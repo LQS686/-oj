@@ -1,0 +1,773 @@
+
+// Prisma Schema for OJ Platform with MongoDB
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// 用户模型
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  username      String    @unique
+  email         String    @unique
+  password      String
+  nickname      String?
+  avatar        String?
+  bio           String?
+  rating        Int       @default(1500)
+  solvedCount   Int       @default(0) // 解题数
+  rank          String    @default("新手")
+  color         String    @default("#808080")
+  isAdmin       Boolean   @default(false)
+  role          String    @default("USER") // ADMIN, TEACHER, USER
+  isSuperAdmin  Boolean   @default(false) // 超级管理员，不可被删除或修改角色
+  isBanned      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // 关系
+  submissions   Submission[]
+  problems      Problem[]
+  contests      Contest[]
+  teams         TeamMember[]
+  posts         Post[]
+  comments      Comment[]
+  postLikes     PostLike[]
+  blogs         Blog[]
+  solutions     Solution[]
+  achievements  UserAchievement[]
+  favorites     Favorite[]
+  teamNotes     TeamNote[]
+  notifications Notification[]
+  
+  // 邀请关系
+  sentDirectInvites     TeamDirectInvite[] @relation("InviterRelation")
+  receivedDirectInvites TeamDirectInvite[] @relation("InviteeRelation")
+  
+  // 申请关系
+  joinRequests          TeamJoinRequest[] @relation("JoinRequestUser")
+  reviewedRequests      TeamJoinRequest[] @relation("JoinRequestReviewer")
+  
+  // 竞赛参与
+  contestParticipations ContestParticipant[]
+  
+  // 头像历史
+  avatarHistory AvatarHistory[]
+
+  // AI生成记录
+  aiGenerations AiGenerationLog[]
+  
+  // AI 偏好
+  aiPreferences UserAiPreference[]
+
+  @@index([rating])
+  @@index([solvedCount])
+  @@index([role])
+}
+
+// 头像历史记录
+model AvatarHistory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  url       String   // 头像URL
+  filename  String?  // 原始文件名
+  size      Int?     // 文件大小
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+}
+
+// 题目模型
+model Problem {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  problemNumber String?     @unique  // 题目编号，如 "P1001"（可为空）
+  title         String
+  description   String
+  input         String
+  output        String
+  samples       Json
+  hint          String?
+  source        String?
+  difficulty    String
+  tags          String[]
+  timeLimit     Int         @default(1000)
+  memoryLimit   Int         @default(128)
+  isPublic      Boolean     @default(false)
+  visibility    String      @default("public") // 'public', 'private', 'contest'
+  totalSubmit   Int         @default(0)
+  totalAccepted Int         @default(0)
+  authorId      String      @db.ObjectId
+  author        User        @relation(fields: [authorId], references: [id])
+  teamId        String?     @db.ObjectId // 关联团队ID (如果是团队私有题目)
+  
+  // AI生成相关字段
+  isAiGenerated Boolean     @default(false)
+  aiStatus      String      @default("MANUAL_CREATED") // MANUAL_CREATED, AI_ASSISTED, AI_GENERATED
+  isVerified    Boolean     @default(true)   // 是否已通过标程验证
+  aiPrompt      String?     // 生成该题目的原始提示词
+  
+  // 标程（用于验证数据）
+  stdCode       String?
+  stdLang       String?
+  
+  verificationLogs VerificationLog[]
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  submissions   Submission[]
+  testCases     TestCase[]
+  solutions     Solution[]
+  contestProblems ContestProblem[]
+  trainingProblems TrainingProblem[]
+  favorites     Favorite[]
+  
+  @@index([isPublic])
+  @@index([difficulty])
+  @@index([visibility])
+  @@index([authorId])
+  @@index([teamId])
+}
+
+// 测试用例
+model TestCase {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  problemId   String   @db.ObjectId
+  problem     Problem  @relation(fields: [problemId], references: [id])
+  input       String
+  output      String
+  isSample    Boolean  @default(false)
+  score       Int      @default(10)
+  orderIndex  Int
+  createdAt   DateTime @default(now())
+}
+
+// 提交记录
+model Submission {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  problemId   String   @db.ObjectId
+  problem     Problem? @relation(fields: [problemId], references: [id])  // ✅ 设置为可选，防止题目被删除导致查询失败
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  contestId   String?  @db.ObjectId
+  contest     Contest? @relation(fields: [contestId], references: [id])
+  language    String
+  code        String
+  status      String
+  score       Int      @default(0)
+  time        Int      @default(0)
+  memory      Int      @default(0)
+  passedTests Int      @default(0)
+  totalTests  Int      @default(0)
+  message     String?
+  testResults Json?
+  assignmentSubmissionId String? @db.ObjectId
+  submittedAt DateTime @default(now())
+  
+  @@index([problemId])
+  @@index([userId])
+  @@index([contestId])
+  @@index([status])
+  @@index([submittedAt])
+  @@index([problemId, userId])
+  @@index([problemId, status])
+  @@index([userId, submittedAt])
+}
+
+// 竞赛模型
+model Contest {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  type        String
+  startTime   DateTime
+  endTime     DateTime
+  duration    Int
+  isPublic    Boolean     @default(false)
+  password    String?
+  authorId    String      @db.ObjectId
+  author      User        @relation(fields: [authorId], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  problems    ContestProblem[]
+  submissions Submission[]
+  participants ContestParticipant[]
+  
+  @@index([isPublic])
+  @@index([startTime])
+  @@index([endTime])
+  @@index([authorId])
+  @@index([type])
+}
+
+// 竞赛题目
+model ContestProblem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  contestId  String   @db.ObjectId
+  contest    Contest  @relation(fields: [contestId], references: [id])
+  problemId  String   @db.ObjectId
+  problem    Problem  @relation(fields: [problemId], references: [id])
+  orderIndex Int
+  score      Int      @default(100)
+}
+
+// 竞赛参与者
+model ContestParticipant {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  contestId String   @db.ObjectId
+  contest   Contest  @relation(fields: [contestId], references: [id])
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  score     Int      @default(0)
+  rank      Int      @default(0)
+  penalty   Int      @default(0)
+  joinedAt  DateTime @default(now())
+
+  @@unique([contestId, userId]) // 确保同一用户在同一竞赛中只有一条参与记录
+}
+
+// 团队
+model Team {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  name        String       @unique
+  description String?
+  avatar      String?
+  isPublic    Boolean      @default(true)
+  maxMembers  Int          @default(50)  // 最大成员数
+  ownerId     String       @db.ObjectId  // 团队创建者
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  members     TeamMember[]
+  assignments TeamAssignment[]
+  notes       TeamNote[]
+  directInvites TeamDirectInvite[]
+}
+
+// 团队成员
+model TeamMember {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId    String   @db.ObjectId
+  team      Team     @relation(fields: [teamId], references: [id])
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  role      String   // owner, admin, member
+  remark    String?  // 成员备注
+  
+  // ✅ 细粒度权限控制
+  permissions Json?    @default("{\"canViewProblems\":true,\"canSubmit\":true,\"canViewNotes\":true,\"canCreateNotes\":false,\"canManageAssignments\":false,\"canInviteMembers\":false}")
+  
+  // 活动统计
+  lastActiveAt DateTime? // 最后活动时间
+  joinedAt     DateTime  @default(now())
+  
+  @@unique([teamId, userId])  // 确保用户在团队中唯一
+  @@index([teamId, role])     // 优化按角色查询
+  @@index([teamId, lastActiveAt]) // 优化按活动度查询
+}
+
+
+
+// 团队作业
+model TeamAssignment {
+  id          String                    @id @default(auto()) @map("_id") @db.ObjectId
+  teamId      String                    @db.ObjectId
+  team        Team                      @relation(fields: [teamId], references: [id])
+  title       String
+  description String
+  problemIds  String[]  @db.ObjectId  // 引用平台公开题库的题目ID列表
+  startTime   DateTime?
+  endTime     DateTime?
+  createdBy   String                    @db.ObjectId
+  createdAt   DateTime                  @default(now())
+  
+  submissions TeamAssignmentSubmission[]
+}
+
+// 团队作业提交记录
+model TeamAssignmentSubmission {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId    String          @db.ObjectId
+  assignment      TeamAssignment  @relation(fields: [assignmentId], references: [id])
+  userId          String          @db.ObjectId
+  problemId       String          @db.ObjectId
+  
+  // 提交内容
+  code            String          // 提交的代码
+  language        String          // 编程语言
+  
+  // 评测结果
+  status          String          // AC, WA, TLE, MLE, RE, CE, SE 等
+  score           Int             @default(0)  // 得分
+  time            Int             @default(0)  // 执行时间（ms）
+  memory          Int             @default(0)  // 内存使用（KB）
+  passedTests     Int             @default(0)  // 通过的测试点数
+  totalTests      Int             @default(0)  // 总测试点数
+  message         String?         // 错误信息或编译信息
+  
+  // 提交时间信息
+  submittedAt     DateTime        @default(now())
+  isLate          Boolean         @default(false)  // 是否逾期提交
+  
+  // ✅ 删除唯一索引，允许多次提交
+  // @@unique([assignmentId, userId, problemId])  // 已注释：允许同一用户对同一题目多次提交
+  @@index([assignmentId, userId])  // 优化按作业和用户查询
+  @@index([assignmentId, problemId])  // 优化按作业和题目查询
+  @@index([assignmentId, userId, problemId, submittedAt])  // 优化查询最新提交
+}
+
+// 团队笔记
+model TeamNote {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId      String   @db.ObjectId
+  team        Team     @relation(fields: [teamId], references: [id])
+  title       String
+  content     String
+  category    String   // 笔记分类
+  tags        String[]
+  authorId    String   @db.ObjectId
+  author      User     @relation(fields: [authorId], references: [id])
+  isPublic    Boolean  @default(true)  // 是否对团队成员公开
+  views       Int      @default(0)
+  likes       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ✅ 团队邀请码
+model TeamInvite {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId      String   @db.ObjectId
+  code        String   @unique  // 邀请码（唯一）
+  createdBy   String   @db.ObjectId  // 创建者
+  maxUses     Int      @default(1)  // 最大使用次数（-1表示无限）
+  usedCount   Int      @default(0)  // 已使用次数
+  expiresAt   DateTime?  // 过期时间（可选）
+  createdAt   DateTime @default(now())
+  
+  @@index([teamId])
+}
+
+// ✅ 团队直接邀请（通过用户名邀请）
+model TeamDirectInvite {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId        String   @db.ObjectId
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  inviterId     String   @db.ObjectId  // 邀请人ID
+  inviter       User     @relation("InviterRelation", fields: [inviterId], references: [id])
+  inviteeId     String   @db.ObjectId  // 被邀请人ID
+  invitee       User     @relation("InviteeRelation", fields: [inviteeId], references: [id])
+  status        String   @default("pending")  // pending | accepted | rejected | expired
+  message       String?  // 邀请留言
+  expiresAt     DateTime?  // 过期时间
+  respondedAt   DateTime?  // 响应时间
+  createdAt     DateTime @default(now())
+  
+  @@index([teamId])
+  @@index([inviteeId])
+  @@index([inviterId])
+  @@unique([teamId, inviteeId])  // 同一团队只能向同一用户发送一次邀请
+}
+
+// ✅ 团队加入申请
+model TeamJoinRequest {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId      String   @db.ObjectId
+  userId      String   @db.ObjectId  // 申请人ID
+  user        User     @relation("JoinRequestUser", fields: [userId], references: [id])
+  status      String   @default("pending")  // pending | approved | rejected
+  message     String?  // 申请留言
+  reviewerId  String?  @db.ObjectId  // 审批人ID
+  reviewer    User?    @relation("JoinRequestReviewer", fields: [reviewerId], references: [id])
+  reviewedAt  DateTime?  // 审批时间
+  createdAt   DateTime @default(now())
+  
+  @@index([teamId])
+  @@index([userId])
+  @@unique([teamId, userId])  // 同一用户只能向同一团队发送一次申请
+}
+
+// 讨论帖子
+model Post {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  content   String
+  authorId  String    @db.ObjectId
+  author    User      @relation(fields: [authorId], references: [id])
+  
+  // 分类关联
+  categoryId String?   @db.ObjectId
+  category   Category? @relation(fields: [categoryId], references: [id])
+  
+  // 保留 type 字段以兼容旧数据，或者作为备用
+  type      String?
+  
+  tags      String[]
+  views     Int       @default(0)
+  likes     Int       @default(0) // 缓存点赞数
+  
+  isPinned  Boolean   @default(false)
+  isLocked  Boolean   @default(false)
+  isDeleted Boolean   @default(false) // 逻辑删除
+  status    String    @default("published") // published, draft, reviewing
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  comments  Comment[]
+  postLikes PostLike[]
+}
+
+// 评论
+model Comment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  postId    String?  @db.ObjectId
+  post      Post?    @relation(fields: [postId], references: [id])
+  solutionId String? @db.ObjectId
+  solution  Solution? @relation(fields: [solutionId], references: [id])
+  authorId  String   @db.ObjectId
+  author    User     @relation(fields: [authorId], references: [id])
+  likes     Int      @default(0)
+  
+  // 嵌套评论
+  parentId  String?  @db.ObjectId
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   Comment[] @relation("CommentReplies")
+  
+  isDeleted Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 帖子分类
+model Category {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  posts       Post[]
+}
+
+// 帖子点赞记录
+model PostLike {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  postId    String   @db.ObjectId
+  post      Post     @relation(fields: [postId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+// 题解
+model Solution {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  problemId  String    @db.ObjectId
+  problem    Problem   @relation(fields: [problemId], references: [id])
+  authorId   String    @db.ObjectId
+  author     User      @relation(fields: [authorId], references: [id])
+  title      String
+  content    String
+  language   String?
+  code       String?
+  views      Int       @default(0)
+  likes      Int       @default(0)
+  isOfficial Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  
+  comments   Comment[]
+}
+
+// 博客
+model Blog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  content   String
+  authorId  String   @db.ObjectId
+  author    User     @relation(fields: [authorId], references: [id])
+  tags      String[]
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 训练计划
+model Training {
+  id          String            @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  difficulty  String
+  isPublic    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  
+  problems    TrainingProblem[]
+}
+
+// 训练题目
+model TrainingProblem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  trainingId String   @db.ObjectId
+  training   Training @relation(fields: [trainingId], references: [id])
+  problemId  String   @db.ObjectId
+  problem    Problem  @relation(fields: [problemId], references: [id])
+  orderIndex Int
+}
+
+// 成就
+model Achievement {
+  id          String            @id @default(auto()) @map("_id") @db.ObjectId
+  name        String            @unique
+  description String
+  icon        String
+  condition   String
+  
+  users       UserAchievement[]
+}
+
+// 用户成就
+model UserAchievement {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String      @db.ObjectId
+  user          User        @relation(fields: [userId], references: [id])
+  achievementId String      @db.ObjectId
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  earnedAt      DateTime    @default(now())
+}
+
+// 收藏
+model Favorite {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  problemId String   @db.ObjectId
+  problem   Problem  @relation(fields: [problemId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// 通知
+model Notification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  title     String
+  content   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// 笔记阅读历史
+model NoteReadHistory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId    String   @db.ObjectId
+  noteId    String   @db.ObjectId
+  userId    String   @db.ObjectId
+  readAt    DateTime @default(now())
+
+  @@unique([userId, noteId])
+}
+
+// 积分账户
+model PointsAccount {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId    String   @db.ObjectId
+  userId    String   @db.ObjectId
+  balance   Int      @default(0)
+  total     Int      @default(0) // 累计获得积分
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamId, userId])
+}
+
+// 积分历史
+model PointsHistory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId      String   @db.ObjectId
+  userId      String   @db.ObjectId
+  amount      Int
+  action      String   // EARN, SPEND
+  reason      String
+  type        String   // ASSIGNMENT_COMPLETION, NOTE_READ, CLASS_PERFORMANCE, SHOP_EXCHANGE
+  relatedId   String?  // 关联ID (assignmentId_problemId, noteId, etc)
+  createdAt   DateTime @default(now())
+  
+  @@index([teamId, userId])
+}
+
+// 审计日志
+model AuditLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String?  @db.ObjectId // 可为空（未登录用户）
+  action      String   // 例如: "ACCESS_DENIED", "LOGIN_FAILED"
+  resource    String   // 例如: "/api/contests/123/problems"
+  details     Json?    // 详细信息
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+}
+
+// 积分商城商品
+model PointsShopItem {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId          String   @db.ObjectId
+  name            String
+  description     String
+  category        String
+  pointsRequired  Int
+  stock           Int      @default(0)
+  isUnlimited     Boolean  @default(false)
+  imageUrl        String?
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([teamId, category])
+}
+
+// 积分兑换记录
+model PointsExchange {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  teamId          String   @db.ObjectId
+  userId          String   @db.ObjectId
+  itemId          String   @db.ObjectId
+  itemName        String
+  pointsSpent     Int
+  quantity        Int      @default(1)
+  status          String   // PENDING, PROCESSING, COMPLETED, CANCELLED
+  deliveryInfo    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([teamId, userId])
+}
+
+// AI出题记录
+model AiGenerationLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  status      String   // PENDING, COMPLETED, FAILED
+  params      Json     // 请求参数：类型、难度、知识点等
+  result      Json?    // 生成的题目数据（数组）
+  error       String?  // 错误信息
+  tokensUsed  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// AI模型配置 (Deprecated: Use AiProvider and AiModel instead)
+model AiModelConfig {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String?  @db.ObjectId // 关联用户，为空则为全局配置
+  scope             String   @default("GLOBAL") // GLOBAL, USER
+  
+  // 生成模型配置
+  provider          String   // openai, deepseek, anthropic, google, custom
+  model             String   // e.g. gpt-4, deepseek-chat
+  apiKey            String   // Encrypted
+  baseUrl           String?  // Optional custom base URL
+  
+  // 思考模型配置
+  enableThinking    Boolean  @default(false)
+  thinkingProvider  String?
+  thinkingModel     String?
+  thinkingApiKey    String?  // Encrypted
+  thinkingBaseUrl   String?
+  thinkingLevel     Int      @default(3) // 1-5
+  
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([scope])
+}
+
+// ✅ NEW: AI Provider Configuration
+model AiProvider {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  name        String    // e.g. "DeepSeek"
+  slug        String    @unique // e.g. "deepseek"
+  baseUrl     String?
+  apiKey      String?   // Encrypted. Optional (some providers might be public or authless?)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  models      AiModel[]
+}
+
+// ✅ NEW: AI Model Definition
+model AiModel {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  name        String     // Display name e.g. "DeepSeek Chat V3"
+  model       String     // API model string e.g. "deepseek-chat"
+  providerId  String     @db.ObjectId
+  provider    AiProvider @relation(fields: [providerId], references: [id])
+  type        String     // "generation", "thinking"
+  
+  // Configs
+  maxTokens   Int        @default(2048)
+  temperature Float      @default(0.7)
+  timeout     Int        @default(60000) // ms
+  
+  isActive    Boolean    @default(true)
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  preferences UserAiPreference[]
+}
+
+// ✅ NEW: User AI Preferences
+model UserAiPreference {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  modelId     String   @db.ObjectId
+  model       AiModel  @relation(fields: [modelId], references: [id])
+  
+  count       Int      @default(1)
+  lastUsed    DateTime @default(now())
+  isDefault   Boolean  @default(false)
+  
+  @@unique([userId, modelId])
+  @@index([userId, lastUsed])
+}
+
+model VerificationLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  problemId String   @db.ObjectId
+  problem   Problem  @relation(fields: [problemId], references: [id])
+  operatorId String  @db.ObjectId // 操作人ID
+  status    String   // SUCCESS, FAILED
+  details   Json     // 详细报告：执行时间、修正数量、错误信息等
+  createdAt DateTime @default(now())
+}
+
+model SystemConfig {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}

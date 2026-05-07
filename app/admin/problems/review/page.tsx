@@ -1,0 +1,710 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import AdminLayout from '@/components/AdminLayout'
+import { fetchWithAuth } from '@/lib/api/base'
+import {
+  Clock, CheckCircle, XCircle, AlertCircle, Play, Edit, Save, 
+  ArrowLeft, FileText, Code, Database, ChevronLeft, ChevronRight,
+  Loader2, Eye, EyeOff, Send, RefreshCw
+} from 'lucide-react'
+import Link from 'next/link'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { DIFFICULTIES, DIFFICULTY_COLORS } from '@/lib/constants'
+
+interface TestCase {
+  id: string
+  input: string
+  output: string
+  isSample: boolean
+  score: number
+  orderIndex: number
+}
+
+interface Problem {
+  id: string
+  problemNumber: string | null
+  title: string
+  description: string
+  input: string
+  output: string
+  samples: any[]
+  hint: string | null
+  difficulty: string
+  tags: string[]
+  timeLimit: number
+  memoryLimit: number
+  isPublic: boolean
+  visibility: string
+  isAiGenerated: boolean
+  aiStatus: string
+  isVerified: boolean
+  stdCode: string | null
+  stdLang: string | null
+  testCases: TestCase[]
+  createdAt: string
+}
+
+export default function ProblemReviewPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [problems, setProblems] = useState<Problem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [verifying, setVerifying] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  
+  const [editMode, setEditMode] = useState(false)
+  const [editedProblem, setEditedProblem] = useState<Problem | null>(null)
+  const [editedTestCases, setEditedTestCases] = useState<TestCase[]>([])
+  
+  const [solutionCode, setSolutionCode] = useState('')
+  const [solutionLanguage, setSolutionLanguage] = useState('cpp')
+  const [verifyResults, setVerifyResults] = useState<any>(null)
+
+  useEffect(() => {
+    fetchProblems()
+  }, [])
+
+  useEffect(() => {
+    if (problems.length > 0 && searchParams.get('id')) {
+      const idx = problems.findIndex(p => p.id === searchParams.get('id'))
+      if (idx >= 0) setSelectedIndex(idx)
+    }
+  }, [problems, searchParams])
+
+  useEffect(() => {
+    setSolutionCode('')
+    setSolutionLanguage('cpp')
+    setVerifyResults(null)
+    setError('')
+    setSuccess('')
+    setEditMode(false)
+    setEditedProblem(null)
+    setEditedTestCases([])
+  }, [selectedIndex])
+
+  const fetchProblems = async () => {
+    try {
+      const response = await fetchWithAuth('/api/admin/problems/review')
+      const data = await response.json()
+      if (data.success) {
+        setProblems(data.data || [])
+      }
+    } catch (err) {
+      setError('获取题目列表失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const currentProblem = problems[selectedIndex]
+
+  const handleVerify = async () => {
+    if (!currentProblem || !solutionCode.trim()) {
+      setError('请输入标程代码')
+      return
+    }
+
+    setVerifying(true)
+    setError('')
+    setVerifyResults(null)
+
+    try {
+      const response = await fetchWithAuth(`/api/admin/problems/${currentProblem.id}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          solutionCode,
+          solutionLanguage
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setSuccess(data.message)
+        setVerifyResults(data.data)
+        fetchProblems()
+      } else {
+        setError(data.error || '验证失败')
+        setVerifyResults(data.data)
+      }
+    } catch (err) {
+      setError('网络错误')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  const handleApprove = async () => {
+    if (!currentProblem) return
+
+    setSaving(true)
+    setError('')
+
+    try {
+      const response = await fetchWithAuth(`/api/admin/problems/${currentProblem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visibility: 'public',
+          isVerified: true
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setSuccess('题目已审核通过并公开')
+        fetchProblems()
+      } else {
+        setError(data.error || '审核失败')
+      }
+    } catch (err) {
+      setError('网络错误')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!currentProblem) return
+    if (!confirm('确定要拒绝这道题目吗？题目将被删除。')) return
+
+    setSaving(true)
+    setError('')
+
+    try {
+      const response = await fetchWithAuth(`/api/admin/problems/${currentProblem.id}`, {
+        method: 'DELETE'
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setSuccess('题目已拒绝并删除')
+        setSelectedIndex(Math.max(0, selectedIndex - 1))
+        fetchProblems()
+      } else {
+        setError(data.error || '操作失败')
+      }
+    } catch (err) {
+      setError('网络错误')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editedProblem) return
+
+    setSaving(true)
+    setError('')
+
+    try {
+      const response = await fetchWithAuth(`/api/admin/problems/${editedProblem.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editedProblem.title,
+          description: editedProblem.description,
+          input: editedProblem.input,
+          output: editedProblem.output,
+          hint: editedProblem.hint,
+          difficulty: editedProblem.difficulty,
+          tags: editedProblem.tags,
+          timeLimit: editedProblem.timeLimit,
+          memoryLimit: editedProblem.memoryLimit,
+          testCases: editedTestCases
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setSuccess('题目已保存')
+        setEditMode(false)
+        fetchProblems()
+      } else {
+        setError(data.error || '保存失败')
+      }
+    } catch (err) {
+      setError('网络错误')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const startEdit = () => {
+    if (!currentProblem) return
+    setEditedProblem({ ...currentProblem })
+    setEditedTestCases([...currentProblem.testCases])
+    setEditMode(true)
+  }
+
+  const cancelEdit = () => {
+    setEditMode(false)
+    setEditedProblem(null)
+    setEditedTestCases([])
+  }
+
+  const getDifficultyColor = (diff: string) => {
+    const color = DIFFICULTY_COLORS[diff]
+    if (color) {
+      const [textColor, bgColor] = color.split(' ')
+      return `${bgColor} ${textColor}`
+    }
+    return 'bg-muted/500/20 text-slate-400'
+  }
+
+  const getStatusBadge = (problem: Problem) => {
+    if (problem.isVerified && problem.visibility === 'public') {
+      return <span className="px-2 py-1 rounded text-xs bg-secondary/100/20 text-green-400">已通过</span>
+    }
+    if (problem.isVerified) {
+      return <span className="px-2 py-1 rounded text-xs bg-blue-500/20 text-blue-400">已验证</span>
+    }
+    return <span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-accent-light">待验证</span>
+  }
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-400">加载中...</p>
+          </div>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  if (problems.length === 0) {
+    return (
+      <AdminLayout>
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/20">
+              <CheckCircle className="w-5 h-5 text-primary-light" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">题目审核</h1>
+              <p className="text-sm text-slate-400">审核AI生成的题目</p>
+            </div>
+          </div>
+
+          <div className="card p-12 text-center">
+            <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400 opacity-50" />
+            <p className="text-lg text-slate-300">暂无待审核题目</p>
+            <p className="text-sm text-muted-foreground mt-2">所有AI生成的题目都已审核完成</p>
+          </div>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        {error && (
+          <div className="bg-error/100/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-secondary/100/20 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg">
+            {success}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/20">
+              <CheckCircle className="w-5 h-5 text-primary-light" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">题目审核</h1>
+              <p className="text-sm text-slate-400">审核AI生成的题目 ({problems.length} 道待审核)</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedIndex(Math.max(0, selectedIndex - 1))}
+              disabled={selectedIndex === 0}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm text-slate-400">
+              {selectedIndex + 1} / {problems.length}
+            </span>
+            <button
+              onClick={() => setSelectedIndex(Math.min(problems.length - 1, selectedIndex + 1))}
+              disabled={selectedIndex === problems.length - 1}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-primary-light" />
+                  <h2 className="text-lg font-bold text-white">题目信息</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  {getStatusBadge(currentProblem)}
+                  {!editMode && (
+                    <button
+                      onClick={startEdit}
+                      className="btn btn-ghost text-sm flex items-center gap-1"
+                    >
+                      <Edit className="w-4 h-4" />
+                      编辑
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {editMode && editedProblem ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">题目名称</label>
+                    <input
+                      type="text"
+                      value={editedProblem.title}
+                      onChange={(e) => setEditedProblem({ ...editedProblem, title: e.target.value })}
+                      className="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">题目描述</label>
+                    <textarea
+                      value={editedProblem.description}
+                      onChange={(e) => setEditedProblem({ ...editedProblem, description: e.target.value })}
+                      className="input min-h-[200px]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">输入格式</label>
+                      <textarea
+                        value={editedProblem.input}
+                        onChange={(e) => setEditedProblem({ ...editedProblem, input: e.target.value })}
+                        className="input min-h-[100px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">输出格式</label>
+                      <textarea
+                        value={editedProblem.output}
+                        onChange={(e) => setEditedProblem({ ...editedProblem, output: e.target.value })}
+                        className="input min-h-[100px]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">提示</label>
+                    <textarea
+                      value={editedProblem.hint || ''}
+                      onChange={(e) => setEditedProblem({ ...editedProblem, hint: e.target.value })}
+                      className="input"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">难度</label>
+                      <select
+                        value={editedProblem.difficulty}
+                        onChange={(e) => setEditedProblem({ ...editedProblem, difficulty: e.target.value })}
+                        className="input"
+                      >
+                        {DIFFICULTIES.map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">时间限制</label>
+                      <input
+                        type="number"
+                        value={editedProblem.timeLimit}
+                        onChange={(e) => setEditedProblem({ ...editedProblem, timeLimit: parseInt(e.target.value) })}
+                        className="input"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">内存</label>
+                      <input
+                        type="number"
+                        value={editedProblem.memoryLimit}
+                        onChange={(e) => setEditedProblem({ ...editedProblem, memoryLimit: parseInt(e.target.value) })}
+                        className="input"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">标签</label>
+                      <input
+                        type="text"
+                        value={editedProblem.tags.join(', ')}
+                        onChange={(e) => setEditedProblem({ ...editedProblem, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
+                        className="input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+                    <button onClick={cancelEdit} className="btn btn-ghost">取消</button>
+                    <button onClick={handleSaveEdit} disabled={saving} className="btn btn-primary flex items-center gap-2">
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      保存
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-2">{currentProblem.title}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`px-2 py-1 rounded text-xs ${getDifficultyColor(currentProblem.difficulty)}`}>
+                        {currentProblem.difficulty}
+                      </span>
+                      {currentProblem.tags.map((tag, idx) => (
+                        <span key={idx} className="px-2 py-1 rounded text-xs bg-white/10 text-slate-400">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="prose prose-invert prose-slate max-w-none">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        code({ node, inline, className, children, ...props }: any) {
+                          const match = /language-(\w+)/.exec(className || '')
+                          return !inline && match ? (
+                            <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                              {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                          ) : (
+                            <code className="bg-slate-700 px-1.5 py-0.5 rounded text-pink-400" {...props}>{children}</code>
+                          )
+                        }
+                      }}
+                    >
+                      {currentProblem.description}
+                    </ReactMarkdown>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 rounded-lg bg-white/5">
+                      <h4 className="text-sm font-medium text-slate-400 mb-2">输入格式</h4>
+                      <p className="text-slate-300 text-sm whitespace-pre-wrap">{currentProblem.input}</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-white/5">
+                      <h4 className="text-sm font-medium text-slate-400 mb-2">输出格式</h4>
+                      <p className="text-slate-300 text-sm whitespace-pre-wrap">{currentProblem.output}</p>
+                    </div>
+                  </div>
+
+                  {currentProblem.hint && (
+                    <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                      <h4 className="text-sm font-medium text-accent-light mb-2">提示</h4>
+                      <p className="text-slate-300 text-sm">{currentProblem.hint}</p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span>时间限制: {currentProblem.timeLimit}ms</span>
+                    <span>内存限制: {currentProblem.memoryLimit}MB</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="card p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Database className="w-5 h-5 text-primary-light" />
+                <h2 className="text-lg font-bold text-white">测试用例 ({currentProblem.testCases.length})</h2>
+              </div>
+
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {currentProblem.testCases.map((tc, idx) => (
+                  <div key={tc.id} className="p-3 rounded-lg bg-white/5 border border-white/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-slate-300">
+                        #{idx + 1} {tc.isSample ? '(样例)' : '(隐藏)'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{tc.score}分</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">输入</p>
+                        <pre className="text-xs text-slate-300 bg-slate-800/50 p-2 rounded overflow-x-auto max-h-24 overflow-y-auto">
+                          {tc.input}
+                        </pre>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">输出</p>
+                        <pre className="text-xs text-slate-300 bg-slate-800/50 p-2 rounded overflow-x-auto max-h-24 overflow-y-auto">
+                          {tc.output}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="card p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Code className="w-5 h-5 text-primary-light" />
+                <h2 className="text-lg font-bold text-white">标程验证</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">编程语言</label>
+                  <select
+                    value={solutionLanguage}
+                    onChange={(e) => setSolutionLanguage(e.target.value)}
+                    className="input"
+                  >
+                    <option value="cpp">C++</option>
+                    <option value="c">C</option>
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">标程代码</label>
+                  <textarea
+                    value={solutionCode}
+                    onChange={(e) => setSolutionCode(e.target.value)}
+                    placeholder="粘贴标程代码..."
+                    className="input font-mono text-sm min-h-[300px]"
+                  />
+                </div>
+
+                {currentProblem.stdCode && (
+                  <button
+                    onClick={() => {
+                      setSolutionCode(currentProblem.stdCode || '')
+                      setSolutionLanguage(currentProblem.stdLang || 'cpp')
+                    }}
+                    className="text-sm text-primary-light hover:text-white"
+                  >
+                    加载已保存的标程
+                  </button>
+                )}
+
+                <button
+                  onClick={handleVerify}
+                  disabled={verifying || !solutionCode.trim()}
+                  className="btn btn-primary w-full flex items-center justify-center gap-2"
+                >
+                  {verifying ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      验证中...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      运行验证
+                    </>
+                  )}
+                </button>
+
+                {verifyResults && (
+                  <div className="p-3 rounded-lg bg-white/5">
+                    <h4 className="text-sm font-medium text-slate-300 mb-2">验证结果</h4>
+                    <div className="space-y-1">
+                      {verifyResults.results?.map((r: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400">测试点 #{idx + 1}</span>
+                          <span className={r.status === 'OK' ? 'text-green-400' : 'text-red-400'}>
+                            {r.status} {r.time ? `(${r.time}ms)` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="card p-6">
+              <h2 className="text-lg font-bold text-white mb-4">审核操作</h2>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleApprove}
+                  disabled={saving || !currentProblem.isVerified}
+                  className="btn w-full bg-secondary/100/20 hover:bg-secondary/100/30 text-green-400 border border-green-500/30 flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  审核通过并公开
+                </button>
+
+                {!currentProblem.isVerified && (
+                  <p className="text-xs text-accent-light text-center">
+                    请先验证标程后再审核通过
+                  </p>
+                )}
+
+                <button
+                  onClick={handleReject}
+                  disabled={saving}
+                  className="btn w-full bg-error/100/20 hover:bg-error/100/30 text-red-400 border border-red-500/30 flex items-center justify-center gap-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  拒绝并删除
+                </button>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <Link
+                  href={`/admin/problems/${currentProblem.id}/edit`}
+                  className="btn btn-ghost w-full flex items-center justify-center gap-2"
+                >
+                  <Edit className="w-4 h-4" />
+                  完整编辑
+                </Link>
+              </div>
+            </div>
+
+            <div className="card p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                创建时间: {new Date(currentProblem.createdAt).toLocaleString('zh-CN')}
+              </div>
+              {currentProblem.isAiGenerated && (
+                <div className="flex items-center gap-2 text-xs text-purple-400 mt-2">
+                  <AlertCircle className="w-4 h-4" />
+                  AI生成题目
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
+  )
+}

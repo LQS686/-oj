@@ -1,0 +1,263 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getUserFromRequest } from '@/lib/auth'
+import { createNotifications } from '@/lib/notifications'
+
+interface RouteContext {
+  params: Promise<{ id: string }>
+}
+
+// 辅助函数：验证 MongoDB ObjectId
+function isValidObjectId(id: string) {
+  return /^[0-9a-fA-F]{24}$/.test(id)
+}
+
+// 创建加入申请
+export async function POST(request: NextRequest, { params }: RouteContext) {
+  try {
+    const { id: teamId } = await params
+    const user = getUserFromRequest(request)
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: '未授权' },
+        { status: 401 }
+      )
+    }
+
+    if (!isValidObjectId(teamId)) {
+      return NextResponse.json(
+        { success: false, error: '无效的团队ID' },
+        { status: 400 }
+      )
+    }
+
+    const currentUserId = user.userId
+    const body = await request.json()
+    const { message } = body
+
+    // 检查团队是否存在
+    const team = await prisma.team.findUnique({
+      where: { id: teamId }
+    })
+
+    if (!team) {
+      return NextResponse.json(
+        { success: false, error: '团队不存在' },
+        { status: 404 }
+      )
+    }
+
+    // 检查用户是否已是团队成员
+    const existingMember = await prisma.teamMember.findUnique({
+      where: {
+        teamId_userId: {
+          teamId,
+          userId: currentUserId
+        }
+      }
+    })
+
+    if (existingMember) {
+      return NextResponse.json(
+        { success: false, error: '您已是团队成员' },
+        { status: 400 }
+      )
+    }
+
+    // 检查是否已有申请记录(任何状态)
+    const existingRequest = await prisma.teamJoinRequest.findUnique({
+      where: {
+        teamId_userId: {
+          teamId,
+          userId: currentUserId
+        }
+      }
+    })
+
+    let requestId
+
+    if (existingRequest) {
+      // 如果已有待处理的申请,不允许重复提交
+      if (existingRequest.status === 'pending') {
+        return NextResponse.json(
+          { success: false, error: '您已提交过申请，请等待审批' },
+          { status: 400 }
+        )
+      }
+
+      // 如果之前的申请已被处理(approved/rejected),更新为新的pending状态
+      const updatedRequest = await prisma.teamJoinRequest.update({
+        where: { id: existingRequest.id },
+        data: {
+          status: 'pending',
+          message: message || null,
+          reviewerId: null,
+          reviewedAt: null,
+          createdAt: new Date()
+        }
+      })
+      requestId = updatedRequest.id
+    } else {
+      // 创建新的加入申请
+      const newRequest = await prisma.teamJoinRequest.create({
+        data: {
+          teamId,
+          userId: currentUserId,
+          status: 'pending',
+          message: message || null,
+        }
+      })
+      requestId = newRequest.id
+    }
+
+    // 获取申请人信息
+    const applicantUser = await prisma.user.findUnique({
+      where: { id: currentUserId }
+    })
+
+    // 通知团队所有者和管理员
+    const adminMembers = await prisma.teamMember.findMany({
+      where: {
+        teamId,
+        role: { in: ['owner', 'admin'] }
+      }
+    })
+
+    const notifications = adminMembers.map(member => ({
+      userId: member.userId,
+      type: 'team_join_request',
+      title: '团队加入申请',
+      content: `${applicantUser?.nickname || applicantUser?.username} 申请加入团队 "${team.name}"`,
+      link: `/teams/${teamId}/requests`
+    }))
+
+    if (notifications.length > 0) {
+      await createNotifications(notifications)
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        requestId
+      }
+    })
+
+  } catch (error: any) {
+    console.error('创建加入申请失败:', error)
+    return NextResponse.json(
+      { success: false, error: error.message || '创建申请失败' },
+      { status: 500 }
+    )
+  }
+}
+
+// 获取加入申请列表
+export async function GET(request: NextRequest, { params }: RouteContext) {
+  try {
+    const { id: teamId } = await params
+    const user = getUserFromRequest(request)
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: '未授权' },
+        { status: 401 }
+      )
+    }
+
+    if (!isValidObjectId(teamId)) {
+      return NextResponse.json(
+        { success: false, error: '无效的团队ID' },
+        { status: 400 }
+      )
+    }
+
+    const currentUserId = user.userId
+
+    // 验证当前用户是否是团队管理员
+    const currentMember = await prisma.teamMember.findUnique({
+      where: {
+        teamId_userId: {
+          teamId,
+          userId: currentUserId
+        }
+      }
+    })
+
+    if (!currentMember) {
+      return NextResponse.json(
+        { success: false, error: '您不是团队成员' },
+        { status: 403 }
+      )
+    }
+
+    const isAdmin = ['owner', 'admin'].includes(currentMember.role)
+
+    if (!isAdmin) {
+      return NextResponse.json(
+        { success: false, error: '只有管理员可以查看申请列表' },
+        { status: 403 }
+      )
+    }
+
+    // 获取加入申请列表
+    const requests = await prisma.teamJoinRequest.findMany({
+      where: { teamId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            nickname: true,
+            avatar: true
+          }
+        },
+        reviewer: {
+          select: {
+            id: true,
+            username: true,
+            nickname: true,
+            avatar: true
+          }
+        }
+      }
+    })
+
+    // 组装数据
+    const requestsWithUsers = requests.map(request => {
+      return {
+        id: request.id,
+        teamId: request.teamId,
+        applicant: {
+          id: request.user.id,
+          username: request.user.username,
+          nickname: request.user.nickname,
+          avatar: request.user.avatar
+        },
+        reviewer: request.reviewer ? {
+          id: request.reviewer.id,
+          username: request.reviewer.username,
+          nickname: request.reviewer.nickname,
+          avatar: request.reviewer.avatar
+        } : null,
+        status: request.status,
+        message: request.message,
+        reviewedAt: request.reviewedAt?.toISOString(),
+        createdAt: request.createdAt.toISOString()
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: requestsWithUsers
+    })
+
+  } catch (error: any) {
+    console.error('获取加入申请列表失败:', error)
+    return NextResponse.json(
+      { success: false, error: error.message || '获取申请列表失败' },
+      { status: 500 }
+    )
+  }
+}

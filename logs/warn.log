@@ -1,0 +1,8 @@
+{"timestamp":"2026-04-10T12:55:28.184Z","level":"warn","message":"登录尝试缺少字段","meta":{"input":{"password":"admin123"}}}
+{"timestamp":"2026-04-10T12:55:59.872Z","level":"warn","message":"数据库连接失败，使用模拟数据","meta":{"code":"P2010","meta":{"modelName":"Problem","code":"unknown","message":"Kind: Server selection timeout: No available servers. Topology: { Type: Unknown, Servers: [ { Address: localhost:27017, Type: Unknown, Error: Kind: I/O error: Connection refused (os error 111), labels: {} } ] }, labels: {}"},"clientVersion":"6.17.1","name":"PrismaClientKnownRequestError"}}
+{"timestamp":"2026-05-07T07:41:35.535Z","level":"warn","message":"逾期提交，分数设置为0","meta":{"assignmentSubmissionId":"69fc42263f3989aec4a17b73"}}
+{"timestamp":"2026-05-07T12:13:19.717Z","level":"warn","message":"编译失败"}
+{"timestamp":"2026-05-07T12:15:09.027Z","level":"warn","message":"编译失败"}
+{"timestamp":"2026-05-07T12:15:20.668Z","level":"warn","message":"编译失败"}
+{"timestamp":"2026-05-07T12:16:07.680Z","level":"warn","message":"编译失败"}
+{"timestamp":"2026-05-07T12:16:14.354Z","level":"warn","message":"编译失败"}
