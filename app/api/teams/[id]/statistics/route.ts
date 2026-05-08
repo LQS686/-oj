@@ -175,6 +175,21 @@ export async function GET(
       })
     ])
 
+    const userMap = new Map<string, { nickname: string | null; username: string; avatar: string | null }>()
+    const problemMap = new Map<string, string>()
+    if (recentSubmissions.length > 0) {
+      const userIds = [...new Set(recentSubmissions.map(s => s.userId))]
+      const problemIds = [...new Set(recentSubmissions.map(s => s.problemId).filter(Boolean))]
+      const [users, problems] = await Promise.all(
+        userIds.length > 0 ? [
+          prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, nickname: true, username: true, avatar: true } }),
+          problemIds.length > 0 ? prisma.problem.findMany({ where: { id: { in: problemIds } }, select: { id: true, title: true } }) : Promise.resolve([])
+        ] : [Promise.resolve([]), Promise.resolve([])]
+      )
+      users.forEach(u => userMap.set(u.id, u))
+      problems.forEach(p => problemMap.set(p.id, p.title))
+    }
+
     const roleBreakdown: Record<string, number> = {}
     for (const role of roleCounts) {
       roleBreakdown[role.role] = role._count
@@ -205,16 +220,22 @@ export async function GET(
           overdue: assignmentStats.overdue,
           completed: assignmentStats.completed
         },
-        recentActivity: recentSubmissions.map(sub => ({
-          id: sub.id,
-          userId: sub.userId,
-          problemId: sub.problemId,
-          assignmentId: sub.assignmentId,
-          status: sub.status,
-          score: sub.score,
-          language: sub.language,
-          submittedAt: sub.submittedAt
-        }))
+        recentActivity: recentSubmissions.map(sub => {
+          const u = userMap.get(sub.userId)
+          return {
+            id: sub.id,
+            userId: sub.userId,
+            username: u?.nickname || u?.username || '未知用户',
+            avatar: u?.avatar || null,
+            problemId: sub.problemId,
+            problemTitle: problemMap.get(sub.problemId) || '未知题目',
+            assignmentId: sub.assignmentId,
+            status: sub.status,
+            score: sub.score,
+            language: sub.language,
+            submittedAt: sub.submittedAt
+          }
+        })
       }
     })
   } catch (error) {
