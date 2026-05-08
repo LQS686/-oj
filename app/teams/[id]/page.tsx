@@ -259,7 +259,7 @@ export default function TeamDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <div className="container mx-auto px-4 sm:px-6 py-6">
         <div className="bg-white dark:bg-card rounded-xl border border-border shadow-sm overflow-hidden mb-4">
           <div className="p-5 flex items-start justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
