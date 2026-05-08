@@ -3303,3 +3303,4 @@
 {"timestamp":"2026-05-08T02:23:41.673Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
 {"timestamp":"2026-05-08T02:24:11.673Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
 {"timestamp":"2026-05-08T02:24:41.675Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:25:11.688Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
