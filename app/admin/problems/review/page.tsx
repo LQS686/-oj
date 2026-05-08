@@ -257,17 +257,17 @@ export default function ProblemReviewPage() {
       const [textColor, bgColor] = color.split(' ')
       return `${bgColor} ${textColor}`
     }
-    return 'bg-muted/500/20 text-slate-400'
+    return 'bg-muted/40 text-muted-foreground'
   }
 
   const getStatusBadge = (problem: Problem) => {
     if (problem.isVerified && problem.visibility === 'public') {
-      return <span className="px-2 py-1 rounded text-xs bg-secondary/100/20 text-green-400">已通过</span>
+      return <span className="px-2 py-1 rounded text-xs bg-secondary/10 text-secondary">已通过</span>
     }
     if (problem.isVerified) {
-      return <span className="px-2 py-1 rounded text-xs bg-blue-500/20 text-blue-400">已验证</span>
+      return <span className="px-2 py-1 rounded text-xs bg-primary/10 text-primary-light">已验证</span>
     }
-    return <span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-accent-light">待验证</span>
+    return <span className="px-2 py-1 rounded text-xs bg-warning/10 text-warning">待验证</span>
   }
 
   if (loading) {
@@ -276,7 +276,7 @@ export default function ProblemReviewPage() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-400">加载中...</p>
+            <p className="text-muted-foreground">加载中...</p>
           </div>
         </div>
       </AdminLayout>
@@ -292,14 +292,14 @@ export default function ProblemReviewPage() {
               <CheckCircle className="w-5 h-5 text-primary-light" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">题目审核</h1>
-              <p className="text-sm text-slate-400">审核AI生成的题目</p>
+              <h1 className="text-2xl font-bold text-foreground">题目审核</h1>
+              <p className="text-sm text-muted-foreground">审核AI生成的题目</p>
             </div>
           </div>
 
           <div className="card p-12 text-center">
             <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400 opacity-50" />
-            <p className="text-lg text-slate-300">暂无待审核题目</p>
+            <p className="text-lg text-foreground">暂无待审核题目</p>
             <p className="text-sm text-muted-foreground mt-2">所有AI生成的题目都已审核完成</p>
           </div>
         </div>
@@ -311,13 +311,13 @@ export default function ProblemReviewPage() {
     <AdminLayout>
       <div className="space-y-6">
         {error && (
-          <div className="bg-error/100/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg">
+          <div className="bg-error/5 border border-error/15 text-error px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="bg-secondary/100/20 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg">
+          <div className="bg-secondary/5 border border-secondary/15 text-secondary px-4 py-3 rounded-lg">
             {success}
           </div>
         )}
@@ -328,8 +328,8 @@ export default function ProblemReviewPage() {
               <CheckCircle className="w-5 h-5 text-primary-light" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">题目审核</h1>
-              <p className="text-sm text-slate-400">审核AI生成的题目 ({problems.length} 道待审核)</p>
+              <h1 className="text-2xl font-bold text-foreground">题目审核</h1>
+              <p className="text-sm text-muted-foreground">审核AI生成的题目 ({problems.length} 道待审核)</p>
             </div>
           </div>
 
@@ -337,17 +337,17 @@ export default function ProblemReviewPage() {
             <button
               onClick={() => setSelectedIndex(Math.max(0, selectedIndex - 1))}
               disabled={selectedIndex === 0}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted/40 hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <span className="text-sm text-slate-400">
+            <span className="text-sm text-muted-foreground">
               {selectedIndex + 1} / {problems.length}
             </span>
             <button
               onClick={() => setSelectedIndex(Math.min(problems.length - 1, selectedIndex + 1))}
               disabled={selectedIndex === problems.length - 1}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-muted/40 hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -360,7 +360,7 @@ export default function ProblemReviewPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <FileText className="w-5 h-5 text-primary-light" />
-                  <h2 className="text-lg font-bold text-white">题目信息</h2>
+                  <h2 className="text-lg font-bold text-foreground">题目信息</h2>
                 </div>
                 <div className="flex items-center gap-2">
                   {getStatusBadge(currentProblem)}
@@ -379,7 +379,7 @@ export default function ProblemReviewPage() {
               {editMode && editedProblem ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">题目名称</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">题目名称</label>
                     <input
                       type="text"
                       value={editedProblem.title}
@@ -389,7 +389,7 @@ export default function ProblemReviewPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">题目描述</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">题目描述</label>
                     <textarea
                       value={editedProblem.description}
                       onChange={(e) => setEditedProblem({ ...editedProblem, description: e.target.value })}
@@ -399,7 +399,7 @@ export default function ProblemReviewPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">输入格式</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">输入格式</label>
                       <textarea
                         value={editedProblem.input}
                         onChange={(e) => setEditedProblem({ ...editedProblem, input: e.target.value })}
@@ -407,7 +407,7 @@ export default function ProblemReviewPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">输出格式</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">输出格式</label>
                       <textarea
                         value={editedProblem.output}
                         onChange={(e) => setEditedProblem({ ...editedProblem, output: e.target.value })}
@@ -417,7 +417,7 @@ export default function ProblemReviewPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">提示</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">提示</label>
                     <textarea
                       value={editedProblem.hint || ''}
                       onChange={(e) => setEditedProblem({ ...editedProblem, hint: e.target.value })}
@@ -427,7 +427,7 @@ export default function ProblemReviewPage() {
 
                   <div className="grid grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">难度</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">难度</label>
                       <select
                         value={editedProblem.difficulty}
                         onChange={(e) => setEditedProblem({ ...editedProblem, difficulty: e.target.value })}
@@ -439,7 +439,7 @@ export default function ProblemReviewPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">时间限制</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">时间限制</label>
                       <input
                         type="number"
                         value={editedProblem.timeLimit}
@@ -448,7 +448,7 @@ export default function ProblemReviewPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">内存</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">内存</label>
                       <input
                         type="number"
                         value={editedProblem.memoryLimit}
@@ -457,7 +457,7 @@ export default function ProblemReviewPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">标签</label>
+                      <label className="block text-sm font-medium text-foreground mb-2">标签</label>
                       <input
                         type="text"
                         value={editedProblem.tags.join(', ')}
@@ -467,7 +467,7 @@ export default function ProblemReviewPage() {
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+                  <div className="flex justify-end gap-3 pt-4 border-t border-border">
                     <button onClick={cancelEdit} className="btn btn-ghost">取消</button>
                     <button onClick={handleSaveEdit} disabled={saving} className="btn btn-primary flex items-center gap-2">
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -478,13 +478,13 @@ export default function ProblemReviewPage() {
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-xl font-bold text-white mb-2">{currentProblem.title}</h3>
+                    <h3 className="text-xl font-bold text-foreground mb-2">{currentProblem.title}</h3>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`px-2 py-1 rounded text-xs ${getDifficultyColor(currentProblem.difficulty)}`}>
                         {currentProblem.difficulty}
                       </span>
                       {currentProblem.tags.map((tag, idx) => (
-                        <span key={idx} className="px-2 py-1 rounded text-xs bg-white/10 text-slate-400">{tag}</span>
+                        <span key={idx} className="px-2 py-1 rounded text-xs bg-muted/60 text-muted-foreground">{tag}</span>
                       ))}
                     </div>
                   </div>
@@ -510,20 +510,20 @@ export default function ProblemReviewPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg bg-white/5">
-                      <h4 className="text-sm font-medium text-slate-400 mb-2">输入格式</h4>
-                      <p className="text-slate-300 text-sm whitespace-pre-wrap">{currentProblem.input}</p>
+                    <div className="p-4 rounded-lg bg-muted/40">
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">输入格式</h4>
+                      <p className="text-foreground text-sm whitespace-pre-wrap">{currentProblem.input}</p>
                     </div>
-                    <div className="p-4 rounded-lg bg-white/5">
-                      <h4 className="text-sm font-medium text-slate-400 mb-2">输出格式</h4>
-                      <p className="text-slate-300 text-sm whitespace-pre-wrap">{currentProblem.output}</p>
+                    <div className="p-4 rounded-lg bg-muted/40">
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">输出格式</h4>
+                      <p className="text-foreground text-sm whitespace-pre-wrap">{currentProblem.output}</p>
                     </div>
                   </div>
 
                   {currentProblem.hint && (
-                    <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                      <h4 className="text-sm font-medium text-accent-light mb-2">提示</h4>
-                      <p className="text-slate-300 text-sm">{currentProblem.hint}</p>
+                    <div className="p-4 rounded-lg bg-warning/5 border border-warning/15">
+                      <h4 className="text-sm font-medium text-warning mb-2">提示</h4>
+                      <p className="text-foreground text-sm">{currentProblem.hint}</p>
                     </div>
                   )}
 
@@ -538,14 +538,14 @@ export default function ProblemReviewPage() {
             <div className="card p-6">
               <div className="flex items-center gap-3 mb-4">
                 <Database className="w-5 h-5 text-primary-light" />
-                <h2 className="text-lg font-bold text-white">测试用例 ({currentProblem.testCases.length})</h2>
+                <h2 className="text-lg font-bold text-foreground">测试用例 ({currentProblem.testCases.length})</h2>
               </div>
 
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {currentProblem.testCases.map((tc, idx) => (
-                  <div key={tc.id} className="p-3 rounded-lg bg-white/5 border border-white/10">
+                  <div key={tc.id} className="p-3 rounded-lg bg-muted/40 border border-border">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-slate-300">
+                      <span className="text-sm font-medium text-foreground">
                         #{idx + 1} {tc.isSample ? '(样例)' : '(隐藏)'}
                       </span>
                       <span className="text-xs text-muted-foreground">{tc.score}分</span>
@@ -574,12 +574,12 @@ export default function ProblemReviewPage() {
             <div className="card p-6">
               <div className="flex items-center gap-3 mb-4">
                 <Code className="w-5 h-5 text-primary-light" />
-                <h2 className="text-lg font-bold text-white">标程验证</h2>
+                <h2 className="text-lg font-bold text-foreground">标程验证</h2>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">编程语言</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">编程语言</label>
                   <select
                     value={solutionLanguage}
                     onChange={(e) => setSolutionLanguage(e.target.value)}
@@ -593,7 +593,7 @@ export default function ProblemReviewPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">标程代码</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">标程代码</label>
                   <textarea
                     value={solutionCode}
                     onChange={(e) => setSolutionCode(e.target.value)}
@@ -608,7 +608,7 @@ export default function ProblemReviewPage() {
                       setSolutionCode(currentProblem.stdCode || '')
                       setSolutionLanguage(currentProblem.stdLang || 'cpp')
                     }}
-                    className="text-sm text-primary-light hover:text-white"
+                    className="text-sm text-primary-light hover:text-foreground"
                   >
                     加载已保存的标程
                   </button>
@@ -633,12 +633,12 @@ export default function ProblemReviewPage() {
                 </button>
 
                 {verifyResults && (
-                  <div className="p-3 rounded-lg bg-white/5">
-                    <h4 className="text-sm font-medium text-slate-300 mb-2">验证结果</h4>
+                  <div className="p-3 rounded-lg bg-muted/40">
+                    <h4 className="text-sm font-medium text-foreground mb-2">验证结果</h4>
                     <div className="space-y-1">
                       {verifyResults.results?.map((r: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400">测试点 #{idx + 1}</span>
+                          <span className="text-muted-foreground">测试点 #{idx + 1}</span>
                           <span className={r.status === 'OK' ? 'text-green-400' : 'text-red-400'}>
                             {r.status} {r.time ? `(${r.time}ms)` : ''}
                           </span>
@@ -651,20 +651,20 @@ export default function ProblemReviewPage() {
             </div>
 
             <div className="card p-6">
-              <h2 className="text-lg font-bold text-white mb-4">审核操作</h2>
+              <h2 className="text-lg font-bold text-foreground mb-4">审核操作</h2>
 
               <div className="space-y-3">
                 <button
                   onClick={handleApprove}
                   disabled={saving || !currentProblem.isVerified}
-                  className="btn w-full bg-secondary/100/20 hover:bg-secondary/100/30 text-green-400 border border-green-500/30 flex items-center justify-center gap-2"
+                  className="btn w-full bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 flex items-center justify-center gap-2"
                 >
                   <CheckCircle className="w-4 h-4" />
                   审核通过并公开
                 </button>
 
                 {!currentProblem.isVerified && (
-                  <p className="text-xs text-accent-light text-center">
+                  <p className="text-xs text-warning text-center">
                     请先验证标程后再审核通过
                   </p>
                 )}
@@ -672,14 +672,14 @@ export default function ProblemReviewPage() {
                 <button
                   onClick={handleReject}
                   disabled={saving}
-                  className="btn w-full bg-error/100/20 hover:bg-error/100/30 text-red-400 border border-red-500/30 flex items-center justify-center gap-2"
+                  className="btn w-full bg-error/5 hover:bg-error/10 text-error border border-error/15 flex items-center justify-center gap-2"
                 >
                   <XCircle className="w-4 h-4" />
                   拒绝并删除
                 </button>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-white/10">
+              <div className="mt-4 pt-4 border-t border-border">
                 <Link
                   href={`/admin/problems/${currentProblem.id}/edit`}
                   className="btn btn-ghost w-full flex items-center justify-center gap-2"

@@ -274,13 +274,13 @@ export default function AIGenerationPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return <span className="px-2 py-0.5 rounded text-xs bg-accent/10 text-accent-light">等待中</span>
+        return <span className="px-2 py-0.5 rounded text-xs bg-accent/10 text-accent">等待中</span>
       case 'PROCESSING':
         return <span className="px-2 py-0.5 rounded text-xs bg-info/10 text-info flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />处理中</span>
       case 'COMPLETED':
-        return <span className="px-2 py-0.5 rounded text-xs bg-secondary/100/20 text-secondary">已完成</span>
+        return <span className="px-2 py-0.5 rounded text-xs bg-secondary/10 text-secondary">已完成</span>
       case 'FAILED':
-        return <span className="px-2 py-0.5 rounded text-xs bg-error/100/20 text-error">失败</span>
+        return <span className="px-2 py-0.5 rounded text-xs bg-error/5 text-error">失败</span>
       default:
         return <span className="px-2 py-0.5 rounded text-xs bg-muted/500/20 text-muted-foreground">{status}</span>
     }
@@ -314,11 +314,11 @@ export default function AIGenerationPage() {
     <AdminLayout>
       <div className="space-y-6">
         {models.length === 0 && (
-          <div className="card p-4 border-yellow-500/30 bg-yellow-500/5">
+          <div className="card p-4 border-warning/15 bg-warning/5">
             <div className="flex items-center gap-3">
-              <Cpu className="w-5 h-5 text-accent-light" />
+              <Cpu className="w-5 h-5 text-warning" />
               <div className="flex-1">
-                <p className="text-accent-light font-medium">尚未配置 AI 模型</p>
+                <p className="text-warning font-medium">尚未配置 AI 模型</p>
                 <p className="text-sm text-muted-foreground">请先配置 AI 服务商和模型才能使用出题功能</p>
               </div>
               <Link
@@ -378,13 +378,13 @@ export default function AIGenerationPage() {
                   className={`p-3 rounded-lg cursor-pointer transition-colors ${
                     selectedLog?.id === log.id 
                       ? 'bg-primary/20 border border-primary/30' 
-                      : 'bg-white/5 hover:bg-white/10'
+                      : 'bg-muted/40 hover:bg-muted/60'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {getStatusBadge(log.status)}
-                      <span className="text-sm text-slate-300">
+                      <span className="text-sm text-foreground">
                         {log.params?.topic?.[0] || log.params?.title || '未知主题'}
                       </span>
                     </div>
@@ -410,7 +410,7 @@ export default function AIGenerationPage() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   AI 模型 <span className="text-error">*</span>
                 </label>
                 <div className="flex gap-2">
@@ -446,7 +446,7 @@ export default function AIGenerationPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   题目主题 <span className="text-error">*</span>
                 </label>
                 <input
@@ -460,7 +460,7 @@ export default function AIGenerationPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     目标难度
                   </label>
                   <select
@@ -475,7 +475,7 @@ export default function AIGenerationPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     生成数量
                   </label>
                   <select
@@ -491,7 +491,7 @@ export default function AIGenerationPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   附加要求 (可选)
                 </label>
                 <textarea
@@ -586,7 +586,7 @@ export default function AIGenerationPage() {
 
                 <div>
                   <span className="text-sm text-muted-foreground">题目描述</span>
-                  <p className="text-slate-300 mt-1 text-sm line-clamp-4">{result.description}</p>
+                  <p className="text-foreground mt-1 text-sm line-clamp-4">{result.description}</p>
                 </div>
 
                 {result.samples && result.samples.length > 0 && (
@@ -595,13 +595,13 @@ export default function AIGenerationPage() {
                     <div className="mt-2 space-y-2">
                       {result.samples.slice(0, 2).map((sample, idx) => (
                         <div key={idx} className="grid grid-cols-2 gap-2">
-                          <div className="bg-white/5 rounded-lg p-2">
+                          <div className="bg-muted/40 rounded-lg p-2">
                             <p className="text-xs text-muted-foreground mb-1">输入</p>
-                            <pre className="text-xs text-slate-300 whitespace-pre-wrap overflow-hidden">{sample.input?.slice(0, 100)}{sample.input?.length > 100 ? '...' : ''}</pre>
+                            <pre className="text-xs text-foreground whitespace-pre-wrap overflow-hidden">{sample.input?.slice(0, 100)}{sample.input?.length > 100 ? '...' : ''}</pre>
                           </div>
-                          <div className="bg-white/5 rounded-lg p-2">
+                          <div className="bg-muted/40 rounded-lg p-2">
                             <p className="text-xs text-muted-foreground mb-1">输出</p>
-                            <pre className="text-xs text-slate-300 whitespace-pre-wrap overflow-hidden">{sample.output?.slice(0, 100)}{sample.output?.length > 100 ? '...' : ''}</pre>
+                            <pre className="text-xs text-foreground whitespace-pre-wrap overflow-hidden">{sample.output?.slice(0, 100)}{sample.output?.length > 100 ? '...' : ''}</pre>
                           </div>
                         </div>
                       ))}
@@ -610,7 +610,7 @@ export default function AIGenerationPage() {
                 )}
 
                 {thought && (
-                  <details className="bg-white/5 rounded-lg p-3">
+                  <details className="bg-muted/40 rounded-lg p-3">
                     <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
                       思考过程
                     </summary>
@@ -618,7 +618,7 @@ export default function AIGenerationPage() {
                   </details>
                 )}
 
-                <div className="pt-4 border-t border-white/10">
+                <div className="pt-4 border-t border-border">
                   <button
                     onClick={handleCreateProblem}
                     className="btn btn-primary w-full flex items-center justify-center gap-2"
@@ -635,28 +635,28 @@ export default function AIGenerationPage() {
         <div className="card p-6">
           <h2 className="text-lg font-bold text-foreground mb-4">使用说明</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-lg bg-white/5">
+            <div className="p-4 rounded-lg bg-muted/40">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/20 mb-3">
                 <span className="text-primary-light font-bold">1</span>
               </div>
               <h3 className="text-foreground font-medium mb-1">选择模型</h3>
               <p className="text-sm text-muted-foreground">选择要使用的 AI 模型</p>
             </div>
-            <div className="p-4 rounded-lg bg-white/5">
+            <div className="p-4 rounded-lg bg-muted/40">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/20 mb-3">
                 <span className="text-primary-light font-bold">2</span>
               </div>
               <h3 className="text-foreground font-medium mb-1">输入主题</h3>
               <p className="text-sm text-muted-foreground">描述题目类型和要求</p>
             </div>
-            <div className="p-4 rounded-lg bg-white/5">
+            <div className="p-4 rounded-lg bg-muted/40">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/20 mb-3">
                 <span className="text-primary-light font-bold">3</span>
               </div>
               <h3 className="text-foreground font-medium mb-1">后台运行</h3>
               <p className="text-sm text-muted-foreground">可切换页面，生成继续</p>
             </div>
-            <div className="p-4 rounded-lg bg-white/5">
+            <div className="p-4 rounded-lg bg-muted/40">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/20 mb-3">
                 <span className="text-primary-light font-bold">4</span>
               </div>
