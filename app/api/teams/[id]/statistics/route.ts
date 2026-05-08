@@ -116,18 +116,22 @@ export async function GET(
         }
       })(),
       Promise.all([
-        prisma.teamMember.count({
+        prisma.teamAssignmentSubmission.findMany({
           where: {
-            teamId,
-            lastActiveAt: { gte: sevenDaysAgo }
-          }
-        }),
-        prisma.teamMember.count({
+            assignment: { teamId },
+            submittedAt: { gte: sevenDaysAgo }
+          },
+          select: { userId: true },
+          distinct: ['userId']
+        }).then(s => s.length),
+        prisma.teamAssignmentSubmission.findMany({
           where: {
-            teamId,
-            lastActiveAt: { gte: thirtyDaysAgo }
-          }
-        })
+            assignment: { teamId },
+            submittedAt: { gte: thirtyDaysAgo }
+          },
+          select: { userId: true },
+          distinct: ['userId']
+        }).then(s => s.length)
       ]),
       (async () => {
         const assignments = await prisma.teamAssignment.findMany({
@@ -135,38 +139,21 @@ export async function GET(
           select: {
             id: true,
             endTime: true,
-            problemIds: true,
-            _count: {
-              select: {
-                submissions: {
-                  where: {
-                    status: 'AC'
-                  }
-                }
-              }
-            }
           }
         })
 
         let inProgress = 0
         let overdue = 0
-        let completed = 0
 
-        for (const assignment of assignments) {
-          const totalProblems = assignment.problemIds.length
-          const completedMembers = assignment._count.submissions
-          const totalRequired = totalProblems
-
-          if (assignment.endTime && new Date(assignment.endTime) < now) {
+        for (const a of assignments) {
+          if (a.endTime && new Date(a.endTime) < now) {
             overdue++
-          } else if (completedMembers >= totalRequired && totalRequired > 0) {
-            completed++
           } else {
             inProgress++
           }
         }
 
-        return { inProgress, overdue, completed }
+        return { inProgress, overdue, completed: 0 }
       })(),
       prisma.teamAssignmentSubmission.findMany({
         where: { assignment: { teamId } },

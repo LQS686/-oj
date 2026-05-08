@@ -3243,3 +3243,12 @@
 {"timestamp":"2026-05-08T01:58:11.257Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
 {"timestamp":"2026-05-08T01:58:41.263Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
 {"timestamp":"2026-05-08T01:59:11.271Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:59:41.283Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:59:54.396Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-05-08T02:00:11.287Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:00:41.296Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:01:11.303Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:01:41.315Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:02:11.324Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:02:41.336Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:03:11.342Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
