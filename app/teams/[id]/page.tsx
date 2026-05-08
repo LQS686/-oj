@@ -186,7 +186,6 @@ export default function TeamDetailPage() {
               )}
               <div className="min-w-0">
                 <h1 className="text-lg font-bold text-foreground truncate">{team.name}</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">{team.stats.memberCount} 成员 · {team.stats.assignmentCount} 作业 · {team.stats.noteCount} 笔记</p>
               </div>
             </div>
 

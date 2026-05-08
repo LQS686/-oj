@@ -3285,3 +3285,21 @@
 {"timestamp":"2026-05-08T02:16:11.536Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
 {"timestamp":"2026-05-08T02:16:41.546Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
 {"timestamp":"2026-05-08T02:17:11.557Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:17:41.561Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:17:51.023Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-05-08T02:17:59.235Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-05-08T02:18:11.571Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:18:41.581Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:19:11.589Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:19:41.603Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:20:11.611Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:20:41.621Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:21:11.634Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:21:41.647Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:21:46.675Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-05-08T02:22:11.648Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:22:41.664Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:23:11.664Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:23:41.673Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:24:11.673Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T02:24:41.675Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
