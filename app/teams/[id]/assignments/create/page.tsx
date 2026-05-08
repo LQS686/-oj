@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Calendar, BookOpen, AlertCircle, ArrowLeft } from 'lucide-react'
+import { BookOpen, AlertCircle, ArrowLeft } from 'lucide-react'
 import { getDifficultyColor } from '@/lib/status'
 
 interface Problem {
@@ -52,9 +52,7 @@ export default function CreateAssignmentPage() {
     try {
       setProblemsLoading(true)
       const response = await fetch('/api/problems?pageSize=100&isPublic=true')
-
       const data = await response.json()
-
       if (data.success) {
         setProblems(data.data.problems || [])
       } else {
@@ -104,18 +102,9 @@ export default function CreateAssignmentPage() {
     try {
       setLoading(true)
 
-      console.log('[CreateAssignment] 提交数据:', {
-        teamId: params.id,
-        title: formData.title,
-        deadline: formData.deadline,
-        problemCount: selectedProblems.length
-      })
-      
       const response = await fetchWithAuth(`/api/teams/${params.id}/assignments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: formData.title,
           description: formData.description,
@@ -124,9 +113,7 @@ export default function CreateAssignmentPage() {
         })
       })
 
-      console.log('[CreateAssignment] 响应状态:', response.status)
       const data = await response.json()
-      console.log('[CreateAssignment] 响应数据:', data)
 
       if (data.success) {
         setSuccess('作业创建成功')
@@ -137,204 +124,176 @@ export default function CreateAssignmentPage() {
         setError(data.error || '创建失败')
       }
     } catch (err) {
-    console.error('[CreateAssignment] 请求异常:', err)
-    setError('创建失败，请重试')
-  } finally {
-    setLoading(false)
+      setError('创建失败，请重试')
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   const filteredProblems = problems.filter(problem => {
-    const matchesSearch = 
+    const matchesSearch =
       problem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       problem.problemNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       problem.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-    
+
     const matchesDifficulty = difficultyFilter === 'all' || problem.difficulty === difficultyFilter
-    
+
     return matchesSearch && matchesDifficulty
   })
 
+  const difficultyOptions = [
+    { key: 'all', label: '全部' },
+    { key: 'easy', label: '简单' },
+    { key: 'medium', label: '中等' },
+    { key: 'hard', label: '困难' }
+  ]
+
+  if (!user) return null
+
   return (
-    <div className="min-h-screen py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           返回
         </button>
 
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white">创建团队作业</h1>
-          <p className="mt-1 text-gray-400">为团队成员布置作业任务</p>
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-foreground">创建团队作业</h1>
+          <p className="mt-1 text-sm text-muted-foreground">为团队成员布置作业任务</p>
         </div>
 
-        <div className="card">
+        <div className="bg-white dark:bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="p-6">
             <form onSubmit={handleSubmit}>
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    作业标题 <span className="text-red-400">*</span>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    作业标题 <span className="text-error">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="例如：第一周练习作业"
-                    className="input w-full"
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
                     作业描述
                   </label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="描述作业要求和注意事项"
-                    rows={4}
-                    className="input w-full"
+                    rows={3}
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-y focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    截止时间 <span className="text-red-400">*</span>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    截止时间 <span className="text-error">*</span>
                   </label>
-                  <div className="relative">
-                    <input
-                      type="datetime-local"
-                      value={formData.deadline}
-                      onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                      className="input w-full"
-                      required
-                    />
-                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                  <p className="mt-1 text-sm text-gray-500">默认为7天后，可手动调整</p>
+                  <input
+                    type="datetime-local"
+                    value={formData.deadline}
+                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                    required
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">默认为7天后，可手动调整</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    从平台题库选择题目 <span className="text-red-400">*</span>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    从平台题库选择题目 <span className="text-error">*</span>
                   </label>
 
                   {problemsLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                    <div className="flex items-center justify-center py-10">
+                      <div className="w-7 h-7 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                     </div>
                   ) : problems.length === 0 ? (
-                    <div className="text-center py-8">
-                      <BookOpen className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-                      <p className="text-gray-400">平台暂无公开题目</p>
+                    <div className="text-center py-10">
+                      <BookOpen className="w-10 h-10 text-muted-foreground/40 mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">平台暂无公开题目</p>
                     </div>
                   ) : (
                     <>
-                      <div className="mb-4 space-y-3">
+                      <div className="space-y-3">
                         <input
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder="搜索题目编号、标题或标签..."
-                          className="input w-full"
+                          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
                         />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setDifficultyFilter('all')}
-                            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                              difficultyFilter === 'all'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                            }`}
-                          >
-                            全部
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDifficultyFilter('easy')}
-                            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                              difficultyFilter === 'easy'
-                                ? 'bg-green-600 text-white'
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                            }`}
-                          >
-                            简单
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDifficultyFilter('medium')}
-                            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                              difficultyFilter === 'medium'
-                                ? 'bg-yellow-600 text-white'
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                            }`}
-                          >
-                            中等
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDifficultyFilter('hard')}
-                            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                              difficultyFilter === 'hard'
-                                ? 'bg-red-600 text-white'
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                            }`}
-                          >
-                            困难
-                          </button>
+                        <div className="flex gap-1.5">
+                          {difficultyOptions.map(opt => (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              onClick={() => setDifficultyFilter(opt.key)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                difficultyFilter === opt.key
+                                  ? 'bg-primary text-white shadow-sm'
+                                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
-                      <div className="mb-3 text-sm text-gray-400">
-                        已选择 {selectedProblems.length} 个题目 | 显示 {filteredProblems.length} / {problems.length} 个题目
+                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>已选择 <strong className="text-foreground">{selectedProblems.length}</strong> 个题目</span>
+                        <span>显示 {filteredProblems.length} / {problems.length}</span>
                       </div>
-                      <div className="space-y-2 max-h-96 overflow-y-auto border border-white/10 rounded-lg p-4">
+
+                      <div className="space-y-2 max-h-[360px] overflow-y-auto rounded-lg border border-border mt-2">
                         {filteredProblems.map(problem => (
                           <div
                             key={problem.id}
                             onClick={() => toggleProblem(problem.id)}
-                            className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                            className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-all border-b border-border/60 last:border-b-0 ${
                               selectedProblems.includes(problem.id)
-                                ? 'border-indigo-500 bg-indigo-500/10'
-                                : 'border-white/10 hover:border-indigo-500/50'
+                                ? 'bg-primary/5'
+                                : 'hover:bg-muted/50'
                             }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <input
+                                type="checkbox"
+                                checked={selectedProblems.includes(problem.id)}
+                                onChange={() => {}}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
                                   {problem.problemNumber && (
-                                    <span className="text-sm font-mono text-gray-500">
-                                      {problem.problemNumber}
-                                    </span>
+                                    <span className="shrink-0 text-xs font-mono text-muted-foreground">{problem.problemNumber}</span>
                                   )}
-                                  <h3 className="font-medium text-white">{problem.title}</h3>
-                                  <span className={`px-2 py-0.5 rounded text-xs ${
-                                    getDifficultyColor(problem.difficulty)
-                                  }`}>
+                                  <span className="font-medium text-foreground text-sm truncate">{problem.title}</span>
+                                  <span className={`shrink-0 px-1.5 py-0.5 rounded text-[11px] font-medium ${getDifficultyColor(problem.difficulty)}`}>
                                     {problem.difficulty}
                                   </span>
                                 </div>
-                                <div className="flex gap-1">
-                                  {problem.tags.slice(0, 4).map((tag, idx) => (
-                                    <span key={idx} className="px-2 py-0.5 bg-white/10 rounded text-xs text-gray-400">
+                                <div className="flex gap-1 mt-1 flex-wrap">
+                                  {problem.tags.slice(0, 3).map((tag, idx) => (
+                                    <span key={idx} className="px-1.5 py-0.5 bg-muted rounded text-[11px] text-muted-foreground">
                                       {tag}
                                     </span>
                                   ))}
                                 </div>
-                              </div>
-                              <div className="ml-4">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedProblems.includes(problem.id)}
-                                  onChange={() => {}}
-                                  className="w-5 h-5 text-indigo-600 border-gray-600 rounded focus:ring-indigo-500 bg-white/10"
-                                />
                               </div>
                             </div>
                           </div>
@@ -344,12 +303,12 @@ export default function CreateAssignmentPage() {
                   )}
                 </div>
 
-                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-indigo-400 mt-0.5" />
-                    <div className="text-sm text-indigo-300">
-                      <p className="font-medium mb-1">温馨提示</p>
-                      <ul className="list-disc list-inside space-y-1">
+                <div className="p-3.5 rounded-lg bg-primary/5 border border-primary/10">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-primary-light mt-0.5 shrink-0" />
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p className="font-medium text-foreground">温馨提示</p>
+                      <ul className="list-disc list-inside space-y-0.5">
                         <li>作业题目来自平台公开题库，所有成员都可以查看</li>
                         <li>成员需要在截止时间前完成所有题目</li>
                         <li>可以在团队详情页查看成员的完成进度</li>
@@ -359,29 +318,29 @@ export default function CreateAssignmentPage() {
                 </div>
 
                 {error && (
-                  <div className="p-4 bg-error/100/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-400">{error}</p>
+                  <div className="p-3 rounded-lg bg-error/5 border border-error/15">
+                    <p className="text-sm text-error">{error}</p>
                   </div>
                 )}
 
                 {success && (
-                  <div className="p-4 bg-secondary/100/10 border border-green-500/20 rounded-lg">
-                    <p className="text-sm text-green-400">{success}</p>
+                  <div className="p-3 rounded-lg bg-secondary/5 border border-secondary/15">
+                    <p className="text-sm text-secondary font-medium">{success}</p>
                   </div>
                 )}
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
                     disabled={loading || problemsLoading}
-                    className="btn-primary flex-1"
+                    className="btn-primary btn flex-1"
                   >
                     {loading ? '创建中...' : '创建作业'}
                   </button>
                   <button
                     type="button"
                     onClick={() => router.push(`/teams/${params.id}`)}
-                    className="px-6 py-2 bg-white/10 text-gray-300 rounded-lg hover:bg-white/20 font-medium transition-colors"
+                    className="btn-ghost btn"
                   >
                     取消
                   </button>

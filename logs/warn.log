@@ -6,3 +6,4 @@
 {"timestamp":"2026-05-07T12:15:20.668Z","level":"warn","message":"编译失败"}
 {"timestamp":"2026-05-07T12:16:07.680Z","level":"warn","message":"编译失败"}
 {"timestamp":"2026-05-07T12:16:14.354Z","level":"warn","message":"编译失败"}
+{"timestamp":"2026-05-08T01:11:13.626Z","level":"warn","message":"逾期提交，分数设置为0","meta":{"assignmentSubmissionId":"69fd3821ab362ee9c7404400"}}

@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Calendar, BookOpen, AlertCircle, Trash2, ArrowLeft, Save } from 'lucide-react'
+import { BookOpen, AlertCircle, Trash2, ArrowLeft, Save } from 'lucide-react'
+import { getDifficultyColor } from '@/lib/status'
 
 interface Problem {
   id: string
@@ -34,7 +35,7 @@ export default function EditAssignmentPage() {
   const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  
+
   const [problems, setProblems] = useState<Problem[]>([])
   const [selectedProblems, setSelectedProblems] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -51,8 +52,7 @@ export default function EditAssignmentPage() {
     if (!dateString) return ''
     const date = new Date(dateString)
     const offset = date.getTimezoneOffset() * 60000
-    const localISOTime = new Date(date.getTime() - offset).toISOString().slice(0, 16)
-    return localISOTime
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16)
   }
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function EditAssignmentPage() {
   const fetchData = async () => {
     try {
       setDataLoading(true)
-      
+
       const [assignmentRes, problemsRes] = await Promise.all([
         fetchWithAuth(`/api/teams/${teamId}/assignments/${assignmentId}`),
         fetch('/api/problems?pageSize=100&isPublic=true')
@@ -75,16 +75,11 @@ export default function EditAssignmentPage() {
       const assignmentData = await assignmentRes.json()
       const problemsData = await problemsRes.json()
 
-      if (!assignmentData.success) {
-        throw new Error(assignmentData.error || '获取作业详情失败')
-      }
-
-      if (!problemsData.success) {
-        throw new Error(problemsData.error || '获取题目列表失败')
-      }
+      if (!assignmentData.success) throw new Error(assignmentData.error || '获取作业详情失败')
+      if (!problemsData.success) throw new Error(problemsData.error || '获取题目列表失败')
 
       const assignment: Assignment = assignmentData.data.assignment
-      
+
       setFormData({
         title: assignment.title,
         description: assignment.description || '',
@@ -94,11 +89,8 @@ export default function EditAssignmentPage() {
 
       setSelectedProblems(assignment.problems.map(p => p.id))
       setProblems(problemsData.data.problems || [])
-
     } catch (err: unknown) {
-      const error = err as Error
-      console.error('获取数据失败:', err)
-      setError(error.message || '获取数据失败')
+      setError((err as Error).message || '获取数据失败')
     } finally {
       setDataLoading(false)
     }
@@ -134,11 +126,11 @@ export default function EditAssignmentPage() {
 
     const endTime = new Date(formData.endTime)
     if (formData.startTime) {
-        const startTime = new Date(formData.startTime)
-        if (startTime >= endTime) {
-            setError('开始时间必须早于截止时间')
-            return
-        }
+      const startTime = new Date(formData.startTime)
+      if (startTime >= endTime) {
+        setError('开始时间必须早于截止时间')
+        return
+      }
     }
 
     try {
@@ -146,9 +138,7 @@ export default function EditAssignmentPage() {
 
       const response = await fetchWithAuth(`/api/teams/${teamId}/assignments/${assignmentId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: formData.title,
           description: formData.description,
@@ -170,7 +160,6 @@ export default function EditAssignmentPage() {
         setError(data.error || '更新失败')
       }
     } catch (err) {
-      console.error('更新失败:', err)
       setError('更新失败，请重试')
     } finally {
       setLoading(false)
@@ -178,18 +167,14 @@ export default function EditAssignmentPage() {
   }
 
   const handleDelete = async () => {
-    if (!confirm('确定要删除这个作业吗？此操作不可恢复，所有提交记录也将被删除。')) {
-      return
-    }
+    if (!confirm('确定要删除这个作业吗？此操作不可恢复，所有提交记录也将被删除。')) return
 
     try {
       setLoading(true)
       const response = await fetchWithAuth(`/api/teams/${teamId}/assignments/${assignmentId}`, {
         method: 'DELETE'
       })
-
       const data = await response.json()
-
       if (data.success) {
         router.push(`/teams/${teamId}?tab=assignments`)
       } else {
@@ -197,271 +182,223 @@ export default function EditAssignmentPage() {
         setLoading(false)
       }
     } catch (err) {
-      console.error('删除失败:', err)
       setError('删除失败，请重试')
       setLoading(false)
     }
   }
 
-  const difficultyColors: Record<string, string> = {
-    easy: 'text-green-400 bg-secondary/100/20',
-    medium: 'text-accent-light bg-yellow-500/20',
-    hard: 'text-red-400 bg-error/100/20'
-  }
-
-  const difficultyText: Record<string, string> = {
-    easy: '简单',
-    medium: '中等',
-    hard: '困难'
-  }
-
   const filteredProblems = problems.filter(problem => {
-    const matchesSearch = 
+    const matchesSearch =
       problem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (problem.problemNumber && problem.problemNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
       problem.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-    
-    const matchesDifficulty = difficultyFilter === 'all' || problem.difficulty === difficultyFilter
-    
-    return matchesSearch && matchesDifficulty
+    return matchesSearch && (difficultyFilter === 'all' || problem.difficulty === difficultyFilter)
   })
+
+  const difficultyOptions = [
+    { key: 'all', label: '全部' },
+    { key: 'easy', label: '简单' },
+    { key: 'medium', label: '中等' },
+    { key: 'hard', label: '困难' }
+  ]
 
   if (dataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     )
   }
 
+  if (!user) return null
+
   return (
-    <div className="min-h-screen py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex items-center justify-between mb-8">
           <div>
             <button
-                onClick={() => router.back()}
-                className="flex items-center gap-2 text-gray-400 hover:text-white mb-2 transition-colors"
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors"
             >
-                <ArrowLeft className="w-4 h-4" />
-                返回
+              <ArrowLeft className="w-4 h-4" />
+              返回
             </button>
-            <h1 className="text-3xl font-bold text-white">编辑作业</h1>
-            <p className="mt-1 text-gray-400">修改作业信息或题目</p>
+            <h1 className="text-2xl font-bold text-foreground">编辑作业</h1>
+            <p className="mt-1 text-sm text-muted-foreground">修改作业信息或题目</p>
           </div>
-          
           <button
             type="button"
             onClick={handleDelete}
-            className="flex items-center gap-2 px-4 py-2 bg-error/100/10 text-red-400 rounded-lg hover:bg-error/100/20 transition-colors border border-red-500/20"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-error bg-error/5 border border-error/15 rounded-lg hover:bg-error/10 transition-colors"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
             删除作业
           </button>
         </div>
 
-        <div className="card">
+        <div className="bg-white dark:bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="p-6">
             <form onSubmit={handleSubmit}>
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    作业标题 <span className="text-red-400">*</span>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    作业标题 <span className="text-error">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="例如：第一周练习作业"
-                    className="input w-full"
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
                     作业描述
                   </label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="描述作业要求和注意事项"
-                    rows={4}
-                    className="input w-full"
+                    rows={3}
+                    className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-y focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
                   />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                            开始时间
-                        </label>
-                        <div className="relative">
-                            <input
-                            type="datetime-local"
-                            value={formData.startTime}
-                            onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                            className="input w-full"
-                            />
-                            <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                        </div>
-                        <p className="mt-1 text-sm text-gray-500">留空则保持原开始时间</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                            截止时间 <span className="text-red-400">*</span>
-                        </label>
-                        <div className="relative">
-                            <input
-                            type="datetime-local"
-                            value={formData.endTime}
-                            onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                            className="input w-full"
-                            required
-                            />
-                            <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                        </div>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      开始时间
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={formData.startTime}
+                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                    />
+                    <p className="mt-1.5 text-xs text-muted-foreground">留空则保持原开始时间</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      截止时间 <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={formData.endTime}
+                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    选择题目 <span className="text-red-400">*</span>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    选择题目 <span className="text-error">*</span>
                   </label>
 
-                  <div className="mb-4 space-y-3">
+                  <div className="space-y-3">
                     <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="搜索题目编号、标题或标签..."
-                        className="input w-full"
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="搜索题目编号、标题或标签..."
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
                     />
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
+                      {difficultyOptions.map(opt => (
                         <button
-                        type="button"
-                        onClick={() => setDifficultyFilter('all')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                            difficultyFilter === 'all'
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setDifficultyFilter(opt.key)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            difficultyFilter === opt.key
+                              ? 'bg-primary text-white shadow-sm'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                          }`}
                         >
-                        全部
+                          {opt.label}
                         </button>
-                        <button
-                        type="button"
-                        onClick={() => setDifficultyFilter('easy')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                            difficultyFilter === 'easy'
-                            ? 'bg-green-600 text-white'
-                            : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                        >
-                        简单
-                        </button>
-                        <button
-                        type="button"
-                        onClick={() => setDifficultyFilter('medium')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                            difficultyFilter === 'medium'
-                            ? 'bg-yellow-600 text-white'
-                            : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                        >
-                        中等
-                        </button>
-                        <button
-                        type="button"
-                        onClick={() => setDifficultyFilter('hard')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                            difficultyFilter === 'hard'
-                            ? 'bg-red-600 text-white'
-                            : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                        >
-                        困难
-                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="mb-3 text-sm text-gray-400">
-                    已选择 {selectedProblems.length} 个题目 | 显示 {filteredProblems.length} / {problems.length} 个题目
+                  <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>已选择 <strong className="text-foreground">{selectedProblems.length}</strong> 个题目</span>
+                    <span>显示 {filteredProblems.length} / {problems.length}</span>
                   </div>
-                  
-                  <div className="space-y-2 max-h-96 overflow-y-auto border border-white/10 rounded-lg p-4">
+
+                  <div className="space-y-0 max-h-[360px] overflow-y-auto rounded-lg border border-border mt-2">
                     {filteredProblems.map(problem => (
-                        <div
+                      <div
                         key={problem.id}
                         onClick={() => toggleProblem(problem.id)}
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                            selectedProblems.includes(problem.id)
-                            ? 'border-indigo-500 bg-indigo-500/10'
-                            : 'border-white/10 hover:border-indigo-500/50'
+                        className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-all border-b border-border/60 last:border-b-0 ${
+                          selectedProblems.includes(problem.id)
+                            ? 'bg-primary/5'
+                            : 'hover:bg-muted/50'
                         }`}
-                        >
-                        <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                                {problem.problemNumber && (
-                                <span className="text-sm font-mono text-gray-500">
-                                    {problem.problemNumber}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={selectedProblems.includes(problem.id)}
+                            onChange={() => {}}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              {problem.problemNumber && (
+                                <span className="shrink-0 text-xs font-mono text-muted-foreground">{problem.problemNumber}</span>
+                              )}
+                              <span className="font-medium text-foreground text-sm truncate">{problem.title}</span>
+                              <span className={`shrink-0 px-1.5 py-0.5 rounded text-[11px] font-medium ${getDifficultyColor(problem.difficulty)}`}>
+                                {problem.difficulty}
+                              </span>
+                            </div>
+                            <div className="flex gap-1 mt-1 flex-wrap">
+                              {problem.tags.slice(0, 3).map((tag, idx) => (
+                                <span key={idx} className="px-1.5 py-0.5 bg-muted rounded text-[11px] text-muted-foreground">
+                                  {tag}
                                 </span>
-                                )}
-                                <h3 className="font-medium text-white">{problem.title}</h3>
-                                <span className={`px-2 py-0.5 rounded text-xs ${
-                                difficultyColors[problem.difficulty] || 'bg-white/10 text-gray-400'
-                                }`}>
-                                {difficultyText[problem.difficulty] || problem.difficulty}
-                                </span>
+                              ))}
                             </div>
-                            <div className="flex gap-1">
-                                {problem.tags.slice(0, 4).map((tag, idx) => (
-                                <span key={idx} className="px-2 py-0.5 bg-white/10 rounded text-xs text-gray-400">
-                                    {tag}
-                                </span>
-                                ))}
-                            </div>
-                            </div>
-                            <div className="ml-4">
-                            <input
-                                type="checkbox"
-                                checked={selectedProblems.includes(problem.id)}
-                                onChange={() => {}}
-                                className="w-5 h-5 text-indigo-600 border-gray-600 rounded focus:ring-indigo-500 bg-white/10"
-                            />
-                            </div>
+                          </div>
                         </div>
-                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
 
                 {error && (
-                  <div className="p-4 bg-error/100/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-400">{error}</p>
+                  <div className="p-3 rounded-lg bg-error/5 border border-error/15">
+                    <p className="text-sm text-error">{error}</p>
                   </div>
                 )}
 
                 {success && (
-                  <div className="p-4 bg-secondary/100/10 border border-green-500/20 rounded-lg">
-                    <p className="text-sm text-green-400">{success}</p>
+                  <div className="p-3 rounded-lg bg-secondary/5 border border-secondary/15">
+                    <p className="text-sm text-secondary font-medium">{success}</p>
                   </div>
                 )}
 
-                <div className="flex gap-3 pt-4 border-t border-white/10">
+                <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="btn-primary flex items-center justify-center gap-2 flex-1"
+                    className="btn-primary btn flex items-center justify-center gap-2 flex-1"
                   >
-                    <Save className="w-5 h-5" />
+                    <Save className="w-4 h-4" />
                     {loading ? '保存中...' : '保存修改'}
                   </button>
                   <button
                     type="button"
                     onClick={() => router.back()}
-                    className="px-6 py-2 bg-white/10 text-gray-300 rounded-lg hover:bg-white/20 font-medium transition-colors"
+                    className="btn-ghost btn"
                   >
                     取消
                   </button>

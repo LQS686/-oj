@@ -379,3 +379,25 @@
 {"timestamp":"2026-05-07T12:18:58.790Z","level":"debug","message":"内存超过限制","meta":{"current":946,"limit":256}}
 {"timestamp":"2026-05-07T12:18:58.857Z","level":"debug","message":"内存超过限制","meta":{"current":946,"limit":256}}
 {"timestamp":"2026-05-07T12:18:58.869Z","level":"debug","message":"内存超过限制","meta":{"current":946,"limit":256}}
+{"timestamp":"2026-05-08T01:10:58.132Z","level":"debug","message":"分析代码安全性"}
+{"timestamp":"2026-05-08T01:10:58.140Z","level":"debug","message":"编译代码"}
+{"timestamp":"2026-05-08T01:10:58.146Z","level":"debug","message":"编译命令","meta":{"command":"g++ -O2 -std=c++17 -o \"E:\\桌面\\oj\\temp\\judge\\solution_1778202658140_a7wzjp.exe\" \"E:\\桌面\\oj\\temp\\judge\\solution_1778202658140_a7wzjp.cpp\""}}
+{"timestamp":"2026-05-08T01:11:13.485Z","level":"debug","message":"编译成功"}
+{"timestamp":"2026-05-08T01:11:13.485Z","level":"debug","message":"测试用例","meta":{"index":1,"total":6}}
+{"timestamp":"2026-05-08T01:11:13.488Z","level":"debug","message":"执行命令","meta":{"command":"solution_1778202658140_a7wzjp.exe","args":[]}}
+{"timestamp":"2026-05-08T01:11:13.519Z","level":"debug","message":"通过","meta":{"time":31,"memory":1024}}
+{"timestamp":"2026-05-08T01:11:13.520Z","level":"debug","message":"测试用例","meta":{"index":2,"total":6}}
+{"timestamp":"2026-05-08T01:11:13.522Z","level":"debug","message":"执行命令","meta":{"command":"solution_1778202658140_a7wzjp.exe","args":[]}}
+{"timestamp":"2026-05-08T01:11:13.541Z","level":"debug","message":"通过","meta":{"time":19,"memory":1024}}
+{"timestamp":"2026-05-08T01:11:13.542Z","level":"debug","message":"测试用例","meta":{"index":3,"total":6}}
+{"timestamp":"2026-05-08T01:11:13.543Z","level":"debug","message":"执行命令","meta":{"command":"solution_1778202658140_a7wzjp.exe","args":[]}}
+{"timestamp":"2026-05-08T01:11:13.553Z","level":"debug","message":"通过","meta":{"time":9,"memory":1024}}
+{"timestamp":"2026-05-08T01:11:13.554Z","level":"debug","message":"测试用例","meta":{"index":4,"total":6}}
+{"timestamp":"2026-05-08T01:11:13.555Z","level":"debug","message":"执行命令","meta":{"command":"solution_1778202658140_a7wzjp.exe","args":[]}}
+{"timestamp":"2026-05-08T01:11:13.566Z","level":"debug","message":"通过","meta":{"time":10,"memory":1024}}
+{"timestamp":"2026-05-08T01:11:13.566Z","level":"debug","message":"测试用例","meta":{"index":5,"total":6}}
+{"timestamp":"2026-05-08T01:11:13.568Z","level":"debug","message":"执行命令","meta":{"command":"solution_1778202658140_a7wzjp.exe","args":[]}}
+{"timestamp":"2026-05-08T01:11:13.580Z","level":"debug","message":"通过","meta":{"time":10,"memory":1024}}
+{"timestamp":"2026-05-08T01:11:13.580Z","level":"debug","message":"测试用例","meta":{"index":6,"total":6}}
+{"timestamp":"2026-05-08T01:11:13.582Z","level":"debug","message":"执行命令","meta":{"command":"solution_1778202658140_a7wzjp.exe","args":[]}}
+{"timestamp":"2026-05-08T01:11:13.593Z","level":"debug","message":"通过","meta":{"time":10,"memory":1024}}
