@@ -71,14 +71,14 @@ export default function TeamManagePage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center card-static rounded-2xl p-12 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8 text-error" />
+        <div className="text-center bg-white rounded-xl border border-border shadow-sm p-12 max-w-md">
+          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
-          <p className="text-error text-lg mb-6">{error}</p>
+          <p className="text-red-500 text-lg mb-6">{error}</p>
           <button
             onClick={() => router.push(`/teams/${params.id}`)}
-            className="btn-primary btn"
+            className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
           >
             返回团队详情
           </button>
@@ -98,7 +98,7 @@ export default function TeamManagePage() {
           返回团队详情
         </button>
 
-          <div className="card-static rounded-2xl p-8">
+        <div className="bg-white rounded-xl border border-border shadow-sm p-8">
           <div className="flex items-center gap-4 mb-8">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30">
               <Settings className="w-6 h-6 text-white" />
@@ -109,10 +109,10 @@ export default function TeamManagePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <button
               onClick={() => router.push(`/teams/${params.id}/members`)}
-              className="card p-6 text-left group"
+              className="bg-white rounded-xl border border-border p-6 text-left group hover:shadow-md transition-shadow"
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -129,7 +129,7 @@ export default function TeamManagePage() {
 
             <button
               onClick={() => router.push(`/teams/${params.id}/invites`)}
-              className="card p-6 text-left group"
+              className="bg-white rounded-xl border border-border p-6 text-left group hover:shadow-md transition-shadow"
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-purple-500/15 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -146,7 +146,7 @@ export default function TeamManagePage() {
 
             <button
               onClick={() => router.push(`/teams/${params.id}/requests`)}
-              className="card p-6 text-left group"
+              className="bg-white rounded-xl border border-border p-6 text-left group hover:shadow-md transition-shadow"
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-secondary/15 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -156,46 +156,6 @@ export default function TeamManagePage() {
                   <div className="font-semibold text-foreground text-lg mb-1 group-hover:text-secondary-light transition-colors">申请管理</div>
                   <div className="text-sm text-muted-foreground">
                     审批加入申请、查看申请记录、管理申请状态
-                  </div>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <button
-              onClick={() => router.push(`/teams/${params.id}/assignments`)}
-              className="card p-6 text-left group"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <ClipboardList className="w-6 h-6 text-primary-light" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-foreground text-lg mb-1 group-hover:text-primary-light transition-colors">
-                    作业与训练
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    管理团队作业、查看完成情况，帮助同学按阶段完成训练计划。
-                  </div>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => router.push(`/teams/${params.id}/points`)}
-              className="card p-6 text-left group"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-secondary/15 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Settings className="w-6 h-6 text-secondary-light" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-foreground text-lg mb-1 group-hover:text-secondary-light transition-colors">
-                    积分与激励
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    查看积分规则与明细，通过积分商城配置激励方案，提升课堂参与度。
                   </div>
                 </div>
               </div>

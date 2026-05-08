@@ -1,17 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import {
   Users,
-  Shield,
   Activity,
   Search,
   UserPlus,
   ArrowLeft,
-  Crown
+  Crown,
+  Trash2
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -49,22 +49,14 @@ export default function TeamMembersPage() {
       return
     }
     fetchMembers()
-  }, [user, roleFilter, activeFilter, sortBy, sortOrder])
+  }, [user])
 
   const fetchMembers = async () => {
     try {
       setLoading(true)
+      setError('')
 
-      const queryParams = new URLSearchParams({
-        sortBy,
-        sortOrder
-      })
-
-      if (roleFilter) queryParams.append('role', roleFilter)
-      if (activeFilter) queryParams.append('active', activeFilter)
-
-      const response = await fetchWithAuth(`/api/teams/${params.id}?${queryParams}`)
-
+      const response = await fetchWithAuth(`/api/teams/${params.id}`)
       const data = await response.json()
 
       if (data.success) {
@@ -81,24 +73,61 @@ export default function TeamMembersPage() {
     }
   }
 
+  const handleRemoveMember = useCallback(async (userId: string, username: string) => {
+    if (!confirm(`确定要移除成员 "${username}" 吗？此操作不可撤销。`)) return
+
+    try {
+      const res = await fetchWithAuth(`/api/teams/${params.id}/members?userId=${userId}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+      if (data.success) {
+        setMembers(prev => prev.filter(m => m.userId !== userId))
+      } else {
+        alert(data.error || '移除成员失败')
+      }
+    } catch {
+      alert('移除成员失败')
+    }
+  }, [params.id])
+
+  const handleRoleChange = useCallback(async (userId: string, newRole: string) => {
+    try {
+      const res = await fetchWithAuth(`/api/teams/${params.id}/members?userId=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setMembers(prev =>
+          prev.map(m => m.userId === userId ? { ...m, role: newRole } : m)
+        )
+      } else {
+        alert(data.error || '变更角色失败')
+        fetchMembers()
+      }
+    } catch {
+      alert('变更角色失败')
+      fetchMembers()
+    }
+  }, [params.id])
+
   const handleViewActivity = (memberId: string) => {
     router.push(`/teams/${params.id}/members/${memberId}/activity`)
   }
 
-  const handleManagePermissions = (memberId: string) => {
-    router.push(`/teams/${params.id}/members/${memberId}/permissions`)
-  }
-
   const getRoleBadge = (role: string) => {
-    const badges: Record<string, { text: string; color: string }> = {
-      owner: { text: '所有者', color: 'tag-warning' },
-      admin: { text: '管理员', color: 'tag-primary' },
-      member: { text: '成员', color: 'tag' }
+    const badges: Record<string, { text: string; cls: string }> = {
+      owner: { text: '所有者', cls: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
+      admin: { text: '管理员', cls: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-light' },
+      member: { text: '成员', cls: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary/10 text-secondary' }
     }
 
     const badge = badges[role] || badges.member
     return (
-      <span className={`tag ${badge.color}`}>
+      <span className={badge.cls}>
+        <Crown className={`w-3 h-3 mr-1 ${role === 'owner' ? '' : 'hidden'}`} />
         {badge.text}
       </span>
     )
@@ -112,25 +141,58 @@ export default function TeamMembersPage() {
     const lastActive = new Date(lastActiveAt)
 
     if (lastActive >= thirtyDaysAgo) {
-      return { text: '活跃', color: 'text-secondary-light' }
+      return { text: '活跃', color: 'text-emerald-600 dark:text-emerald-400' }
     }
     return { text: '不活跃', color: 'text-muted-foreground' }
   }
 
-  const filteredMembers = members.filter(m => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      return (
-        m.username?.toLowerCase().includes(query) ||
-        m.nickname?.toLowerCase().includes(query)
-      )
-    }
-    return true
-  })
+  const filteredAndSorted = (() => {
+    let result = members.filter(m => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        if (!(m.username?.toLowerCase().includes(query) || m.nickname?.toLowerCase().includes(query))) {
+          return false
+        }
+      }
+      if (roleFilter && m.role !== roleFilter) return false
+      if (activeFilter) {
+        const status = getActivityStatus(m.lastActiveAt)
+        const isActive = status.text === '活跃'
+        if (activeFilter === 'true' && !isActive) return false
+        if (activeFilter === 'false' && isActive) return false
+      }
+      return true
+    })
+
+    result.sort((a, b) => {
+      let cmp = 0
+      switch (sortBy) {
+        case 'joinedAt':
+          cmp = new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime()
+          break
+        case 'lastActiveAt':
+          cmp = (new Date(a.lastActiveAt || 0).getTime()) - (new Date(b.lastActiveAt || 0).getTime())
+          break
+        case 'role': {
+          const order: Record<string, number> = { owner: 0, admin: 1, member: 2 }
+          cmp = (order[a.role] ?? 3) - (order[b.role] ?? 3)
+          break
+        }
+        case 'username':
+          cmp = (a.username || '').localeCompare(b.username || '')
+          break
+        default:
+          break
+      }
+      return sortOrder === 'asc' ? cmp : -cmp
+    })
+
+    return result
+  })()
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-card">
         <div className="text-center">
           <div className="relative w-16 h-16 mx-auto mb-6">
             <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
@@ -143,7 +205,7 @@ export default function TeamMembersPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-white dark:bg-card">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="flex items-center gap-2 text-sm mb-6">
           <Link
@@ -157,7 +219,7 @@ export default function TeamMembersPage() {
           <span className="text-foreground font-medium">成员管理</span>
         </div>
 
-        <div className="card-static rounded-2xl p-6 mb-6">
+        <div className="bg-white dark:bg-card rounded-2xl border border-border p-6 mb-6 shadow-sm">
           <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30">
@@ -172,7 +234,7 @@ export default function TeamMembersPage() {
             {isAdmin && (
               <Link
                 href={`/teams/${params.id}/invites`}
-                className="btn btn-primary"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-light font-medium hover:bg-primary/90 transition-colors"
               >
                 <UserPlus className="w-4 h-4" />
                 邀请成员
@@ -182,20 +244,20 @@ export default function TeamMembersPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="relative md:col-span-2">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="搜索用户名或昵称..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="input pl-11"
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-white dark:bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
               />
             </div>
 
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="input"
+              className="px-3 py-2.5 rounded-lg border border-border bg-white dark:bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             >
               <option value="">全部角色</option>
               <option value="owner">所有者</option>
@@ -206,7 +268,7 @@ export default function TeamMembersPage() {
             <select
               value={activeFilter}
               onChange={(e) => setActiveFilter(e.target.value)}
-              className="input"
+              className="px-3 py-2.5 rounded-lg border border-border bg-white dark:bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             >
               <option value="">全部活跃度</option>
               <option value="true">活跃</option>
@@ -216,11 +278,11 @@ export default function TeamMembersPage() {
             <select
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
-                const [newSortBy, newSortOrder] = e.target.value.split('-')
-                setSortBy(newSortBy)
-                setSortOrder(newSortOrder)
+                const [sb, so] = e.target.value.split('-')
+                setSortBy(sb)
+                setSortOrder(so)
               }}
-              className="input"
+              className="px-3 py-2.5 rounded-lg border border-border bg-white dark:bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
             >
               <option value="joinedAt-desc">加入时间 ↓</option>
               <option value="joinedAt-asc">加入时间 ↑</option>
@@ -232,23 +294,23 @@ export default function TeamMembersPage() {
           </div>
         </div>
 
-        {filteredMembers.length === 0 ? (
-          <div className="card-static rounded-2xl p-16 text-center">
+        {filteredAndSorted.length === 0 ? (
+          <div className="bg-white dark:bg-card rounded-2xl border border-border p-16 text-center shadow-sm">
             <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
               <Users className="w-8 h-8 text-muted-foreground" />
             </div>
             <div className="text-foreground text-xl font-semibold mb-2">
-              {searchQuery ? '没有找到匹配的成员' : '暂无成员'}
+              {searchQuery || roleFilter || activeFilter ? '没有找到匹配的成员' : '暂无成员'}
             </div>
             <div className="text-muted-foreground">
-              {searchQuery ? '尝试其他搜索条件' : '邀请成员加入团队吧'}
+              {searchQuery || roleFilter || activeFilter ? '尝试其他搜索条件' : '邀请成员加入团队吧'}
             </div>
           </div>
         ) : (
-          <div className="card-static rounded-2xl overflow-hidden">
+          <div className="bg-white dark:bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="min-w-full">
-                <thead className="bg-muted/30">
+                <thead className="bg-muted/20">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       用户
@@ -270,9 +332,12 @@ export default function TeamMembersPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredMembers.map((member) => {
+                <tbody className="divide-y divide-border/40">
+                  {filteredAndSorted.map((member) => {
                     const activityStatus = getActivityStatus(member.lastActiveAt)
+                    const isOwner = member.role === 'owner'
+                    const isSelf = member.userId === user?.id
+
                     return (
                       <tr key={member.id} className="hover:bg-muted/20 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -281,7 +346,7 @@ export default function TeamMembersPage() {
                               <img
                                 src={member.avatar}
                                 alt={member.username}
-                                className="w-10 h-10 rounded-full mr-3 ring-2 ring-primary/20"
+                                className="w-10 h-10 rounded-full mr-3 ring-2 ring-primary/20 object-cover"
                               />
                             ) : (
                               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center mr-3">
@@ -291,6 +356,9 @@ export default function TeamMembersPage() {
                             <div>
                               <div className="text-sm font-medium text-foreground">
                                 {member.nickname || member.username}
+                                {isSelf && (
+                                  <span className="ml-2 text-xs text-muted-foreground">(我)</span>
+                                )}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 @{member.username}
@@ -299,7 +367,18 @@ export default function TeamMembersPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {getRoleBadge(member.role)}
+                          {isAdmin && !isOwner ? (
+                            <select
+                              defaultValue={member.role}
+                              onChange={(e) => handleRoleChange(member.userId, e.target.value)}
+                              className="text-sm px-2 py-1 rounded-md border border-border bg-white dark:bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+                            >
+                              <option value="admin">管理员</option>
+                              <option value="member">成员</option>
+                            </select>
+                          ) : (
+                            getRoleBadge(member.role)
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`text-sm font-medium ${activityStatus.color}`}>
@@ -318,18 +397,18 @@ export default function TeamMembersPage() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleViewActivity(member.userId)}
-                              className="text-primary-light hover:text-primary flex items-center gap-1 transition-colors"
+                              className="text-primary-light hover:text-primary flex items-center gap-1 transition-colors p-1.5 rounded-md hover:bg-primary/5"
                               title="查看活动"
                             >
                               <Activity className="w-4 h-4" />
                             </button>
-                            {isAdmin && member.role !== 'owner' && (
+                            {isAdmin && !isOwner && (
                               <button
-                                onClick={() => handleManagePermissions(member.userId)}
-                                className="text-muted-foreground hover:text-primary-light flex items-center gap-1 transition-colors"
-                                title="管理权限"
+                                onClick={() => handleRemoveMember(member.userId, member.nickname || member.username)}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-1 transition-colors p-1.5 rounded-md"
+                                title="移除成员"
                               >
-                                <Shield className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             )}
                           </div>
@@ -344,8 +423,8 @@ export default function TeamMembersPage() {
         )}
 
         {error && (
-          <div className="mt-4 p-4 card-static rounded-xl border border-error/30 bg-error/5">
-            <p className="text-error">{error}</p>
+          <div className="mt-4 p-4 rounded-xl border border-red-200 dark:border-red-800/40 bg-red-50 dark:bg-red-950/20">
+            <p className="text-red-600 dark:text-red-400">{error}</p>
           </div>
         )}
       </div>
