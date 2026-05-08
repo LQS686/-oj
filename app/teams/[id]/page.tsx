@@ -47,6 +47,7 @@ interface Assignment {
   id: string
   title: string
   description: string
+  startTime?: string
   deadline: string
   problemCount: number
   problems?: any[]
@@ -462,6 +463,12 @@ function AssignmentsTab({ teamId, assignments, loading, filter, setFilter, user 
     return new Date() > end ? { text: '已结束', color: 'text-error bg-error/10' } : { text: '进行中', color: 'text-secondary bg-secondary/10' }
   }
 
+  const fmtDate = (d?: string) => {
+    if (!d) return '-'
+    const dt = new Date(d)
+    return `${dt.getMonth() + 1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+  }
+
   const filtered = assignments.filter((a: Assignment) => {
     if (filter === 'all') return true
     const end = new Date(a.deadline)
@@ -497,14 +504,18 @@ function AssignmentsTab({ teamId, assignments, loading, filter, setFilter, user 
             const st = getAssignmentStatus(a)
             return (
               <Link key={a.id} href={`/teams/${teamId}/assignments/${a.id}`} className="block p-4 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/[0.02] transition-colors">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-medium text-foreground text-sm truncate">{a.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{a.description || '暂无描述'}</p>
-                  </div>
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.color}`}>{st.text}</span>
-                    <span className="text-[11px] text-muted-foreground">{a.problemCount || 0}题</span>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-foreground text-sm truncate">{a.title}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${st.color}`}>{st.text}</span>
+                    </div>
+                    {a.description && <p className="text-xs text-muted-foreground truncate mb-2">{a.description}</p>}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDate(a.startTime)} ~ {fmtDate(a.deadline)}</span>
+                      <span className="inline-flex items-center gap-1"><User className="w-3 h-3" />{a.createdBy || '-'}</span>
+                      <span className="inline-flex items-center gap-1"><FileText className="w-3 h-3" />{a.problemCount || 0} 题</span>
+                    </div>
                   </div>
                 </div>
               </Link>

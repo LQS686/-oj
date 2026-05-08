@@ -3203,3 +3203,21 @@
 {"timestamp":"2026-05-08T01:40:11.019Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
 {"timestamp":"2026-05-08T01:40:41.020Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
 {"timestamp":"2026-05-08T01:41:11.034Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:41:41.039Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:42:11.040Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:42:11.973Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-05-08T01:42:41.044Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:43:11.044Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:43:41.056Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:44:11.062Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:44:41.071Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:45:11.079Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:45:41.084Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:46:11.085Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:46:41.087Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:47:11.098Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:47:28.174Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-05-08T01:47:41.107Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:48:11.119Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:48:41.128Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
+{"timestamp":"2026-05-08T01:49:11.136Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":1}}
