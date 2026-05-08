@@ -303,7 +303,7 @@ export default function AssignmentDetailPage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-error mb-4">{error || '作业不存在'}</p>
-          <button onClick={() => router.push(`/teams/${params.id}/assignments`)} className="btn-primary btn">
+          <button onClick={() => router.push(`/teams/${params.id}?tab=assignments`)} className="btn-primary btn">
             返回列表
           </button>
         </div>
@@ -324,7 +324,7 @@ export default function AssignmentDetailPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <button
-          onClick={() => router.push(`/teams/${params.id}/assignments`)}
+          onClick={() => router.push(`/teams/${params.id}?tab=assignments`)}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
