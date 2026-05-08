@@ -59,6 +59,7 @@ interface Assignment {
   userStatus: string
   createdAt: string
   createdBy?: string
+  createdByName?: string
 }
 
 interface Note {
@@ -510,10 +511,9 @@ function AssignmentsTab({ teamId, assignments, loading, filter, setFilter, user 
                       <h3 className="font-medium text-foreground text-sm truncate">{a.title}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${st.color}`}>{st.text}</span>
                     </div>
-                    {a.description && <p className="text-xs text-muted-foreground truncate mb-2">{a.description}</p>}
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                       <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDate(a.startTime)} ~ {fmtDate(a.deadline)}</span>
-                      <span className="inline-flex items-center gap-1"><User className="w-3 h-3" />{a.createdBy || '-'}</span>
+                      <span className="inline-flex items-center gap-1"><User className="w-3 h-3" />{a.createdByName || a.createdBy || '-'}</span>
                       <span className="inline-flex items-center gap-1"><FileText className="w-3 h-3" />{a.problemCount || 0} 题</span>
                     </div>
                   </div>

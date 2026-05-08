@@ -97,6 +97,13 @@ export async function GET(
     ])
 
     // 获取每个作业的完成情况
+    const creatorIds = [...new Set(assignments.map(a => a.createdBy).filter(Boolean))]
+    const creatorMap = new Map<string, string>()
+    if (creatorIds.length > 0) {
+      const creators = await prisma.user.findMany({ where: { id: { in: creatorIds } }, select: { id: true, nickname: true, username: true } })
+      creators.forEach(u => creatorMap.set(u.id, u.nickname || u.username))
+    }
+
     const assignmentsWithStats = await Promise.all(
       assignments.map(async (assignment) => {
         // 获取作业的所有提交
@@ -179,7 +186,8 @@ export async function GET(
           },
           userStatus,
           createdAt: assignment.createdAt,
-          createdBy: assignment.createdBy
+          createdBy: assignment.createdBy,
+          createdByName: creatorMap.get(assignment.createdBy || '') || assignment.createdBy || '-'
         }
       })
     )
