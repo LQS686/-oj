@@ -26,23 +26,54 @@ export class ParamGenPromptGenerator implements PromptGenerator {
 - 禁止添加模板之外的字段
 - 禁止删除模板中的字段
 - 禁止在 JSON 之外添加任何解释、markdown 标记（\`\`\`json 等）、think 块
-- 标程代码（solutionCpp/solutionPython）必须可在标准编译器下编译运行
-- 测试点（testCases）必须真实可解，与标程输出完全一致
+
+# ⚠️ 字段名固定规则
+所有字段名必须用 **snake_case**（下划线命名），与模板完全一致：
+- test_cases（不是 testCases）
+- time_limit（不是 timeLimit）
+- memory_limit（不是 memoryLimit）
+- solution_cpp（不是 solutionCpp）
+- solution_python（不是 solutionPython）
+
+# ⚠️ 多道题时的关键约束
+- 无论生成几道题，**顶层必须是 JSON 数组**：[ {problem1}, {problem2}, ... ]
+- 严禁把多道题塞进同一个对象（会导致重复 key，JSON.parse 只保留最后一个值）
+- count=1 时输出长度为 1 的数组：[ {...} ]
+- count=2 时输出长度为 2 的数组：[ {...}, {...} ]
+- count=3 时输出长度为 3 的数组：[ {...}, {...}, {...} ]
+
+# ⚠️ 响应长度
+- 字段内容必须完整闭合，禁止中途截断
+- test_cases 必须包含 15 个对象（不是 3 个），覆盖 10 个维度（最小值/最大值/边界/反例/随机/全相同/单调/极端比例/倒数边界/随机压力）
+- 标程代码（solution_cpp / solution_python）必须可在标准编译器下编译运行
+- 测试点（test_cases）必须真实可解，与标程输出完全一致
+- 中文标点、字符串、代码中可能含双引号，**必须用 \\" 转义**，否则 JSON 非法
 
 # 字段填充指引
 - title: 4-10 字中文题目名
 - description: Markdown 格式，简体中文，含背景/要求/约束
 - samples: 至少 2 组，explanation 用中文
-- testCases: 至少 15 组，覆盖 10 个维度的至少 9 个
-- timeLimit / memoryLimit: 根据难度档位选择合适的整数值
-- solutionCpp: C++17 标程
-- solutionPython: Python3 标程
+- test_cases: 至少 15 组，每组 { "input": "...", "output": "..." }
+- tags: 至少 2 个中文标签
+- hint: 1-2 句数据范围提示
+- time_limit / memory_limit: 根据难度档位选择合适的整数值（直接写数字，不要带引号）
+- solution_cpp: C++17 标程（字符串里可能含 \\n 换行；含双引号必须转义为 \\"）
+- solution_python: Python3 标程
 `;
 
-    const userPrompt = `请根据主题「${topic.join('、')}」、难度「${difficulty}」、类型「${type}」，按以下 JSON 模板生成 ${count} 道题。
+    const userPrompt = `请根据主题「${topic.join('、')}」、难度「${difficulty}」、类型「${type}」，生成 ${count} 道题。
 
 ${additionalInfo ? `附加要求：${additionalInfo}\n` : ''}
-只输出一个 JSON 对象，结构与下方模板 1:1 对应。
+
+# 输出格式（严格遵守）
+
+- 顶层必须是一个 **JSON 数组**，长度为 ${count}
+- 每个元素是 1 道题的对象
+- 字段名必须用 snake_case：test_cases / time_limit / memory_limit / solution_cpp / solution_python
+- 所有 <...> 占位符都必须替换为真实内容
+- 模板仅供参考结构，**请直接输出 JSON，不要写"下面是 JSON"等任何前言**
+
+# JSON 模板
 
 ${fillTemplate(difficulty, timeLimit, memoryLimit)}`;
 

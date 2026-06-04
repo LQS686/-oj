@@ -243,9 +243,9 @@ export async function generateProblems(params: GenerationParams, userId?: string
     ],
     temperature: temperature,
     response_format: { type: 'json_object' as const },
-    // DeepSeek 官方建议：合理设置 max_tokens 防止 JSON 字符串被中途截断
-    // 出一道完整题（含样例、测试数据、双解法）通常 4000-8000 tokens
-    max_tokens: 8192
+    // 出 1 道完整题（15 组测试数据 + 双解法）通常 4000-9000 tokens；
+    // 出 2-3 道时叠加。给到 16384 防止长响应被截断。
+    max_tokens: 16384
   }
 
   // 尝试 1：标准调用，使用 callWithRetry 包装
@@ -362,32 +362,53 @@ export async function generateProblems(params: GenerationParams, userId?: string
     }
 
     let problems: GeneratedProblem[] = [];
+
+    // ⚠️ 修复：避免把 test_cases 数组误识别为 problems
+    // 1) 顶层是数组：直接用
+    // 2) 顶层有 problems 字段（数组）：用之
+    // 3) 否则视为单道题，把顶层对象包成 [parsed]
     if (Array.isArray(parsed)) {
-      problems = parsed;
-    } else if (parsed.problems && Array.isArray(parsed.problems)) {
-      problems = parsed.problems;
-    } else {
-      const values = Object.values(parsed);
-      for (const val of values) {
-        if (Array.isArray(val)) {
-            problems = val as GeneratedProblem[];
-            break;
-        }
+      problems = parsed
+    } else if (parsed && typeof parsed === 'object') {
+      if (Array.isArray(parsed.problems)) {
+        problems = parsed.problems
+      } else {
+        // 顶层是单道题对象，包成数组
+        problems = [parsed]
       }
+    } else {
+      throw new Error('Invalid JSON structure returned by AI: not an object or array')
     }
 
     if (problems.length === 0) {
-        throw new Error('Invalid JSON structure returned by AI');
+        throw new Error('Invalid JSON structure returned by AI: empty problems array')
     }
 
     // Post-processing to handle potential field naming mismatches if LLM hallucinates
-    const normalizedProblems = problems.map(p => ({
-        ...p,
-        input: p.input || (p as any).input_description || 'No input description',
-        output: p.output || (p as any).output_description || 'No output description',
-        time_limit: p.time_limit || 1000,
-        memory_limit: p.memory_limit || 128
-    }));
+    // camelCase → snake_case 兜底，避免字段名错误导致 test_cases=0、solution_cpp 丢失
+    const camelToSnakeMap: Record<string, string> = {
+      testCases: 'test_cases',
+      timeLimit: 'time_limit',
+      memoryLimit: 'memory_limit',
+      solutionCpp: 'solution_cpp',
+      solutionPython: 'solution_python',
+      inputDescription: 'input',
+      outputDescription: 'output'
+    }
+    const normalizedProblems = problems.map(p => {
+      const normalized: any = { ...p }
+      for (const [camel, snake] of Object.entries(camelToSnakeMap)) {
+        if (normalized[snake] === undefined && normalized[camel] !== undefined) {
+          normalized[snake] = normalized[camel]
+        }
+      }
+      // 兜底字段
+      normalized.input = normalized.input || normalized.input_description || ''
+      normalized.output = normalized.output || normalized.output_description || ''
+      normalized.time_limit = normalized.time_limit || 1000
+      normalized.memory_limit = normalized.memory_limit || 128
+      return normalized
+    }) as GeneratedProblem[];
 
     // 质量自检：对每条 problem 调用 checkGeneratedProblem，失败项不阻塞但记录到 qualityIssues
     const qualityIssues: Array<{ problemIndex: number; reason: string; details?: string[] }> = []

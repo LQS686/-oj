@@ -147,6 +147,8 @@ export interface ParseFailureInfo {
   strippedThinkBlock: boolean
   /** JSON.parse 抛出的错误信息 */
   parseError: string
+  /** 修复建议（截断/格式/字段名等） */
+  hint?: string
 }
 
 /**
@@ -172,12 +174,24 @@ export function safeJsonParse(text: string): any {
   try {
     return JSON.parse(stripped)
   } catch (e: any) {
+    // 启发式检测响应是否被 max_tokens 截断：
+    // 截断的标志 = 字符串里所有括号/引号都是奇数个未闭合
+    // 简化判定：如果内容最后 50 字包含未闭合的 " 或 { 或 [，大概率是截断
+    const tail = stripped.slice(-100)
+    const unbalanced =
+      (tail.match(/{/g) || []).length !== (tail.match(/}/g) || []).length ||
+      (tail.match(/\[/g) || []).length !== (tail.match(/\]/g) || []).length ||
+      /["{[](?![^"{}[\]]*["}\]])\s*$/.test(tail)
+    const hint = unbalanced
+      ? '响应可能因 max_tokens 不够而被截断；请增大 max_tokens 或减少生成数量'
+      : undefined
     throw createParseError(
       'JSON.parse failed after stripping think blocks',
       text,
       strippedThinkBlock,
       e?.message || String(e),
-      stripped
+      stripped,
+      hint
     )
   }
 }
@@ -187,7 +201,8 @@ function createParseError(
   original: string,
   strippedThinkBlock: boolean,
   parseError: string,
-  stripped?: string
+  stripped?: string,
+  hint?: string
 ): Error & { code?: string; info?: ParseFailureInfo } {
   const err: Error & { code?: string; info?: ParseFailureInfo } = new Error(msg)
   err.code = 'AI_PARSE_FAILED'
@@ -196,14 +211,16 @@ function createParseError(
     strippedContent: (stripped || '').substring(0, 500),
     contentLength: (original || '').length,
     strippedThinkBlock,
-    parseError
+    parseError,
+    hint
   }
   logger.warn('[safeJsonParse] JSON.parse failed — model returned non-JSON content', {
     contentLength: err.info.contentLength,
     contentPreview: err.info.originalContent,
     strippedContent: err.info.strippedContent,
     parseError,
-    strippedThinkBlock
+    strippedThinkBlock,
+    hint
   })
   return err
 }
