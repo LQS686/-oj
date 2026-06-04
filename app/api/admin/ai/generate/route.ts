@@ -46,7 +46,12 @@ export async function POST(request: NextRequest) {
       if (oldLog.status === 'COMPLETED') {
         return NextResponse.json({ success: false, error: '该日志已成功完成，无需重试' }, { status: 400 })
       }
-      if (oldLog.status === 'PENDING' || oldLog.status === 'PROCESSING') {
+      // 僵尸日志（dev server 重启后遗留的 PROCESSING 永远完不成）允许重试
+      // 判定标准：PENDING/PROCESSING 且 createdAt 超过 10 分钟
+      const STUCK_TIMEOUT_MS = 10 * 60 * 1000
+      const isStuck = (oldLog.status === 'PENDING' || oldLog.status === 'PROCESSING') &&
+        (Date.now() - new Date(oldLog.createdAt).getTime()) > STUCK_TIMEOUT_MS
+      if (!isStuck && (oldLog.status === 'PENDING' || oldLog.status === 'PROCESSING')) {
         return NextResponse.json({ success: false, error: '该日志正在处理中，请等待完成后再试' }, { status: 400 })
       }
 

@@ -496,7 +496,19 @@ export default function AIGenerationPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  /**
+   * 状态徽章：
+   *   - PENDING/PROCESSING 且 createdAt 超过 10 分钟 → 视觉显示"超时"（不依赖后端标记）
+   *   - 其他状态原样显示
+   */
+  const STUCK_TIMEOUT_MS = 10 * 60 * 1000
+  const getStatusBadge = (status: string, createdAt?: string) => {
+    if ((status === 'PENDING' || status === 'PROCESSING') && createdAt) {
+      const age = Date.now() - new Date(createdAt).getTime()
+      if (age > STUCK_TIMEOUT_MS) {
+        return <span className="px-2 py-0.5 rounded text-xs bg-error/10 text-error flex items-center gap-1">⏱️ 超时</span>
+      }
+    }
     switch (status) {
       case 'PENDING':
         return <span className="px-2 py-0.5 rounded text-xs bg-accent/10 text-accent">等待中</span>
@@ -625,7 +637,7 @@ export default function AIGenerationPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {getStatusBadge(log.status)}
+                      {getStatusBadge(log.status, log.createdAt)}
                       <span className="text-sm text-foreground">
                         {log.params?.topic?.[0] || log.params?.title || '未知主题'}
                       </span>
@@ -640,8 +652,8 @@ export default function AIGenerationPage() {
                   {log.tokensUsed && (
                     <p className="text-xs text-muted-foreground mt-1">消耗 {log.tokensUsed} tokens</p>
                   )}
-                  {/* 失败日志：加重试按钮（带降温度） */}
-                  {log.status === 'FAILED' && (
+                  {/* 失败日志 / 超时僵尸日志：加重试按钮（带降温度） */}
+                  {(log.status === 'FAILED' || (log.status === 'PENDING' || log.status === 'PROCESSING') && Date.now() - new Date(log.createdAt).getTime() > STUCK_TIMEOUT_MS) && (
                     <div className="mt-2 flex justify-end">
                       <button
                         onClick={(e) => handleRetryLog(log, e)}
