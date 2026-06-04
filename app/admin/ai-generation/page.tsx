@@ -569,7 +569,7 @@ export default function AIGenerationPage() {
             </div>
           </div>
           
-          {logs.length > 0 && (
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setShowHistory(!showHistory)}
               className="btn btn-ghost flex items-center gap-2"
@@ -581,13 +581,23 @@ export default function AIGenerationPage() {
               )}
               {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-          )}
+            <button
+              onClick={() => fetchLogs()}
+              className="btn btn-ghost text-xs flex items-center gap-1"
+              title="手动刷新生成记录"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </button>
+          </div>
         </div>
 
-        {showHistory && logs.length > 0 && (
+        {showHistory && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium text-foreground">最近生成记录</h3>
+              <h3 className="font-medium text-foreground">
+                最近生成记录
+                {logs.length > 0 && <span className="text-xs text-muted-foreground ml-2">（共 {logs.length} 条）</span>}
+              </h3>
               <button
                 onClick={() => setShowHistory(false)}
                 className="p-1 rounded hover:bg-white/10 text-muted-foreground"
@@ -595,7 +605,14 @@ export default function AIGenerationPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            {logs.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                <History className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>暂无生成记录</p>
+                <p className="text-xs mt-1">点击"开始生成"后，记录会显示在这里</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
               {logs.map(log => (
                 <div
                   key={log.id}
@@ -648,7 +665,8 @@ export default function AIGenerationPage() {
                   )}
                 </div>
               ))}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
