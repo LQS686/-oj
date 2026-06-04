@@ -654,10 +654,12 @@ export default function AIModelsPage() {
                 {effectiveModels.map(model => (
                   <div key={model.id} className="p-4 rounded-lg bg-white/5 border border-white/10">
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-foreground">{model.name}</span>
-                          <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{model.model}</span>
+                          {model.name !== model.model && (
+                            <code className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary font-mono">{model.model}</code>
+                          )}
                           {model.type === 'thinking' && (
                             <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">🧠 思考</span>
                           )}
@@ -669,12 +671,18 @@ export default function AIModelsPage() {
                             <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300" title={JSON.stringify(model.params, null, 2)}>⚙️ v4 高级参数</span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                           <span>{model.provider?.name || '未知服务商'}</span>
                           <span>•</span>
                           <span>{model.type === 'generation' ? '生成模型' : '思考模型'}</span>
                           <span>•</span>
-                          <span>{model.maxTokens} tokens</span>
+                          <span>🌡️ T={model.temperature}</span>
+                          {supportsThinkingParam(model) && (
+                            <>
+                              <span>•</span>
+                              <span>🧠 支持 thinking 参数</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

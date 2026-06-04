@@ -1,7 +1,7 @@
 /**
  * AI 出题端到端测试
  *
- * 依次触发 4 种生成模式（ParamGen / Clone / Similar / TestData），
+ * 依次触发 2 种生成模式（ParamGen / TestData），
  * 断言返回结构 + 必填字段。
  *
  * 用法:
@@ -49,55 +49,6 @@ const testCases: TestCase[] = [
       if (!p.test_cases || p.test_cases.length < 3) missing.push('test_cases (需要 >= 3)')
       if (!p.solution_cpp && !p.solution_python) missing.push('solution_cpp / solution_python')
       if (missing.length > 0) return `必填字段缺失: ${missing.join(', ')}`
-      return null
-    }
-  },
-  {
-    name: 'Clone 模式 — 从原题文本提取',
-    params: {
-      mode: 'text_based',
-      textModeType: 'clone',
-      textInput: `【问题描述】
-给定一个长度为 n 的整数数组，求其中最大的连续子段和。
-
-【输入格式】
-第一行一个整数 n (1 ≤ n ≤ 10^5)
-第二行 n 个整数 a_1, a_2, ..., a_n
-
-【输出格式】
-输出最大连续子段和
-
-【样例输入】
-5
--1 3 -2 5 -1
-
-【样例输出】
-6 (子段 [3, -2, 5, -1])`,
-      optimizeDescription: false
-    },
-    validate: (r) => {
-      if (!Array.isArray(r.problems) || r.problems.length === 0) {
-        return 'problems 数组为空'
-      }
-      return null
-    }
-  },
-  {
-    name: 'Similar 模式 — 同算法异背景',
-    params: {
-      mode: 'text_based',
-      textModeType: 'similar',
-      textInput: `【问题描述】
-给定一个长度为 n 的整数数组，求最大连续子段和。
-
-【输入】n=5, arr=[-1, 3, -2, 5, -1]
-【输出】6`,
-      optimizeDescription: false
-    },
-    validate: (r) => {
-      if (!Array.isArray(r.problems) || r.problems.length === 0) {
-        return 'problems 数组为空'
-      }
       return null
     }
   },

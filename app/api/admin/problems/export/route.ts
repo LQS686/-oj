@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
         id: true,
         title: true,
         aiStatus: true,
-        isVerified: true,
         createdAt: true,
         updatedAt: true,
         totalSubmit: true,
@@ -33,12 +32,11 @@ export async function GET(request: NextRequest) {
     })
 
     // Generate CSV
-    const headers = ['ID', 'Title', 'Source', 'Verified', 'Created At', 'Updated At', 'Submissions', 'Accepted']
+    const headers = ['ID', 'Title', 'Source', 'Created At', 'Updated At', 'Submissions', 'Accepted']
     const rows = problems.map(p => [
       p.id,
       p.title,
       p.aiStatus,
-      p.isVerified ? 'Yes' : 'No',
       p.createdAt.toISOString(),
       p.updatedAt.toISOString(),
       p.totalSubmit,

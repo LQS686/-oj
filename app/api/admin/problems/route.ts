@@ -51,11 +51,6 @@ export async function GET(request: NextRequest) {
         updatedAt: true,
         isAiGenerated: true,
         aiStatus: true,
-        isVerified: true,
-        verifiedAt: true,
-        judgeStatus: true,
-        judgeMessage: true,
-        fixAttempts: true
       }
     })
 

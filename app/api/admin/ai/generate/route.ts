@@ -17,9 +17,7 @@ export async function POST(request: NextRequest) {
     const {
         mode = 'parametric',
         // Parametric
-        type, difficulty, topic, count, additionalInfo,
-        // Text Based
-        textInput, textModeType, optimizeDescription,
+        type, difficulty, topic, additionalInfo,
         // Test Data Gen
         title, description, inputDescription, outputDescription,
         // Common
@@ -31,6 +29,8 @@ export async function POST(request: NextRequest) {
         retryFromLogId,
         reduceTemperature,  // 显式降温度（用于重试）
     } = body
+    // 业务决策（2026-06）：单次 AI 调用只生成 1 道题，count 字段已废弃
+    const COUNT = 1
 
     // 3. Retry path: 从已失败日志重跑
     if (retryFromLogId) {
@@ -84,11 +84,8 @@ export async function POST(request: NextRequest) {
           type: retryParams.type,
           difficulty: retryParams.difficulty,
           topic: retryParams.topic,
-          count: retryParams.count || count || 1,
+          count: COUNT,  // 业务决策（2026-06）：硬编码 1
           additionalInfo: retryParams.additionalInfo,
-          textInput: retryParams.textInput,
-          textModeType: retryParams.textModeType,
-          optimizeDescription: retryParams.optimizeDescription,
           title: retryParams.title,
           description: retryParams.description,
           inputDescription: retryParams.inputDescription,
@@ -98,7 +95,8 @@ export async function POST(request: NextRequest) {
           solutionLanguage: retryParams.solutionLanguage,
           modelId: retryParams.modelId || modelId,
           // 重试标识，让 generator 内部降温度
-          _retry: true
+          _retry: true,
+          _reduceTemperature: true  // 重试默认降温度
         }
       })
 
@@ -106,11 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validation based on mode
-    if (mode === 'text_based') {
-        if (!textInput || !textInput.trim()) {
-            return NextResponse.json({ success: false, error: 'Missing text input' }, { status: 400 })
-        }
-    } else if (mode === 'test_data') {
+    if (mode === 'test_data') {
         if (!title || !description) {
             return NextResponse.json({ success: false, error: 'Missing title or description' }, { status: 400 })
         }
@@ -118,7 +112,8 @@ export async function POST(request: NextRequest) {
         // test_data 生成器内部 hasSolution=false 走"无标程：output 必须是真实结果"路径
     } else {
         // Parametric mode (default)
-        if (!type || !difficulty || !topic || !count) {
+        // 业务决策（2026-06）：count 字段已废弃，固定为 1
+        if (!type || !difficulty || !topic) {
             return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
         }
     }
@@ -169,12 +164,8 @@ export async function POST(request: NextRequest) {
         type,
         difficulty,
         topic,
-        count: count ? Math.min(count, 5) : 1,
+        count: COUNT,  // 业务决策（2026-06）：硬编码 1
         additionalInfo,
-        // Text Based
-        textInput,
-        textModeType: textModeType || 'clone',
-        optimizeDescription: optimizeDescription || false,
         // Test Data Gen
         title,
         description,

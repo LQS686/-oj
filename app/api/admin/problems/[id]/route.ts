@@ -175,17 +175,6 @@ async function handleUpdate(
       updateData.visibility = updateData.isPublic ? 'public' : 'private'
     }
 
-    // 🚀 Check constraint for AI Generated problems
-    if (updateData.visibility === 'public') {
-        const problemAny = existingProblem as any
-        if ((problemAny.aiStatus === 'AI_GENERATED' || problemAny.aiStatus === 'GENERATED') && !problemAny.isVerified) {
-             return NextResponse.json(
-                { success: false, error: 'AI 生成的题目必须先通过标程验证（并在测试数据页纠正输出）后才能公开' },
-                { status: 400 }
-            )
-        }
-    }
-
     // 如果提供了测试用例更新
     // Prisma 的 update 可以处理关联数据的 create/delete/update
     // 但完全替换（deleteMany + createMany）在嵌套 update 中可能不支持直接 deleteMany

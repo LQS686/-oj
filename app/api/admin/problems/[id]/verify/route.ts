@@ -131,7 +131,6 @@ export async function POST(
         await tx.problem.update({
             where: { id },
             data: {
-                isVerified: true,
                 stdCode: solutionCode,
                 stdLang: solutionLanguage,
             }

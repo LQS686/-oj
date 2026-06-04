@@ -8,18 +8,13 @@ import { checkGeneratedProblem, checkTestDataQuality } from './quality-check'
 import { safeJsonParse as _safeJsonParse } from './response-parser'
 
 export interface GenerationParams {
-  mode: 'parametric' | 'text_based' | 'test_data';
+  mode: 'parametric' | 'test_data';
   // Parametric Mode Fields
   type?: string;
   difficulty?: string;
   topic?: string[];
   count?: number;
   additionalInfo?: string;
-
-  // Text Based Mode Fields
-  textInput?: string;
-  textModeType?: 'clone' | 'similar';
-  optimizeDescription?: boolean;
 
   // Test Data Gen Fields
   title?: string;
@@ -37,7 +32,9 @@ export interface GenerationParams {
   // ✅ New: Specific Model ID to use
   modelId?: string;
 
-  // ✅ New: 内部重试标记（由后端 retry 路径传入，generator 据此走降温度路径）
+  // ✅ New: 内部重试标记（由 route.ts retry 路径传入，generator 据此走降温度路径）
+  // _reduceTemperature: true → 基础温度 cap 到 0.2（适合 JSON 解析失败后的重试）
+  // _retry: true → 标记这是重试（仅用于日志/审计，generator 当前不消费）
   _retry?: boolean;
   _reduceTemperature?: boolean;
 }
@@ -54,6 +51,66 @@ export interface GenerationResult {
 function safeJsonParse(content: string): any {
   // safeJsonParse 已迁出到 ./response-parser，自动剥离 DeepSeek 思考块 + 6 步修复
   return _safeJsonParse(content)
+}
+
+/**
+ * 从 AI 响应中提取 problems 数组
+ *
+ * 关键修复：避免把 test_cases 数组误识别为 problems
+ * 1) 顶层是数组：直接用
+ * 2) 顶层有 problems 字段（数组）：用之
+ * 3) 顶层有 problems 字段（单对象）：包成 [problems]
+ * 4) 否则视为单道题，把顶层对象包成 [parsed]
+ * 5) 顶层是 null/undefined/标量：抛错
+ */
+export function extractProblems(parsed: any): GeneratedProblem[] {
+  if (Array.isArray(parsed)) {
+    return parsed as GeneratedProblem[]
+  }
+  if (parsed && typeof parsed === 'object') {
+    // 显式 problems 字段：可能是数组或单对象（AI 偶尔会犯这种错）
+    if ('problems' in parsed) {
+      if (Array.isArray(parsed.problems)) {
+        return parsed.problems as GeneratedProblem[]
+      }
+      if (parsed.problems && typeof parsed.problems === 'object') {
+        return [parsed.problems as GeneratedProblem]
+      }
+    }
+    // 顶层是单道题对象，包成数组
+    return [parsed as GeneratedProblem]
+  }
+  throw new Error('Invalid JSON structure returned by AI: not an object or array')
+}
+
+/**
+ * 单道题字段归一化
+ *
+ * - camelCase → snake_case 兜底（AI 偶尔输出 testCases/solutionCpp 等驼峰）
+ * - 缺 time_limit → 1000，缺 memory_limit → 128
+ * - input/output 兜底 input_description/output_description
+ */
+export function normalizeProblem(p: any): any {
+  const camelToSnakeMap: Record<string, string> = {
+    testCases: 'test_cases',
+    timeLimit: 'time_limit',
+    memoryLimit: 'memory_limit',
+    solutionCpp: 'solution_cpp',
+    solutionPython: 'solution_python',
+    inputDescription: 'input',
+    outputDescription: 'output'
+  }
+  const normalized: any = { ...p }
+  for (const [camel, snake] of Object.entries(camelToSnakeMap)) {
+    if (normalized[snake] === undefined && normalized[camel] !== undefined) {
+      normalized[snake] = normalized[camel]
+    }
+  }
+  normalized.input = normalized.input || normalized.input_description || ''
+  normalized.output = normalized.output || normalized.output_description || ''
+  normalized.time_limit = normalized.time_limit || 1000
+  normalized.memory_limit = normalized.memory_limit || 128
+  return normalized
 }
 
 /**
@@ -135,30 +192,16 @@ function mapToContext(params: GenerationParams): PromptContext {
             count: params.count || 5,
             hasSolution: !!params.solutionCode && !!params.solutionLanguage
         };
-    } else if (params.mode === 'text_based') {
-        if (params.textModeType === 'similar') {
-            return {
-                mode: GenerationMode.SIMILAR,
-                textInput: params.textInput || ''
-            };
-        } else {
-            // Default to Clone
-            return {
-                mode: GenerationMode.CLONE,
-                textInput: params.textInput || '',
-                optimizeDescription: params.optimizeDescription || false
-            };
-        }
-    } else {
-        return {
-            mode: GenerationMode.PARAM_GEN,
-            type: params.type || 'programming',
-            difficulty: params.difficulty || '入门',
-            topic: params.topic || [],
-            count: params.count || 1,
-            additionalInfo: params.additionalInfo
-        };
     }
+    // 默认 ParamGen（AI 出题）
+    return {
+        mode: GenerationMode.PARAM_GEN,
+        type: params.type || 'programming',
+        difficulty: params.difficulty || '入门',
+        topic: params.topic || [],
+        count: params.count || 1,
+        additionalInfo: params.additionalInfo
+    };
 }
 
 async function runThinkingStep(config: AiConfig, context: PromptContext): Promise<{ content: string, tokens: number }> {
@@ -225,23 +268,25 @@ export async function generateProblems(params: GenerationParams, userId?: string
   const model = getModelName(config, false)
 
   let finalUserPrompt = userPrompt;
-  
-  // Do NOT include thought process for CLONE mode
-  // The thought process often contains sample analysis like "n=3 output ABC",
-  // which confuses the LLM into thinking "3" is the input description.
-  // For CLONE mode, we want pure extraction from the user input.
-  if (thoughtProcess && context.mode !== GenerationMode.CLONE) {
-      finalUserPrompt += `\n\nRefer to the following design analysis when generating the problems:\n${thoughtProcess}`
+
+  // 思考过程（design analysis）作为参考追加到 user prompt
+  // 注意：仅 ParamGen 模式会运行 thinking（TEST_DATA_GEN 已在上方跳过）
+  if (thoughtProcess) {
+      finalUserPrompt += `\n\n# 参考：以下为资深命题人对本题的设计分析（请作为思路参考，最终题目要符合用户原始要求）\n${thoughtProcess}`
   }
 
   // 使用 buildChatParams 统一处理（自动注入 thinking / reasoning_effort + 透传 config.params）
+  // 重试场景：_reduceTemperature=true 时，基础温度下调到 0.2（更稳的 JSON 输出）
+  const effectiveBaseTemperature = params._reduceTemperature
+    ? Math.min(temperature, 0.2)
+    : temperature
   const baseParams = {
     model,
     messages: [
       { role: 'system' as const, content: systemPrompt },
       { role: 'user' as const, content: finalUserPrompt },
     ],
-    temperature: temperature,
+    temperature: effectiveBaseTemperature,
     response_format: { type: 'json_object' as const },
     // 出 1 道完整题（15 组测试数据 + 双解法）通常 4000-9000 tokens；
     // 出 2-3 道时叠加。给到 16384 防止长响应被截断。
@@ -335,10 +380,12 @@ export async function generateProblems(params: GenerationParams, userId?: string
     // Special handling for Test Data Gen
     if (context.mode === GenerationMode.TEST_DATA_GEN) {
         let testCases = [];
-        if (parsed.test_cases && Array.isArray(parsed.test_cases)) {
-            testCases = parsed.test_cases;
+        // 优先 snake_case；同时兜底 camelCase（AI 偶尔会犯这种错）
+        const tcs = parsed.test_cases ?? parsed.testCases
+        if (Array.isArray(tcs)) {
+            testCases = tcs
         } else if (Array.isArray(parsed)) {
-            testCases = parsed;
+            testCases = parsed
         }
 
         // 质量自检
@@ -367,48 +414,14 @@ export async function generateProblems(params: GenerationParams, userId?: string
     // 1) 顶层是数组：直接用
     // 2) 顶层有 problems 字段（数组）：用之
     // 3) 否则视为单道题，把顶层对象包成 [parsed]
-    if (Array.isArray(parsed)) {
-      problems = parsed
-    } else if (parsed && typeof parsed === 'object') {
-      if (Array.isArray(parsed.problems)) {
-        problems = parsed.problems
-      } else {
-        // 顶层是单道题对象，包成数组
-        problems = [parsed]
-      }
-    } else {
-      throw new Error('Invalid JSON structure returned by AI: not an object or array')
-    }
-
+    problems = extractProblems(parsed)
     if (problems.length === 0) {
         throw new Error('Invalid JSON structure returned by AI: empty problems array')
     }
 
     // Post-processing to handle potential field naming mismatches if LLM hallucinates
     // camelCase → snake_case 兜底，避免字段名错误导致 test_cases=0、solution_cpp 丢失
-    const camelToSnakeMap: Record<string, string> = {
-      testCases: 'test_cases',
-      timeLimit: 'time_limit',
-      memoryLimit: 'memory_limit',
-      solutionCpp: 'solution_cpp',
-      solutionPython: 'solution_python',
-      inputDescription: 'input',
-      outputDescription: 'output'
-    }
-    const normalizedProblems = problems.map(p => {
-      const normalized: any = { ...p }
-      for (const [camel, snake] of Object.entries(camelToSnakeMap)) {
-        if (normalized[snake] === undefined && normalized[camel] !== undefined) {
-          normalized[snake] = normalized[camel]
-        }
-      }
-      // 兜底字段
-      normalized.input = normalized.input || normalized.input_description || ''
-      normalized.output = normalized.output || normalized.output_description || ''
-      normalized.time_limit = normalized.time_limit || 1000
-      normalized.memory_limit = normalized.memory_limit || 128
-      return normalized
-    }) as GeneratedProblem[];
+    const normalizedProblems = problems.map(p => normalizeProblem(p))
 
     // 质量自检：对每条 problem 调用 checkGeneratedProblem，失败项不阻塞但记录到 qualityIssues
     const qualityIssues: Array<{ problemIndex: number; reason: string; details?: string[] }> = []

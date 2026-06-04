@@ -2,9 +2,9 @@
  * AI 出题 JSON 模板
  *
  * 设计原则：
- * 1. 字段名与 [lib/ai/prompts/core/types.ts](file:///e:/桌面/oj/lib/ai/prompts/core/types.ts) `GeneratedProblem` + [lib/ai/save-problem.ts](file:///e:/桌面/oj/lib/ai/save-problem.ts) + [lib/ai/quality-check.ts](file:///e:/桌面/oj/lib/ai/quality-check.ts) 1:1 对应
+ * 1. 字段名与 [lib/ai/prompts/core/types.ts](file:///e:/桌面/oj/lib/ai/prompts/core/types.ts) `GeneratedProblem` + [lib/ai/quality-check.ts](file:///e:/桌面/oj/lib/ai/quality-check.ts) + Prisma `Problem` schema 1:1 对应
  * 2. 统一使用 snake_case（test_cases / time_limit / memory_limit / solution_cpp / solution_python），
- *    因为数据库 schema / save 路由 / quality-check 都用 snake_case
+ *    因为数据库 schema / normalizeProblem / quality-check 都用 snake_case
  * 3. **关键** count >= 1 始终输出 JSON 数组（[{...}, {...}]），避免 count > 1 时双道题被塞进同一对象
  *    导致重复 key、JSON.parse 只保留最后一个值
  * 4. 不使用任何注释（块注释 / 行注释 都不是合法 JSON）

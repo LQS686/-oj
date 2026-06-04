@@ -4,13 +4,12 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
-import { ArrowLeft, Download, Database, CheckCircle, AlertCircle, Edit, Clock, History, Loader2 } from 'lucide-react'
+import { ArrowLeft, Download, Database, Edit, Clock, History, Loader2 } from 'lucide-react'
 
 interface Problem {
   id: string
   title: string
   aiStatus: string
-  isVerified: boolean
   createdAt: string
   updatedAt: string
 }
@@ -161,7 +160,7 @@ export default function SourceManagementPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">题目来源管理</h1>
-                <p className="text-sm text-slate-400">集中管理题目来源标记、验证状态及审计日志</p>
+                <p className="text-sm text-slate-400">集中管理题目来源标记及审计日志</p>
               </div>
             </div>
           </div>
@@ -242,7 +241,6 @@ export default function SourceManagementPage() {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">题目</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">来源标记</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">验证状态</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">最后更新</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">操作</th>
                     </tr>
@@ -269,19 +267,6 @@ export default function SourceManagementPage() {
                             <span className="tag tag-info">AI_ASSISTED</span>
                           ) : (
                             <span className="tag">MANUAL_CREATED</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {p.isVerified ? (
-                            <span className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
-                              <CheckCircle className="w-4 h-4" />
-                              已验证
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1.5 text-red-400 text-xs font-medium">
-                              <AlertCircle className="w-4 h-4" />
-                              待验证
-                            </span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-400">

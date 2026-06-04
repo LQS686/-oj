@@ -17,10 +17,14 @@ import { logger } from '../logger'
 
 /**
  * 剥离 DeepSeek v4 thinking 块：`<think>...</think>`
- * 不区分大小写，跨多行匹配。
+ * 不区分大小写，跨多行匹配。使用贪婪匹配以正确处理嵌套 think 块。
  */
 export function stripThinkBlocks(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+  // 贪婪匹配：<think> 到最远的 </think>。
+  // 对于 <think>外层<think>内层</think>外层继续</think>，贪婪会正确匹配整个外层块。
+  // 对多个独立 think 块（罕见），贪婪会把它们当成一个大的，从第一个 <think> 到最后一个 </think>，
+  // 但这种场景实际不常见；如果出现，再叠加具体清理逻辑。
+  return text.replace(/<think>[\s\S]*<\/think>/gi, '').trim()
 }
 
 /**

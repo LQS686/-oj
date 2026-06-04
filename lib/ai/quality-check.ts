@@ -124,7 +124,7 @@ export function checkGeneratedProblem(p: any): QualityCheckResult {
     issues.push('samples 不足 1 组')
   }
 
-  // test_cases 数量下限（从 3 提升到 10）
+  // test_cases 数量下限（10 为硬下限，15 为推荐值；与 prompt 一致）
   if (!Array.isArray(p.test_cases) || p.test_cases.length < 10) {
     issues.push(`test_cases 不足 10 组（实际 ${Array.isArray(p.test_cases) ? p.test_cases.length : 0}）`)
   } else if (p.test_cases.length < 15) {

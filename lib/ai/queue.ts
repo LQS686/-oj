@@ -250,7 +250,6 @@ class AiQueue extends EventEmitter {
                     where: { id: problemId },
                     data: {
                         aiStatus: 'AI_ASSISTED',
-                        isVerified: true,
                         stdCode: job.data.params.solutionCode,
                         stdLang: job.data.params.solutionLanguage
                     } as any
@@ -296,7 +295,7 @@ class AiQueue extends EventEmitter {
         }
       }
 
-      // --- Mode: PARAM_GEN / CLONE / SIMILAR (Create New Problems) ---
+      // --- Mode: PARAM_GEN (Create New Problems) ---
       if (job.data.params.mode !== 'test_data') {
           const savedProblems = []
           
@@ -356,12 +355,12 @@ class AiQueue extends EventEmitter {
                   tags: Array.isArray(problem.tags) ? problem.tags : [],
                   timeLimit: problem.time_limit || 1000,
                   memoryLimit: problem.memory_limit || 128,
-                  isPublic: false,
-                  visibility: 'private',
+                  // 业务决策（2026-06）：AI 生成的题目不需要人工验证，直接加入公开题库
+                  isPublic: true,
+                  visibility: 'public',
                   authorId: job.data.userId,
                   isAiGenerated: true,
                   aiStatus: 'AI_GENERATED',
-                  isVerified: false,
                   aiPrompt: JSON.stringify(job.data.params),
                   testCases: {
                     create: validTestCases
@@ -408,7 +407,7 @@ class AiQueue extends EventEmitter {
                 userId: job.data.userId,
                 type: 'system',
                 title: 'AI 题目生成完成',
-                content: `已成功生成并入库 ${savedProblems.length} 个题目。`,
+                content: `已成功生成并发布到公开题库 ${savedProblems.length} 个题目。`,
                 link: '/admin/ai-generation'
             })
           }
@@ -421,11 +420,16 @@ class AiQueue extends EventEmitter {
       // If we are here, it means mode is 'test_data' but no targetProblemId, which is manual generation (handled by client polling usually, but we should mark complete)
       // Or some other unhandled state.
       // Update log for manual generation (no auto-save)
+      // 注：剥离 _stats 字段，避免内部执行的统计信息污染 log.result
+      const cleanTestCases = (testCases || []).map(({ input, output }: any) => ({
+        input: input !== undefined ? String(input) : '',
+        output: output !== undefined ? String(output) : ''
+      }))
       await prisma.aiGenerationLog.update({
         where: { id: job.id },
-        data: { 
+        data: {
           status: 'COMPLETED',
-          result: { testCases: testCases || [], thought } as any,
+          result: { testCases: cleanTestCases, thought } as any,
           tokensUsed: tokensUsed || 0
         }
       })

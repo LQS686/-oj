@@ -47,7 +47,6 @@ export interface Problem {
   teamId: string | null
   isAiGenerated: boolean
   aiStatus: string
-  isVerified: boolean
   createdAt: string
   updatedAt: string
   author?: {

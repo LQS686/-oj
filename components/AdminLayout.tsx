@@ -20,8 +20,7 @@ import {
   Bell,
   User,
   ChevronDown,
-  Cpu,
-  CheckCircle
+  Cpu
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
@@ -105,11 +104,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: FileText,
       label: '题目管理',
       href: '/admin/problems'
-    },
-    {
-      icon: CheckCircle,
-      label: '题目审核',
-      href: '/admin/problems/review'
     },
     {
       icon: Sparkles,

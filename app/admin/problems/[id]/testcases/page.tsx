@@ -35,8 +35,7 @@ export default function ProblemTestCasesPage() {
   const [inputDesc, setInputDesc] = useState('')
   const [outputDesc, setOutputDesc] = useState('')
   const [aiStatus, setAiStatus] = useState('NONE')
-  const [isVerified, setIsVerified] = useState(true)
-  
+
   const [testCases, setTestCases] = useState<TestCase[]>([])
 
   const [showAiModal, setShowAiModal] = useState(false)
@@ -122,8 +121,7 @@ export default function ProblemTestCasesPage() {
         setInputDesc(problem.input || '')
         setOutputDesc(problem.output || '')
         setAiStatus(problem.aiStatus || 'NONE')
-        setIsVerified(problem.isVerified === undefined ? true : problem.isVerified)
-        
+
         if (problem.stdCode) {
             setSolutionCode(problem.stdCode)
         }
@@ -434,26 +432,6 @@ export default function ProblemTestCasesPage() {
           </div>
         </div>
 
-        {(aiStatus === 'AI_GENERATED' || aiStatus === 'GENERATED') && !isVerified && (
-          <div className="bg-accent/100/20 border border-amber-500/30 p-4 rounded-lg flex items-start justify-between">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-6 h-6 text-amber-400 mt-0.5" />
-              <div>
-                <h3 className="text-lg font-bold text-amber-400">该题目为 AI 自动生成，尚未通过验证</h3>
-                <p className="text-accent-light/80 mt-1">
-                  为确保题目质量，必须通过标程验证并纠正所有测试点的输出数据后，才允许将题目公开到题库。
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowVerifyModal(true)}
-              className="btn btn-primary bg-accent/100 hover:bg-amber-600"
-            >
-              立即验证
-            </button>
-          </div>
-        )}
-
         {error && (
           <div className="bg-error/100/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
@@ -724,7 +702,6 @@ export default function ProblemTestCasesPage() {
                   <ul className="list-disc list-inside space-y-1 opacity-80">
                     <li>系统将运行您提供的标程代码，对当前所有测试点的输入进行计算。</li>
                     <li>所有测试点的<span className="font-bold">输出数据将被标程的运行结果覆盖</span>。</li>
-                    <li>若所有测试点均运行成功，题目将被标记为"已验证"。</li>
                   </ul>
                 </div>
 

@@ -61,7 +61,6 @@ export async function GET(
     const { 
       testCases, 
       aiStatus, 
-      isVerified, 
       stdCode, 
       stdLang, 
       aiPrompt, 

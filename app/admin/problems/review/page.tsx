@@ -42,7 +42,6 @@ interface Problem {
   visibility: string
   isAiGenerated: boolean
   aiStatus: string
-  isVerified: boolean
   stdCode: string | null
   stdLang: string | null
   testCases: TestCase[]
@@ -231,13 +230,10 @@ export default function ProblemReviewPage() {
   }
 
   const getStatusBadge = (problem: Problem) => {
-    if (problem.isVerified && problem.visibility === 'public') {
+    if (problem.visibility === 'public') {
       return <span className="px-2 py-1 rounded text-xs bg-secondary/10 text-secondary">已通过</span>
     }
-    if (problem.isVerified) {
-      return <span className="px-2 py-1 rounded text-xs bg-primary/10 text-primary-light">已验证</span>
-    }
-    return <span className="px-2 py-1 rounded text-xs bg-warning/10 text-warning">待验证</span>
+    return <span className="px-2 py-1 rounded text-xs bg-warning/10 text-warning">待审核</span>
   }
 
   if (loading) {

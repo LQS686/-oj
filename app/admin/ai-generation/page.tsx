@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import {
   Loader2, FileText, Check, CheckCircle, AlertCircle, AlertTriangle,
   XCircle, Copy, RefreshCw, Settings, Cpu, History, X, ChevronDown, ChevronUp,
-  Wand2, Rocket, Target, Lightbulb, Brain,
-  Hash, ChevronRight
+  Wand2, Target, Lightbulb, Brain,
+  ChevronRight
 } from 'lucide-react'
 import Link from 'next/link'
 import { DIFFICULTIES, DIFFICULTY_COLORS } from '@/lib/constants'
@@ -65,6 +65,25 @@ interface LogStatus {
   params?: LogParams
 }
 
+/**
+ * 并发生成：每个任务独立追踪状态
+ * 业务决策（2026-06）：单次 AI 调用固定 1 道题，但用户可同时提交多个任务
+ */
+interface JobState {
+  logId: string
+  status: 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  startedAt: number
+  intervalId?: ReturnType<typeof setInterval>
+  // 仅在 COMPLETED 后填充
+  result?: GenerationResult
+  thought?: string | null
+  qualityIssues?: Array<{ problemIndex: number; reason: string; details?: string[] }>
+  // 仅在 FAILED 后填充
+  error?: string
+  // 重试用：保存原始 params 以便 retry 重用
+  retryFromLogId?: string
+}
+
 const LAST_MODEL_KEY = 'ai-last-model-id'
 
 /** 快速主题 chip（点击填入主题输入框） */
@@ -100,18 +119,13 @@ function getAdditionalPlaceholder(d: string): string {
   return '例如：李超树、动态 DP、K-D Tree、计算几何、博弈论...'
 }
 
-/** 当前工作流步骤（1 配置 2 生成 3 发布） */
-function getWorkflowStep(loading: boolean, result: GenerationResult | null, publishing: number | null): 1 | 2 | 3 {
-  if (publishing !== null) return 3
-  if (loading) return 2
-  if (result) return 3
-  return 1
+/** 当前工作流步骤（1 配置 2 生成；只要有 active 任务就算第 2 步） */
+function getWorkflowStep(hasActiveJobs: boolean): 1 | 2 {
+  return hasActiveJobs ? 2 : 1
 }
 
 export default function AIGenerationPage() {
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [result, setResult] = useState<GenerationResult | null>(null)
   const [copied, setCopied] = useState(false)
 
   const [models, setModels] = useState<AIModel[]>([])
@@ -120,54 +134,50 @@ export default function AIGenerationPage() {
 
   const [topic, setTopic] = useState('')
   const [difficulty, setDifficulty] = useState('普及')
-  const [count, setCount] = useState(1)
+  // 业务决策（2026-06）：单次生成固定 1 道题，count 选择器已移除
   const [additionalInfo, setAdditionalInfo] = useState('')
 
-  const [pollingLogId, setPollingLogId] = useState<string | null>(null)
-  const [thought, setThought] = useState<string | null>(null)
+  // 并发生成：每个任务独立追踪（Map: logId -> JobState）
+  const [activeJobs, setActiveJobs] = useState<Map<string, JobState>>(new Map())
 
   const [logs, setLogs] = useState<LogStatus[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [selectedLog, setSelectedLog] = useState<LogStatus | null>(null)
-  const [qualityIssues, setQualityIssues] = useState<Array<{ problemIndex: number; reason: string; details?: string[] }>>([])
   const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
 
-  const [publishing, setPublishing] = useState<number | null>(null)
-  const [publishStep, setPublishStep] = useState<number>(0)
-  const [publishResult, setPublishResult] = useState<{
-    problemId?: string
-    attempts: number
-    success: true | 'partial' | false
-    warning?: string
-    error?: string
-    judgeResult?: { status: string; passed: number; total: number; message?: string }
-  } | null>(null)
+  // 提交任务计数器（用于显示 N 个进行中）
+  const submittingRef = useRef(false)
+
+  // 防误触：单次点击后冷却 DEBOUNCE_MS 毫秒，期间按钮禁用，避免双击/连击浪费 AI 资源
+  const DEBOUNCE_MS = 1500
+  const cooldownUntilRef = useRef(0)
+  const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [cooldown, setCooldown] = useState(0)
+
+  /** 启动冷却倒计时（点击提交后立即调用） */
+  const triggerCooldown = () => {
+    cooldownUntilRef.current = Date.now() + DEBOUNCE_MS
+    if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current)
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((cooldownUntilRef.current - Date.now()) / 1000))
+      setCooldown(remaining)
+      if (remaining <= 0 && cooldownTimerRef.current) {
+        clearInterval(cooldownTimerRef.current)
+        cooldownTimerRef.current = null
+      }
+    }
+    tick()
+    cooldownTimerRef.current = setInterval(tick, 250)
+  }
 
   useEffect(() => { fetchModels(); fetchLogs() }, [])
 
+  // 卸载时清理冷却计时器
   useEffect(() => {
-    if (logs.length > 0) {
-      const STUCK_TIMEOUT_MS = 10 * 60 * 1000
-      const now = Date.now()
-      const pendingLog = logs.find(l => {
-        if (l.status !== 'PENDING' && l.status !== 'PROCESSING') return false
-        const age = now - new Date(l.createdAt).getTime()
-        return age < STUCK_TIMEOUT_MS
-      })
-      const stuckLog = logs.find(l => {
-        if (l.status !== 'PENDING' && l.status !== 'PROCESSING') return false
-        const age = now - new Date(l.createdAt).getTime()
-        return age >= STUCK_TIMEOUT_MS
-      })
-      if (stuckLog) {
-        logger.warn('[ai-generation] 检测到僵尸日志，已超时', { logId: stuckLog.id, ageMinutes: Math.round((now - new Date(stuckLog.createdAt).getTime()) / 60000) })
-      }
-      if (pendingLog && !pollingLogId) {
-        setPollingLogId(pendingLog.id)
-        setLoading(true)
-      }
+    return () => {
+      if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current)
     }
-  }, [logs, pollingLogId])
+  }, [])
 
   const fetchModels = async () => {
     try {
@@ -207,102 +217,188 @@ export default function AIGenerationPage() {
     try {
       const response = await fetchWithAuth(`/api/admin/ai/generate?logId=${logId}`)
       const data = await response.json()
-      if (data.success && data.data) {
-        const log: LogStatus = data.data
-        if (log.status === 'COMPLETED') {
-          setPollingLogId(null)
-          setLoading(false)
-          fetchLogs()
-          if (log.result?.problems?.[0]) {
-            const p = log.result.problems[0]
-            setResult({
-              title: p.title || '',
-              description: p.description || '',
-              difficulty: p.difficulty || difficulty,
-              tags: p.tags || [],
-              inputFormat: p.input || '',
-              outputFormat: p.output || '',
-              samples: p.samples || [],
-              hints: p.hint ? [p.hint] : [],
-              testCases: p.test_cases || []
-            })
-          } else if (log.result?.testCases) {
-            setResult({
-              title: '测试数据生成完成',
-              description: `已生成 ${log.result.testCases.length} 组测试数据`,
-              difficulty,
-              tags: [],
-              inputFormat: '',
-              outputFormat: '',
-              samples: [],
-              hints: [],
-              testCases: log.result.testCases
-            })
+      if (!data.success || !data.data) return
+      const log: LogStatus = data.data
+      const job = activeJobsRef.current.get(logId)
+      if (!job) return // 已被取消
+
+      if (log.status === 'COMPLETED') {
+        if (job.intervalId) clearInterval(job.intervalId)
+        let result: GenerationResult | undefined
+        let thought: string | null = null
+        let qualityIssues: JobState['qualityIssues'] = []
+        if (log.result?.problems?.[0]) {
+          const p = log.result.problems[0]
+          result = {
+            title: p.title || '',
+            description: p.description || '',
+            difficulty: p.difficulty || difficulty,
+            tags: p.tags || [],
+            inputFormat: p.input || '',
+            outputFormat: p.output || '',
+            samples: p.samples || [],
+            hints: p.hint ? [p.hint] : [],
+            testCases: p.test_cases || []
           }
-          if (log.result?.thought) setThought(log.result.thought)
-          setQualityIssues(log.result?.qualityIssues || [])
-        } else if (log.status === 'FAILED') {
-          setPollingLogId(null)
-          setLoading(false)
-          fetchLogs()
-          setError(log.error || '生成失败')
+        } else if (log.result?.testCases) {
+          result = {
+            title: '测试数据生成完成',
+            description: `已生成 ${log.result.testCases.length} 组测试数据`,
+            difficulty,
+            tags: [],
+            inputFormat: '',
+            outputFormat: '',
+            samples: [],
+            hints: [],
+            testCases: log.result.testCases
+          }
         }
+        if (log.result?.thought) thought = log.result.thought
+        qualityIssues = log.result?.qualityIssues || []
+        setActiveJobs(prev => {
+          const m = new Map(prev)
+          const existing = m.get(logId)
+          if (!existing) return m
+          m.set(logId, { ...existing, status: 'COMPLETED', result, thought, qualityIssues, intervalId: undefined })
+          return m
+        })
+        fetchLogs()
+      } else if (log.status === 'FAILED') {
+        if (job.intervalId) clearInterval(job.intervalId)
+        setActiveJobs(prev => {
+          const m = new Map(prev)
+          const existing = m.get(logId)
+          if (!existing) return m
+          m.set(logId, { ...existing, status: 'FAILED', error: log.error || '生成失败', intervalId: undefined })
+          return m
+        })
+        fetchLogs()
       }
     } catch (err) {
       logger.error('轮询状态失败', err)
     }
   }, [difficulty])
 
+  // 用 ref 持有 activeJobs 引用，避免 pollLogStatus 因 activeJobs 变化重新创建
+  // （重新创建会导致 setInterval 回调拿到旧引用，从而清不掉 interval）
+  const activeJobsRef = useRef(activeJobs)
+  useEffect(() => { activeJobsRef.current = activeJobs }, [activeJobs])
+
+  // 组件卸载时清理所有 interval
   useEffect(() => {
-    if (pollingLogId) {
-      const interval = setInterval(() => pollLogStatus(pollingLogId), 2000)
-      return () => clearInterval(interval)
+    return () => {
+      activeJobsRef.current.forEach((j: JobState) => {
+        if (j.intervalId) clearInterval(j.intervalId)
+      })
     }
-  }, [pollingLogId, pollLogStatus])
+  }, [])
 
-  const handleCancelPolling = () => {
-    if (!pollingLogId) return
-    if (!confirm('确定要取消当前等待吗？\n\n后端任务可能仍在运行（无法强制终止），但 UI 不再等待。')) return
-    setPollingLogId(null)
-    setLoading(false)
-    setError('已取消轮询。如需继续，可手动到"生成记录"中找到该日志点"重试"')
-  }
+  // 业务决策（2026-06）：恢复 PROCESSING 状态的孤儿日志，自动加入 activeJobs 继续轮询
+  // （用户切走页面再切回时，会自动接管仍在运行的后台任务）
+  useEffect(() => {
+    if (logs.length === 0) return
+    const STUCK_TIMEOUT_MS = 10 * 60 * 1000
+    const now = Date.now()
+    for (const l of logs) {
+      if (l.status !== 'PENDING' && l.status !== 'PROCESSING') continue
+      const age = now - new Date(l.createdAt).getTime()
+      if (age >= STUCK_TIMEOUT_MS) {
+        logger.warn('[ai-generation] 检测到僵尸日志，已超时', { logId: l.id, ageMinutes: Math.round(age / 60000) })
+        continue
+      }
+      if (!activeJobsRef.current.has(l.id)) {
+        const intervalId = setInterval(() => pollLogStatus(l.id), 2000)
+        setActiveJobs(prev => {
+          const m = new Map(prev)
+          m.set(l.id, {
+            logId: l.id,
+            status: 'PROCESSING',
+            startedAt: new Date(l.createdAt).getTime(),
+            intervalId
+          })
+          return m
+        })
+      }
+    }
+  }, [logs, pollLogStatus])
 
-  const handleGenerate = async () => {
-    if (!topic.trim()) { setError('请输入题目主题'); return }
-    if (!selectedModelId) { setError('请选择 AI 模型'); return }
-    setLoading(true)
+  // 启动新任务：提交 + 加入 activeJobs + 启动独立 setInterval
+  const startJob = async (body: Record<string, any>, retryFromLogId?: string) => {
+    // 防误触冷却：上次点击未到 DEBOUNCE_MS 毫秒，丢弃本次请求（避免双击/连击浪费 AI 资源）
+    if (Date.now() < cooldownUntilRef.current) return
+    if (submittingRef.current) return
+    submittingRef.current = true
+    triggerCooldown()  // 立即开始冷却，无论后续请求成功或失败
     setError('')
-    setResult(null)
-    setThought(null)
-    setPublishResult(null)
-    localStorage.setItem(LAST_MODEL_KEY, selectedModelId)
     try {
       const response = await fetchWithAuth('/api/admin/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'parametric',
-          type: 'programming',
-          difficulty,
-          topic: [topic.trim()],
-          count: Math.min(count, 3),
-          additionalInfo: additionalInfo.trim() || undefined,
-          modelId: selectedModelId
-        })
+        body: JSON.stringify(body)
       })
       const data = await response.json()
       if (data.success) {
-        setPollingLogId(data.data.logId)
+        const logId: string = data.data.logId
+        const intervalId = setInterval(() => pollLogStatus(logId), 2000)
+        const newJob: JobState = {
+          logId,
+          status: 'PROCESSING',
+          startedAt: Date.now(),
+          intervalId,
+          retryFromLogId
+        }
+        setActiveJobs(prev => {
+          const m = new Map(prev)
+          m.set(logId, newJob)
+          return m
+        })
         fetchLogs()
       } else {
-        setLoading(false)
         setError(data.error || '生成失败')
       }
     } catch {
-      setLoading(false)
       setError('网络错误')
+    } finally {
+      submittingRef.current = false
     }
+  }
+
+  // 取消单个任务：清 interval + 从 activeJobs 移除
+  const cancelJob = (logId: string) => {
+    const job = activeJobsRef.current.get(logId)
+    if (!job) return
+    if (!confirm('确定要取消此任务？\n\n后端任务可能仍在运行（无法强制终止），但 UI 不再等待。')) return
+    if (job.intervalId) clearInterval(job.intervalId)
+    setActiveJobs(prev => {
+      const m = new Map(prev)
+      m.delete(logId)
+      return m
+    })
+  }
+
+  // 移除已完成/已失败任务（仅 UI 清理）
+  const dismissJob = (logId: string) => {
+    setActiveJobs(prev => {
+      const m = new Map(prev)
+      m.delete(logId)
+      return m
+    })
+  }
+
+  // 主入口：开始生成（每次点击 = 1 个独立任务，可与已有任务并发）
+  const handleGenerate = async () => {
+    if (!topic.trim()) { setError('请输入题目主题'); return }
+    if (!selectedModelId) { setError('请选择 AI 模型'); return }
+    localStorage.setItem(LAST_MODEL_KEY, selectedModelId)
+    await startJob({
+      mode: 'parametric',
+      type: 'programming',
+      difficulty,
+      topic: [topic.trim()],
+      // 业务决策（2026-06）：count 已硬编码为 1，前端不再传
+      additionalInfo: additionalInfo.trim() || undefined,
+      modelId: selectedModelId
+    })
   }
 
   const handleCopy = (text: string) => {
@@ -311,95 +407,9 @@ export default function AIGenerationPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleSaveAndPublish = async () => {
-    if (!result) return
-    if (!selectedModelId) { setError('请先选择 AI 模型'); return }
-    setPublishing(0)
-    setPublishStep(1)
-    setError('')
-    setPublishResult(null)
-    try {
-      setPublishStep(2)
-      await new Promise(r => setTimeout(r, 1500))
-      setPublishStep(3)
-      await new Promise(r => setTimeout(r, 1500))
-      const response = await fetchWithAuth('/api/admin/ai/save-and-verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problems: [result],
-          logId: pollingLogId,
-          modelId: selectedModelId
-        })
-      })
-      const data = await response.json()
-      if (data.success && data.data?.results?.[0]) {
-        const r = data.data.results[0]
-        if (r.attempts > 0) {
-          setPublishStep(4)
-          await new Promise(r => setTimeout(r, 1000))
-          setPublishStep(5)
-          await new Promise(r => setTimeout(r, 1000))
-        }
-        setPublishStep(6)
-        setPublishResult({
-          problemId: r.problemId,
-          attempts: r.attempts,
-          success: r.success,
-          warning: r.warning,
-          error: r.error,
-          judgeResult: r.judgeResult
-        })
-      } else {
-        setError(data.error || '自动发布失败')
-        setPublishResult({ attempts: 0, success: false, error: data.error || '自动发布失败' })
-      }
-    } catch (err) {
-      logger.error('自动发布失败', err)
-      setError('网络错误')
-      setPublishResult({ attempts: 0, success: false, error: '网络错误' })
-    } finally {
-      setPublishing(null)
-    }
-  }
-
-  const handleSaveAsDraft = async () => {
-    if (!result) return
-    setError('')
-    try {
-      const response = await fetchWithAuth('/api/admin/ai/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problems: [result], logId: pollingLogId })
-      })
-      const data = await response.json()
-      if (data.success) setError('已保存为草稿（未公开）')
-      else setError(data.error || '保存草稿失败')
-    } catch {
-      setError('网络错误')
-    }
-  }
-
-  const handleSelectLog = async (log: LogStatus) => {
+  const handleSelectLog = (log: LogStatus) => {
+    // 业务决策（2026-06）：选中历史日志时，仅打开 modal 展示；不复制到 activeJobs（避免与正在运行的任务混淆）
     setSelectedLog(log)
-    if (log.status === 'COMPLETED' && log.result) {
-      if (log.result.problems?.[0]) {
-        const p = log.result.problems[0]
-        setResult({
-          title: p.title || '',
-          description: p.description || '',
-          difficulty: p.difficulty || '入门',
-          tags: p.tags || [],
-          inputFormat: p.input || '',
-          outputFormat: p.output || '',
-          samples: p.samples || [],
-          hints: p.hint ? [p.hint] : [],
-          testCases: p.test_cases || []
-        })
-      }
-      if (log.result.thought) setThought(log.result.thought)
-      setQualityIssues(log.result.qualityIssues || [])
-    }
   }
 
   const handleRetryLog = async (log: LogStatus, e: React.MouseEvent) => {
@@ -408,23 +418,8 @@ export default function AIGenerationPage() {
     if (!confirm(`确定要重试该失败记录吗？\n\n主题：${log.params?.topic?.[0] || log.params?.title || '未知'}\n错误：${log.error || '(无)'}\n\n重试时会自动降低温度以提高稳定性。`)) return
     setRetryingLogId(log.id)
     try {
-      const response = await fetchWithAuth('/api/admin/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retryFromLogId: log.id, reduceTemperature: true })
-      })
-      const data = await response.json()
-      if (data.success) {
-        await fetchLogs()
-        if (data.data?.logId) {
-          setPollingLogId(data.data.logId)
-          setLoading(true)
-          setError('')
-          setResult(null)
-        }
-      } else {
-        alert(`重试失败：${data.error || '未知错误'}`)
-      }
+      // 业务决策（2026-06）：重试也走 startJob，加入 activeJobs 与其它任务并发
+      await startJob({ retryFromLogId: log.id, reduceTemperature: true }, log.id)
     } catch (err) {
       logger.error('重试请求失败', err)
       alert('重试请求失败，请查看控制台')
@@ -460,7 +455,7 @@ export default function AIGenerationPage() {
   }
 
   const selectedModel = models.find(m => m.id === selectedModelId)
-  const currentStep = getWorkflowStep(loading, result, publishing)
+  const currentStep = getWorkflowStep(activeJobs.size > 0)
 
   if (loadingModels) {
     return (
@@ -498,7 +493,11 @@ export default function AIGenerationPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">AI 智能出题</h1>
-            <p className="text-sm text-muted-foreground mt-1">使用 AI 自动生成题目内容，验证通过后自动发布到题库</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              使用 AI 自动生成题目内容，生成完成后直接发布到公开题库
+              <span className="mx-1.5">·</span>
+              可多次点击「开始生成」并发生成多个独立任务，互不阻塞
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -525,8 +524,7 @@ export default function AIGenerationPage() {
           <div className="flex items-center justify-between">
             {[
               { step: 1, label: '配置参数', icon: Settings, desc: '模型 / 主题 / 难度' },
-              { step: 2, label: 'AI 生成', icon: Wand2,    desc: '后台运行可切换页面' },
-              { step: 3, label: '自动发布', icon: Rocket,  desc: '验证通过即公开' }
+              { step: 2, label: 'AI 生成', icon: Wand2,    desc: '完成后自动发布到公开题库' }
             ].map(({ step, label, icon: Icon, desc }, idx, arr) => {
               const isActive = currentStep === step
               const isCompleted = currentStep > step
@@ -676,12 +674,19 @@ export default function AIGenerationPage() {
                 {selectedModel && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className="tag tag-primary text-xs">
-                      {selectedModel.model}
+                      {selectedModel.name}
                     </span>
+                    {selectedModel.name !== selectedModel.model && (
+                      <code className="tag text-xs font-mono">{selectedModel.model}</code>
+                    )}
                     <span className={`tag text-xs ${selectedModel.type === 'thinking' ? 'tag-warning' : 'tag-info'}`}>
                       {selectedModel.type === 'thinking' ? '🧠 思考模型' : '⚡ 生成模型'}
                     </span>
                     <span className="tag text-xs">📏 {selectedModel.maxTokens}</span>
+                    <span className="tag text-xs">🌡️ T={selectedModel.temperature}</span>
+                    {selectedModel.provider?.name && (
+                      <span className="tag text-xs">{selectedModel.provider.name}</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -750,27 +755,13 @@ export default function AIGenerationPage() {
               </div>
 
               {/* 数量 */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
-                  <Hash className="w-3.5 h-3.5 text-muted-foreground" />
-                  生成数量
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[1, 2, 3].map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setCount(n)}
-                      className={`p-2.5 rounded-lg text-sm transition-colors border ${
-                        count === n
-                          ? 'bg-primary text-white border-primary'
-                          : 'bg-muted/30 hover:bg-muted border-border text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {n} 道
-                    </button>
-                  ))}
-                </div>
+              {/* 单题模式提示（业务决策 2026-06） */}
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">单次生成一道题</span>
+                  <span className="mx-1.5">·</span>
+                  <span>可多次点击「开始生成」并发生成多个独立任务，互不阻塞</span>
+                </p>
               </div>
 
               {/* 附加要求 */}
@@ -796,13 +787,15 @@ export default function AIGenerationPage() {
 
               <button
                 onClick={handleGenerate}
-                disabled={loading || !topic.trim() || !selectedModelId}
+                disabled={submittingRef.current || !topic.trim() || !selectedModelId || cooldown > 0}
                 className="btn btn-primary w-full flex items-center justify-center gap-2 relative overflow-hidden group"
               >
                 {/* 流光效果 */}
                 <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                {loading ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" />生成中...</>
+                {cooldown > 0 ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" />请稍候（{cooldown}s）</>
+                ) : activeJobs.size > 0 ? (
+                  <><Wand2 className="w-5 h-5" />再生成一道（{activeJobs.size} 个进行中）</>
                 ) : (
                   <><Wand2 className="w-5 h-5" />开始生成</>
                 )}
@@ -810,24 +803,21 @@ export default function AIGenerationPage() {
             </div>
           </div>
 
-          {/* ---------- 右：结果卡 ---------- */}
+          {/* ---------- 右：结果卡（并发多任务） ---------- */}
           <div className="lg:col-span-3 card-static p-6 min-h-[600px] flex flex-col">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-foreground">生成结果</h2>
-              {result && (
-                <button
-                  onClick={handleGenerate}
-                  disabled={loading}
-                  className="btn btn-ghost text-sm flex items-center gap-1"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  重新生成
-                </button>
-              )}
+              <div>
+                <h2 className="text-base font-semibold text-foreground">生成结果</h2>
+                {activeJobs.size > 0 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {activeJobs.size} 个任务进行中
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* 空状态 */}
-            {!result && !loading && (
+            {/* 空状态：所有任务都已 dismiss */}
+            {activeJobs.size === 0 && (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center max-w-md">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -835,262 +825,195 @@ export default function AIGenerationPage() {
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">等待 AI 创作</h3>
                   <p className="text-sm text-muted-foreground mb-1">在左侧填写参数后点击"开始生成"</p>
-                  <p className="text-xs text-muted-foreground">AI 将为您生成完整的题目内容</p>
+                  <p className="text-xs text-muted-foreground">单次生成一道题 · 可同时提交多个独立任务</p>
                 </div>
               </div>
             )}
 
-            {/* 加载态 */}
-            {loading && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <Loader2 className="w-12 h-12 mx-auto mb-4 text-primary animate-spin" />
-                  <p className="text-foreground font-medium">AI 正在生成题目...</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    使用 {selectedModel?.name || 'AI 模型'} · 思考中
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">您可以切换到其他页面，生成会在后台继续</p>
-                  <button
-                    onClick={handleCancelPolling}
-                    className="btn btn-ghost text-xs mt-4 text-muted-foreground"
-                  >
-                    卡住了？取消轮询
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* 结果展示 */}
-            {result && !loading && (
+            {/* 多任务卡片堆叠 */}
+            {activeJobs.size > 0 && (
               <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1">
-                {/* 标题 + 复制 */}
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-1">题目名称</p>
-                      <h3 className="text-xl font-bold text-foreground">{result.title}</h3>
-                    </div>
-                    <button
-                      onClick={() => handleCopy(result.title)}
-                      className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                      title="复制标题"
-                    >
-                      {copied ? <CheckCircle className="w-4 h-4 text-secondary" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  {/* 难度 + 标签 */}
-                  <div className="flex items-center gap-2 flex-wrap mt-3">
-                    <span className={`tag ${getDifficultyColor(result.difficulty)}`}>
-                      {result.difficulty}
-                    </span>
-                    {result.tags.map((tag, idx) => (
-                      <span key={idx} className="tag">{tag}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 题目描述 */}
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">题目描述</p>
-                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
-                    {result.description}
-                  </p>
-                </div>
-
-                {/* 样例 */}
-                {result.samples && result.samples.length > 0 && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">样例（{result.samples.length}）</p>
-                    <div className="space-y-2">
-                      {result.samples.slice(0, 2).map((sample, idx) => (
-                        <div key={idx} className="grid grid-cols-2 gap-2">
-                          <div className="bg-muted/40 rounded-lg p-2">
-                            <p className="text-xs text-muted-foreground mb-1">输入</p>
-                            <pre className="text-xs text-foreground whitespace-pre-wrap font-mono">
-                              {sample.input?.slice(0, 200)}{sample.input?.length > 200 ? '...' : ''}
-                            </pre>
-                          </div>
-                          <div className="bg-muted/40 rounded-lg p-2">
-                            <p className="text-xs text-muted-foreground mb-1">输出</p>
-                            <pre className="text-xs text-foreground whitespace-pre-wrap font-mono">
-                              {sample.output?.slice(0, 200)}{sample.output?.length > 200 ? '...' : ''}
-                            </pre>
-                          </div>
+                {Array.from(activeJobs.values()).map(job => {
+                  const log = logs.find(l => l.id === job.logId)
+                  const elapsed = Math.floor((Date.now() - job.startedAt) / 1000)
+                  return (
+                    <div key={job.logId} className="border border-border rounded-xl overflow-hidden bg-card">
+                      {/* 卡片头：状态徽章 + 操作 */}
+                      <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {job.status === 'PROCESSING' && (
+                            <>
+                              <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                              <span className="text-sm font-medium text-foreground">生成中 · {elapsed}s</span>
+                            </>
+                          )}
+                          {job.status === 'COMPLETED' && (
+                            <>
+                              <CheckCircle className="w-4 h-4 text-secondary" />
+                              <span className="text-sm font-medium text-secondary">已生成并发布到公开题库</span>
+                            </>
+                          )}
+                          {job.status === 'FAILED' && (
+                            <>
+                              <XCircle className="w-4 h-4 text-error" />
+                              <span className="text-sm font-medium text-error">生成失败</span>
+                            </>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {thought && (
-                  <details className="bg-muted/40 rounded-lg p-3">
-                    <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                      AI 思考过程
-                    </summary>
-                    <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap leading-relaxed">
-                      {thought.slice(0, 800)}{thought.length > 800 ? '...' : ''}
-                    </p>
-                  </details>
-                )}
-
-                {qualityIssues.length > 0 && (
-                  <div className="bg-warning/5 border border-warning/20 rounded-lg p-3">
-                    <p className="text-sm font-medium text-warning flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4" />
-                      质量自检发现 {qualityIssues.length} 个提示
-                    </p>
-                    <ul className="text-xs text-warning/80 mt-2 space-y-1">
-                      {qualityIssues.map((q, i) => (
-                        <li key={i}>• 题目 #{q.problemIndex + 1}：{q.reason}</li>
-                      ))}
-                    </ul>
-                    <p className="text-xs text-warning/60 mt-2">提示：仍可继续导入到题库</p>
-                  </div>
-                )}
-
-                {/* 发布按钮 + 进度 */}
-                <div className="pt-4 border-t border-border space-y-3">
-                  <button
-                    onClick={handleSaveAndPublish}
-                    disabled={publishing !== null || !result || !selectedModelId}
-                    className="btn btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {publishing !== null ? (
-                      <><Loader2 className="w-5 h-5 animate-spin" />发布中...</>
-                    ) : (
-                      <><Rocket className="w-5 h-5" />创建并自动发布</>
-                    )}
-                  </button>
-
-                  {/* 发布进度 - 时间线样式 */}
-                  {publishing !== null && (
-                    <div className="bg-muted/40 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                        <span className="text-sm font-medium text-foreground">正在自动发布...</span>
+                        <div className="flex items-center gap-1">
+                          {job.status === 'PROCESSING' && (
+                            <button
+                              onClick={() => cancelJob(job.logId)}
+                              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                              title="取消此任务"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                          {(job.status === 'COMPLETED' || job.status === 'FAILED') && (
+                            <button
+                              onClick={() => dismissJob(job.logId)}
+                              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                              title="关闭此卡片"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        {[
-                          { step: 1, label: '保存题目到数据库' },
-                          { step: 2, label: '编译标程' },
-                          { step: 3, label: '运行测试数据' },
-                          { step: 4, label: 'AI 修正标程（如果需要）' },
-                          { step: 5, label: '重新验证' },
-                          { step: 6, label: '公开到题库' }
-                        ].map(({ step, label }) => {
-                          const done = publishStep > step
-                          const active = publishStep === step
-                          return (
-                            <div key={step} className="flex items-center gap-2 text-sm">
-                              {done ? (
-                                <Check className="w-4 h-4 text-secondary" />
-                              ) : active ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                              ) : (
-                                <div className="w-4 h-4 rounded-full border border-muted" />
+
+                      {/* 卡片体：按状态分 */}
+                      <div className="p-4">
+                        {job.status === 'PROCESSING' && (
+                          <div className="space-y-2">
+                            <p className="text-sm text-foreground">
+                              {log?.params?.topic?.[0] && (
+                                <span className="text-muted-foreground">主题：</span>
                               )}
-                              <span className={publishStep >= step ? 'text-foreground' : 'text-muted-foreground'}>
-                                {label}
-                              </span>
+                              {log?.params?.topic?.[0] || '（主题：未显示）'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              使用 {selectedModel?.name || 'AI 模型'} · 思考中
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              可继续点击"开始生成"提交新任务，本任务互不阻塞
+                            </p>
+                          </div>
+                        )}
+
+                        {job.status === 'COMPLETED' && job.result && (
+                          <div className="space-y-3">
+                            {/* 标题 + 复制 */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <p className="text-xs text-muted-foreground mb-1">题目名称</p>
+                                <h3 className="text-lg font-bold text-foreground">{job.result.title}</h3>
+                              </div>
+                              <button
+                                onClick={() => handleCopy(job.result!.title)}
+                                className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                                title="复制标题"
+                              >
+                                {copied ? <CheckCircle className="w-4 h-4 text-secondary" /> : <Copy className="w-4 h-4" />}
+                              </button>
                             </div>
-                          )
-                        })}
+                            {/* 难度 + 标签 */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`tag ${getDifficultyColor(job.result.difficulty)}`}>
+                                {job.result.difficulty}
+                              </span>
+                              {job.result.tags.map((tag, idx) => (
+                                <span key={idx} className="tag">{tag}</span>
+                              ))}
+                            </div>
+                            {/* 描述（折叠） */}
+                            <details className="bg-muted/40 rounded-lg p-3">
+                              <summary className="text-sm text-foreground cursor-pointer">题目描述</summary>
+                              <p className="text-xs text-muted-foreground mt-2 leading-relaxed whitespace-pre-wrap">
+                                {job.result.description.slice(0, 600)}{job.result.description.length > 600 ? '...' : ''}
+                              </p>
+                            </details>
+                            {/* 样例 */}
+                            {job.result.samples && job.result.samples.length > 0 && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-2">样例（{job.result.samples.length}）</p>
+                                <div className="space-y-2">
+                                  {job.result.samples.slice(0, 2).map((sample, idx) => (
+                                    <div key={idx} className="grid grid-cols-2 gap-2">
+                                      <div className="bg-muted/40 rounded-lg p-2">
+                                        <p className="text-xs text-muted-foreground mb-1">输入</p>
+                                        <pre className="text-xs text-foreground whitespace-pre-wrap font-mono">
+                                          {sample.input?.slice(0, 200)}{sample.input?.length > 200 ? '...' : ''}
+                                        </pre>
+                                      </div>
+                                      <div className="bg-muted/40 rounded-lg p-2">
+                                        <p className="text-xs text-muted-foreground mb-1">输出</p>
+                                        <pre className="text-xs text-foreground whitespace-pre-wrap font-mono">
+                                          {sample.output?.slice(0, 200)}{sample.output?.length > 200 ? '...' : ''}
+                                        </pre>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* 思考过程 */}
+                            {job.thought && (
+                              <details className="bg-muted/40 rounded-lg p-3">
+                                <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                                  AI 思考过程
+                                </summary>
+                                <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap leading-relaxed">
+                                  {job.thought.slice(0, 800)}{job.thought.length > 800 ? '...' : ''}
+                                </p>
+                              </details>
+                            )}
+                            {/* 质量自检 */}
+                            {job.qualityIssues && job.qualityIssues.length > 0 && (
+                              <div className="bg-warning/5 border border-warning/20 rounded-lg p-3">
+                                <p className="text-sm font-medium text-warning flex items-center gap-1.5">
+                                  <AlertTriangle className="w-4 h-4" />
+                                  质量自检发现 {job.qualityIssues.length} 个提示
+                                </p>
+                                <ul className="text-xs text-warning/80 mt-2 space-y-1">
+                                  {job.qualityIssues.map((q, i) => (
+                                    <li key={i}>• 题目 #{q.problemIndex + 1}：{q.reason}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {/* 在题库中查看 */}
+                            <div className="pt-3 border-t border-border flex flex-wrap gap-2">
+                              <button
+                                onClick={() => window.open('/admin/problems', '_blank')}
+                                className="btn btn-primary text-sm flex items-center gap-1.5"
+                              >
+                                <FileText className="w-4 h-4" />
+                                在题库中查看
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {job.status === 'FAILED' && (
+                          <div className="space-y-2">
+                            <p className="text-sm text-error">{job.error || '生成失败'}</p>
+                            <button
+                              onClick={() => {
+                                const origLog = logs.find(l => l.id === job.retryFromLogId)
+                                if (origLog) handleRetryLog(origLog, { stopPropagation: () => {} } as React.MouseEvent)
+                              }}
+                              className="btn btn-ghost text-sm flex items-center gap-1.5"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                              重试
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-
-                  {/* 发布结果 - 4 种状态 */}
-                  {publishResult !== null && (
-                    <div className={`rounded-lg p-4 space-y-3 ${
-                      publishResult.success === true && publishResult.attempts === 0
-                        ? 'bg-secondary/10 border border-secondary/30'
-                        : publishResult.success === true && publishResult.attempts > 0
-                          ? 'bg-warning/10 border border-warning/30'
-                          : publishResult.success === 'partial'
-                            ? 'bg-accent/10 border border-accent/30'
-                            : 'bg-error/10 border border-error/30'
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        {publishResult.success === true && publishResult.attempts === 0 && (
-                          <>
-                            <CheckCircle className="w-5 h-5 text-secondary" />
-                            <span className="text-sm font-medium text-secondary">已自动公开到题库（首次验证通过）</span>
-                          </>
-                        )}
-                        {publishResult.success === true && publishResult.attempts > 0 && (
-                          <>
-                            <CheckCircle className="w-5 h-5 text-warning" />
-                            <span className="text-sm font-medium text-warning">已自动公开（AI 修正 {publishResult.attempts} 次后通过）</span>
-                          </>
-                        )}
-                        {publishResult.success === 'partial' && (
-                          <>
-                            <AlertTriangle className="w-5 h-5 text-accent" />
-                            <span className="text-sm font-medium text-accent">已自动入库，但标程未通过验证</span>
-                          </>
-                        )}
-                        {publishResult.success === false && (
-                          <>
-                            <XCircle className="w-5 h-5 text-error" />
-                            <span className="text-sm font-medium text-error">自动发布失败</span>
-                          </>
-                        )}
-                      </div>
-
-                      {publishResult.judgeResult && (
-                        <p className="text-xs text-muted-foreground">
-                          评测状态：<span className="text-foreground">{publishResult.judgeResult.status}</span>
-                          {' · '}通过 {publishResult.judgeResult.passed} / {publishResult.judgeResult.total}
-                          {publishResult.judgeResult.message && ` · ${publishResult.judgeResult.message}`}
-                        </p>
-                      )}
-
-                      {publishResult.success === 'partial' && (
-                        <p className="text-xs text-accent/80">题目已公开，但标程未经验证，请在题解中手动添加正确代码</p>
-                      )}
-                      {publishResult.error && <p className="text-xs text-error/80">错误：{publishResult.error}</p>}
-
-                      <div className="flex flex-wrap gap-2">
-                        {publishResult.success === true && publishResult.problemId && (
-                          <>
-                            <button
-                              onClick={() => window.open(`/problem/${publishResult.problemId}`, '_blank')}
-                              className="btn btn-primary text-sm flex items-center gap-1.5"
-                            >
-                              <FileText className="w-4 h-4" />
-                              查看题目
-                            </button>
-                            <button
-                              onClick={() => window.open(`/problem/${publishResult.problemId}#solutions`, '_blank')}
-                              className="btn btn-ghost text-sm"
-                            >
-                              查看题解
-                            </button>
-                          </>
-                        )}
-                        {publishResult.success === 'partial' && publishResult.problemId && (
-                          <button
-                            onClick={() => window.open(`/problem/${publishResult.problemId}`, '_blank')}
-                            className="btn btn-primary text-sm flex items-center gap-1.5"
-                          >
-                            <FileText className="w-4 h-4" />
-                            查看题目
-                          </button>
-                        )}
-                        {publishResult.success === false && (
-                          <button
-                            onClick={handleSaveAsDraft}
-                            className="btn btn-ghost text-sm flex items-center gap-1.5"
-                          >
-                            <FileText className="w-4 h-4" />
-                            保留为草稿
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -1099,12 +1022,11 @@ export default function AIGenerationPage() {
         {/* ============ 使用流程 ============ */}
         <div className="card-static p-6">
           <h2 className="text-base font-semibold text-foreground mb-4">使用流程</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { num: 1, icon: Settings,  title: '选择模型', desc: '选择已配置的 AI 模型' },
-              { num: 2, icon: Lightbulb, title: '输入主题', desc: '描述题目类型与要求' },
-              { num: 3, icon: Wand2,     title: '后台运行', desc: '可切换页面继续生成' },
-              { num: 4, icon: Rocket,    title: '自动发布', desc: '验证通过即公开' }
+              { num: 1, icon: Settings,  title: '选择模型',     desc: '选择已配置的 AI 模型' },
+              { num: 2, icon: Lightbulb, title: '输入主题',     desc: '描述题目类型与要求' },
+              { num: 3, icon: Wand2,     title: '后台生成',     desc: '完成后自动发布到公开题库' }
             ].map(({ num, icon: Icon, title, desc }) => (
               <div key={num} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
