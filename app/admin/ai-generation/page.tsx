@@ -159,7 +159,24 @@ export default function AIGenerationPage() {
 
   useEffect(() => {
     if (logs.length > 0) {
-      const pendingLog = logs.find(l => l.status === 'PENDING' || l.status === 'PROCESSING')
+      // 自动恢复 polling：只恢复"最近 10 分钟内"创建的 PENDING/PROCESSING
+      // 过滤掉 dev server 重启后遗留的"僵尸日志"（PROCESSING 但队列已清空，永远完不成）
+      const STUCK_TIMEOUT_MS = 10 * 60 * 1000 // 10 分钟
+      const now = Date.now()
+      const pendingLog = logs.find(l => {
+        if (l.status !== 'PENDING' && l.status !== 'PROCESSING') return false
+        const age = now - new Date(l.createdAt).getTime()
+        return age < STUCK_TIMEOUT_MS
+      })
+      const stuckLog = logs.find(l => {
+        if (l.status !== 'PENDING' && l.status !== 'PROCESSING') return false
+        const age = now - new Date(l.createdAt).getTime()
+        return age >= STUCK_TIMEOUT_MS
+      })
+      if (stuckLog) {
+        // 僵尸日志：UI 上提示用户去生成记录里"重试"
+        logger.warn('[ai-generation] 检测到僵尸日志，已超时', { logId: stuckLog.id, ageMinutes: Math.round((now - new Date(stuckLog.createdAt).getTime()) / 60000) })
+      }
       if (pendingLog && !pollingLogId) {
         setPollingLogId(pendingLog.id)
         setLoading(true)
@@ -279,6 +296,21 @@ export default function AIGenerationPage() {
       return () => clearInterval(interval)
     }
   }, [pollingLogId, pollLogStatus])
+
+  /**
+   * 手动取消当前轮询（清空 loading 状态）
+   * 场景：dev server 重启后日志卡在 PROCESSING / AI 调用时间过长
+   * 注意：后端队列仍在跑（如果有的话），但 UI 不再等待，前端可以重新发起
+   */
+  const handleCancelPolling = () => {
+    if (!pollingLogId) return
+    if (!confirm('确定要取消当前等待吗？\n\n后端任务可能仍在运行（无法强制终止），但 UI 不再等待。')) {
+      return
+    }
+    setPollingLogId(null)
+    setLoading(false)
+    setError('已取消轮询。如需继续，可手动到"生成记录"中找到该日志点"重试"')
+  }
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -801,9 +833,15 @@ export default function AIGenerationPage() {
 
             {loading && (
               <div className="text-center py-12">
-                <Loader2 className="w-12 h-12 mx-auto mb-4 text-primary animate-spin" />
+                <Loader2 className="w-12 h-12 mb-4 text-primary animate-spin mx-auto" />
                 <p className="text-muted-foreground">AI 正在生成题目...</p>
                 <p className="text-sm text-muted-foreground mt-2">您可以切换到其他页面，生成会在后台继续</p>
+                <button
+                  onClick={handleCancelPolling}
+                  className="btn btn-ghost text-xs mt-4 text-muted-foreground hover:text-error"
+                >
+                  卡住了？取消轮询
+                </button>
               </div>
             )}
 
