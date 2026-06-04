@@ -49,8 +49,13 @@ export async function GET(request: NextRequest) {
         totalAccepted: true,
         createdAt: true,
         updatedAt: true,
+        isAiGenerated: true,
         aiStatus: true,
-        isVerified: true
+        isVerified: true,
+        verifiedAt: true,
+        judgeStatus: true,
+        judgeMessage: true,
+        fixAttempts: true
       }
     })
 

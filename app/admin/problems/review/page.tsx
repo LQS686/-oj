@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import {
-  Clock, CheckCircle, XCircle, AlertCircle, Play, Edit, Save, 
+  Clock, CheckCircle, XCircle, Play, Edit, Save,
   ArrowLeft, FileText, Code, Database, ChevronLeft, ChevronRight,
   Loader2, Eye, EyeOff, Send, RefreshCw
 } from 'lucide-react'
@@ -142,36 +142,6 @@ export default function ProblemReviewPage() {
     }
   }
 
-  const handleApprove = async () => {
-    if (!currentProblem) return
-
-    setSaving(true)
-    setError('')
-
-    try {
-      const response = await fetchWithAuth(`/api/admin/problems/${currentProblem.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visibility: 'public',
-          isVerified: true
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setSuccess('题目已审核通过并公开')
-        fetchProblems()
-      } else {
-        setError(data.error || '审核失败')
-      }
-    } catch (err) {
-      setError('网络错误')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const handleReject = async () => {
     if (!currentProblem) return
     if (!confirm('确定要拒绝这道题目吗？题目将被删除。')) return
@@ -293,14 +263,14 @@ export default function ProblemReviewPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">题目审核</h1>
-              <p className="text-sm text-muted-foreground">审核AI生成的题目</p>
+              <p className="text-sm text-muted-foreground">审核手动提交的题目</p>
             </div>
           </div>
 
           <div className="card p-12 text-center">
             <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400 opacity-50" />
             <p className="text-lg text-foreground">暂无待审核题目</p>
-            <p className="text-sm text-muted-foreground mt-2">所有AI生成的题目都已审核完成</p>
+            <p className="text-sm text-muted-foreground mt-2">所有手动提交的题目都已审核完成</p>
           </div>
         </div>
       </AdminLayout>
@@ -329,7 +299,7 @@ export default function ProblemReviewPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">题目审核</h1>
-              <p className="text-sm text-muted-foreground">审核AI生成的题目 ({problems.length} 道待审核)</p>
+              <p className="text-sm text-muted-foreground">审核手动提交的题目 ({problems.length} 道待审核)</p>
             </div>
           </div>
 
@@ -655,21 +625,6 @@ export default function ProblemReviewPage() {
 
               <div className="space-y-3">
                 <button
-                  onClick={handleApprove}
-                  disabled={saving || !currentProblem.isVerified}
-                  className="btn w-full bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 flex items-center justify-center gap-2"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  审核通过并公开
-                </button>
-
-                {!currentProblem.isVerified && (
-                  <p className="text-xs text-warning text-center">
-                    请先验证标程后再审核通过
-                  </p>
-                )}
-
-                <button
                   onClick={handleReject}
                   disabled={saving}
                   className="btn w-full bg-error/5 hover:bg-error/10 text-error border border-error/15 flex items-center justify-center gap-2"
@@ -695,12 +650,6 @@ export default function ProblemReviewPage() {
                 <Clock className="w-4 h-4" />
                 创建时间: {new Date(currentProblem.createdAt).toLocaleString('zh-CN')}
               </div>
-              {currentProblem.isAiGenerated && (
-                <div className="flex items-center gap-2 text-xs text-purple-400 mt-2">
-                  <AlertCircle className="w-4 h-4" />
-                  AI生成题目
-                </div>
-              )}
             </div>
           </div>
         </div>

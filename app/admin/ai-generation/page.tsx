@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { Sparkles, Loader2, FileText, CheckCircle, AlertCircle, Copy, RefreshCw, Settings, Cpu, History, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Sparkles, Loader2, FileText, Check, CheckCircle, AlertCircle, AlertTriangle, XCircle, Copy, RefreshCw, Settings, Cpu, History, X, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import { DIFFICULTIES, DIFFICULTY_COLORS } from '@/lib/constants'
 
@@ -151,6 +151,18 @@ export default function AIGenerationPage() {
   const [selectedLog, setSelectedLog] = useState<LogStatus | null>(null)
   const [qualityIssues, setQualityIssues] = useState<Array<{ problemIndex: number; reason: string; details?: string[] }>>([])
   const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
+
+  // 自动发布进度
+  const [publishing, setPublishing] = useState<number | null>(null)
+  const [publishStep, setPublishStep] = useState<number>(0)
+  const [publishResult, setPublishResult] = useState<{
+    problemId?: string
+    attempts: number
+    success: true | 'partial' | false
+    warning?: string
+    error?: string
+    judgeResult?: { status: string; passed: number; total: number; message?: string }
+  } | null>(null)
 
   useEffect(() => {
     fetchModels()
@@ -417,10 +429,102 @@ export default function AIGenerationPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleCreateProblem = () => {
+  /**
+   * "创建并自动发布"：
+   *   步骤 1：保存题目到数据库（后端 saveProblem）
+   *   步骤 2-3：编译标程 + 运行测试数据（后端 executeJudge）
+   *   步骤 4-5：AI 修正标程（如有需要）+ 重新验证（最多 3 次）
+   *   步骤 6：公开到题库（更新 isPublic / aiStatus='VERIFIED'）
+   *
+   * 前端用 setTimeout 模拟前 2 步节奏（让用户看到进度），实际耗时由后端决定
+   * 端到端通常 5-30 秒
+   */
+  const handleSaveAndPublish = async () => {
     if (!result) return
-    const encoded = encodeURIComponent(JSON.stringify(result))
-    router.push(`/admin/problems/create?ai=${encoded}`)
+    if (!selectedModelId) {
+      setError('请先选择 AI 模型')
+      return
+    }
+    setPublishing(0)
+    setPublishStep(1)
+    setError('')
+    setPublishResult(null)
+
+    try {
+      // 步骤 1 已经在前端 fire-and-forget（点按钮 = 开始保存）
+      // 步骤 2-3 模拟节奏
+      setPublishStep(2) // 编译
+      await new Promise(r => setTimeout(r, 1500))
+      setPublishStep(3) // 运行
+      await new Promise(r => setTimeout(r, 1500))
+
+      const response = await fetchWithAuth('/api/admin/ai/save-and-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problems: [result],
+          logId: pollingLogId,
+          modelId: selectedModelId
+        })
+      })
+      const data = await response.json()
+
+      if (data.success && data.data?.results?.[0]) {
+        const r = data.data.results[0]
+        // 若后端返回 attempts > 0，说明有过修正
+        if (r.attempts > 0) {
+          setPublishStep(4) // 修正中
+          await new Promise(r => setTimeout(r, 1000))
+          setPublishStep(5) // 重验证
+          await new Promise(r => setTimeout(r, 1000))
+        }
+        setPublishStep(6) // 公开
+        setPublishResult({
+          problemId: r.problemId,
+          attempts: r.attempts,
+          success: r.success,
+          warning: r.warning,
+          error: r.error,
+          judgeResult: r.judgeResult
+        })
+      } else {
+        setError(data.error || '自动发布失败')
+        setPublishResult({ attempts: 0, success: false, error: data.error || '自动发布失败' })
+      }
+    } catch (err) {
+      logger.error('自动发布失败', err)
+      setError('网络错误')
+      setPublishResult({ attempts: 0, success: false, error: '网络错误' })
+    } finally {
+      setPublishing(null)
+    }
+  }
+
+  /**
+   * 草稿路径：当自动发布失败时，给用户一个"保留为草稿"的回退方案
+   * 调 /api/admin/ai/save（无验证版本），保留题目入库待人工 review
+   */
+  const handleSaveAsDraft = async () => {
+    if (!result) return
+    setError('')
+    try {
+      const response = await fetchWithAuth('/api/admin/ai/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problems: [result],
+          logId: pollingLogId
+        })
+      })
+      const data = await response.json()
+      if (data.success) {
+        setError('已保存为草稿（未公开）')
+      } else {
+        setError(data.error || '保存草稿失败')
+      }
+    } catch {
+      setError('网络错误')
+    }
   }
 
   const handleSelectLog = async (log: LogStatus) => {
@@ -933,33 +1037,6 @@ export default function AIGenerationPage() {
                   </details>
                 )}
 
-                {/* 测试数据补全：未生成时提示 + 一键补全按钮（仅题目描述已生成但 testCases 为空时显示） */}
-                {(!result.testCases || result.testCases.length === 0) && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                    <p className="text-sm text-blue-300 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4" />
-                      题目描述已生成，尚未生成测试数据
-                    </p>
-                    <button
-                      onClick={handleGenerateTestCases}
-                      disabled={loading}
-                      className="btn btn-primary text-sm mt-2 flex items-center gap-1.5"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          生成中...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          补全测试数据（15 组）
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-
                 {/* 质量自检问题（黄色 chip 提示，不阻塞导入） */}
                 {qualityIssues.length > 0 && (
                   <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
@@ -978,14 +1055,156 @@ export default function AIGenerationPage() {
                   </div>
                 )}
 
-                <div className="pt-4 border-t border-border">
+                <div className="pt-4 border-t border-border space-y-3">
                   <button
-                    onClick={handleCreateProblem}
-                    className="btn btn-primary w-full flex items-center justify-center gap-2"
+                    onClick={handleSaveAndPublish}
+                    disabled={publishing !== null || !result || !selectedModelId}
+                    className="btn btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <FileText className="w-5 h-5" />
-                    创建此题目
+                    {publishing !== null ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        发布中...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-5 h-5" />
+                        创建并自动发布
+                      </>
+                    )}
                   </button>
+
+                  {/* 发布进度：6 步 */}
+                  {publishing !== null && (
+                    <div className="bg-muted/40 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        <span className="text-sm text-foreground">正在自动发布...</span>
+                      </div>
+                      <div className="space-y-2">
+                        {[
+                          { step: 1, label: '保存题目到数据库' },
+                          { step: 2, label: '编译标程' },
+                          { step: 3, label: '运行测试数据' },
+                          { step: 4, label: 'AI 修正标程（如果需要）' },
+                          { step: 5, label: '重新验证' },
+                          { step: 6, label: '公开到题库' }
+                        ].map(({ step, label }) => (
+                          <div key={step} className="flex items-center gap-2 text-sm">
+                            {publishStep > step ? (
+                              <Check className="w-4 h-4 text-secondary" />
+                            ) : publishStep === step ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                            ) : (
+                              <div className="w-4 h-4 rounded-full border border-muted" />
+                            )}
+                            <span className={publishStep >= step ? 'text-foreground' : 'text-muted-foreground'}>
+                              {label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 发布结果：4 种状态 */}
+                  {publishResult !== null && (
+                    <div className={`rounded-lg p-4 space-y-3 ${
+                      publishResult.success === true && publishResult.attempts === 0
+                        ? 'bg-secondary/10 border border-secondary/30'
+                        : publishResult.success === true && publishResult.attempts > 0
+                          ? 'bg-yellow-500/10 border border-yellow-500/30'
+                          : publishResult.success === 'partial'
+                            ? 'bg-orange-500/10 border border-orange-500/30'
+                            : 'bg-error/10 border border-error/30'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {publishResult.success === true && publishResult.attempts === 0 && (
+                          <>
+                            <CheckCircle className="w-5 h-5 text-secondary" />
+                            <span className="text-sm font-medium text-secondary">已自动公开到题库（首次验证通过）</span>
+                          </>
+                        )}
+                        {publishResult.success === true && publishResult.attempts > 0 && (
+                          <>
+                            <CheckCircle className="w-5 h-5 text-yellow-300" />
+                            <span className="text-sm font-medium text-yellow-300">已自动公开到题库（AI 修正 {publishResult.attempts} 次后通过）</span>
+                          </>
+                        )}
+                        {publishResult.success === 'partial' && (
+                          <>
+                            <AlertTriangle className="w-5 h-5 text-orange-300" />
+                            <span className="text-sm font-medium text-orange-300">已自动入库，但标程未通过验证</span>
+                          </>
+                        )}
+                        {publishResult.success === false && (
+                          <>
+                            <XCircle className="w-5 h-5 text-error" />
+                            <span className="text-sm font-medium text-error">自动发布失败</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* 评测摘要 */}
+                      {publishResult.judgeResult && (
+                        <div className="text-xs text-muted-foreground">
+                          评测状态：<span className="text-foreground">{publishResult.judgeResult.status}</span>
+                          {' · '}
+                          通过 {publishResult.judgeResult.passed} / {publishResult.judgeResult.total}
+                          {publishResult.judgeResult.message && ` · ${publishResult.judgeResult.message}`}
+                        </div>
+                      )}
+
+                      {/* partial 警告 */}
+                      {publishResult.success === 'partial' && (
+                        <p className="text-xs text-orange-200/80">题目已公开，但标程未经验证，请在题解中手动添加正确代码</p>
+                      )}
+
+                      {/* 错误信息 */}
+                      {publishResult.error && (
+                        <p className="text-xs text-error/80">错误：{publishResult.error}</p>
+                      )}
+
+                      {/* 操作按钮 */}
+                      <div className="flex flex-wrap gap-2">
+                        {publishResult.success === true && publishResult.problemId && (
+                          <>
+                            <button
+                              onClick={() => window.open(`/problem/${publishResult.problemId}`, '_blank')}
+                              className="btn btn-primary text-sm flex items-center gap-1.5"
+                            >
+                              <FileText className="w-4 h-4" />
+                              查看题目
+                            </button>
+                            <button
+                              onClick={() => window.open(`/problem/${publishResult.problemId}#solutions`, '_blank')}
+                              className="btn btn-ghost text-sm flex items-center gap-1.5"
+                            >
+                              查看题解
+                            </button>
+                          </>
+                        )}
+                        {publishResult.success === 'partial' && publishResult.problemId && (
+                          <button
+                            onClick={() => window.open(`/problem/${publishResult.problemId}`, '_blank')}
+                            className="btn btn-primary text-sm flex items-center gap-1.5"
+                          >
+                            <FileText className="w-4 h-4" />
+                            查看题目
+                          </button>
+                        )}
+                        {publishResult.success === false && (
+                          <button
+                            onClick={handleSaveAsDraft}
+                            className="btn btn-ghost text-sm flex items-center gap-1.5"
+                          >
+                            <FileText className="w-4 h-4" />
+                            保留为草稿
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

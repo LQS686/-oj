@@ -14,12 +14,7 @@ export async function GET(request: NextRequest) {
 
     const problems = await prisma.problem.findMany({
       where: {
-        OR: [
-          { isAiGenerated: true, visibility: 'private' },
-          { isAiGenerated: true, isPublic: false },
-          { aiStatus: 'AI_GENERATED', visibility: 'private' },
-          { aiStatus: 'GENERATED', visibility: 'private' }
-        ]
+        isAiGenerated: false  // 仅展示手动提交的题目
       },
       include: {
         testCases: {

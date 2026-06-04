@@ -26,8 +26,13 @@ interface Problem {
   totalSubmit: number
   totalAccepted: number
   createdAt: string
+  isAiGenerated?: boolean
   aiStatus: string
   isVerified: boolean
+  verifiedAt?: string | null
+  judgeStatus?: string | null
+  judgeMessage?: string | null
+  fixAttempts?: number
 }
 
 export default function AdminProblemsPage() {
@@ -572,6 +577,28 @@ export default function AdminProblemsPage() {
                               需验证
                             </span>
                           )}
+                          {problem.aiStatus === 'VERIFIED' && (
+                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-300 border border-green-500/20">
+                              <Check className="w-3 h-3" />
+                              已验证
+                            </span>
+                          )}
+                          {problem.aiStatus === 'AUTO_PUBLISHED_WITH_FAILURES' && (
+                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-300 border border-orange-500/20">
+                              <span className="w-1 h-1 rounded-full bg-orange-400 animate-pulse"></span>
+                              标程未验证
+                            </span>
+                          )}
+                          {problem.aiStatus === 'DRAFT' && (
+                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted/50 text-muted-foreground border border-slate-200">
+                              草稿
+                            </span>
+                          )}
+                          {problem.aiStatus === 'FORCE_PUBLISHED' && (
+                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">
+                              强制公开
+                            </span>
+                          )}
                         </div>
                         
                         <div className="flex flex-wrap items-center gap-2">
@@ -813,6 +840,93 @@ export default function AdminProblemsPage() {
                   <div className="text-sm text-foreground">{selectedProblem.memoryLimit || 256} MB</div>
                 </div>
               </div>
+
+              {(selectedProblem.isAiGenerated || ['VERIFIED', 'AUTO_PUBLISHED_WITH_FAILURES', 'DRAFT', 'FORCE_PUBLISHED', 'PENDING'].includes(selectedProblem.aiStatus)) && (
+                <div className="mb-4 p-4 rounded-lg border border-primary/20 bg-primary/5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <FileText className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold text-foreground">AI 生成信息</span>
+                  </div>
+
+                  {selectedProblem.aiStatus === 'AUTO_PUBLISHED_WITH_FAILURES' && (
+                    <div className="mb-3 p-3 rounded-lg bg-error/10 border border-error/30 text-sm text-error flex items-start gap-2">
+                      <span className="font-bold flex-shrink-0">⚠</span>
+                      <span>标程未通过自动验证，请手动在题解板块添加正确代码</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <div className="text-muted-foreground mb-1">AI 状态</div>
+                      <div>
+                        {selectedProblem.aiStatus === 'VERIFIED' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-green-300 border border-green-500/20">
+                            <Check className="w-3 h-3" />
+                            已验证
+                          </span>
+                        )}
+                        {selectedProblem.aiStatus === 'AUTO_PUBLISHED_WITH_FAILURES' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-300 border border-orange-500/20">
+                            <span className="w-1 h-1 rounded-full bg-orange-400 animate-pulse"></span>
+                            标程未验证
+                          </span>
+                        )}
+                        {selectedProblem.aiStatus === 'DRAFT' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground border border-slate-200">
+                            草稿
+                          </span>
+                        )}
+                        {selectedProblem.aiStatus === 'FORCE_PUBLISHED' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">
+                            强制公开
+                          </span>
+                        )}
+                        {selectedProblem.aiStatus === 'PENDING' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                            验证中
+                          </span>
+                        )}
+                        {!['VERIFIED', 'AUTO_PUBLISHED_WITH_FAILURES', 'DRAFT', 'FORCE_PUBLISHED', 'PENDING'].includes(selectedProblem.aiStatus) && (
+                          <span className="text-foreground">{selectedProblem.aiStatus || '-'}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-muted-foreground mb-1">验证时间</div>
+                      <div className="text-foreground">
+                        {selectedProblem.verifiedAt
+                          ? new Date(selectedProblem.verifiedAt).toLocaleString('zh-CN')
+                          : '-'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-muted-foreground mb-1">判定结果</div>
+                      <div className="text-foreground">
+                        {selectedProblem.judgeStatus || '-'}
+                        {selectedProblem.judgeStatus && selectedProblem.judgeStatus !== 'AC' && (
+                          <span className="ml-1 text-error">({selectedProblem.judgeStatus})</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-muted-foreground mb-1">自动修正次数</div>
+                      <div className="text-foreground">{selectedProblem.fixAttempts ?? 0}</div>
+                    </div>
+                  </div>
+
+                  {selectedProblem.judgeMessage && selectedProblem.judgeStatus && selectedProblem.judgeStatus !== 'AC' && (
+                    <div className="mt-3">
+                      <div className="text-xs text-muted-foreground mb-1">错误信息</div>
+                      <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground whitespace-pre-wrap max-h-24 overflow-y-auto custom-scrollbar font-mono">
+                        {selectedProblem.judgeMessage}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {selectedProblem.source && (
                 <div className="mb-4">

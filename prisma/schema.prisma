@@ -107,9 +107,13 @@ model Problem {
   
   // AI生成相关字段
   isAiGenerated Boolean     @default(false)
-  aiStatus      String      @default("MANUAL_CREATED") // MANUAL_CREATED, AI_ASSISTED, AI_GENERATED
+  aiStatus      String      @default("MANUAL_CREATED") // MANUAL_CREATED, AI_ASSISTED, AI_GENERATED  // 枚举值：'PENDING' | 'VERIFIED' | 'AUTO_PUBLISHED_WITH_FAILURES' | 'DRAFT' | 'FORCE_PUBLISHED'
   isVerified    Boolean     @default(true)   // 是否已通过标程验证
   aiPrompt      String?     // 生成该题目的原始提示词
+  verifiedAt    DateTime?   // 最近一次验证通过时间
+  judgeStatus   String?     // 'AC' | 'WA' | 'CE' | 'RE' | 'TLE' | 'MLE'  (最后一次验证结果)
+  judgeMessage  String?     // 失败时的错误信息
+  fixAttempts   Int         @default(0)  // 自动修正循环执行次数
   
   // 标程（用于验证数据）
   stdCode       String?
@@ -484,6 +488,8 @@ model Solution {
   views      Int       @default(0)
   likes      Int       @default(0)
   isOfficial Boolean   @default(false)
+  verified   Boolean   @default(false)  // 标程是否通过真实运行验证
+  verifiedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   
