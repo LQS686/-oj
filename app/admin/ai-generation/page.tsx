@@ -5,10 +5,10 @@ import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import {
-  Sparkles, Loader2, FileText, Check, CheckCircle, AlertCircle, AlertTriangle,
+  Loader2, FileText, Check, CheckCircle, AlertCircle, AlertTriangle,
   XCircle, Copy, RefreshCw, Settings, Cpu, History, X, ChevronDown, ChevronUp,
-  Wand2, Rocket, Target, Trophy, Lightbulb, Brain, Zap, BookOpen,
-  Code2, Star, Hash, Layers, ChevronRight
+  Wand2, Rocket, Target, Lightbulb, Brain,
+  Hash, ChevronRight
 } from 'lucide-react'
 import Link from 'next/link'
 import { DIFFICULTIES, DIFFICULTY_COLORS } from '@/lib/constants'
@@ -67,27 +67,16 @@ interface LogStatus {
 
 const LAST_MODEL_KEY = 'ai-last-model-id'
 
-/** 难度对应的"颜色-图标"组合：用于难度 pill */
-const DIFFICULTY_VISUAL: Record<string, { color: string; icon: string; desc: string }> = {
-  '入门':   { color: 'from-emerald-400 to-teal-500',     icon: '🌱', desc: '基础语法' },
-  '普及-':  { color: 'from-lime-400 to-green-500',       icon: '🌿', desc: '简单算法' },
-  '普及':   { color: 'from-sky-400 to-blue-500',         icon: '📘', desc: '标准算法' },
-  '普及+':  { color: 'from-indigo-400 to-violet-500',    icon: '🎯', desc: '复杂结构' },
-  '提高':   { color: 'from-fuchsia-400 to-purple-500',   icon: '⚡', desc: '高级算法' },
-  '提高+':  { color: 'from-pink-400 to-rose-500',        icon: '🔥', desc: '省选级别' },
-  '省选':   { color: 'from-orange-400 to-red-500',       icon: '🏆', desc: '省选难度' },
-  'NOI':    { color: 'from-red-500 to-rose-700',         icon: '👑', desc: 'NOI 级别' }
-}
-
+/** 快速主题 chip（点击填入主题输入框） */
 const QUICK_TOPICS = [
-  { label: '动态规划', icon: '🧠', color: 'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-300' },
-  { label: '图论',     icon: '🕸️', color: 'from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-300' },
-  { label: '最短路',   icon: '🛣️', color: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30 text-emerald-300' },
-  { label: '二分',     icon: '🎯', color: 'from-amber-500/20 to-orange-500/20 border-amber-500/30 text-amber-300' },
-  { label: '字符串',   icon: '📝', color: 'from-rose-500/20 to-pink-500/20 border-rose-500/30 text-rose-300' },
-  { label: '贪心',     icon: '💰', color: 'from-yellow-500/20 to-amber-500/20 border-yellow-500/30 text-yellow-300' },
-  { label: 'DFS/BFS',  icon: '🌲', color: 'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-300' },
-  { label: '数据结构', icon: '🗂️', color: 'from-indigo-500/20 to-violet-500/20 border-indigo-500/30 text-indigo-300' }
+  { label: '动态规划', icon: '🧠' },
+  { label: '图论',     icon: '🕸️' },
+  { label: '最短路',   icon: '🛣️' },
+  { label: '二分',     icon: '🎯' },
+  { label: '字符串',   icon: '📝' },
+  { label: '贪心',     icon: '💰' },
+  { label: 'DFS/BFS',  icon: '🌲' },
+  { label: '数据结构', icon: '🗂️' }
 ]
 
 function getDifficultyHint(d: string): string {
@@ -472,8 +461,6 @@ export default function AIGenerationPage() {
 
   const selectedModel = models.find(m => m.id === selectedModelId)
   const currentStep = getWorkflowStep(loading, result, publishing)
-  const runningLogsCount = logs.filter(l => l.status === 'PENDING' || l.status === 'PROCESSING').length
-  const successLogsCount = logs.filter(l => l.status === 'COMPLETED').length
 
   if (loadingModels) {
     return (
@@ -507,105 +494,34 @@ export default function AIGenerationPage() {
           </div>
         )}
 
-        {/* ============ Hero 头部 ============ */}
-        <div className="relative overflow-hidden rounded-2xl border border-border" style={{
-          background: `
-            radial-gradient(ellipse 80% 50% at 20% 0%, rgba(59,130,246,0.18), transparent 60%),
-            radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168,85,247,0.15), transparent 60%),
-            radial-gradient(ellipse 50% 40% at 50% 50%, rgba(16,185,129,0.08), transparent 60%),
-            linear-gradient(135deg, rgba(15,23,42,0.4) 0%, rgba(30,41,59,0.6) 100%)
-          `
-        }}>
-          {/* 装饰光斑 */}
-          <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full blur-3xl opacity-30 animate-float"
-            style={{ background: 'radial-gradient(circle, #3B82F6 0%, transparent 70%)' }} />
-          <div className="absolute -bottom-20 -right-20 w-96 h-96 rounded-full blur-3xl opacity-20 animate-float"
-            style={{ background: 'radial-gradient(circle, #A855F7 0%, transparent 70%)', animationDelay: '2s' }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full blur-3xl opacity-15 animate-float"
-            style={{ background: 'radial-gradient(circle, #10B981 0%, transparent 70%)', animationDelay: '4s' }} />
-
-          <div className="relative z-10 p-8 md:p-10">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="flex-1">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary-light mb-4 animate-fade-in">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  AI 智能出题 · 全新升级
-                </div>
-                <h1 className="text-3xl md:text-4xl font-bold mb-3">
-                  <span className="gradient-text glow">让 AI 一键生成高质量题目</span>
-                </h1>
-                <p className="text-muted-foreground text-sm md:text-base max-w-2xl leading-relaxed">
-                  描述题目主题，AI 自动生成描述、样例、测试数据和标准程序，
-                  <span className="text-foreground font-medium">自动验证通过后立即发布到题库</span>，
-                  整个流程无需人工干预。
-                </p>
-
-                {/* 特性徽章 */}
-                <div className="flex flex-wrap gap-2 mt-5">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/10 border border-secondary/20 text-xs text-secondary">
-                    <Zap className="w-3.5 h-3.5" />
-                    严格 JSON 输出
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-info/10 border border-info/20 text-xs text-info">
-                    <Target className="w-3.5 h-3.5" />
-                    15 组测试数据
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warning/10 border border-warning/20 text-xs text-warning">
-                    <Brain className="w-3.5 h-3.5" />
-                    AI 自动修正
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs text-primary-light">
-                    <Rocket className="w-3.5 h-3.5" />
-                    验证通过即发布
-                  </span>
-                </div>
-              </div>
-
-              {/* 右侧统计卡 */}
-              <div className="grid grid-cols-3 gap-3 md:w-auto">
-                <div className="card-static p-4 min-w-[100px] text-center hover-lift">
-                  <div className="text-2xl font-bold gradient-text">{logs.length}</div>
-                  <div className="text-xs text-muted-foreground mt-1">总生成数</div>
-                </div>
-                <div className="card-static p-4 min-w-[100px] text-center hover-lift">
-                  <div className="text-2xl font-bold text-secondary">{successLogsCount}</div>
-                  <div className="text-xs text-muted-foreground mt-1">已成功</div>
-                </div>
-                <div className="card-static p-4 min-w-[100px] text-center hover-lift">
-                  <div className="text-2xl font-bold text-warning flex items-center justify-center gap-1">
-                    {runningLogsCount}
-                    {runningLogsCount > 0 && <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">进行中</div>
-                </div>
-              </div>
-            </div>
-
-            {/* 历史记录按钮 */}
-            <div className="relative z-10 flex items-center gap-3 mt-6 pt-6 border-t border-border/50">
-              <button
-                onClick={() => setShowHistory(!showHistory)}
-                className="btn btn-ghost flex items-center gap-2 text-sm"
-              >
-                <History className="w-4 h-4" />
-                {showHistory ? '隐藏' : '查看'}生成记录
-                {logs.length > 0 && <span className="text-xs text-muted-foreground">({logs.length})</span>}
-                {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={() => fetchLogs()}
-                className="btn btn-ghost text-xs flex items-center gap-1"
-                title="手动刷新生成记录"
-              >
-                <RefreshCw className="w-3 h-3" />
-                刷新
-              </button>
-            </div>
+        {/* ============ 页面标题（与其他 admin 页一致） ============ */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">AI 智能出题</h1>
+            <p className="text-sm text-muted-foreground mt-1">使用 AI 自动生成题目内容，验证通过后自动发布到题库</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="btn btn-ghost flex items-center gap-2 text-sm"
+            >
+              <History className="w-4 h-4" />
+              生成记录
+              {logs.length > 0 && <span className="text-xs text-muted-foreground">({logs.length})</span>}
+              {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => fetchLogs()}
+              className="btn btn-ghost text-xs flex items-center gap-1"
+              title="手动刷新生成记录"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </button>
           </div>
         </div>
 
         {/* ============ 工作流步骤条 ============ */}
-        <div className="card-static p-5">
+        <div className="card-static p-4">
           <div className="flex items-center justify-between">
             {[
               { step: 1, label: '配置参数', icon: Settings, desc: '模型 / 主题 / 难度' },
@@ -617,33 +533,26 @@ export default function AIGenerationPage() {
               return (
                 <div key={step} className="flex items-center flex-1">
                   <div className="flex items-center gap-3 flex-1">
-                    <div className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
                       isActive
-                        ? 'bg-gradient-to-br from-primary to-primary-dark text-white shadow-lg shadow-primary/30 scale-110'
+                        ? 'bg-primary text-white'
                         : isCompleted
-                          ? 'bg-gradient-to-br from-secondary to-secondary-dark text-white'
-                          : 'bg-muted/40 text-muted-foreground'
+                          ? 'bg-secondary text-white'
+                          : 'bg-muted text-muted-foreground'
                     }`}>
                       {isCompleted ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
-                      {isActive && (
-                        <span className="absolute inset-0 rounded-xl border-2 border-primary animate-ping opacity-50" />
-                      )}
                     </div>
                     <div className="hidden sm:block">
-                      <div className={`text-sm font-semibold ${isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      <div className={`text-sm font-medium ${isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
                         {label}
                       </div>
                       <div className="text-xs text-muted-foreground">{desc}</div>
                     </div>
                   </div>
                   {idx < arr.length - 1 && (
-                    <div className="flex-1 mx-3 h-0.5 relative overflow-hidden rounded-full bg-muted/40">
-                      <div
-                        className={`absolute inset-y-0 left-0 transition-all duration-500 ${
-                          isCompleted ? 'w-full bg-gradient-to-r from-secondary to-secondary-light' : 'w-0'
-                        }`}
-                      />
-                    </div>
+                    <div className={`flex-1 mx-3 h-0.5 rounded-full transition-colors ${
+                      isCompleted ? 'bg-secondary' : 'bg-muted/40'
+                    }`} />
                   )}
                 </div>
               )
@@ -723,16 +632,8 @@ export default function AIGenerationPage() {
         {/* ============ 主体两栏 ============ */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* ---------- 左：配置卡 ---------- */}
-          <div className="lg:col-span-2 card-static p-6 hover-lift">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/20">
-                <Settings className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-foreground">配置参数</h2>
-                <p className="text-xs text-muted-foreground">配置出题需求</p>
-              </div>
-            </div>
+          <div className="lg:col-span-2 card-static p-6">
+            <h2 className="text-base font-semibold text-foreground mb-5">配置参数</h2>
 
             <div className="space-y-5">
               {/* AI 模型选择 */}
@@ -788,7 +689,7 @@ export default function AIGenerationPage() {
               {/* 主题输入 */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
-                  <Lightbulb className="w-3.5 h-3.5 text-accent" />
+                  <Lightbulb className="w-3.5 h-3.5 text-muted-foreground" />
                   题目主题 <span className="text-error">*</span>
                 </label>
                 <input
@@ -804,7 +705,7 @@ export default function AIGenerationPage() {
                       key={t.label}
                       type="button"
                       onClick={() => setTopic(t.label)}
-                      className={`group relative px-2.5 py-1 rounded-md text-xs font-medium border bg-gradient-to-r ${t.color} hover:scale-105 transition-all duration-200`}
+                      className="px-2.5 py-1 rounded text-xs border border-border bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <span className="mr-1">{t.icon}</span>{t.label}
                     </button>
@@ -812,34 +713,27 @@ export default function AIGenerationPage() {
                 </div>
               </div>
 
-              {/* 难度选择 - 视觉化 pill 网格 */}
+              {/* 难度选择 */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
-                  <Target className="w-3.5 h-3.5 text-secondary" />
+                  <Target className="w-3.5 h-3.5 text-muted-foreground" />
                   目标难度
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {DIFFICULTIES.map(d => {
-                    const v = DIFFICULTY_VISUAL[d] || { color: 'from-gray-400 to-gray-500', icon: '📌', desc: d }
                     const active = difficulty === d
                     return (
                       <button
                         key={d}
                         type="button"
                         onClick={() => setDifficulty(d)}
-                        className={`relative p-2.5 rounded-lg text-center transition-all duration-200 border ${
+                        className={`p-2.5 rounded-lg text-center text-sm transition-colors border ${
                           active
-                            ? `bg-gradient-to-br ${v.color} text-white border-transparent shadow-lg scale-105`
-                            : 'bg-muted/30 hover:bg-muted/60 border-border text-muted-foreground hover:text-foreground'
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-muted/30 hover:bg-muted border-border text-muted-foreground hover:text-foreground'
                         }`}
                       >
-                        <div className="text-base mb-0.5">{v.icon}</div>
-                        <div className="text-xs font-semibold">{d}</div>
-                        {active && (
-                          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center">
-                            <Check className="w-2.5 h-2.5 text-primary" strokeWidth={3} />
-                          </div>
-                        )}
+                        {d}
                       </button>
                     )
                   })}
@@ -847,9 +741,9 @@ export default function AIGenerationPage() {
                 <details className="mt-2 text-xs group">
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-1 list-none">
                     <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-                    💡 难度说明（{difficulty}）
+                    难度说明（{difficulty}）
                   </summary>
-                  <div className="mt-2 p-3 rounded-lg bg-muted/40 text-muted-foreground border-l-2 border-primary">
+                  <div className="mt-2 p-2 rounded bg-muted/40 text-muted-foreground">
                     {getDifficultyHint(difficulty)}
                   </div>
                 </details>
@@ -858,7 +752,7 @@ export default function AIGenerationPage() {
               {/* 数量 */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
-                  <Hash className="w-3.5 h-3.5 text-info" />
+                  <Hash className="w-3.5 h-3.5 text-muted-foreground" />
                   生成数量
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -867,13 +761,12 @@ export default function AIGenerationPage() {
                       key={n}
                       type="button"
                       onClick={() => setCount(n)}
-                      className={`p-2.5 rounded-lg text-sm font-semibold transition-all duration-200 border ${
+                      className={`p-2.5 rounded-lg text-sm transition-colors border ${
                         count === n
-                          ? 'bg-gradient-to-br from-primary to-primary-dark text-white border-transparent shadow-lg'
-                          : 'bg-muted/30 hover:bg-muted/60 border-border text-muted-foreground'
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-muted/30 hover:bg-muted border-border text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <Layers className="w-4 h-4 inline mr-1" />
                       {n} 道
                     </button>
                   ))}
@@ -883,7 +776,7 @@ export default function AIGenerationPage() {
               {/* 附加要求 */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
-                  <FileText className="w-3.5 h-3.5 text-warning" />
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
                   附加要求 <span className="text-xs text-muted-foreground font-normal">（可选）</span>
                 </label>
                 <textarea
@@ -918,17 +811,9 @@ export default function AIGenerationPage() {
           </div>
 
           {/* ---------- 右：结果卡 ---------- */}
-          <div className="lg:col-span-3 card-static p-6 hover-lift min-h-[600px] flex flex-col">
+          <div className="lg:col-span-3 card-static p-6 min-h-[600px] flex flex-col">
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-secondary to-secondary-dark flex items-center justify-center shadow-lg shadow-secondary/20">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-foreground">生成结果</h2>
-                  <p className="text-xs text-muted-foreground">查看 AI 输出</p>
-                </div>
-              </div>
+              <h2 className="text-base font-semibold text-foreground">生成结果</h2>
               {result && (
                 <button
                   onClick={handleGenerate}
@@ -941,67 +826,33 @@ export default function AIGenerationPage() {
               )}
             </div>
 
-            {/* 空状态 - 全新设计 */}
+            {/* 空状态 */}
             {!result && !loading && (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center max-w-md">
-                  <div className="relative inline-block mb-6">
-                    <div className="absolute inset-0 rounded-full blur-2xl opacity-50"
-                      style={{ background: 'radial-gradient(circle, #3B82F6 0%, transparent 70%)' }} />
-                    <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center animate-float">
-                      <Brain className="w-12 h-12 text-primary-light" />
-                    </div>
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <Brain className="w-8 h-8 text-primary-light" />
                   </div>
-                  <h3 className="text-xl font-bold gradient-text mb-2">等待 AI 创作中</h3>
-                  <p className="text-sm text-muted-foreground mb-1">输入主题并点击"开始生成"</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">等待 AI 创作</h3>
+                  <p className="text-sm text-muted-foreground mb-1">在左侧填写参数后点击"开始生成"</p>
                   <p className="text-xs text-muted-foreground">AI 将为您生成完整的题目内容</p>
-
-                  <div className="mt-6 grid grid-cols-3 gap-3 text-left">
-                    {[
-                      { icon: FileText, label: '题目描述', desc: '完整题干' },
-                      { icon: Code2,    label: '标程代码', desc: 'C++ / Python' },
-                      { icon: Target,   label: '测试数据', desc: '15 组覆盖' }
-                    ].map(({ icon: Icon, label, desc }) => (
-                      <div key={label} className="p-3 rounded-lg bg-muted/30 border border-border">
-                        <Icon className="w-4 h-4 text-primary mb-1" />
-                        <div className="text-xs font-semibold text-foreground">{label}</div>
-                        <div className="text-xs text-muted-foreground">{desc}</div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* 加载态 - 全新设计 */}
+            {/* 加载态 */}
             {loading && (
               <div className="flex-1 flex items-center justify-center">
-                <div className="text-center max-w-sm">
-                  <div className="relative inline-block mb-6">
-                    <div className="absolute inset-0 rounded-full blur-2xl opacity-60 animate-pulse-slow"
-                      style={{ background: 'radial-gradient(circle, #A855F7 0%, transparent 70%)' }} />
-                    <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-primary/30 to-secondary/30 border-2 border-primary/40 flex items-center justify-center">
-                      <Loader2 className="w-12 h-12 text-primary-light animate-spin" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold gradient-text mb-2">AI 正在生成题目...</h3>
-                  <p className="text-sm text-muted-foreground mb-1">使用 {selectedModel?.name || 'AI 模型'} 思考中</p>
-                  <p className="text-xs text-muted-foreground">您可以切换到其他页面，生成会在后台继续</p>
-
-                  {/* 进度点 */}
-                  <div className="mt-6 flex items-center justify-center gap-1.5">
-                    {[0, 1, 2].map(i => (
-                      <div
-                        key={i}
-                        className="w-2 h-2 rounded-full bg-primary animate-pulse"
-                        style={{ animationDelay: `${i * 0.2}s` }}
-                      />
-                    ))}
-                  </div>
-
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 mx-auto mb-4 text-primary animate-spin" />
+                  <p className="text-foreground font-medium">AI 正在生成题目...</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    使用 {selectedModel?.name || 'AI 模型'} · 思考中
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">您可以切换到其他页面，生成会在后台继续</p>
                   <button
                     onClick={handleCancelPolling}
-                    className="btn btn-ghost text-xs mt-6 text-muted-foreground hover:text-error"
+                    className="btn btn-ghost text-xs mt-4 text-muted-foreground"
                   >
                     卡住了？取消轮询
                   </button>
@@ -1013,19 +864,15 @@ export default function AIGenerationPage() {
             {result && !loading && (
               <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1">
                 {/* 标题 + 复制 */}
-                <div className="relative group">
-                  <div className="absolute -left-3 top-0 bottom-0 w-1 rounded-full bg-gradient-to-b from-primary to-secondary" />
+                <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                        <Star className="w-3 h-3" />
-                        题目名称
-                      </p>
+                      <p className="text-xs text-muted-foreground mb-1">题目名称</p>
                       <h3 className="text-xl font-bold text-foreground">{result.title}</h3>
                     </div>
                     <button
                       onClick={() => handleCopy(result.title)}
-                      className="p-2 rounded-lg bg-muted/40 hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                      className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                       title="复制标题"
                     >
                       {copied ? <CheckCircle className="w-4 h-4 text-secondary" /> : <Copy className="w-4 h-4" />}
@@ -1035,20 +882,17 @@ export default function AIGenerationPage() {
                   {/* 难度 + 标签 */}
                   <div className="flex items-center gap-2 flex-wrap mt-3">
                     <span className={`tag ${getDifficultyColor(result.difficulty)}`}>
-                      {DIFFICULTY_VISUAL[result.difficulty]?.icon} {result.difficulty}
+                      {result.difficulty}
                     </span>
                     {result.tags.map((tag, idx) => (
-                      <span key={idx} className="tag tag-primary text-xs">{tag}</span>
+                      <span key={idx} className="tag">{tag}</span>
                     ))}
                   </div>
                 </div>
 
                 {/* 题目描述 */}
-                <div className="p-4 rounded-xl bg-muted/30 border border-border">
-                  <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1 font-medium">
-                    <BookOpen className="w-3 h-3" />
-                    题目描述
-                  </p>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">题目描述</p>
                   <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
                     {result.description}
                   </p>
@@ -1057,26 +901,19 @@ export default function AIGenerationPage() {
                 {/* 样例 */}
                 {result.samples && result.samples.length > 0 && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1 font-medium">
-                      <FileText className="w-3 h-3" />
-                      样例（{result.samples.length}）
-                    </p>
+                    <p className="text-xs text-muted-foreground mb-2">样例（{result.samples.length}）</p>
                     <div className="space-y-2">
                       {result.samples.slice(0, 2).map((sample, idx) => (
                         <div key={idx} className="grid grid-cols-2 gap-2">
-                          <div className="bg-gradient-to-br from-blue-500/5 to-cyan-500/5 border border-blue-500/20 rounded-lg p-3">
-                            <p className="text-xs text-blue-300 mb-1 font-semibold flex items-center gap-1">
-                              <ChevronRight className="w-3 h-3" />输入
-                            </p>
-                            <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                          <div className="bg-muted/40 rounded-lg p-2">
+                            <p className="text-xs text-muted-foreground mb-1">输入</p>
+                            <pre className="text-xs text-foreground whitespace-pre-wrap font-mono">
                               {sample.input?.slice(0, 200)}{sample.input?.length > 200 ? '...' : ''}
                             </pre>
                           </div>
-                          <div className="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 border border-emerald-500/20 rounded-lg p-3">
-                            <p className="text-xs text-emerald-300 mb-1 font-semibold flex items-center gap-1">
-                              <ChevronRight className="w-3 h-3" />输出
-                            </p>
-                            <pre className="text-xs text-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                          <div className="bg-muted/40 rounded-lg p-2">
+                            <p className="text-xs text-muted-foreground mb-1">输出</p>
+                            <pre className="text-xs text-foreground whitespace-pre-wrap font-mono">
                               {sample.output?.slice(0, 200)}{sample.output?.length > 200 ? '...' : ''}
                             </pre>
                           </div>
@@ -1087,32 +924,28 @@ export default function AIGenerationPage() {
                 )}
 
                 {thought && (
-                  <details className="bg-muted/30 rounded-lg border border-border">
-                    <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground p-3 flex items-center gap-2">
-                      <Brain className="w-4 h-4" />
+                  <details className="bg-muted/40 rounded-lg p-3">
+                    <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
                       AI 思考过程
                     </summary>
-                    <p className="text-xs text-muted-foreground px-3 pb-3 whitespace-pre-wrap leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap leading-relaxed">
                       {thought.slice(0, 800)}{thought.length > 800 ? '...' : ''}
                     </p>
                   </details>
                 )}
 
                 {qualityIssues.length > 0 && (
-                  <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/30 rounded-lg p-3">
-                    <p className="text-sm font-medium text-yellow-300 flex items-center gap-1.5">
+                  <div className="bg-warning/5 border border-warning/20 rounded-lg p-3">
+                    <p className="text-sm font-medium text-warning flex items-center gap-1.5">
                       <AlertTriangle className="w-4 h-4" />
                       质量自检发现 {qualityIssues.length} 个提示
                     </p>
-                    <ul className="text-xs text-yellow-200/80 mt-2 space-y-1">
+                    <ul className="text-xs text-warning/80 mt-2 space-y-1">
                       {qualityIssues.map((q, i) => (
-                        <li key={i} className="flex items-start gap-1">
-                          <span className="text-yellow-400">•</span>
-                          <span>题目 #{q.problemIndex + 1}：{q.reason}</span>
-                        </li>
+                        <li key={i}>• 题目 #{q.problemIndex + 1}：{q.reason}</li>
                       ))}
                     </ul>
-                    <p className="text-xs text-yellow-200/60 mt-2">提示：仍可继续导入到题库</p>
+                    <p className="text-xs text-warning/60 mt-2">提示：仍可继续导入到题库</p>
                   </div>
                 )}
 
@@ -1121,9 +954,8 @@ export default function AIGenerationPage() {
                   <button
                     onClick={handleSaveAndPublish}
                     disabled={publishing !== null || !result || !selectedModelId}
-                    className="btn btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 relative overflow-hidden group"
+                    className="btn btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                     {publishing !== null ? (
                       <><Loader2 className="w-5 h-5 animate-spin" />发布中...</>
                     ) : (
@@ -1133,40 +965,32 @@ export default function AIGenerationPage() {
 
                   {/* 发布进度 - 时间线样式 */}
                   {publishing !== null && (
-                    <div className="relative p-5 rounded-xl bg-gradient-to-br from-primary/5 to-secondary/5 border border-primary/20">
-                      <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-muted/40 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
                         <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                        <span className="text-sm font-semibold text-foreground">正在自动发布...</span>
+                        <span className="text-sm font-medium text-foreground">正在自动发布...</span>
                       </div>
-                      <div className="space-y-3 relative">
-                        {/* 时间线连接线 */}
-                        <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-border" />
+                      <div className="space-y-2">
                         {[
-                          { step: 1, label: '保存题目到数据库', icon: FileText },
-                          { step: 2, label: '编译标程', icon: Code2 },
-                          { step: 3, label: '运行测试数据', icon: Target },
-                          { step: 4, label: 'AI 修正标程（如果需要）', icon: Wand2 },
-                          { step: 5, label: '重新验证', icon: CheckCircle },
-                          { step: 6, label: '公开到题库', icon: Rocket }
-                        ].map(({ step, label, icon: Icon }) => {
+                          { step: 1, label: '保存题目到数据库' },
+                          { step: 2, label: '编译标程' },
+                          { step: 3, label: '运行测试数据' },
+                          { step: 4, label: 'AI 修正标程（如果需要）' },
+                          { step: 5, label: '重新验证' },
+                          { step: 6, label: '公开到题库' }
+                        ].map(({ step, label }) => {
                           const done = publishStep > step
                           const active = publishStep === step
                           return (
-                            <div key={step} className="flex items-center gap-3 relative">
-                              <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                                done ? 'bg-gradient-to-br from-secondary to-secondary-dark'
-                                  : active ? 'bg-gradient-to-br from-primary to-primary-dark animate-pulse'
-                                  : 'bg-muted border border-border'
-                              }`}>
-                                {done ? (
-                                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                                ) : active ? (
-                                  <Loader2 className="w-3 h-3 text-white animate-spin" />
-                                ) : (
-                                  <Icon className="w-3 h-3 text-muted-foreground" />
-                                )}
-                              </div>
-                              <span className={`text-sm ${publishStep >= step ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                            <div key={step} className="flex items-center gap-2 text-sm">
+                              {done ? (
+                                <Check className="w-4 h-4 text-secondary" />
+                              ) : active ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full border border-muted" />
+                              )}
+                              <span className={publishStep >= step ? 'text-foreground' : 'text-muted-foreground'}>
                                 {label}
                               </span>
                             </div>
@@ -1178,69 +1002,56 @@ export default function AIGenerationPage() {
 
                   {/* 发布结果 - 4 种状态 */}
                   {publishResult !== null && (
-                    <div className={`rounded-xl p-4 space-y-3 animate-fade-in ${
+                    <div className={`rounded-lg p-4 space-y-3 ${
                       publishResult.success === true && publishResult.attempts === 0
-                        ? 'bg-gradient-to-br from-secondary/15 to-emerald-500/5 border border-secondary/30'
+                        ? 'bg-secondary/10 border border-secondary/30'
                         : publishResult.success === true && publishResult.attempts > 0
-                          ? 'bg-gradient-to-br from-yellow-500/15 to-amber-500/5 border border-yellow-500/30'
+                          ? 'bg-warning/10 border border-warning/30'
                           : publishResult.success === 'partial'
-                            ? 'bg-gradient-to-br from-orange-500/15 to-red-500/5 border border-orange-500/30'
-                            : 'bg-gradient-to-br from-error/15 to-red-500/5 border border-error/30'
+                            ? 'bg-accent/10 border border-accent/30'
+                            : 'bg-error/10 border border-error/30'
                     }`}>
                       <div className="flex items-center gap-2">
                         {publishResult.success === true && publishResult.attempts === 0 && (
                           <>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-secondary-dark flex items-center justify-center">
-                              <Trophy className="w-4 h-4 text-white" />
-                            </div>
-                            <span className="text-sm font-semibold text-secondary">已自动公开到题库（首次验证通过）</span>
+                            <CheckCircle className="w-5 h-5 text-secondary" />
+                            <span className="text-sm font-medium text-secondary">已自动公开到题库（首次验证通过）</span>
                           </>
                         )}
                         {publishResult.success === true && publishResult.attempts > 0 && (
                           <>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-amber-500 flex items-center justify-center">
-                              <Wand2 className="w-4 h-4 text-white" />
-                            </div>
-                            <span className="text-sm font-semibold text-yellow-300">已自动公开（AI 修正 {publishResult.attempts} 次后通过）</span>
+                            <CheckCircle className="w-5 h-5 text-warning" />
+                            <span className="text-sm font-medium text-warning">已自动公开（AI 修正 {publishResult.attempts} 次后通过）</span>
                           </>
                         )}
                         {publishResult.success === 'partial' && (
                           <>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                              <AlertTriangle className="w-4 h-4 text-white" />
-                            </div>
-                            <span className="text-sm font-semibold text-orange-300">已自动入库，但标程未通过验证</span>
+                            <AlertTriangle className="w-5 h-5 text-accent" />
+                            <span className="text-sm font-medium text-accent">已自动入库，但标程未通过验证</span>
                           </>
                         )}
                         {publishResult.success === false && (
                           <>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-error to-red-600 flex items-center justify-center">
-                              <XCircle className="w-4 h-4 text-white" />
-                            </div>
-                            <span className="text-sm font-semibold text-error">自动发布失败</span>
+                            <XCircle className="w-5 h-5 text-error" />
+                            <span className="text-sm font-medium text-error">自动发布失败</span>
                           </>
                         )}
                       </div>
 
                       {publishResult.judgeResult && (
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            <span>状态：<span className="text-foreground font-medium">{publishResult.judgeResult.status}</span></span>
-                          </div>
-                          <div className="h-3 w-px bg-border" />
-                          <div className="text-xs text-muted-foreground">
-                            通过 <span className="text-secondary font-bold">{publishResult.judgeResult.passed}</span> / {publishResult.judgeResult.total}
-                          </div>
-                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          评测状态：<span className="text-foreground">{publishResult.judgeResult.status}</span>
+                          {' · '}通过 {publishResult.judgeResult.passed} / {publishResult.judgeResult.total}
+                          {publishResult.judgeResult.message && ` · ${publishResult.judgeResult.message}`}
+                        </p>
                       )}
 
                       {publishResult.success === 'partial' && (
-                        <p className="text-xs text-orange-200/80">题目已公开，但标程未经验证，请在题解中手动添加正确代码</p>
+                        <p className="text-xs text-accent/80">题目已公开，但标程未经验证，请在题解中手动添加正确代码</p>
                       )}
                       {publishResult.error && <p className="text-xs text-error/80">错误：{publishResult.error}</p>}
 
-                      <div className="flex flex-wrap gap-2 pt-1">
+                      <div className="flex flex-wrap gap-2">
                         {publishResult.success === true && publishResult.problemId && (
                           <>
                             <button
@@ -1252,7 +1063,7 @@ export default function AIGenerationPage() {
                             </button>
                             <button
                               onClick={() => window.open(`/problem/${publishResult.problemId}#solutions`, '_blank')}
-                              className="btn btn-ghost text-sm flex items-center gap-1.5"
+                              className="btn btn-ghost text-sm"
                             >
                               查看题解
                             </button>
@@ -1285,37 +1096,24 @@ export default function AIGenerationPage() {
           </div>
         </div>
 
-        {/* ============ 使用说明 - 时间线样式 ============ */}
+        {/* ============ 使用流程 ============ */}
         <div className="card-static p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-lg shadow-accent/20">
-              <Lightbulb className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-foreground">使用流程</h2>
-              <p className="text-xs text-muted-foreground">4 步完成 AI 出题</p>
-            </div>
-          </div>
-
-          <div className="relative grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* 连接线 */}
-            <div className="hidden md:block absolute top-6 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-primary via-secondary to-accent opacity-30" />
-
+          <h2 className="text-base font-semibold text-foreground mb-4">使用流程</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[
-              { num: 1, icon: Settings,  title: '选择模型', desc: '选择已配置的 AI 模型', color: 'from-primary to-primary-dark' },
-              { num: 2, icon: Lightbulb, title: '输入主题', desc: '描述题目类型与要求',   color: 'from-info to-cyan-500' },
-              { num: 3, icon: Wand2,     title: '后台运行', desc: '可切换页面继续生成',   color: 'from-secondary to-emerald-500' },
-              { num: 4, icon: Rocket,    title: '自动发布', desc: '验证通过即公开',       color: 'from-accent to-amber-500' }
-            ].map(({ num, icon: Icon, title, desc, color }) => (
-              <div key={num} className="relative text-center group">
-                <div className={`relative z-10 w-12 h-12 mx-auto rounded-xl bg-gradient-to-br ${color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                  <Icon className="w-5 h-5 text-white" />
-                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-background border-2 border-current flex items-center justify-center text-xs font-bold">
-                    {num}
-                  </div>
+              { num: 1, icon: Settings,  title: '选择模型', desc: '选择已配置的 AI 模型' },
+              { num: 2, icon: Lightbulb, title: '输入主题', desc: '描述题目类型与要求' },
+              { num: 3, icon: Wand2,     title: '后台运行', desc: '可切换页面继续生成' },
+              { num: 4, icon: Rocket,    title: '自动发布', desc: '验证通过即公开' }
+            ].map(({ num, icon: Icon, title, desc }) => (
+              <div key={num} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4 h-4 text-foreground" />
                 </div>
-                <h3 className="text-sm font-semibold text-foreground mt-3">{title}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{desc}</p>
+                <div>
+                  <div className="text-sm font-medium text-foreground">{title}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{desc}</div>
+                </div>
               </div>
             ))}
           </div>
