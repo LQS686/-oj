@@ -32,6 +32,20 @@ function validateEnvironment(): void {
     process.exit(1)
   }
 
+  // 软必需：AI_CONFIG_ENCRYPTION_KEY 用于加密 AI 服务商的 API Key
+  // 缺失时仅警告，不退出 — 但会：
+  //   1) GET /api/admin/ai/providers 的 maskApiKey 降级为显示 ********
+  //   2) POST /api/admin/ai/providers 拒绝写入并返回 400 提示
+  //   3) encrypt() 抛错
+  if (!process.env.AI_CONFIG_ENCRYPTION_KEY) {
+    logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    logger.warn('⚠️  AI_CONFIG_ENCRYPTION_KEY 未配置！')
+    logger.warn('   AI 服务商的 API Key 将无法加密存储与展示。')
+    logger.warn('   请运行以下命令生成 32 字节密钥并写入 .env：')
+    logger.warn('   node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+    logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  }
+
   logger.info('环境变量验证通过')
 }
 

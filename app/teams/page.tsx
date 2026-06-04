@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Users, Search, Plus, Calendar, TrendingUp, X, ChevronLeft, ChevronRight, Globe, Lock } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 import { useRouter } from 'next/navigation'
 
 interface Team {
@@ -64,7 +65,7 @@ export default function TeamsPage() {
         setTotalPages(data.data.totalPages)
       }
     } catch (error) {
-      console.error('获取团队列表失败:', error)
+      logger.error('获取团队列表失败', error)
     } finally {
       setLoading(false)
       setInitialLoading(false)
@@ -113,7 +114,7 @@ export default function TeamsPage() {
           setShowTeamModal(true)
         }
       } catch (error) {
-        console.error('获取团队信息失败:', error)
+        logger.error('获取团队信息失败', error)
       }
       return
     }
@@ -142,7 +143,7 @@ export default function TeamsPage() {
         }
       }
     } catch (error) {
-      console.error('获取团队信息失败:', error)
+      logger.error('获取团队信息失败', error)
     }
   }
 
@@ -369,7 +370,7 @@ function TeamDetailModal({ team, onClose, user, router }: { team: Team, onClose:
         alert(data.error || '提交申请失败')
       }
     } catch (error) {
-      console.error('提交申请失败:', error)
+      logger.error('提交申请失败', error)
       alert('网络错误')
     } finally {
       setLoading(false)

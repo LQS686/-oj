@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { createNotification } from '@/lib/notifications'
 import { compileCode, cleanup } from '@/lib/judge/compiler'
 import { executeCode } from '@/lib/judge/executor'
+import { ensureTotalScoreIs100 } from '@/lib/test-case-score'
 
 interface AiJob {
   logId: string
@@ -320,16 +321,27 @@ class AiQueue extends EventEmitter {
           
           for (const problem of problems) {
             const problemNumber = `P${nextNumber}`
-            
+
             try {
-              // Validate test cases
-              const validTestCases = (problem.test_cases || []).map((tc, idx) => ({
-                input: tc.input !== undefined ? String(tc.input) : '',
-                output: tc.output !== undefined ? String(tc.output) : '',
-                isSample: false,
-                score: 10,
-                orderIndex: idx
-              }))
+              // AI 输出的 score 不可信，统一归一化到总和 100
+              // （即使 AI 给了 score=10 也重新均分，避免最终总分 != 100）
+              const rawTestCases = problem.test_cases || []
+              if (rawTestCases.length < 10) {
+                logger.warn('[ai-queue] AI 生成的测试点偏少（< 10 组）', {
+                  problemTitle: problem.title,
+                  testCaseCount: rawTestCases.length,
+                  hint: '可能 max_tokens 不够或 prompt 未生效；考虑重启 dev server 重试'
+                })
+              }
+              const validTestCases = ensureTotalScoreIs100(
+                rawTestCases.map((tc, idx) => ({
+                  input: tc.input !== undefined ? String(tc.input) : '',
+                  output: tc.output !== undefined ? String(tc.output) : '',
+                  isSample: false,
+                  score: 10,
+                  orderIndex: idx
+                }))
+              )
 
               const newProblem = await prisma.problem.create({
                 data: {
@@ -425,12 +437,23 @@ class AiQueue extends EventEmitter {
       job.status = 'failed'
       job.error = error.message
 
+      // 透传 AI_PARSE_FAILED 错误代码到日志，让前端能识别并友好提示
+      const isParseError = error?.code === 'AI_PARSE_FAILED'
+      const errorMessage = isParseError
+        ? `AI 返回格式异常：${error.message}。建议：重试 / 切换模型 / 降低 temperature`
+        : error.message
+
       // Update DB with error
       await prisma.aiGenerationLog.update({
         where: { id: job.id },
-        data: { 
+        data: {
           status: 'FAILED',
-          error: error.message
+          error: errorMessage,
+          result: isParseError ? {
+            parseFailed: true,
+            parseInfo: error?.info || null,
+            originalContent: error?.info?.originalContent
+          } as any : undefined
         }
       })
 

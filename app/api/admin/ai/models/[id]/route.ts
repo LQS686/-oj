@@ -11,9 +11,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params
     const body = await request.json()
-    const { 
+    const {
       name, model, providerId, type,
-      maxTokens, temperature, timeout, isActive 
+      maxTokens, temperature, timeout, isActive, params: modelParams
     } = body
 
     const existing = await prisma.aiModel.findUnique({ where: { id } })
@@ -31,6 +31,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         maxTokens,
         temperature,
         timeout,
+        // 高级参数（DeepSeek v4 thinking / topP 等），允许为空对象
+        params: modelParams && typeof modelParams === 'object' ? modelParams : {},
         isActive: isActive !== undefined ? isActive : existing.isActive
       }
     })

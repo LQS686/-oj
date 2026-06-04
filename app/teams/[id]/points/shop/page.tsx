@@ -33,10 +33,6 @@ export default function PointsShopPage() {
   const [loading, setLoading] = useState(true)
   const [exchanging, setExchanging] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [teamId, category])
-
   const loadData = async () => {
     try {
       setLoading(true)
@@ -69,6 +65,10 @@ export default function PointsShopPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadData()
+  }, [teamId, category])
 
   const handleExchange = async (itemId: string, itemName: string, pointsRequired: number) => {
     if (balance.availablePoints < pointsRequired) {

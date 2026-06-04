@@ -26,6 +26,7 @@ import JudgeStatus from '@/components/JudgeStatus'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -153,7 +154,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         }
       }
     } catch (error) {
-      console.error('获取提交记录失败:', error)
+      logger.error('获取提交记录失败', error)
     } finally {
       setSubmissionsLoading(false)
     }
@@ -183,7 +184,10 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           setJudgeProgress(null)
           setLastResult({
             status: data.status,
-            score: data.score || data.passedTests * 10
+            // 不要再做 passedTests * 10 的兜底 — 后端 judge worker 已通过
+            // `result.score += testCase.score` 计算精确分数；若 data.score 缺失
+            // 显示 0（更诚实），避免显示 50/100 这种误导性数值
+            score: typeof data.score === 'number' ? data.score : 0
           })
           fetchSubmissions()
         }

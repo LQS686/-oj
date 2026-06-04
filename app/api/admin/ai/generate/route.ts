@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getUserFromRequest } from '@/lib/auth'
 import { addAiJob } from '@/lib/ai/queue'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +14,10 @@ export async function POST(request: NextRequest) {
 
     // 2. Parse body
     const body = await request.json()
-    const { 
-        mode = 'parametric', 
+    const {
+        mode = 'parametric',
         // Parametric
-        type, difficulty, topic, count, additionalInfo, 
+        type, difficulty, topic, count, additionalInfo,
         // Text Based
         textInput, textModeType, optimizeDescription,
         // Test Data Gen
@@ -25,8 +26,81 @@ export async function POST(request: NextRequest) {
         targetProblemId,
         solutionCode,
         solutionLanguage,
-        modelId
+        modelId,
+        // Retry
+        retryFromLogId,
+        reduceTemperature,  // 显式降温度（用于重试）
+        // Step 2: skip test cases on first round (will be filled by test_data mode later)
+        skipTestCases
     } = body
+
+    // 3. Retry path: 从已失败日志重跑
+    if (retryFromLogId) {
+      const oldLog = await prisma.aiGenerationLog.findUnique({ where: { id: retryFromLogId } })
+      if (!oldLog) {
+        return NextResponse.json({ success: false, error: 'Log not found' }, { status: 404 })
+      }
+      if (oldLog.userId !== user.userId && !user.isAdmin) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+      }
+      if (oldLog.status === 'COMPLETED') {
+        return NextResponse.json({ success: false, error: '该日志已成功完成，无需重试' }, { status: 400 })
+      }
+      if (oldLog.status === 'PENDING' || oldLog.status === 'PROCESSING') {
+        return NextResponse.json({ success: false, error: '该日志正在处理中，请等待完成后再试' }, { status: 400 })
+      }
+
+      // 重用原参数
+      const retryParams = (oldLog.params as any) || {}
+      logger.info('[ai-generate] Retry from log', {
+        retryFromLogId,
+        userId: user.userId,
+        reduceTemperature
+      })
+
+      // 重置日志状态为 PENDING
+      const retryLog = await prisma.aiGenerationLog.create({
+        data: {
+          userId: user.userId,
+          status: 'PENDING',
+          params: {
+            ...retryParams,
+            // 重试时强制重置：清空旧 result/error，标记这是重试
+            _retryFrom: retryFromLogId,
+            _reduceTemperature: reduceTemperature || true
+          }
+        }
+      })
+
+      // 加入队列（沿用原参数）
+      await addAiJob({
+        logId: retryLog.id,
+        userId: user.userId,
+        params: {
+          mode: retryParams.mode || mode,
+          type: retryParams.type,
+          difficulty: retryParams.difficulty,
+          topic: retryParams.topic,
+          count: retryParams.count || count || 1,
+          additionalInfo: retryParams.additionalInfo,
+          textInput: retryParams.textInput,
+          textModeType: retryParams.textModeType,
+          optimizeDescription: retryParams.optimizeDescription,
+          title: retryParams.title,
+          description: retryParams.description,
+          inputDescription: retryParams.inputDescription,
+          outputDescription: retryParams.outputDescription,
+          targetProblemId: retryParams.targetProblemId,
+          solutionCode: retryParams.solutionCode,
+          solutionLanguage: retryParams.solutionLanguage,
+          modelId: retryParams.modelId || modelId,
+          // 重试标识，让 generator 内部降温度
+          _retry: true
+        }
+      })
+
+      return NextResponse.json({ success: true, data: { logId: retryLog.id, retriedFrom: retryFromLogId } })
+    }
 
     // Validation based on mode
     if (mode === 'text_based') {
@@ -37,10 +111,8 @@ export async function POST(request: NextRequest) {
         if (!title || !description) {
             return NextResponse.json({ success: false, error: 'Missing title or description' }, { status: 400 })
         }
-        // Enforce solution code presence
-        if (!body.solutionCode || !body.solutionCode.trim()) {
-            return NextResponse.json({ success: false, error: 'Must provide solution code for test data generation' }, { status: 400 })
-        }
+        // 标程可选：拆分流程中 AI 在第一阶段已生成 solution_cpp，但部分模型可能未遵守；后端不应阻塞
+        // test_data 生成器内部 hasSolution=false 走"无标程：output 必须是真实结果"路径
     } else {
         // Parametric mode (default)
         if (!type || !difficulty || !topic || !count) {
@@ -109,7 +181,9 @@ export async function POST(request: NextRequest) {
         targetProblemId,
         solutionCode,
         solutionLanguage,
-        modelId
+        modelId,
+        // ParamGen: 跳过 test_cases 生成（下一步由 test_data 模式补全）
+        skipTestCases: !!skipTestCases
       }
     })
 

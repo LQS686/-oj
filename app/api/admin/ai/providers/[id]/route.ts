@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getUserFromRequest } from '@/lib/auth'
 import { encrypt, maskApiKey } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -37,6 +38,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data
     })
 
+    // 级联处理：当 isActive 从 true 变为 false 时，软删除挂载在该 Provider 上的所有 model
+    // 这样可以避免出现"挂在已禁用 Provider 上的活跃 model"这种孤儿数据。
+    // 反向（false → true）不做处理，model 的 isActive 状态由用户在「AI 模型管理」页手动恢复。
+    if (
+      isActive === false &&
+      existing.isActive === true
+    ) {
+      const cascaded = await prisma.aiModel.updateMany({
+        where: { providerId: id, isActive: true },
+        data: { isActive: false }
+      })
+      if (cascaded.count > 0) {
+        logger.info(
+          `[ai/providers] 服务商 ${id} 被禁用，级联软删除 ${cascaded.count} 个挂载模型`
+        )
+      }
+    }
+
     return NextResponse.json({ success: true, data: provider })
   } catch (error) {
     console.error('Update Provider Error:', error)
@@ -53,20 +72,24 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { id } = await params
 
-    // Check if any models are using this provider
-    const modelsCount = await prisma.aiModel.count({
+    // 级联删除：先删除该服务商下的所有模型，再删除服务商本身
+    // 避免在 MongoDB 无外键约束时留下指向不存在 Provider 的孤儿 model
+    const deletedModels = await prisma.aiModel.deleteMany({
       where: { providerId: id }
     })
-
-    if (modelsCount > 0) {
-      return NextResponse.json({ success: false, error: 'Cannot delete provider with existing models' }, { status: 400 })
-    }
 
     await prisma.aiProvider.delete({
       where: { id }
     })
 
-    return NextResponse.json({ success: true })
+    if (deletedModels.count > 0) {
+      logger.info(`[ai/providers] 级联删除服务商 ${id}，连带删除 ${deletedModels.count} 个模型`)
+    }
+
+    return NextResponse.json({
+      success: true,
+      deletedModels: deletedModels.count
+    })
   } catch (error) {
     console.error('Delete Provider Error:', error)
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 })

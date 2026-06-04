@@ -682,7 +682,7 @@ model AiModelConfig {
   
   // 生成模型配置
   provider          String   // openai, deepseek, anthropic, google, custom
-  model             String   // e.g. gpt-4, deepseek-chat
+  model             String   // e.g. gpt-4, deepseek-v4-flash
   apiKey            String   // Encrypted
   baseUrl           String?  // Optional custom base URL
   
@@ -719,8 +719,8 @@ model AiProvider {
 // ✅ NEW: AI Model Definition
 model AiModel {
   id          String     @id @default(auto()) @map("_id") @db.ObjectId
-  name        String     // Display name e.g. "DeepSeek Chat V3"
-  model       String     // API model string e.g. "deepseek-chat"
+  name        String     // Display name e.g. "DeepSeek V4 Flash"
+  model       String     // API model string e.g. "deepseek-v4-flash"
   providerId  String     @db.ObjectId
   provider    AiProvider @relation(fields: [providerId], references: [id])
   type        String     // "generation", "thinking"
@@ -729,7 +729,11 @@ model AiModel {
   maxTokens   Int        @default(2048)
   temperature Float      @default(0.7)
   timeout     Int        @default(60000) // ms
-  
+
+  // 高级参数 (topP / frequencyPenalty / presencePenalty / responseFormat / stop / thinking / reasoning_effort)
+  // DeepSeek v4 模型使用 { thinking: { type: "enabled" }, reasoning_effort: "high" } 控制思考模式
+  params      Json       @default("{}")
+
   isActive    Boolean    @default(true)
   
   createdAt   DateTime   @default(now())

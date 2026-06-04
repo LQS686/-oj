@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, TrendingUp, Award, BookOpen, FileText, BarChart3, CheckCircle, Clock, Target } from 'lucide-react'
 import type { TeamMember } from '@/types/models'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 
 interface ActivityStats {
   overall: {
@@ -62,7 +63,7 @@ export default function MemberActivityPage() {
         setMemberInfo(member)
       }
     } catch (error) {
-      console.error('获取成员信息失败:', error)
+      logger.error('获取成员信息失败', error)
     }
   }
 

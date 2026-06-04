@@ -23,6 +23,7 @@ import {
 import StudentCompletionTable from '@/components/StudentCompletionTable'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import { getDifficultyColor } from '@/lib/status'
+import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 
 const languageOptions = [
@@ -138,7 +139,7 @@ export default function AssignmentDetailPage() {
         setTeamMembers(data.data)
       }
     } catch (err) {
-      console.error('获取团队成员失败:', err)
+      logger.error('获取团队成员失败', err)
     }
   }
 

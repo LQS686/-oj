@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 import {
   Mail,
   Plus,
@@ -117,7 +118,7 @@ export default function TeamInvitesPage() {
         setDirectInvites(data.data)
       }
     } catch (err) {
-      console.error('获取直接邀请列表失败:', err)
+      logger.error('获取直接邀请列表失败', err)
     }
   }
 

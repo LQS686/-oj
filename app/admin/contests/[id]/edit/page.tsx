@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Trophy, ArrowLeft, Save, Plus, X, AlertCircle } from 'lucide-react'
+import { logger } from '@/lib/logger'
+import { Trophy, ArrowLeft, Save, X } from 'lucide-react'
 import type { Problem } from '@/types/models'
 
 export default function EditContestPage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,13 +28,9 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
   const [contestProblems, setContestProblems] = useState<Problem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Problem[]>([])
-  const [searching, setSearching] = useState(false)
+  const [, setSearching] = useState(false)
 
-  useEffect(() => {
-    fetchContest()
-  }, [id])
-
-  const fetchContest = async () => {
+  const fetchContest = useCallback(async () => {
     try {
       const response = await fetchWithAuth(`/api/admin/contests/${id}`)
 
@@ -58,12 +55,16 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
       } else {
         setError(data.error || '获取竞赛失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误')
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    fetchContest()
+  }, [id, fetchContest])
 
   const searchProblems = async (query: string) => {
     if (!query) {
@@ -82,7 +83,7 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
         setSearchResults(filtered.slice(0, 5))
       }
     } catch (err) {
-      console.error(err)
+      logger.error('搜索题目失败', err)
     } finally {
       setSearching(false)
     }
@@ -119,7 +120,7 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
       } else {
         setError(data.error || '更新失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误')
     } finally {
       setSaving(false)

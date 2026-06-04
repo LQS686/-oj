@@ -16,6 +16,7 @@ import { useUser } from '@/contexts/UserContext'
 import { canAccessAdmin, isAdmin, getRoleLabel } from '@/lib/permissions'
 import { useNotificationSocket } from '@/hooks/useNotificationSocket'
 import { notificationApi } from '@/lib/api'
+import { logger } from '@/lib/logger'
 import Image from 'next/image'
 import Dropdown from '../common/Dropdown'
 
@@ -32,10 +33,10 @@ export default function UserMenu() {
       const data = await notificationApi.getNotifications(1)
       setUnreadCount(data.unreadCount)
     } catch (error) {
-      console.error('获取未读通知数量失败:', error)
+      logger.error('获取未读通知数量失败', error)
       // 在测试环境中忽略错误
       if (process.env.NODE_ENV !== 'test') {
-        console.error('获取未读通知数量失败:', error)
+        logger.error('获取未读通知数量失败', error)
       }
     }
   }, [])

@@ -7,6 +7,7 @@ import type { Prisma } from '@prisma/client'
 import { errorHandler } from '@/lib/error-handler'
 import { errorMonitor } from '@/lib/error-monitor'
 import { success, badRequest, forbidden, created, internalError } from '@/lib/api-response'
+import { ensureTotalScoreIs100 } from '@/lib/test-case-score'
 
 // 模拟数据
 const mockProblems = [
@@ -229,19 +230,28 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 创建测试用例
+    // 创建测试用例 — 统一保证测试点总分 = 100
     if (body.testCases && Array.isArray(body.testCases)) {
+      const normalizedTestCases = ensureTotalScoreIs100(
+        body.testCases.map((testCase: TestCaseInput, index: number) => ({
+          input: testCase.input,
+          output: testCase.output,
+          isSample: testCase.isSample || false,
+          score: testCase.score || 0,
+          orderIndex: index + 1
+        }))
+      )
       await Promise.all(
-        body.testCases.map((testCase: TestCaseInput, index: number) =>
+        normalizedTestCases.map((testCase) =>
           prisma.testCase.create({
             data: {
               problemId: problem.id,
               input: testCase.input,
               output: testCase.output,
-              isSample: testCase.isSample || false,
-              score: testCase.score || 10,
-              orderIndex: index + 1,
-            },
+              isSample: testCase.isSample,
+              score: testCase.score,
+              orderIndex: testCase.orderIndex
+            }
           })
         )
       )

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
+import MarkdownRenderer from '@/components/MarkdownRenderer'
 import { ArrowLeft, User, Calendar, Tag, Edit, Trash2, FileText, AlertCircle } from 'lucide-react'
 
 interface Note {
@@ -77,27 +78,6 @@ export default function NoteDetailPage() {
     } catch (err) {
       alert('删除失败，请重试')
     }
-  }
-
-  const renderMarkdown = (text: string) => {
-    let html = text
-    
-    html = html.replace(/^### (.*$)/gim, '<h3 class="text-xl font-bold text-foreground mt-6 mb-3">$1</h3>')
-    html = html.replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold text-foreground mt-8 mb-4">$1</h2>')
-    html = html.replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold text-foreground mt-10 mb-5">$1</h1>')
-    
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
-    
-    html = html.replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-sm text-primary-light">$1</code>')
-    
-    html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-card border border-border p-4 rounded-lg my-4 overflow-x-auto"><code class="text-foreground">$1</code></pre>')
-    
-    html = html.replace(/^\- (.*$)/gim, '<li class="ml-6 list-disc text-muted-foreground">$1</li>')
-    html = html.replace(/(<li class="ml-6 list-disc text-muted-foreground">.*<\/li>)/g, '<ul class="my-4">$1</ul>')
-    
-    html = html.replace(/\n/g, '<br />')
-    
-    return html
   }
 
   if (loading) {
@@ -209,10 +189,9 @@ export default function NoteDetailPage() {
           </div>
 
           <div className="p-6">
-            <div 
-              className="prose prose-invert max-w-none text-foreground"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(note.content) }}
-            />
+            <div className="prose prose-invert max-w-none text-foreground">
+              <MarkdownRenderer content={note.content} />
+            </div>
           </div>
         </div>
 

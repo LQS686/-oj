@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 import { ArrowLeft, Upload, X, Plus, Sparkles, Loader2, Save, FileText, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
 import { ModelSelector } from '@/components/ai/ModelSelector'
+import { ensureTotalScoreIs100 } from '@/lib/test-case-score'
 
 interface TestCase {
   input: string
@@ -65,7 +67,7 @@ export default function ProblemTestCasesPage() {
         setLogs(data.data)
       }
     } catch (err) {
-      console.error('Failed to fetch logs', err)
+      logger.error('Failed to fetch logs', err)
     } finally {
       setLogsLoading(false)
     }
@@ -94,7 +96,7 @@ export default function ProblemTestCasesPage() {
             }
           }
         } catch (err) {
-          console.error('Polling error', err)
+          logger.error('轮询生成状态失败', err)
         }
       }, 2000)
       return () => clearInterval(interval)
@@ -148,16 +150,10 @@ export default function ProblemTestCasesPage() {
     }
   }
 
-  const distributeScores = (cases: TestCase[]) => {
-    if (cases.length === 0) return []
-    const n = cases.length
-    const baseScore = Math.floor(100 / n)
-    const remainder = 100 % n
-    
-    return cases.map((tc, idx) => ({
-      ...tc,
-      score: baseScore + (idx < remainder ? 1 : 0)
-    }))
+  const distributeScores = (cases: TestCase[]): TestCase[] => {
+    if (cases.length === 0) return cases
+    // 使用统一的测试点分数组件，保证最终总分 = 100
+    return ensureTotalScoreIs100(cases)
   }
 
   const handleAddTestCase = () => {
@@ -200,12 +196,14 @@ export default function ProblemTestCasesPage() {
       const data = await response.json()
 
       if (data.success) {
-        const newTestCases: TestCase[] = data.data.testCases.map((tc: any) => ({
-          input: tc.inputPreview,
-          output: tc.outputPreview,
-          isSample: false,
-          score: 10
-        }))
+        const newTestCases: TestCase[] = ensureTotalScoreIs100(
+          data.data.testCases.map((tc: any) => ({
+            input: tc.inputPreview,
+            output: tc.outputPreview,
+            isSample: false,
+            score: 10
+          }))
+        )
         
         if (testCases.length > 0 && !confirm('是否覆盖现有测试用例？点击取消将追加到现有列表。')) {
            setTestCases(distributeScores([...testCases, ...newTestCases]))
@@ -270,7 +268,7 @@ export default function ProblemTestCasesPage() {
         setError(data.error || '验证失败')
       }
     } catch (err) {
-      console.error('Verify failed:', err)
+      logger.error('Verify failed', err)
       setError('网络请求失败')
     } finally {
       setVerifying(false)
@@ -315,7 +313,7 @@ export default function ProblemTestCasesPage() {
         alert('提交生成任务失败: ' + (data.error || '未知错误'))
       }
     } catch (err) {
-      console.error('AI Generation Failed:', err)
+      logger.error('AI 生成测试数据失败', err)
       alert('网络请求失败')
       setAiGenerating(false)
     }

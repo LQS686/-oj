@@ -19,6 +19,20 @@ export default function ContestHeader({ contest, canViewDetails = false }: { con
   const [status, setStatus] = useState<string>('')
   const [progress, setProgress] = useState(0)
 
+  const formatDuration = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+
+    if (hours > 24) {
+      const days = Math.floor(hours / 24)
+      return `${days}天 ${hours % 24}小时`
+    }
+
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
+
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().getTime()
@@ -46,20 +60,6 @@ export default function ContestHeader({ contest, canViewDetails = false }: { con
 
     return () => clearInterval(timer)
   }, [contest])
-
-  const formatDuration = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000)
-    const hours = Math.floor(totalSeconds / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-    
-    if (hours > 24) {
-      const days = Math.floor(hours / 24)
-      return `${days}天 ${hours % 24}小时`
-    }
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-  }
 
   const getStatusConfig = () => {
     switch (status) {

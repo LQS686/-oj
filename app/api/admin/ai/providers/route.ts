@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getUserFromRequest } from '@/lib/auth'
 import { encrypt, maskApiKey } from '@/lib/crypto'
+import { getProviderMeta, resolveBaseUrl } from '@/lib/ai/providers'
 
 type ProviderWithMaskedKey = {
   id: string
@@ -59,13 +60,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Provider slug already exists' }, { status: 400 })
     }
 
-    const encryptedKey = apiKey ? encrypt(apiKey) : null
+    // 预设填充：若 slug 在字典中且未传 baseUrl，从字典读取
+    const meta = getProviderMeta(slug)
+    const finalBaseUrl = baseUrl || (meta ? meta.baseUrl : null)
+
+    let encryptedKey: string | null = null
+    if (apiKey) {
+      try {
+        encryptedKey = encrypt(apiKey)
+      } catch (err: any) {
+        // 写入路径必须配置密钥，给清晰提示（不要 500 通用错误）
+        if (err?.message?.includes('AI_CONFIG_ENCRYPTION_KEY')) {
+          return NextResponse.json({
+            success: false,
+            error: 'AI_CONFIG_ENCRYPTION_KEY 环境变量未设置，请先在 .env 配置 32 字节密钥再添加服务商',
+            code: 'MISSING_ENCRYPTION_KEY'
+          }, { status: 400 })
+        }
+        throw err
+      }
+    }
 
     const provider = await prisma.aiProvider.create({
       data: {
         name,
         slug,
-        baseUrl: baseUrl || null,
+        baseUrl: finalBaseUrl || null,
         apiKey: encryptedKey,
         isActive: true
       }

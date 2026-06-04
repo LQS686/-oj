@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import type { Assignment } from '@/types/models'
 
@@ -66,7 +67,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
           setAssignment(data.data)
         }
       } catch (error) {
-        console.error('获取作业信息失败:', error)
+        logger.error('获取作业信息失败', error)
       }
     }
     fetchAssignment()
@@ -106,7 +107,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
           }
         }
       } catch (error) {
-        console.error('获取提交记录失败:', error)
+        logger.error('获取提交记录失败', error)
       } finally {
         setLoading(false)
       }

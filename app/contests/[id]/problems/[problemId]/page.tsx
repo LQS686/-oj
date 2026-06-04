@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Clock, Database, Send, AlertCircle, ArrowLeft, CheckCircle, XCircle, Wifi, WifiOff, BookOpen, ListChecks } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
+import { logger } from '@/lib/logger'
 import JudgeStatus from '@/components/JudgeStatus'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
@@ -36,7 +37,7 @@ export default function ContestProblemDetailPage({ params }: { params: Promise<{
     userId: user?.id || '',
     enabled: !!user,
     onSubmissionUpdate: (data) => {
-      console.log('📥 收到实时评测结果:', data)
+      logger.debug('收到实时评测结果', data)
       
       setSubmissions(prev => {
         const index = prev.findIndex(s => s.id === data.id)
@@ -128,7 +129,7 @@ export default function ContestProblemDetailPage({ params }: { params: Promise<{
         setSubmissions(data.data.submissions)
       }
     } catch (err) {
-      console.error('Fetch submissions failed', err)
+      logger.error('Fetch submissions failed', err)
     }
   }
 

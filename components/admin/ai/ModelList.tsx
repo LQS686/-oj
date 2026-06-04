@@ -165,7 +165,7 @@ export function ModelList() {
                                 className="w-full p-2 border rounded" 
                                 value={form.model} 
                                 onChange={e => setForm({...form, model: e.target.value})}
-                                placeholder="e.g. deepseek-chat"
+                                placeholder="e.g. deepseek-v4-flash"
                                 required
                             />
                         </div>
@@ -256,7 +256,7 @@ export function ModelList() {
                                     {m.type === 'thinking' ? <Cpu className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
                                 </div>
                                 <div>
-                                    <div className="font-bold flex items-center gap-2">
+                                    <div className="font-bold flex items-center gap-2 flex-wrap">
                                         {m.name}
                                         <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-normal">
                                             {m.provider.name}

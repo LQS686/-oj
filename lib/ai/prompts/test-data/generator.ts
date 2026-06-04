@@ -1,5 +1,6 @@
 
 import { GenerationMode, TestDataGenContext, PromptGenerator, PromptResult } from '../core/types';
+import { TEST_DATA_QUALITY_GATES, THINKING_STEP_FRAME, renderTestCaseDimensions } from '../core/quality-gates';
 
 export class TestDataGenPromptGenerator implements PromptGenerator {
   generate(context: TestDataGenContext): PromptResult {
@@ -8,31 +9,50 @@ export class TestDataGenPromptGenerator implements PromptGenerator {
     }
 
     const { title, description, inputDescription, outputDescription, count, hasSolution } = context;
-    const temperature = 0.5;
-    
-    const systemPrompt = `你是一个专业的算法测试数据生成器。
-你的任务是为给定的编程题目生成高质量的测试数据。
-你必须严格按照指定的JSON格式返回结果。`;
+    // TestDataGen：结构化数据生成，需要一定随机性以覆盖多样场景
+    const temperature = 0.3;
+    // 用户传入 count 过低时自动上调到 15（保证覆盖度）
+    const finalCount = Math.max(count, 15);
 
-    let outputRequirement = `4. 确保所有输出根据题目描述和输出格式是正确的`;
-    let exampleJson = `{
-  "test_cases": [
-    { "input": "1 2", "output": "3" },
-    { "input": "10 20", "output": "30" }
-  ]
-}`;
+    const systemPrompt = `你是一位资深的算法测试数据生成器，专为编程竞赛题目生成高质量的 input / output 对。
+
+核心原则：
+1. 数据真实性 — 每一组 test_cases 的 input 都必须满足题目输入格式，output 都必须是 input 经过题目算法计算的真实结果
+2. 边界覆盖 — 必须覆盖最小值、最大值、边界条件、特殊值、随机典型、全相同、严格单调、极端比例、倒数边界、随机压力 10 类
+3. 纯数据 — input / output 字符串中不能包含中文字符或注释
+4. 难度匹配 — 至少 1 组数据应接近数据范围上限（用于压力测试）
+5. 数量充分 — 默认 15 组起步（用户可指定更多），覆盖度优先于紧凑度`;
+
+    let outputRequirement: string
+    let exampleJson: string
 
     if (hasSolution) {
-      outputRequirement = `4. 你只需要生成"input"字段，"output"字段可以是空字符串""，因为会由标程计算输出。专注于生成多样化和有技巧性的输入。`;
+      // 有标程：output 字段可以空字符串（前端会用标程计算），但建议仍给出供校验
+      outputRequirement = `4. 你需要生成 input 和 output 两个字段：
+   - input 必须严格遵循输入格式
+   - output 必须是 input 通过题目算法计算后的真实结果（用于前端交叉校验）
+   - 即使前端会用标程重算，你提供的 output 也应与之完全一致
+5. 至少 1 组数据应接近数据范围上限（用于压力测试）`
       exampleJson = `{
   "test_cases": [
-    { "input": "1 2", "output": "" },
-    { "input": "10 20", "output": "" }
+    { "input": "5\\n1 2 3 4 5", "output": "15" },
+    { "input": "3\\n10 20 30", "output": "60" }
   ]
-}`;
+}`
+    } else {
+      // 无标程：output 必须是真实计算结果
+      outputRequirement = `4. output 必须是 input 通过题目算法计算后的**真实结果**（这是关键 — 绝对不能输出空字符串、占位符、待定符号）
+5. 在生成 output 前，务必在心中完整执行一遍算法，确保结果正确
+6. 至少 1 组数据应接近数据范围上限（用于压力测试）`
+      exampleJson = `{
+  "test_cases": [
+    { "input": "5\\n1 2 3 4 5", "output": "15" },
+    { "input": "3\\n10 20 30", "output": "60" }
+  ]
+}`
     }
 
-    const userPrompt = `请为以下题目生成 ${count} 组测试数据。
+    const userPrompt = `请为以下题目生成 ${finalCount} 组测试数据${count < 15 ? `（用户请求 ${count} 组，但已自动上调到 15 组以保证覆盖度）` : ''}。
 
 【题目信息】
 标题：${title}
@@ -46,18 +66,23 @@ ${inputDescription}
 ${outputDescription}
 
 【要求】
-1. 生成 ${count} 组测试数据
-2. 覆盖边界情况（最小值、最大值、边界条件）
-3. 确保所有输入严格遵循输入格式
+1. 生成 ${finalCount} 组测试数据${count >= 15 ? '（数量严格匹配）' : '（用户原要求' + count + '组，已上调至 15 组以保证覆盖度）'}
+2. 必须覆盖以下 10 个维度的至少 9 个：
+${renderTestCaseDimensions()}
+3. 严格遵循输入格式（行数、列数、字段顺序、值域）
 ${outputRequirement}
-5. 输入/输出数据不能包含中文字符
-6. 不要在input或output字符串中换行，除非题目明确需要多行输出
 
-【JSON格式】
-返回一个JSON对象：
+【质量门禁】（不可违反）
+${TEST_DATA_QUALITY_GATES.map(g => `- ${g}`).join('\n')}
+
+【输出格式】
+仅返回一个 JSON 对象：
 ${exampleJson}
 
-直接返回JSON对象，不要添加markdown标记。`;
+注意：
+- 字符串中的换行必须用 \\n 转义（不要写裸换行）
+- 不要添加任何 markdown 标记（\`\`\`json 等）
+- 不要在 JSON 外添加任何解释文字`;
 
     return {
       systemPrompt,
@@ -68,26 +93,21 @@ ${exampleJson}
 
   generateThinkingPrompt(context: TestDataGenContext): string {
     const { title, description, inputDescription, outputDescription, count } = context;
-    return `为题目"${title}"设计 ${count} 组测试数据。
+    return `你是一位资深的算法测试数据规划师，正在为以下题目规划 ${count} 组测试数据。
 
-题目描述：
-${description}
+题目：${title}
+描述：${description}
+输入格式：${inputDescription}
+输出格式：${outputDescription}
 
-输入格式：
-${inputDescription}
+${THINKING_STEP_FRAME}
 
-输出格式：
-${outputDescription}
+请输出：
+- 数据范围分析（每行/字段的合法值域）
+- ${count} 组测试数据的维度规划（仅列类别与意图，如"n=1 的最小值情形"、"n=10^5 压力测试"）
+- 关键边界条件清单
+- 若有特殊数据格式（如浮点精度、负数、字符串），列出注意事项
 
-要求：
-1. 分析输入约束和边界情况
-2. 规划 ${count} 组测试数据，覆盖：
-   - 简单/小数据
-   - 边界情况（最小/最大约束）
-   - 随机典型数据
-   - 特殊/技巧性数据
-3. 验证逻辑确保输出正确
-
-暂时只输出设计思路，不要生成JSON。`;
+注意：仅输出规划文本，不要生成 JSON、不要添加 \`\`\` 标记。`;
   }
 }

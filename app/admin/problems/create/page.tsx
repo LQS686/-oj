@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 import { ArrowLeft, Plus, X, Save, Loader2, FileText, Sparkles } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
 
@@ -64,7 +65,7 @@ export default function CreateProblemPage() {
           setSamples(data.samples)
         }
       } catch (e) {
-        console.error('Failed to parse AI data', e)
+        logger.error('解析 AI 数据失败', e)
       }
     }
   }, [aiData])

@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Search, Plus, Trash2, Save, AlertCircle, Trophy } from 'lucide-react'
 import type { Problem } from '@/types/models'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 
 export default function EditContestPage() {
   const router = useRouter()
@@ -93,7 +94,7 @@ export default function EditContestPage() {
         setSearchResults(filtered)
       }
     } catch (err) {
-      console.error(err)
+      logger.error('搜索题目失败', err)
     } finally {
       setSearching(false)
     }

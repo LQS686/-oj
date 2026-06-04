@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
@@ -27,11 +27,7 @@ export default function AdminPostsPage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
-  useEffect(() => {
-    fetchPosts()
-  }, [])
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetchWithAuth('/api/admin/posts')
@@ -48,12 +44,16 @@ export default function AdminPostsPage() {
       } else {
         setError(data.error || '获取帖子列表失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误')
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    fetchPosts()
+  }, [fetchPosts])
 
   const handleTogglePublish = async (postId: string, currentStatus: boolean) => {
     try {
@@ -69,7 +69,7 @@ export default function AdminPostsPage() {
       } else {
         alert(data.error || '操作失败')
       }
-    } catch (err) {
+    } catch {
       alert('网络错误')
     }
   }
@@ -90,7 +90,7 @@ export default function AdminPostsPage() {
       } else {
         alert(data.error || '删除失败')
       }
-    } catch (err) {
+    } catch {
       alert('网络错误')
     }
   }

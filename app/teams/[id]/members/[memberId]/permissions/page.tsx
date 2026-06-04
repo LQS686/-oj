@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Shield, AlertCircle, Info, ArrowLeft } from 'lucide-react'
 import type { TeamMember, TeamPermissions } from '@/types/models'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 
 type Permissions = TeamPermissions
 
@@ -142,7 +143,7 @@ export default function MemberPermissionsPage() {
         alert(data.error || '权限更新失败')
       }
     } catch (error) {
-      console.error('权限更新失败:', error)
+      logger.error('权限更新失败', error)
       alert('权限更新失败')
     } finally {
       setSaving(false)

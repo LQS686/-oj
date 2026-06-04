@@ -9,6 +9,9 @@ interface Model {
     model: string
     type: string // 'generation' | 'thinking'
     providerName: string
+    providerSlug?: string
+    maxTokens?: number
+    temperature?: number
 }
 
 interface ModelSelectorProps {
@@ -116,8 +119,14 @@ export function ModelSelector({ value, onChange, className = '', showThinking = 
                                                 <Zap className="w-4 h-4 text-blue-500" />
                                             )}
                                             <div className="flex flex-col items-start">
-                                                <span className="font-medium">{model.name}</span>
-                                                <span className="text-xs text-gray-500">{model.providerName} · {model.model}</span>
+                                                <span className="font-medium">
+                                                  {model.name}
+                                                  {model.type === 'thinking' && <span className="text-xs text-purple-500 ml-1">🧠</span>}
+                                                </span>
+                                                <span className="text-xs text-gray-500">
+                                                  {model.providerName} · {model.model}
+                                                  {model.maxTokens ? ` · 📏 ${model.maxTokens}` : ''}
+                                                </span>
                                             </div>
                                         </div>
                                         {value === model.id && <Check className="w-4 h-4 text-purple-600" />}

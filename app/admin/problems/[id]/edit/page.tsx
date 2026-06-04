@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
-import { ArrowLeft, Plus, X, Save, Loader2, FileText, Edit } from 'lucide-react'
+import { ArrowLeft, Plus, X, Save, Loader2, Edit } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
 
 interface Sample {
@@ -39,11 +39,7 @@ export default function EditProblemPage() {
 
   const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '', explanation: '' }])
 
-  useEffect(() => {
-    fetchProblemData()
-  }, [problemId])
-
-  const fetchProblemData = async () => {
+  const fetchProblemData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetchWithAuth(`/api/admin/problems/${problemId}`)
@@ -72,12 +68,16 @@ export default function EditProblemPage() {
       } else {
         setError(data.error || '获取题目数据失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误')
     } finally {
       setLoading(false)
     }
-  }
+  }, [problemId])
+
+  useEffect(() => {
+    fetchProblemData()
+  }, [problemId, fetchProblemData])
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -143,7 +143,7 @@ export default function EditProblemPage() {
       } else {
         setError(data.error || '更新失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误')
     } finally {
       setSubmitting(false)

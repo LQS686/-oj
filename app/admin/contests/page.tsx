@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Trophy, Plus, Search, Edit, Trash2, Calendar, Users, Clock, Eye, EyeOff, Play, Pause } from 'lucide-react'
+import { Trophy, Plus, Search, Edit, Trash2, Calendar, Users, Clock, Eye, EyeOff } from 'lucide-react'
 
 interface Contest {
   id: string
@@ -30,11 +30,7 @@ export default function AdminContestsPage() {
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
-  useEffect(() => {
-    fetchContests()
-  }, [])
-
-  const fetchContests = async () => {
+  const fetchContests = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetchWithAuth('/api/admin/contests')
@@ -51,12 +47,16 @@ export default function AdminContestsPage() {
       } else {
         setError(data.error || '获取竞赛列表失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误')
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    fetchContests()
+  }, [fetchContests])
 
   const handleToggleVisibility = async (contestId: string, currentVisibility: boolean) => {
     try {
@@ -72,7 +72,7 @@ export default function AdminContestsPage() {
       } else {
         alert(data.error || '操作失败')
       }
-    } catch (err) {
+    } catch {
       alert('网络错误')
     }
   }
@@ -93,7 +93,7 @@ export default function AdminContestsPage() {
       } else {
         alert(data.error || '删除失败')
       }
-    } catch (err) {
+    } catch {
       alert('网络错误')
     }
   }

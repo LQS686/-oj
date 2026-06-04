@@ -14,23 +14,66 @@ interface VerificationCode {
   expiresAt: number
 }
 
+interface EmailSendResult {
+  sent: boolean
+  reason?: string
+}
+
 const verificationCodes = new Map<string, VerificationCode>()
 
 function generateVerificationCode(): string {
   return crypto.randomInt(100000, 999999).toString()
 }
 
-function sendVerificationEmail(email: string, code: string): boolean {
-  logger.info(`发送验证码至邮箱: ${email}, 验证码: ${code}`)
+/**
+ * 发送邮箱验证码。
+ *
+ * 返回 { sent, reason }：
+ *   - sent=true  表示验证码已通过真实邮件服务投递
+ *   - sent=false 表示未实际发送，reason 给出原因（便于上层返回明确错误）
+ *
+ * ⚠️ 当前为占位实现：除非在 .env 中显式配置了 SENDGRID_API_KEY 或 MAILGUN_API_KEY
+ *    并接入了真实邮件服务，否则函数将返回 sent=false。
+ *
+ * 启用方式（任选其一）：
+ *   1. SendGrid：在 .env 中设置 SENDGRID_API_KEY=...，并实现 sendWithSendGrid()
+ *   2. Mailgun：在 .env 中设置 MAILGUN_API_KEY=... 与 MAILGUN_DOMAIN=...，并实现 sendWithMailgun()
+ *   3. SMTP/Nodemailer：在 .env 中设置 SMTP_HOST/USER/PASS，并在下方分支中实现 sendWithSmtp()
+ */
+function sendVerificationEmail(email: string, code: string): EmailSendResult {
+  logger.info(`准备发送验证码至邮箱: ${email}`)
 
-  if (process.env.SENDGRID_API_KEY || process.env.MAILGUN_API_KEY) {
-    // 生产环境：接入真实邮件服务
-    // TODO: 集成 SendGrid/Mailgun/Nodemailer 发送邮件
-    logger.info(`[Email] 验证码 ${code} 发送至 ${email}（邮件服务待集成）`)
-    return true
+  const hasSendGrid = !!process.env.SENDGRID_API_KEY
+  const hasMailgun = !!process.env.MAILGUN_API_KEY
+
+  if (hasSendGrid) {
+    // TODO: 接入 SendGrid SDK 调用真实接口
+    //   import sgMail from '@sendgrid/mail'
+    //   sgMail.setApiKey(process.env.SENDGRID_API_KEY!)
+    //   await sgMail.send({ to: email, from: FROM_ADDRESS, subject, text, html })
+    logger.error(
+      `[Email] 检测到 SENDGRID_API_KEY，但 SendGrid 邮件发送尚未实现，验证码 ${code} 未实际投递至 ${email}`
+    )
+    return { sent: false, reason: 'SendGrid 邮件服务尚未集成' }
   }
 
-  return true
+  if (hasMailgun) {
+    // TODO: 接入 Mailgun SDK 调用真实接口
+    //   import formData from 'form-data'
+    //   import Mailgun from 'mailgun.js'
+    //   const mg = new Mailgun(formData)
+    //   const client = mg.client({ username: 'api', key: process.env.MAILGUN_API_KEY! })
+    //   await client.messages.create(process.env.MAILGUN_DOMAIN!, { ... })
+    logger.error(
+      `[Email] 检测到 MAILGUN_API_KEY，但 Mailgun 邮件发送尚未实现，验证码 ${code} 未实际投递至 ${email}`
+    )
+    return { sent: false, reason: 'Mailgun 邮件服务尚未集成' }
+  }
+
+  logger.error(
+    `[Email] 未配置任何邮件服务（SENDGRID_API_KEY / MAILGUN_API_KEY），验证码 ${code} 无法发送至 ${email}`
+  )
+  return { sent: false, reason: '未配置邮件服务（SENDGRID_API_KEY / MAILGUN_API_KEY）' }
 }
 
 async function checkEmailExists(email: string): Promise<boolean> {
@@ -107,20 +150,30 @@ export async function POST(request: NextRequest) {
     const code = generateVerificationCode()
     const expiresAt = Date.now() + 5 * 60 * 1000
 
+    // 仅在邮件确实发送成功后才缓存验证码，
+    // 避免在邮件未投递时让客户端一直等待一个永远不会到达的验证码。
+    const emailResult = sendVerificationEmail(newEmail, code)
+    if (!emailResult.sent) {
+      logger.warn(
+        `[Email] 拒绝缓存验证码：邮件未实际发送，userId=${user.userId}, newEmail=${newEmail}, reason=${emailResult.reason}`
+      )
+      return NextResponse.json(
+        {
+          success: false,
+          error: '邮件服务尚未配置或集成，暂无法发送验证码',
+          reason: emailResult.reason,
+          code: 'EMAIL_SERVICE_NOT_IMPLEMENTED',
+        },
+        { status: 501 }
+      )
+    }
+
     verificationCodes.set(user.userId, {
       code,
       email: newEmail,
       userId: user.userId,
       expiresAt
     })
-
-    const emailSent = sendVerificationEmail(newEmail, code)
-    if (!emailSent) {
-      return NextResponse.json(
-        { success: false, error: '发送验证码失败，请稍后重试' },
-        { status: 500 }
-      )
-    }
 
     return NextResponse.json({
       success: true,

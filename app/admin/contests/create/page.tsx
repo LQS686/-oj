@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 import { Trophy, ArrowLeft, Save, X, Search, Plus, AlertCircle } from 'lucide-react'
 
 interface Problem {
@@ -33,9 +34,8 @@ export default function CreateContestPage() {
   const [contestProblems, setContestProblems] = useState<Problem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Problem[]>([])
-  const [searching, setSearching] = useState(false)
+  const [searching] = useState(false)
   const [batchInput, setBatchInput] = useState('')
-  const [problemsLoaded, setProblemsLoaded] = useState(false)
 
   useEffect(() => {
     const fetchProblems = async () => {
@@ -44,10 +44,9 @@ export default function CreateContestPage() {
         const data = await response.json()
         if (data.success) {
           setAllProblems(data.data)
-          setProblemsLoaded(true)
         }
       } catch (err) {
-        console.error('Failed to load problems', err)
+        logger.error('加载题目列表失败', err)
       }
     }
     fetchProblems()
@@ -131,7 +130,7 @@ export default function CreateContestPage() {
       } else {
         setError(data.error || '创建失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误')
     } finally {
       setLoading(false)

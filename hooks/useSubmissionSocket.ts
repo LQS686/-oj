@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import io, { Socket } from 'socket.io-client'
+import { logger } from '@/lib/logger'
 
 interface SubmissionUpdate {
   id: string
@@ -70,7 +71,7 @@ export function useSubmissionSocket({
     if (!enabled || !userId) {
       // 清理现有连接
       if (socketRef.current) {
-        console.log('🧹 清理现有 WebSocket 连接')
+        logger.debug('清理现有 WebSocket 连接')
         socketRef.current.disconnect()
         socketRef.current = null
       }
@@ -80,11 +81,11 @@ export function useSubmissionSocket({
 
     // 如果已经有连接，不重复连接
     if (socketRef.current?.connected) {
-      console.log('⚡ WebSocket 已连接，跳过重复连接')
+      logger.debug('WebSocket 已连接，跳过重复连接')
       return
     }
 
-    console.log('🔌 开始连接 WebSocket...')
+    logger.debug('开始连接 WebSocket...')
 
     const socketUrl = typeof window !== 'undefined' 
       ? window.location.origin 
@@ -110,7 +111,7 @@ export function useSubmissionSocket({
 
     // 连接事件
     socket.on('connect', () => {
-      console.log('✅ WebSocket 已连接:', socket.id)
+      logger.debug('WebSocket 已连接', { id: socket.id })
       setIsConnected(true)
 
       // 加入用户房间
@@ -119,54 +120,54 @@ export function useSubmissionSocket({
 
     // 确认加入房间
     socket.on('joined', (data) => {
-      console.log('✅ 已加入房间:', data)
+      logger.debug('已加入房间', data)
     })
 
     // 断开事件
     socket.on('disconnect', (reason) => {
-      console.log('❌ WebSocket 断开连接:', reason)
+      logger.debug('WebSocket 断开连接', { reason })
       setIsConnected(false)
     })
 
     // 重连事件
     socket.on('reconnect', (attemptNumber) => {
-      console.log(`🔄 WebSocket 重连成功 (尝试 ${attemptNumber} 次)`)
+      logger.debug(`WebSocket 重连成功 (尝试 ${attemptNumber} 次)`)
       setIsConnected(true)
       socket.emit('join', userId)
     })
 
     // 提交状态更新
     socket.on('submission:update', (data: SubmissionUpdate) => {
-      console.log('📥 收到提交更新:', data)
+      logger.debug('收到提交更新', data)
       setLastUpdate(data)
       callbacksRef.current.onSubmissionUpdate?.(data)
     })
 
     // 评测进度
     socket.on('judge:progress', (data: JudgeProgress) => {
-      console.log('📊 收到评测进度:', data)
+      logger.debug('收到评测进度', data)
       callbacksRef.current.onJudgeProgress?.(data)
     })
 
     // 系统通知
     socket.on('notification', (data: Notification) => {
-      console.log('🔔 收到通知:', data)
+      logger.debug('收到通知', data)
       callbacksRef.current.onNotification?.(data)
     })
 
     // 错误处理
     socket.on('error', (error) => {
-      console.error('❌ WebSocket 错误:', error)
+      logger.error('WebSocket 错误', error)
     })
 
     socket.on('connect_error', (error) => {
-      console.error('❌ WebSocket 连接错误:', error)
+      logger.error('WebSocket 连接错误', error)
       setIsConnected(false)
     })
 
     // 清理函数
     return () => {
-      console.log('🧹 清理 WebSocket 连接')
+      logger.debug('清理 WebSocket 连接')
       if (socket.connected) {
         socket.emit('leave', userId)
       }

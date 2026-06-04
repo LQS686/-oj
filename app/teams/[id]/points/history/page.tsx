@@ -37,10 +37,6 @@ export default function PointsHistoryPage() {
   const [filter, setFilter] = useState<'ALL' | 'EARN' | 'SPEND'>('ALL')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadHistory()
-  }, [teamId, pagination.page, filter])
-
   const loadHistory = async () => {
     try {
       setLoading(true)
@@ -69,6 +65,10 @@ export default function PointsHistoryPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadHistory()
+  }, [teamId, pagination.page, filter])
 
   const getTypeStyle = (type: string) => {
     switch (type) {

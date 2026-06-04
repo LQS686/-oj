@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
+import { logger } from '@/lib/logger'
 import { 
   LayoutDashboard, 
   FileText, 
@@ -61,10 +62,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  useEffect(() => {
-    fetchNotifications()
-  }, [])
-
   const fetchNotifications = async () => {
     try {
       const response = await fetchWithAuth('/api/notifications?limit=10')
@@ -74,9 +71,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         setUnreadCount(data.data?.unreadCount || 0)
       }
     } catch (error) {
-      console.error('获取通知失败:', error)
+      logger.error('获取通知失败', error)
     }
   }
+
+  useEffect(() => {
+    fetchNotifications()
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -88,7 +89,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       logout()
       router.push('/login')
     } catch (error) {
-      console.error('登出失败:', error)
+      logger.error('登出失败', error)
       localStorage.removeItem('token')
       router.push('/login')
     }

@@ -35,10 +35,6 @@ export default function TeamPointsPage() {
   const [ranking, setRanking] = useState<RankingItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [teamId])
-
   const loadData = async () => {
     try {
       const token = localStorage.getItem('token')
@@ -65,6 +61,10 @@ export default function TeamPointsPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadData()
+  }, [teamId])
 
   if (loading) {
     return (
