@@ -40,9 +40,6 @@ export interface GenerationParams {
   // ✅ New: 内部重试标记（由后端 retry 路径传入，generator 据此走降温度路径）
   _retry?: boolean;
   _reduceTemperature?: boolean;
-
-  // ✅ New: ParamGen 模式下跳过 test_cases 生成（下一步由 test_data 模式补全）
-  skipTestCases?: boolean;
 }
 
 export interface GenerationResult {
@@ -159,8 +156,7 @@ function mapToContext(params: GenerationParams): PromptContext {
             difficulty: params.difficulty || '入门',
             topic: params.topic || [],
             count: params.count || 1,
-            additionalInfo: params.additionalInfo,
-            skipTestCases: !!params.skipTestCases
+            additionalInfo: params.additionalInfo
         };
     }
 }

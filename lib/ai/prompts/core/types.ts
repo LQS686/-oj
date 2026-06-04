@@ -44,8 +44,6 @@ export interface ParamGenContext extends BaseContext {
   topic: string[];
   count: number;
   additionalInfo?: string;
-  /** true = 只生成题目描述（不含 test_cases 字段），由前端后续单独触发 test_data 模式补全 */
-  skipTestCases?: boolean;
 }
 
 export interface TestDataGenContext extends BaseContext {

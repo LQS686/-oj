@@ -41,12 +41,6 @@ interface GenerationResult {
     input: string
     output: string
   }>
-  // AI 生成的标程（拆分流程的第二步需要喂给 test_data 模式）
-  solutionCpp?: string
-  solutionPython?: string
-  // 推荐的时间/内存限制
-  timeLimit?: number
-  memoryLimit?: number
 }
 
 interface LogResult {
@@ -67,10 +61,6 @@ interface LogResult {
       input: string
       output: string
     }>
-    solution_cpp?: string
-    solution_python?: string
-    time_limit?: number
-    memory_limit?: number
   }>
   testCases?: Array<{
     input: string
@@ -141,7 +131,6 @@ export default function AIGenerationPage() {
   const [difficulty, setDifficulty] = useState('普及')
   const [count, setCount] = useState(1)
   const [additionalInfo, setAdditionalInfo] = useState('')
-  const [skipTestCases, setSkipTestCases] = useState(true) // 默认：拆分生成，描述与测试数据分两步
   
   const [pollingLogId, setPollingLogId] = useState<string | null>(null)
   const [thought, setThought] = useState<string | null>(null)
@@ -259,29 +248,20 @@ export default function AIGenerationPage() {
               outputFormat: p.output || '',
               samples: p.samples || [],
               hints: p.hint ? [p.hint] : [],
-              testCases: p.test_cases || [],
-              // 拆分流程：保存标程代码，第二步 test_data 模式要用
-              solutionCpp: p.solution_cpp,
-              solutionPython: p.solution_python,
-              timeLimit: p.time_limit,
-              memoryLimit: p.memory_limit
+              testCases: p.test_cases || []
             })
           } else if (log.result?.testCases) {
-            // test_data 模式：合并到已有的 result（保留题目描述），若无已有 result 则单独立
-            const newTestCases = log.result.testCases
-            setResult(prev => prev ? {
-              ...prev,
-              testCases: newTestCases
-            } : {
+            // test_data 模式：纯替换，不再保留 prev
+            setResult({
               title: '测试数据生成完成',
-              description: `已生成 ${newTestCases.length} 组测试数据`,
+              description: `已生成 ${log.result.testCases.length} 组测试数据`,
               difficulty: difficulty,
               tags: [],
               inputFormat: '',
               outputFormat: '',
               samples: [],
               hints: [],
-              testCases: newTestCases
+              testCases: log.result.testCases
             })
           }
 
@@ -353,9 +333,7 @@ export default function AIGenerationPage() {
           topic: [topic.trim()],
           count: Math.min(count, 3),
           additionalInfo: additionalInfo.trim() || undefined,
-          modelId: selectedModelId,
-          // 拆分生成：第一阶段不生成测试数据（用户可在结果卡片上"补全测试数据"）
-          skipTestCases
+          modelId: selectedModelId
         })
       })
 
@@ -366,56 +344,6 @@ export default function AIGenerationPage() {
       } else {
         setLoading(false)
         setError(data.error || '生成失败')
-      }
-    } catch {
-      setLoading(false)
-      setError('网络错误')
-    }
-  }
-
-  /**
-   * 第二步：为已生成的题目描述补全测试数据
-   * 复用 test_data 模式（用 description / input / output 喂给 AI 生成 15 组）
-   * 标程：优先用第一阶段 AI 生成的 solution_cpp（或 solution_python），让 test_data 模式走 hasSolution=true 路径
-   */
-  const handleGenerateTestCases = async () => {
-    if (!result) return
-    if (!selectedModelId) {
-      setError('请先选择 AI 模型')
-      return
-    }
-    setLoading(true)
-    setError('')
-    setThought(null)
-
-    // 选一个最合适的标程：优先 C++（性能稳定），其次 Python
-    // 都没有时，test_data 模式走 hasSolution=false 路径（output 必须是真实结果）
-    const solutionCode = result.solutionCpp || result.solutionPython || ''
-    const solutionLanguage = result.solutionCpp ? 'cpp' : (result.solutionPython ? 'python' : undefined)
-
-    try {
-      const response = await fetchWithAuth('/api/admin/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'test_data',
-          title: result.title,
-          description: result.description,
-          inputDescription: result.inputFormat,
-          outputDescription: result.outputFormat,
-          count: 15,
-          modelId: selectedModelId,
-          // 后端标程改为可选；只在有标程时才传
-          ...(solutionCode ? { solutionCode, solutionLanguage } : {})
-        })
-      })
-      const data = await response.json()
-      if (data.success) {
-        setPollingLogId(data.data.logId)
-        fetchLogs()
-      } else {
-        setLoading(false)
-        setError(data.error || '生成测试数据失败')
       }
     } catch {
       setLoading(false)
@@ -542,11 +470,7 @@ export default function AIGenerationPage() {
           outputFormat: p.output || '',
           samples: p.samples || [],
           hints: p.hint ? [p.hint] : [],
-          testCases: p.test_cases || [],
-          solutionCpp: p.solution_cpp,
-          solutionPython: p.solution_python,
-          timeLimit: p.time_limit,
-          memoryLimit: p.memory_limit
+          testCases: p.test_cases || []
         })
       }
       if (log.result.thought) {
@@ -901,19 +825,6 @@ export default function AIGenerationPage() {
                   className="input min-h-[80px]"
                 />
               </div>
-
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={skipTestCases}
-                  onChange={(e) => setSkipTestCases(e.target.checked)}
-                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-                />
-                <span className="text-sm text-foreground">仅生成题目描述（测试数据稍后单独生成）</span>
-              </label>
-              <p className="text-xs text-muted-foreground -mt-3 ml-6">
-                推荐开启：分两步生成，单次 prompt 体积小、JSON 解析更稳；可在结果卡片上点击"补全测试数据"继续。
-              </p>
 
               {error && (
                 <div className="flex items-center gap-2 text-error text-sm">

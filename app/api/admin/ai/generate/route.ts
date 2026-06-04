@@ -30,8 +30,6 @@ export async function POST(request: NextRequest) {
         // Retry
         retryFromLogId,
         reduceTemperature,  // 显式降温度（用于重试）
-        // Step 2: skip test cases on first round (will be filled by test_data mode later)
-        skipTestCases
     } = body
 
     // 3. Retry path: 从已失败日志重跑
@@ -187,8 +185,6 @@ export async function POST(request: NextRequest) {
         solutionCode,
         solutionLanguage,
         modelId,
-        // ParamGen: 跳过 test_cases 生成（下一步由 test_data 模式补全）
-        skipTestCases: !!skipTestCases
       }
     })
 
