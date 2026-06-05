@@ -95,7 +95,7 @@ export default function MarkdownContent({
             }
 
             return (
-              <code className="bg-slate-700 px-1.5 py-0.5 rounded text-pink-400" {...props}>
+              <code className="bg-primary/10 text-primary-light px-1.5 py-0.5 rounded border border-primary/20 font-mono text-[0.85em]" {...props}>
                 {children}
               </code>
             )

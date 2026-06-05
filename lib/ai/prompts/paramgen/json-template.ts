@@ -33,7 +33,7 @@ export const SINGLE_PROBLEM_TEMPLATE = `{
     }
   ],
   "hint": "<1-2 句数据范围提示，不要直接透露算法>",
-  "tags": ["<中文标签1>", "<中文标签2>"],
+  "tags": <2-4 个中文标签字符串数组，例如 ["动态规划", "背包", "时间优化"]；元素必须是字符串、必须是中文、不得含难度词>,
   "difficulty": "<难度字符串，必须与传入的 difficulty 完全一致>",
   "time_limit": <1000 或 1500 或 2000 或 3000 或 5000 整数毫秒>,
   "memory_limit": <64 或 128 或 256 或 512 或 1024 整数MB>,
@@ -43,7 +43,8 @@ export const SINGLE_PROBLEM_TEMPLATE = `{
     {"input": "<测试3输入>", "output": "<测试3输出>"}
   ],
   "solution_cpp": "<完整可编译的 C++17 标程，以 #include <bits/stdc++.h> 开头，变量命名清晰>",
-  "solution_python": "<完整可运行的 Python3 标程，可使用 sys.stdin.read() 加速>"
+  "solution_python": "<完整可运行的 Python3 标程，可使用 sys.stdin.read() 加速>",
+  "solution_article": "<5 段式 markdown 题解，使用 H2 ## 分隔：思路分析 / 算法描述 / 复杂度分析 / 参考代码 / 关键点说明；字符串内可能含双引号 / 反引号 / 换行，必须用 \\\" 和 \\n 转义>"
 }`
 
 /**
@@ -61,7 +62,8 @@ export const PROBLEM_JSON_TEMPLATE = `[
 export const REQUIRED_FIELDS = [
   'title', 'description', 'input', 'output', 'samples', 'hint',
   'tags', 'difficulty', 'time_limit', 'memory_limit',
-  'test_cases', 'solution_cpp', 'solution_python'
+  'test_cases', 'solution_cpp', 'solution_python',
+  'solution_article'
 ] as const
 
 /**

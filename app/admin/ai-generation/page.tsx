@@ -7,11 +7,12 @@ import { logger } from '@/lib/logger'
 import {
   Loader2, FileText, Check, CheckCircle, AlertCircle, AlertTriangle,
   XCircle, Copy, RefreshCw, Settings, Cpu, History, X, ChevronDown, ChevronUp,
-  Wand2, Target, Lightbulb, Brain,
+  Wand2, Target, Lightbulb, Brain, Plus,
   ChevronRight
 } from 'lucide-react'
 import Link from 'next/link'
 import { DIFFICULTIES, DIFFICULTY_COLORS } from '@/lib/constants'
+import { TOPICS } from '@/lib/ai/prompts/core/types'
 
 interface AIModel {
   id: string
@@ -86,16 +87,23 @@ interface JobState {
 
 const LAST_MODEL_KEY = 'ai-last-model-id'
 
-/** 快速主题 chip（点击填入主题输入框） */
-const QUICK_TOPICS = [
-  { label: '动态规划', icon: '🧠' },
-  { label: '图论',     icon: '🕸️' },
-  { label: '最短路',   icon: '🛣️' },
-  { label: '二分',     icon: '🎯' },
-  { label: '字符串',   icon: '📝' },
-  { label: '贪心',     icon: '💰' },
-  { label: 'DFS/BFS',  icon: '🌲' },
-  { label: '数据结构', icon: '🗂️' }
+/**
+ * 主题分组（仅用于 UI 排版，方便从 ~50 个主题里快速找到目标）
+ * 实际可选值仍以 TOPICS 全集为准；分组不影响 prompt 与后端传参
+ */
+const TOPIC_GROUPS: Array<{ label: string; topics: readonly string[] }> = [
+  { label: '基础语法', topics: ['变量与类型', '输入输出', '运算符与表达式', 'if 判断', '循环', '数组基础', '字符串基础', '函数', '结构体', '递归入门', 'switch'] },
+  { label: '基础',     topics: ['枚举', '模拟', '递推', '前缀和', '差分', '离散化', '倍增'] },
+  { label: '排序/查找', topics: ['排序', '二分查找', '二分答案', '三分', '分治'] },
+  { label: '动态规划',  topics: ['动态规划', '背包', '区间 DP', '树形 DP', '状压 DP', '数位 DP', '概率 DP', 'DP 优化'] },
+  { label: '贪心',     topics: ['贪心'] },
+  { label: '图论',     topics: ['图论', '最短路', '最小生成树', '拓扑排序', '二分图', '强连通分量', '网络流', '树上问题'] },
+  { label: '搜索',     topics: ['DFS/BFS', '搜索剪枝', '启发式搜索', 'A*', 'IDA*'] },
+  { label: '字符串',   topics: ['字符串', '字符串哈希', 'KMP', 'Trie', 'AC 自动机', '后缀数组', '后缀自动机', 'Manacher'] },
+  { label: '数据结构', topics: ['数据结构', '栈', '队列', '链表', '堆/优先队列', '单调栈', '单调队列', '并查集', '线段树', '树状数组', '平衡树', '可持久化', '树链剖分'] },
+  { label: '数学',     topics: ['数论', '组合数学', '概率期望', '博弈论', '矩阵乘法', '生成函数', '多项式', '线性代数'] },
+  { label: '计算几何',  topics: ['计算几何', '扫描线'] },
+  { label: '高级/特殊', topics: ['位运算', '构造', '随机化', '莫队', '分块', 'CDQ 分治', 'K-D Tree', '李超树'] }
 ]
 
 function getDifficultyHint(d: string): string {
@@ -112,11 +120,8 @@ function getDifficultyHint(d: string): string {
   return map[d] || '请按此档位对应的算法难度生成。'
 }
 
-function getAdditionalPlaceholder(d: string): string {
-  if (['入门', '普及-'].includes(d)) return '例如：单源最短路径、DP 入门、二分查找基础...'
-  if (['普及', '普及+'].includes(d)) return '例如：图论（BFS/DFS）、区间 DP、并查集、单调栈...'
-  if (['提高', '提高+'].includes(d)) return '例如：树链剖分、莫队、FFT、SAM、生成函数...'
-  return '例如：李超树、动态 DP、K-D Tree、计算几何、博弈论...'
+function getAdditionalPlaceholder(): string {
+  return '例如：以校园生活为背景融入剧情、以三国历史为线索加入角色与故事、加入"外卖配送"生活场景...（AI 会把这些背景故事或元素自然地融入题目描述，但不影响算法核心）'
 }
 
 /** 当前工作流步骤（1 配置 2 生成；只要有 active 任务就算第 2 步） */
@@ -132,9 +137,13 @@ export default function AIGenerationPage() {
   const [selectedModelId, setSelectedModelId] = useState('')
   const [loadingModels, setLoadingModels] = useState(true)
 
-  const [topic, setTopic] = useState('')
+  // 题目主题（多选），覆盖 TOPICS 全集；多选时 AI 会把多个主题融合到一道题里
+  const [topics, setTopics] = useState<string[]>([])
+  // 手动输入主题的输入框
+  const [topicInput, setTopicInput] = useState('')
   const [difficulty, setDifficulty] = useState('普及')
   // 业务决策（2026-06）：单次生成固定 1 道题，count 选择器已移除
+  // 附加要求：背景故事 / 元素（不影响算法核心）
   const [additionalInfo, setAdditionalInfo] = useState('')
 
   // 并发生成：每个任务独立追踪（Map: logId -> JobState）
@@ -144,6 +153,9 @@ export default function AIGenerationPage() {
   const [showHistory, setShowHistory] = useState(false)
   const [selectedLog, setSelectedLog] = useState<LogStatus | null>(null)
   const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
+
+  // 每秒更新一次时间戳，驱动"生成中 · Ns"重新渲染
+  const [now, setNow] = useState(Date.now())
 
   // 提交任务计数器（用于显示 N 个进行中）
   const submittingRef = useRef(false)
@@ -178,6 +190,13 @@ export default function AIGenerationPage() {
       if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current)
     }
   }, [])
+
+  // 有任务在跑时，每秒推进 now 以刷新"生成中 · Ns"计时
+  useEffect(() => {
+    if (activeJobs.size === 0) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [activeJobs.size])
 
   const fetchModels = async () => {
     try {
@@ -385,16 +404,34 @@ export default function AIGenerationPage() {
     })
   }
 
+  // 主题多选：点击 chip 切换选中状态
+  const toggleTopic = (t: string) => {
+    setTopics(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  }
+
+  // 手动添加主题：去空格、跳过空、跳过重复
+  // 输入可以是 TOPICS 全集里的标准名，也可以是自定义词（如"三维 DP"）
+  const addCustomTopic = (raw: string) => {
+    const t = raw.trim()
+    if (!t) return
+    setTopics(prev => prev.includes(t) ? prev : [...prev, t])
+  }
+
+  // 移除主题（用于"已选"行的 × 按钮）
+  const removeTopic = (t: string) => {
+    setTopics(prev => prev.filter(x => x !== t))
+  }
+
   // 主入口：开始生成（每次点击 = 1 个独立任务，可与已有任务并发）
   const handleGenerate = async () => {
-    if (!topic.trim()) { setError('请输入题目主题'); return }
+    if (topics.length === 0) { setError('请至少选择 1 个题目主题'); return }
     if (!selectedModelId) { setError('请选择 AI 模型'); return }
     localStorage.setItem(LAST_MODEL_KEY, selectedModelId)
     await startJob({
       mode: 'parametric',
       type: 'programming',
       difficulty,
-      topic: [topic.trim()],
+      topic: topics,
       // 业务决策（2026-06）：count 已硬编码为 1，前端不再传
       additionalInfo: additionalInfo.trim() || undefined,
       modelId: selectedModelId
@@ -415,7 +452,10 @@ export default function AIGenerationPage() {
   const handleRetryLog = async (log: LogStatus, e: React.MouseEvent) => {
     e.stopPropagation()
     if (retryingLogId) return
-    if (!confirm(`确定要重试该失败记录吗？\n\n主题：${log.params?.topic?.[0] || log.params?.title || '未知'}\n错误：${log.error || '(无)'}\n\n重试时会自动降低温度以提高稳定性。`)) return
+    const topicLabel = (log.params?.topic && log.params.topic.length > 0)
+      ? log.params.topic.join('、')
+      : (log.params?.title || '未知')
+    if (!confirm(`确定要重试该失败记录吗？\n\n主题：${topicLabel}\n错误：${log.error || '(无)'}\n\n重试时会自动降低温度以提高稳定性。`)) return
     setRetryingLogId(log.id)
     try {
       // 业务决策（2026-06）：重试也走 startJob，加入 activeJobs 与其它任务并发
@@ -595,7 +635,9 @@ export default function AIGenerationPage() {
                       <div className="flex items-center gap-3">
                         {getStatusBadge(log.status, log.createdAt)}
                         <span className="text-sm text-foreground">
-                          {log.params?.topic?.[0] || log.params?.title || '未知主题'}
+                          {(log.params?.topic && log.params.topic.length > 0)
+                            ? log.params.topic.join('、')
+                            : (log.params?.title || '未知主题')}
                         </span>
                       </div>
                       <span className="text-xs text-muted-foreground">
@@ -691,29 +733,97 @@ export default function AIGenerationPage() {
                 )}
               </div>
 
-              {/* 主题输入 */}
+              {/* 主题选择（多选，覆盖 TOPICS 全集 + 手动输入） */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
                   <Lightbulb className="w-3.5 h-3.5 text-muted-foreground" />
                   题目主题 <span className="text-error">*</span>
+                  <span className="text-xs text-muted-foreground font-normal ml-1">
+                    （可多选 · 已选 {topics.length} / {TOPICS.length}）
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  placeholder="例如：动态规划、最短路径、二分查找..."
-                  className="input"
-                />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {QUICK_TOPICS.map(t => (
-                    <button
-                      key={t.label}
-                      type="button"
-                      onClick={() => setTopic(t.label)}
-                      className="px-2.5 py-1 rounded text-xs border border-border bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <span className="mr-1">{t.icon}</span>{t.label}
-                    </button>
+
+                {/* 手动输入：可输入 TOPICS 全集里的标准名快速选中，也可输入自定义词 */}
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={topicInput}
+                    onChange={(e) => setTopicInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        addCustomTopic(topicInput)
+                        setTopicInput('')
+                      }
+                    }}
+                    placeholder="输入主题后回车添加（标准名或自定义词均可）"
+                    className="input flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addCustomTopic(topicInput)
+                      setTopicInput('')
+                    }}
+                    disabled={!topicInput.trim()}
+                    className="btn btn-secondary px-3 flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    添加
+                  </button>
+                </div>
+
+                {/* 已选主题（预设 + 自定义），可点 × 移除 */}
+                {topics.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2 p-2 rounded-lg border border-dashed border-border bg-muted/20">
+                    {topics.map(t => (
+                      <span
+                        key={t}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-primary text-white"
+                      >
+                        {t}
+                        {TOPICS.includes(t as any) && (
+                          <span className="text-[10px] opacity-70">预设</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeTopic(t)}
+                          className="hover:bg-white/20 rounded-full p-0.5 -mr-1"
+                          title="移除"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="rounded-lg border border-border bg-card/50 p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-2.5">
+                  {TOPIC_GROUPS.map(group => (
+                    <div key={group.label} className="flex items-start gap-2">
+                      <span className="text-xs font-medium text-muted-foreground w-16 flex-shrink-0 pt-1">
+                        {group.label}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 flex-1">
+                        {group.topics.map(t => {
+                          const active = topics.includes(t)
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => toggleTopic(t)}
+                              className={`px-2.5 py-1 rounded text-xs border transition-colors ${
+                                active
+                                  ? 'bg-primary text-white border-primary'
+                                  : 'bg-muted/30 hover:bg-muted border-border text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              {t}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -764,18 +874,21 @@ export default function AIGenerationPage() {
                 </p>
               </div>
 
-              {/* 附加要求 */}
+              {/* 附加要求：背景故事 / 元素（不影响算法核心） */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
                   <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                  附加要求 <span className="text-xs text-muted-foreground font-normal">（可选）</span>
+                  附加要求 <span className="text-xs text-muted-foreground font-normal">（可选 · 背景故事 / 元素）</span>
                 </label>
                 <textarea
                   value={additionalInfo}
                   onChange={(e) => setAdditionalInfo(e.target.value)}
-                  placeholder={getAdditionalPlaceholder(difficulty)}
+                  placeholder={getAdditionalPlaceholder()}
                   className="input min-h-[80px] resize-y"
                 />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  AI 会把这些背景故事或元素自然地融入题目描述，但不会改变核心算法与数据范围
+                </p>
               </div>
 
               {error && (
@@ -787,7 +900,7 @@ export default function AIGenerationPage() {
 
               <button
                 onClick={handleGenerate}
-                disabled={submittingRef.current || !topic.trim() || !selectedModelId || cooldown > 0}
+                disabled={submittingRef.current || topics.length === 0 || !selectedModelId || cooldown > 0}
                 className="btn btn-primary w-full flex items-center justify-center gap-2 relative overflow-hidden group"
               >
                 {/* 流光效果 */}
@@ -835,7 +948,7 @@ export default function AIGenerationPage() {
               <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1">
                 {Array.from(activeJobs.values()).map(job => {
                   const log = logs.find(l => l.id === job.logId)
-                  const elapsed = Math.floor((Date.now() - job.startedAt) / 1000)
+                  const elapsed = Math.floor((now - job.startedAt) / 1000)
                   return (
                     <div key={job.logId} className="border border-border rounded-xl overflow-hidden bg-card">
                       {/* 卡片头：状态徽章 + 操作 */}
@@ -887,10 +1000,12 @@ export default function AIGenerationPage() {
                         {job.status === 'PROCESSING' && (
                           <div className="space-y-2">
                             <p className="text-sm text-foreground">
-                              {log?.params?.topic?.[0] && (
+                              {(log?.params?.topic && log.params.topic.length > 0) && (
                                 <span className="text-muted-foreground">主题：</span>
                               )}
-                              {log?.params?.topic?.[0] || '（主题：未显示）'}
+                              {(log?.params?.topic && log.params.topic.length > 0)
+                                ? log.params.topic.join('、')
+                                : '（主题：未显示）'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               使用 {selectedModel?.name || 'AI 模型'} · 思考中

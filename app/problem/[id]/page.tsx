@@ -67,7 +67,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('cpp')
-  const [activeTab, setActiveTab] = useState<'description' | 'submit' | 'solutions' | 'submissions'>('description')
+  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions'>('description')
   const [submitting, setSubmitting] = useState(false)
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
   const [judgeStatus, setJudgeStatus] = useState<any>(null)
@@ -425,59 +425,87 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           </div>
         )}
 
-        <div className="card-static rounded-2xl overflow-hidden shadow-lg shadow-primary/5">
-          <div className="flex border-b border-border">
-            {[
-              { key: 'description', label: '题目描述', icon: BookOpen },
-              { key: 'submit', label: '提交代码', icon: CodeIcon },
-              { key: 'solutions', label: '题解', icon: MessageSquare },
-              { key: 'submissions', label: '提交记录', icon: ListChecks }
-            ]
-              .filter((tab) => !(isAssignmentContext && tab.key === 'solutions'))
-              .map((tab) => {
-                const Icon = tab.icon
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key as typeof activeTab)}
-                    className={`flex items-center gap-2 px-5 py-3.5 font-medium transition-all duration-300 relative cursor-pointer group ${
-                      activeTab === tab.key
-                        ? 'text-primary-light'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 transition-transform duration-300 ${activeTab === tab.key ? 'rotate-3' : 'group-hover:rotate-3'}`} />
-                    {tab.label}
-                    {activeTab === tab.key && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full animate-gradient" />
-                    )}
-                  </button>
-                )
-              })}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
+          {/* 左栏：题面 / 题解 / 提交记录（原 tab + 内容） */}
+          <div className="card-static rounded-2xl overflow-hidden shadow-lg shadow-primary/5">
+            <div className="flex border-b border-border overflow-x-auto">
+              {[
+                { key: 'description', label: '题目描述', icon: BookOpen },
+                { key: 'solutions', label: '题解', icon: MessageSquare },
+                { key: 'submissions', label: '提交记录', icon: ListChecks }
+              ]
+                .filter((tab) => !(isAssignmentContext && tab.key === 'solutions'))
+                .map((tab) => {
+                  const Icon = tab.icon
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key as typeof activeTab)}
+                      className={`flex items-center gap-2 px-5 py-3.5 font-medium transition-all duration-300 relative cursor-pointer group whitespace-nowrap ${
+                        activeTab === tab.key
+                          ? 'text-primary-light'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 transition-transform duration-300 ${activeTab === tab.key ? 'rotate-3' : 'group-hover:rotate-3'}`} />
+                      {tab.label}
+                      {activeTab === tab.key && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full animate-gradient" />
+                      )}
+                    </button>
+                  )
+                })}
+            </div>
+
+            <div className="p-6">
+              {activeTab === 'description' && (
+                <ProblemDescription problem={problem} />
+              )}
+
+              {activeTab === 'solutions' && (
+                <SolutionTabPanel
+                  problemId={problemId}
+                  isAssignmentContext={isAssignmentContext}
+                />
+              )}
+
+              {activeTab === 'submissions' && (
+                <SubmissionList
+                  submissions={submissions}
+                  loading={submissionsLoading}
+                  error={null}
+                  user={user}
+                  fromAssignment={fromAssignment}
+                  teamId={teamId}
+                  onSelect={(sub) => setSelectedSubmission(sub)}
+                />
+              )}
+            </div>
           </div>
 
-          <div className="p-6">
-            {activeTab === 'description' && (
-              <ProblemDescription problem={problem} />
-            )}
-
-            {activeTab === 'submit' && (
-              <div className="space-y-4">
+          {/* 右栏：提交代码（宽屏 sticky，窄屏堆叠在左栏下方） */}
+          <div className="lg:sticky lg:top-4">
+            <div className="card-static rounded-2xl overflow-hidden shadow-lg shadow-primary/5">
+              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border bg-muted/30">
+                <CodeIcon className="w-4 h-4 text-primary-light" />
+                <h3 className="font-medium text-foreground">提交代码</h3>
+              </div>
+              <div className="p-4 space-y-3">
                 {!user && (
-                  <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-accent-light hover:bg-yellow-500/15 hover:border-yellow-500/30 transition-all duration-300">
-                    <div className="flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-accent-light hover:bg-yellow-500/15 hover:border-yellow-500/30 transition-all duration-300">
+                    <div className="flex items-center gap-2 text-sm">
                       <AlertCircle className="w-4 h-4" />
                       <span>请先登录后再提交代码</span>
                     </div>
                   </div>
                 )}
 
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <label className="text-sm font-medium text-foreground">选择语言</label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-sm font-medium text-foreground">语言</label>
                   <select
                     value={language}
                     onChange={(e) => handleLanguageChange(e.target.value)}
-                    className="input w-auto min-w-[160px] py-2 text-sm hover:border-primary/30 transition-colors duration-300"
+                    className="input w-auto min-w-[140px] py-1.5 text-sm hover:border-primary/30 transition-colors duration-300"
                   >
                     {languageOptions.map((lang) => (
                       <option key={lang.value} value={lang.value} className="bg-slate-900 text-slate-100">
@@ -490,12 +518,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                 <textarea
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  className="w-full h-[400px] rounded-xl bg-slate-900 text-slate-100 font-mono text-sm p-4 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
+                  className="w-full h-[360px] rounded-xl bg-slate-900 text-slate-100 font-mono text-sm p-3 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
                   spellCheck={false}
                   placeholder="在此粘贴或输入代码..."
                 />
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleSubmit}
                     disabled={submitting || !user}
@@ -509,7 +537,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     ) : (
                       <>
                         <Send className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" />
-                        提交代码
+                        提交
                       </>
                     )}
                   </button>
@@ -521,26 +549,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                   </button>
                 </div>
               </div>
-            )}
-
-            {activeTab === 'solutions' && (
-              <SolutionTabPanel
-                problemId={problemId}
-                isAssignmentContext={isAssignmentContext}
-              />
-            )}
-
-            {activeTab === 'submissions' && (
-              <SubmissionList
-                submissions={submissions}
-                loading={submissionsLoading}
-                error={null}
-                user={user}
-                fromAssignment={fromAssignment}
-                teamId={teamId}
-                onSelect={(sub) => setSelectedSubmission(sub)}
-              />
-            )}
+            </div>
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { createNotification } from '@/lib/notifications'
 import { compileCode, cleanup } from '@/lib/judge/compiler'
 import { executeCode } from '@/lib/judge/executor'
 import { ensureTotalScoreIs100 } from '@/lib/test-case-score'
+import { validateCodeSafety } from '@/lib/judge/codeAnalyzer'
 
 interface AiJob {
   logId: string
@@ -201,8 +202,6 @@ class AiQueue extends EventEmitter {
                 throw new Error(`Target problem not found: ${problemId}`)
             }
 
-            // Solution execution moved above
-
             // Combine existing and new cases
             const existingCases = targetProblem.testCases.map(tc => ({
                 input: tc.input,
@@ -290,7 +289,6 @@ class AiQueue extends EventEmitter {
 
         } catch (error: any) {
             logger.error('Test Data Auto-Save Error', error)
-            // Fall through to general error handler or handle here
             throw error
         }
       }
@@ -298,7 +296,15 @@ class AiQueue extends EventEmitter {
       // --- Mode: PARAM_GEN (Create New Problems) ---
       if (job.data.params.mode !== 'test_data') {
           const savedProblems = []
-          
+          // 每道题目的测试点 output 修正统计，最终聚合写入 aiGenerationLog.result.correctionStats
+          const correctionStatsList: any[] = []
+          // 每道题目的题解创建结果（'created' | 'missing' + problemNumber / solutionId）
+          const solutionResults: Array<{
+            problemNumber: string
+            status: 'created' | 'missing'
+            solutionId?: string
+          }> = []
+
           // 1. Get next problem number start
           // Use createdAt desc to find the latest problem, as string sorting of "P10000" < "P9999" is incorrect
           const latestProblem = await prisma.problem.findFirst({
@@ -342,6 +348,156 @@ class AiQueue extends EventEmitter {
                 }))
               )
 
+              // ---------------------------------------------------------
+              // 🚀 用标程帮助修正测试点 output
+              // 业务决策（2026-06）：AI 推断的 output 不可信，必须真实运行标程覆盖
+              // 复用 test_data 模式已有的 compileCode / executeCode / cleanup helper
+              // - 优先 solution_cpp，缺失时回退 solution_python
+              // - 编译失败 / 无标程 / 安全检查失败：跳过修正，保留 AI 原 output
+              // - 单点失败（TLE/RE/非零退出）：跳过该点，保留 AI 原 output
+              // - 成功：用 result.output.trim() 覆盖
+              // ---------------------------------------------------------
+              let correctionStats: any
+              const hasSolutionCpp = typeof problem.solution_cpp === 'string' && (problem.solution_cpp as string).trim().length > 0
+              const hasSolutionPython = typeof problem.solution_python === 'string' && (problem.solution_python as string).trim().length > 0
+              const stdCode: string | null = hasSolutionCpp
+                ? (problem.solution_cpp as string)
+                : hasSolutionPython
+                  ? (problem.solution_python as string)
+                  : null
+              const stdLang: 'cpp' | 'python' | null = hasSolutionCpp
+                ? 'cpp'
+                : hasSolutionPython
+                  ? 'python'
+                  : null
+
+              if (!stdCode || !stdLang) {
+                // 无标程可用
+                correctionStats = { skipped: 'no_solution' }
+                logger.info('[ai-queue] 无标程可用，跳过测试点 output 修正', {
+                  problemTitle: problem.title,
+                  hasCpp: hasSolutionCpp,
+                  hasPython: hasSolutionPython
+                })
+              } else {
+                // 安全预检（如可用）
+                let unsafe: string | null = null
+                try {
+                  const safety = validateCodeSafety(stdCode, stdLang)
+                  if (!safety.safe) {
+                    unsafe = (safety as any).reason || (safety as any).message || 'unsafe_code'
+                  }
+                } catch (e) {
+                  // 预检函数不可用 / 异常时降级为不预检，不阻塞主流程
+                  logger.warn('[ai-queue] validateCodeSafety 不可用，跳过安全预检', e)
+                }
+
+                if (unsafe) {
+                  correctionStats = { skipped: 'unsafe_code', reason: unsafe }
+                  logger.warn('[ai-queue] 标程安全预检未通过，跳过 output 修正', {
+                    problemTitle: problem.title,
+                    language: stdLang,
+                    reason: unsafe
+                  })
+                } else {
+                  // 编译标程
+                  const compileResult = await compileCode(stdCode, stdLang)
+                  if (!compileResult.success) {
+                    correctionStats = {
+                      skipped: 'compile_failed',
+                      compileError: compileResult.error || compileResult.stderr || 'unknown'
+                    }
+                    logger.warn('[ai-queue] 标程编译失败，跳过 output 修正', {
+                      problemTitle: problem.title,
+                      language: stdLang,
+                      compileError: correctionStats.compileError
+                    })
+                  } else {
+                    // 编译成功：跑每个 test case
+                    let totalTime = 0
+                    let totalMemory = 0
+                    let passed = 0
+                    let failed = 0
+                    const total = validTestCases.length
+
+                    try {
+                      for (let i = 0; i < validTestCases.length; i++) {
+                        const tc: any = validTestCases[i]
+                        const input = typeof tc.input === 'string' ? tc.input : String(tc.input || '')
+
+                        try {
+                          const result = await executeCode({
+                            code: stdCode,
+                            language: stdLang,
+                            input,
+                            timeLimit: 2000,
+                            memoryLimit: 256,
+                            compiledPath: compileResult.compiledPath
+                          })
+
+                          if (result.timeout) {
+                            logger.warn(`[ai-queue] 标程在测试点 #${i + 1} 超时，保留 AI 原 output`, {
+                              problemTitle: problem.title
+                            })
+                            failed++
+                            continue
+                          }
+                          if (result.runtimeError) {
+                            logger.warn(`[ai-queue] 标程在测试点 #${i + 1} 运行时错误，保留 AI 原 output`, {
+                              problemTitle: problem.title,
+                              error: result.error
+                            })
+                            failed++
+                            continue
+                          }
+                          if (result.exitCode !== 0) {
+                            logger.warn(`[ai-queue] 标程在测试点 #${i + 1} 非零退出 (exitCode=${result.exitCode})，保留 AI 原 output`, {
+                              problemTitle: problem.title
+                            })
+                            failed++
+                            continue
+                          }
+
+                          passed++
+                          totalTime += result.time || 0
+                          totalMemory += result.memory || 0
+
+                          // 覆盖 AI 推断的 output（trim 处理，避免末尾空行/空格污染）
+                          tc.output = (result.output || '').trim()
+                        } catch (execErr) {
+                          logger.error(`[ai-queue] 测试点 #${i + 1} 执行异常，保留 AI 原 output`, {
+                            problemTitle: problem.title,
+                            err: execErr
+                          })
+                          failed++
+                        }
+                      }
+                    } finally {
+                      await cleanup(compileResult.compiledPath)
+                    }
+
+                    correctionStats = {
+                      total,
+                      passed,
+                      failed,
+                      corrected: passed,
+                      avgTime: passed > 0 ? Math.round(totalTime / passed) : 0,
+                      avgMemory: passed > 0 ? Math.round(totalMemory / passed) : 0
+                    }
+
+                    logger.info('[ai-queue] 测试点 output 修正完成', {
+                      problemTitle: problem.title,
+                      ...correctionStats
+                    })
+                  }
+                }
+              }
+              // 把统计推入数组，用于写入 aiGenerationLog.result.correctionStats
+              correctionStatsList.push(correctionStats)
+              // ---------------------------------------------------------
+              // END 标程修正 output
+              // ---------------------------------------------------------
+
               const newProblem = await prisma.problem.create({
                 data: {
                   problemNumber,
@@ -368,6 +524,90 @@ class AiQueue extends EventEmitter {
                 }
               })
               savedProblems.push(newProblem)
+
+              // ---------------------------------------------------------
+              // 🚀 直接写 Solution 题解（合并到 AI 出题单次调用）
+              // 业务决策（2026-06）：单次 AI 调用同时返回题目 + 题解，
+              // 不再调 enqueueSolutionJob 走第 2 段链路（避免"2 个任务"）
+              // - AI 输出的 solution_article 字段直接作为 Solution.content
+              // - 同题同源（sourceType='AI_OFFICIAL'）的旧记录先 deleteMany
+              // - 题解缺失时仅 log warning，不阻断主流程（Problem 已入库）
+              // ---------------------------------------------------------
+              let solutionResult: {
+                problemNumber: string
+                status: 'created' | 'missing'
+                solutionId?: string
+              } = { problemNumber, status: 'missing' }
+
+              try {
+                const article = typeof problem.solution_article === 'string' ? problem.solution_article.trim() : ''
+                if (!article) {
+                  logger.warn('[ai-queue] AI 返回的 solution_article 缺失，跳过题解创建', {
+                    problemId: newProblem.id,
+                    problemNumber: newProblem.problemNumber
+                  })
+                } else {
+                  // 清理同题同源的旧 AI 标程题解（保持"同题只有一份 AI_OFFICIAL"）
+                  await prisma.solution.deleteMany({
+                    where: {
+                      problemId: newProblem.id,
+                      sourceType: 'AI_OFFICIAL'
+                    } as any
+                  })
+
+                  // 决定 code / codeLanguage（与之前 enqueueSolutionJob 的策略一致）
+                  const code: string | null = problem.solution_cpp
+                    ? String(problem.solution_cpp)
+                    : problem.solution_python
+                      ? String(problem.solution_python)
+                      : null
+                  const codeLanguage: 'cpp' | 'python' | null = problem.solution_cpp
+                    ? 'cpp'
+                    : problem.solution_python
+                      ? 'python'
+                      : null
+
+                  const solution = await prisma.solution.create({
+                    data: {
+                      problemId: newProblem.id,
+                      authorId: job.data.userId,
+                      title: `AI 标程题解 - ${newProblem.title}`,
+                      content: article,
+                      code: code || null,
+                      codeLanguage: codeLanguage || null,
+                      language: codeLanguage || null,
+                      isOfficial: true,
+                      isAiGenerated: true,
+                      sourceType: 'AI_OFFICIAL'
+                    } as any
+                  })
+
+                  solutionResult = {
+                    problemNumber,
+                    status: 'created',
+                    solutionId: solution.id
+                  }
+
+                  logger.info('[ai-queue] 题解随题目同步创建', {
+                    problemId: newProblem.id,
+                    problemNumber: newProblem.problemNumber,
+                    solutionId: solution.id,
+                    contentLength: article.length
+                  })
+                }
+              } catch (e) {
+                // 题解创建失败不阻断主流程（题目已入库）
+                logger.error('[ai-queue] 题解随题目同步创建失败', {
+                  problemId: newProblem.id,
+                  problemNumber: newProblem.problemNumber,
+                  err: e
+                })
+              }
+              solutionResults.push(solutionResult)
+              // ---------------------------------------------------------
+              // END 同步写题解
+              // ---------------------------------------------------------
+
               nextNumber++
             } catch (saveError: any) {
               logger.error(`Failed to save AI problem: ${problem.title}`, saveError)
@@ -390,11 +630,15 @@ class AiQueue extends EventEmitter {
           // Update DB with results
           await prisma.aiGenerationLog.update({
             where: { id: job.id },
-            data: { 
+            data: {
               status: finalStatus,
               result: {
                 problems: savedProblems.length > 0 ? savedProblems : problems,
-                thought: thought
+                thought: thought,
+                // 每道题目的测试点 output 修正统计（来自 PARAM_GEN 路径的标程执行）
+                correctionStats: correctionStatsList,
+                // 每道题目的题解创建结果（created = 题解已写库；missing = AI 未返回题解，可手动重生成）
+                solutionStatus: solutionResults
               } as any,
               tokensUsed: tokensUsed || 0,
               error: finalError
