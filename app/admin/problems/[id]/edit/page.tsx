@@ -4,13 +4,47 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
-import { ArrowLeft, Plus, X, Save, Loader2, Edit } from 'lucide-react'
+import {
+  ArrowLeft,
+  Plus,
+  X,
+  Save,
+  Loader2,
+  Edit,
+  Eye,
+  Trash2,
+  Sparkles,
+  RefreshCw,
+  Clock,
+  Code2,
+  AlertCircle,
+  MessageSquare
+} from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
+import { formatRelativeTime } from '@/lib/utils'
 
 interface Sample {
   input: string
   output: string
   explanation?: string
+}
+
+interface AdminSolutionItem {
+  id: string
+  title: string
+  codeLanguage: string | null
+  views: number
+  likes: number
+  isOfficial: boolean
+  isAiGenerated: boolean
+  sourceType: string
+  createdAt: string
+  author: {
+    id: string
+    username: string
+    nickname: string | null
+    avatar: string | null
+  }
 }
 
 export default function EditProblemPage() {
@@ -38,6 +72,14 @@ export default function EditProblemPage() {
   const [source, setSource] = useState('')
 
   const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '', explanation: '' }])
+
+  // 题解管理
+  const [solutions, setSolutions] = useState<AdminSolutionItem[]>([])
+  const [solutionsLoading, setSolutionsLoading] = useState(true)
+  const [solutionsError, setSolutionsError] = useState('')
+  const [deletingSolutionId, setDeletingSolutionId] = useState<string | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const fetchProblemData = useCallback(async () => {
     try {
@@ -78,6 +120,100 @@ export default function EditProblemPage() {
   useEffect(() => {
     fetchProblemData()
   }, [problemId, fetchProblemData])
+
+  const fetchSolutions = useCallback(async () => {
+    try {
+      setSolutionsLoading(true)
+      setSolutionsError('')
+      const response = await fetchWithAuth(
+        `/api/solutions?problemId=${problemId}&pageSize=100`
+      )
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      const data = await response.json()
+      if (data.success) {
+        const list = Array.isArray(data.data?.items)
+          ? data.data.items
+          : Array.isArray(data.data?.solutions)
+            ? data.data.solutions
+            : Array.isArray(data.data)
+              ? data.data
+              : []
+        setSolutions(list as AdminSolutionItem[])
+      } else {
+        setSolutionsError(data.error || '获取题解列表失败')
+      }
+    } catch (err: any) {
+      setSolutionsError(err?.message || '网络错误')
+    } finally {
+      setSolutionsLoading(false)
+    }
+  }, [problemId])
+
+  useEffect(() => {
+    fetchSolutions()
+  }, [problemId, fetchSolutions])
+
+  const handleViewSolution = (solutionId: string) => {
+    router.push(`/problems/${problemId}/solutions/${solutionId}`)
+  }
+
+  const handleDeleteSolution = async (solutionId: string) => {
+    const ok = window.confirm('确定要删除此题解吗？此操作不可撤销。')
+    if (!ok) return
+    try {
+      setDeletingSolutionId(solutionId)
+      const response = await fetchWithAuth(`/api/solutions/${solutionId}`, {
+        method: 'DELETE'
+      })
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.success) {
+        setActionMessage({ type: 'success', text: '题解已删除' })
+        setSolutions((prev) => prev.filter((s) => s.id !== solutionId))
+      } else {
+        setActionMessage({
+          type: 'error',
+          text: data?.error || '删除题解失败'
+        })
+      }
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err?.message || '网络错误' })
+    } finally {
+      setDeletingSolutionId(null)
+      setTimeout(() => setActionMessage(null), 3000)
+    }
+  }
+
+  const handleRegenerateSolution = async () => {
+    const ok = window.confirm(
+      '将删除原 AI 官方题解并重新生成。确定继续吗？'
+    )
+    if (!ok) return
+    try {
+      setRegenerating(true)
+      setActionMessage(null)
+      const response = await fetchWithAuth(
+        `/api/admin/problems/${problemId}/regenerate-solution`,
+        { method: 'POST' }
+      )
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.success) {
+        setActionMessage({ type: 'success', text: 'AI 题解已重新入队生成' })
+        await fetchSolutions()
+      } else {
+        setActionMessage({
+          type: 'error',
+          text: data?.error || '重新生成失败'
+        })
+      }
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err?.message || '网络错误' })
+    } finally {
+      setRegenerating(false)
+      setTimeout(() => setActionMessage(null), 4000)
+    }
+  }
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -487,6 +623,201 @@ export default function EditProblemPage() {
             </button>
           </div>
         </form>
+
+        <section className="card p-6 space-y-4" aria-label="题解管理">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{
+                  background:
+                    'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)'
+                }}
+              >
+                <MessageSquare className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  题解管理（{solutions.length}）
+                </h2>
+                <p className="text-xs text-slate-400">
+                  管理该题下的所有题解，AI 题解可一键重新生成
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRegenerateSolution}
+              disabled={regenerating}
+              className="btn btn-primary text-sm flex items-center gap-2"
+              title="删除原 AI 官方题解并重新入队生成"
+            >
+              {regenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              AI 重新生成
+            </button>
+          </div>
+
+          {actionMessage && (
+            <div
+              className={`px-4 py-3 rounded-lg text-sm border ${
+                actionMessage.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-red-500/10 border-red-500/30 text-red-300'
+              }`}
+            >
+              {actionMessage.text}
+            </div>
+          )}
+
+          {solutionsLoading && (
+            <div className="space-y-3" aria-busy="true" aria-live="polite">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-lg bg-white/5 border border-white/10 p-4 animate-pulse"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white/10" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-2/3 bg-white/10 rounded" />
+                      <div className="h-3 w-1/3 bg-white/10 rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!solutionsLoading && solutionsError && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              <span>{solutionsError}</span>
+            </div>
+          )}
+
+          {!solutionsLoading && !solutionsError && solutions.length === 0 && (
+            <div className="text-center py-12 rounded-lg bg-white/5 border border-white/10">
+              <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-3">
+                <MessageSquare className="w-7 h-7 text-slate-400" />
+              </div>
+              <p className="text-slate-400">暂无题解</p>
+            </div>
+          )}
+
+          {!solutionsLoading && !solutionsError && solutions.length > 0 && (
+            <div className="space-y-3">
+              {solutions.map((s) => (
+                <div
+                  key={s.id}
+                  className="rounded-xl bg-white/5 border border-white/10 p-4 hover:border-primary/40 transition-colors"
+                >
+                  <div className="flex items-start gap-3 flex-wrap">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="avatar avatar-md flex-shrink-0">
+                        {s.author?.avatar ? (
+                          <img
+                            src={s.author.avatar}
+                            alt={s.author.nickname || s.author.username}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="avatar-fallback text-sm">
+                            {(s.author?.nickname || s.author?.username || '?')
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="text-sm font-semibold text-white line-clamp-1">
+                            {s.title}
+                          </h3>
+                          {s.isAiGenerated && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-purple-500 to-purple-700 text-white">
+                              <Sparkles className="w-3 h-3" />
+                              AI 生成
+                            </span>
+                          )}
+                          {s.isOfficial && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-amber-400 to-yellow-500 text-amber-950">
+                              标程
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+                          <span className="text-slate-300">
+                            {s.author?.nickname || s.author?.username || '匿名'}
+                          </span>
+                          <span className="opacity-50">·</span>
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatRelativeTime(s.createdAt)}
+                          </span>
+                          {s.codeLanguage && (
+                            <>
+                              <span className="opacity-50">·</span>
+                              <span className="inline-flex items-center gap-1">
+                                <Code2 className="w-3 h-3" />
+                                {s.codeLanguage}
+                              </span>
+                            </>
+                          )}
+                          <span className="opacity-50">·</span>
+                          <span>👁 {s.views}</span>
+                          <span>👍 {s.likes}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleViewSolution(s.id)}
+                        className="px-3 py-1.5 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 flex items-center gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        查看
+                      </button>
+                      {s.isAiGenerated && (
+                        <button
+                          type="button"
+                          onClick={handleRegenerateSolution}
+                          disabled={regenerating}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-200 border border-purple-500/30 flex items-center gap-1"
+                          title="删除此题解并重新生成"
+                        >
+                          {regenerating ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          )}
+                          AI 重新生成
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSolution(s.id)}
+                        disabled={deletingSolutionId === s.id}
+                        className="px-3 py-1.5 text-xs rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1"
+                      >
+                        {deletingSolutionId === s.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </AdminLayout>
   )

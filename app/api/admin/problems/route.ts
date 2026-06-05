@@ -13,6 +13,7 @@ import {
 } from '@/lib/validation'
 import { trimAll, escapeHtml } from '@/lib/sanitize'
 import { redistributeTestScores } from '@/lib/testcase-score'
+import { enqueueSolutionJob } from '@/lib/ai/solution-queue'
 
 export async function GET(request: NextRequest) {
   try {
@@ -273,10 +274,26 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ 题目创建成功, ID:', problem.id)
 
+    // 入队 AI 题解生成（不阻塞题目创建响应，AI 模块异常不影响题目落库）
+    try {
+      const { logId } = await enqueueSolutionJob({
+        problemId: problem.id,
+        title: problem.title,
+        description: problem.description,
+        stdCode: '',
+        stdLang: '',
+        authorId: auth.user.userId
+      })
+      console.log('🤖 AI 题解生成已入队, logId:', logId)
+    } catch (aiError) {
+      console.error('⚠️ AI 题解入队失败（不影响题目创建）:', aiError)
+    }
+
     return NextResponse.json({
       success: true,
       data: problem,
-      message: '题目创建成功'
+      message: '题目创建成功',
+      solutionGenerationStatus: 'queued'
     })
   } catch (error) {
     console.error('💥 创建题目失败:', error)

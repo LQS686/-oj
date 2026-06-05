@@ -25,6 +25,7 @@ import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import JudgeStatus from '@/components/JudgeStatus'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
+import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 
@@ -61,6 +62,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const teamId = searchParams.get('teamId')
   const assignmentTitle = searchParams.get('assignmentTitle')
   const returnTab = searchParams.get('returnTab') || 'info'
+
+  const isAssignmentContext = fromAssignment === '1'
   
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('cpp')
@@ -112,6 +115,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     const langKey = getLanguageStorageKey(problemId, teamId, fromAssignment)
     localStorage.removeItem(langKey)
   }, [problemId, teamId, fromAssignment])
+
+  useEffect(() => {
+    if (isAssignmentContext && activeTab === 'solutions') {
+      setActiveTab('description')
+    }
+  }, [isAssignmentContext, activeTab])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !code) return
@@ -423,26 +432,28 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
               { key: 'submit', label: '提交代码', icon: CodeIcon },
               { key: 'solutions', label: '题解', icon: MessageSquare },
               { key: 'submissions', label: '提交记录', icon: ListChecks }
-            ].map((tab) => {
-              const Icon = tab.icon
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key as typeof activeTab)}
-                  className={`flex items-center gap-2 px-5 py-3.5 font-medium transition-all duration-300 relative cursor-pointer group ${
-                    activeTab === tab.key
-                      ? 'text-primary-light'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 transition-transform duration-300 ${activeTab === tab.key ? 'rotate-3' : 'group-hover:rotate-3'}`} />
-                  {tab.label}
-                  {activeTab === tab.key && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full animate-gradient" />
-                  )}
-                </button>
-              )
-            })}
+            ]
+              .filter((tab) => !(isAssignmentContext && tab.key === 'solutions'))
+              .map((tab) => {
+                const Icon = tab.icon
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key as typeof activeTab)}
+                    className={`flex items-center gap-2 px-5 py-3.5 font-medium transition-all duration-300 relative cursor-pointer group ${
+                      activeTab === tab.key
+                        ? 'text-primary-light'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 transition-transform duration-300 ${activeTab === tab.key ? 'rotate-3' : 'group-hover:rotate-3'}`} />
+                    {tab.label}
+                    {activeTab === tab.key && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full animate-gradient" />
+                    )}
+                  </button>
+                )
+              })}
           </div>
 
           <div className="p-6">
@@ -513,12 +524,10 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             )}
 
             {activeTab === 'solutions' && (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4 hover:bg-muted/70 transition-colors duration-300 group">
-                  <MessageSquare className="w-8 h-8 text-muted-foreground transition-transform duration-300 group-hover:scale-110" />
-                </div>
-                <p className="text-muted-foreground">暂无题解</p>
-              </div>
+              <SolutionTabPanel
+                problemId={problemId}
+                isAssignmentContext={isAssignmentContext}
+              />
             )}
 
             {activeTab === 'submissions' && (

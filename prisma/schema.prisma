@@ -39,6 +39,8 @@ model User {
   postLikes     PostLike[]
   blogs         Blog[]
   solutions     Solution[]
+  solutionViews SolutionView[]
+  solutionLikes SolutionLike[]
   achievements  UserAchievement[]
   favorites     Favorite[]
   teamNotes     TeamNote[]
@@ -471,22 +473,59 @@ model PostLike {
 
 // 题解
 model Solution {
-  id         String    @id @default(auto()) @map("_id") @db.ObjectId
-  problemId  String    @db.ObjectId
-  problem    Problem   @relation(fields: [problemId], references: [id])
-  authorId   String    @db.ObjectId
-  author     User      @relation(fields: [authorId], references: [id])
-  title      String
-  content    String
-  language   String?
-  code       String?
-  views      Int       @default(0)
-  likes      Int       @default(0)
-  isOfficial Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  
-  comments   Comment[]
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  problemId     String    @db.ObjectId
+  problem       Problem   @relation(fields: [problemId], references: [id])
+  authorId      String    @db.ObjectId
+  author        User      @relation(fields: [authorId], references: [id])
+  title         String
+  content       String
+  language      String?   // 兼容旧字段：题解配套代码语言
+  code          String?   // 兼容旧字段：题解配套代码
+  codeLanguage  String?   // 新字段：与 code 配对的语言（语义更清晰）
+  views         Int       @default(0)
+  likes         Int       @default(0)
+  isOfficial    Boolean   @default(false)            // 是否标程题解（置顶展示）
+  isAiGenerated Boolean   @default(false)            // 是否 AI 生成
+  sourceType    String    @default("USER")           // USER / OFFICIAL / AI_OFFICIAL
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  comments      Comment[]
+  viewRecords   SolutionView[]
+  likeRecords   SolutionLike[]
+
+  @@index([problemId, isOfficial])
+  @@index([problemId, createdAt])
+  @@index([authorId])
+}
+
+// 题解浏览记录（用于"单账户/IP 只统计一次"的 views 去重）
+// viewerKey: 登录用户存 userId；未登录用户存 "ip:userAgentHash" 形式的字符串
+model SolutionView {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  solutionId String   @db.ObjectId
+  solution   Solution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  userId     String?  @db.ObjectId
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  viewerKey  String                                       // userId 或 "ip:userAgentHash"
+  viewedAt   DateTime @default(now())
+
+  @@unique([solutionId, viewerKey])
+  @@index([solutionId, viewedAt])
+}
+
+// 题解点赞记录（用于"单用户只能点一次赞"的 likes 去重）
+model SolutionLike {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  solutionId String   @db.ObjectId
+  solution   Solution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([solutionId, userId])
+  @@index([userId])
 }
 
 // 博客
