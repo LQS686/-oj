@@ -35,15 +35,14 @@
 
 ---
 
-## 阶段三：缓存与前端 🚧
+## 阶段三：缓存与前端 ✅
 
 - [x] **Task 14: 服务端缓存层** — `lib/cache.ts` 已在各 service 中使用（TTL 60s）
-- [ ] **Task 15: 前端 SWR 集成** — 后续迭代
-  - [ ] 15.1: 引入 `swr` 依赖
-  - [ ] 15.2: `useCurrentUser()` hook 走 SWR
-  - [ ] 15.3: 班级详情 / 题目详情 / 用户主页使用 SWR
-
----
+- [x] **Task 15: 前端 SWR 集成**
+  - [x] 15.1: 引入 `swr` 依赖（package.json）
+  - [x] 15.2: `useCurrentUser()` hook 走 SWR
+  - [x] 15.3: 班级详情 / 题目详情 / 用户主页 / 通知 / 竞赛 5 个 hook 走 SWR
+  - [x] 15.4: SwrProvider 包裹 layout（deduping 30s / retry 2 / no revalidateOnFocus）
 
 ## 阶段四：冗余清理 ✅
 
@@ -72,7 +71,7 @@
 - [x] **Task 19: 命名规范 + ESLint**
   - [x] 19.1: `eslint.config.js` 启用 `no-shadow-restricted-names` / 限制 console
   - [x] 19.2: 新增 `docs/NAMING_CONVENTION.md`
-  - [ ] 19.3: husky + lint-staged（后续）
+  - [x] 19.3: husky + lint-staged（pre-commit 自动跑 eslint + tsc）
 
 ---
 
@@ -86,16 +85,17 @@
   - [x] 20.5: 业务代码 console.* 已使用 logger 替代
 
 - [x] **Task 21: 提交 + 推送 Gitee** ✅
-  - [x] 21.1: 分批提交（基础设施 → 业务层 → 清理 → 文档）4 commits
-  - [x] 21.2: `git push origin master`（a1f245e 推送成功）
+  - [x] 21.1: 分批提交（基础设施 → 业务层 → 清理 → 文档 → withApi → SWR → husky → 路由示范）8 commits
+  - [x] 21.2: `git push origin master`（baf6ced 推送成功）
   - [x] 21.3: 更新 README.md 项目结构图 + 2026/06 架构优化 changelog
 
 ---
 
 ## 后续迭代（不阻塞本次重构）
 
-- [ ] 路由级迁移：100+ API 路由逐个改用 `withAuth` / `withClassRole` 中间件
-- [ ] SWR 集成：客户端缓存层（Task 15）
-- [ ] husky + lint-staged 自动化（Task 19.3）
+- [ ] 路由级迁移：剩余 ~117 个 API 路由逐个改用 `withAuth` / `withClassRole` / `withApi` 中间件
+- [x] SWR 集成：客户端缓存层（Task 15 完成）
+- [x] husky + lint-staged 自动化（Task 19.3 完成）
 - [ ] 服务端缓存统一抽象 `getOrSet<T>(key, ttl, loader)`（lib/cache.ts）
 - [ ] 用户登出 / 班级成员变更时缓存失效联动
+- [ ] 路由瘦身：app/api/**/*.ts 单文件不超过 200 行
