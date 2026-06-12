@@ -1,266 +1,130 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma, prismaRo } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
-import { logger } from '@/lib/logger'
-import type { ProblemWhereInput, TestCaseInput } from '@/types/api'
-import type { Prisma } from '@prisma/client'
-import { errorHandler } from '@/lib/error-handler'
-import { errorMonitor } from '@/lib/error-monitor'
-import { success, badRequest, forbidden, created, internalError } from '@/lib/api-response'
+/**
+ * 公共题库列表 / 创建
+ * - GET  /api/problems  列表
+ * - POST /api/problems  创建题目（管理员）
+ */
+import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
+import { createProblemWithTestcases } from '@/lib/problem/service'
+import { prisma } from '@/lib/prisma'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
 
-// 模拟数据
-const mockProblems = [
-  {
-    id: '1',
-    problemNumber: 'P1001',
-    title: 'A+B Problem',
-    difficulty: '入门',
-    tags: ['模拟', '入门'],
-    totalSubmit: 10000,
-    totalAccepted: 8000,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '2',
-    problemNumber: 'P1002',
-    title: '过河卒',
-    difficulty: '普及-',
-    tags: ['动态规划', '递推'],
-    totalSubmit: 8000,
-    totalAccepted: 5000,
-    createdAt: new Date('2024-01-02'),
-  },
-  {
-    id: '3',
-    problemNumber: 'P1003',
-    title: '铺地毯',
-    difficulty: '普及',
-    tags: ['模拟', '枚举'],
-    totalSubmit: 7000,
-    totalAccepted: 4500,
-    createdAt: new Date('2024-01-03'),
-  },
-  {
-    id: '4',
-    problemNumber: 'P1004',
-    title: '方格取数',
-    difficulty: '普及+',
-    tags: ['动态规划', '递归'],
-    totalSubmit: 6000,
-    totalAccepted: 3500,
-    createdAt: new Date('2024-01-04'),
-  },
-  {
-    id: '5',
-    problemNumber: 'P1005',
-    title: '最长上升子序列',
-    difficulty: '提高',
-    tags: ['动态规划', '二分'],
-    totalSubmit: 5000,
-    totalAccepted: 2500,
-    createdAt: new Date('2024-01-05'),
-  },
-]
+export const GET = withApi.public(async (req) => {
+  const q = readQuery<{
+    page?: string
+    pageSize?: string
+    search?: string
+    difficulty?: 'easy' | 'medium' | 'hard'
+    tag?: string
+  }>(req)
+  const page = Math.max(1, parseInt(q.page || '1') || 1)
+  const pageSize = Math.min(50, Math.max(1, parseInt(q.pageSize || '20') || 20))
 
-// GET /api/problems - 获取题目列表 (Read Only)
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    let page = parseInt(searchParams.get('page') || '1')
-    let limit = parseInt(searchParams.get('limit') || '20')
-    
-    if (isNaN(page) || page < 1) page = 1
-    if (isNaN(limit) || limit < 1) limit = 20
-    if (limit > 50) limit = 50
-    
-    const difficulty = searchParams.get('difficulty')
-    const tag = searchParams.get('tag')
-    const search = searchParams.get('search')
-    const numbers = searchParams.get('numbers') // Support batch lookup by problem numbers
-
-    // 构建查询条件
-    const where: Prisma.ProblemWhereInput = { 
-      isPublic: true,
-    }
-    
-    if (difficulty && difficulty !== '全部') {
-      where.difficulty = difficulty
-    }
-    
-    if (tag && tag !== '全部') {
-      where.tags = { has: tag }
-    }
-    
-    if (numbers) {
-      // Batch lookup
-      const numList = numbers.split(',').map(n => n.trim()).filter(Boolean)
-      if (numList.length > 0) {
-        where.problemNumber = { in: numList }
-      }
-    } else if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { problemNumber: { contains: search, mode: 'insensitive' } },
-      ]
-    }
-
-    // 尝试从数据库获取数据
-    try {
-      // 查询题目和总数 - 使用 prismaRo 进行读操作
-      // 注意：prismaRo 配置了 ReadPreference=secondaryPreferred
-      const [problems, total] = await Promise.all([
-        prismaRo.problem.findMany({
-          where,
-          skip: (page - 1) * limit,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            problemNumber: true,
-            title: true,
-            difficulty: true,
-            tags: true,
-            totalSubmit: true,
-            totalAccepted: true,
-            createdAt: true,
-          },
-        }),
-        prismaRo.problem.count({ where }),
-      ])
-
-      return success({
-        problems,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      })
-    } catch (dbError) {
-      // 数据库连接失败，使用模拟数据
-      logger.warn('数据库连接失败，使用模拟数据', dbError)
-      
-      // 过滤模拟数据
-      let filteredProblems = [...mockProblems]
-      
-      if (difficulty && difficulty !== '全部') {
-        filteredProblems = filteredProblems.filter(p => p.difficulty === difficulty)
-      }
-      
-      if (tag && tag !== '全部') {
-        filteredProblems = filteredProblems.filter(p => p.tags.includes(tag))
-      }
-      
-      if (search) {
-        const searchLower = search.toLowerCase()
-        filteredProblems = filteredProblems.filter(p => 
-          p.title.toLowerCase().includes(searchLower) ||
-          p.problemNumber.toLowerCase().includes(searchLower)
-        )
-      }
-      
-      if (numbers) {
-        const numList = numbers.split(',').map(n => n.trim()).filter(Boolean)
-        if (numList.length > 0) {
-          filteredProblems = filteredProblems.filter(p => numList.includes(p.problemNumber))
-        }
-      }
-      
-      // 分页
-      const total = filteredProblems.length
-      const start = (page - 1) * limit
-      const end = start + limit
-      const paginatedProblems = filteredProblems.slice(start, end)
-      
-      return success({
-        problems: paginatedProblems,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      })
-    }
-  } catch (error) {
-    logger.error('Error fetching problems', error)
-    await errorMonitor.trackError(error instanceof Error ? error : String(error), { errorType: 'problem', endpoint: '/api/problems' })
-    return errorHandler.handle(error, request)
+  const where: any = { isPublic: true }
+  if (q.search) {
+    where.OR = [
+      { title: { contains: q.search, mode: 'insensitive' } },
+      { id: { contains: q.search } },
+    ]
   }
-}
+  if (q.difficulty) where.difficulty = q.difficulty
+  if (q.tag) where.tags = { has: q.tag }
 
+  const [items, total] = await Promise.all([
+    prisma.problem.findMany({
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.problem.count({ where }),
+  ])
 
-// POST /api/problems - 创建题目（需要管理员权限）
-export async function POST(request: NextRequest) {
+  return ok({ items, total, page, pageSize })
+})
+
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  const currentUser = await prisma.user.findUnique({ where: { id: user.id } })
+  if (!currentUser?.isAdmin) throw403('只有管理员可以创建题目')
+
+  const body = await readJson<{
+    title?: string
+    description?: string
+    input?: string
+    output?: string
+    samples?: any
+    hint?: string
+    source?: string
+    difficulty?: string
+    tags?: string[]
+    timeLimit?: number
+    memoryLimit?: number
+    isPublic?: boolean
+    testCases?: any[]
+  }>(req)
+
+  // 校验必填字段
+  if (!body.title || !body.description || !body.difficulty) {
+    throw400('MISSING_FIELDS', '请填写完整的题目信息')
+  }
+
+  // 测试用例处理
+  let processedTestCases: any[] | undefined
+  if (body.testCases && Array.isArray(body.testCases) && body.testCases.length > 0) {
+    const withOrder = body.testCases.map((tc, index) => ({
+      input: tc.input ?? '',
+      output: tc.output ?? '',
+      isSample: !!tc.isSample,
+      score: typeof tc.score === 'number' ? tc.score : 0,
+      orderIndex: index + 1,
+    }))
+    const hasSample = withOrder.some((tc) => tc.isSample)
+    if (!hasSample) {
+      throw400('NEED_SAMPLE', '测试用例中至少需要包含一个样例')
+    }
+    const invalidSample = withOrder.find(
+      (tc) => tc.isSample && (!tc.input.trim() || !tc.output.trim())
+    )
+    if (invalidSample) {
+      throw400('INVALID_SAMPLE', '样例测试用例的输入输出不能为空')
+    }
+    const normalized = ensureTotalScoreIs100(withOrder)
+    const allTestCases = await Promise.resolve(normalized)
+    processedTestCases = allTestCases
+  } else {
+    throw400('MISSING_TEST_CASES', '请至少添加一个测试用例')
+  }
+
+  // 题目去重
+  const existing = await prisma.problem.findFirst({
+    where: { title: body.title },
+  })
+  if (existing) {
+    throw400('TITLE_TAKEN', '已存在同名题目')
+  }
+
   try {
-    // 验证用户权限
-    const currentUser = getUserFromRequest(request)
-    if (!currentUser || !currentUser.isAdmin) {
-      return forbidden('需要管理员权限')
-    }
-
-    const body = await request.json()
-    
-    // 验证必需字段
-    const requiredFields = ['title', 'description', 'input', 'output', 'difficulty']
-    for (const field of requiredFields) {
-      if (!body[field]) {
-        return badRequest(`缺少必需字段: ${field}`)
-      }
-    }
-
-    // 创建题目
-    const problem = await prisma.problem.create({
-      data: {
-        title: body.title,
-        description: body.description,
-        input: body.input,
-        output: body.output,
-        samples: body.samples || [],
-        hint: body.hint,
-        source: body.source,
-        difficulty: body.difficulty,
-        tags: body.tags || [],
-        timeLimit: body.timeLimit || 1000,
-        memoryLimit: body.memoryLimit || 128,
-        isPublic: body.isPublic ?? false,
-        authorId: currentUser.userId,
-      },
+    const problem = await createProblemWithTestcases({
+      title: body.title!,
+      description: body.description!,
+      input: body.input || '',
+      output: body.output || '',
+      samples: body.samples || [],
+      hint: body.hint,
+      source: body.source,
+      difficulty: body.difficulty!,
+      tags: body.tags || [],
+      timeLimit: body.timeLimit,
+      memoryLimit: body.memoryLimit,
+      isPublic: body.isPublic ?? false,
+      testCases: processedTestCases,
+      authorId: user.id,
     })
-
-    // 创建测试用例 — 统一保证测试点总分 = 100
-    if (body.testCases && Array.isArray(body.testCases)) {
-      const normalizedTestCases = ensureTotalScoreIs100(
-        body.testCases.map((testCase: TestCaseInput, index: number) => ({
-          input: testCase.input,
-          output: testCase.output,
-          isSample: testCase.isSample || false,
-          score: testCase.score || 0,
-          orderIndex: index + 1
-        }))
-      )
-      await Promise.all(
-        normalizedTestCases.map((testCase) =>
-          prisma.testCase.create({
-            data: {
-              problemId: problem.id,
-              input: testCase.input,
-              output: testCase.output,
-              isSample: testCase.isSample,
-              score: testCase.score,
-              orderIndex: testCase.orderIndex
-            }
-          })
-        )
-      )
+    return ok({ id: problem.id }, { status: 201 })
+  } catch (err: any) {
+    if (err?.code === 'P2002') {
+      throw400('TITLE_TAKEN', '已存在同名题目')
     }
-
-    return created(problem, '题目创建成功')
-  } catch (error) {
-    logger.error('Error creating problem', error)
-    await errorMonitor.trackError(error instanceof Error ? error : String(error), { errorType: 'problem', endpoint: '/api/problems' })
-    return errorHandler.handle(error, request)
+    console.error('Create problem failed:', err)
+    throw400('CREATE_FAILED', '题目创建失败')
   }
-}
+})

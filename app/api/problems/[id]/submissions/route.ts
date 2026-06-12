@@ -1,160 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+/**
+ * 题目提交记录（公共题库 + 班级作业合并流）
+ * GET /api/problems/[id]/submissions
+ */
+import { withApi, ok, readQuery, throw400, throw404 } from '@/lib/api/withApi'
+import { listProblemSubmissionsMerged } from '@/lib/problem/service'
 
-// GET /api/problems/[id]/submissions - 获取题目的提交记录
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: problemIdOrNumber } = await params
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const userId = searchParams.get('userId') // 可选：只获取特定用户的提交
+export const GET = withApi.public(async (req, ctx) => {
+  const { id } = (ctx as any).params
+  if (!id) throw400('INVALID_ID', '无效的题目ID')
 
-    console.log('📥 获取题目提交记录, 题目标识:', problemIdOrNumber, ', 页码:', page)
+  const q = readQuery<{ page?: string; pageSize?: string; userId?: string }>(req)
+  const page = Math.max(1, parseInt(q.page || '1') || 1)
+  const pageSize = Math.max(1, parseInt(q.pageSize || '20') || 20)
 
-    // 先查找题目获取真实的 ObjectId
-    let problem
-    if (problemIdOrNumber.match(/^[0-9a-fA-F]{24}$/)) {
-      // 是 ObjectId
-      problem = await prisma.problem.findUnique({
-        where: { id: problemIdOrNumber },
-        select: { id: true }
-      })
-    } else {
-      // 是 problemNumber
-      problem = await prisma.problem.findFirst({
-        where: { problemNumber: problemIdOrNumber },
-        select: { id: true }
-      })
-    }
+  const result = await listProblemSubmissionsMerged(id, {
+    page,
+    pageSize,
+    userId: q.userId,
+  })
+  if (!result) throw404('题目不存在')
 
-    if (!problem) {
-      return NextResponse.json(
-        { success: false, error: '题目不存在' },
-        { status: 404 }
-      )
-    }
-
-    const problemId = problem.id
-
-    // 构建查询条件
-    const where: any = { problemId }
-    if (userId) {
-      where.userId = userId
-    }
-
-    // 查询 Submission 模型（题库和竞赛提交）- 不分页，获取所有数据后合并再分页
-    const [submissions, classSubmissions, totalSubmissions, totalClassSubmissions] = await Promise.all([
-      prisma.submission.findMany({
-        where,
-        orderBy: { submittedAt: 'desc' },
-        select: {
-          id: true,
-          status: true,
-          language: true,
-          time: true,
-          memory: true,
-          score: true,
-          passedTests: true,
-          totalTests: true,
-          submittedAt: true,
-          user: {
-            select: {
-              id: true,
-              username: true,
-              nickname: true,
-            },
-          },
-        },
-      }),
-      // 查询 ClassAssignmentSubmission 模型（班级作业提交）
-      prisma.classAssignmentSubmission.findMany({
-        where: {
-          problemId,
-          ...(userId ? { userId } : {}),
-        },
-        orderBy: { submittedAt: 'desc' },
-        select: {
-          id: true,
-          status: true,
-          language: true,
-          time: true,
-          memory: true,
-          score: true,
-          passedTests: true,
-          totalTests: true,
-          submittedAt: true,
-          userId: true,
-        },
-      }),
-      prisma.submission.count({ where }),
-      prisma.classAssignmentSubmission.count({
-        where: {
-          problemId,
-          ...(userId ? { userId } : {}),
-        },
-      }),
-    ])
-
-    // 获取班级作业提交的用户信息
-    const classSubmissionUserIds = [...new Set(classSubmissions.map(sub => sub.userId))]
-    const users = classSubmissionUserIds.length > 0 
-      ? await prisma.user.findMany({
-          where: { id: { in: classSubmissionUserIds } },
-          select: {
-            id: true,
-            username: true,
-            nickname: true,
-          },
-        })
-      : []
-    const userMap = new Map(users.map(user => [user.id, user]))
-
-    // 格式化班级作业提交记录
-    const formattedClassSubmissions = classSubmissions.map(sub => ({
-      id: sub.id,
-      status: sub.status,
-      language: sub.language,
-      time: sub.time,
-      memory: sub.memory,
-      score: sub.score,
-      passedTests: sub.passedTests,
-      totalTests: sub.totalTests,
-      submittedAt: sub.submittedAt,
-      user: userMap.get(sub.userId) || {
-        id: sub.userId,
-        username: '未知用户',
-        nickname: null,
-      },
-    }))
-
-    // 合并所有提交记录并按提交时间排序
-    const allSubmissions = [...submissions, ...formattedClassSubmissions]
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
-      .slice((page - 1) * limit, page * limit)
-
-    const total = totalSubmissions + totalClassSubmissions
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        submissions: allSubmissions,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      },
-    })
-  } catch (error) {
-    console.error('❌ 获取提交记录失败:', error)
-    return NextResponse.json(
-      { success: false, error: '获取提交记录失败' },
-      { status: 500 }
-    )
-  }
-}
+  return ok(result)
+})

@@ -1,156 +1,75 @@
 /**
  * 积分商城商品管理
- * GET /api/classes/[id]/points/shop - 获取商品列表
- * POST /api/classes/[id]/points/shop - 创建商品（管理员）
+ * - GET  /api/classes/[id]/points/shop  商品列表
+ * - POST /api/classes/[id]/points/shop  创建商品（管理员）
  */
-
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
+import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
+import { isObjectId } from '@/lib/api/validation'
 import { getShopItems, createShopItem } from '@/lib/points/shop'
+import { isClassAdminRole } from '@/lib/class/service'
+import { prisma } from '@/lib/prisma'
 
-// 辅助函数：验证 MongoDB ObjectId
-function isValidObjectId(id: string) {
-  return /^[0-9a-fA-F]{24}$/.test(id)
-}
+export const GET = withApi.auth(async (req, ctx, { user }) => {
+  const { id: classId } = (ctx as any).params
+  if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权' },
-        { status: 401 }
-      )
-    }
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId: user.id } },
+  })
+  if (!member) throw403('只有班级成员可以查看商城')
 
-    const { id: classId } = await params
+  const q = readQuery<{ category?: string; isActive?: string; page?: string; limit?: string }>(req)
+  const page = parseInt(q.page || '1') || 1
+  const limit = parseInt(q.limit || '20') || 20
 
-    if (!isValidObjectId(classId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的班级ID' },
-        { status: 400 }
-      )
-    }
+  const result = await getShopItems(classId!, {
+    category: q.category,
+    isActive: q.isActive === 'true',
+    page,
+    limit,
+  })
 
-    // 解析查询参数
-    const searchParams = request.nextUrl.searchParams
-    const category = searchParams.get('category') || undefined
-    const isActive = searchParams.get('isActive') === 'true'
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+  if (!result.success) throw400('QUERY_FAILED', result.error!)
+  return ok(result.data)
+})
 
-    const result = await getShopItems(classId, {
-      category,
-      isActive,
-      page,
-      limit
-    })
+export const POST = withApi.auth(async (req, ctx, { user }) => {
+  const { id: classId } = (ctx as any).params
+  if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
-    if (!result.success) {
-      return NextResponse.json(result, { status: 500 })
-    }
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId: user.id } },
+  })
+  if (!member || !isClassAdminRole(member.role)) throw403('需要管理员权限')
 
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error('[API] 获取商品列表失败:', error)
-    return NextResponse.json(
-      { success: false, error: '服务器错误' },
-      { status: 500 }
-    )
+  const body = await readJson<{
+    name?: string
+    description?: string
+    category?: string
+    pointsRequired?: number
+    stock?: number
+    isUnlimited?: boolean
+    imageUrl?: string
+    sortOrder?: number
+  }>(req)
+  if (!body.name || !body.category || !body.pointsRequired) {
+    throw400('MISSING_FIELDS', '缺少必要参数')
   }
-}
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权' },
-        { status: 401 }
-      )
-    }
-
-    const { id: classId } = await params
-
-    if (!isValidObjectId(classId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的班级ID' },
-        { status: 400 }
-      )
-    }
-
-    // 检查管理员权限
-    const member = await prisma.classMember.findUnique({
-      where: {
-        classId_userId: {
-          classId,
-          userId: user.userId
-        }
-      }
-    })
-
-    if (!member || !['owner', 'assistant'].includes(member.role)) {
-      return NextResponse.json(
-        { success: false, error: '需要管理员权限' },
-        { status: 403 }
-      )
-    }
-
-    // 解析请求数据
-    const body = await request.json()
-    const {
-      name,
-      description,
-      category,
-      pointsRequired,
-      stock,
-      isUnlimited,
-      imageUrl,
-      sortOrder
-    } = body
-
-    if (!name || !category || !pointsRequired) {
-      return NextResponse.json(
-        { success: false, error: '缺少必要参数' },
-        { status: 400 }
-      )
-    }
-
-    if (pointsRequired <= 0) {
-      return NextResponse.json(
-        { success: false, error: '积分必须大于0' },
-        { status: 400 }
-      )
-    }
-
-    const result = await createShopItem(classId, {
-      name,
-      description,
-      category,
-      pointsRequired,
-      stock,
-      isUnlimited,
-      imageUrl,
-      sortOrder
-    })
-
-    if (!result.success) {
-      return NextResponse.json(result, { status: 500 })
-    }
-
-    return NextResponse.json(result, { status: 201 })
-  } catch (error) {
-    console.error('[API] 创建商品失败:', error)
-    return NextResponse.json(
-      { success: false, error: '服务器错误' },
-      { status: 500 }
-    )
+  if (body.pointsRequired! <= 0) {
+    throw400('INVALID_POINTS', '积分必须大于0')
   }
-}
+
+  const result = await createShopItem(classId!, {
+    name: body.name!,
+    description: body.description,
+    category: body.category!,
+    pointsRequired: body.pointsRequired!,
+    stock: body.stock,
+    isUnlimited: body.isUnlimited,
+    imageUrl: body.imageUrl,
+    sortOrder: body.sortOrder,
+  })
+
+  if (!result.success) throw400('CREATE_FAILED', result.error!)
+  return ok(result.data, { status: 201 })
+})

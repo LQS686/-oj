@@ -1,174 +1,74 @@
-import { NextRequest, NextResponse } from 'next/server'
+/**
+ * 班级列表 / 创建
+ * - GET /api/classes  公开列表（含 / 排除我的班级）
+ * - POST /api/classes  创建班级
+ */
+import { withApi, ok, readJson, readQuery, throw400, throw409 } from '@/lib/api/withApi'
+import { listClasses, createClass } from '@/lib/class/service'
 import { prisma } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
-import { Prisma } from '@prisma/client'
-import { logger } from '@/lib/logger'
 
-// GET /api/classes - 获取班级列表
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    let page = parseInt(searchParams.get('page') || '1')
-    let pageSize = parseInt(searchParams.get('pageSize') || '20')
-    
-    if (isNaN(page) || page < 1) page = 1
-    if (isNaN(pageSize) || pageSize < 1) pageSize = 20
-    if (pageSize > 50) pageSize = 50
-    
-    const search = searchParams.get('search') || ''
-    const myClasses = searchParams.get('myClasses') === 'true'
+export const GET = withApi.public(async (req) => {
+  const q = readQuery<{ page?: string; pageSize?: string; search?: string; myClasses?: string }>(req)
+  const page = Math.max(1, parseInt(q.page || '1') || 1)
+  const pageSize = Math.min(50, Math.max(1, parseInt(q.pageSize || '20') || 20))
+  const myClasses = q.myClasses === 'true'
 
-    // 构建查询条件
-    const where: Prisma.ClassWhereInput = {}
+  // myClasses 必须先登录
+  let userId: string | undefined
+  if (myClasses) {
+    const { getUserFromRequest } = await import('@/lib/auth')
+    const session = getUserFromRequest(req)
+    if (!session?.userId) throw400('UNAUTHORIZED', '请先登录')
+    userId = session!.userId
+  }
 
-    // 只显示公开班级
-    if (!myClasses) {
-      where.isPublic = true
-    }
+  const result = await listClasses({
+    page,
+    pageSize,
+    search: q.search || '',
+    myClasses,
+    userId,
+  })
+  return ok(result)
+})
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ]
-    }
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  const body = await readJson<{
+    name?: string
+    description?: string
+    avatar?: string
+    isPublic?: boolean
+    maxMembers?: number
+  }>(req)
 
-    // 如果查询我的班级
-    if (myClasses) {
-      const currentUser = getUserFromRequest(request)
-      if (!currentUser) {
-        return NextResponse.json(
-          { success: false, error: '请先登录' },
-          { status: 401 }
-        )
-      }
+  if (!body.name || !body.name.trim()) {
+    throw400('INVALID_NAME', '班级名称不能为空')
+  }
 
-      // 查询用户加入的班级
-      where.members = {
-        some: {
-          userId: currentUser.userId
-        }
-      }
-    }
+  // 检查班级名是否已存在
+  const existing = await prisma.class.findUnique({ where: { name: body.name!.trim() } })
+  if (existing) throw409('班级名称已存在')
 
-    // 分页查询
-    const [classes, total] = await Promise.all([
-      prisma.class.findMany({
-        where,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          _count: {
-            select: { members: true }
-          }
-        }
-      }),
-      prisma.class.count({ where })
-    ])
+  const classData = await createClass({
+    name: body.name!,
+    description: body.description,
+    avatar: body.avatar,
+    isPublic: body.isPublic,
+    maxMembers: body.maxMembers,
+    ownerId: user.id,
+  })
 
-    // 格式化返回数据
-    const classesWithStats = classes.map(classData => ({
+  return ok(
+    {
       id: classData.id,
       name: classData.name,
       description: classData.description,
       avatar: classData.avatar,
       isPublic: classData.isPublic,
       maxMembers: classData.maxMembers,
-      memberCount: classData._count.members,
-      createdAt: classData.createdAt
-    }))
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        classes: classesWithStats,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize)
-      }
-    })
-  } catch (error) {
-    logger.error('获取班级列表失败', error)
-    return NextResponse.json(
-      { success: false, error: '服务器内部错误，请稍后重试' },
-      { status: 500 }
-    )
-  }
-}
-
-// POST /api/classes - 创建班级
-export async function POST(request: NextRequest) {
-  try {
-    // 验证用户身份
-    const currentUser = getUserFromRequest(request)
-    if (!currentUser) {
-      return NextResponse.json(
-        { success: false, error: '请先登录' },
-        { status: 401 }
-      )
-    }
-
-    const body = await request.json()
-    const { name, description, avatar, isPublic, maxMembers } = body
-
-    if (!name || !name.trim()) {
-      return NextResponse.json(
-        { success: false, error: '班级名称不能为空' },
-        { status: 400 }
-      )
-    }
-
-    // 检查班级名是否已存在
-    const existing = await prisma.class.findUnique({
-      where: { name: name.trim() }
-    })
-    
-    if (existing) {
-      return NextResponse.json(
-        { success: false, error: '班级名称已存在' },
-        { status: 400 }
-      )
-    }
-
-    // 创建班级并添加创建者为owner
-    const classData = await prisma.class.create({
-      data: {
-        name: name.trim(),
-        description: description || '',
-        avatar: avatar || '',
-        isPublic: isPublic !== false,
-        maxMembers: maxMembers || 50,
-        ownerId: currentUser.userId,
-        members: {
-          create: {
-            userId: currentUser.userId,
-            role: 'owner'
-          }
-        }
-      }
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: classData.id,
-        name: classData.name,
-        description: classData.description,
-        avatar: classData.avatar,
-        isPublic: classData.isPublic,
-        maxMembers: classData.maxMembers,
-        ownerId: classData.ownerId,
-        createdAt: classData.createdAt
-      },
-      message: '班级创建成功'
-    })
-  } catch (error) {
-    logger.error('创建班级失败', error)
-    return NextResponse.json(
-      { success: false, error: '服务器内部错误，请稍后重试' },
-      { status: 500 }
-    )
-  }
-}
+      ownerId: classData.ownerId,
+      createdAt: classData.createdAt,
+    },
+    { status: 201 }
+  )
+})

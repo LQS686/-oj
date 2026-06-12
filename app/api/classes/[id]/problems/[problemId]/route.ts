@@ -1,296 +1,129 @@
 /**
- * 班级单个题目管理 API
- * - GET /api/classes/[id]/problems/[problemId] - 获取班级题目详情
- * - PUT /api/classes/[id]/problems/[problemId] - 更新班级题目
- * - DELETE /api/classes/[id]/problems/[problemId] - 删除班级题目
+ * 班级单个题目管理
+ * - GET    /api/classes/[id]/problems/[problemId]
+ * - PUT    /api/classes/[id]/problems/[problemId]
+ * - DELETE /api/classes/[id]/problems/[problemId]
  */
-
-import { NextRequest, NextResponse } from 'next/server'
+import {
+  withApi,
+  ok,
+  readJson,
+  throw400,
+  throw403,
+  throw404,
+} from '@/lib/api/withApi'
+import { isObjectId } from '@/lib/api/validation'
+import {
+  getClassProblem,
+  updateClassProblemFields,
+  deleteClassProblem,
+} from '@/lib/class/service'
 import { prisma } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
 
-interface RouteContext {
-  params: Promise<{ id: string; problemId: string }>
-}
+export const GET = withApi.auth(async (req, ctx, { user }) => {
+  const { id, problemId } = (ctx as any).params
+  if (!isObjectId(id) || !isObjectId(problemId)) {
+    throw400('INVALID_ID', '无效的ID')
+  }
 
-// 辅助函数：验证 MongoDB ObjectId
-function isValidObjectId(id: string) {
-  return /^[0-9a-fA-F]{24}$/.test(id)
-}
+  const problem = await getClassProblem(id, problemId)
+  if (!problem) throw404('题目不存在')
 
-/**
- * GET /api/classes/[id]/problems/[problemId] - 获取班级题目详情
- */
-export async function GET(
-  request: NextRequest,
-  context: RouteContext
-) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权访问' },
-        { status: 401 }
-      )
-    }
+  const classData = await prisma.class.findUnique({ where: { id } })
+  if (!classData) throw404('班级不存在')
 
-    const { id, problemId } = await context.params
-    const classId = id
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId: id, userId: user.id } },
+  })
+  if (!classData!.isPublic && !member) throw403('无权访问该班级')
 
-    if (!isValidObjectId(classId) || !isValidObjectId(problemId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的ID' },
-        { status: 400 }
-      )
-    }
-
-    // 获取题目
-    const problem = await prisma.problem.findUnique({
-      where: {
-        id: problemId,
-        classId: classId // 确保是该班级的题目
-      },
-      include: {
-        testCases: {
-          orderBy: { orderIndex: 'asc' }
-        }
-      }
-    })
-
-    if (!problem) {
-      return NextResponse.json(
-        { success: false, error: '题目不存在' },
-        { status: 404 }
-      )
-    }
-
-    // 检查访问权限
-    const classData = await prisma.class.findUnique({ where: { id: classId } })
-    if (!classData) {
-      return NextResponse.json(
-        { success: false, error: '班级不存在' },
-        { status: 404 }
-      )
-    }
-
-    const member = await prisma.classMember.findUnique({
-      where: {
-        classId_userId: {
-          classId,
-          userId: user.userId
-        }
-      }
-    })
-
-    if (!classData.isPublic && !member) {
-      return NextResponse.json(
-        { success: false, error: '无权访问该班级' },
-        { status: 403 }
-      )
-    }
-
-    // 计算统计信息
-    // 这里的 AC 率是基于该题目在所有地方的提交？
-    // 既然是班级私有题目，提交也是针对这个 ID 的。
-    // Problem 模型有 totalSubmit 和 totalAccepted
-    const acRate = problem.totalSubmit > 0 
-      ? Math.round((problem.totalAccepted / problem.totalSubmit) * 100) 
+  const acRate =
+    problem!.totalSubmit > 0
+      ? Math.round((problem!.totalAccepted / problem!.totalSubmit) * 100)
       : 0
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: problem.id,
-        title: problem.title,
-        description: problem.description,
-        difficulty: problem.difficulty,
-        tags: problem.tags || [],
-        timeLimit: problem.timeLimit,
-        memoryLimit: problem.memoryLimit,
-        testCases: problem.testCases.map(tc => ({
-          id: tc.id,
-          input: tc.input,
-          expectedOutput: tc.output,
-          isHidden: !tc.isSample
-        })),
-        stats: {
-          acCount: problem.totalAccepted,
-          totalSubmissions: problem.totalSubmit,
-          acRate
-        },
-        createdBy: problem.authorId,
-        createdAt: problem.createdAt,
-        updatedAt: problem.updatedAt
-      }
-    })
-  } catch (error: any) {
-    console.error('获取班级题目详情失败:', error)
-    return NextResponse.json(
-      { success: false, error: '获取班级题目详情失败' },
-      { status: 500 }
-    )
+  return ok({
+    id: problem!.id,
+    title: problem!.title,
+    description: problem!.description,
+    difficulty: problem!.difficulty,
+    tags: problem!.tags || [],
+    timeLimit: problem!.timeLimit,
+    memoryLimit: problem!.memoryLimit,
+    testCases: problem!.testCases.map((tc) => ({
+      id: tc.id,
+      input: tc.input,
+      expectedOutput: tc.output,
+      isHidden: !tc.isSample,
+    })),
+    stats: {
+      acCount: problem!.totalAccepted,
+      totalSubmissions: problem!.totalSubmit,
+      acRate,
+    },
+    createdBy: problem!.authorId,
+    createdAt: problem!.createdAt,
+    updatedAt: problem!.updatedAt,
+  })
+})
+
+export const PUT = withApi.auth(async (req, ctx, { user }) => {
+  const { id, problemId } = (ctx as any).params
+  if (!isObjectId(id) || !isObjectId(problemId)) {
+    throw400('INVALID_ID', '无效的ID')
   }
-}
 
-/**
- * PUT /api/classes/[id]/problems/[problemId] - 更新班级题目
- */
-export async function PUT(
-  request: NextRequest,
-  context: RouteContext
-) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权访问' },
-        { status: 401 }
-      )
-    }
-
-    const { id, problemId } = await context.params
-    const classId = id
-
-    if (!isValidObjectId(classId) || !isValidObjectId(problemId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的ID' },
-        { status: 400 }
-      )
-    }
-
-    // 检查权限（只有管理员可以编辑题目）
-    const member = await prisma.classMember.findUnique({
-      where: {
-        classId_userId: {
-          classId,
-          userId: user.userId
-        }
-      }
-    })
-
-    if (!member || (member.role !== 'owner' && member.role !== 'assistant')) {
-      return NextResponse.json(
-        { success: false, error: '只有管理员可以编辑题目' },
-        { status: 403 }
-      )
-    }
-
-    // 检查题目是否存在
-    const problem = await prisma.problem.findUnique({
-      where: {
-        id: problemId,
-        classId: classId
-      }
-    })
-
-    if (!problem) {
-      return NextResponse.json(
-        { success: false, error: '题目不存在' },
-        { status: 404 }
-      )
-    }
-
-    const body = await request.json()
-    const { title, description, difficulty, tags, timeLimit, memoryLimit } = body
-
-    const updateData: any = {}
-    if (title !== undefined) updateData.title = title
-    if (description !== undefined) updateData.description = description
-    if (difficulty !== undefined) updateData.difficulty = difficulty
-    if (tags !== undefined) updateData.tags = tags
-    if (timeLimit !== undefined) updateData.timeLimit = timeLimit
-    if (memoryLimit !== undefined) updateData.memoryLimit = memoryLimit
-
-    await prisma.problem.update({
-      where: { id: problemId },
-      data: updateData
-    })
-
-    return NextResponse.json({
-      success: true,
-      message: '题目更新成功'
-    })
-  } catch (error: any) {
-    console.error('更新班级题目失败:', error)
-    return NextResponse.json(
-      { success: false, error: '更新班级题目失败' },
-      { status: 500 }
-    )
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId: id, userId: user.id } },
+  })
+  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
+    throw403('只有管理员可以编辑题目')
   }
-}
 
-/**
- * DELETE /api/classes/[id]/problems/[problemId] - 删除班级题目
- */
-export async function DELETE(
-  request: NextRequest,
-  context: RouteContext
-) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权访问' },
-        { status: 401 }
-      )
-    }
+  const problem = await prisma.problem.findUnique({
+    where: { id: problemId, classId: id },
+  })
+  if (!problem) throw404('题目不存在')
 
-    const { id, problemId } = await context.params
-    const classId = id
+  const body = await readJson<{
+    title?: string
+    description?: string
+    difficulty?: string
+    tags?: string[]
+    timeLimit?: number
+    memoryLimit?: number
+  }>(req)
 
-    if (!isValidObjectId(classId) || !isValidObjectId(problemId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的ID' },
-        { status: 400 }
-      )
-    }
+  const updateData: any = {}
+  if (body.title !== undefined) updateData.title = body.title
+  if (body.description !== undefined) updateData.description = body.description
+  if (body.difficulty !== undefined) updateData.difficulty = body.difficulty
+  if (body.tags !== undefined) updateData.tags = body.tags
+  if (body.timeLimit !== undefined) updateData.timeLimit = body.timeLimit
+  if (body.memoryLimit !== undefined) updateData.memoryLimit = body.memoryLimit
 
-    // 检查权限（只有管理员可以删除题目）
-    const member = await prisma.classMember.findUnique({
-      where: {
-        classId_userId: {
-          classId,
-          userId: user.userId
-        }
-      }
-    })
+  await updateClassProblemFields(problemId, updateData)
+  return ok({ message: '题目更新成功' })
+})
 
-    if (!member || (member.role !== 'owner' && member.role !== 'assistant')) {
-      return NextResponse.json(
-        { success: false, error: '只有管理员可以删除题目' },
-        { status: 403 }
-      )
-    }
-
-    // 检查题目是否存在
-    const problem = await prisma.problem.findUnique({
-      where: {
-        id: problemId,
-        classId: classId
-      }
-    })
-
-    if (!problem) {
-      return NextResponse.json(
-        { success: false, error: '题目不存在' },
-        { status: 404 }
-      )
-    }
-
-    // 删除题目（testCases 会自动级联删除）
-    await prisma.problem.delete({
-      where: { id: problemId }
-    })
-
-    return NextResponse.json({
-      success: true,
-      message: '题目删除成功'
-    })
-  } catch (error: any) {
-    console.error('删除班级题目失败:', error)
-    return NextResponse.json(
-      { success: false, error: '删除班级题目失败' },
-      { status: 500 }
-    )
+export const DELETE = withApi.auth(async (req, ctx, { user }) => {
+  const { id, problemId } = (ctx as any).params
+  if (!isObjectId(id) || !isObjectId(problemId)) {
+    throw400('INVALID_ID', '无效的ID')
   }
-}
+
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId: id, userId: user.id } },
+  })
+  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
+    throw403('只有管理员可以删除题目')
+  }
+
+  const problem = await prisma.problem.findUnique({
+    where: { id: problemId, classId: id },
+  })
+  if (!problem) throw404('题目不存在')
+
+  await deleteClassProblem(problemId)
+  return ok({ message: '题目删除成功' })
+})

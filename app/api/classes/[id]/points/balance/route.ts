@@ -1,44 +1,16 @@
 /**
- * 查询班级成员积分余额
+ * 班级成员积分余额
  * GET /api/classes/[id]/points/balance
  */
-
-import { NextRequest, NextResponse } from 'next/server'
-import { getUserFromRequest } from '@/lib/auth'
+import { withApi, ok, throw400 } from '@/lib/api/withApi'
+import { isObjectId } from '@/lib/api/validation'
 import { getPointsBalance } from '@/lib/points/account'
 
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
+export const GET = withApi.auth(async (req, ctx, { user }) => {
+  const { id: classId } = (ctx as any).params
+  if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
-export async function GET(
-  request: NextRequest,
-  context: RouteContext
-) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权' },
-        { status: 401 }
-      )
-    }
-
-    const { id: classId } = await context.params
-    const userId = user.userId
-
-    const result = await getPointsBalance(classId, userId)
-
-    if (!result.success) {
-      return NextResponse.json(result, { status: 500 })
-    }
-
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error('[API] 查询积分余额失败:', error)
-    return NextResponse.json(
-      { success: false, error: '服务器错误' },
-      { status: 500 }
-    )
-  }
-}
+  const result = await getPointsBalance(classId!, user.id)
+  if (!result.success) throw400('QUERY_FAILED', result.error!)
+  return ok(result.data)
+})

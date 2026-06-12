@@ -1,93 +1,54 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+/**
+ * 公共题目详情（按 ObjectId 或 problemNumber 解析）
+ * GET /api/problems/[id]
+ */
+import { withApi, ok, throw400, throw404 } from '@/lib/api/withApi'
+import { findProblemByIdOrNumber, getProblemStatusCounts } from '@/lib/problem/service'
 
-// GET /api/problems/[id] - 获取题目详情
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    console.log('📥 获取题目详情, ID:', id)
-    
-    // 判断是 ObjectId 还是 problemNumber
-    let problem
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      // 24位十六进制字符串，是 ObjectId
-      problem = await prisma.problem.findUnique({
-        where: { id },
-        include: {
-          author: {
-            select: {
-              id: true,
-              username: true,
-              nickname: true,
-            },
-          },
-          testCases: {
-            where: { isSample: true },
-            orderBy: { orderIndex: 'asc' },
-          },
-        },
-      })
-    } else {
-      // 不是 ObjectId，可能是 problemNumber（如 P1001）
-      problem = await prisma.problem.findFirst({
-        where: { problemNumber: id },
-        include: {
-          author: {
-            select: {
-              id: true,
-              username: true,
-              nickname: true,
-            },
-          },
-          testCases: {
-            where: { isSample: true },
-            orderBy: { orderIndex: 'asc' },
-          },
-        },
-      })
-    }
+export const GET = withApi.public(async (req, ctx) => {
+  const { id } = (ctx as any).params
+  if (!id) throw400('INVALID_ID', '无效的题目ID')
 
-    if (!problem) {
-      return NextResponse.json(
-        { success: false, error: '题目不存在' },
-        { status: 404 }
-      )
-    }
+  const problem = await findProblemByIdOrNumber(id)
+  if (!problem) throw404('题目不存在')
 
-    // 不返回非样例的测试用例及敏感的AI/标程字段
-    const { 
-      testCases, 
-      aiStatus, 
-      stdCode, 
-      stdLang, 
-      aiPrompt, 
-      ...problemData 
-    } = problem as any
-    
-    // 优先使用 samples 字段 (JSON)，如果没有则使用 testCases 中的样例
-    let samples = problemData.samples
-    if (!Array.isArray(samples) || samples.length === 0) {
-      samples = testCases.map((tc: any) => ({
-        input: tc.input,
-        output: tc.output,
-      }))
-    }
+  const p = problem!
+  const acRate =
+    p.totalSubmit > 0
+      ? Math.round((p.totalAccepted / p.totalSubmit) * 100)
+      : 0
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...problemData,
-        samples,
-      },
-    })
-  } catch (error) {
-    console.error('Error fetching problem:', error)
-    return NextResponse.json(
-      { success: false, error: '获取题目失败' },
-      { status: 500 }
-    )
-  }
-}
+  const statusCounts = await getProblemStatusCounts(p.id)
+
+  return ok({
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    input: p.input,
+    output: p.output,
+    samples: p.samples || [],
+    hint: p.hint,
+    source: p.source,
+    difficulty: p.difficulty,
+    tags: p.tags || [],
+    timeLimit: p.timeLimit,
+    memoryLimit: p.memoryLimit,
+    isPublic: p.isPublic,
+    problemNumber: p.problemNumber,
+    author: p.author,
+    testCases: p.testCases.map((tc) => ({
+      id: tc.id,
+      input: tc.input,
+      expectedOutput: tc.output,
+      isSample: tc.isSample,
+    })),
+    stats: {
+      acCount: p.totalAccepted,
+      totalSubmissions: p.totalSubmit,
+      acRate,
+      statusCounts,
+    },
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  })
+})

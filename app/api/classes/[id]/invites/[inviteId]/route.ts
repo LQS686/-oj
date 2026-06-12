@@ -1,90 +1,28 @@
 /**
- * 班级邀请管理 API
- * - DELETE /api/classes/[id]/invites/[inviteId] - 撤销/删除邀请码
+ * 班级邀请码删除
+ * DELETE /api/classes/[id]/invites/[inviteId]
  */
-
-import { NextRequest, NextResponse } from 'next/server'
+import { withApi, ok, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { isObjectId } from '@/lib/api/validation'
+import { getClassInviteSimple, deleteClassInviteSimple } from '@/lib/class/service'
 import { prisma } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
 
-interface RouteContext {
-  params: Promise<{ id: string; inviteId: string }>
-}
-
-// 辅助函数：验证 MongoDB ObjectId
-function isValidObjectId(id: string) {
-  return /^[0-9a-fA-F]{24}$/.test(id)
-}
-
-export async function DELETE(
-  request: NextRequest,
-  context: RouteContext
-) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权访问' },
-        { status: 401 }
-      )
-    }
-
-    const { id, inviteId } = await context.params
-    const classId = id
-
-    if (!isValidObjectId(classId) || !isValidObjectId(inviteId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的ID' },
-        { status: 400 }
-      )
-    }
-
-    // 检查权限（只有管理员可以删除邀请码）
-    const member = await prisma.classMember.findUnique({
-      where: {
-        classId_userId: {
-          classId,
-          userId: user.userId
-        }
-      }
-    })
-
-    if (!member || (member.role !== 'owner' && member.role !== 'assistant')) {
-      return NextResponse.json(
-        { success: false, error: '只有管理员可以管理邀请码' },
-        { status: 403 }
-      )
-    }
-
-    // 检查邀请码是否存在
-    const invite = await prisma.classInvite.findUnique({
-      where: {
-        id: inviteId,
-        classId: classId
-      }
-    })
-
-    if (!invite) {
-      return NextResponse.json(
-        { success: false, error: '邀请码不存在' },
-        { status: 404 }
-      )
-    }
-
-    // 删除邀请码
-    await prisma.classInvite.delete({
-      where: { id: inviteId }
-    })
-
-    return NextResponse.json({
-      success: true,
-      message: '邀请码已删除'
-    })
-  } catch (error: any) {
-    console.error('删除邀请码失败:', error)
-    return NextResponse.json(
-      { success: false, error: '删除邀请码失败' },
-      { status: 500 }
-    )
+export const DELETE = withApi.auth(async (req, ctx, { user }) => {
+  const { id, inviteId } = (ctx as any).params
+  if (!isObjectId(id) || !isObjectId(inviteId)) {
+    throw400('INVALID_ID', '无效的ID')
   }
-}
+
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId: id, userId: user.id } },
+  })
+  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
+    throw403('只有管理员可以管理邀请码')
+  }
+
+  const invite = await getClassInviteSimple(id, inviteId)
+  if (!invite) throw404('邀请码不存在')
+
+  await deleteClassInviteSimple(inviteId)
+  return ok({ message: '邀请码已删除' })
+})

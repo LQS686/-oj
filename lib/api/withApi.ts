@@ -60,12 +60,12 @@ export class ApiError extends Error {
 /**
  * 抛出 400 / 401 / 403 / 404 便捷函数
  */
-export const throw400 = (code: string, msg: string) => { throw new ApiError(code, msg, 400) }
-export const throw401 = (msg = '未登录') => { throw new ApiError('UNAUTHORIZED', msg, 401) }
-export const throw403 = (msg = '权限不足') => { throw new ApiError('FORBIDDEN', msg, 403) }
-export const throw404 = (msg = '资源不存在') => { throw new ApiError('NOT_FOUND', msg, 404) }
-export const throw409 = (msg: string) => { throw new ApiError('CONFLICT', msg, 409) }
-export const throw500 = (msg = '服务器错误') => { throw new ApiError('INTERNAL', msg, 500) }
+export const throw400 = (code: string, msg: string): never => { throw new ApiError(code, msg, 400) }
+export const throw401 = (msg = '未登录'): never => { throw new ApiError('UNAUTHORIZED', msg, 401) }
+export const throw403 = (msg = '权限不足'): never => { throw new ApiError('FORBIDDEN', msg, 403) }
+export const throw404 = (msg = '资源不存在'): never => { throw new ApiError('NOT_FOUND', msg, 404) }
+export const throw409 = (msg: string): never => { throw new ApiError('CONFLICT', msg, 409) }
+export const throw500 = (msg = '服务器错误'): never => { throw new ApiError('INTERNAL', msg, 500) }
 
 /**
  * 内部：异常包装 + 日志
@@ -87,6 +87,9 @@ async function safeCall(
     }
     if (err?.message === 'INVALID_JSON') {
       return fail('INVALID_JSON', '请求体不是合法 JSON', 400)
+    }
+    if (err?.name === 'ValidationError') {
+      return fail('VALIDATION', err.message || '参数不合法', 400)
     }
     if (err?.code === 'P2002') {
       return fail('UNIQUE_VIOLATION', '数据已存在', 409)
