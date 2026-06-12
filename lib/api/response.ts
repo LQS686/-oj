@@ -1,29 +1,35 @@
 /**
  * lib/api/response.ts
- * 统一 API 响应格式：{ ok, data, error, code }
+ * 统一 API 响应格式：{ ok, data, error, code } + 兼容旧格式 { success, data, error }
+ *
+ * 现状：前端 apiClient 处理 { success, data, message, error }；
+ * 新格式使用 { ok, data, error, code }。为保持向后兼容，默认 ok/fail 同时输出两个字段。
  */
 
 export interface ApiSuccess<T = unknown> {
   ok: true
+  success: true
   data: T
 }
 
 export interface ApiFail {
   ok: false
+  success: false
   error: string
   code: string
 }
 
 export type ApiResponse<T = unknown> = ApiSuccess<T> | ApiFail
 
-export const ok = <T>(data: T, init?: ResponseInit): Response =>
-  Response.json({ ok: true, data } as ApiSuccess<T>, init)
+export const ok = <T>(data: T, init?: globalThis.ResponseInit): Response => {
+  const body: ApiSuccess<T> = { ok: true, success: true, data }
+  return Response.json(body, init)
+}
 
-export const fail = (code: string, message: string, status: number = 400): Response =>
-  Response.json(
-    { ok: false, error: message, code } as ApiFail,
-    { status }
-  )
+export const fail = (code: string, message: string, status: number = 400): Response => {
+  const body: ApiFail = { ok: false, success: false, error: message, code }
+  return Response.json(body, { status })
+}
 
 export const unauthorized = (message = '未登录') =>
   fail('UNAUTHORIZED', message, 401)
