@@ -11,19 +11,25 @@ export interface NotificationFilter {
   unreadOnly?: boolean
 }
 
-export async function listNotifications(filter: NotificationFilter) {
+export async function listNotifications(
+  filter: NotificationFilter,
+  options: { page?: number; pageSize?: number } = {}
+) {
+  const page = options.page ?? 1
+  const pageSize = options.pageSize ?? 20
   const where: any = { userId: filter.userId }
   if (filter.unreadOnly) where.isRead = false
   const [items, total, unreadCount] = await Promise.all([
     prisma.notification.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: DEFAULT_PAGE_SIZE,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
     prisma.notification.count({ where }),
     prisma.notification.count({ where: { userId: filter.userId, isRead: false } }),
   ])
-  return { items, total, unreadCount }
+  return { items, total, unreadCount, page, pageSize }
 }
 
 export async function createNotification(data: {
