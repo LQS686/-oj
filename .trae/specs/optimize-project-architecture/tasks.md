@@ -85,10 +85,10 @@
   - [x] 20.4: 业务层 prisma 调用收敛在 `lib/<domain>/service.ts`
   - [x] 20.5: 业务代码 console.* 已使用 logger 替代
 
-- [ ] **Task 21: 提交 + 推送 Gitee**
-  - [ ] 21.1: 分批提交（基础设施 → 业务层 → 清理）
-  - [ ] 21.2: `git push origin master`
-  - [ ] 21.3: 更新 README.md 项目结构图
+- [x] **Task 21: 提交 + 推送 Gitee** ✅
+  - [x] 21.1: 分批提交（基础设施 → 业务层 → 清理 → 文档）4 commits
+  - [x] 21.2: `git push origin master`（a1f245e 推送成功）
+  - [x] 21.3: 更新 README.md 项目结构图 + 2026/06 架构优化 changelog
 
 ---
 

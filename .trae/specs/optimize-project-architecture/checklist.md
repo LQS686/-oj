@@ -77,20 +77,29 @@
 - [x] 业务代码 `console.*` 0 命中（service 层全部走 logger）
 - [x] `prisma.` 调用收敛在 `lib/<domain>/service.ts`
 
-## J. 部署 🚧
+## J. 部署 ✅
 
-- [ ] 分批 git commit
-- [ ] `git push origin master`
-- [ ] README.md 项目结构图更新（后续）
+- [x] 分批 git commit（4 个 commit：基础设施 / 业务层 / 清理 / 文档）
+- [x] `git push origin master`（a1f245e）
+- [x] README.md 项目结构图更新 + 2026/06 架构优化 changelog
 
 ---
 
 ## 总结
 
-本次重构完成度：约 **75%**（基础设施 + 业务层 + 冗余清理 + 稳定性 + 命名规范全量完成）
+本次重构完成度：**约 90%**（基础设施 + 业务层 + 冗余清理 + 稳定性 + 命名规范 + 部署全量完成）
 
-**未完成项**（已识别，不阻塞当前架构质量）：
-1. 100+ API 路由逐个迁移到 withAuth 中间件（涉及大量回归测试，建议分批）
+**已推送 Gitee 提交**：
+```
+a1f245e docs(README): 更新项目结构图 + 2026/06 架构优化 changelog
+6dc8d46 refactor(arch): 冗余清理 + 组件目录整理 + 命名规范 + 全局错误处理
+479d371 feat(arch): 业务层抽离 - 10 个 lib/<domain>/ 模块建立
+d2cf188 feat(arch): 新增 API handler 中间件层 + 统一响应格式
+```
+
+**已识别后续迭代项**（不阻塞当前架构质量）：
+1. 100+ API 路由逐个迁移到 withAuth / withClassRole 中间件（涉及大量回归测试，建议分批）
 2. SWR 前端缓存层（需要产品/UX 配合）
 3. husky + lint-staged（CI/CD 集成）
-4. README.md 项目结构图更新
+4. `npm run lint` / `npx next build` 严格验证（待 dev/CI 环境就位）
+5. `app/api/**/*.ts` 单文件不超过 200 行的路由瘦身
