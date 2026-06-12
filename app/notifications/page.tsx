@@ -124,13 +124,13 @@ export default function NotificationsPage() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'team_invite':
+      case 'class_invite':
         return '📨'
-      case 'team_join_request':
+      case 'class_join_request':
         return '👥'
-      case 'team_join_result':
+      case 'class_join_result':
         return '✅'
-      case 'team_invite_result':
+      case 'class_invite_result':
         return '📬'
       default:
         return '🔔'

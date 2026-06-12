@@ -44,7 +44,7 @@ export interface Problem {
   totalSubmit: number
   totalAccepted: number
   authorId: string
-  teamId: string | null
+  classId: string | null
   isAiGenerated: boolean
   aiStatus: string
   createdAt: string
@@ -184,7 +184,7 @@ export interface Comment {
   }
 }
 
-export interface Team {
+export interface Class {
   id: string
   name: string
   description: string | null
@@ -203,12 +203,12 @@ export interface Team {
   }
 }
 
-export interface TeamMember {
+export interface ClassMember {
   id: string
-  teamId: string
+  classId: string
   userId: string
-  role: 'owner' | 'admin' | 'member'
-  permissions: TeamPermissions
+  role: 'owner' | 'assistant' | 'student'
+  permissions: ClassPermissions
   joinedAt: string
   username?: string
   nickname?: string
@@ -216,7 +216,7 @@ export interface TeamMember {
   avatar?: string
 }
 
-export interface TeamPermissions {
+export interface ClassPermissions {
   canViewProblems: boolean
   canSubmit: boolean
   canViewNotes: boolean
@@ -272,7 +272,7 @@ export interface ActiveUser {
 
 export interface Assignment {
   id: string
-  teamId: string
+  classId: string
   title: string
   description: string | null
   problemIds: string[]

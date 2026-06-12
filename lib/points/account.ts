@@ -7,15 +7,15 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 
 /**
- * 获取或创建团队成员积分账户
+ * 获取或创建班级成员积分账户
  */
-export async function getOrCreatePointsAccount(teamId: string, userId: string) {
+export async function getOrCreatePointsAccount(classId: string, userId: string) {
   try {
     // 尝试获取现有账户
     let account = await prisma.pointsAccount.findUnique({
       where: {
-        teamId_userId: {
-          teamId,
+        classId_userId: {
+          classId,
           userId
         }
       }
@@ -25,7 +25,7 @@ export async function getOrCreatePointsAccount(teamId: string, userId: string) {
     if (!account) {
       account = await prisma.pointsAccount.create({
         data: {
-          teamId,
+          classId,
           userId,
           balance: 0,
           total: 0
@@ -37,7 +37,7 @@ export async function getOrCreatePointsAccount(teamId: string, userId: string) {
       success: true,
       data: {
         id: account.id,
-        teamId: account.teamId,
+        classId: account.classId,
         userId: account.userId,
         totalPoints: account.total,
         availablePoints: account.balance,
@@ -58,12 +58,12 @@ export async function getOrCreatePointsAccount(teamId: string, userId: string) {
 /**
  * 查询积分账户余额
  */
-export async function getPointsBalance(teamId: string, userId: string) {
+export async function getPointsBalance(classId: string, userId: string) {
   try {
     const account = await prisma.pointsAccount.findUnique({
       where: {
-        teamId_userId: {
-          teamId,
+        classId_userId: {
+          classId,
           userId
         }
       }
@@ -101,7 +101,7 @@ export async function getPointsBalance(teamId: string, userId: string) {
  * 增加积分（原子操作）
  */
 export async function addPoints(
-  teamId: string,
+  classId: string,
   userId: string,
   points: number,
   reason: string,
@@ -115,13 +115,13 @@ export async function addPoints(
       // upsert: 如果存在则更新，不存在则创建
       await tx.pointsAccount.upsert({
         where: {
-          teamId_userId: {
-            teamId,
+          classId_userId: {
+            classId,
             userId
           }
         },
         create: {
-          teamId,
+          classId,
           userId,
           balance: points,
           total: points
@@ -135,7 +135,7 @@ export async function addPoints(
       // 2. 记录积分历史
       await tx.pointsHistory.create({
         data: {
-          teamId,
+          classId,
           userId,
           action: 'EARN',
           amount: points,
@@ -163,7 +163,7 @@ export async function addPoints(
  * 扣除积分（原子操作，带余额检查）
  */
 export async function deductPoints(
-  teamId: string,
+  classId: string,
   userId: string,
   points: number,
   reason: string,
@@ -175,8 +175,8 @@ export async function deductPoints(
       // 1. 检查余额
       const account = await tx.pointsAccount.findUnique({
         where: {
-          teamId_userId: {
-            teamId,
+          classId_userId: {
+            classId,
             userId
           }
         }
@@ -189,8 +189,8 @@ export async function deductPoints(
       // 2. 扣除积分
       await tx.pointsAccount.update({
         where: {
-          teamId_userId: {
-            teamId,
+          classId_userId: {
+            classId,
             userId
           }
         },
@@ -203,7 +203,7 @@ export async function deductPoints(
       // 3. 记录历史
       await tx.pointsHistory.create({
         data: {
-          teamId,
+          classId,
           userId,
           action: 'SPEND',
           amount: points, // 存储为正数
@@ -228,12 +228,12 @@ export async function deductPoints(
 }
 
 /**
- * 获取团队积分排行榜
+ * 获取班级积分排行榜
  */
-export async function getTeamPointsRanking(teamId: string, limit: number = 10) {
+export async function getClassPointsRanking(classId: string, limit: number = 10) {
   try {
     const rankings = await prisma.pointsAccount.findMany({
-      where: { teamId },
+      where: { classId },
       orderBy: { total: 'desc' },
       take: limit
     })

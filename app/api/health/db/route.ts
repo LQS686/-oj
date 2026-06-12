@@ -20,7 +20,7 @@ export async function GET() {
     let primary = null
     
     try {
-      const adminDb = client.db('admin')
+      const adminDb = client.db('assistant')
       const status = await adminDb.command({ replSetGetStatus: 1 })
       
       if (status.ok) {

@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     const userId = user.userId
 
-    const [submissions, teamSubmissions] = await Promise.all([
+    const [submissions, classSubmissions] = await Promise.all([
       prismaRo.submission.findMany({
         where: {
           userId: userId,
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
           score: true
         }
       }),
-      prismaRo.teamAssignmentSubmission.findMany({
+      prismaRo.classAssignmentSubmission.findMany({
         where: {
           userId: userId,
           problemId: { in: problemIds }
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       })
     ])
 
-    const allSubmissions = [...submissions, ...teamSubmissions]
+    const allSubmissions = [...submissions, ...classSubmissions]
 
     const problemStatus: { [problemId: string]: { score: number, submitted: boolean } } = {}
     

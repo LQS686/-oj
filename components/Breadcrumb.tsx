@@ -18,7 +18,7 @@ export default function Breadcrumb() {
     '/problems': '题库',
     '/contests': '竞赛',
     '/training': '训练',
-    '/teams': '团队',
+    '/classes': '班级',
     '/discuss': '社区',
     '/rank': '排行榜',
     '/submissions': '提交记录',

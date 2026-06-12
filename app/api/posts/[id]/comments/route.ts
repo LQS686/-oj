@@ -29,7 +29,7 @@ const mockComments = {
       content: '你好，很高兴认识你！',
       author: {
         id: '3',
-        username: 'admin',
+        username: 'assistant',
         nickname: '系统管理员',
         avatar: '',
         rating: 3000,
@@ -46,7 +46,7 @@ const mockComments = {
       content: '写得很好，谢谢分享！',
       author: {
         id: '3',
-        username: 'admin',
+        username: 'assistant',
         nickname: '系统管理员',
         avatar: '',
         rating: 3000,

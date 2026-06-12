@@ -67,7 +67,7 @@ const mockPosts = [
     content: '这道题很简单，直接输入输出即可。',
     author: {
       id: '3',
-      username: 'admin',
+      username: 'assistant',
       nickname: '系统管理员',
       rating: 3000,
       color: '#dc2626',

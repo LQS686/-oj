@@ -14,7 +14,7 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const PAGE_PATH = path.resolve(__dirname, '..', 'app', 'admin', 'ai-generation', 'page.tsx')
+const PAGE_PATH = path.resolve(__dirname, '..', 'app', 'assistant', 'ai-generation', 'page.tsx')
 
 interface TestCase {
   name: string
@@ -268,28 +268,28 @@ const cases: TestCase[] = [
   {
     name: '✅ API 路由存在: /api/admin/ai/generate',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'api', 'admin', 'ai', 'generate', 'route.ts')
+      const p = path.resolve(__dirname, '..', 'app', 'api', 'assistant', 'ai', 'generate', 'route.ts')
       if (!fs.existsSync(p)) throw new Error('route.ts 不存在')
     }
   },
   {
     name: '🚫 已移除: /api/admin/ai/save 路由不应存在（业务决策 2026-06）',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'api', 'admin', 'ai', 'save', 'route.ts')
+      const p = path.resolve(__dirname, '..', 'app', 'api', 'assistant', 'ai', 'save', 'route.ts')
       if (fs.existsSync(p)) throw new Error('save/route.ts 不应再存在，请删除')
     }
   },
   {
     name: '🚫 已移除: /api/admin/ai/save-and-verify 路由不应存在（业务决策 2026-06）',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'api', 'admin', 'ai', 'save-and-verify', 'route.ts')
+      const p = path.resolve(__dirname, '..', 'app', 'api', 'assistant', 'ai', 'save-and-verify', 'route.ts')
       if (fs.existsSync(p)) throw new Error('save-and-verify/route.ts 不应再存在，请删除')
     }
   },
   {
     name: '✅ API 路由存在: /api/admin/ai/models',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'api', 'admin', 'ai', 'models', 'route.ts')
+      const p = path.resolve(__dirname, '..', 'app', 'api', 'assistant', 'ai', 'models', 'route.ts')
       if (!fs.existsSync(p)) throw new Error('models/route.ts 不存在')
     }
   },
@@ -298,7 +298,7 @@ const cases: TestCase[] = [
   {
     name: '🚫 题目列表页无"需验证"红色 badge（业务决策 2026-06 移除验证状态）',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'admin', 'problems', 'page.tsx')
+      const p = path.resolve(__dirname, '..', 'app', 'assistant', 'problems', 'page.tsx')
       const c = fs.readFileSync(p, 'utf-8')
       if (c.includes('需验证')) {
         throw new Error('app/admin/problems/page.tsx 不应再含"需验证" badge')
@@ -308,7 +308,7 @@ const cases: TestCase[] = [
   {
     name: '🚫 题目列表页无"已验证"绿色 badge',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'admin', 'problems', 'page.tsx')
+      const p = path.resolve(__dirname, '..', 'app', 'assistant', 'problems', 'page.tsx')
       const c = fs.readFileSync(p, 'utf-8')
       if (c.match(/[>'"]\s*已验证\s*[<'"<]/)) {
         throw new Error('app/admin/problems/page.tsx 不应再含"已验证" badge')
@@ -318,7 +318,7 @@ const cases: TestCase[] = [
   {
     name: '🚫 题目列表页无"标程未验证"橙色 badge',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'admin', 'problems', 'page.tsx')
+      const p = path.resolve(__dirname, '..', 'app', 'assistant', 'problems', 'page.tsx')
       const c = fs.readFileSync(p, 'utf-8')
       if (c.includes('标程未验证')) {
         throw new Error('app/admin/problems/page.tsx 不应再含"标程未验证" badge')
@@ -328,7 +328,7 @@ const cases: TestCase[] = [
   {
     name: '🚫 题目列表页无"验证中"PENDING badge',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'admin', 'problems', 'page.tsx')
+      const p = path.resolve(__dirname, '..', 'app', 'assistant', 'problems', 'page.tsx')
       const c = fs.readFileSync(p, 'utf-8')
       if (c.match(/>\s*验证中\s*</)) {
         throw new Error('app/admin/problems/page.tsx 不应再含"验证中" badge（PENDING 状态已废弃）')
@@ -338,7 +338,7 @@ const cases: TestCase[] = [
   {
     name: '🚫 题目列表页不再以 aiStatus === VERIFIED / AUTO_PUBLISHED_WITH_FAILURES 渲染 badge',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'admin', 'problems', 'page.tsx')
+      const p = path.resolve(__dirname, '..', 'app', 'assistant', 'problems', 'page.tsx')
       const c = fs.readFileSync(p, 'utf-8')
       if (c.includes("aiStatus === 'VERIFIED'") || c.includes("aiStatus === 'AUTO_PUBLISHED_WITH_FAILURES'")) {
         throw new Error('不应再按 aiStatus VERIFIED / AUTO_PUBLISHED_WITH_FAILURES 渲染 badge')
@@ -361,7 +361,7 @@ const cases: TestCase[] = [
   {
     name: '🚫 题目来源页无"验证状态"列 + 无"已验证" tag',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'admin', 'problems', 'source', 'page.tsx')
+      const p = path.resolve(__dirname, '..', 'app', 'assistant', 'problems', 'source', 'page.tsx')
       const c = fs.readFileSync(p, 'utf-8')
       if (c.includes('验证状态')) {
         throw new Error('source/page.tsx 不应再含"验证状态"列')
@@ -374,7 +374,7 @@ const cases: TestCase[] = [
   {
     name: '🚫 testcases 页无"isVerified" 本地 state + 无"标记为已验证"提示',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'admin', 'problems', '[id]', 'testcases', 'page.tsx')
+      const p = path.resolve(__dirname, '..', 'app', 'assistant', 'problems', '[id]', 'testcases', 'page.tsx')
       const c = fs.readFileSync(p, 'utf-8')
       if (c.match(/\bisVerified\b/) || c.match(/\bsetIsVerified\b/)) {
         throw new Error('testcases/page.tsx 不应再有 isVerified / setIsVerified 引用')
@@ -402,7 +402,7 @@ const cases: TestCase[] = [
   {
     name: '🚫 AI 出题页面无 isVerified / verifiedAt / judgeStatus / fixAttempts 引用',
     fn: () => {
-      const p = path.resolve(__dirname, '..', 'app', 'admin', 'ai-generation', 'page.tsx')
+      const p = path.resolve(__dirname, '..', 'app', 'assistant', 'ai-generation', 'page.tsx')
       const c = fs.readFileSync(p, 'utf-8')
       for (const f of ['isVerified', 'verifiedAt', 'judgeStatus', 'fixAttempts']) {
         if (c.match(new RegExp(`\\b${f}\\b`))) {

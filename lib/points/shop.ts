@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger'
  * 获取商城商品列表
  */
 export async function getShopItems(
-  teamId: string,
+  classId: string,
   options?: {
     category?: string
     isActive?: boolean
@@ -24,7 +24,7 @@ export async function getShopItems(
     const skip = (page - 1) * limit
 
     // 构建查询条件
-    const where: any = { teamId }
+    const where: any = { classId }
 
     if (options?.category) {
       where.category = options.category
@@ -84,7 +84,7 @@ export async function getShopItems(
  * 创建商品
  */
 export async function createShopItem(
-  teamId: string,
+  classId: string,
   itemData: {
     name: string
     description?: string
@@ -99,7 +99,7 @@ export async function createShopItem(
   try {
     const item = await prisma.pointsShopItem.create({
       data: {
-        teamId,
+        classId,
         name: itemData.name,
         description: itemData.description || '',
         category: itemData.category,
@@ -175,7 +175,7 @@ export async function updateShopItem(
  * 兑换商品
  */
 export async function exchangeItem(
-  teamId: string,
+  classId: string,
   userId: string,
   itemId: string,
   quantity: number = 1,
@@ -206,8 +206,8 @@ export async function exchangeItem(
       // 3. 检查余额并扣除积分
       const account = await tx.pointsAccount.findUnique({
         where: {
-          teamId_userId: {
-            teamId,
+          classId_userId: {
+            classId,
             userId
           }
         }
@@ -220,8 +220,8 @@ export async function exchangeItem(
       // 扣除积分
       await tx.pointsAccount.update({
         where: {
-          teamId_userId: {
-            teamId,
+          classId_userId: {
+            classId,
             userId
           }
         },
@@ -233,7 +233,7 @@ export async function exchangeItem(
       // 记录积分历史
       await tx.pointsHistory.create({
         data: {
-          teamId,
+          classId,
           userId,
           amount: totalPoints, // 存储为正数
           reason: `兑换商品：${item.name} x${quantity}`,
@@ -254,7 +254,7 @@ export async function exchangeItem(
       // 5. 创建兑换记录
       const exchange = await tx.pointsExchange.create({
         data: {
-          teamId,
+          classId,
           userId,
           itemId,
           itemName: item.name,
@@ -286,7 +286,7 @@ export async function exchangeItem(
  * 查询兑换记录
  */
 export async function getExchangeRecords(
-  teamId: string,
+  classId: string,
   userId?: string,
   options?: {
     status?: string
@@ -300,7 +300,7 @@ export async function getExchangeRecords(
     const skip = (page - 1) * limit
 
     // 构建查询条件
-    const where: any = { teamId }
+    const where: any = { classId }
 
     if (userId) {
       where.userId = userId

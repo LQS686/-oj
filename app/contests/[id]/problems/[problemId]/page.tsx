@@ -326,7 +326,7 @@ export default function ContestProblemDetailPage({ params }: { params: Promise<{
                   error={null}
                   user={user}
                   fromAssignment={null}
-                  teamId={null}
+                  classId={null}
                   onSelect={() => {}}
                 />
               )}

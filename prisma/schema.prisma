@@ -33,7 +33,7 @@ model User {
   submissions   Submission[]
   problems      Problem[]
   contests      Contest[]
-  teams         TeamMember[]
+  classes       ClassMember[]
   posts         Post[]
   comments      Comment[]
   postLikes     PostLike[]
@@ -43,16 +43,16 @@ model User {
   solutionLikes SolutionLike[]
   achievements  UserAchievement[]
   favorites     Favorite[]
-  teamNotes     TeamNote[]
+  classNotes    ClassNote[]
   notifications Notification[]
-  
+
   // 邀请关系
-  sentDirectInvites     TeamDirectInvite[] @relation("InviterRelation")
-  receivedDirectInvites TeamDirectInvite[] @relation("InviteeRelation")
-  
+  sentDirectInvites     ClassDirectInvite[] @relation("InviterRelation")
+  receivedDirectInvites ClassDirectInvite[] @relation("InviteeRelation")
+
   // 申请关系
-  joinRequests          TeamJoinRequest[] @relation("JoinRequestUser")
-  reviewedRequests      TeamJoinRequest[] @relation("JoinRequestReviewer")
+  joinRequests          ClassJoinRequest[] @relation("JoinRequestUser")
+  reviewedRequests      ClassJoinRequest[] @relation("JoinRequestReviewer")
   
   // 竞赛参与
   contestParticipations ContestParticipant[]
@@ -105,7 +105,7 @@ model Problem {
   totalAccepted Int         @default(0)
   authorId      String      @db.ObjectId
   author        User        @relation(fields: [authorId], references: [id])
-  teamId        String?     @db.ObjectId // 关联团队ID (如果是团队私有题目)
+  classId       String?     @db.ObjectId // 关联班级ID (如果是班级私有题目)
   
   // AI生成相关字段
   isAiGenerated Boolean     @default(false)
@@ -132,7 +132,7 @@ model Problem {
   @@index([difficulty])
   @@index([visibility])
   @@index([authorId])
-  @@index([teamId])
+  @@index([classId])
 }
 
 // 测试用例
@@ -233,53 +233,51 @@ model ContestParticipant {
   @@unique([contestId, userId]) // 确保同一用户在同一竞赛中只有一条参与记录
 }
 
-// 团队
-model Team {
+// 班级
+model Class {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
   name        String       @unique
   description String?
   avatar      String?
   isPublic    Boolean      @default(true)
   maxMembers  Int          @default(50)  // 最大成员数
-  ownerId     String       @db.ObjectId  // 团队创建者
+  ownerId     String       @db.ObjectId  // 班级创建者（班主任）
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  
-  members     TeamMember[]
-  assignments TeamAssignment[]
-  notes       TeamNote[]
-  directInvites TeamDirectInvite[]
+
+  members     ClassMember[]
+  assignments ClassAssignment[]
+  notes       ClassNote[]
+  directInvites ClassDirectInvite[]
 }
 
-// 团队成员
-model TeamMember {
+// 班级成员
+model ClassMember {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId    String   @db.ObjectId
-  team      Team     @relation(fields: [teamId], references: [id])
+  classId   String   @db.ObjectId
+  class     Class    @relation(fields: [classId], references: [id])
   userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  role      String   // owner, admin, member
+  role      String   // teacher(班主任), assistant(助教), student(学生)
   remark    String?  // 成员备注
-  
-  // ✅ 细粒度权限控制
+
+  // 细粒度权限控制
   permissions Json?    @default("{\"canViewProblems\":true,\"canSubmit\":true,\"canViewNotes\":true,\"canCreateNotes\":false,\"canManageAssignments\":false,\"canInviteMembers\":false}")
-  
+
   // 活动统计
   lastActiveAt DateTime? // 最后活动时间
   joinedAt     DateTime  @default(now())
-  
-  @@unique([teamId, userId])  // 确保用户在团队中唯一
-  @@index([teamId, role])     // 优化按角色查询
-  @@index([teamId, lastActiveAt]) // 优化按活动度查询
+
+  @@unique([classId, userId])  // 确保用户在班级中唯一
+  @@index([classId, role])     // 优化按角色查询
+  @@index([classId, lastActiveAt]) // 优化按活动度查询
 }
 
-
-
-// 团队作业
-model TeamAssignment {
+// 班级作业
+model ClassAssignment {
   id          String                    @id @default(auto()) @map("_id") @db.ObjectId
-  teamId      String                    @db.ObjectId
-  team        Team                      @relation(fields: [teamId], references: [id])
+  classId     String                    @db.ObjectId
+  class       Class                     @relation(fields: [classId], references: [id])
   title       String
   description String
   problemIds  String[]  @db.ObjectId  // 引用平台公开题库的题目ID列表
@@ -287,79 +285,77 @@ model TeamAssignment {
   endTime     DateTime?
   createdBy   String                    @db.ObjectId
   createdAt   DateTime                  @default(now())
-  
-  submissions TeamAssignmentSubmission[]
+
+  submissions ClassAssignmentSubmission[]
 }
 
-// 团队作业提交记录
-model TeamAssignmentSubmission {
-  id              String          @id @default(auto()) @map("_id") @db.ObjectId
-  assignmentId    String          @db.ObjectId
-  assignment      TeamAssignment  @relation(fields: [assignmentId], references: [id])
-  userId          String          @db.ObjectId
-  problemId       String          @db.ObjectId
-  
+// 班级作业提交记录
+model ClassAssignmentSubmission {
+  id              String                @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId    String                @db.ObjectId
+  assignment      ClassAssignment       @relation(fields: [assignmentId], references: [id])
+  userId          String                @db.ObjectId
+  problemId       String                @db.ObjectId
+
   // 提交内容
-  code            String          // 提交的代码
-  language        String          // 编程语言
-  
+  code            String                // 提交的代码
+  language        String                // 编程语言
+
   // 评测结果
-  status          String          // AC, WA, TLE, MLE, RE, CE, SE 等
-  score           Int             @default(0)  // 得分
-  time            Int             @default(0)  // 执行时间（ms）
-  memory          Int             @default(0)  // 内存使用（KB）
-  passedTests     Int             @default(0)  // 通过的测试点数
-  totalTests      Int             @default(0)  // 总测试点数
-  message         String?         // 错误信息或编译信息
-  
+  status          String                // AC, WA, TLE, MLE, RE, CE, SE 等
+  score           Int                   @default(0)  // 得分
+  time            Int                   @default(0)  // 执行时间（ms）
+  memory          Int                   @default(0)  // 内存使用（KB）
+  passedTests     Int                   @default(0)  // 通过的测试点数
+  totalTests      Int                   @default(0)  // 总测试点数
+  message         String?               // 错误信息或编译信息
+
   // 提交时间信息
-  submittedAt     DateTime        @default(now())
-  isLate          Boolean         @default(false)  // 是否逾期提交
-  
-  // ✅ 删除唯一索引，允许多次提交
-  // @@unique([assignmentId, userId, problemId])  // 已注释：允许同一用户对同一题目多次提交
+  submittedAt     DateTime              @default(now())
+  isLate          Boolean               @default(false)  // 是否逾期提交
+
   @@index([assignmentId, userId])  // 优化按作业和用户查询
   @@index([assignmentId, problemId])  // 优化按作业和题目查询
   @@index([assignmentId, userId, problemId, submittedAt])  // 优化查询最新提交
 }
 
-// 团队笔记
-model TeamNote {
+// 班级笔记
+model ClassNote {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId      String   @db.ObjectId
-  team        Team     @relation(fields: [teamId], references: [id])
+  classId     String   @db.ObjectId
+  class       Class    @relation(fields: [classId], references: [id])
   title       String
   content     String
   category    String   // 笔记分类
   tags        String[]
   authorId    String   @db.ObjectId
   author      User     @relation(fields: [authorId], references: [id])
-  isPublic    Boolean  @default(true)  // 是否对团队成员公开
+  isPublic    Boolean  @default(true)  // 是否对班级成员公开
   views       Int      @default(0)
   likes       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-// ✅ 团队邀请码
-model TeamInvite {
+// 班级邀请码
+model ClassInvite {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId      String   @db.ObjectId
+  classId     String   @db.ObjectId
   code        String   @unique  // 邀请码（唯一）
   createdBy   String   @db.ObjectId  // 创建者
   maxUses     Int      @default(1)  // 最大使用次数（-1表示无限）
   usedCount   Int      @default(0)  // 已使用次数
   expiresAt   DateTime?  // 过期时间（可选）
   createdAt   DateTime @default(now())
-  
-  @@index([teamId])
+
+  @@index([classId])
 }
 
-// ✅ 团队直接邀请（通过用户名邀请）
-model TeamDirectInvite {
+// 班级直接邀请（通过用户名邀请）
+model ClassDirectInvite {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId        String   @db.ObjectId
-  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  classId       String   @db.ObjectId
+  class         Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   inviterId     String   @db.ObjectId  // 邀请人ID
   inviter       User     @relation("InviterRelation", fields: [inviterId], references: [id])
   inviteeId     String   @db.ObjectId  // 被邀请人ID
@@ -369,17 +365,17 @@ model TeamDirectInvite {
   expiresAt     DateTime?  // 过期时间
   respondedAt   DateTime?  // 响应时间
   createdAt     DateTime @default(now())
-  
-  @@index([teamId])
+
+  @@index([classId])
   @@index([inviteeId])
   @@index([inviterId])
-  @@unique([teamId, inviteeId])  // 同一团队只能向同一用户发送一次邀请
+  @@unique([classId, inviteeId])  // 同班只能向同一用户发送一次邀请
 }
 
-// ✅ 团队加入申请
-model TeamJoinRequest {
+// 班级加入申请
+model ClassJoinRequest {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId      String   @db.ObjectId
+  classId     String   @db.ObjectId
   userId      String   @db.ObjectId  // 申请人ID
   user        User     @relation("JoinRequestUser", fields: [userId], references: [id])
   status      String   @default("pending")  // pending | approved | rejected
@@ -388,10 +384,10 @@ model TeamJoinRequest {
   reviewer    User?    @relation("JoinRequestReviewer", fields: [reviewerId], references: [id])
   reviewedAt  DateTime?  // 审批时间
   createdAt   DateTime @default(now())
-  
-  @@index([teamId])
+
+  @@index([classId])
   @@index([userId])
-  @@unique([teamId, userId])  // 同一用户只能向同一团队发送一次申请
+  @@unique([classId, userId])  // 同一用户只能向同一班级发送一次申请
 }
 
 // 讨论帖子
@@ -612,7 +608,7 @@ model Notification {
 // 笔记阅读历史
 model NoteReadHistory {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId    String   @db.ObjectId
+  classId   String   @db.ObjectId
   noteId    String   @db.ObjectId
   userId    String   @db.ObjectId
   readAt    DateTime @default(now())
@@ -623,19 +619,19 @@ model NoteReadHistory {
 // 积分账户
 model PointsAccount {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId    String   @db.ObjectId
+  classId   String   @db.ObjectId
   userId    String   @db.ObjectId
   balance   Int      @default(0)
   total     Int      @default(0) // 累计获得积分
   updatedAt DateTime @updatedAt
 
-  @@unique([teamId, userId])
+  @@unique([classId, userId])
 }
 
 // 积分历史
 model PointsHistory {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId      String   @db.ObjectId
+  classId     String   @db.ObjectId
   userId      String   @db.ObjectId
   amount      Int
   action      String   // EARN, SPEND
@@ -643,8 +639,8 @@ model PointsHistory {
   type        String   // ASSIGNMENT_COMPLETION, NOTE_READ, CLASS_PERFORMANCE, SHOP_EXCHANGE
   relatedId   String?  // 关联ID (assignmentId_problemId, noteId, etc)
   createdAt   DateTime @default(now())
-  
-  @@index([teamId, userId])
+
+  @@index([classId, userId])
 }
 
 // 审计日志
@@ -662,7 +658,7 @@ model AuditLog {
 // 积分商城商品
 model PointsShopItem {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId          String   @db.ObjectId
+  classId         String   @db.ObjectId
   name            String
   description     String
   category        String
@@ -675,13 +671,13 @@ model PointsShopItem {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@index([teamId, category])
+  @@index([classId, category])
 }
 
 // 积分兑换记录
 model PointsExchange {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  teamId          String   @db.ObjectId
+  classId         String   @db.ObjectId
   userId          String   @db.ObjectId
   itemId          String   @db.ObjectId
   itemName        String
@@ -692,7 +688,7 @@ model PointsExchange {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@index([teamId, userId])
+  @@index([classId, userId])
 }
 
 // AI出题记录

@@ -167,11 +167,11 @@ export default function UserMenu() {
             </Link>
           )}
           <Link
-            href="/teams"
+            href="/classes"
             className="dropdown-item group"
           >
             <Users className="w-[18px] h-[18px] transition-transform duration-300 group-hover:rotate-3" />
-            我的团队
+            我的班级
           </Link>
           <Link
             href="/settings"

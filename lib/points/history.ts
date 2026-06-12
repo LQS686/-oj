@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger'
  * 查询用户积分历史记录
  */
 export async function getPointsHistory(
-  teamId: string,
+  classId: string,
   userId: string,
   options?: {
     page?: number
@@ -27,7 +27,7 @@ export async function getPointsHistory(
 
     // 构建查询条件
     const where: any = {
-      teamId,
+      classId,
       userId
     }
 
@@ -106,14 +106,14 @@ export async function getPointsHistory(
 }
 
 /**
- * 查询团队积分统计数据
+ * 查询班级积分统计数据
  */
-export async function getTeamPointsStats(teamId: string) {
+export async function getClassPointsStats(classId: string) {
   try {
     // 统计总发放积分
     const earnStats = await prisma.pointsHistory.aggregate({
       where: {
-        teamId,
+        classId,
         action: 'EARN'
       },
       _sum: {
@@ -125,7 +125,7 @@ export async function getTeamPointsStats(teamId: string) {
     // 统计总消费积分
     const spendStats = await prisma.pointsHistory.aggregate({
       where: {
-        teamId,
+        classId,
         action: 'SPEND'
       },
       _sum: {
@@ -137,7 +137,7 @@ export async function getTeamPointsStats(teamId: string) {
     // 统计活跃成员数 (total > 0)
     const activeMembers = await prisma.pointsAccount.count({
       where: {
-        teamId,
+        classId,
         total: { gt: 0 }
       }
     })
@@ -147,7 +147,7 @@ export async function getTeamPointsStats(teamId: string) {
     const sourceStatsGroup = await prisma.pointsHistory.groupBy({
       by: ['type'],
       where: {
-        teamId,
+        classId,
         action: 'EARN'
       },
       _sum: {
@@ -186,7 +186,7 @@ export async function getTeamPointsStats(teamId: string) {
  * 检查是否已发放积分（幂等性检查）
  */
 export async function checkPointsAwarded(
-  teamId: string,
+  classId: string,
   userId: string,
   sourceType: string,
   sourceId: string
@@ -194,7 +194,7 @@ export async function checkPointsAwarded(
   try {
     const exists = await prisma.pointsHistory.findFirst({
       where: {
-        teamId,
+        classId,
         userId,
         type: sourceType,
         relatedId: sourceId,

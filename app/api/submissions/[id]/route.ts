@@ -32,17 +32,17 @@ export async function GET(
       },
     })
 
-    // 如果在 Submission 中找不到，尝试从 TeamAssignmentSubmission 中查找
+    // 如果在 Submission 中找不到，尝试从 ClassAssignmentSubmission 中查找
     if (!submission) {
-      const teamSubmission = await prisma.teamAssignmentSubmission.findUnique({
+      const classSubmission = await prisma.classAssignmentSubmission.findUnique({
         where: { id }
       })
       
-      if (teamSubmission) {
+      if (classSubmission) {
         // 获取相关的题目和用户信息
         const [problem, user] = await Promise.all([
           prisma.problem.findUnique({
-            where: { id: teamSubmission.problemId },
+            where: { id: classSubmission.problemId },
             select: {
               id: true,
               problemNumber: true,
@@ -51,7 +51,7 @@ export async function GET(
             }
           }),
           prisma.user.findUnique({
-            where: { id: teamSubmission.userId },
+            where: { id: classSubmission.userId },
             select: {
               id: true,
               username: true,
@@ -60,29 +60,29 @@ export async function GET(
           })
         ])
         
-        // 格式化团队作业提交记录
+        // 格式化班级作业提交记录
         submission = {
-          id: teamSubmission.id,
-          problemId: teamSubmission.problemId,
-          userId: teamSubmission.userId,
-          language: teamSubmission.language,
-          code: teamSubmission.code,
-          status: teamSubmission.status,
-          score: teamSubmission.score,
-          time: teamSubmission.time,
-          memory: teamSubmission.memory,
-          passedTests: teamSubmission.passedTests,
-          totalTests: teamSubmission.totalTests,
-          message: teamSubmission.message,
-          submittedAt: teamSubmission.submittedAt,
+          id: classSubmission.id,
+          problemId: classSubmission.problemId,
+          userId: classSubmission.userId,
+          language: classSubmission.language,
+          code: classSubmission.code,
+          status: classSubmission.status,
+          score: classSubmission.score,
+          time: classSubmission.time,
+          memory: classSubmission.memory,
+          passedTests: classSubmission.passedTests,
+          totalTests: classSubmission.totalTests,
+          message: classSubmission.message,
+          submittedAt: classSubmission.submittedAt,
           problem: problem || {
-            id: teamSubmission.problemId,
+            id: classSubmission.problemId,
             problemNumber: null,
             title: '未知题目',
             difficulty: '未知'
           },
           user: user || {
-            id: teamSubmission.userId,
+            id: classSubmission.userId,
             username: '未知用户',
             nickname: null
           }
@@ -99,7 +99,7 @@ export async function GET(
 
     // 格式化测试结果
     // 注意：Prisma 模型中 testResults 可能是 Json 类型，如果是 Submission 模型
-    // TeamAssignmentSubmission 没有 testResults 字段（根据之前的 schema）
+    // ClassAssignmentSubmission 没有 testResults 字段（根据之前的 schema）
     // Submission 模型我们在 schema 中添加了 testResults Json?
     
     let testResults = []

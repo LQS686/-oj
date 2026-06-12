@@ -44,7 +44,7 @@ interface StudentCompletionTableProps {
   assignmentTitle: string
   onProblemClick?: (index: number) => void
   allSubmissions?: RawSubmission[]
-  teamId?: string
+  classId?: string
   assignmentId?: string
 }
 
@@ -266,7 +266,7 @@ function SubmissionModal({
   )
 }
 
-export default function StudentCompletionTable({ students, problems, assignmentTitle, onProblemClick, allSubmissions, teamId, assignmentId }: StudentCompletionTableProps) {
+export default function StudentCompletionTable({ students, problems, assignmentTitle, onProblemClick, allSubmissions, classId, assignmentId }: StudentCompletionTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortField, setSortField] = useState<'name' | 'score' | 'completed'>('name')

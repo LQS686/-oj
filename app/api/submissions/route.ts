@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
     await incrementProblemSubmitCount(problem.id)
 
     // ❌ 【数据隔离】题库提交不应该同步到作业
-    // 只有从作业路径提交的代码才应该记录到 TeamAssignmentSubmission
-    // 作业提交请使用: POST /api/teams/{id}/assignments/{assignmentId}/submit
+    // 只有从作业路径提交的代码才应该记录到 ClassAssignmentSubmission
+    // 作业提交请使用: POST /api/classes/{id}/assignments/{assignmentId}/submit
     logger.info('题库提交，不同步到作业')
 
     // 加入评测队列

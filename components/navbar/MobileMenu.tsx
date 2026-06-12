@@ -34,7 +34,7 @@ export default function MobileMenu() {
     { href: '/problems', label: '题库', icon: BookOpen },
     { href: '/contests', label: '竞赛', icon: Trophy },
     { href: '/training', label: '训练', icon: Dumbbell },
-    { href: '/teams', label: '团队', icon: Users },
+    { href: '/classes', label: '班级', icon: Users },
     { href: '/discuss', label: '社区', icon: MessageSquare },
     { href: '/rank', label: '排行榜', icon: BarChart3 },
   ]

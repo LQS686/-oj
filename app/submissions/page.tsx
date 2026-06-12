@@ -45,18 +45,18 @@ function SubmissionsContent() {
   const userId = searchParams.get('userId')
   const status = searchParams.get('status')
   const assignmentId = searchParams.get('assignmentId')
-  const teamId = searchParams.get('teamId')
+  const classId = searchParams.get('classId')
 
   useEffect(() => {
     fetchSubmissions()
-  }, [page, problemId, userId, status, assignmentId, teamId])
+  }, [page, problemId, userId, status, assignmentId, classId])
 
   const fetchSubmissions = async () => {
     try {
       let response;
       
-      if (assignmentId && teamId) {
-        console.log('📊 [数据隔离] 加载作业提交记录', { assignmentId, teamId, problemId, userId })
+      if (assignmentId && classId) {
+        console.log('📊 [数据隔离] 加载作业提交记录', { assignmentId, classId, problemId, userId })
         
         const params = new URLSearchParams({
           page: page.toString(),
@@ -68,7 +68,7 @@ function SubmissionsContent() {
         if (status) params.append('status', status)
         
         response = await fetchWithAuth(
-          `/api/teams/${teamId}/assignments/${assignmentId}/submissions?${params.toString()}`
+          `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params.toString()}`
         )
       } else {
         console.log('📊 [数据隔离] 加载题库提交记录', { problemId, userId })
@@ -194,7 +194,7 @@ function SubmissionsContent() {
               <span className="text-sm text-muted-foreground">当前筛选条件：</span>
               {assignmentId && (
                 <span className="tag tag-primary">
-                  团队作业提交
+                  班级作业提交
                 </span>
               )}
               {problemId && submissions.length > 0 && (

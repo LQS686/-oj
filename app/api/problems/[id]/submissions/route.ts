@@ -47,7 +47,7 @@ export async function GET(
     }
 
     // 查询 Submission 模型（题库和竞赛提交）- 不分页，获取所有数据后合并再分页
-    const [submissions, teamSubmissions, totalSubmissions, totalTeamSubmissions] = await Promise.all([
+    const [submissions, classSubmissions, totalSubmissions, totalClassSubmissions] = await Promise.all([
       prisma.submission.findMany({
         where,
         orderBy: { submittedAt: 'desc' },
@@ -70,8 +70,8 @@ export async function GET(
           },
         },
       }),
-      // 查询 TeamAssignmentSubmission 模型（团队作业提交）
-      prisma.teamAssignmentSubmission.findMany({
+      // 查询 ClassAssignmentSubmission 模型（班级作业提交）
+      prisma.classAssignmentSubmission.findMany({
         where: {
           problemId,
           ...(userId ? { userId } : {}),
@@ -91,7 +91,7 @@ export async function GET(
         },
       }),
       prisma.submission.count({ where }),
-      prisma.teamAssignmentSubmission.count({
+      prisma.classAssignmentSubmission.count({
         where: {
           problemId,
           ...(userId ? { userId } : {}),
@@ -99,11 +99,11 @@ export async function GET(
       }),
     ])
 
-    // 获取团队作业提交的用户信息
-    const teamSubmissionUserIds = [...new Set(teamSubmissions.map(sub => sub.userId))]
-    const users = teamSubmissionUserIds.length > 0 
+    // 获取班级作业提交的用户信息
+    const classSubmissionUserIds = [...new Set(classSubmissions.map(sub => sub.userId))]
+    const users = classSubmissionUserIds.length > 0 
       ? await prisma.user.findMany({
-          where: { id: { in: teamSubmissionUserIds } },
+          where: { id: { in: classSubmissionUserIds } },
           select: {
             id: true,
             username: true,
@@ -113,8 +113,8 @@ export async function GET(
       : []
     const userMap = new Map(users.map(user => [user.id, user]))
 
-    // 格式化团队作业提交记录
-    const formattedTeamSubmissions = teamSubmissions.map(sub => ({
+    // 格式化班级作业提交记录
+    const formattedClassSubmissions = classSubmissions.map(sub => ({
       id: sub.id,
       status: sub.status,
       language: sub.language,
@@ -132,11 +132,11 @@ export async function GET(
     }))
 
     // 合并所有提交记录并按提交时间排序
-    const allSubmissions = [...submissions, ...formattedTeamSubmissions]
+    const allSubmissions = [...submissions, ...formattedClassSubmissions]
       .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
       .slice((page - 1) * limit, page * limit)
 
-    const total = totalSubmissions + totalTeamSubmissions
+    const total = totalSubmissions + totalClassSubmissions
 
     return NextResponse.json({
       success: true,

@@ -21,7 +21,7 @@ export function canCreateContest(user: User | null): boolean {
   return isAdmin(user) || isTeacher(user)
 }
 
-export function canCreateTeam(user: User | null): boolean {
+export function canCreateClass(user: User | null): boolean {
   return isAdmin(user) || isTeacher(user)
 }
 

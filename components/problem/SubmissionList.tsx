@@ -9,7 +9,7 @@ interface SubmissionListProps {
   error: string | null
   user: any
   fromAssignment: string | null
-  teamId: string | null
+  classId: string | null
   onSelect: (submission: any) => void
 }
 
@@ -19,7 +19,7 @@ export default function SubmissionList({
   error,
   user,
   fromAssignment,
-  teamId,
+  classId,
   onSelect
 }: SubmissionListProps) {
   const router = useRouter()
@@ -72,7 +72,7 @@ export default function SubmissionList({
             key={sub.id}
             className="card-static p-4 cursor-pointer hover:bg-primary/5 transition-colors rounded-xl"
             onClick={() => {
-              if (fromAssignment && teamId) {
+              if (fromAssignment && classId) {
                 onSelect(sub)
               } else {
                 router.push(`/submission/${sub.id}`)

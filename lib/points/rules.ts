@@ -33,7 +33,7 @@ export const POINTS_RULES = {
     CONTINUOUS_BONUS: 2 // 连续签到每天额外奖励
   },
 
-  // 团队贡献积分
+  // 班级贡献积分
   CONTRIBUTION: {
     CREATE_NOTE: 10,
     HELP_OTHERS: 5

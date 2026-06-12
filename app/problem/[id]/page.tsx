@@ -37,16 +37,16 @@ const languageOptions = [
   { value: 'javascript', label: 'JavaScript', version: 'Node.js 18' }
 ]
 
-function getStorageKey(problemId: string, teamId: string | null, assignmentId: string | null): string {
-  if (teamId && assignmentId) {
-    return `code_team_${teamId}_${assignmentId}_${problemId}`
+function getStorageKey(problemId: string, classId: string | null, assignmentId: string | null): string {
+  if (classId && assignmentId) {
+    return `code_class_${classId}_${assignmentId}_${problemId}`
   }
   return `code_problem_${problemId}`
 }
 
-function getLanguageStorageKey(problemId: string, teamId: string | null, assignmentId: string | null): string {
-  if (teamId && assignmentId) {
-    return `lang_team_${teamId}_${assignmentId}_${problemId}`
+function getLanguageStorageKey(problemId: string, classId: string | null, assignmentId: string | null): string {
+  if (classId && assignmentId) {
+    return `lang_class_${classId}_${assignmentId}_${problemId}`
   }
   return `lang_problem_${problemId}`
 }
@@ -59,7 +59,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const { user } = useUser()
   
   const fromAssignment = searchParams.get('fromAssignment')
-  const teamId = searchParams.get('teamId')
+  const classId = searchParams.get('classId')
   const assignmentTitle = searchParams.get('assignmentTitle')
   const returnTab = searchParams.get('returnTab') || 'info'
 
@@ -109,12 +109,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const codeKey = getStorageKey(problemId, teamId, fromAssignment)
+    const codeKey = getStorageKey(problemId, classId, fromAssignment)
     localStorage.removeItem(codeKey)
 
-    const langKey = getLanguageStorageKey(problemId, teamId, fromAssignment)
+    const langKey = getLanguageStorageKey(problemId, classId, fromAssignment)
     localStorage.removeItem(langKey)
-  }, [problemId, teamId, fromAssignment])
+  }, [problemId, classId, fromAssignment])
 
   useEffect(() => {
     if (isAssignmentContext && activeTab === 'solutions') {
@@ -125,24 +125,24 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     if (typeof window === 'undefined' || !code) return
     
-    const codeKey = getStorageKey(problemId, teamId, fromAssignment)
+    const codeKey = getStorageKey(problemId, classId, fromAssignment)
     localStorage.setItem(codeKey, code)
-  }, [code, problemId, teamId, fromAssignment])
+  }, [code, problemId, classId, fromAssignment])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     
-    const langKey = getLanguageStorageKey(problemId, teamId, fromAssignment)
+    const langKey = getLanguageStorageKey(problemId, classId, fromAssignment)
     localStorage.setItem(langKey, language)
-  }, [language, problemId, teamId, fromAssignment])
+  }, [language, problemId, classId, fromAssignment])
   
   const fetchSubmissions = async () => {
     try {
       setSubmissionsLoading(true)
       
       let url: string
-      if (fromAssignment && teamId) {
-        url = `/api/teams/${teamId}/assignments/${fromAssignment}/submissions?problemId=${problemId}`
+      if (fromAssignment && classId) {
+        url = `/api/classes/${classId}/assignments/${fromAssignment}/submissions?problemId=${problemId}`
         
         const response = await fetchWithAuth(url)
         const data = await response.json()
@@ -173,7 +173,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     if (activeTab === 'submissions') {
       fetchSubmissions()
     }
-  }, [activeTab, problemId, user, fromAssignment, teamId])
+  }, [activeTab, problemId, user, fromAssignment, classId])
 
   const { isConnected } = useSubmissionSocket({
     userId: user?.id || '',
@@ -240,8 +240,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       let submitUrl: string
       let submitBody: any
 
-      if (fromAssignment && teamId) {
-        submitUrl = `/api/teams/${teamId}/assignments/${fromAssignment}/submit`
+      if (fromAssignment && classId) {
+        submitUrl = `/api/classes/${classId}/assignments/${fromAssignment}/submit`
         submitBody = { problemId, code, language }
       } else {
         submitUrl = '/api/submissions'
@@ -321,8 +321,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       <div className="container mx-auto px-4 pt-6">
         <button
           onClick={() => {
-            if (fromAssignment && teamId) {
-              router.replace(`/teams/${teamId}/assignments/${fromAssignment}?tab=${returnTab}`)
+            if (fromAssignment && classId) {
+              router.replace(`/classes/${classId}/assignments/${fromAssignment}?tab=${returnTab}`)
             } else {
               router.push('/problems')
             }
@@ -330,7 +330,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           className="flex items-center gap-2 text-muted-foreground hover:text-primary-light mb-4 transition-colors cursor-pointer group"
         >
           <ArrowLeft className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-[-2px]" />
-          <span className="transition-colors duration-300 group-hover:text-primary-light">{fromAssignment && teamId ? `返回作业` : '返回题库'}</span>
+          <span className="transition-colors duration-300 group-hover:text-primary-light">{fromAssignment && classId ? `返回作业` : '返回题库'}</span>
         </button>
 
         <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -476,7 +476,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                   error={null}
                   user={user}
                   fromAssignment={fromAssignment}
-                  teamId={teamId}
+                  classId={classId}
                   onSelect={(sub) => setSelectedSubmission(sub)}
                 />
               )}

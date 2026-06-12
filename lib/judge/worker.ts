@@ -5,7 +5,7 @@ import type { JudgeResult } from './queue'
 import { emitSubmissionUpdate, broadcastMessage } from '@/lib/websocket/server'
 import { 
   updateSubmissionDirect, 
-  updateTeamAssignmentSubmissionDirect, 
+  updateClassAssignmentSubmissionDirect, 
   incrementProblemAcceptedCount, 
   isFirstAccepted 
 } from '@/lib/mongodb-direct'
@@ -81,7 +81,7 @@ judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
       }
     }
 
-    // ✅ 同步到 TeamAssignmentSubmission
+    // ✅ 同步到 ClassAssignmentSubmission
     // 只更新已存在的作业提交记录（由作业提交 API 创建）
     try {
       logger.info(`开始同步作业提交记录`)
@@ -91,7 +91,7 @@ judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
         logger.info(`找到关联的作业提交记录`, { assignmentSubmissionId: submission.assignmentSubmissionId })
         
         // ✅ 查询作业提交记录的详细信息，包括isLate字段
-        const assignmentSubmission = await prisma.teamAssignmentSubmission.findUnique({
+        const assignmentSubmission = await prisma.classAssignmentSubmission.findUnique({
           where: { id: submission.assignmentSubmissionId }
         })
         
@@ -107,7 +107,7 @@ judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
         }
         
         // ✅ 精确更新对应的作业提交记录
-        // await prisma.teamAssignmentSubmission.update({
+        // await prisma.classAssignmentSubmission.update({
         //   where: { id: submission.assignmentSubmissionId },
         //   data: {
         //     status: result.status,
@@ -120,7 +120,7 @@ judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
         //   }
         // })
 
-        await updateTeamAssignmentSubmissionDirect(submission.assignmentSubmissionId, {
+        await updateClassAssignmentSubmissionDirect(submission.assignmentSubmissionId, {
             status: result.status,
             score: finalScore,
             time: result.time,

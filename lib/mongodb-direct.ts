@@ -224,9 +224,9 @@ export async function isFirstAccepted(problemId: string, userId: string, current
 }
 
 /**
- * 直接创建团队作业提交记录（绕过 Prisma 事务）
+ * 直接创建班级作业提交记录（绕过 Prisma 事务）
  */
-export async function createTeamAssignmentSubmissionDirect(data: {
+export async function createClassAssignmentSubmissionDirect(data: {
   assignmentId: string
   userId: string
   problemId: string
@@ -258,7 +258,7 @@ export async function createTeamAssignmentSubmissionDirect(data: {
       isLate: data.isLate
     }
 
-    await db.collection('TeamAssignmentSubmission').insertOne(submission)
+    await db.collection('ClassAssignmentSubmission').insertOne(submission)
 
     return {
       id: submission._id.toString(),
@@ -271,9 +271,9 @@ export async function createTeamAssignmentSubmissionDirect(data: {
 }
 
 /**
- * 直接更新团队作业提交记录（绕过 Prisma 事务）
+ * 直接更新班级作业提交记录（绕过 Prisma 事务）
  */
-export async function updateTeamAssignmentSubmissionDirect(
+export async function updateClassAssignmentSubmissionDirect(
   submissionId: string,
   data: {
     status?: string
@@ -296,7 +296,7 @@ export async function updateTeamAssignmentSubmissionDirect(
       }
     }
 
-    await db.collection('TeamAssignmentSubmission').updateOne(
+    await db.collection('ClassAssignmentSubmission').updateOne(
       { _id: new ObjectId(submissionId) },
       { $set: sanitized }
     )
@@ -703,9 +703,9 @@ export async function registerContestParticipantDirect(data: {
 }
 
 /**
- * 直接更新团队作业（绕过 Prisma 事务）
+ * 直接更新班级作业（绕过 Prisma 事务）
  */
-export async function updateTeamAssignmentDirect(
+export async function updateClassAssignmentDirect(
   assignmentId: string,
   data: {
     title?: string
@@ -725,7 +725,7 @@ export async function updateTeamAssignmentDirect(
       updateData.problemIds = data.problemIds.map(id => new ObjectId(id))
     }
 
-    await db.collection('TeamAssignment').updateOne(
+    await db.collection('ClassAssignment').updateOne(
       { _id: new ObjectId(assignmentId) },
       { $set: updateData }
     )
@@ -733,20 +733,20 @@ export async function updateTeamAssignmentDirect(
 }
 
 /**
- * 直接删除团队作业（绕过 Prisma 事务）
+ * 直接删除班级作业（绕过 Prisma 事务）
  */
-export async function deleteTeamAssignmentDirect(assignmentId: string) {
+export async function deleteClassAssignmentDirect(assignmentId: string) {
   return withRetry(async () => {
     const client = await getMongoClient()
     const db = client.db()
 
     // 1. 删除相关提交记录
-    await db.collection('TeamAssignmentSubmission').deleteMany({
+    await db.collection('ClassAssignmentSubmission').deleteMany({
       assignmentId: new ObjectId(assignmentId)
     })
 
     // 2. 删除作业本身
-    await db.collection('TeamAssignment').deleteOne({
+    await db.collection('ClassAssignment').deleteOne({
       _id: new ObjectId(assignmentId)
     })
   })

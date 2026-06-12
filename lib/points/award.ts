@@ -13,7 +13,7 @@ import { logger } from '@/lib/logger'
  * 完成作业题目时发放积分
  */
 export async function awardAssignmentPoints(
-  teamId: string,
+  classId: string,
   userId: string,
   assignmentId: string,
   problemId: string,
@@ -23,7 +23,7 @@ export async function awardAssignmentPoints(
   try {
     // 检查是否已发放（幂等性）
     const checkResult = await checkPointsAwarded(
-      teamId,
+      classId,
       userId,
       'ASSIGNMENT_COMPLETION',
       `${assignmentId}_${problemId}`
@@ -39,7 +39,7 @@ export async function awardAssignmentPoints(
 
     // 发放积分
     const result = await addPoints(
-      teamId,
+      classId,
       userId,
       points,
       `完成作业题目「${problemTitle}」`,
@@ -65,7 +65,7 @@ export async function awardAssignmentPoints(
  * 首次阅读笔记时发放积分
  */
 export async function awardNoteReadPoints(
-  teamId: string,
+  classId: string,
   userId: string,
   noteId: string,
   noteTitle: string
@@ -91,7 +91,7 @@ export async function awardNoteReadPoints(
     try {
       await prisma.noteReadHistory.create({
         data: {
-          teamId,
+          classId,
           noteId,
           userId,
           readAt: new Date()
@@ -109,7 +109,7 @@ export async function awardNoteReadPoints(
 
     // 发放积分
     const result = await addPoints(
-      teamId,
+      classId,
       userId,
       points,
       `首次阅读笔记「${noteTitle}」`,
@@ -135,7 +135,7 @@ export async function awardNoteReadPoints(
  * 课堂表现积分发放（管理员手动）
  */
 export async function awardClassPerformancePoints(
-  teamId: string,
+  classId: string,
   userId: string,
   points: number,
   reason: string
@@ -149,7 +149,7 @@ export async function awardClassPerformancePoints(
     }
 
     const result = await addPoints(
-      teamId,
+      classId,
       userId,
       points,
       `课堂表现：${reason}`,

@@ -226,7 +226,7 @@ export function validateContestTime(startTime: Date, endTime: Date): boolean {
   return endTime > startTime
 }
 
-export function validateTeamName(name: string): boolean {
+export function validateClassName(name: string): boolean {
   if (!name || typeof name !== 'string') {
     return false
   }
@@ -234,7 +234,7 @@ export function validateTeamName(name: string): boolean {
   return trimmed.length >= 2 && trimmed.length <= 50
 }
 
-export function validateTeamDescription(description: string): boolean {
+export function validateClassDescription(description: string): boolean {
   if (!description || typeof description !== 'string') {
     return false
   }

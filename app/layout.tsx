@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "OJ Platform - 在线编程学习平台",
   description: "海量题库、实时评测、专业竞赛，助你从入门到精通",
   keywords: ["OJ", "编程", "算法", "竞赛", "题库", "在线评测"],
-  authors: [{ name: "OJ Platform Team" }],
+  authors: [{ name: "OJ Platform Class" }],
   openGraph: {
     title: "OJ Platform - 在线编程学习平台",
     description: "海量题库、实时评测、专业竞赛，助你从入门到精通",

@@ -1,11 +1,11 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { 
-  BookOpen, 
-  Trophy, 
-  Dumbbell, 
-  Users, 
+import {
+  BookOpen,
+  Trophy,
+  Dumbbell,
+  GraduationCap,
   MessageSquare,
   BarChart3
 } from 'lucide-react'
@@ -23,7 +23,7 @@ export default function NavLinks() {
     { href: '/problems', label: '题库', icon: BookOpen },
     { href: '/contests', label: '竞赛', icon: Trophy },
     { href: '/training', label: '训练', icon: Dumbbell },
-    { href: '/teams', label: '团队', icon: Users },
+    { href: '/classes', label: '班级', icon: GraduationCap },
     { href: '/discuss', label: '社区', icon: MessageSquare },
     { href: '/rank', label: '排行榜', icon: BarChart3 },
   ]

@@ -32,7 +32,7 @@ async function main() {
     // 创建管理员用户
     const adminPassword = await bcrypt.hash('admin123', 10)
     const adminResult = await db.collection('User').insertOne({
-      username: 'admin',
+      username: 'assistant',
       email: 'admin@oj.com',
       password: adminPassword,
       nickname: '系统管理员',

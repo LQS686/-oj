@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Users, 
+import {
+  LayoutDashboard,
+  FileText,
+  Users,
   Shield,
   Settings,
   LogOut,
@@ -15,7 +15,7 @@ import {
   X,
   Trophy,
   MessageSquare,
-  Briefcase,
+  GraduationCap,
   Sparkles,
   Bell,
   User,
@@ -126,9 +126,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/users'
     },
     {
-      icon: Briefcase,
-      label: '团队管理',
-      href: '/admin/teams'
+      icon: GraduationCap,
+      label: '班级管理',
+      href: '/admin/classes'
     },
     {
       icon: MessageSquare,
