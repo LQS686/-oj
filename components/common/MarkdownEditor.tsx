@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import MarkdownContent from './common/MarkdownContent'
+import MarkdownContent from './MarkdownContent'
 import { 
   Bold, Italic, List, ListOrdered, Code, FileCode, Link as LinkIcon, Image as ImageIcon, 
   Eye, Edit3, Heading1, Heading2, Heading3, Quote, Minus, Table, CheckSquare,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import MarkdownRenderer from '../MarkdownRenderer'
+import MarkdownRenderer from '../common/MarkdownRenderer'
 import { FileCode, FileInput, FileOutput, Lightbulb, Tag, Copy, Check, ArrowUp } from 'lucide-react'
 
 interface ProblemDescriptionProps {

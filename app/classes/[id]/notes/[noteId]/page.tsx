@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
-import MarkdownRenderer from '@/components/MarkdownRenderer'
+import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { ArrowLeft, User, Calendar, Tag, Edit, Trash2, FileText, AlertCircle } from 'lucide-react'
 
 interface Note {

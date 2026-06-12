@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { createNotification } from '@/lib/notifications'
 import { compileCode, cleanup } from '@/lib/judge/compiler'
 import { executeCode } from '@/lib/judge/executor'
-import { ensureTotalScoreIs100 } from '@/lib/test-case-score'
+import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
 import { validateCodeSafety } from '@/lib/judge/codeAnalyzer'
 
 interface AiJob {

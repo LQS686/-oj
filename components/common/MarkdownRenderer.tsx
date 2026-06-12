@@ -1,5 +1,5 @@
 import React from 'react'
-import MarkdownContent from './common/MarkdownContent'
+import MarkdownContent from './MarkdownContent'
 
 interface MarkdownRendererProps {
   content: string

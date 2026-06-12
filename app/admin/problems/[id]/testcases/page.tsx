@@ -7,7 +7,7 @@ import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ArrowLeft, Upload, X, Plus, Sparkles, Loader2, Save, FileText, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
 import { ModelSelector } from '@/components/ai/ModelSelector'
-import { ensureTotalScoreIs100 } from '@/lib/test-case-score'
+import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
 
 interface TestCase {
   input: string

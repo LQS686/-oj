@@ -69,8 +69,26 @@ export default [
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     rules: {
-      'no-console': 'off',
+      'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
       'no-debugger': 'warn',
+      'no-shadow-restricted-names': 'error',
+      'no-redeclare': 'off',
+      '@typescript-eslint/no-redeclare': 'warn',
+      'no-case-declarations': 'off',
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+      'no-useless-escape': 'warn',
+      'no-control-regex': 'warn',
+      'no-prototype-builtins': 'warn',
+      'prefer-const': 'warn',
+      'eqeqeq': ['warn', 'always', { null: 'ignore' }],
+      'react/no-unknown-property': 'warn',
+    },
+  },
+  {
+    // 业务层 / 共享 utils 强制 import 顺序
+    files: ['lib/**/*.ts', 'app/api/**/*.ts'],
+    rules: {
+      '@typescript-eslint/consistent-type-imports': 'warn',
     },
   },
   {

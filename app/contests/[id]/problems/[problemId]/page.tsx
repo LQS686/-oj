@@ -7,7 +7,7 @@ import { Clock, Database, Send, AlertCircle, ArrowLeft, CheckCircle, XCircle, Wi
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { logger } from '@/lib/logger'
-import JudgeStatus from '@/components/JudgeStatus'
+import JudgeStatus from '@/components/submission/JudgeStatus'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
 import type { Problem, Submission, JudgeStatusData } from '@/types/models'

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
-import { parseTestCaseZip } from '@/lib/testcase-upload'
+import { parseTestCaseZip } from '@/lib/problem/testcase'
 
 // 禁用 Next.js 默认的 body parser
 export const dynamic = 'force-dynamic'

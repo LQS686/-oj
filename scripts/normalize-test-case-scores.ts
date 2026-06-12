@@ -17,7 +17,7 @@
  */
 
 import { prisma } from '../lib/prisma'
-import { distributeTestCaseScores, ensureTotalScoreIs100, assertTotalScoreIs100 } from '../lib/test-case-score'
+import { distributeTestCaseScores, ensureTotalScoreIs100, assertTotalScoreIs100 } from '../lib/problem/testcase'
 
 const FORCE = process.argv.includes('--force')
 
@@ -57,7 +57,7 @@ async function main() {
     const newCases = ensureTotalScoreIs100(
       p.testCases.map((tc) => ({ id: tc.id, score: tc.score }))
     )
-    const newScores = newCases.map((tc) => tc.score)
+    const newScores = newCases.map((tc: any) => tc.score)
     fixes.push({
       problemId: p.id,
       problemNumber: p.problemNumber ?? '(无题号)',

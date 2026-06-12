@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import MarkdownEditor from '@/components/MarkdownEditor'
+import MarkdownEditor from '@/components/common/MarkdownEditor'
 import { ArrowLeft, Send, Save, Eye, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import type { Category } from '@/types/models'

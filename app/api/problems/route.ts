@@ -7,7 +7,7 @@ import type { Prisma } from '@prisma/client'
 import { errorHandler } from '@/lib/error-handler'
 import { errorMonitor } from '@/lib/error-monitor'
 import { success, badRequest, forbidden, created, internalError } from '@/lib/api-response'
-import { ensureTotalScoreIs100 } from '@/lib/test-case-score'
+import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
 
 // 模拟数据
 const mockProblems = [

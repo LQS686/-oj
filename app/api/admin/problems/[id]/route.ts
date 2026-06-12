@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { prisma } from '@/lib/prisma'
-import { redistributeTestScores } from '@/lib/testcase-score'
+import { redistributeTestScores } from '@/lib/problem/testcase'
 
 interface RouteContext {
   params: Promise<{

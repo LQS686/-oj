@@ -12,7 +12,7 @@ import {
   validateTestCases,
 } from '@/lib/validation'
 import { trimAll, escapeHtml } from '@/lib/sanitize'
-import { redistributeTestScores } from '@/lib/testcase-score'
+import { redistributeTestScores } from '@/lib/problem/testcase'
 import { enqueueSolutionJob } from '@/lib/ai/solution-queue'
 
 export async function GET(request: NextRequest) {
