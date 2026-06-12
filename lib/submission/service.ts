@@ -4,7 +4,11 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { addJudgeJob } from '@/lib/judge/queue'
+import { createSubmissionDirect, incrementProblemSubmitCount, updateSubmissionDirect } from '@/lib/mongodb-direct'
+import { logger } from '@/lib/logger'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
+import type { Prisma } from '@prisma/client'
 
 export interface SubmissionFilter {
   userId?: string
@@ -92,4 +96,187 @@ export async function getProblemSubmissions(problemId: string, limit = 20) {
     orderBy: { submittedAt: 'desc' },
     include: { user: { select: { id: true, username: true, nickname: true, avatar: true } } },
   })
+}
+
+/* ============================================================================
+ * 业务封装：原 /api/submissions 路由中的复杂逻辑
+ * ========================================================================== */
+
+/**
+ * 提交代码：题目查找 + 创建记录 + 自增 + 加入评测队列
+ */
+export interface CreateSubmissionAdvancedInput {
+  problemId: string
+  code: string
+  language: string
+  contestId?: string
+}
+
+export async function submitCode(userId: string, body: CreateSubmissionAdvancedInput) {
+  // 验证题目存在（支持 problemNumber 与 ObjectID 两种）
+  let problem: any
+  try {
+    problem = await prisma.problem.findUnique({
+      where: { problemNumber: body.problemId },
+      include: { testCases: true },
+    })
+    if (!problem && body.problemId.length === 24) {
+      problem = await prisma.problem.findUnique({
+        where: { id: body.problemId },
+        include: { testCases: true },
+      })
+    }
+  } catch (error) {
+    logger.error('查找题目错误', error)
+  }
+  if (!problem) {
+    const err: any = new Error('题目不存在')
+    err.status = 404
+    throw err
+  }
+
+  // 创建提交记录
+  const submission = await createSubmissionDirect({
+    problemId: problem.id,
+    userId,
+    contestId: body.contestId || undefined,
+    language: body.language,
+    code: body.code,
+    status: 'Pending',
+    totalTests: problem.testCases.length,
+  })
+
+  // 自增题目提交数
+  await incrementProblemSubmitCount(problem.id)
+
+  // ❌ 【数据隔离】题库提交不写入 ClassAssignmentSubmission（保留旧注释语义）
+  logger.info('题库提交，不同步到作业')
+
+  // 加入评测队列（失败回写 SE）
+  try {
+    await addJudgeJob({
+      submissionId: submission.id,
+      problemId: problem.id,
+      userId,
+      code: body.code,
+      language: body.language,
+      timeLimit: problem.timeLimit,
+      memoryLimit: problem.memoryLimit,
+      testCases: (problem.testCases as any[]).map((tc) => ({
+        id: tc.id,
+        input: tc.input,
+        output: tc.output,
+        score: tc.score,
+      })),
+    })
+    logger.info(`提交 ${submission.id} 已加入评测队列`)
+  } catch (queueError) {
+    logger.error('加入队列失败', queueError)
+    await updateSubmissionDirect(submission.id, {
+      status: 'SE',
+      message: '评测系统错误，请稍后重试',
+    })
+  }
+
+  return submission
+}
+
+/**
+ * 提交记录列表（problemId/userId/status 过滤 + 剔除已删除题目）
+ */
+export async function listSubmissionsAdvanced(
+  page: number,
+  limit: number,
+  filter: { problemId?: string; userId?: string; status?: string }
+) {
+  const where: Prisma.SubmissionWhereInput = {}
+  if (filter.problemId) where.problemId = filter.problemId
+  if (filter.userId) where.userId = filter.userId
+  if (filter.status) where.status = filter.status
+
+  const [submissions, total] = await Promise.all([
+    prisma.submission.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { submittedAt: 'desc' },
+      include: {
+        problem: { select: { id: true, title: true } },
+        user: { select: { id: true, username: true, nickname: true } },
+      },
+    }),
+    prisma.submission.count({ where }),
+  ])
+
+  const validSubmissions = submissions.filter((sub) => sub.problem !== null)
+  if (validSubmissions.length < submissions.length) {
+    logger.warn(`发现 ${submissions.length - validSubmissions.length} 条无效提交记录（对应题目不存在）`)
+  }
+  return {
+    submissions: validSubmissions,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  }
+}
+
+/**
+ * 提交详情：先查 Submission，找不到再回退到 ClassAssignmentSubmission
+ */
+export async function getSubmissionDetailOrClassAssignment(id: string) {
+  let submission: any = await prisma.submission.findUnique({
+    where: { id },
+    include: {
+      problem: { select: { id: true, problemNumber: true, title: true, difficulty: true } },
+      user: { select: { id: true, username: true, nickname: true } },
+    },
+  })
+  if (submission) {
+    const testResults = 'testResults' in submission && submission.testResults
+      ? (submission.testResults as any)
+      : []
+    return { ...submission, testResults }
+  }
+  const classSubmission = await prisma.classAssignmentSubmission.findUnique({ where: { id } })
+  if (!classSubmission) return null
+  const [problem, user] = await Promise.all([
+    prisma.problem.findUnique({
+      where: { id: classSubmission.problemId },
+      select: { id: true, problemNumber: true, title: true, difficulty: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: classSubmission.userId },
+      select: { id: true, username: true, nickname: true },
+    }),
+  ])
+  return {
+    id: classSubmission.id,
+    problemId: classSubmission.problemId,
+    userId: classSubmission.userId,
+    language: classSubmission.language,
+    code: classSubmission.code,
+    status: classSubmission.status,
+    score: classSubmission.score,
+    time: classSubmission.time,
+    memory: classSubmission.memory,
+    passedTests: classSubmission.passedTests,
+    totalTests: classSubmission.totalTests,
+    message: classSubmission.message,
+    submittedAt: classSubmission.submittedAt,
+    problem: problem || {
+      id: classSubmission.problemId,
+      problemNumber: null,
+      title: '未知题目',
+      difficulty: '未知',
+    },
+    user: user || {
+      id: classSubmission.userId,
+      username: '未知用户',
+      nickname: null,
+    },
+    testResults: [],
+  }
 }

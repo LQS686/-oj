@@ -1,21 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getUserFromRequest } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+/**
+ * /api/users/avatar/history - 当前用户头像历史（最近 20 条）
+ */
+import { withApi, ok } from '@/lib/api/withApi'
+import { listAvatarHistory } from '@/lib/user/service'
 
-export async function GET(request: NextRequest) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-
-    const history = await prisma.avatarHistory.findMany({
-      where: { userId: user.userId },
-      orderBy: { createdAt: 'desc' },
-      take: 20
-    })
-
-    return NextResponse.json({ success: true, data: history })
-  } catch (error) {
-    console.error('Fetch history error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to fetch history' }, { status: 500 })
-  }
-}
+export const GET = withApi.auth(async (_req, _ctx, { user }) => {
+  const history = await listAvatarHistory(user.id, 20)
+  return ok(history)
+})

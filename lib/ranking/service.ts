@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import type { Prisma } from '@prisma/client'
 
 export type RankingType = 'global' | 'class' | 'contest' | 'weekly'
 
@@ -95,4 +96,116 @@ export async function getMyRank(userId: string) {
     const higher = await prisma.user.count({ where: { rating: { gt: me.rating } } })
     return { rank: higher + 1, rating: me.rating }
   }, { ttl: 60_000 })
+}
+
+/* ============================================================================
+ * 业务封装：原 /api/rankings 路由中的复杂逻辑（rating / solved）
+ * ========================================================================== */
+
+export interface RankingUser {
+  id: string
+  username: string
+  nickname: string | null
+  rating: number
+  solvedCount: number
+  rank: string | null
+  color: string | null
+  avatar: string | null
+  position: number
+  solvedProblems: number
+}
+
+export interface RankingPage {
+  users: RankingUser[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+}
+
+/**
+ * 综合 / 已解决 排行榜（已禁用户剔除，带缓存 60s）
+ */
+export async function listRankingByType(type: 'rating' | 'solved', page: number, limit: number): Promise<RankingPage> {
+  return cache.get('ranking:list', [type, page, limit], async () => {
+    const orderBy: Prisma.UserOrderByWithRelationInput[] = type === 'solved'
+      ? [{ solvedCount: 'desc' }, { rating: 'desc' }]
+      : [{ rating: 'desc' }, { solvedCount: 'desc' }]
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where: { isBanned: false },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy,
+        select: {
+          id: true,
+          username: true,
+          nickname: true,
+          rating: true,
+          solvedCount: true,
+          rank: true,
+          color: true,
+          avatar: true,
+        },
+      }),
+      prisma.user.count({ where: { isBanned: false } }),
+    ])
+
+    const rankedUsers: RankingUser[] = users.map((user, index) => ({
+      ...user,
+      position: (page - 1) * limit + index + 1,
+      solvedProblems: user.solvedCount,
+    }))
+
+    return {
+      users: rankedUsers,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }
+  }, { ttl: 60_000 })
+}
+
+/**
+ * 当前用户的实时排名（rating / solved 模式分别计算）
+ */
+export async function getMyRankAdvanced(userId: string, type: 'rating' | 'solved' = 'rating') {
+  let rank = 0
+  if (type === 'solved') {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { solvedCount: true, rating: true },
+    })
+    if (currentUser) {
+      const count = await prisma.user.count({
+        where: {
+          isBanned: false,
+          OR: [
+            { solvedCount: { gt: currentUser.solvedCount } },
+            { solvedCount: currentUser.solvedCount, rating: { gt: currentUser.rating } },
+          ],
+        },
+      })
+      rank = count + 1
+    }
+  } else {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { rating: true, solvedCount: true },
+    })
+    if (currentUser) {
+      const count = await prisma.user.count({
+        where: {
+          isBanned: false,
+          OR: [
+            { rating: { gt: currentUser.rating } },
+            { rating: currentUser.rating, solvedCount: { gt: currentUser.solvedCount } },
+          ],
+        },
+      })
+      rank = count + 1
+    }
+  }
+  return { rank, userId }
 }

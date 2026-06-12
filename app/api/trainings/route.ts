@@ -1,112 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server'
+/**
+ * /api/trainings - 训练计划列表/创建
+ *
+ * GET  公开：分页查询（仅公开）
+ * POST 鉴权：仅管理员可创建（含批量绑定题目）
+ */
+import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
+import { listPublicTrainingsAdvanced, createTrainingWithProblems } from '@/lib/training/service'
+import { toInt } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
-import { logger } from '@/lib/logger'
-import { success, paginated, unauthorized, forbidden, notFound, error } from '@/lib/api-response'
-import type { Prisma } from '@prisma/client'
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    let page = parseInt(searchParams.get('page') || '1')
-    let limit = parseInt(searchParams.get('limit') || '20')
+export const GET = withApi.public(async (req) => {
+  const q = readQuery<{ page?: string; limit?: string; keyword?: string; difficulty?: string }>(req)
+  let page = toInt(q.page, 'page', 1)
+  let limit = toInt(q.limit, 'limit', 20)
+  if (page < 1) page = 1
+  if (limit < 1) limit = 20
+  if (limit > 50) limit = 50
 
-    if (isNaN(page) || page < 1) page = 1
-    if (isNaN(limit) || limit < 1) limit = 20
-    if (limit > 50) limit = 50
+  const data = await listPublicTrainingsAdvanced(page, limit, {
+    keyword: q.keyword,
+    difficulty: q.difficulty,
+  })
+  return ok({
+    items: data.items,
+    pagination: { page: data.page, limit: data.pageSize, total: data.total, totalPages: data.totalPages },
+  })
+})
 
-    const keyword = searchParams.get('keyword')
-    const difficulty = searchParams.get('difficulty')
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  // 管理员鉴权：非 dynamic 路由用 auth + DB 二次确认
+  const currentUser = await prisma.user.findUnique({ where: { id: user.id } })
+  if (!currentUser?.isAdmin) throw403('只有管理员可以创建训练计划')
 
-    const where: Prisma.TrainingWhereInput = { isPublic: true }
+  const body = await readJson<{
+    title: string
+    description: string
+    difficulty: string
+    isPublic?: boolean
+    problemIds?: string[]
+  }>(req)
 
-    if (keyword) {
-      where.OR = [
-        { title: { contains: keyword, mode: 'insensitive' } },
-        { description: { contains: keyword, mode: 'insensitive' } },
-      ]
-    }
-
-    if (difficulty) {
-      where.difficulty = difficulty
-    }
-
-    const [trainings, total] = await Promise.all([
-      prisma.training.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          _count: {
-            select: {
-              problems: true,
-            },
-          },
-        },
-      }),
-      prisma.training.count({ where }),
-    ])
-
-    const trainingsWithStats = trainings.map(t => ({
-      ...t,
-      problemCount: t._count.problems,
-    }))
-
-    return paginated(trainingsWithStats, {
-      page,
-      pageSize: limit,
-      total,
-    })
-  } catch (err) {
-    logger.error('获取训练计划列表错误', err)
-    return error('获取训练计划列表失败', 500)
+  if (!body.title || !body.description || !body.difficulty) {
+    throw400('VALIDATION', '缺少必要参数')
   }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const currentUser = getUserFromRequest(request)
-    if (!currentUser) {
-      return unauthorized('请先登录')
-    }
-
-    if (!currentUser.isAdmin) {
-      return forbidden('只有管理员可以创建训练计划')
-    }
-
-    const body = await request.json()
-
-    const { title, description, difficulty, isPublic, problemIds } = body
-
-    if (!title || !description || !difficulty) {
-      return error('缺少必要参数', 400)
-    }
-
-    const training = await prisma.training.create({
-      data: {
-        title,
-        description,
-        difficulty,
-        isPublic: isPublic ?? true,
-      },
-    })
-
-    if (problemIds && problemIds.length > 0) {
-      const trainingProblems = problemIds.map((problemId: string, index: number) => ({
-        trainingId: training.id,
-        problemId,
-        orderIndex: index,
-      }))
-
-      await prisma.trainingProblem.createMany({
-        data: trainingProblems,
-      })
-    }
-
-    return success(training, '训练计划创建成功')
-  } catch (err) {
-    logger.error('创建训练计划错误', err)
-    return error('创建训练计划失败', 500)
-  }
-}
+  const training = await createTrainingWithProblems(body)
+  return ok({ data: training, message: '训练计划创建成功' }, { status: 201 })
+})

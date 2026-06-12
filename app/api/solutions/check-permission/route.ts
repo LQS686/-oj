@@ -1,63 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
-import { canViewSolutions, REQUIRED_SOLUTION_SCORE } from '@/lib/solution/permissions'
-import { resolveProblemId } from '@/lib/solution/problem-resolver'
-import { logger } from '@/lib/logger'
+/**
+ * /api/solutions/check-permission - 题解查看权限预检
+ */
+import { withApi, ok, readQuery, throw400, throw404 } from '@/lib/api/withApi'
+import { checkSolutionPermission, loadSolutionViewUser } from '@/lib/solution/service'
 
-async function loadSolutionUser(request: NextRequest) {
-  const payload = getUserFromRequest(request)
-  if (!payload) return null
-  const dbUser = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    select: { id: true, role: true, isAdmin: true }
-  })
-  if (!dbUser) return null
-  return {
-    id: dbUser.id,
-    role: dbUser.role,
-    isAdmin: dbUser.isAdmin || payload.isAdmin === true
-  }
-}
+export const GET = withApi.public(async (req) => {
+  const q = readQuery<{ problemId?: string; isAssignmentContext?: string }>(req)
+  if (!q.problemId) throw400('VALIDATION', 'problemId 不能为空')
 
-// GET /api/solutions/check-permission?problemId=xxx&isAssignmentContext=xxx
-export async function GET(request: NextRequest) {
+  const isAssignmentContext = q.isAssignmentContext === 'true'
+  const viewer = await loadSolutionViewUser(req)
+
   try {
-    const { searchParams } = new URL(request.url)
-    const problemId = searchParams.get('problemId')
-    const isAssignmentContext = searchParams.get('isAssignmentContext') === 'true'
-
-    if (!problemId) {
-      return NextResponse.json(
-        { success: false, error: 'problemId 不能为空' },
-        { status: 400 }
-      )
-    }
-
-    const user = await loadSolutionUser(request)
-    const realProblemId = await resolveProblemId(problemId)
-    if (!realProblemId) {
-      return NextResponse.json(
-        { success: false, error: '题目不存在' },
-        { status: 404 }
-      )
-    }
-    const result = await canViewSolutions(user, realProblemId, { isAssignmentContext })
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        allowed: result.allowed,
-        reason: result.reason,
-        ...(result.bestScore !== undefined ? { bestScore: result.bestScore } : {}),
-        requiredScore: REQUIRED_SOLUTION_SCORE
-      }
-    })
-  } catch (error) {
-    logger.error('检查题解权限错误', error)
-    return NextResponse.json(
-      { success: false, error: '检查题解权限失败' },
-      { status: 500 }
-    )
+    const data = await checkSolutionPermission(q.problemId!, isAssignmentContext, viewer)
+    return ok(data)
+  } catch (err: any) {
+    if (err?.status === 404) throw404(err.message)
+    throw err
   }
-}
+})
