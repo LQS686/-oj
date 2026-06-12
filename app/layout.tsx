@@ -3,6 +3,7 @@ import "./globals.css"
 import Navbar from "@/components/Navbar"
 import { UserProvider } from "@/contexts/UserContext"
 import { SettingsProvider } from "@/contexts/SettingsContext"
+import { SwrProvider } from "@/components/SwrProvider"
 import { Toaster } from "react-hot-toast"
 
 export const metadata: Metadata = {
@@ -34,41 +35,43 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <SettingsProvider>
-          <UserProvider>
-            <Navbar />
-            <main className="relative">
-              {children}
-            </main>
-            <Toaster 
-              position="top-right"
-              toastOptions={{
-                duration: 3000,
-                style: {
-                  background: 'var(--background-secondary)',
-                  color: 'var(--foreground)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  padding: '1rem',
-                  backdropFilter: 'blur(24px)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-                },
-                success: {
-                  iconTheme: {
-                    primary: 'var(--success)',
-                    secondary: 'var(--foreground)',
+        <SwrProvider>
+          <SettingsProvider>
+            <UserProvider>
+              <Navbar />
+              <main className="relative">
+                {children}
+              </main>
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 3000,
+                  style: {
+                    background: 'var(--background-secondary)',
+                    color: 'var(--foreground)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    padding: '1rem',
+                    backdropFilter: 'blur(24px)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
                   },
-                },
-                error: {
-                  iconTheme: {
-                    primary: 'var(--error)',
-                    secondary: 'var(--foreground)',
+                  success: {
+                    iconTheme: {
+                      primary: 'var(--success)',
+                      secondary: 'var(--foreground)',
+                    },
                   },
-                },
-              }}
-            />
-          </UserProvider>
-        </SettingsProvider>
+                  error: {
+                    iconTheme: {
+                      primary: 'var(--error)',
+                      secondary: 'var(--foreground)',
+                    },
+                  },
+                }}
+              />
+            </UserProvider>
+          </SettingsProvider>
+        </SwrProvider>
       </body>
     </html>
   )
