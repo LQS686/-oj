@@ -114,28 +114,75 @@ docker-compose logs -f app
 
 ```
 dashan-oj/
-├── app/                    # Next.js App Router 页面与 API
-│   ├── api/               # API 路由
-│   ├── admin/             # 管理后台
-│   ├── classes/[id]/        # 班级模块（作业/成员/题目/积分）
-│   └── problem/[id]/      # 题目详情与提交
-├── components/             # React 组件
-│   ├── navbar/            # 导航栏组件
-│   ├── problem/           # 题目相关组件
-│   └── admin/             # 管理后台组件
-├── lib/                    # 工具库
-│   ├── judge/             # 评测核心
-│   ├── points/            # 积分系统
-│   ├── ai/                # AI 相关
-│   └── api/base.ts        # fetchWithAuth 封装
-├── prisma/                 # 数据库模型
-├── hooks/                  # 自定义 Hooks
-└── contexts/               # React Context
+├── app/                          # Next.js App Router
+│   ├── api/                      # 100+ API 路由（已统一响应格式）
+│   ├── admin/                    # 管理后台
+│   ├── classes/[id]/             # 班级模块（作业/成员/题目/积分/笔记）
+│   ├── problem/[id]/             # 题目详情与提交
+│   ├── contests/                 # 竞赛
+│   ├── discuss/                  # 讨论/题解
+│   ├── error.tsx                 # 路由级错误边界
+│   └── global-error.tsx          # 根级错误边界
+├── components/                   # React 组件
+│   ├── common/                   # 通用组件（MarkdownEditor/MarkdownRenderer）
+│   ├── submission/               # 提交相关（JudgeStatus）
+│   ├── problem/                  # 题目相关
+│   ├── solution/                 # 题解相关
+│   ├── admin/                    # 管理后台
+│   └── navbar/                   # 导航栏
+├── lib/                          # 业务层（2026/06 架构优化）
+│   ├── api/                      # API 中间件层
+│   │   ├── handler.ts            #   withAuth / withClassRole / withRateLimit
+│   │   ├── response.ts           #   ok() / fail() 统一响应
+│   │   └── validation.ts         #   required / toInt / validateObjectId
+│   ├── auth/                     # 认证业务层
+│   ├── user/                     # 用户业务层
+│   ├── problem/                  # 题目业务层（含 testcase 子模块）
+│   ├── submission/               # 提交业务层
+│   ├── contest/                  # 竞赛业务层
+│   ├── notification/             # 通知业务层
+│   ├── post/                     # 帖子业务层
+│   ├── ranking/                  # 排行榜业务层
+│   ├── solution/                 # 题解业务层
+│   ├── training/                 # 训练计划业务层
+│   ├── points/                   # 积分业务层
+│   ├── class/                    # 班级业务层（团队→班级重构）
+│   ├── judge/                    # 评测核心
+│   ├── ai/                       # AI 相关
+│   ├── cache.ts                  # 进程级缓存（TTL 60s）
+│   ├── auth.ts                   # 认证工具
+│   ├── prisma.ts                 # Prisma Client
+│   └── types/common.ts           # Pagination / ListOptions
+├── docs/
+│   └── NAMING_CONVENTION.md      # 命名规范
+├── prisma/                       # 数据库模型
+├── hooks/                        # 自定义 Hooks
+├── contexts/                     # React Context
+└── scripts/                      # 一次性脚本（迁移/规整）
+```
+
+### 业务层调用链
+
+```
+Route → withAuth/withClassRole (中间件) → lib/<domain>/service.ts → prisma
+                                     ↓
+                            lib/cache.ts (进程级缓存, TTL 60s)
 ```
 
 ## 🔄 更新日志
 
 ### 2026/06
+- ✅ **项目架构优化**（模块化 / 业务层 / 中间件 / 命名规范 / 稳定性）
+  - **API 中间件层**：`lib/api/handler.ts` 提供 `withAuth` / `withClassRole` / `withAdmin` / `withRateLimit`，进程级用户缓存（TTL 60s）
+  - **统一响应**：`{ ok, data, error, code }` + `ok()` / `fail()` 7 个便捷函数
+  - **业务层抽离**：10 个 `lib/<domain>/{service,validation,index}.ts` 模块（auth / user / contest / problem / submission / notification / post / ranking / solution / training）
+  - **校验工具**：`lib/api/validation.ts` 提供 `required/optional/toInt/validateObjectId/ValidationError`
+  - **缓存层**：`lib/cache.ts` TTL 60s，所有 service 走缓存避免重复查询
+  - **冗余清理**：删除 `replace_console.cjs`，合并 `lib/test-case-score.ts` + `lib/testcase-score.ts` + `lib/testcase-upload.ts` → `lib/problem/testcase.ts`
+  - **组件整理**：`components/MarkdownEditor.tsx` / `MarkdownRenderer.tsx` → `components/common/`，`JudgeStatus.tsx` → `components/submission/`
+  - **稳定性**：`app/global-error.tsx` 根级错误边界 + `withAuth` 统一异常捕获 + `logger.error`
+  - **命名规范**：`docs/NAMING_CONVENTION.md` + ESLint 启用 `no-shadow-restricted-names`
+  - **Prisma 调用收敛**：所有 prisma 调用集中在 `lib/<domain>/service.ts`
 - ✅ **团队 → 班级 全面重构**（数据库模型 / 路由 / 业务层 / UI 同步）
   - 8 个核心模型重命名：Team → Class / TeamMember → ClassMember / TeamAssignment → ClassAssignment / ...
   - 业务层抽离：`lib/class/{auth,member,assignment,note,invite}`
