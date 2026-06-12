@@ -1,6 +1,6 @@
 # 大山OJ (Dashan OJ)
 
-一个功能完整的在线编程平台 (Online Judge)，支持多语言代码提交、自动评测、实时反馈、团队协作、积分商城等功能。
+一个功能完整的在线编程平台 (Online Judge)，支持多语言代码提交、自动评测、实时反馈、班级协作、积分商城等功能。
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.0.0-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
@@ -16,12 +16,12 @@
 - ⚡ **自动评测** — 实时编译执行判定，WebSocket 推送评测进度，支持时间/内存限制
 - 📊 **评测结果** — AC/WA/TLE/MLE/RE/CE 全状态支持，详细测试点结果
 
-### 团队系统
-- 👥 **团队管理** — 创建/加入团队，邀请码机制，成员角色权限控制（所有者/管理员/成员）
-- 📋 **团队作业** — 标签页式作业详情（题目/完成情况），A/B/C 字母切换内嵌题目，代码编辑提交一体
+### 班级系统
+- 👥 **班级管理** — 创建/加入班级，邀请码机制，成员角色权限控制（班主任/助教/学生）
+- 📋 **班级作业** — 标签页式作业详情（题目/完成情况），A/B/C 字母切换内嵌题目，代码编辑提交一体
 - 📈 **完成度追踪** — 学生完成情况矩阵表（搜索/排序/筛选），点击分数查看提交记录弹窗+代码查看
-- 🏆 **排行榜** — 团队内积分排名
-- 📝 **笔记系统** — 团队知识库
+- 🏆 **排行榜** — 班级内积分排名
+- 📝 **笔记系统** — 班级知识库
 - 🎯 **积分体系** — 积分获取规则、积分商城兑换商品
 
 ### 其他功能
@@ -117,7 +117,7 @@ dashan-oj/
 ├── app/                    # Next.js App Router 页面与 API
 │   ├── api/               # API 路由
 │   ├── admin/             # 管理后台
-│   ├── teams/[id]/        # 团队模块（作业/成员/题目/积分）
+│   ├── classes/[id]/        # 班级模块（作业/成员/题目/积分）
 │   └── problem/[id]/      # 题目详情与提交
 ├── components/             # React 组件
 │   ├── navbar/            # 导航栏组件
@@ -134,6 +134,14 @@ dashan-oj/
 ```
 
 ## 🔄 更新日志
+
+### 2026/06
+- ✅ **团队 → 班级 全面重构**（数据库模型 / 路由 / 业务层 / UI 同步）
+  - 8 个核心模型重命名：Team → Class / TeamMember → ClassMember / TeamAssignment → ClassAssignment / ...
+  - 业务层抽离：`lib/class/{auth,member,assignment,note,invite}`
+  - 角色语义：owner→teacher、admin→assistant、member→student
+  - MongoDB 迁移脚本：`scripts/migrate-team-to-class.ts`
+- ✅ ...
 
 ### 2026/05
 - ✅ 作业详情页重构为标签页 + A/B/C 字母切换式布局
