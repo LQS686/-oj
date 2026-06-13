@@ -81,9 +81,10 @@ export default function AdminProblemsPage() {
 
       const data = await response.json()
       if (data.success) {
-        setProblems(data.data)
+        setProblems(Array.isArray(data.data) ? data.data : [])
       } else {
         setError(data.error || '获取题目列表失败')
+        setProblems([])
       }
     } catch (err) {
       setError('网络错误')

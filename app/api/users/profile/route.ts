@@ -16,7 +16,7 @@ export const PUT = withApi.auth(async (req, _ctx, { user }) => {
   const body = await readJson<{ nickname?: string; bio?: string; avatar?: string }>(req)
   try {
     const updated = await updateCurrentUserBasic(user.id, body)
-    return ok({ data: updated, message: '资料更新成功' })
+    return ok(updated)
   } catch (err: any) {
     if (err?.status === 400) throw400('VALIDATION', err.message)
     throw err

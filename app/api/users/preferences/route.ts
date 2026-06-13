@@ -16,7 +16,7 @@ export const PUT = withApi.auth(async (req, _ctx, { user }) => {
   const body = await readJson<Record<string, any>>(req)
   try {
     const preferences = await updateUserPreferencesCollection(user.id, body)
-    return ok({ data: preferences, message: '偏好设置已更新' })
+    return ok(preferences)
   } catch (err: any) {
     if (err?.status === 400) throw400('VALIDATION', err.message)
     throw err

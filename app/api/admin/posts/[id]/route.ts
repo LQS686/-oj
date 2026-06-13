@@ -29,7 +29,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
 
   // 重新查询帖子以返回最新状态
   const post = await getPostAfterMongoDirectUpdate(id)
-  return ok({ data: post })
+  return ok(post)
 })
 
 /**

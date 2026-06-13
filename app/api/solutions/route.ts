@@ -56,7 +56,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
 
   try {
     const solution = await createUserSolution(body, user.id)
-    return ok({ data: solution, message: '题解发布成功' }, { status: 201 })
+    return ok(solution, { status: 201 })
   } catch (err: any) {
     if (err?.status === 400) throw400('VALIDATION', err.message)
     if (err?.status === 404) throw404(err.message)

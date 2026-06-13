@@ -15,7 +15,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
     throw403('需要管理员权限')
   }
   const data = await listAiProvidersForAdmin()
-  return ok({ data })
+  return ok({ items: data })
 })
 
 /**
@@ -33,5 +33,5 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   }
 
   const provider = await createAiProvider({ name: name!, slug: slug!, baseUrl, apiKey })
-  return ok({ data: provider })
+  return ok(provider)
 })

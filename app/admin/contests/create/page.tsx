@@ -43,7 +43,9 @@ export default function CreateContestPage() {
         const response = await fetchWithAuth('/api/admin/problems')
         const data = await response.json()
         if (data.success) {
-          setAllProblems(data.data)
+          setAllProblems(Array.isArray(data.data) ? data.data : [])
+        } else {
+          setAllProblems([])
         }
       } catch (err) {
         logger.error('加载题目列表失败', err)

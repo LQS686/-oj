@@ -12,5 +12,5 @@ export const POST = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的ID')
   const models = await discoverProviderModels(id)
-  return ok({ data: models })
+  return ok(models)
 })

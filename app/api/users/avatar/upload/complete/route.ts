@@ -50,5 +50,5 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     // Non-blocking error
   }
 
-  return ok({ data: { avatar: result.url } })
+  return ok({ avatar: result.url })
 })

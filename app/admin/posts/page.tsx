@@ -40,9 +40,10 @@ export default function AdminPostsPage() {
 
       const data = await response.json()
       if (data.success) {
-        setPosts(data.data)
+        setPosts(Array.isArray(data.data) ? data.data : [])
       } else {
         setError(data.error || '获取帖子列表失败')
+        setPosts([])
       }
     } catch {
       setError('网络错误')

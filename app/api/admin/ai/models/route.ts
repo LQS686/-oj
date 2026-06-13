@@ -24,7 +24,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
   }
 
   const { data, orphanCount } = await listActiveAiModelsEnriched()
-  return ok({ data, _orphanFiltered: orphanCount })
+  return ok({ items: data, _orphanFiltered: orphanCount })
 })
 
 /**
@@ -62,5 +62,5 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     maxTokens, temperature, timeout, params,
   })
 
-  return ok({ data: newModel })
+  return ok(newModel)
 })

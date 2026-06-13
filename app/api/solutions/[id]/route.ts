@@ -72,7 +72,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
 
   try {
     const updated = await updateUserSolution(id, user.id, isAdmin, isTeacher, body)
-    return ok({ data: updated, message: '题解更新成功' })
+    return ok(updated)
   } catch (err: any) {
     if (err?.status === 400) throw400('VALIDATION', err.message)
     if (err?.status === 403) throw403(err.message)

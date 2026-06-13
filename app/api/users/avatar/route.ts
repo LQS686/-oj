@@ -23,7 +23,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
       crypto,
       path
     )
-    return ok({ data: { avatarUrl }, message: '头像更新成功' })
+    return ok({ avatarUrl })
   } catch (err: any) {
     if (err?.status === 400) throw400('VALIDATION', err.message)
     throw err

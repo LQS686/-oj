@@ -30,7 +30,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
 
   const contest = await adminGetContestWithProblems(id)
   if (!contest) throw404('竞赛不存在')
-  return ok({ data: contest })
+  return ok(contest)
 })
 
 /**

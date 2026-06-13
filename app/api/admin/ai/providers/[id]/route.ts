@@ -30,7 +30,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   const { name, baseUrl, apiKey, isActive } = body
 
   const provider = await updateAiProvider(id, { name, baseUrl, apiKey, isActive })
-  return ok({ data: provider })
+  return ok(provider)
 })
 
 /**

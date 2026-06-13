@@ -44,5 +44,5 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     throw400('VALIDATION', '缺少必要参数')
   }
   const training = await createTrainingWithProblems(body)
-  return ok({ data: training, message: '训练计划创建成功' }, { status: 201 })
+  return ok(training, { status: 201 })
 })

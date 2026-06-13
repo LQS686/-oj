@@ -28,9 +28,9 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
   const logId = searchParams.get('logId')
 
   if (!logId) {
-    return ok({ data: await listRecentAiLogs(user.id, 20) })
+    return ok(await listRecentAiLogs(user.id, 20))
   }
-  return ok({ data: await getAiLogById(logId) })
+  return ok(await getAiLogById(logId))
 })
 
 /**
@@ -46,9 +46,9 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
 
   // 3. Retry path: 从已失败日志重跑
   if (retryFromLogId) {
-    return ok({ data: await retryAiGeneration(user.id, retryFromLogId, reduceTemperature) })
+    return ok(await retryAiGeneration(user.id, retryFromLogId, reduceTemperature))
   }
 
   validateAiGenerateBody(body)
-  return ok({ data: await enqueueAiGeneration(user.id, body) })
+  return ok(await enqueueAiGeneration(user.id, body))
 })

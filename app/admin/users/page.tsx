@@ -89,9 +89,10 @@ export default function AdminUsersPage() {
 
       const data = await response.json()
       if (data.success) {
-        setUsers(data.data)
+        setUsers(Array.isArray(data.data) ? data.data : [])
       } else {
         setError(data.error || '获取用户列表失败')
+        setUsers([])
       }
     } catch (err) {
       setError('网络错误')

@@ -40,7 +40,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
-  return ok({ data: await updateAdminProblem(id, body), message: '题目更新成功' })
+  return ok(await updateAdminProblem(id, body))
 })
 
 /**
@@ -51,7 +51,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
-  return ok({ data: await updateAdminProblem(id, body), message: '题目更新成功' })
+  return ok(await updateAdminProblem(id, body))
 })
 
 /**

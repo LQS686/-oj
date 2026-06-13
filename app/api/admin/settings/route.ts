@@ -16,7 +16,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
   }
 
   const settings = await getSystemSettings()
-  return ok({ data: settings })
+  return ok(settings)
 })
 
 /**

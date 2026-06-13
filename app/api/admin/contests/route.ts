@@ -53,5 +53,5 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     isPublic, password, problems,
   }, user.id)
 
-  return ok({ data: contest })
+  return ok(contest)
 })

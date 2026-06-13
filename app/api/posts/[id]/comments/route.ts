@@ -30,7 +30,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
       parentId: body.parentId,
       authorId: user.id,
     })
-    return ok({ data: comment, message: '评论发表成功' }, { status: 201 })
+    return ok(comment, { status: 201 })
   } catch (err: any) {
     if (err?.status === 404) throw404(err.message)
     throw err

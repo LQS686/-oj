@@ -226,9 +226,13 @@ export default function AIGenerationPage() {
     try {
       const response = await fetchWithAuth('/api/admin/ai/generate')
       const data = await response.json()
-      if (data.success) setLogs(data.data || [])
+      // 服务端已解开双层包装 → data.data 直接是数组
+      const items = Array.isArray(data.data) ? data.data : []
+      if (data.success) setLogs(items)
+      else setLogs([])
     } catch (error) {
       logger.error('获取生成记录失败', error)
+      setLogs([])
     }
   }
 

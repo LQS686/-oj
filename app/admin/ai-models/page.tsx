@@ -268,10 +268,11 @@ export default function AIModelsPage() {
       const res = await fetchWithAuth(`/api/admin/ai/providers/${providerId}/discover-models`)
       const data = await res.json()
       if (data.success) {
-        if (data.data && data.data.length > 0) {
-          setDiscoveredModels(data.data)
+        const models = Array.isArray(data.data) ? data.data : (Array.isArray(data.data?.items) ? data.data.items : [])
+        if (models.length > 0) {
+          setDiscoveredModels(models)
           // 默认勾选前 5 个（避免一次性全选导致超量）
-          setSelectedDiscovered(new Set(data.data.slice(0, 5).map((m: DiscoveredModel) => m.model)))
+          setSelectedDiscovered(new Set(models.slice(0, 5).map((m: DiscoveredModel) => m.model)))
         } else {
           setDiscoverError(data.reason === 'NOT_SUPPORTED'
             ? (data.message || '该服务商未提供模型列表接口')

@@ -40,7 +40,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     params: modelParams,
   })
 
-  return ok({ data: updatedModel })
+  return ok(updatedModel)
 })
 
 /**

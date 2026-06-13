@@ -44,9 +44,10 @@ export default function AdminClassesPage() {
 
       const data = await response.json()
       if (data.success) {
-        setClasses(data.data)
+        setClasses(Array.isArray(data.data) ? data.data : [])
       } else {
         setError(data.error || '获取班级列表失败')
+        setClasses([])
       }
     } catch (err) {
       setError('网络错误')

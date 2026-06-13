@@ -43,9 +43,10 @@ export default function AdminContestsPage() {
 
       const data = await response.json()
       if (data.success) {
-        setContests(data.data)
+        setContests(Array.isArray(data.data) ? data.data : [])
       } else {
         setError(data.error || '获取竞赛列表失败')
+        setContests([])
       }
     } catch {
       setError('网络错误')

@@ -19,5 +19,5 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
   const status = query.status
 
   const result = await listAdminSubmissions({ page, pageSize, status })
-  return ok({ data: result })
+  return ok(result)
 })
