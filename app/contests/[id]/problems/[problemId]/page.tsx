@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Clock, Database, Send, AlertCircle, ArrowLeft, CheckCircle, XCircle, Wifi, WifiOff, BookOpen, ListChecks } from 'lucide-react'
@@ -33,23 +33,67 @@ export default function ContestProblemDetailPage({ params }: { params: Promise<{
   const [showJudgeStatus, setShowJudgeStatus] = useState(false)
   const [judgeProgress, setJudgeProgress] = useState<{ currentTest: number; totalTests: number } | null>(null)
 
+  // ref 跟踪 currentSubmissionId，避免回调闭包拿到陈旧值
+  const currentSubmissionIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    currentSubmissionIdRef.current = currentSubmissionId
+  }, [currentSubmissionId])
+
+  // 兜底：submissions 列表里最新一条非终态变成终态时，
+  // 强制重置 submitting，避免"评测中"按钮卡死
+  useEffect(() => {
+    if (!submitting) return
+    if (!Array.isArray(submissions) || submissions.length === 0) return
+    const latest = submissions[0]
+    const status = latest?.status
+    if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
+      setSubmitting(false)
+      setJudgeProgress(null)
+      setSubmitResult({
+        type: status === 'AC' || status === 'Accepted' ? 'success' : 'error',
+        text: `评测完成：${status}`,
+        id: latest.id
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, submitting])
+
   const { isConnected } = useSubmissionSocket({
     userId: user?.id || '',
     enabled: !!user,
     onSubmissionUpdate: (data) => {
       logger.debug('收到实时评测结果', data)
       
-      setSubmissions(prev => {
-        const index = prev.findIndex(s => s.id === data.id)
-        if (index !== -1) {
-          const newSubmissions = [...prev]
-          newSubmissions[index] = { ...newSubmissions[index], ...data }
-          return newSubmissions
-        }
-        return prev
-      })
+      // 1) 乐观更新提交列表（不依赖 currentSubmissionId）
+      if (data?.id) {
+        setSubmissions((prev) => {
+          if (!Array.isArray(prev)) return prev
+          const index = prev.findIndex(s => s.id === data.id)
+          if (index !== -1) {
+            const newSubmissions = prev.slice()
+            newSubmissions[index] = { ...newSubmissions[index], ...data }
+            return newSubmissions
+          }
+          return prev
+        })
+      }
 
-      if (data.id === currentSubmissionId) {
+      // 2) 任何终态事件都重置 submitting（不再被 currentSubmissionId 拦截）
+      const isFinal = data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+      if (isFinal) {
+        setSubmitting(false)
+        setJudgeProgress(null)
+        setSubmitResult({
+          type: data.status === 'AC' || data.status === 'Accepted' ? 'success' : 'error',
+          text: `评测完成：${data.status}`,
+          id: data.id
+        })
+        fetchSubmissions()
+      }
+
+      // 3) 仅当是当前提交时，单独驱动 JudgeStatus 面板
+      const isCurrentSubmission = data.id === currentSubmissionIdRef.current
+      if (isCurrentSubmission) {
         setJudgeStatus({
           submissionId: data.id,
           status: data.status,
@@ -57,24 +101,12 @@ export default function ContestProblemDetailPage({ params }: { params: Promise<{
           totalTests: data.totalTests || 0,
           testResults: data.testResults || [],
         })
-        
+
         setShowJudgeStatus(true)
-        
-        if (data.status !== 'Pending' && data.status !== 'Judging') {
-          setSubmitting(false)
-          setJudgeProgress(null)
-          setSubmitResult({ 
-            type: data.status === 'AC' || data.status === 'Accepted' ? 'success' : 'error', 
-            text: `评测完成：${data.status}`,
-            id: data.id 
-          })
-          fetchSubmissions()
-        }
       }
     },
     onJudgeProgress: (data) => {
-      console.log('📡 评测进度:', data)
-      if (data.submissionId === currentSubmissionId) {
+      if (data?.submissionId === currentSubmissionIdRef.current) {
         setJudgeProgress({
           currentTest: data.currentTest,
           totalTests: data.totalTests,

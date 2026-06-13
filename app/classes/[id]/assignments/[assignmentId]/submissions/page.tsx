@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
+import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import type { Assignment } from '@/types/models'
 
@@ -86,7 +87,8 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
         params.append('pageSize', '50')
         
         const response = await fetchWithAuth(
-          `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`
+          `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
+          { cache: 'no-store' }
         )
         const data = await response.json()
         
@@ -115,6 +117,65 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
     
     fetchSubmissions()
   }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus, isFromLeaderboard])
+
+  // 轮询兜底：列表里有非终态记录时每 3s 拉一次，
+  // 解决 WebSocket 漏推 / 断连时提交记录永远不刷新的问题
+  useEffect(() => {
+    if (!Array.isArray(submissions) || submissions.length === 0) return
+    const hasNonFinal = submissions.some(
+      (s) => s?.status === 'Pending' || s?.status === 'Judging' || s?.status === 'Running'
+    )
+    if (!hasNonFinal) return
+    const timer = setInterval(async () => {
+      try {
+        const params = new URLSearchParams()
+        if (filterUserId) params.append('userId', filterUserId)
+        if (filterProblemId) params.append('problemId', filterProblemId)
+        if (filterStatus) params.append('status', filterStatus)
+        params.append('page', '1')
+        params.append('pageSize', '50')
+        
+        const response = await fetchWithAuth(
+          `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
+          { cache: 'no-store' }
+        )
+        const data = await response.json()
+        if (data.success) {
+          setSubmissions(data.data.submissions || [])
+        }
+      } catch (error) {
+        logger.error('轮询提交记录失败', error)
+      }
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus, submissions])
+
+  // WebSocket 实时推送：本地有用户提交时收到推送，
+  // 立即合并到列表（乐观更新），再后台拉一次拿权威数据
+  useSubmissionSocket({
+    userId: user?.id || '',
+    enabled: !!user,
+    onSubmissionUpdate: (data) => {
+      if (!data?.id) return
+      setSubmissions((prev) => {
+        if (!Array.isArray(prev)) return prev
+        const idx = prev.findIndex((s) => s?.id === data.id)
+        if (idx === -1) return prev
+        const next = prev.slice()
+        next[idx] = {
+          ...next[idx],
+          status: data.status,
+          score: typeof data.score === 'number' ? data.score : next[idx].score,
+          time: typeof data.time === 'number' ? data.time : next[idx].time,
+          memory: typeof data.memory === 'number' ? data.memory : next[idx].memory,
+          passedTests: typeof data.passedTests === 'number' ? data.passedTests : next[idx].passedTests,
+          totalTests: typeof data.totalTests === 'number' ? data.totalTests : next[idx].totalTests,
+          message: data.message ?? next[idx].message,
+        }
+        return next
+      })
+    },
+  })
 
   const getStatusInfo = (status: string, score: number) => {
     switch (status) {

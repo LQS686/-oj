@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
@@ -99,6 +99,12 @@ export default function AssignmentDetailPage() {
   const [lastResult, setLastResult] = useState<{ status: string; score: number } | null>(null)
   const [submitCooldown, setSubmitCooldown] = useState(false)
 
+  // ref 跟踪 currentSubmissionId，避免回调闭包拿到陈旧值
+  const currentSubmissionIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    currentSubmissionIdRef.current = currentSubmissionId
+  }, [currentSubmissionId])
+
   useEffect(() => {
     fetchAssignment()
     fetchClassMembers()
@@ -173,11 +179,73 @@ export default function AssignmentDetailPage() {
     }
   }, [params.id, params.assignmentId])
 
+  // 兜底：作业内部"我的提交状态"列表里只要有一条终态，就把按钮重置。
+  // 解决 ref 没追上 / tab 切换 / 多提交 等场景下 submitting 卡在 true 的问题。
+  useEffect(() => {
+    if (!submitting) return
+    if (!Array.isArray(submissions) || submissions.length === 0) return
+    const mySubs = submissions.filter((s) => !s.userId || s.userId === user?.id)
+    const latestMine = mySubs[0]
+    if (!latestMine) return
+    const status = latestMine.status
+    if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
+      setSubmitting(false)
+      setSubmitCooldown(false)
+      setJudgeProgress(null)
+      if (!lastResult || lastResult.status !== status) {
+        setLastResult({
+          status,
+          score: typeof latestMine.score === 'number' ? latestMine.score : 0
+        })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, submitting, user?.id])
+
   const { isConnected } = useSubmissionSocket({
     userId: user?.id || '',
     enabled: !!user,
     onSubmissionUpdate: (data) => {
-      if (data.id === currentSubmissionId) {
+      // 1) 收到任何"终态"事件都直接重置 submitting / cooldown，
+      //    不要再被 currentSubmissionId 门控拦截（同样的 bug 在
+      //    /problem/[id] 出现过，导致按钮永远卡在"评测中"）。
+      const isFinal = data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+      if (isFinal) {
+        setSubmitting(false)
+        setSubmitCooldown(false)
+        setJudgeProgress(null)
+        setLastResult({
+          status: data.status,
+          score: typeof data.score === 'number' ? data.score : (data.passedTests || 0) * 10
+        })
+        setCode('')
+      }
+
+      // 2) 乐观合并到本作业的"我的提交"列表（无论是否 currentSubmissionId）
+      if (data?.id && isFinal) {
+        const currentProblemId = assignment?.problems?.[selectedProblemIndex]?.id || ''
+        setSubmissions((prev) => {
+          if (!Array.isArray(prev)) return prev
+          const filtered = prev.filter(
+            (s) => !(s.userId === user?.id && s.problemId === currentProblemId)
+          )
+          return [
+            ...filtered,
+            {
+              id: data.id,
+              userId: user?.id,
+              problemId: currentProblemId,
+              status: data.status,
+              score: typeof data.score === 'number' ? data.score : 0,
+              submittedAt: new Date().toISOString()
+            }
+          ]
+        })
+      }
+
+      // 3) 仅当是"当前提交"时，单独驱动中间进度条状态
+      const isCurrentSubmission = data.id === currentSubmissionIdRef.current
+      if (isCurrentSubmission) {
         setJudgeStatus({
           submissionId: data.id,
           status: data.status,
@@ -185,34 +253,10 @@ export default function AssignmentDetailPage() {
           totalTests: data.totalTests || 0,
           testResults: data.testResults || [],
         })
-        if (data.status !== 'Pending' && data.status !== 'Judging') {
-          setSubmitting(false)
-          setSubmitCooldown(false)
-          setJudgeProgress(null)
-          setLastResult({
-            status: data.status,
-            score: data.score || data.passedTests * 10
-          })
-          setCode('')
-          setSubmissions(prev => {
-            const newSub = {
-              id: currentSubmissionId || '',
-              userId: user?.id,
-              problemId: assignment?.problems?.[selectedProblemIndex]?.id || '',
-              status: data.status,
-              score: data.score || data.passedTests * 10,
-              submittedAt: new Date().toISOString()
-            }
-            const filtered = prev.filter(s =>
-              !(s.userId === user?.id && s.problemId === (assignment?.problems?.[selectedProblemIndex]?.id || ''))
-            )
-            return [...filtered, newSub]
-          })
-        }
       }
     },
     onJudgeProgress: (data) => {
-      if (data.submissionId === currentSubmissionId) {
+      if (data?.submissionId === currentSubmissionIdRef.current) {
         setJudgeProgress({
           currentTest: data.currentTest,
           totalTests: data.totalTests,
