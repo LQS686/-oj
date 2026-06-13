@@ -115,9 +115,9 @@ export default function ProblemsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setProblems(data.data.problems)
-        setTotalPages(data.data.pagination.totalPages)
-        setTotalProblems(data.data.pagination.total)
+        setProblems(data.data.problems || [])
+        setTotalPages(data.data.pagination?.totalPages || 1)
+        setTotalProblems(data.data.pagination?.total || 0)
       }
     } catch (error) {
       console.error('获取题目列表失败:', error)

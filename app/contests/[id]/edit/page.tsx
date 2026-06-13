@@ -88,7 +88,7 @@ export default function EditContestPage() {
       const response = await fetch(`/api/problems?search=${encodeURIComponent(query)}&limit=5`)
       const data = await response.json()
       if (data.success) {
-        const filtered = data.data.problems.filter((p: Problem) => 
+        const filtered = (data.data.problems || []).filter((p: Problem) =>
           !contestProblems.find(cp => cp.id === p.id)
         )
         setSearchResults(filtered)
@@ -125,7 +125,7 @@ export default function EditContestPage() {
       const data = await response.json()
       
       if (data.success) {
-        const foundProblems = data.data.problems as Problem[]
+        const foundProblems = (data.data.problems || []) as Problem[]
         const newProblems: Problem[] = []
         const foundNumbers = new Set(foundProblems.map(p => p.problemNumber))
         const notFound: string[] = []

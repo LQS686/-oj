@@ -61,7 +61,7 @@ export default function CreateContestPage() {
       const data = await response.json()
       if (data.success) {
         // Filter out already added problems
-        const filtered = data.data.problems.filter((p: Problem) => 
+        const filtered = (data.data.problems || []).filter((p: Problem) =>
           !contestProblems.find(cp => cp.id === p.id)
         )
         setSearchResults(filtered)
@@ -99,7 +99,7 @@ export default function CreateContestPage() {
       const data = await response.json()
       
       if (data.success) {
-        const foundProblems = data.data.problems as Problem[]
+        const foundProblems = (data.data.problems || []) as Problem[]
         const newProblems: Problem[] = []
         const foundNumbers = new Set(foundProblems.map(p => p.problemNumber))
         const notFound: string[] = []

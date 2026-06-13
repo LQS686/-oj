@@ -906,10 +906,13 @@ export async function getOperatorForSolutionRegen(userId: string) {
  * ========================================================================== */
 
 export interface ListPublicProblemsResult {
-  items: any[]
-  total: number
-  page: number
-  pageSize: number
+  problems: any[]
+  pagination: {
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }
 }
 
 /** 公共题库列表（分页 + 关键字 + 难度 + tag 过滤） */
@@ -941,7 +944,15 @@ export async function listPublicProblems(filter: {
     prisma.problem.count({ where }),
   ])
 
-  return { items, total, page, pageSize }
+  return {
+    problems: items,
+    pagination: {
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    },
+  }
 }
 
 /** 按 title 检查是否已存在同名题目 */
