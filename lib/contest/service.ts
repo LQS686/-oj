@@ -254,6 +254,7 @@ export async function updateContestWithProblems(
       })
     }
   }
+  cache.delete(`contest:byId:${contestId}`)
   return updated
 }
 
@@ -579,6 +580,9 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
     })
   }
 
+  // 提交后失效该竞赛的排行榜缓存（不同 limit 的缓存都要清）
+  cache.deleteByPrefix(`contest:rank:${input.contestId}`)
+
   return {
     submissionId: submission.id,
     submission,
@@ -645,6 +649,7 @@ export async function adminUpdateContest(
       })
     }
   }
+  cache.delete(`contest:byId:${contestId}`)
   return { message: '更新成功' }
 }
 
@@ -669,6 +674,7 @@ export async function adminGetContestWithProblems(contestId: string) {
 }
 
 export async function adminDeleteContest(contestId: string) {
+  cache.delete(`contest:byId:${contestId}`)
   return prisma.contest.delete({ where: { id: contestId } })
 }
 

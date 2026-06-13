@@ -77,16 +77,18 @@ export async function getProblemById(id: string) {
 }
 
 export async function createProblem(data: any, authorId: string) {
-  return prisma.problem.create({ data: { ...data, authorId } })
+  const problem = await prisma.problem.create({ data: { ...data, authorId } })
+  clearProblemCache(problem.id)
+  return problem
 }
 
 export async function updateProblem(id: string, data: any) {
-  cache.delete(`problem:byId:${id}`)
+  clearProblemCache(id)
   return prisma.problem.update({ where: { id }, data })
 }
 
 export async function deleteProblem(id: string) {
-  cache.delete(`problem:byId:${id}`)
+  clearProblemCache(id)
   return prisma.problem.delete({ where: { id } })
 }
 
@@ -202,6 +204,7 @@ export async function createProblemWithTestcases(input: CreateProblemInput) {
       )
     )
   }
+  clearProblemCache(problem.id)
   return problem
 }
 
@@ -515,6 +518,7 @@ export async function createAdminProblem(
   if (problem.testCases && problem.testCases.length > 0) {
     await redistributeTestScores(problem.id)
   }
+  clearProblemCache(problem.id)
   return problem
 }
 
@@ -571,6 +575,7 @@ export async function applyProblemVerification(input: VerifyProblemInput) {
       aiStatus: newStatus,
     },
   })
+  clearProblemCache(input.id)
 
   return {
     message: '验证完成',
@@ -582,6 +587,15 @@ export async function applyProblemVerification(input: VerifyProblemInput) {
 /* ============================================================================
  * 管理员编辑/获取/删除题目（原 /api/admin/problems/[id]）
  * ========================================================================== */
+
+/**
+ * 清除单道题目的全部缓存（byId + statusCounts）
+ */
+export function clearProblemCache(problemId: string) {
+  cache.delete(`problem:byId:${problemId}`)
+  cache.delete(`problem:statusCounts:${problemId}`)
+  cache.deleteByPrefix('problem:tags')
+}
 
 const ADMIN_PROBLEM_EDITABLE_FIELDS = [
   'problemNumber',
@@ -660,6 +674,9 @@ export async function updateAdminProblem(
   return prisma.problem.findUnique({
     where: { id },
     include: { testCases: { orderBy: { orderIndex: 'asc' } } },
+  }).then((result) => {
+    clearProblemCache(id)
+    return result
   })
 }
 
@@ -675,6 +692,7 @@ export async function deleteAdminProblem(id: string) {
   await prisma.favorite.deleteMany({ where: { problemId: id } })
   await prisma.testCase.deleteMany({ where: { problemId: id } })
   await prisma.problem.delete({ where: { id } })
+  clearProblemCache(id)
   return { message: '题目已删除' }
 }
 
@@ -695,23 +713,27 @@ export async function batchUpdateProblemVisibility(
   problemIds: string[],
   visibility: BatchProblemVisibility
 ) {
-  return prisma.problem.updateMany({
+  const result = await prisma.problem.updateMany({
     where: { id: { in: problemIds } },
     data: {
       visibility,
       isPublic: visibility === 'public',
     },
   })
+  problemIds.forEach(clearProblemCache)
+  return result
 }
 
 /**
  * 批量修改题目难度
  */
 export async function batchUpdateProblemDifficulty(problemIds: string[], difficulty: string) {
-  return prisma.problem.updateMany({
+  const result = await prisma.problem.updateMany({
     where: { id: { in: problemIds } },
     data: { difficulty },
   })
+  problemIds.forEach(clearProblemCache)
+  return result
 }
 
 /**
@@ -724,7 +746,9 @@ export async function batchDeleteProblems(problemIds: string[]) {
   await prisma.trainingProblem.deleteMany({ where: { problemId: { in: problemIds } } })
   await prisma.favorite.deleteMany({ where: { problemId: { in: problemIds } } })
   await prisma.testCase.deleteMany({ where: { problemId: { in: problemIds } } })
-  return prisma.problem.deleteMany({ where: { id: { in: problemIds } } })
+  const result = await prisma.problem.deleteMany({ where: { id: { in: problemIds } } })
+  problemIds.forEach(clearProblemCache)
+  return result
 }
 
 /**
@@ -798,6 +822,7 @@ export async function batchUpdateProblemSource(
       ip,
     },
   })
+  problemIds.forEach(clearProblemCache)
   return result
 }
 

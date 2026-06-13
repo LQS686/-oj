@@ -169,6 +169,14 @@ export async function deletePost(id: string) {
   return prisma.post.delete({ where: { id } })
 }
 
+/**
+ * 清空帖子详情缓存
+ * （被 updateUserPost / softDeleteUserPost / togglePostLike 等调用）
+ */
+export function clearPostCache(id: string) {
+  cache.delete(`post:byId:${id}`)
+}
+
 export async function listComments(postId: string) {
   return prisma.comment.findMany({
     where: { postId },
@@ -192,10 +200,12 @@ export async function togglePostLike(postId: string, userId: string) {
   if (existing) {
     await prisma.postLike.delete({ where: { id: existing.id } })
     await prisma.post.update({ where: { id: postId }, data: { likes: { decrement: 1 } } })
+    clearPostCache(postId)
     return { liked: false }
   } else {
     await prisma.postLike.create({ data: { userId, postId } })
     await prisma.post.update({ where: { id: postId }, data: { likes: { increment: 1 } } })
+    clearPostCache(postId)
     return { liked: true }
   }
 }
@@ -432,6 +442,7 @@ export async function updateUserPost(
   }
 ) {
   await updatePostDirect(id, data)
+  clearPostCache(id)
 }
 
 /**
@@ -439,6 +450,7 @@ export async function updateUserPost(
  */
 export async function softDeleteUserPost(id: string) {
   await softDeletePostDirect(id)
+  clearPostCache(id)
 }
 
 /**

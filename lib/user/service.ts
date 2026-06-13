@@ -5,6 +5,7 @@
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { getMongoClient } from '@/lib/mongodb-direct'
+import { clearRankingCache } from '@/lib/ranking/service'
 import bcrypt from 'bcryptjs'
 import {
   validateEmail,
@@ -88,6 +89,9 @@ export async function getActiveUsers(limit = 20) {
 export async function clearUserCache(userId: string) {
   cache.delete(`user:profile:${userId}`)
   cache.delete(`user:stats:${userId}`)
+  cache.delete(`auth:user:${userId}`)
+  // 任何用户变更（role / isAdmin / isBanned / rating / solvedCount / 删除）都会影响榜单
+  clearRankingCache()
 }
 
 /* ============================================================================

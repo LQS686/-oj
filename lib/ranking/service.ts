@@ -209,3 +209,15 @@ export async function getMyRankAdvanced(userId: string, type: 'rating' | 'solved
   }
   return { rank, userId }
 }
+
+/**
+ * 清空所有排行榜相关缓存
+ * （adminUpdateUser / adminDeleteUser / batchUpdateUserRole / batchDeleteUsers 等
+ *  影响 rating / solvedCount / isBanned 的操作都需要清榜单）
+ */
+export function clearRankingCache() {
+  cache.deleteByPrefix('ranking:global')
+  cache.deleteByPrefix('ranking:class')
+  cache.deleteByPrefix('ranking:myRank')
+  cache.deleteByPrefix('ranking:list')
+}

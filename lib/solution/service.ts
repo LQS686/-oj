@@ -59,6 +59,14 @@ export async function deleteSolution(id: string) {
   return prisma.solution.delete({ where: { id } })
 }
 
+/**
+ * 清空题解详情缓存
+ * （被 updateUserSolution / deleteUserSolution / toggleSolutionLike / 浏览数自增 等调用）
+ */
+export function clearSolutionCache(id: string) {
+  cache.delete(`solution:byId:${id}`)
+}
+
 export async function incrementViewCount(id: string) {
   return prisma.solution.update({
     where: { id },
@@ -256,6 +264,8 @@ export async function getSolutionDetailWithPermission(
         return prisma.solution.update({
           where: { id },
           data: { views: { increment: 1 } },
+        }).then(() => {
+          clearSolutionCache(id)
         })
       }
       return null
@@ -325,7 +335,7 @@ export async function updateUserSolution(
   if (input.code !== undefined) {
     data.code = input.code === null ? null : String(input.code)
   }
-  return prisma.solution.update({
+  const updated = await prisma.solution.update({
     where: { id },
     data,
     include: {
@@ -334,6 +344,8 @@ export async function updateUserSolution(
       },
     },
   })
+  clearSolutionCache(id)
+  return updated
 }
 
 /**
@@ -363,6 +375,7 @@ export async function deleteUserSolution(
   // 先删除关联评论，再删除题解
   await prisma.comment.deleteMany({ where: { solutionId: id } })
   await prisma.solution.delete({ where: { id } })
+  clearSolutionCache(id)
 }
 
 /**
@@ -413,6 +426,7 @@ export async function toggleSolutionLike(
       prisma.solution.update({ where: { id }, data: { likes: { decrement: 1 } } }),
     ])
     const updated = await prisma.solution.findUnique({ where: { id }, select: { likes: true } })
+    clearSolutionCache(id)
     return { liked: false, likes: updated?.likes ?? 0 }
   }
   try {
@@ -424,6 +438,7 @@ export async function toggleSolutionLike(
     if (err?.code !== 'P2002') throw err
   }
   const updated = await prisma.solution.findUnique({ where: { id }, select: { likes: true } })
+  clearSolutionCache(id)
   return { liked: true, likes: updated?.likes ?? 0 }
 }
 

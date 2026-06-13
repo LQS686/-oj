@@ -10,6 +10,7 @@ import {
   isFirstAccepted 
 } from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
+import { cache } from '@/lib/cache'
 
 // 监听评测完成事件
 judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
@@ -49,6 +50,10 @@ judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
       message: result.message,
       testResults: result.testResults
     })
+
+    // 失效提交详情缓存 + 题目状态统计缓存（状态变化后读旧缓存会拿到陈旧数据）
+    cache.delete(`submission:byId:${result.submissionId}`)
+    cache.delete(`problem:statusCounts:${submission.problemId}`)
 
     // 如果AC，更新题目通过数
     if (result.status === 'AC') {

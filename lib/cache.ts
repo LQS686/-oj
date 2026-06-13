@@ -65,6 +65,21 @@ class Cache {
     this.storage.delete(key)
   }
 
+  /**
+   * 按前缀删除所有匹配 key（用于批量缓存失效）
+   * 例：cache.deleteByPrefix('ranking:list') 会删除 ranking:list:xxx 所有 key
+   */
+  deleteByPrefix(prefix: string): number {
+    let count = 0
+    for (const key of this.storage.keys()) {
+      if (key.startsWith(prefix + ':') || key === prefix) {
+        this.storage.delete(key)
+        count++
+      }
+    }
+    return count
+  }
+
   clear() {
     this.storage.clear()
   }
