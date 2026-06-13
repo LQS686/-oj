@@ -203,7 +203,12 @@ export default function AIGenerationPage() {
       const response = await fetchWithAuth(`/api/admin/ai/models?_t=${Date.now()}`)
       const data = await response.json()
       if (data.success) {
-        const activeModels = data.data.filter((m: AIModel) => m.isActive)
+        const rawList = Array.isArray(data.data?.items)
+          ? data.data.items
+          : Array.isArray(data.data)
+            ? data.data
+            : []
+        const activeModels = rawList.filter((m: AIModel) => m.isActive)
         setModels(activeModels)
         const lastModelId = localStorage.getItem(LAST_MODEL_KEY)
         if (lastModelId && activeModels.some((m: AIModel) => m.id === lastModelId)) {
