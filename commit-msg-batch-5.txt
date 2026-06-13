@@ -1,9 +1,0 @@
-refactor(arch): 最终批 - 抽取 12 个长路由业务到 service 层
-
-- 抽取复杂逻辑到 service：批量注册 / 管理员题目 / AI 生成 / 作业详情
-- 简化路由层：剩余 12 个路由均 ≤ 69 行
-- 新建 lib/ai/discover.ts / lib/ai/service.ts
-- 扩展 lib/user / lib/problem / lib/class / lib/contest service
-
-12 路由 2340 → 575 行（-75%）
-累计迁移 121 个 API 路由，tsc 0 错误
