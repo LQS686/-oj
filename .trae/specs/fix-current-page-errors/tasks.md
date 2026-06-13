@@ -1,17 +1,17 @@
 # Tasks - 修复当前线上页面/权限/数据异常
 
 ## 任务总览
-- [ ] Task 1: 信息收集 - 静态扫描 4 路
-- [ ] Task 2: 信息收集 - 服务端错误日志分析
-- [ ] Task 3: 信息收集 - 客户端 console.error 拦截日志分析
-- [ ] Task 4: 分类与优先级排序
-- [ ] Task 5: 高优 - 修复 ctx.params 路由残留（回归确认）
-- [ ] Task 6: 高优 - 修复响应字段不一致（items/problems/分页结构）
-- [ ] Task 7: 中优 - 修复 ID 校验边界
-- [ ] Task 8: 中优 - 修复前端 useEffect 字段缺失防御
-- [ ] Task 9: 低优 - 规范化 console.error → logger
-- [ ] Task 10: 验证 - tsc 0 错误 + 抽样页面手动验证
-- [ ] Task 11: 提交推送
+- [x] Task 1: 信息收集 - 静态扫描 4 路
+- [x] Task 2: 信息收集 - 服务端错误日志分析
+- [x] Task 3: 信息收集 - 客户端 console.error 拦截日志分析
+- [x] Task 4: 分类与优先级排序
+- [x] Task 5: 高优 - 修复 ctx.params 路由残留（回归确认）
+- [x] Task 6: 高优 - 修复响应字段不一致
+- [x] Task 7: 中优 - 修复 ID 校验边界
+- [x] Task 8: 中优 - 修复前端 useEffect 字段缺失防御
+- [x] Task 9: 低优 - 规范化 console.error → logger
+- [x] Task 10: 验证 - tsc 0 错误 + 抽样页面手动验证
+- [x] Task 11: 提交推送
 
 ## 详细任务
 

@@ -62,6 +62,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const classId = searchParams.get('classId')
   const assignmentTitle = searchParams.get('assignmentTitle')
   const returnTab = searchParams.get('returnTab') || 'info'
+  const fromTraining = searchParams.get('from') === 'training'
+  const trainingId = searchParams.get('trainingId')
 
   const isAssignmentContext = fromAssignment === '1'
   
@@ -402,6 +404,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           onClick={() => {
             if (fromAssignment && classId) {
               router.replace(`/classes/${classId}/assignments/${fromAssignment}?tab=${returnTab}`)
+            } else if (fromTraining && trainingId) {
+              router.push(`/training/${trainingId}`)
             } else {
               router.push('/problems')
             }
@@ -409,7 +413,13 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           className="flex items-center gap-2 text-muted-foreground hover:text-primary-light mb-4 transition-colors cursor-pointer group"
         >
           <ArrowLeft className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-[-2px]" />
-          <span className="transition-colors duration-300 group-hover:text-primary-light">{fromAssignment && classId ? `返回作业` : '返回题库'}</span>
+          <span className="transition-colors duration-300 group-hover:text-primary-light">
+            {fromAssignment && classId
+              ? `返回作业`
+              : fromTraining && trainingId
+                ? '返回题单'
+                : '返回题库'}
+          </span>
         </button>
 
         <div className="flex flex-wrap items-center gap-3 mb-3">

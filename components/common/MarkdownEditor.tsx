@@ -7,6 +7,7 @@ import {
   Eye, Edit3, Heading1, Heading2, Heading3, Quote, Minus, Table, CheckSquare,
   X, Maximize2, Minimize2
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 interface MarkdownEditorProps {
   value: string
@@ -14,6 +15,51 @@ interface MarkdownEditorProps {
   height?: string
   placeholder?: string
 }
+
+type ToolbarCommand =
+  | { type: 'lineStart'; prefix: string }
+  | { type: 'wrap'; before: string; after?: string }
+
+interface ToolbarItem {
+  icon: LucideIcon
+  title: string
+  command: ToolbarCommand
+}
+
+const toolbarGroups: ToolbarItem[][] = [
+  [
+    { icon: Heading1, title: '标题1', command: { type: 'lineStart', prefix: '# ' } },
+    { icon: Heading2, title: '标题2', command: { type: 'lineStart', prefix: '## ' } },
+    { icon: Heading3, title: '标题3', command: { type: 'lineStart', prefix: '### ' } },
+  ],
+  [
+    { icon: Bold, title: '粗体 (Ctrl+B)', command: { type: 'wrap', before: '**', after: '**' } },
+    { icon: Italic, title: '斜体 (Ctrl+I)', command: { type: 'wrap', before: '*', after: '*' } },
+    { icon: CheckSquare, title: '任务列表', command: { type: 'lineStart', prefix: '- [ ] ' } },
+  ],
+  [
+    { icon: List, title: '无序列表', command: { type: 'lineStart', prefix: '- ' } },
+    { icon: ListOrdered, title: '有序列表', command: { type: 'lineStart', prefix: '1. ' } },
+    { icon: Quote, title: '引用', command: { type: 'lineStart', prefix: '> ' } },
+  ],
+  [
+    { icon: Code, title: '行内代码', command: { type: 'wrap', before: '`', after: '`' } },
+    { icon: FileCode, title: '代码块', command: { type: 'wrap', before: '```\n', after: '\n```' } },
+    { icon: Minus, title: '分割线', command: { type: 'wrap', before: '\n---\n' } },
+  ],
+  [
+    { icon: LinkIcon, title: '链接', command: { type: 'wrap', before: '[', after: '](url)' } },
+    { icon: ImageIcon, title: '图片', command: { type: 'wrap', before: '![', after: '](url)' } },
+    {
+      icon: Table,
+      title: '表格',
+      command: {
+        type: 'wrap',
+        before: '\n| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n',
+      },
+    },
+  ],
+]
 
 export default function MarkdownEditor({ 
   value, 
@@ -67,33 +113,13 @@ export default function MarkdownEditor({
     }, 0)
   }, [onChange])
 
-  const toolbarGroups = [
-    [
-      { icon: Heading1, title: '标题1', action: () => insertLineStart('# ') },
-      { icon: Heading2, title: '标题2', action: () => insertLineStart('## ') },
-      { icon: Heading3, title: '标题3', action: () => insertLineStart('### ') },
-    ],
-    [
-      { icon: Bold, title: '粗体 (Ctrl+B)', action: () => insertText('**', '**') },
-      { icon: Italic, title: '斜体 (Ctrl+I)', action: () => insertText('*', '*') },
-      { icon: CheckSquare, title: '任务列表', action: () => insertLineStart('- [ ] ') },
-    ],
-    [
-      { icon: List, title: '无序列表', action: () => insertLineStart('- ') },
-      { icon: ListOrdered, title: '有序列表', action: () => insertLineStart('1. ') },
-      { icon: Quote, title: '引用', action: () => insertLineStart('> ') },
-    ],
-    [
-      { icon: Code, title: '行内代码', action: () => insertText('`', '`') },
-      { icon: FileCode, title: '代码块', action: () => insertText('```\n', '\n```') },
-      { icon: Minus, title: '分割线', action: () => insertText('\n---\n') },
-    ],
-    [
-      { icon: LinkIcon, title: '链接', action: () => insertText('[', '](url)') },
-      { icon: ImageIcon, title: '图片', action: () => insertText('![', '](url)') },
-      { icon: Table, title: '表格', action: () => insertText('\n| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n') },
-    ],
-  ]
+  const runToolbarCommand = useCallback((command: ToolbarCommand) => {
+    if (command.type === 'lineStart') {
+      insertLineStart(command.prefix)
+      return
+    }
+    insertText(command.before, command.after)
+  }, [insertLineStart, insertText])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -134,7 +160,7 @@ export default function MarkdownEditor({
               {group.map((item, itemIndex) => (
                 <button
                   key={itemIndex}
-                  onClick={item.action}
+                  onClick={() => runToolbarCommand(item.command)}
                   className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
                   title={item.title}
                   type="button"

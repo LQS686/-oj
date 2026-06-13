@@ -362,7 +362,7 @@ export function getIO(): SocketIOServer | null {
 /**
  * 发送提交状态更新到指定用户
  */
-export function emitSubmissionUpdate(userId: string, data: { id: string; status: string; score: number; time?: number; memory?: number; passedTests?: number; totalTests?: number; message?: string; testResults?: any[] }) {
+export function emitSubmissionUpdate(userId: string, data: { id: string; status: string; score: number; time?: number; memory?: number; passedTests?: number; totalTests?: number; problemId?: string; message?: string; testResults?: any[] }) {
   const ioInstance = getIO()
   if (!ioInstance) {
     console.warn('⚠️  WebSocket 服务器未初始化，跳过推送')

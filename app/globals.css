@@ -296,6 +296,14 @@ code, pre {
     position: relative;
     overflow: hidden;
   }
+
+  .btn-sm {
+    padding: 0.4375rem 0.875rem;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+    border-radius: calc(var(--radius) - 2px);
+    gap: 0.375rem;
+  }
   
   .btn:focus-visible {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);

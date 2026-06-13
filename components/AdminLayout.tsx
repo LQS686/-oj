@@ -20,7 +20,8 @@ import {
   Bell,
   User,
   ChevronDown,
-  Cpu
+  Cpu,
+  BookOpen
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
@@ -119,6 +120,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: Trophy,
       label: '竞赛管理',
       href: '/admin/contests'
+    },
+    {
+      icon: BookOpen,
+      label: '题单管理',
+      href: '/admin/trainings'
     },
     {
       icon: Users,

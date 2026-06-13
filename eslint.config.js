@@ -55,7 +55,6 @@ export default [
       'react/react-in-jsx-scope': 'off',
       'react/no-unescaped-entities': 'off',
       'react/no-unknown-property': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
 
       'no-redeclare': 'off',
       '@typescript-eslint/no-redeclare': 'warn',
@@ -63,7 +62,6 @@ export default [
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-useless-escape': 'warn',
       'no-control-regex': 'warn',
-      'react/no-unknown-property': 'warn',
     },
   },
   {
@@ -73,7 +71,6 @@ export default [
       'no-debugger': 'warn',
       'no-shadow-restricted-names': 'error',
       'no-redeclare': 'off',
-      '@typescript-eslint/no-redeclare': 'warn',
       'no-case-declarations': 'off',
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-useless-escape': 'warn',
@@ -81,12 +78,14 @@ export default [
       'no-prototype-builtins': 'warn',
       'prefer-const': 'warn',
       'eqeqeq': ['warn', 'always', { null: 'ignore' }],
-      'react/no-unknown-property': 'warn',
     },
   },
   {
     // 业务层 / 共享 utils 强制 import 顺序
     files: ['lib/**/*.ts', 'app/api/**/*.ts'],
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+    },
     rules: {
       '@typescript-eslint/consistent-type-imports': 'warn',
     },

@@ -1,12 +1,25 @@
 /**
  * lib/training/service.ts
- * 训练计划 CRUD + 进度
+ * 训练计划（题单）业务层
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { logger } from '@/lib/logger'
-import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
+import { DEFAULT_PAGE_SIZE, type ListOptions } from '@/lib/types/common'
 import type { Prisma } from '@prisma/client'
+import type {
+  TrainingListItem,
+  PaginatedResponse,
+  TrainingListQuery,
+  TrainingCreateInput,
+  TrainingUpdateInput,
+  TrainingCategoryType,
+  TrainingDetail,
+  TrainingProblemItem,
+  TrainingCategory,
+  UserTrainingProgress,
+  TrainingProblemStatus,
+} from './types'
 
 export interface TrainingFilter {
   keyword?: string
@@ -14,13 +27,40 @@ export interface TrainingFilter {
   categoryId?: string
 }
 
+const TRAINING_LIST_TTL = 30_000
+const TRAINING_DETAIL_TTL = 30_000
+
+/** 缓存 key 工具 */
+function listKey(filter: object, opts: object): string {
+  return `training:list:${cacheHash({ filter, opts })}`
+}
+function byIdKey(id: string): string {
+  return `training:byId:${id}`
+}
+function enrollmentKey(userId: string, trainingId: string): string {
+  return `training:enrollment:${userId}:${trainingId}`
+}
+function userEnrollmentsKey(userId: string): string {
+  return `training:enrollments:${userId}`
+}
+function categoriesKey(): string {
+  return 'training:categories:all'
+}
+function cacheHash(input: object): string {
+  return Buffer.from(JSON.stringify(input)).toString('base64url').slice(0, 32)
+}
+
+/* ============================================================================
+ * 基础 CRUD
+ * ========================================================================== */
+
 export async function listTrainings(
   filter: TrainingFilter = {},
   options: ListOptions = {}
-): Promise<PaginatedResult<any>> {
+): Promise<{ items: any[]; total: number; page: number; pageSize: number }> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const where: any = {}
+  const where: Prisma.TrainingWhereInput = {}
   if (filter.keyword) {
     where.OR = [
       { title: { contains: filter.keyword, mode: 'insensitive' } },
@@ -47,123 +87,492 @@ export async function getTrainingById(id: string) {
       where: { id },
       include: { problems: { include: { problem: true }, orderBy: { orderIndex: 'asc' } } },
     })
-  }, { ttl: 30_000 })
+  }, { ttl: TRAINING_DETAIL_TTL })
 }
 
-export async function createTraining(data: any) {
+export async function createTraining(data: Prisma.TrainingCreateInput) {
   return prisma.training.create({ data })
 }
 
-export async function updateTraining(id: string, data: any) {
-  cache.delete(`training:byId:${id}`)
+export async function updateTraining(id: string, data: Prisma.TrainingUpdateInput) {
+  cache.delete(byIdKey(id))
+  cache.deleteByPrefix('training:list:')
   return prisma.training.update({ where: { id }, data })
 }
 
 export async function deleteTraining(id: string) {
-  cache.delete(`training:byId:${id}`)
-  return prisma.training.delete({ where: { id } })
-}
-
-export async function getUserTrainingProgress(trainingId: string, userId: string) {
-  return (prisma as any).trainingProgress
-    ? await (prisma as any).trainingProgress.findUnique({
-        where: { trainingId_userId: { trainingId, userId } },
-      })
-    : null
-}
-
-export async function updateTrainingProgress(
-  trainingId: string,
-  userId: string,
-  data: { completedProblems?: number; totalScore?: number }
-) {
-  const model = (prisma as any).trainingProgress
-  if (!model) return null
-  return model.upsert({
-    where: { trainingId_userId: { trainingId, userId } },
-    update: data,
-    create: { trainingId, userId, ...data },
-  })
+  cache.delete(byIdKey(id))
+  cache.deleteByPrefix('training:list:')
+  // 级联删除关联表（Prisma 关系未设 onDelete: Cascade，需手动）
+  return prisma.$transaction([
+    prisma.trainingProblem.deleteMany({ where: { trainingId: id } }),
+    prisma.trainingEnrollment.deleteMany({ where: { trainingId: id } }),
+    prisma.training.delete({ where: { id } }),
+  ])
 }
 
 /* ============================================================================
- * 业务封装：原 /api/trainings 路由中的复杂逻辑
+ * 高级查询：公开列表（带分类/标签/作者/题目计数/用户进度）
  * ========================================================================== */
 
-/**
- * 训练计划列表（公开 + 关键字 + 难度 + 题目计数）
- */
 export async function listPublicTrainingsAdvanced(
   page: number,
   limit: number,
-  filter: { keyword?: string; difficulty?: string }
-) {
-  const where: Prisma.TrainingWhereInput = { isPublic: true }
-  if (filter.keyword) {
-    where.OR = [
-      { title: { contains: filter.keyword, mode: 'insensitive' } },
-      { description: { contains: filter.keyword, mode: 'insensitive' } },
-    ]
+  filter: {
+    keyword?: string
+    difficulty?: string
+    categoryId?: string
+    userId?: string | null
   }
-  if (filter.difficulty) where.difficulty = filter.difficulty
+): Promise<PaginatedResponse<TrainingListItem>> {
+  // 公开题单：isPublic + published
+  // 登录用户：额外可看到自己创建的私有/草稿题单（用于"我的题单"分类）
+  const baseScope: Prisma.TrainingWhereInput = filter.userId
+    ? {
+        OR: [
+          { isPublic: true, status: 'published' },
+          { authorId: filter.userId },
+        ],
+      }
+    : { isPublic: true, status: 'published' }
+  const extra: Prisma.TrainingWhereInput[] = []
+  if (filter.keyword) {
+    extra.push({
+      OR: [
+        { title: { contains: filter.keyword, mode: 'insensitive' } },
+        { description: { contains: filter.keyword, mode: 'insensitive' } },
+      ],
+    })
+  }
+  if (filter.difficulty) extra.push({ difficulty: filter.difficulty })
+  if (filter.categoryId) extra.push({ categoryId: filter.categoryId })
+  const where: Prisma.TrainingWhereInput = extra.length > 0
+    ? { AND: [baseScope, ...extra] }
+    : baseScope
 
   const [trainings, total] = await Promise.all([
     prisma.training.findMany({
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { problems: true } } },
+      orderBy: [{ isRecommended: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        _count: { select: { problems: true, enrollments: true } },
+        author: { select: { id: true, username: true, nickname: true, avatar: true } },
+        category: { select: { id: true, name: true } },
+      },
     }),
     prisma.training.count({ where }),
   ])
+
+  // 批量拉取当前用户在这些题单上的进度
+  let progressMap = new Map<string, { solvedCount: number; attemptedCount: number; isJoined: boolean }>()
+  if (filter.userId && trainings.length > 0) {
+    const trainingIds = trainings.map(t => t.id)
+    const enrollments = await prisma.trainingEnrollment.findMany({
+      where: { userId: filter.userId, trainingId: { in: trainingIds } },
+      select: { trainingId: true },
+    })
+    const enrolledSet = new Set(enrollments.map(e => e.trainingId))
+
+    const allProblems = await prisma.trainingProblem.findMany({
+      where: { trainingId: { in: trainingIds } },
+      select: { id: true, trainingId: true, problemId: true },
+    })
+    const problemIds = [...new Set(allProblems.map(p => p.problemId))]
+    const submissions = problemIds.length > 0 ? await prisma.submission.findMany({
+      where: { userId: filter.userId, problemId: { in: problemIds } },
+      select: { problemId: true, status: true },
+    }) : []
+    const acSet = new Set(submissions.filter(s => s.status === 'AC').map(s => s.problemId))
+    const attSet = new Set(submissions.map(s => s.problemId))
+
+    for (const t of trainings) {
+      const tProblems = allProblems.filter(p => p.trainingId === t.id)
+      const total = tProblems.length
+      const solvedCount = tProblems.filter(p => acSet.has(p.problemId)).length
+      const attemptedCount = tProblems.filter(p => attSet.has(p.problemId)).length
+      progressMap.set(t.id, {
+        solvedCount,
+        attemptedCount,
+        isJoined: enrolledSet.has(t.id),
+      })
+      void total
+    }
+  }
+
+  const items: TrainingListItem[] = trainings.map(t => {
+    const p = progressMap.get(t.id)
+    const total = t._count.problems
+    return {
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      difficulty: t.difficulty,
+      categoryType: (t.categoryType as TrainingCategoryType | null) ?? null,
+      isPublic: t.isPublic,
+      status: t.status,
+      isRecommended: t.isRecommended,
+      tags: t.tags || [],
+      cover: t.cover,
+      joinCount: t.joinCount,
+      viewCount: t.viewCount,
+      problemCount: total,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      author: t.author,
+      category: t.category,
+      userProgress: p
+        ? {
+            solvedCount: p.solvedCount,
+            attemptedCount: p.attemptedCount,
+            progressPercentage: total > 0 ? Math.round((p.solvedCount / total) * 100) : 0,
+            isJoined: p.isJoined,
+          }
+        : { solvedCount: 0, attemptedCount: 0, progressPercentage: 0, isJoined: false },
+    }
+  })
+
   return {
-    items: trainings.map(t => ({ ...t, problemCount: t._count.problems })),
+    items,
     total,
     page,
     pageSize: limit,
-    totalPages: Math.ceil(total / limit),
+    totalPages: Math.max(1, Math.ceil(total / limit)),
   }
 }
 
-/**
- * 创建训练计划 + 批量绑定题目
- */
-export interface CreateTrainingInput {
-  title: string
-  description: string
-  difficulty: string
-  isPublic?: boolean
-  problemIds?: string[]
+/* ============================================================================
+ * 推荐题单 / 分类
+ * ========================================================================== */
+
+export async function listRecommendedTrainings(limit = 3, userId: string | null = null) {
+  return cache.get('training:recommended', [limit, userId || 'guest'], async () => {
+    const trainings = await prisma.training.findMany({
+      where: { isPublic: true, status: 'published', isRecommended: true },
+      take: limit,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        _count: { select: { problems: true } },
+        author: { select: { id: true, username: true, nickname: true, avatar: true } },
+        category: { select: { id: true, name: true } },
+      },
+    })
+    return trainings.map(t => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      difficulty: t.difficulty,
+      cover: t.cover,
+      tags: t.tags,
+      isRecommended: t.isRecommended,
+      joinCount: t.joinCount,
+      viewCount: t.viewCount,
+      problemCount: t._count.problems,
+      author: t.author,
+      category: t.category,
+      createdAt: t.createdAt,
+    }))
+  }, { ttl: TRAINING_LIST_TTL })
 }
 
-export async function createTrainingWithProblems(input: CreateTrainingInput) {
-  const training = await prisma.training.create({
+export async function listCategories(): Promise<TrainingCategory[]> {
+  return cache.get('training:categories', ['all'], async () => {
+    const items = await prisma.trainingCategory.findMany({
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
+      include: { _count: { select: { trainings: true } } },
+    })
+    return items.map(c => ({
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      orderIndex: c.orderIndex,
+      createdAt: c.createdAt,
+      _count: c._count,
+    }))
+  }, { ttl: 60_000 })
+}
+
+export async function createCategory(input: { name: string; description?: string; orderIndex?: number }) {
+  cache.delete(categoriesKey())
+  return prisma.trainingCategory.create({
     data: {
-      title: input.title,
-      description: input.description,
-      difficulty: input.difficulty,
-      isPublic: input.isPublic ?? true,
+      name: input.name,
+      description: input.description || null,
+      orderIndex: input.orderIndex ?? 0,
     },
   })
-  if (input.problemIds && input.problemIds.length > 0) {
-    const trainingProblems = input.problemIds.map((problemId, index) => ({
+}
+
+export async function updateCategory(id: string, input: { name?: string; description?: string; orderIndex?: number }) {
+  cache.delete(categoriesKey())
+  return prisma.trainingCategory.update({
+    where: { id },
+    data: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.orderIndex !== undefined ? { orderIndex: input.orderIndex } : {}),
+    },
+  })
+}
+
+export async function deleteCategory(id: string) {
+  cache.delete(categoriesKey())
+  return prisma.trainingCategory.delete({ where: { id } })
+}
+
+/* ============================================================================
+ * 创建 / 更新（含题目）
+ * ========================================================================== */
+
+export async function createTrainingWithProblems(input: TrainingCreateInput) {
+  const { problemIds, ...rest } = input
+  const training = await prisma.training.create({
+    data: {
+      title: rest.title,
+      description: rest.description,
+      // difficulty 字段已废弃，仅在显式传入时设置（兼容老数据）
+      ...(rest.difficulty != null ? { difficulty: rest.difficulty } : {}),
+      categoryType: rest.categoryType ?? null,
+      isPublic: rest.isPublic ?? true,
+      status: rest.status ?? 'published',
+      isRecommended: rest.isRecommended ?? false,
+      authorId: rest.authorId || null,
+      categoryId: rest.categoryId || null,
+      tags: rest.tags || [],
+      cover: rest.cover || null,
+    },
+  })
+  if (problemIds && problemIds.length > 0) {
+    const trainingProblems = problemIds.map((problemId, index) => ({
       trainingId: training.id,
       problemId,
       orderIndex: index,
     }))
     await prisma.trainingProblem.createMany({ data: trainingProblems })
   }
+  cache.deleteByPrefix('training:list:')
   return training
 }
 
-/**
- * 训练详情 + 当前用户题目状态
- */
-export async function getTrainingWithProblemStatuses(id: string, userId: string | null) {
+export async function updateTrainingAndProblems(
+  id: string,
+  input: TrainingUpdateInput
+) {
+  cache.delete(byIdKey(id))
+  cache.deleteByPrefix('training:list:')
+  return prisma.training.update({
+    where: { id },
+    data: {
+      ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.difficulty !== undefined ? { difficulty: input.difficulty } : {}),
+      ...(input.categoryType !== undefined ? { categoryType: input.categoryType } : {}),
+      ...(input.isPublic !== undefined ? { isPublic: input.isPublic } : {}),
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.isRecommended !== undefined ? { isRecommended: input.isRecommended } : {}),
+      ...(input.categoryId !== undefined ? { categoryId: input.categoryId || null } : {}),
+      ...(input.tags !== undefined ? { tags: input.tags } : {}),
+      ...(input.cover !== undefined ? { cover: input.cover } : {}),
+    },
+  })
+}
+
+/* ============================================================================
+ * 题目管理（add/remove/reorder/update）
+ * ========================================================================== */
+
+export async function addTrainingProblems(
+  trainingId: string,
+  problems: Array<{ problemId: string; orderIndex?: number; score?: number; required?: boolean }>
+) {
+  cache.delete(byIdKey(trainingId))
+  // 计算起始 orderIndex
+  const existing = await prisma.trainingProblem.findMany({
+    where: { trainingId },
+    orderBy: { orderIndex: 'desc' },
+    take: 1,
+    select: { orderIndex: true },
+  })
+  let next = (existing[0]?.orderIndex ?? -1) + 1
+  const data = problems.map(p => ({
+    trainingId,
+    problemId: p.problemId,
+    orderIndex: p.orderIndex ?? next++,
+    score: p.score ?? 100,
+    required: p.required ?? true,
+  }))
+  // MongoDB 不支持 skipDuplicates，逐条 create 跳过重复
+  let count = 0
+  for (const item of data) {
+    try {
+      await prisma.trainingProblem.create({ data: item })
+      count++
+    } catch { /* skip duplicate */ }
+  }
+  return { count }
+}
+
+export async function removeTrainingProblems(trainingId: string, problemIds: string[]) {
+  cache.delete(byIdKey(trainingId))
+  return prisma.trainingProblem.deleteMany({
+    where: { trainingId, problemId: { in: problemIds } },
+  })
+}
+
+export async function reorderTrainingProblems(
+  trainingId: string,
+  orderMap: Array<{ problemId: string; orderIndex: number }>
+) {
+  cache.delete(byIdKey(trainingId))
+  await prisma.$transaction(
+    orderMap.map(item =>
+      prisma.trainingProblem.update({
+        where: { trainingId_problemId: { trainingId, problemId: item.problemId } },
+        data: { orderIndex: item.orderIndex },
+      })
+    )
+  )
+  return { count: orderMap.length }
+}
+
+export async function updateTrainingProblemItem(
+  trainingId: string,
+  updates: Array<{ problemId: string; score?: number; required?: boolean; orderIndex?: number }>
+) {
+  cache.delete(byIdKey(trainingId))
+  await prisma.$transaction(
+    updates.map(u =>
+      prisma.trainingProblem.update({
+        where: { trainingId_problemId: { trainingId, problemId: u.problemId } },
+        data: {
+          ...(u.score !== undefined ? { score: u.score } : {}),
+          ...(u.required !== undefined ? { required: u.required } : {}),
+          ...(u.orderIndex !== undefined ? { orderIndex: u.orderIndex } : {}),
+        },
+      })
+    )
+  )
+  return { count: updates.length }
+}
+
+/* ============================================================================
+ * 加入 / 退出
+ * ========================================================================== */
+
+export async function enrollTraining(trainingId: string, userId: string) {
+  const existing = await prisma.trainingEnrollment.findUnique({
+    where: { trainingId_userId: { trainingId, userId } },
+  })
+  if (existing) return existing
+  const result = await prisma.trainingEnrollment.create({
+    data: { trainingId, userId },
+  })
+  await incrementJoinCount(trainingId, 1)
+  cache.delete(enrollmentKey(userId, trainingId))
+  cache.delete(userEnrollmentsKey(userId))
+  return result
+}
+
+export async function unenrollTraining(trainingId: string, userId: string) {
+  const existing = await prisma.trainingEnrollment.findUnique({
+    where: { trainingId_userId: { trainingId, userId } },
+  })
+  if (!existing) return null
+  await prisma.trainingEnrollment.delete({
+    where: { trainingId_userId: { trainingId, userId } },
+  })
+  await incrementJoinCount(trainingId, -1)
+  cache.delete(enrollmentKey(userId, trainingId))
+  cache.delete(userEnrollmentsKey(userId))
+  return existing
+}
+
+export async function isEnrolled(trainingId: string, userId: string): Promise<boolean> {
+  return cache.get('training:enrollment:check', [trainingId, userId], async () => {
+    const r = await prisma.trainingEnrollment.findUnique({
+      where: { trainingId_userId: { trainingId, userId } },
+      select: { id: true },
+    })
+    return !!r
+  }, { ttl: 10_000 })
+}
+
+export async function getUserEnrollments(userId: string) {
+  return cache.get('training:enrollments', [userId], async () => {
+    const enrollments = await prisma.trainingEnrollment.findMany({
+      where: { userId },
+      orderBy: { joinedAt: 'desc' },
+      include: {
+        training: {
+          include: {
+            _count: { select: { problems: true } },
+            category: { select: { id: true, name: true } },
+          },
+        },
+      },
+    })
+    return enrollments.map(e => ({
+      trainingId: e.trainingId,
+      joinedAt: e.joinedAt,
+      training: {
+        id: e.training.id,
+        title: e.training.title,
+        description: e.training.description,
+        difficulty: e.training.difficulty,
+        cover: e.training.cover,
+        tags: e.training.tags,
+        problemCount: e.training._count.problems,
+        category: e.training.category,
+        joinCount: e.training.joinCount,
+        viewCount: e.training.viewCount,
+      },
+    }))
+  }, { ttl: 30_000 })
+}
+
+export async function incrementJoinCount(trainingId: string, delta: number) {
+  try {
+    await prisma.training.update({
+      where: { id: trainingId },
+      data: { joinCount: { increment: delta } },
+    })
+  } catch (err) {
+    logger.warn(`[training] incrementJoinCount failed: ${(err as Error).message}`)
+  }
+  cache.delete(byIdKey(trainingId))
+}
+
+export async function incrementViewCount(trainingId: string) {
+  try {
+    await prisma.training.update({
+      where: { id: trainingId },
+      data: { viewCount: { increment: 1 } },
+    })
+  } catch (err) {
+    logger.warn(`[training] incrementViewCount failed: ${(err as Error).message}`)
+  }
+  // view count 不清除详情缓存以避免抖动
+}
+
+/* ============================================================================
+ * 详情 + 用户进度
+ * ========================================================================== */
+
+function statusFromSubmission(status: string): TrainingProblemStatus {
+  if (status === 'AC' || status === 'ACCEPTED') return 'AC'
+  return 'ATTEMPTED'
+}
+
+export async function getTrainingWithProblemStatuses(
+  id: string,
+  userId: string | null
+): Promise<TrainingDetail | null> {
   const training = await prisma.training.findUnique({
     where: { id },
     include: {
+      author: { select: { id: true, username: true, nickname: true, avatar: true } },
+      category: { select: { id: true, name: true } },
       problems: {
         orderBy: { orderIndex: 'asc' },
         include: {
@@ -175,6 +584,7 @@ export async function getTrainingWithProblemStatuses(id: string, userId: string 
               tags: true,
               totalSubmit: true,
               totalAccepted: true,
+              problemNumber: true,
             },
           },
         },
@@ -183,39 +593,80 @@ export async function getTrainingWithProblemStatuses(id: string, userId: string 
   })
   if (!training) return null
 
-  let problemStatuses: Record<string, { submitted: boolean; accepted: boolean }> = {}
+  let problemStatuses: Record<string, { status: TrainingProblemStatus; lastStatus: string | null; submittedAt: Date | null }> = {}
+  let isJoined = false
   if (userId) {
-    const problemIds = training.problems.map(p => p.problemId)
-    const submissions = await prisma.submission.findMany({
-      where: { userId, problemId: { in: problemIds } },
-      select: { problemId: true, status: true },
+    const enrollment = await prisma.trainingEnrollment.findUnique({
+      where: { trainingId_userId: { trainingId: id, userId } },
+      select: { id: true },
     })
-    const problemStatusMap = new Map<string, { submitted: boolean; accepted: boolean }>()
-    for (const sub of submissions) {
-      const existing = problemStatusMap.get(sub.problemId) || { submitted: false, accepted: false }
-      if (sub.status === 'AC') {
-        problemStatusMap.set(sub.problemId, { submitted: true, accepted: true })
-      } else if (!existing.submitted) {
-        problemStatusMap.set(sub.problemId, { submitted: true, accepted: false })
+    isJoined = !!enrollment
+
+    const problemIds = training.problems.map(p => p.problemId)
+    if (problemIds.length > 0) {
+      const submissions = await prisma.submission.findMany({
+        where: { userId, problemId: { in: problemIds } },
+        select: { problemId: true, status: true, submittedAt: true },
+        orderBy: { submittedAt: 'desc' },
+      })
+      for (const sub of submissions) {
+        if (problemStatuses[sub.problemId]) continue
+        problemStatuses[sub.problemId] = {
+          status: statusFromSubmission(sub.status),
+          lastStatus: sub.status,
+          submittedAt: sub.submittedAt,
+        }
       }
     }
-    problemStatuses = Object.fromEntries(problemStatusMap)
   }
 
-  return {
-    ...training,
-    problems: training.problems.map(p => ({
-      ...p.problem,
+  const problems: TrainingProblemItem[] = training.problems.map(p => {
+    const st = problemStatuses[p.problemId]
+    return {
+      id: p.id,
+      problemId: p.problemId,
       orderIndex: p.orderIndex,
-      submitted: problemStatuses[p.problemId]?.submitted ?? false,
-      accepted: problemStatuses[p.problemId]?.accepted ?? false,
-    })),
+      score: p.score,
+      required: p.required,
+      problem: p.problem,
+      status: st?.status ?? 'NOT_STARTED',
+      lastSubmissionStatus: st?.lastStatus ?? null,
+      submittedAt: st?.submittedAt ?? null,
+    }
+  })
+
+  const totalProblems = problems.length
+  const solvedCount = problems.filter(p => p.status === 'AC').length
+  const attemptedCount = problems.filter(p => p.status === 'AC' || p.status === 'ATTEMPTED').length
+
+  return {
+    id: training.id,
+    title: training.title,
+    description: training.description,
+    difficulty: training.difficulty,
+    categoryType: (training.categoryType as TrainingCategoryType | null) ?? null,
+    isPublic: training.isPublic,
+    status: training.status,
+    isRecommended: training.isRecommended,
+    tags: training.tags || [],
+    cover: training.cover,
+    joinCount: training.joinCount,
+    viewCount: training.viewCount,
+    createdAt: training.createdAt,
+    updatedAt: training.updatedAt,
+    author: training.author,
+    category: training.category,
+    problems,
+    isJoined,
+    userProgress: {
+      totalProblems,
+      solvedCount,
+      attemptedCount,
+      progressPercentage: totalProblems > 0 ? Math.round((solvedCount / totalProblems) * 100) : 0,
+    },
   }
 }
 
-/**
- * 训练题目列表（轻量）
- */
 export async function getTrainingProblems(trainingId: string, userId: string | null) {
   const training = await prisma.training.findUnique({
     where: { id: trainingId },
@@ -240,39 +691,37 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
     },
   })
 
-  let problemStatuses: Record<string, { submitted: boolean; accepted: boolean }> = {}
+  let problemStatuses: Record<string, TrainingProblemStatus> = {}
   if (userId) {
     const problemIds = trainingProblems.map(p => p.problemId)
-    const submissions = await prisma.submission.findMany({
-      where: { userId, problemId: { in: problemIds } },
-      select: { problemId: true, status: true },
-    })
-    const problemStatusMap = new Map<string, { submitted: boolean; accepted: boolean }>()
-    for (const sub of submissions) {
-      const existing = problemStatusMap.get(sub.problemId) || { submitted: false, accepted: false }
-      if (sub.status === 'AC') {
-        problemStatusMap.set(sub.problemId, { submitted: true, accepted: true })
-      } else if (!existing.submitted) {
-        problemStatusMap.set(sub.problemId, { submitted: true, accepted: false })
+    if (problemIds.length > 0) {
+      const submissions = await prisma.submission.findMany({
+        where: { userId, problemId: { in: problemIds } },
+        select: { problemId: true, status: true },
+        orderBy: { submittedAt: 'desc' },
+      })
+      for (const sub of submissions) {
+        if (problemStatuses[sub.problemId]) continue
+        problemStatuses[sub.problemId] = statusFromSubmission(sub.status)
       }
     }
-    problemStatuses = Object.fromEntries(problemStatusMap)
   }
 
   const problems = trainingProblems.map(tp => ({
     ...tp.problem,
     orderIndex: tp.orderIndex,
-    submitted: problemStatuses[tp.problemId]?.submitted ?? false,
-    accepted: problemStatuses[tp.problemId]?.accepted ?? false,
+    score: tp.score,
+    required: tp.required,
+    status: problemStatuses[tp.problemId] ?? 'NOT_STARTED',
   }))
 
   return { training, problems }
 }
 
-/**
- * 用户在某个训练下的进度（AC/Attempted/百分比 + 最近 5 条提交）
- */
-export async function getUserTrainingProgressDetail(trainingId: string, userId: string) {
+export async function getUserTrainingProgressDetail(
+  trainingId: string,
+  userId: string
+): Promise<UserTrainingProgress | null> {
   const training = await prisma.training.findUnique({
     where: { id: trainingId },
     include: { problems: { select: { problemId: true } } },
@@ -282,11 +731,11 @@ export async function getUserTrainingProgressDetail(trainingId: string, userId: 
   const problemIds = training.problems.map(p => p.problemId)
   const totalProblems = problemIds.length
 
-  const submissions = await prisma.submission.findMany({
+  const submissions = problemIds.length > 0 ? await prisma.submission.findMany({
     where: { userId, problemId: { in: problemIds } },
     select: { problemId: true, status: true, submittedAt: true },
     orderBy: { submittedAt: 'desc' },
-  })
+  }) : []
 
   const problemStatusMap = new Map<string, { status: string; submittedAt: Date }>()
   for (const sub of submissions) {
@@ -297,13 +746,13 @@ export async function getUserTrainingProgressDetail(trainingId: string, userId: 
 
   let solvedCount = 0
   let attemptedCount = 0
-  const problemProgress: Array<{ problemId: string; status: string; submittedAt: Date | null }> = []
+  const problemProgress: UserTrainingProgress['problemProgress'] = []
 
   for (const problemId of problemIds) {
     const statusData = problemStatusMap.get(problemId)
     if (statusData) {
       attemptedCount++
-      if (statusData.status === 'AC') {
+      if (statusData.status === 'AC' || statusData.status === 'ACCEPTED') {
         solvedCount++
         problemProgress.push({ problemId, status: 'AC', submittedAt: statusData.submittedAt })
       } else {
@@ -314,18 +763,21 @@ export async function getUserTrainingProgressDetail(trainingId: string, userId: 
     }
   }
 
-  const progressPercentage = totalProblems > 0 ? Math.round((solvedCount / totalProblems) * 100) : 0
-
-  const recentSubmissions = await prisma.submission.findMany({
+  const recentSubmissions = problemIds.length > 0 ? await prisma.submission.findMany({
     where: { userId, problemId: { in: problemIds } },
     orderBy: { submittedAt: 'desc' },
     take: 5,
     select: { id: true, problemId: true, status: true, language: true, submittedAt: true },
-  })
+  }) : []
 
   return {
     training: { id: training.id, title: training.title },
-    progress: { totalProblems, solvedCount, attemptedCount, progressPercentage },
+    progress: {
+      totalProblems,
+      solvedCount,
+      attemptedCount,
+      progressPercentage: totalProblems > 0 ? Math.round((solvedCount / totalProblems) * 100) : 0,
+    },
     problemProgress,
     recentSubmissions: recentSubmissions.map(s => ({
       id: s.id,
@@ -335,4 +787,30 @@ export async function getUserTrainingProgressDetail(trainingId: string, userId: 
       submittedAt: s.submittedAt,
     })),
   }
+}
+
+/* ============================================================================
+ * 兼容旧 API（带 fallback）
+ * ========================================================================== */
+
+export async function getUserTrainingProgress(trainingId: string, userId: string) {
+  return (prisma as any).trainingProgress
+    ? await (prisma as any).trainingProgress.findUnique({
+        where: { trainingId_userId: { trainingId, userId } },
+      })
+    : null
+}
+
+export async function updateTrainingProgress(
+  trainingId: string,
+  userId: string,
+  data: { completedProblems?: number; totalScore?: number }
+) {
+  const model = (prisma as any).trainingProgress
+  if (!model) return null
+  return model.upsert({
+    where: { trainingId_userId: { trainingId, userId } },
+    update: data,
+    create: { trainingId, userId, ...data },
+  })
 }

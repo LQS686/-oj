@@ -66,6 +66,10 @@ model User {
   // AI 偏好
   aiPreferences UserAiPreference[]
 
+  // 题单
+  authoredTrainings    Training[]           @relation("TrainingAuthor")
+  trainingEnrollments  TrainingEnrollment[]
+
   @@index([rating])
   @@index([solvedCount])
   @@index([role])
@@ -539,19 +543,53 @@ model Blog {
   updatedAt DateTime @updatedAt
 }
 
-// 训练计划
+// 训练计划 / 题单
 model Training {
-  id          String            @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  description String
-  difficulty  String
-  isPublic    Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  
-  problems    TrainingProblem[]
+  id            String            @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  description   String
+  difficulty    String?           // 已废弃，保留为可选（兼容老数据）
+  categoryType  String?           // 'official' 官方 | 'contest' 竞赛/考级
+  isPublic      Boolean           @default(true)
+  status        String            @default("published") // draft / published / archived
+  isRecommended Boolean           @default(false)
+  tags          String[]
+  cover         String?
+  joinCount     Int               @default(0)
+  viewCount     Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // 创建者（管理员/教师）
+  authorId      String?           @db.ObjectId
+  author        User?             @relation("TrainingAuthor", fields: [authorId], references: [id])
+
+  // 分类（多维度分类，仅作为辅助，categoryType 才是主分类）
+  categoryId    String?           @db.ObjectId
+  category      TrainingCategory? @relation(fields: [categoryId], references: [id])
+
+  problems      TrainingProblem[]
+  enrollments   TrainingEnrollment[]
+
+  @@index([isPublic, status])
+  @@index([isRecommended, status])
+  @@index([categoryId])
+  @@index([categoryType])
+  @@index([authorId])
 }
 
-// 训练题目
+// 题单分类
+model TrainingCategory {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  name        String     @unique
+  description String?
+  orderIndex  Int        @default(0)
+  createdAt   DateTime   @default(now())
+
+  trainings   Training[]
+}
+
+// 题单题目关联
 model TrainingProblem {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   trainingId String   @db.ObjectId
@@ -559,6 +597,24 @@ model TrainingProblem {
   problemId  String   @db.ObjectId
   problem    Problem  @relation(fields: [problemId], references: [id])
   orderIndex Int
+  score      Int      @default(100)
+  required   Boolean  @default(true)
+
+  @@unique([trainingId, problemId])
+  @@index([trainingId, orderIndex])
+}
+
+// 用户加入题单记录
+model TrainingEnrollment {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  trainingId String   @db.ObjectId
+  training   Training @relation(fields: [trainingId], references: [id])
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id])
+  joinedAt   DateTime @default(now())
+
+  @@unique([trainingId, userId])
+  @@index([userId])
 }
 
 // 成就

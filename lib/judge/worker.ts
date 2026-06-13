@@ -153,6 +153,7 @@ judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
         memory: result.memory,
         passedTests: result.passedTests,
         totalTests: result.totalTests || 0,
+        problemId: submission.problemId,
         message: result.message,
         testResults: result.testResults,
       })

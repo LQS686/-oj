@@ -14,6 +14,7 @@ interface SubmissionUpdate {
   memory: number
   passedTests: number
   totalTests: number
+  problemId?: string
   message?: string
   testResults?: any[]
 }
