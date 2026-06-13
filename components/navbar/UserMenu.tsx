@@ -30,7 +30,7 @@ export default function UserMenu() {
 
   const fetchUnreadCount = useCallback(async () => {
     try {
-      const data = await notificationApi.getNotifications(1)
+      const data = await notificationApi.getNotifications(1, 1)
       setUnreadCount(data.unreadCount)
     } catch (error) {
       logger.error('获取未读通知数量失败', error)

@@ -151,13 +151,21 @@ class ApiClient {
   }
 
   async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
-    const queryString = params
-      ? '?' + new URLSearchParams(params).toString()
-      : '';
-    
+    // 过滤掉 undefined / null / 空字符串，避免出现 ?offset=undefined 这种无效参数
+    const cleanParams: Record<string, string> = {}
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === null || value === '') continue
+        cleanParams[key] = String(value)
+      }
+    }
+    const queryString = Object.keys(cleanParams).length > 0
+      ? '?' + new URLSearchParams(cleanParams).toString()
+      : ''
+
     return this.request<T>(`${endpoint}${queryString}`, {
       method: 'GET',
-    });
+    })
   }
 
   async post<T>(endpoint: string, data?: any): Promise<T> {

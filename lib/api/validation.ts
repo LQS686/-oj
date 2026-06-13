@@ -24,11 +24,12 @@ export function optional(value: unknown): string | undefined {
 }
 
 export function toInt(value: unknown, name: string, def = 0): number {
+  if (value === undefined || value === null || value === '') return def
   const v = Number(value)
   if (!Number.isFinite(v) || !Number.isInteger(v)) {
     throw new ValidationError(`${name} 必须是整数`)
   }
-  return v ?? def
+  return v
 }
 
 export function toBool(value: unknown): boolean {

@@ -16,8 +16,8 @@ interface NotificationResponse {
 }
 
 export const notificationApi = {
-  async getNotifications(limit?: number, offset?: number): Promise<NotificationResponse> {
-    return apiClient.get<NotificationResponse>('/notifications', { limit, offset });
+  async getNotifications(page?: number, pageSize?: number): Promise<NotificationResponse> {
+    return apiClient.get<NotificationResponse>('/notifications', { page, pageSize });
   },
 
   async getNotificationById(id: string): Promise<Notification> {
