@@ -39,25 +39,37 @@ export async function createNotification(data: {
   content: string
   link?: string
 }) {
-  return prisma.notification.create({ data })
+  const result = await prisma.notification.create({ data })
+  clearNotificationCache(data.userId)
+  return result
+}
+
+export async function clearNotificationCache(userId: string) {
+  cache.delete(`notification:unread:${userId}`)
 }
 
 export async function markRead(id: string, userId: string) {
-  return prisma.notification.updateMany({
+  const result = await prisma.notification.updateMany({
     where: { id, userId },
     data: { isRead: true },
   })
+  clearNotificationCache(userId)
+  return result
 }
 
 export async function markAllRead(userId: string) {
-  return prisma.notification.updateMany({
+  const result = await prisma.notification.updateMany({
     where: { userId, isRead: false },
     data: { isRead: true },
   })
+  clearNotificationCache(userId)
+  return result
 }
 
 export async function deleteNotification(id: string, userId: string) {
-  return prisma.notification.deleteMany({ where: { id, userId } })
+  const result = await prisma.notification.deleteMany({ where: { id, userId } })
+  clearNotificationCache(userId)
+  return result
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {
