@@ -67,8 +67,14 @@ export async function updateUserProfile(userId: string, data: Partial<{
   nickname: string
   bio: string
   avatar: string
-}>) {
-  return prisma.user.update({ where: { id: userId }, data })
+}>): Promise<{ id: string; nickname: string | null; bio: string | null; avatar: string | null }> {
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data,
+    select: { id: true, nickname: true, bio: true, avatar: true },
+  })
+  clearUserCache(userId)
+  return updated
 }
 
 export async function getActiveUsers(limit = 20) {
@@ -365,6 +371,9 @@ export async function updateCurrentUserBasic(
       isAdmin: true,
       updatedAt: true,
     },
+  }).then((result) => {
+    if (result) clearUserCache(userId)
+    return result
   })
 }
 
@@ -410,6 +419,7 @@ export async function changeCurrentUserPassword(
     { _id: new (require('mongodb').ObjectId)(userId) },
     { $set: { password: hashedPassword, updatedAt: new Date() } }
   )
+  clearUserCache(userId)
 }
 
 /**
@@ -548,6 +558,7 @@ export async function uploadUserAvatar(
   await writeFile(filePath, buffer)
   const avatarUrl = `/uploads/avatars/${safeFilename}`
   await prisma.user.update({ where: { id: userId }, data: { avatar: avatarUrl } })
+  clearUserCache(userId)
   return avatarUrl
 }
 
@@ -964,7 +975,7 @@ export async function adminUpdateUser(
     }
     updateData.password = await bcryptModule.hash(body.password, 10)
   }
-  return prisma.user.update({
+  const result = await prisma.user.update({
     where: { id: targetUserId },
     data: updateData,
     select: {
@@ -976,13 +987,17 @@ export async function adminUpdateUser(
       isBanned: true,
     },
   })
+  clearUserCache(targetUserId)
+  return result
 }
 
 /**
  * 管理员删除用户
  */
 export async function adminDeleteUser(targetUserId: string) {
-  return prisma.user.delete({ where: { id: targetUserId } })
+  const result = await prisma.user.delete({ where: { id: targetUserId } })
+  clearUserCache(targetUserId)
+  return result
 }
 
 /**
@@ -1021,20 +1036,24 @@ export async function filterUserIdsForBatchAction(
  * 批量更新用户角色
  */
 export async function batchUpdateUserRole(finalUserIds: string[], role: 'ADMIN' | 'TEACHER' | 'USER') {
-  return prisma.user.updateMany({
+  const result = await prisma.user.updateMany({
     where: { id: { in: finalUserIds } },
     data: {
       role,
       isAdmin: role === 'ADMIN',
     },
   })
+  finalUserIds.forEach(clearUserCache)
+  return result
 }
 
 /**
  * 批量删除用户
  */
 export async function batchDeleteUsers(finalUserIds: string[]) {
-  return prisma.user.deleteMany({ where: { id: { in: finalUserIds } } })
+  const result = await prisma.user.deleteMany({ where: { id: { in: finalUserIds } } })
+  finalUserIds.forEach(clearUserCache)
+  return result
 }
 
 /* ============================================================================
@@ -1063,6 +1082,7 @@ export async function changeCurrentUserEmail(
     throw err
   }
   await prisma.user.update({ where: { id: userId }, data: { email: newEmail } })
+  clearUserCache(userId)
   return { email: newEmail }
 }
 
