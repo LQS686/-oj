@@ -95,7 +95,9 @@ export default function DiscussPage() {
       const res = await fetch('/api/users/active?limit=5')
       const data = await res.json()
       if (data.success) {
-        setActiveUsers(data.data)
+        setActiveUsers(Array.isArray(data.data?.users) ? data.data.users : (Array.isArray(data.data) ? data.data : []))
+      } else {
+        setActiveUsers([])
       }
     } catch (err) {
       console.error(err)
