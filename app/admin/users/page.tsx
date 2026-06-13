@@ -811,7 +811,7 @@ export default function AdminUsersPage() {
                       type="checkbox"
                       checked={useUnifiedPassword}
                       onChange={(e) => setUseUnifiedPassword(e.target.checked)}
-                      className="w-4 h-4 rounded border-white/20 bg-muted/50 text-primary focus:ring-primary"
+                      className="w-4 h-4 rounded border-border bg-muted/50 text-primary focus:ring-primary"
                     />
                     <span className="text-sm text-muted-foreground">使用统一密码</span>
                   </label>
@@ -933,7 +933,7 @@ export default function AdminUsersPage() {
               <div className="space-y-4">
                 <div
                   className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                    isDragging ? 'border-primary bg-primary/5' : 'border-white/20 hover:border-white/40'
+                    isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-foreground/40'
                   }`}
                   onDragOver={handleCsvDragOver}
                   onDragLeave={handleCsvDragLeave}

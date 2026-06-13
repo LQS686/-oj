@@ -207,7 +207,7 @@ export default function AdminClassesPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/10">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
                 <button
                   onClick={() => handleToggleVisibility(classData.id, classData.isPublic)}
                   className={`p-2 rounded-lg transition-colors ${

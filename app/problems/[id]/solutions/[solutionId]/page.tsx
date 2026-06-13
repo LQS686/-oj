@@ -432,7 +432,7 @@ export default function SolutionDetailPage() {
                 </span>
               )}
             </div>
-            <pre className="bg-slate-900 rounded-xl p-4 overflow-x-auto text-sm font-mono text-slate-100 border border-border hover:border-primary/30 transition-colors">
+            <pre className="bg-muted rounded-xl p-4 overflow-x-auto text-sm font-mono text-foreground border border-border hover:border-primary/30 transition-colors">
               <code>{solution.code}</code>
             </pre>
           </div>

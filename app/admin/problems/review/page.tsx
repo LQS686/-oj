@@ -466,7 +466,7 @@ export default function ProblemReviewPage() {
                               {String(children).replace(/\n$/, '')}
                             </SyntaxHighlighter>
                           ) : (
-                            <code className="bg-slate-700 px-1.5 py-0.5 rounded text-pink-400" {...props}>{children}</code>
+                            <code className="bg-muted px-1.5 py-0.5 rounded text-pink-400" {...props}>{children}</code>
                           )
                         }
                       }}
@@ -519,13 +519,13 @@ export default function ProblemReviewPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">输入</p>
-                        <pre className="text-xs text-slate-300 bg-slate-800/50 p-2 rounded overflow-x-auto max-h-24 overflow-y-auto">
+                        <pre className="text-xs text-foreground bg-muted p-2 rounded overflow-x-auto max-h-24 overflow-y-auto">
                           {tc.input}
                         </pre>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">输出</p>
-                        <pre className="text-xs text-slate-300 bg-slate-800/50 p-2 rounded overflow-x-auto max-h-24 overflow-y-auto">
+                        <pre className="text-xs text-foreground bg-muted p-2 rounded overflow-x-auto max-h-24 overflow-y-auto">
                           {tc.output}
                         </pre>
                       </div>

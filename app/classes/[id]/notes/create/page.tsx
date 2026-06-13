@@ -92,15 +92,15 @@ export default function CreateNotePage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           返回
         </button>
 
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white">创建班级笔记</h1>
-          <p className="mt-1 text-gray-400">分享学习心得和解题思路</p>
+          <h1 className="text-3xl font-bold text-foreground">创建班级笔记</h1>
+          <p className="mt-1 text-muted-foreground">分享学习心得和解题思路</p>
         </div>
 
         <div className="card">
@@ -108,7 +108,7 @@ export default function CreateNotePage() {
             <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     笔记标题 <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -120,14 +120,14 @@ export default function CreateNotePage() {
                     className="input w-full"
                     required
                   />
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {formData.title.length}/100
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       分类
                     </label>
                     <select
@@ -142,7 +142,7 @@ export default function CreateNotePage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       标签
                     </label>
                     <div className="relative">
@@ -153,16 +153,16 @@ export default function CreateNotePage() {
                         placeholder="多个标签用逗号分隔"
                         className="input w-full pr-10"
                       />
-                      <Tag className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                      <Tag className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       例如：贪心算法,基础题
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     笔记内容 <span className="text-red-400">*</span>
                   </label>
                   <textarea
@@ -173,26 +173,26 @@ export default function CreateNotePage() {
                     className="input w-full font-mono text-sm"
                     required
                   />
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     支持Markdown格式，{formData.content.length} 字符
                   </p>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                <div className="bg-muted border border-border rounded-lg p-4">
                   <div className="flex items-start gap-2">
-                    <FileText className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div className="text-sm text-gray-300">
+                    <FileText className="w-5 h-5 text-muted-foreground mt-0.5" />
+                    <div className="text-sm text-foreground">
                       <p className="font-medium mb-2">Markdown 语法提示</p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <p><code className="bg-white/10 px-1 rounded text-indigo-400"># 标题</code> - 一级标题</p>
-                          <p><code className="bg-white/10 px-1 rounded text-indigo-400">## 标题</code> - 二级标题</p>
-                          <p><code className="bg-white/10 px-1 rounded text-indigo-400">**粗体**</code> - 加粗文本</p>
+                          <p><code className="bg-muted px-1 rounded text-indigo-400"># 标题</code> - 一级标题</p>
+                          <p><code className="bg-muted px-1 rounded text-indigo-400">## 标题</code> - 二级标题</p>
+                          <p><code className="bg-muted px-1 rounded text-indigo-400">**粗体**</code> - 加粗文本</p>
                         </div>
                         <div className="space-y-1">
-                          <p><code className="bg-white/10 px-1 rounded text-indigo-400">- 项目</code> - 无序列表</p>
-                          <p><code className="bg-white/10 px-1 rounded text-indigo-400">`代码`</code> - 行内代码</p>
-                          <p><code className="bg-white/10 px-1 rounded text-indigo-400">```代码块```</code> - 代码块</p>
+                          <p><code className="bg-muted px-1 rounded text-indigo-400">- 项目</code> - 无序列表</p>
+                          <p><code className="bg-muted px-1 rounded text-indigo-400">`代码`</code> - 行内代码</p>
+                          <p><code className="bg-muted px-1 rounded text-indigo-400">```代码块```</code> - 代码块</p>
                         </div>
                       </div>
                     </div>
@@ -236,7 +236,7 @@ export default function CreateNotePage() {
                   <button
                     type="button"
                     onClick={() => router.push(`/classes/${params.id}`)}
-                    className="px-6 py-2 bg-white/10 text-gray-300 rounded-lg hover:bg-white/20 font-medium transition-colors"
+                    className="px-6 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 font-medium transition-colors"
                   >
                     取消
                   </button>

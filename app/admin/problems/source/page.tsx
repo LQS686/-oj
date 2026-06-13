@@ -138,7 +138,7 @@ export default function SourceManagementPage() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-400">加载中...</p>
+            <p className="text-muted-foreground">加载中...</p>
           </div>
         </div>
       </AdminLayout>
@@ -150,8 +150,8 @@ export default function SourceManagementPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-              <ArrowLeft className="w-5 h-5 text-slate-400" />
+            <button onClick={() => router.back()} className="p-2 hover:bg-muted rounded-lg transition-colors">
+              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -159,8 +159,8 @@ export default function SourceManagementPage() {
                 <Database className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">题目来源管理</h1>
-                <p className="text-sm text-slate-400">集中管理题目来源标记及审计日志</p>
+                <h1 className="text-2xl font-bold text-foreground">题目来源管理</h1>
+                <p className="text-sm text-muted-foreground">集中管理题目来源标记及审计日志</p>
               </div>
             </div>
           </div>
@@ -173,11 +173,11 @@ export default function SourceManagementPage() {
           </button>
         </div>
 
-        <div className="flex gap-1 p-1 rounded-lg bg-white/5">
+        <div className="flex gap-1 p-1 rounded-lg bg-muted">
           <button 
             onClick={() => setActiveTab('problems')} 
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeTab === 'problems' ? 'bg-primary text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              activeTab === 'problems' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >
             题目来源列表
@@ -185,7 +185,7 @@ export default function SourceManagementPage() {
           <button 
             onClick={() => setActiveTab('logs')} 
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeTab === 'logs' ? 'bg-primary text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              activeTab === 'logs' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >
             来源变更日志
@@ -194,7 +194,7 @@ export default function SourceManagementPage() {
 
         {activeTab === 'problems' ? (
           <>
-            <div className="flex gap-1 p-1 rounded-lg bg-white/5">
+            <div className="flex gap-1 p-1 rounded-lg bg-muted">
               {[
                 { id: 'all', label: '全部来源' },
                 { id: 'MANUAL_CREATED', label: '人工录入' },
@@ -205,7 +205,7 @@ export default function SourceManagementPage() {
                   key={tab.id}
                   onClick={() => setSourceFilter(tab.id)}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    sourceFilter === tab.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    sourceFilter === tab.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
                 >
                   {tab.label}
@@ -230,34 +230,34 @@ export default function SourceManagementPage() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-white/10">
+                    <tr className="border-b border-border">
                       <th className="px-6 py-3 w-4">
                         <input 
                           type="checkbox" 
                           checked={filteredProblems.length > 0 && selectedIds.size === filteredProblems.length} 
                           onChange={toggleSelectAll} 
-                          className="rounded border-slate-600 bg-slate-800 text-primary focus:ring-primary/50" 
+                          className="rounded border-border bg-muted text-primary focus:ring-primary/50" 
                         />
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">题目</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">来源标记</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">最后更新</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">操作</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">题目</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">来源标记</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">最后更新</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {filteredProblems.map(p => (
-                      <tr key={p.id} className="hover:bg-white/5 transition-colors">
+                      <tr key={p.id} className="hover:bg-muted transition-colors">
                         <td className="px-6 py-4">
                           <input 
                             type="checkbox" 
                             checked={selectedIds.has(p.id)} 
                             onChange={() => toggleSelect(p.id)} 
-                            className="rounded border-slate-600 bg-slate-800 text-primary focus:ring-primary/50" 
+                            className="rounded border-border bg-muted text-primary focus:ring-primary/50" 
                           />
                         </td>
                         <td className="px-6 py-4">
-                          <div className="font-medium text-white">{p.title}</div>
+                          <div className="font-medium text-foreground">{p.title}</div>
                           <div className="text-xs text-muted-foreground font-mono mt-0.5">{p.id}</div>
                         </td>
                         <td className="px-6 py-4">
@@ -269,13 +269,13 @@ export default function SourceManagementPage() {
                             <span className="tag">MANUAL_CREATED</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-400">
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {new Date(p.updatedAt).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button 
                             onClick={() => router.push(`/admin/problems/${p.id}/testcases`)}
-                            className="text-primary-light hover:text-white text-sm font-medium"
+                            className="text-primary-light hover:text-foreground text-sm font-medium"
                           >
                             去验证 →
                           </button>
@@ -289,16 +289,16 @@ export default function SourceManagementPage() {
           </>
         ) : (
           <div className="card overflow-hidden">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center">
-              <h3 className="font-bold text-white flex items-center gap-2">
-                <History className="w-5 h-5 text-slate-400" />
+            <div className="p-4 border-b border-border flex justify-between items-center">
+              <h3 className="font-bold text-foreground flex items-center gap-2">
+                <History className="w-5 h-5 text-muted-foreground" />
                 最近变更记录
               </h3>
-              <button onClick={fetchLogs} className="text-sm text-primary-light hover:text-white">刷新</button>
+              <button onClick={fetchLogs} className="text-sm text-primary-light hover:text-foreground">刷新</button>
             </div>
             {logsLoading ? (
               <div className="flex justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
             ) : logs.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">暂无变更记录</div>
@@ -306,29 +306,29 @@ export default function SourceManagementPage() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">时间</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">操作人</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">动作</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">详情</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">IP</th>
+                    <tr className="border-b border-border">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">时间</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">操作人</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">动作</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">详情</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">IP</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {logs.map(log => (
-                      <tr key={log.id} className="hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 text-sm text-slate-400">
+                      <tr key={log.id} className="hover:bg-muted transition-colors">
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {new Date(log.createdAt).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 text-sm text-white font-medium">
+                        <td className="px-6 py-4 text-sm text-foreground font-medium">
                           {log.userId || 'System'}
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-300">
+                        <td className="px-6 py-4 text-sm text-foreground">
                           <span className="tag">
                             {log.action}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-400">
+                        <td className="px-6 py-4 text-sm text-muted-foreground">
                           {log.details ? (
                             <div className="space-y-1">
                               {log.details.count !== undefined && <div>数量: {log.details.count}</div>}
@@ -355,12 +355,12 @@ export default function SourceManagementPage() {
         {showBatchModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="card p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-bold text-white mb-4">批量修改来源标记</h3>
-              <p className="text-slate-400 mb-4 text-sm">正在修改 <span className="text-white font-bold">{selectedIds.size}</span> 个题目的来源属性。</p>
+              <h3 className="text-lg font-bold text-foreground mb-4">批量修改来源标记</h3>
+              <p className="text-muted-foreground mb-4 text-sm">正在修改 <span className="text-foreground font-bold">{selectedIds.size}</span> 个题目的来源属性。</p>
               
               <div className="space-y-3">
                 {['MANUAL_CREATED', 'AI_ASSISTED', 'AI_GENERATED'].map(opt => (
-                  <label key={opt} className="flex items-center gap-3 p-3 rounded-lg border border-white/10 cursor-pointer hover:bg-white/5 transition-colors">
+                  <label key={opt} className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-muted transition-colors">
                     <input 
                       type="radio" 
                       name="source" 
@@ -369,7 +369,7 @@ export default function SourceManagementPage() {
                       onChange={(e) => setTargetSource(e.target.value)}
                       className="text-primary focus:ring-primary/50"
                     />
-                    <span className="font-medium text-slate-300">{opt}</span>
+                    <span className="font-medium text-foreground">{opt}</span>
                   </label>
                 ))}
               </div>

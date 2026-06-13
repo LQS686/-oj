@@ -8,3 +8,17 @@
 - [x] 检查6：确认优化后的视觉体验得到用户认可
 - [x] 检查7：验证品牌识别的一致性
 - [x] 检查8：确认样式代码的可维护性和可扩展性
+- [x] 检查9：补漏 - 18 个页面剩余硬编码暗色颜色已替换（任务6）
+  - [x] 9.1 `/admin/problems/source` 修复
+  - [x] 9.2 `/admin/problems/[id]/testcases` 修复
+  - [x] 9.3 `/admin/problems/[id]/edit` 修复
+  - [x] 9.4 `/admin/problems/review` 修复
+  - [x] 9.5 `/admin/ai-models` 修复
+  - [x] 9.6 `/admin/posts` 修复
+  - [x] 9.7 `/admin/classes` 修复
+  - [x] 9.8 `/admin/users` 修复
+  - [x] 9.9 `/classes/*` 系列 5 个页面修复
+  - [x] 9.10 `/contests/*` 系列 3 个页面修复
+  - [x] 9.11 `/problem/[id]` 修复
+  - [x] 9.12 `/problems/[id]/solutions/[solutionId]` 修复
+- [x] 检查10：全项目 grep 验证无残留硬编码暗色颜色（除浅色专属）

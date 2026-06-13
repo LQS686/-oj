@@ -200,7 +200,7 @@ export default function AdminSubmissionsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/10">
+                <tr className="border-b border-border">
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     提交ID
                   </th>
@@ -293,7 +293,7 @@ export default function AdminSubmissionsPage() {
           )}
 
           {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
+            <div className="px-6 py-4 border-t border-border flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 显示 {(page - 1) * pageSize + 1} 到 {Math.min(page * pageSize, total)} 共 {total} 条
               </div>

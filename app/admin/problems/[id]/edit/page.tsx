@@ -292,7 +292,7 @@ export default function EditProblemPage() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-400">加载中...</p>
+            <p className="text-muted-foreground">加载中...</p>
           </div>
         </div>
       </AdminLayout>
@@ -305,9 +305,9 @@ export default function EditProblemPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-slate-400" />
+            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -316,7 +316,7 @@ export default function EditProblemPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">编辑题目</h1>
-              <p className="text-sm text-slate-400">修改题目基本信息和描述</p>
+              <p className="text-sm text-muted-foreground">修改题目基本信息和描述</p>
             </div>
           </div>
         </div>
@@ -333,7 +333,7 @@ export default function EditProblemPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   题目编号（可选）
                 </label>
                 <input
@@ -346,7 +346,7 @@ export default function EditProblemPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   难度 <span className="text-red-400">*</span>
                 </label>
                 <select
@@ -362,7 +362,7 @@ export default function EditProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 题目标题 <span className="text-red-400">*</span>
               </label>
               <input
@@ -376,7 +376,7 @@ export default function EditProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">标签</label>
+              <label className="block text-sm font-medium text-foreground mb-2">标签</label>
               <div className="flex gap-2 mb-2">
                 <input
                   type="text"
@@ -415,7 +415,7 @@ export default function EditProblemPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   时间限制（ms）
                 </label>
                 <input
@@ -429,7 +429,7 @@ export default function EditProblemPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   内存限制（MB）
                 </label>
                 <input
@@ -444,7 +444,7 @@ export default function EditProblemPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-slate-300">题目可见性：</label>
+              <label className="text-sm font-medium text-foreground">题目可见性：</label>
               <select
                 value={visibility}
                 onChange={(e) => setVisibility(e.target.value)}
@@ -466,7 +466,7 @@ export default function EditProblemPage() {
             <h2 className="text-lg font-bold text-white mb-4">题目描述</h2>
             
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 题目描述 <span className="text-red-400">*</span>
               </label>
               <textarea
@@ -480,7 +480,7 @@ export default function EditProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">输入格式</label>
+              <label className="block text-sm font-medium text-foreground mb-2">输入格式</label>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -491,7 +491,7 @@ export default function EditProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">输出格式</label>
+              <label className="block text-sm font-medium text-foreground mb-2">输出格式</label>
               <textarea
                 value={output}
                 onChange={(e) => setOutput(e.target.value)}
@@ -502,7 +502,7 @@ export default function EditProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">提示（可选）</label>
+              <label className="block text-sm font-medium text-foreground mb-2">提示（可选）</label>
               <textarea
                 value={hint}
                 onChange={(e) => setHint(e.target.value)}
@@ -513,7 +513,7 @@ export default function EditProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">来源（可选）</label>
+              <label className="block text-sm font-medium text-foreground mb-2">来源（可选）</label>
               <input
                 type="text"
                 value={source}
@@ -538,9 +538,9 @@ export default function EditProblemPage() {
             </div>
 
             {samples.map((sample, idx) => (
-              <div key={idx} className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">
+              <div key={idx} className="p-4 rounded-lg bg-muted border border-border space-y-3">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-medium text-slate-300">样例 {idx + 1}</h3>
+                  <h3 className="font-medium text-foreground">样例 {idx + 1}</h3>
                   {samples.length > 1 && (
                     <button
                       type="button"
@@ -553,7 +553,7 @@ export default function EditProblemPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-2">输入</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">输入</label>
                     <textarea
                       value={sample.input}
                       onChange={(e) => {
@@ -566,7 +566,7 @@ export default function EditProblemPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-2">输出</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">输出</label>
                     <textarea
                       value={sample.output}
                       onChange={(e) => {
@@ -580,7 +580,7 @@ export default function EditProblemPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">说明（可选）</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">说明（可选）</label>
                   <input
                     type="text"
                     value={sample.explanation || ''}
@@ -640,7 +640,7 @@ export default function EditProblemPage() {
                 <h2 className="text-lg font-bold text-white">
                   题解管理（{solutions.length}）
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   管理该题下的所有题解，AI 题解可一键重新生成
                 </p>
               </div>
@@ -678,13 +678,13 @@ export default function EditProblemPage() {
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="rounded-lg bg-white/5 border border-white/10 p-4 animate-pulse"
+                  className="rounded-lg bg-muted border border-border p-4 animate-pulse"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-white/10" />
+                    <div className="w-10 h-10 rounded-full bg-muted" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3 w-2/3 bg-white/10 rounded" />
-                      <div className="h-3 w-1/3 bg-white/10 rounded" />
+                      <div className="h-3 w-2/3 bg-muted rounded" />
+                      <div className="h-3 w-1/3 bg-muted rounded" />
                     </div>
                   </div>
                 </div>
@@ -700,11 +700,11 @@ export default function EditProblemPage() {
           )}
 
           {!solutionsLoading && !solutionsError && solutions.length === 0 && (
-            <div className="text-center py-12 rounded-lg bg-white/5 border border-white/10">
-              <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-3">
-                <MessageSquare className="w-7 h-7 text-slate-400" />
+            <div className="text-center py-12 rounded-lg bg-muted border border-border">
+              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                <MessageSquare className="w-7 h-7 text-muted-foreground" />
               </div>
-              <p className="text-slate-400">暂无题解</p>
+              <p className="text-muted-foreground">暂无题解</p>
             </div>
           )}
 
@@ -713,7 +713,7 @@ export default function EditProblemPage() {
               {solutions.map((s) => (
                 <div
                   key={s.id}
-                  className="rounded-xl bg-white/5 border border-white/10 p-4 hover:border-primary/40 transition-colors"
+                  className="rounded-xl bg-muted border border-border p-4 hover:border-primary/40 transition-colors"
                 >
                   <div className="flex items-start gap-3 flex-wrap">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -749,8 +749,8 @@ export default function EditProblemPage() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
-                          <span className="text-slate-300">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                          <span className="text-foreground">
                             {s.author?.nickname || s.author?.username || '匿名'}
                           </span>
                           <span className="opacity-50">·</span>
@@ -777,7 +777,7 @@ export default function EditProblemPage() {
                       <button
                         type="button"
                         onClick={() => handleViewSolution(s.id)}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 flex items-center gap-1"
+                        className="px-3 py-1.5 text-xs rounded-lg bg-muted hover:bg-muted text-slate-200 border border-border flex items-center gap-1"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         查看

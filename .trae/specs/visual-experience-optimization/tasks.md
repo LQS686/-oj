@@ -69,3 +69,40 @@
   - `human-judgment` TR-5.2：验证样式管理的模块化程度
 - **注意**：关注样式代码的结构和组织方式
 - **状态**：已完成 - 优化了样式管理的模块化，确保了所有组件使用CSS变量而不是硬编码的颜色值
+
+## [x] 任务6：补漏 - 系统性替换剩余硬编码暗色颜色（追加）
+- **优先级**：P0
+- **依赖于**：任务1-5
+- **触发**：用户反馈 `/admin/problems/source` 等页面在浅色主题下文字/边框/输入框不可见
+- **根因**：现有替换脚本未覆盖 `text-slate-{300,400,500}` / `bg-slate-{700,800}` / `bg-slate-{700,800}/50` / `border-white/{5,10,20,30}` / `border-slate-{600,700}` / `hover:bg-white/{5,10}` / `placeholder-slate-{400,500}` 等模式
+- **描述**：
+  - 全项目扫描出仍使用硬编码暗色颜色的 18 个页面
+  - 全部替换为主题化 Tailwind 工具类（`text-foreground` / `text-muted-foreground` / `bg-card` / `bg-muted` / `border-border` / `placeholder:text-muted-foreground`）
+  - 在浅色主题下达到 WCAG AA 对比度标准
+- **验收标准**：
+  - AC-6.1：`/admin/problems/source` 页面在浅色主题下文字、表格、表单、徽章全部清晰可读
+  - AC-6.2：18 个待修复页面全部通过浅色主题视觉验证
+  - AC-6.3：`npx tsc --noEmit` 0 错误
+- **测试要求**：
+  - `programmatic` TR-6.1：grep 硬编码颜色模式，匹配数 = 0（除浅色模式专属）
+  - `human-judgment` TR-6.2：手动抽样 18 个页面验证文字清晰度
+- **状态**：已完成（commit 见末尾）
+- **受影响文件**：
+  1. `app/admin/problems/source/page.tsx` (19 处)
+  2. `app/admin/problems/[id]/testcases/page.tsx` (22 处)
+  3. `app/admin/problems/[id]/edit/page.tsx` (10 处)
+  4. `app/admin/problems/review/page.tsx` (3 处)
+  5. `app/admin/ai-models/page.tsx` (8 处)
+  6. `app/admin/posts/page.tsx` (1 处)
+  7. `app/admin/classes/page.tsx` (1 处)
+  8. `app/admin/users/page.tsx` (2 处)
+  9. `app/classes/[id]/assignments/[assignmentId]/page.tsx` (2 处)
+  10. `app/classes/page.tsx` (1 处)
+  11. `app/classes/create/page.tsx` (1 处)
+  12. `app/classes/[id]/notes/create/page.tsx` (1 处)
+  13. `app/classes/[id]/assignments/[assignmentId]/submissions/page.tsx` (1 处)
+  14. `app/contests/[id]/submissions/page.tsx` (4 处)
+  15. `app/contests/[id]/edit/page.tsx` (3 处)
+  16. `app/contests/[id]/problems/[problemId]/page.tsx` (1 处)
+  17. `app/problem/[id]/page.tsx` (5 处)
+  18. `app/problems/[id]/solutions/[solutionId]/page.tsx` (1 处)

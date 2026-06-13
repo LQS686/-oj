@@ -367,7 +367,7 @@ export default function ProblemTestCasesPage() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-400">加载题目数据...</p>
+            <p className="text-muted-foreground">加载题目数据...</p>
           </div>
         </div>
       </AdminLayout>
@@ -381,9 +381,9 @@ export default function ProblemTestCasesPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.back()}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="p-2 hover:bg-muted rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-5 h-5 text-slate-400" />
+              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -393,11 +393,11 @@ export default function ProblemTestCasesPage() {
               <div>
                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
                   测试数据管理
-                  <span className="text-sm font-normal text-slate-400 bg-white/10 px-2 py-0.5 rounded">
+                  <span className="text-sm font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded">
                     {problemTitle}
                   </span>
                 </h1>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   共 {testCases.length} 个测试点，总分 {testCases.reduce((a, b) => a + (b.score || 0), 0)} 分
                 </p>
               </div>
@@ -456,7 +456,7 @@ export default function ProblemTestCasesPage() {
               批量上传
             </h3>
             <div 
-              className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:bg-white/5 transition-colors cursor-pointer" 
+              className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-muted transition-colors cursor-pointer" 
               onClick={() => fileInputRef.current?.click()}
             >
               <input
@@ -472,7 +472,7 @@ export default function ProblemTestCasesPage() {
                 ) : (
                   <Upload className="w-8 h-8 text-muted-foreground" />
                 )}
-                <span className="text-sm font-medium text-slate-400">
+                <span className="text-sm font-medium text-muted-foreground">
                   {uploading ? '正在处理...' : '点击上传 ZIP 压缩包'}
                 </span>
                 <span className="text-xs text-muted-foreground">
@@ -493,7 +493,7 @@ export default function ProblemTestCasesPage() {
               <Sparkles className="w-5 h-5 text-purple-400" />
               AI 智能生成
             </h3>
-            <p className="text-sm text-slate-400 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               根据题目描述和标程自动生成高强度测试数据。
             </p>
             <button
@@ -507,7 +507,7 @@ export default function ProblemTestCasesPage() {
         </div>
 
         <div className="card overflow-hidden">
-          <div className="p-4 border-b border-white/10 flex justify-between items-center">
+          <div className="p-4 border-b border-border flex justify-between items-center">
             <h3 className="font-bold text-white">测试点列表</h3>
             <button
               onClick={handleAddTestCase}
@@ -525,7 +525,7 @@ export default function ProblemTestCasesPage() {
               </div>
             ) : (
               testCases.map((tc, idx) => (
-                <div key={idx} className="p-4 hover:bg-white/5 transition-colors group">
+                <div key={idx} className="p-4 hover:bg-muted transition-colors group">
                   <div className="flex items-start gap-4">
                     <div className="w-12 pt-2 flex flex-col items-center gap-1">
                       <span className="text-xs font-bold text-muted-foreground uppercase">Case</span>
@@ -600,12 +600,12 @@ export default function ProblemTestCasesPage() {
         {showAiModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="card p-6 max-w-2xl w-full mx-4">
-              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+              <div className="flex justify-between items-center mb-6 border-b border-border pb-4">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-purple-400" />
                   AI 生成配置
                 </h3>
-                <button onClick={() => setShowAiModal(false)} className="text-slate-400 hover:text-white">
+                <button onClick={() => setShowAiModal(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -622,7 +622,7 @@ export default function ProblemTestCasesPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">生成数量</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">生成数量</label>
                     <select 
                       value={aiGenCount}
                       onChange={(e) => setAiGenCount(parseInt(e.target.value))}
@@ -634,7 +634,7 @@ export default function ProblemTestCasesPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">标程语言</label>
+                    <label className="block text-sm font-medium text-foreground mb-2">标程语言</label>
                     <select
                       value={solutionLanguage}
                       onChange={(e) => setSolutionLanguage(e.target.value)}
@@ -649,12 +649,12 @@ export default function ProblemTestCasesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">选择 AI 模型</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">选择 AI 模型</label>
                   <ModelSelector value={modelId} onChange={setModelId} showThinking={false} />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     标程代码 <span className="text-red-400">*</span>
                   </label>
                   <textarea
@@ -689,12 +689,12 @@ export default function ProblemTestCasesPage() {
         {showVerifyModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="card p-6 max-w-2xl w-full mx-4">
-              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+              <div className="flex justify-between items-center mb-6 border-b border-border pb-4">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-indigo-400" />
                   标程验证与输出纠正
                 </h3>
-                <button onClick={() => setShowVerifyModal(false)} className="text-slate-400 hover:text-white">
+                <button onClick={() => setShowVerifyModal(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -709,7 +709,7 @@ export default function ProblemTestCasesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">标程语言</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">标程语言</label>
                   <select
                     value={solutionLanguage}
                     onChange={(e) => setSolutionLanguage(e.target.value)}
@@ -723,7 +723,7 @@ export default function ProblemTestCasesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     标程代码 <span className="text-red-400">*</span>
                   </label>
                   <textarea
@@ -768,12 +768,12 @@ export default function ProblemTestCasesPage() {
         {showLogsModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="card p-6 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
-              <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-4">
+              <div className="flex justify-between items-center mb-4 border-b border-border pb-4">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-slate-400" />
+                  <Clock className="w-5 h-5 text-muted-foreground" />
                   验证日志
                 </h3>
-                <button onClick={() => setShowLogsModal(false)} className="text-slate-400 hover:text-white">
+                <button onClick={() => setShowLogsModal(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -781,7 +781,7 @@ export default function ProblemTestCasesPage() {
               <div className="flex-1 overflow-y-auto pr-2">
                 {logsLoading ? (
                   <div className="flex justify-center py-8">
-                    <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : logs.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">暂无验证记录</div>
@@ -797,7 +797,7 @@ export default function ProblemTestCasesPage() {
                             {new Date(log.createdAt).toLocaleString()}
                           </span>
                         </div>
-                        <div className="text-sm text-slate-400 space-y-1">
+                        <div className="text-sm text-muted-foreground space-y-1">
                           <div>通过测试点: {log.details?.passed}</div>
                           <div>失败测试点: {log.details?.failed}</div>
                           {log.details?.fixedCount !== undefined && (

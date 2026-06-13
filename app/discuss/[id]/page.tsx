@@ -260,13 +260,13 @@ export default function PostDetailPage() {
                           {String(children).replace(/\n$/, '')}
                         </SyntaxHighlighter>
                       ) : (
-                        <code className="bg-slate-700 px-1.5 py-0.5 rounded text-pink-400" {...props}>
+                        <code className="bg-muted px-1.5 py-0.5 rounded text-pink-400" {...props}>
                           {children}
                         </code>
                       )
                     },
                     blockquote({ children }) {
-                      return <blockquote className="border-l-4 border-primary pl-4 italic text-slate-400">{children}</blockquote>
+                      return <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground">{children}</blockquote>
                     },
                   }}
                 >

@@ -521,7 +521,7 @@ export default function AssignmentDetailPage() {
                               <textarea
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
-                                className="w-full h-[320px] rounded-xl bg-slate-900 text-slate-100 font-mono text-sm p-4 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors"
+                                className="w-full h-[320px] rounded-xl bg-muted text-foreground font-mono text-sm p-4 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors"
                                 spellCheck={false}
                                 placeholder="在此粘贴或输入代码..."
                               />

@@ -204,7 +204,7 @@ export default function EditContestPage() {
   if (loading) {
       return (
           <div className="min-h-screen flex items-center justify-center">
-              <div className="text-center text-gray-400">
+              <div className="text-center text-muted-foreground">
                   <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                   加载中...
               </div>
@@ -217,7 +217,7 @@ export default function EditContestPage() {
       <div className="container mx-auto px-4 max-w-4xl">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
           <span>返回</span>
@@ -225,7 +225,7 @@ export default function EditContestPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="card p-8 space-y-6">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Trophy className="w-6 h-6 text-indigo-400" />
               编辑竞赛
             </h1>
@@ -239,7 +239,7 @@ export default function EditContestPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   竞赛名称 <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -252,7 +252,7 @@ export default function EditContestPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   竞赛描述
                 </label>
                 <textarea
@@ -265,7 +265,7 @@ export default function EditContestPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     赛制类型
                   </label>
                   <select
@@ -279,7 +279,7 @@ export default function EditContestPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     可见性
                   </label>
                   <select
@@ -293,7 +293,7 @@ export default function EditContestPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     开始时间 <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -306,7 +306,7 @@ export default function EditContestPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     结束时间 <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -321,7 +321,7 @@ export default function EditContestPage() {
 
               {!isPublic && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     参赛密码 <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -337,9 +337,9 @@ export default function EditContestPage() {
           </div>
 
           <div className="card p-8 space-y-6">
-            <div className="flex justify-between items-center border-b border-white/10 pb-4">
-              <h2 className="text-lg font-bold text-white">题目管理</h2>
-              <span className="text-sm text-gray-400 bg-white/10 px-3 py-1 rounded-full">
+            <div className="flex justify-between items-center border-b border-border pb-4">
+              <h2 className="text-lg font-bold text-foreground">题目管理</h2>
+              <span className="text-sm text-muted-foreground bg-muted px-3 py-1 rounded-full">
                 已添加 {contestProblems.length} 题
               </span>
             </div>
@@ -375,7 +375,7 @@ export default function EditContestPage() {
               </div>
 
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   搜索添加题目
                 </label>
                 <div className="relative">
@@ -389,7 +389,7 @@ export default function EditContestPage() {
                     }}
                     className="input w-full pl-10"
                   />
-                  <Search className="w-5 h-5 text-gray-500 absolute left-3 top-3" />
+                  <Search className="w-5 h-5 text-muted-foreground absolute left-3 top-3" />
                 </div>
                 
                 {searchResults.length > 0 && (
@@ -399,13 +399,13 @@ export default function EditContestPage() {
                         key={problem.id}
                         type="button"
                         onClick={() => handleAddProblem(problem)}
-                        className="w-full px-5 py-3 text-left hover:bg-white/5 flex justify-between items-center group transition-colors border-b border-white/5 last:border-b-0"
+                        className="w-full px-5 py-3 text-left hover:bg-muted flex justify-between items-center group transition-colors border-b border-border last:border-b-0"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="font-mono text-sm text-gray-500 bg-white/10 px-2 py-0.5 rounded group-hover:bg-indigo-500/20 group-hover:text-indigo-400 transition-colors">
+                          <span className="font-mono text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded group-hover:bg-indigo-500/20 group-hover:text-indigo-400 transition-colors">
                             {problem.problemNumber}
                           </span>
-                          <span className="font-medium text-white group-hover:text-indigo-400">{problem.title}</span>
+                          <span className="font-medium text-foreground group-hover:text-indigo-400">{problem.title}</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className={`text-xs px-2 py-1 rounded font-medium ${
@@ -415,7 +415,7 @@ export default function EditContestPage() {
                           }`}>
                             {problem.difficulty}
                           </span>
-                          <Plus className="w-4 h-4 text-gray-500 group-hover:text-indigo-400" />
+                          <Plus className="w-4 h-4 text-muted-foreground group-hover:text-indigo-400" />
                         </div>
                       </button>
                     ))}
@@ -423,35 +423,35 @@ export default function EditContestPage() {
                 )}
               </div>
 
-              <div className="border border-white/10 rounded-xl overflow-hidden">
+              <div className="border border-border rounded-xl overflow-hidden">
                 {contestProblems.length === 0 ? (
                   <div className="py-16 text-center">
-                    <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Search className="w-8 h-8 text-gray-500" />
+                    <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Search className="w-8 h-8 text-muted-foreground" />
                     </div>
-                    <p className="text-gray-400 font-medium">暂无题目</p>
-                    <p className="text-sm text-gray-500 mt-1">请使用上方工具搜索或批量添加题目</p>
+                    <p className="text-muted-foreground font-medium">暂无题目</p>
+                    <p className="text-sm text-muted-foreground mt-1">请使用上方工具搜索或批量添加题目</p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-white/5">
+                  <div className="divide-y divide-border">
                     {contestProblems.map((problem, index) => (
-                      <div key={problem.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors group">
+                      <div key={problem.id} className="p-4 flex items-center justify-between hover:bg-muted transition-colors group">
                         <div className="flex items-center gap-4">
                           <span className="w-8 h-8 flex items-center justify-center bg-indigo-500/20 text-indigo-400 rounded-lg text-sm font-bold">
                             {String.fromCharCode(65 + index)}
                           </span>
                           <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm text-gray-500">{problem.problemNumber}</span>
-                              <span className="font-medium text-white">{problem.title}</span>
+                              <span className="font-mono text-sm text-muted-foreground">{problem.problemNumber}</span>
+                              <span className="font-medium text-foreground">{problem.title}</span>
                             </div>
-                            <span className="text-xs text-gray-500 mt-0.5">{problem.difficulty}</span>
+                            <span className="text-xs text-muted-foreground mt-0.5">{problem.difficulty}</span>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleRemoveProblem(problem.id)}
-                          className="p-2 text-gray-500 hover:text-red-400 hover:bg-error/100/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                          className="p-2 text-muted-foreground hover:text-red-400 hover:bg-error/100/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                           title="移除题目"
                         >
                           <Trash2 className="w-5 h-5" />

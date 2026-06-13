@@ -164,7 +164,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
         }
         return {
           icon: <XCircle className="w-5 h-5" />,
-          color: 'text-gray-400',
+          color: 'text-muted-foreground',
           bg: 'bg-gray-500/20',
           label: status
         }
@@ -184,21 +184,21 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
             const returnTab = isFromLeaderboard ? 'leaderboard' : 'info'
             router.push(`/classes/${classId}/assignments/${assignmentId}?tab=${returnTab}`)
           }}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           返回作业详情
         </button>
 
         <div className="card p-6 mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             {isFromLeaderboard && targetUser && targetProblem ? (
               `${assignment?.title} - ${targetProblem.title}(${targetProblem.problemNumber}) - ${targetUser.nickname || targetUser.username}的提交记录`
             ) : (
               `${assignment?.title} - 提交记录`
             )}
           </h1>
-          <p className="text-gray-400">
+          <p className="text-muted-foreground">
             {isFromLeaderboard && targetUser ? (
               `查看 ${targetUser.nickname || targetUser.username} 在 ${targetProblem?.title} 题目上的所有提交`
             ) : (
@@ -210,12 +210,12 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
         {!isFromLeaderboard && (
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
-              <Filter className="w-5 h-5 text-gray-400" />
-              <h2 className="text-lg font-semibold text-white">筛选条件</h2>
+              <Filter className="w-5 h-5 text-muted-foreground" />
+              <h2 className="text-lg font-semibold text-foreground">筛选条件</h2>
             </div>
             <div className="grid md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   用户ID
                 </label>
                 <input
@@ -227,7 +227,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   题目ID
                 </label>
                 <input
@@ -239,7 +239,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   状态
                 </label>
                 <select
@@ -263,68 +263,68 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
-              <p className="text-gray-400">加载中...</p>
+              <p className="text-muted-foreground">加载中...</p>
             </div>
           ) : submissions.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
+            <div className="text-center py-12 text-muted-foreground">
               暂无提交记录
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-white/10">
-                <thead className="bg-white/5">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       提交时间
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       用户
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       题目
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       语言
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       状态
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       得分
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       时间/内存
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       操作
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/10">
+                <tbody className="divide-y divide-border">
                   {submissions.map((submission) => {
                     const statusInfo = getStatusInfo(submission.status, submission.score)
                     return (
-                      <tr key={submission.id} className="hover:bg-white/5">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                      <tr key={submission.id} className="hover:bg-muted">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {new Date(submission.submittedAt).toLocaleString('zh-CN')}
                           {submission.isLate && (
                             <span className="ml-2 text-xs text-red-400">(逾期)</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {submission.user.nickname || submission.user.username}
                         </td>
-                        <td className="px-6 py-4 text-sm text-white">
+                        <td className="px-6 py-4 text-sm text-foreground">
                           <div>
                             <div className="font-medium">{submission.problem.title}</div>
                             {submission.problem.problemNumber && (
-                              <div className="text-xs text-gray-500">
+                              <div className="text-xs text-muted-foreground">
                                 {submission.problem.problemNumber}
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           {submission.language}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -339,14 +339,14 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
                               ? 'bg-secondary/100/20 text-green-400'
                               : submission.score > 0
                               ? 'bg-yellow-500/20 text-accent-light'
-                              : 'bg-white/10 text-gray-400'
+                              : 'bg-muted text-muted-foreground'
                           }`}>
                             {submission.score}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                           <div>{submission.time}ms</div>
-                          <div className="text-xs text-gray-500">{submission.memory}KB</div>
+                          <div className="text-xs text-muted-foreground">{submission.memory}KB</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <button
@@ -370,17 +370,17 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
       {showCodeModal && selectedSubmission && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="card max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-white/10">
+            <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">提交代码</h3>
+                <h3 className="text-xl font-bold text-foreground">提交代码</h3>
                 <button
                   onClick={() => setShowCodeModal(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   <XCircle className="w-6 h-6" />
                 </button>
               </div>
-              <div className="mt-2 text-sm text-gray-400">
+              <div className="mt-2 text-sm text-muted-foreground">
                 <div>题目：{selectedSubmission.problem.title}</div>
                 <div>用户：{selectedSubmission.user.nickname || selectedSubmission.user.username}</div>
                 <div>语言：{selectedSubmission.language}</div>
@@ -389,8 +389,8 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
               </div>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-              <pre className="bg-white/5 p-4 rounded-lg overflow-x-auto">
-                <code className="text-sm text-gray-300">{selectedSubmission.code}</code>
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
+                <code className="text-sm text-foreground">{selectedSubmission.code}</code>
               </pre>
             </div>
           </div>

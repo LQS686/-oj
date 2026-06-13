@@ -378,7 +378,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         </div>
 
         {submitting && judgeStatus && (
-          <div className="mb-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700 animate-fadeIn">
+          <div className="mb-4 p-4 rounded-xl bg-muted border border-border animate-fadeIn">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -391,7 +391,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
               </div>
               <button 
                 onClick={() => setJudgeStatus(null)}
-                className="p-1 hover:bg-slate-700 rounded cursor-pointer transition-colors duration-300 group"
+                className="p-1 hover:bg-muted rounded cursor-pointer transition-colors duration-300 group"
               >
                 <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors duration-300" />
               </button>
@@ -421,7 +421,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
               </div>
               <button 
                 onClick={() => setLastResult(null)}
-                className="p-1 hover:bg-slate-700 rounded cursor-pointer transition-colors duration-300 group"
+                className="p-1 hover:bg-muted rounded cursor-pointer transition-colors duration-300 group"
               >
                 <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors duration-300" />
               </button>
@@ -512,7 +512,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     className="input w-auto min-w-[140px] py-1.5 text-sm hover:border-primary/30 transition-colors duration-300"
                   >
                     {languageOptions.map((lang) => (
-                      <option key={lang.value} value={lang.value} className="bg-slate-900 text-slate-100">
+                      <option key={lang.value} value={lang.value} className="bg-muted text-foreground">
                         {lang.label} ({lang.version})
                       </option>
                     ))}
@@ -522,7 +522,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                 <textarea
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  className="w-full h-[360px] rounded-xl bg-slate-900 text-slate-100 font-mono text-sm p-3 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
+                  className="w-full h-[360px] rounded-xl bg-muted text-foreground font-mono text-sm p-3 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
                   spellCheck={false}
                   placeholder="在此粘贴或输入代码..."
                 />
@@ -567,7 +567,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             className="card-static rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl shadow-primary/10 hover:shadow-primary/20 transition-all duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-slate-800/50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted">
               <h3 className="font-semibold text-foreground">提交详情</h3>
               <button
                 onClick={() => setSelectedSubmission(null)}
@@ -625,7 +625,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     <CodeIcon className="w-4 h-4 text-primary-light" />
                     <h4 className="font-semibold text-foreground">代码</h4>
                   </div>
-                  <pre className="bg-slate-800 rounded-xl p-4 overflow-x-auto text-sm font-mono text-slate-100 border border-border hover:border-primary/30 transition-all duration-300">
+                  <pre className="bg-muted rounded-xl p-4 overflow-x-auto text-sm font-mono text-foreground border border-border hover:border-primary/30 transition-all duration-300">
                     <code>{selectedSubmission.code}</code>
                   </pre>
                 </div>

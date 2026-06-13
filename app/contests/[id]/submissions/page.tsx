@@ -80,12 +80,12 @@ export default function ContestSubmissionsPage() {
         return 'bg-yellow-500/20 text-accent-light'
       case 'CE':
       case 'Compilation Error':
-        return 'bg-gray-500/20 text-gray-400'
+        return 'bg-muted text-muted-foreground'
       case 'Pending':
       case 'Judging':
         return 'bg-indigo-500/20 text-indigo-400'
       default:
-        return 'bg-gray-500/20 text-gray-400'
+        return 'bg-muted text-muted-foreground'
     }
   }
 
@@ -93,7 +93,7 @@ export default function ContestSubmissionsPage() {
     <div className="card p-8">
       <div className="animate-pulse space-y-4">
         {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} className="h-12 bg-white/5 rounded"></div>
+          <div key={i} className="h-12 bg-muted rounded"></div>
         ))}
       </div>
     </div>
@@ -108,22 +108,22 @@ export default function ContestSubmissionsPage() {
   return (
     <div className="card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-white/10">
-          <thead className="bg-white/5">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">提交时间</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">题目</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">用户</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">状态</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">语言</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">耗时</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">内存</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">提交时间</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">题目</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">用户</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">状态</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">语言</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">耗时</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">内存</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10">
+          <tbody className="divide-y divide-border">
             {submissions.map((sub) => (
-              <tr key={sub.id} className="hover:bg-white/5">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+              <tr key={sub.id} className="hover:bg-muted">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {new Date(sub.submittedAt).toLocaleString('zh-CN')}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -134,7 +134,7 @@ export default function ContestSubmissionsPage() {
                     {sub.problem.problemNumber || 'P?'} {sub.problem.title}
                   </Link>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                   {sub.user.nickname || sub.user.username}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -142,13 +142,13 @@ export default function ContestSubmissionsPage() {
                     {sub.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {sub.language}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {sub.time}ms
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                   {Math.round(sub.memory / 1024)}MB
                 </td>
               </tr>
@@ -158,27 +158,27 @@ export default function ContestSubmissionsPage() {
       </div>
 
       {totalPages > 1 && (
-        <div className="px-4 py-3 flex items-center justify-between border-t border-white/10 sm:px-6">
+        <div className="px-4 py-3 flex items-center justify-between border-t border-border sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="relative inline-flex items-center px-4 py-2 border border-white/10 text-sm font-medium rounded-md text-gray-300 bg-white/5 hover:bg-white/10 disabled:opacity-50"
+              className="relative inline-flex items-center px-4 py-2 border border-border text-sm font-medium rounded-md text-foreground bg-muted hover:bg-muted/80 disabled:opacity-50"
             >
               上一页
             </button>
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-white/10 text-sm font-medium rounded-md text-gray-300 bg-white/5 hover:bg-white/10 disabled:opacity-50"
+              className="ml-3 relative inline-flex items-center px-4 py-2 border border-border text-sm font-medium rounded-md text-foreground bg-muted hover:bg-muted/80 disabled:opacity-50"
             >
               下一页
             </button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-400">
-                页码 <span className="font-medium text-white">{page}</span> / <span className="font-medium text-white">{totalPages}</span>
+              <p className="text-sm text-muted-foreground">
+                页码 <span className="font-medium text-foreground">{page}</span> / <span className="font-medium text-foreground">{totalPages}</span>
               </p>
             </div>
             <div>
@@ -186,14 +186,14 @@ export default function ContestSubmissionsPage() {
                 <button
                   onClick={() => setPage(Math.max(1, page - 1))}
                   disabled={page === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/10 bg-white/5 text-sm font-medium text-gray-400 hover:bg-white/10 disabled:opacity-50"
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-border bg-muted text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
                 >
                   上一页
                 </button>
                 <button
                   onClick={() => setPage(Math.min(totalPages, page + 1))}
                   disabled={page === totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/10 bg-white/5 text-sm font-medium text-gray-400 hover:bg-white/10 disabled:opacity-50"
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-border bg-muted text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
                 >
                   下一页
                 </button>

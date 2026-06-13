@@ -544,7 +544,7 @@ export default function AdminProblemsPage() {
                       className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${
                         selectedIds.has(problem.id)
                           ? 'bg-primary border-primary text-foreground'
-                          : 'border-slate-600'
+                          : 'border-border'
                       }`}
                     >
                       {selectedIds.has(problem.id) && <Check className="w-3 h-3" />}

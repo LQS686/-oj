@@ -181,7 +181,7 @@ export default function AdminPostsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/10">
+                <tr className="border-b border-border">
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     帖子
                   </th>
@@ -204,7 +204,7 @@ export default function AdminPostsPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredPosts.map((post) => (
-                  <tr key={post.id} className="hover:bg-white/5 transition-colors">
+                  <tr key={post.id} className="hover:bg-muted transition-colors">
                     <td className="px-6 py-4">
                       <div className="max-w-xs">
                         <p className="text-foreground font-medium truncate">{post.title}</p>

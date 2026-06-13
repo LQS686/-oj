@@ -562,12 +562,12 @@ export default function AIModelsPage() {
             ) : (
               <div className="space-y-3">
                 {providers.map(provider => (
-                  <div key={provider.id} className="p-4 rounded-lg bg-white/5 border border-white/10">
+                  <div key={provider.id} className="p-4 rounded-lg bg-muted border border-border">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-foreground">{provider.name}</span>
-                          <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-muted-foreground">{provider.slug}</span>
+                          <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{provider.slug}</span>
                         </div>
                         {provider.baseUrl && (
                           <p className="text-xs text-muted-foreground mt-1">{provider.baseUrl}</p>
@@ -588,14 +588,14 @@ export default function AIModelsPage() {
                         <button
                           onClick={() => openDiscoverModal(provider.id, provider.name)}
                           disabled={!provider.apiKey}
-                          className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
                           title={!provider.apiKey ? '需先配置 API Key' : '自动发现该服务商的模型'}
                         >
                           <Wand2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => editProvider(provider)}
-                          className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
@@ -669,7 +669,7 @@ export default function AIModelsPage() {
             ) : (
               <div className="space-y-3">
                 {effectiveModels.map(model => (
-                  <div key={model.id} className="p-4 rounded-lg bg-white/5 border border-white/10">
+                  <div key={model.id} className="p-4 rounded-lg bg-muted border border-border">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -705,7 +705,7 @@ export default function AIModelsPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => editModel(model)}
-                          className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
@@ -733,7 +733,7 @@ export default function AIModelsPage() {
                 </h3>
                 <button
                   onClick={() => setShowProviderForm(false)}
-                  className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground"
+                  className="p-2 rounded-lg hover:bg-muted text-muted-foreground"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -869,7 +869,7 @@ export default function AIModelsPage() {
                 </h3>
                 <button
                   onClick={() => setShowModelForm(false)}
-                  className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground"
+                  className="p-2 rounded-lg hover:bg-muted text-muted-foreground"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -950,7 +950,7 @@ export default function AIModelsPage() {
                 </div>
 
                 {/* 高级参数折叠区 */}
-                <div className="border-t border-white/10 pt-4">
+                <div className="border-t border-border pt-4">
                   <button
                     type="button"
                     onClick={() => setShowAdvanced(s => !s)}
@@ -961,7 +961,7 @@ export default function AIModelsPage() {
                   {showAdvanced && (
                     <div className="mt-3 space-y-2">
                       <p className="text-xs text-muted-foreground">
-                        透传到 OpenAI chat.completions.create 的额外参数。DeepSeek v4 模型支持 <code className="bg-white/10 px-1 rounded">{'{ "thinking": { "type": "enabled" }, "reasoning_effort": "high" }'}</code> 启用思考模式。
+                        透传到 OpenAI chat.completions.create 的额外参数。DeepSeek v4 模型支持 <code className="bg-muted px-1 rounded">{'{ "thinking": { "type": "enabled" }, "reasoning_effort": "high" }'}</code> 启用思考模式。
                       </p>
                       <textarea
                         value={paramsText}
@@ -1001,8 +1001,8 @@ export default function AIModelsPage() {
         {/* 自动发现模型抽屉 */}
         {discoverModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-card border border-white/10 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-              <div className="flex items-center justify-between p-5 border-b border-white/10">
+            <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between p-5 border-b border-border">
                 <div className="flex items-center gap-3">
                   <Wand2 className="w-5 h-5 text-primary" />
                   <div>
@@ -1012,7 +1012,7 @@ export default function AIModelsPage() {
                 </div>
                 <button
                   onClick={() => setDiscoverModalOpen(false)}
-                  className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground"
+                  className="p-2 rounded-lg hover:bg-muted text-muted-foreground"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1038,10 +1038,10 @@ export default function AIModelsPage() {
                     {discoveredModels.map(m => (
                       <label
                         key={m.model}
-                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-white/5 ${
+                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted ${
                           selectedDiscovered.has(m.model)
                             ? 'border-primary bg-primary/5'
-                            : 'border-white/10'
+                            : 'border-border'
                         }`}
                       >
                         <input
@@ -1053,7 +1053,7 @@ export default function AIModelsPage() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-foreground">{m.name}</span>
-                            <code className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">{m.model}</code>
+                            <code className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{m.model}</code>
                             {m.type === 'thinking' && (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">思考</span>
                             )}
@@ -1072,7 +1072,7 @@ export default function AIModelsPage() {
               </div>
 
               {!discoverError && discoveredModels.length > 0 && (
-                <div className="p-5 border-t border-white/10 flex justify-between items-center">
+                <div className="p-5 border-t border-border flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
                     已选 {selectedDiscovered.size} / {discoveredModels.length}
                   </span>
