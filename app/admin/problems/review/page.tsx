@@ -94,7 +94,7 @@ export default function ProblemReviewPage() {
       const response = await fetchWithAuth('/api/admin/problems/review')
       const data = await response.json()
       if (data.success) {
-        setProblems(data.data || [])
+        setProblems(Array.isArray(data.data) ? data.data : [])
       }
     } catch (err) {
       setError('获取题目列表失败')

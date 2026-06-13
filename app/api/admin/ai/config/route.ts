@@ -33,20 +33,18 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
   }
 
   const { data, config, totalTokens } = await getGlobalAiConfig()
-  if (data) return ok({ data })
+  if (data) return ok(data)
 
   // 数据库无配置时回退到 SystemSettings
   const settings = await getSystemSettings()
   const hasApiKey = !!(settings as any).aiApiKey
   return ok({
-    data: {
-      provider: (settings as any).aiProvider || 'openai',
-      model: (settings as any).aiModel || 'gpt-4',
-      baseUrl: (settings as any).aiBaseUrl || '',
-      apiKey: hasApiKey ? '****configured****' : '',
-      totalTokens,
-      hasApiKey,
-    },
+    provider: (settings as any).aiProvider || 'openai',
+    model: (settings as any).aiModel || 'gpt-4',
+    baseUrl: (settings as any).aiBaseUrl || '',
+    apiKey: hasApiKey ? '****configured****' : '',
+    totalTokens,
+    hasApiKey,
   })
 })
 

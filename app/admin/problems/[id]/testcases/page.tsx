@@ -63,7 +63,7 @@ export default function ProblemTestCasesPage() {
       const res = await fetchWithAuth(`/api/admin/problems/${problemId}/verification-logs`)
       const data = await res.json()
       if (data.success) {
-        setLogs(data.data)
+        setLogs(Array.isArray(data.data) ? data.data : [])
       }
     } catch (err) {
       logger.error('Failed to fetch logs', err)
@@ -194,8 +194,11 @@ export default function ProblemTestCasesPage() {
       const data = await response.json()
 
       if (data.success) {
+        const uploaded = Array.isArray(data.data?.testCases)
+          ? data.data.testCases
+          : []
         const newTestCases: TestCase[] = ensureTotalScoreIs100(
-          data.data.testCases.map((tc: any) => ({
+          uploaded.map((tc: any) => ({
             input: tc.inputPreview,
             output: tc.outputPreview,
             isSample: false,

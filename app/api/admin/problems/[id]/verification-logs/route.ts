@@ -13,5 +13,5 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   const data = await listProblemVerificationLogs(id)
-  return ok({ data })
+  return ok(data)
 })

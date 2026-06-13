@@ -15,7 +15,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
     throw403('需要管理员权限')
   }
   const data = await listAdminContests()
-  return ok({ data })
+  return ok(data)
 })
 
 /**

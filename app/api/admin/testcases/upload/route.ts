@@ -57,19 +57,17 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
   logger.info('✅ 测试点解析成功')
   // 返回解析结果
   return ok({
-    data: {
-      testCases: result.testCases?.map((tc) => ({
-        number: tc.number,
-        inputFile: tc.inputFile,
-        outputFile: tc.outputFile,
-        inputSize: tc.inputSize,
-        outputSize: tc.outputSize,
-        inputPreview: tc.inputContent.substring(0, 200),
-        outputPreview: tc.outputContent.substring(0, 200),
-      })),
-      totalSize: result.totalSize,
-      count: result.testCases?.length || 0,
-    },
+    testCases: result.testCases?.map((tc) => ({
+      number: tc.number,
+      inputFile: tc.inputFile,
+      outputFile: tc.outputFile,
+      inputSize: tc.inputSize,
+      outputSize: tc.outputSize,
+      inputPreview: tc.inputContent.substring(0, 200),
+      outputPreview: tc.outputContent.substring(0, 200),
+    })),
+    totalSize: result.totalSize,
+    count: result.testCases?.length || 0,
     message: `成功解析 ${result.testCases?.length} 个测试点`,
   })
 })

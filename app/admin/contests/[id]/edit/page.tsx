@@ -76,7 +76,8 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
       const response = await fetchWithAuth('/api/admin/problems')
       const data = await response.json()
       if (data.success) {
-        const filtered = data.data.filter((p: Problem) => 
+        const allProblems = Array.isArray(data.data) ? data.data : []
+        const filtered = allProblems.filter((p: Problem) =>
           p.title.toLowerCase().includes(query.toLowerCase()) &&
           !contestProblems.find(cp => cp.id === p.id)
         )

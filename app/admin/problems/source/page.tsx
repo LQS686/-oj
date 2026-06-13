@@ -45,7 +45,7 @@ export default function SourceManagementPage() {
       const res = await fetchWithAuth('/api/admin/logs/source-changes')
       const data = await res.json()
       if (data.success) {
-        setLogs(data.data)
+        setLogs(Array.isArray(data.data) ? data.data : [])
       }
     } catch (err) {
       console.error(err)
