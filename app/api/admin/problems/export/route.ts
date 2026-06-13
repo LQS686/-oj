@@ -5,7 +5,7 @@ import { withApi, throw403 } from '@/lib/api/withApi'
 import { listProblemsForExport } from '@/lib/problem/service'
 
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 

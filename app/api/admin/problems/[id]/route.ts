@@ -15,7 +15,7 @@ import {
 } from '@/lib/problem/service'
 
 function ensureAdmin(user: { role: string }) {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 }

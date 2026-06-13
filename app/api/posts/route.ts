@@ -49,7 +49,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
 
   // user.role 在 withApi.auth 中只暴露 AuthUser 字段，需从 DB 读取 isAdmin。
   // 这里用 user.role === 'admin' / 'super_admin' 判定，与 withApi.admin 一致。
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
 
   const post = await createUserPost(
     {

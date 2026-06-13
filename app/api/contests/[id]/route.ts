@@ -34,7 +34,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
   const access = await ensureContestManageAccess(id, user.id, isAdmin)
   if (!access.ok) {
     if (access.status === 404) throw404(access.error)
@@ -83,7 +83,7 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
   const access = await ensureContestManageAccess(id, user.id, isAdmin)
   if (!access.ok) {
     if (access.status === 404) throw404(access.error)

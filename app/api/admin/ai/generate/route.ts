@@ -20,7 +20,7 @@ import {
  *   有 logId -> 返回单条
  */
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 
@@ -37,7 +37,7 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
  * POST /api/admin/ai/generate
  */
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 

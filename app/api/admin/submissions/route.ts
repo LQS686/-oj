@@ -8,7 +8,7 @@ import { listAdminSubmissions } from '@/lib/submission/service'
  * GET /api/admin/submissions - 获取所有提交记录（管理员）
  */
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 

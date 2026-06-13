@@ -15,7 +15,7 @@ import { getPostAfterMongoDirectUpdate } from '@/lib/post/service'
  * PATCH /api/admin/posts/[id] - 更新帖子状态（管理员）
  */
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const { id } = (ctx as any).params
@@ -36,7 +36,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
  * DELETE /api/admin/posts/[id] - 逻辑删除帖子（管理员）
  */
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const { id } = (ctx as any).params

@@ -11,7 +11,7 @@ import { getSystemSettings, saveSystemSettings } from '@/lib/settings'
  * GET /api/admin/settings
  */
 export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 
@@ -23,7 +23,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
  * PUT /api/admin/settings
  */
 export const PUT = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 

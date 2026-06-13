@@ -143,7 +143,7 @@ export function withAuth(handler: Handler<AuthContext>) {
  */
 export function withAdmin(handler: Handler<AuthContext>) {
   return withAuth(async (req, ctx, { user }) => {
-    if (user.role !== 'admin' && user.role !== 'super_admin') {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
       return forbidden('需要管理员权限')
     }
     return handler(req, ctx, { user })

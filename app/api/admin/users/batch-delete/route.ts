@@ -12,7 +12,7 @@ import {
 } from '@/lib/user/service'
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 

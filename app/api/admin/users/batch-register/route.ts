@@ -22,7 +22,7 @@ const MAX_JSON_USERS = 100
  * - 支持 JSON body 或 multipart/form-data 上传 CSV
  */
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 

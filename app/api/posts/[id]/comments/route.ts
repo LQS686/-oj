@@ -46,7 +46,7 @@ export const DELETE = withApi.auth(async (req, ctx, { user }) => {
   if (!commentId) throw400('VALIDATION', '缺少评论ID')
   if (!isObjectId(commentId!)) throw400('INVALID_ID', '无效的评论ID')
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
   try {
     await softDeleteUserComment(commentId!, postId, user.id, isAdmin)
   } catch (err: any) {

@@ -9,7 +9,7 @@ export interface User {
 
 export function isAdmin(user: User | null): boolean {
   if (!user) return false
-  return user.role === 'ADMIN' || user.isAdmin === true
+  return user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.isAdmin === true
 }
 
 export function isTeacher(user: User | null): boolean {

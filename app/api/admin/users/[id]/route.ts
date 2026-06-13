@@ -18,7 +18,7 @@ import * as bcrypt from 'bcryptjs'
  * PATCH /api/admin/users/[id] - 更新用户权限、状态或重置密码（管理员）
  */
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const { id } = (ctx as any).params
@@ -59,7 +59,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
  * DELETE /api/admin/users/[id] - 删除用户（管理员）
  */
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const { id } = (ctx as any).params

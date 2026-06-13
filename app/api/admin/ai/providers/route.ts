@@ -11,7 +11,7 @@ import { createAiProvider, listAiProvidersForAdmin } from '@/lib/ai/service'
  * GET /api/admin/ai/providers
  */
 export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const data = await listAiProvidersForAdmin()
@@ -22,7 +22,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
  * POST /api/admin/ai/providers
  */
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const body = await readJson<{ name?: string; slug?: string; baseUrl?: string; apiKey?: string }>(req)

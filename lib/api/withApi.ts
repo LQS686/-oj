@@ -164,13 +164,13 @@ export const withApi = {
   admin(
     handler: (req: NextRequest, ctx: ApiContext, context: AuthContext) => Promise<Response | unknown> | Response | unknown
   ) {
-    return async (req: NextRequest, ctx: ApiContext) => {
+    return async (req: NextRequest, ctx: any) => {
       return safeCall(async () => {
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId)
         if (!user) throw throw401('用户不存在')
-        if (user.role !== 'admin' && user.role !== 'super_admin') {
+        if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
           throw throw403('需要管理员权限')
         }
         const resolved = await resolveCtxParams(ctx)

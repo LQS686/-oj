@@ -67,7 +67,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
 
   // 鉴权：作者本人 或 管理员/教师
   const dbUser = await getUserRoleFlags(user.id)
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || dbUser?.isAdmin === true
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || dbUser?.isAdmin === true
   const isTeacher = dbUser?.role === 'TEACHER'
 
   try {
@@ -86,7 +86,7 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题解ID')
 
   const dbUser = await getUserRoleFlags(user.id)
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || dbUser?.isAdmin === true
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || dbUser?.isAdmin === true
   const isTeacher = dbUser?.role === 'TEACHER'
 
   try {

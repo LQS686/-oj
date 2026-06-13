@@ -36,7 +36,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   if (!post) throw404('帖子不存在')
   const safePost = post!
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
   if (safePost.authorId !== user.id && !isAdmin) {
     throw403('无权修改此帖子')
   }
@@ -72,7 +72,7 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   if (!post) throw404('帖子不存在')
   const safePost = post!
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
   if (safePost.authorId !== user.id && !isAdmin) {
     throw403('无权删除此帖子')
   }

@@ -21,7 +21,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   if (!isObjectId(contestId)) throw400('INVALID_ID', '无效的竞赛ID')
 
   const body = await readJson<{ problemId: string; code: string; language: string }>(req)
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
   const result = await submitContestCode({
     contestId: contestId!,
     userId: user.id,

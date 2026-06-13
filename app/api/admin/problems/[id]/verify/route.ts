@@ -19,7 +19,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     throw400('INVALID_ACTION', '无效的操作类型')
   }
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
 
   return ok(
     await applyProblemVerification({

@@ -19,7 +19,7 @@ import { createAiModel, listActiveAiModelsEnriched } from '@/lib/ai/service'
  * 也不会让"挂在已禁用 Provider 上的模型"出现在前端 UI 上。
  */
 export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 
@@ -31,7 +31,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
  * POST /api/admin/ai/models
  */
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
 

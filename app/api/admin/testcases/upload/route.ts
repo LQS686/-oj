@@ -1,7 +1,7 @@
 /**
  * /api/admin/testcases/upload - 上传测试点压缩包（管理员）
  */
-import { withApi, ok, throw400, throw403 } from '@/lib/api/withApi'
+import { withApi, ok, throw400 } from '@/lib/api/withApi'
 import { parseTestCaseZip } from '@/lib/problem/testcase'
 
 // 禁用 Next.js 默认的 body parser
@@ -11,10 +11,7 @@ export const bodyParser = false
 /**
  * POST /api/admin/testcases/upload - 上传测试点压缩包
  */
-export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
-    throw403('需要管理员权限')
-  }
+export const POST = withApi.admin(async (req, _ctx, { user }) => {
 
   console.log('📥 收到测试点上传请求')
 

@@ -15,7 +15,7 @@ import {
  * PUT /api/admin/ai/providers/[id]
  */
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const { id } = (ctx as any).params
@@ -37,7 +37,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
  * DELETE /api/admin/ai/providers/[id]
  */
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const { id } = (ctx as any).params

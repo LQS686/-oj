@@ -8,7 +8,7 @@ import { listAllClassesForAdmin } from '@/lib/class/service'
  * GET /api/admin/classes - 班级列表（管理员）
  */
 export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const data = await listAllClassesForAdmin()

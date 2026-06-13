@@ -6,7 +6,7 @@ import { isObjectId } from '@/lib/api/validation'
 import { discoverProviderModels } from '@/lib/ai/discover'
 
 export const POST = withApi.auth(async (_req, ctx, { user }) => {
-  if (user.role !== 'admin' && user.role !== 'super_admin') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     throw403('需要管理员权限')
   }
   const { id } = (ctx as any).params

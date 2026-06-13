@@ -68,4 +68,20 @@
 ## H. 部署
 
 - [x] 修复独立 commit（按域分批）
-- [ ] `git push origin master` 成功
+- [x] `git push origin master` 成功
+
+## I. 缓存失效审计（额外）
+
+> 通过审计 service 层 mutation 函数，确认 11 个缓存失效 BUG 已全部修复。
+
+- [x] `cache.ts` 新增 `deleteByPrefix` 支持批量失效
+- [x] `user/service.ts`: 7+ 资料变更 mutation → `clearUserCache` (profile/stats/auth:ranking)
+- [x] `notification/service.ts`: 4 个 mutation → `clearNotificationCache`
+- [x] `ranking/service.ts`: 新增 `clearRankingCache` (4 个 prefix)
+- [x] `problem/service.ts`: 9 个 mutation → `clearProblemCache` (byId/statusCounts/tags)
+- [x] `solution/service.ts`: 5 个 mutation → `clearSolutionCache`
+- [x] `post/service.ts`: 4 个 mutation → `clearPostCache`
+- [x] `contest/service.ts`: 评测/编辑/删除 → `cache.delete` (byId + rank prefix)
+- [x] `judge/worker.ts`: 评测完成 → `submission:byId` + `problem:statusCounts`
+- [x] BUG-1 ~ BUG-11 全部修复
+- [x] 提交 `93b3338` 已 push 到 master
