@@ -79,6 +79,27 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
     let maxTime = 0
     let maxMemory = 0
 
+    // 预热：执行一次用户的程序（带空输入、短超时），
+    // 让 OS 文件缓存、子进程创建路径（Windows 冷启动）热起来，
+    // 避免首测点继承数百毫秒的冷启动开销。
+    // 空输入下用户程序可能立即退出或被超时杀死，都不影响后续评测。
+    if (job.testCases.length > 0) {
+      try {
+        logger.debug(`预热执行器`, { language: job.language })
+        await executeCode({
+          code: job.code,
+          language: job.language,
+          input: '',
+          timeLimit: 500, // 预热超时短，避免用户程序挂起
+          memoryLimit: job.memoryLimit || 256,
+          compiledPath: compileResult.compiledPath,
+        })
+      } catch (warmupError) {
+        // 预热失败不影响后续评测
+        logger.debug(`预热执行失败（忽略）`, { error: (warmupError as Error).message })
+      }
+    }
+
     for (let i = 0; i < job.testCases.length; i++) {
       const testCase = job.testCases[i]
       const currentTest = i + 1

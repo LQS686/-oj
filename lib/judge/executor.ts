@@ -57,7 +57,10 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
     await writeFile(inputPath, input, 'utf-8')
 
-    const startTime = Date.now()
+    // 注意：startTime / endTime 放在 spawn/exit 紧邻位置，
+    // 仅测量"进程实际运行"的时长，排除输入写出、流管道搭建、
+    // 子进程创建（spawn overhead）以及输出读盘的 I/O 时间。
+    // 这样可以避免首测点因冷启动被多算几百毫秒。
     let output = ''
     let error = ''
     let exitCode = 0
@@ -65,6 +68,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     let runtimeError = false
     let memoryExceeded = false
     let peakMemoryKB = 0
+    let startTime = 0
+    let endTime = 0
 
     if (USE_DOCKER) {
       const containerId = `judge_${timestamp}_${randomId}`
@@ -96,6 +101,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         stdio: 'inherit'
       })
 
+      // 仅在进程已 spawn、即将被等待时计时
+      startTime = Date.now()
+
       await new Promise<void>((resolve, reject) => {
         let timeoutId: NodeJS.Timeout
 
@@ -104,11 +112,13 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           timeout = true
           spawn('docker', ['rm', '-f', containerId], { detached: true, stdio: 'ignore' })
           dockerProcess.kill()
+          endTime = Date.now()
           resolve()
         }, timeLimit + 1000)
 
         dockerProcess.on('exit', (code) => {
           clearTimeout(timeoutId)
+          endTime = Date.now()
           exitCode = code || 0
           if (code !== 0 && !timeout) {
             runtimeError = true
@@ -118,6 +128,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
         dockerProcess.on('error', (err) => {
           clearTimeout(timeoutId)
+          endTime = Date.now()
           runtimeError = true
           error = err.message
           resolve()
@@ -188,6 +199,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       childProcess.stdout.pipe(outputStream)
       childProcess.stderr.pipe(errorStream)
 
+      // 在流管道搭建完毕、进程即将被等待退出时开始计时
+      startTime = Date.now()
+
       await new Promise<void>((resolve, reject) => {
         let timeoutId: NodeJS.Timeout
 
@@ -218,6 +232,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           }
           
           if (monitorInterval) clearInterval(monitorInterval)
+          if (!endTime) endTime = Date.now()
           resolve()
         }, timeLimit + 1000)
 
@@ -225,6 +240,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           clearTimeout(timeoutId)
           if (monitorInterval) clearInterval(monitorInterval)
           processKilled = true
+          // 进程退出瞬间立刻记录时间，避免被文件 I/O 计入
+          endTime = Date.now()
           exitCode = code || 0
           if (code !== 0 && !timeout) {
             runtimeError = true
@@ -236,6 +253,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           clearTimeout(timeoutId)
           if (monitorInterval) clearInterval(monitorInterval)
           processKilled = true
+          endTime = Date.now()
           runtimeError = true
           error = err.message
           resolve()
@@ -255,8 +273,10 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       }
     }
 
-    const endTime = Date.now()
-    const execTime = endTime - startTime
+    // 兜底：极端异常时（startTime / endTime 未设置）使用当前时刻
+    if (!startTime) startTime = Date.now()
+    if (!endTime) endTime = Date.now()
+    const execTime = Math.max(0, endTime - startTime)
     const preciseTime = Math.max(1, Math.round(execTime))
 
     if (peakMemoryKB === 0) {
