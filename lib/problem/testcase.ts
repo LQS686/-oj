@@ -1,13 +1,23 @@
 /**
  * lib/problem/testcase.ts
- * 合并自 lib/test-case-score.ts + lib/testcase-score.ts + lib/testcase-upload.ts
- * 题目测试用例相关操作统一入口
+ * 题目测试用例相关操作统一入口（仅服务端）
+ * ⚠️ 包含 prisma + fs + AdmZip 依赖，不能在客户端组件中 import
+ * 客户端需要的纯函数（分数计算）请从 `@/lib/problem/testcase-scoring` 导入
  */
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import AdmZip from 'adm-zip'
 import path from 'path'
 import fs from 'fs'
+
+// 重新导出纯函数以兼容服务端 import（不会把 fs 传到客户端因为这些函数本身无副作用）
+export {
+  TOTAL_SCORE,
+  distributeTestCaseScores,
+  assertTotalScoreIs100,
+  normalizeTestCaseScores,
+  ensureTotalScoreIs100,
+} from './testcase-scoring'
 
 export interface TestcaseData {
   input: string
@@ -76,74 +86,6 @@ export async function calculateScore(problemId: string, submissionOutputs: strin
   return total
 }
 
-/* ============================================================================
- * 分数计算 / 校验 / 重分配
- * 合并自 lib/test-case-score.ts 与 lib/testcase-score.ts
- * ========================================================================== */
-
-export const TOTAL_SCORE = 100
-
-export interface TestCaseScoreInput {
-  score?: number
-  [key: string]: any
-}
-
-/**
- * 均分测试点分数：每个 ≈ 100/n，余数加给前 r 个
- */
-export function distributeTestCaseScores<T extends TestCaseScoreInput>(
-  cases: T[],
-  strategy: 'rebalance' | 'keep' = 'rebalance'
-): T[] {
-  if (!Array.isArray(cases) || cases.length === 0) return cases
-  const n = cases.length
-  const base = Math.floor(TOTAL_SCORE / n)
-  const remainder = TOTAL_SCORE % n
-
-  return cases.map((tc, idx) => {
-    let newScore: number
-    if (strategy === 'keep' && typeof tc.score === 'number' && tc.score >= 0) {
-      newScore = tc.score
-    } else {
-      newScore = base + (idx < remainder ? 1 : 0)
-    }
-    return { ...tc, score: newScore }
-  })
-}
-
-/**
- * 校验测试点总分是否为 100
- */
-export function assertTotalScoreIs100(cases: TestCaseScoreInput[]): void {
-  if (!Array.isArray(cases) || cases.length === 0) return
-  const total = cases.reduce((sum, tc) => sum + (Number(tc?.score) || 0), 0)
-  if (total !== TOTAL_SCORE) {
-    throw new Error(
-      `测试点总分必须为 ${TOTAL_SCORE}，实际为 ${total}（共 ${cases.length} 个测试点）`
-    )
-  }
-}
-
-/**
- * 兜底归一化：如果总分不是 100，重新均分
- */
-export function normalizeTestCaseScores<T extends TestCaseScoreInput>(cases: T[]): T[] {
-  if (!Array.isArray(cases) || cases.length === 0) return cases
-  const total = cases.reduce((sum, tc) => sum + (Number(tc?.score) || 0), 0)
-  if (total === TOTAL_SCORE) return cases
-  return distributeTestCaseScores(cases, 'rebalance')
-}
-
-/**
- * 在保存测试点前调用此函数 - 安全网
- */
-export function ensureTotalScoreIs100<T extends TestCaseScoreInput>(cases: T[]): T[] {
-  if (!Array.isArray(cases) || cases.length === 0) return cases
-  const total = cases.reduce((sum, tc) => sum + (Number(tc?.score) || 0), 0)
-  if (total === TOTAL_SCORE) return cases
-  return distributeTestCaseScores(cases, 'rebalance')
-}
-
 /**
  * 重新分配单题测试用例分数（DB 写操作）
  */
@@ -188,7 +130,6 @@ export async function redistributeAllProblemScores(): Promise<void> {
 
 /* ============================================================================
  * 测试点压缩包解析
- * 合并自 lib/testcase-upload.ts
  * ========================================================================== */
 
 export const TESTCASE_UPLOAD_CONFIG = {
@@ -343,5 +284,3 @@ export async function deleteTestCaseFiles(
     logger.error('删除测试点文件失败', error)
   }
 }
-
-
