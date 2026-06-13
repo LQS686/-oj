@@ -133,8 +133,24 @@ export default function AIModelsPage() {
       const providersData = await providersRes.json()
       const modelsData = await modelsRes.json()
 
-      if (providersData.success) setProviders(providersData.data)
-      if (modelsData.success) setModels(modelsData.data)
+      if (providersData.success) {
+        const items = Array.isArray(providersData.data?.items)
+          ? providersData.data.items
+          : Array.isArray(providersData.data)
+            ? providersData.data
+            : []
+        setProviders(items)
+      }
+      if (modelsData.success) {
+        const items = Array.isArray(modelsData.data?.items)
+          ? modelsData.data.items
+          : Array.isArray(modelsData.data)
+            ? modelsData.data
+            : []
+        setModels(items)
+      } else if (!modelsData.success) {
+        setError(modelsData.error?.message || '加载模型数据失败')
+      }
     } catch {
       setError('加载数据失败')
     } finally {
