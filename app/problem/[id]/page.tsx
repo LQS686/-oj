@@ -200,6 +200,27 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, submissions])
 
+  // 兜底：只要列表里最新一条已经是终态，就把"评测中..."按钮重置回"提交"。
+  // 解决 ref 跟 data.id 没对上、tab 切换、refetch 时机错位 等场景下
+  // submitting 卡在 true 不下来的问题。
+  useEffect(() => {
+    if (!submitting) return
+    if (!Array.isArray(submissions) || submissions.length === 0) return
+    const latest = submissions[0] // 列表按 submittedAt desc 排序
+    const status = latest?.status
+    if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
+      setSubmitting(false)
+      setJudgeProgress(null)
+      if (!lastResult || lastResult.status !== status) {
+        setLastResult({
+          status,
+          score: typeof latest.score === 'number' ? latest.score : 0
+        })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, submitting])
+
   const { isConnected } = useSubmissionSocket({
     userId: user?.id || '',
     enabled: !!user,
@@ -235,7 +256,20 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         }
       }
 
-      // 2) 仅当是"当前提交"时，才驱动中间的进度条 / 结果横条
+      // 2) 收到任何"终态"事件都重置"评测中..."按钮，
+      //    不要再被 currentSubmissionId 门控拦截 — 按钮只是表达"我正在等结果"，
+      //    任意一条提交落地（哪怕是更早的）都意味着本轮等待可以结束了。
+      const isFinal = data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+      if (isFinal) {
+        setSubmitting(false)
+        setJudgeProgress(null)
+        setLastResult({
+          status: data.status,
+          score: typeof data.score === 'number' ? data.score : 0
+        })
+      }
+
+      // 3) 仅当是"当前提交"时，单独驱动中间的进度条状态
       const isCurrentSubmission = data.id === currentSubmissionIdRef.current
       if (isCurrentSubmission) {
         setJudgeStatus({
@@ -245,15 +279,6 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           totalTests: data.totalTests || 0,
           testResults: data.testResults || [],
         })
-        
-        if (data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running') {
-          setSubmitting(false)
-          setJudgeProgress(null)
-          setLastResult({
-            status: data.status,
-            score: typeof data.score === 'number' ? data.score : 0
-          })
-        }
       }
     },
     onJudgeProgress: (data) => {
