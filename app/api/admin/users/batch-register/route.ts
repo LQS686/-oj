@@ -1,7 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+/**
+ * /api/admin/users/batch-register - 批量注册用户（管理员）
+ *
+ * 支持两种 Content-Type：
+ *  - multipart/form-data + CSV 文件
+ *  - application/json + users 数组（最多 100 个）
+ *
+ * 每行返回 { total, succeeded, failed, errors: [{ row, username, email, error }] }
+ */
+import { withApi, ok, readJson, throw400, throw403, throw404, throw500 } from '@/lib/api/withApi'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { requireAdmin } from '@/lib/admin-auth'
 import {
   validateEmail,
   validateUsername,
@@ -78,8 +86,8 @@ async function processBatchUsers(
 
       const trimmedUsername = String(user.username).trim()
       const trimmedPassword = String(user.password)
-      const trimmedEmail = user.email 
-        ? String(user.email).trim().toLowerCase() 
+      const trimmedEmail = user.email
+        ? String(user.email).trim().toLowerCase()
         : `${trimmedUsername}@placeholder.local`
 
       if (!validateUsername(trimmedUsername)) {
@@ -187,7 +195,7 @@ async function processBatchUsers(
 
 function parseCSV(csvText: string): UserInput[] {
   const lines = csvText.split(/\r?\n/).filter((line) => line.trim())
-  
+
   if (lines.length < 2) {
     return []
   }
@@ -233,98 +241,68 @@ function parseCSV(csvText: string): UserInput[] {
   return users
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const auth = await requireAdmin(request)
-    if (!auth.isAdmin) {
-      return NextResponse.json(
-        { success: false, error: auth.error || '需要管理员权限' },
-        { status: 403 }
+/**
+ * POST /api/admin/users/batch-register
+ * - 管理员批量注册用户
+ * - 支持 JSON body 或 multipart/form-data 上传 CSV
+ */
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  if (user.role !== 'admin' && user.role !== 'super_admin') {
+    throw403('需要管理员权限')
+  }
+
+  const contentType = req.headers.get('content-type') || ''
+
+  let result: BatchResult
+
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await req.formData()
+    const file = formData.get('file')
+
+    if (!file || !(file instanceof File)) {
+      throw400('NO_FILE', '请上传CSV文件')
+    }
+
+    const f = file as File
+    if (!f.name.endsWith('.csv') && !f.name.endsWith('.txt')) {
+      throw400('BAD_FILE_TYPE', '只支持CSV或TXT格式文件')
+    }
+
+    const csvText = await f.text()
+
+    let users: UserInput[] = []
+    try {
+      users = parseCSV(csvText)
+    } catch (parseError) {
+      throw400(
+        'CSV_PARSE_ERROR',
+        parseError instanceof Error ? parseError.message : 'CSV解析失败',
       )
     }
 
-    const contentType = request.headers.get('content-type') || ''
-
-    let result: BatchResult
-
-    if (contentType.includes('multipart/form-data')) {
-      const formData = await request.formData()
-      const file = formData.get('file')
-
-      if (!file || !(file instanceof File)) {
-        return NextResponse.json(
-          { success: false, error: '请上传CSV文件' },
-          { status: 400 }
-        )
-      }
-
-      if (!file.name.endsWith('.csv') && !file.name.endsWith('.txt')) {
-        return NextResponse.json(
-          { success: false, error: '只支持CSV或TXT格式文件' },
-          { status: 400 }
-        )
-      }
-
-      const csvText = await file.text()
-
-      let users: UserInput[]
-      try {
-        users = parseCSV(csvText)
-      } catch (parseError) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: parseError instanceof Error ? parseError.message : 'CSV解析失败',
-          },
-          { status: 400 }
-        )
-      }
-
-      if (users.length === 0) {
-        return NextResponse.json(
-          { success: false, error: 'CSV文件中没有有效的用户数据' },
-          { status: 400 }
-        )
-      }
-
-      result = await processBatchUsers(users, 2)
-    } else {
-      const body = await request.json()
-      const { users } = body
-
-      if (!users || !Array.isArray(users)) {
-        return NextResponse.json(
-          { success: false, error: '请提供用户数组' },
-          { status: 400 }
-        )
-      }
-
-      if (users.length === 0) {
-        return NextResponse.json(
-          { success: false, error: '用户数组不能为空' },
-          { status: 400 }
-        )
-      }
-
-      if (users.length > 100) {
-        return NextResponse.json(
-          { success: false, error: '单次最多批量注册100个用户' },
-          { status: 400 }
-        )
-      }
-
-      result = await processBatchUsers(users, 1)
+    if (users!.length === 0) {
+      throw400('EMPTY_CSV', 'CSV文件中没有有效的用户数据')
     }
 
-    return NextResponse.json({
-      success: true,
-      data: result,
-    })
-  } catch (error) {
-    console.error('批量注册用户失败:', error)
-    return NextResponse.json(
-      { success: false, error: '批量注册失败，请稍后重试' },
-      { status: 500 }
-    )
+    result = await processBatchUsers(users!, 2)
+  } else {
+    const body = await readJson<{ users?: UserInput[] }>(req)
+    const { users } = body
+
+    if (!users || !Array.isArray(users)) {
+      throw400('INVALID_BODY', '请提供用户数组')
+    }
+
+    if (users!.length === 0) {
+      throw400('EMPTY_USERS', '用户数组不能为空')
+    }
+
+    if (users!.length > 100) {
+      throw400('TOO_MANY', '单次最多批量注册100个用户')
+    }
+
+    result = await processBatchUsers(users!, 1)
   }
-}
+
+  return ok(result)
+})

@@ -1,27 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getUserFromRequest } from '@/lib/auth'
+/**
+ * /api/users/avatar/upload/chunk - 接收头像分片
+ */
+import { withApi, ok, throw400 } from '@/lib/api/withApi'
 import { saveChunk } from '@/lib/upload'
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  const formData = await req.formData()
+  const uploadId = formData.get('uploadId') as string
+  const chunkIndex = parseInt(formData.get('chunkIndex') as string)
+  const file = formData.get('file') as File
 
-    const formData = await request.formData()
-    const uploadId = formData.get('uploadId') as string
-    const chunkIndex = parseInt(formData.get('chunkIndex') as string)
-    const file = formData.get('file') as File
-
-    if (!uploadId || isNaN(chunkIndex) || !file) {
-      return NextResponse.json({ success: false, error: 'Invalid params' }, { status: 400 })
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer())
-    await saveChunk(uploadId, chunkIndex, buffer)
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Chunk upload error:', error)
-    return NextResponse.json({ success: false, error: 'Chunk upload failed' }, { status: 500 })
+  if (!uploadId || isNaN(chunkIndex) || !file) {
+    throw400('INVALID_PARAMS', 'Invalid params')
   }
-}
+
+  const buffer = Buffer.from(await file.arrayBuffer())
+  await saveChunk(uploadId, chunkIndex, buffer)
+
+  return ok({})
+})

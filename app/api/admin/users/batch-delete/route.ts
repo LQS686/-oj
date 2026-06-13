@@ -1,73 +1,55 @@
-import { NextRequest, NextResponse } from 'next/server'
+/**
+ * /api/admin/users/batch-delete - 批量删除用户（管理员）
+ *
+ * POST { userIds: string[] }
+ * - 跳过自己
+ * - 跳过超级管理员
+ */
+import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin } from '@/lib/admin-auth'
 
-export async function POST(request: NextRequest) {
-  try {
-    const auth = await requireAdmin(request)
-    if (!auth.isAdmin || !auth.user) {
-      return NextResponse.json(
-        { success: false, error: auth.error || '需要管理员权限' },
-        { status: 403 }
-      )
-    }
-
-    const body = await request.json()
-    const { userIds } = body
-
-    if (!Array.isArray(userIds) || userIds.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'userIds 必须是非空数组' },
-        { status: 400 }
-      )
-    }
-
-    const filteredUserIds = userIds.filter(id => id !== auth.user!.userId)
-
-    if (filteredUserIds.length === 0) {
-      return NextResponse.json(
-        { success: false, error: '不能删除自己的账号' },
-        { status: 400 }
-      )
-    }
-
-    const superAdmins = await prisma.user.findMany({
-      where: {
-        id: { in: filteredUserIds },
-        isSuperAdmin: true
-      },
-      select: { id: true }
-    })
-
-    const superAdminIds = new Set(superAdmins.map(u => u.id))
-    const finalUserIds = filteredUserIds.filter(id => !superAdminIds.has(id))
-
-    if (finalUserIds.length === 0) {
-      return NextResponse.json(
-        { success: false, error: '选中的用户包含超级管理员，不可被删除' },
-        { status: 403 }
-      )
-    }
-
-    const result = await prisma.user.deleteMany({
-      where: {
-        id: { in: finalUserIds }
-      }
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        deletedCount: result.count,
-        requestedCount: userIds.length,
-        skippedCount: userIds.length - finalUserIds.length
-      }
-    })
-  } catch (error) {
-    console.error('批量删除用户失败:', error)
-    return NextResponse.json(
-      { success: false, error: '服务器错误' },
-      { status: 500 }
-    )
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  if (user.role !== 'admin' && user.role !== 'super_admin') {
+    throw403('需要管理员权限')
   }
-}
+
+  const body = await readJson<{ userIds?: string[] }>(req)
+  const { userIds } = body
+
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    throw400('INVALID_USER_IDS', 'userIds 必须是非空数组')
+  }
+
+  const filteredUserIds = userIds!.filter((id) => id !== user.id)
+
+  if (filteredUserIds.length === 0) {
+    throw400('CANNOT_DELETE_SELF', '不能删除自己的账号')
+  }
+
+  const superAdmins = await prisma.user.findMany({
+    where: {
+      id: { in: filteredUserIds },
+      isSuperAdmin: true,
+    },
+    select: { id: true },
+  })
+
+  const superAdminIds = new Set(superAdmins.map((u) => u.id))
+  const finalUserIds = filteredUserIds.filter((id) => !superAdminIds.has(id))
+
+  if (finalUserIds.length === 0) {
+    throw403('选中的用户包含超级管理员，不可被删除')
+  }
+
+  const result = await prisma.user.deleteMany({
+    where: {
+      id: { in: finalUserIds },
+    },
+  })
+
+  return ok({
+    deletedCount: result.count,
+    requestedCount: userIds!.length,
+    skippedCount: userIds!.length - finalUserIds.length,
+  })
+})

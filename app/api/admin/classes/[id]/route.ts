@@ -1,88 +1,53 @@
-import { NextRequest, NextResponse } from 'next/server'
+/**
+ * /api/admin/classes/[id] - 管理员单个班级操作
+ *
+ * PATCH  更新班级可见性
+ * DELETE 删除班级
+ */
+import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { isObjectId } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin } from '@/lib/admin-auth'
 
-interface RouteContext {
-  params: Promise<{
-    id: string
-  }>
-}
-
-// PATCH /api/admin/classes/[id] - 更新班级可见性
-export async function PATCH(
-  request: NextRequest,
-  context: RouteContext
-) {
-  try {
-    const { id } = await context.params
-    const auth = await requireAdmin(request)
-    if (!auth.isAdmin) {
-      return NextResponse.json(
-        { success: false, error: auth.error || '需要管理员权限' },
-        { status: 403 }
-      )
-    }
-
-    const body = await request.json()
-    const { isPublic } = body
-
-    const classData = await prisma.class.findUnique({
-      where: { id }
-    })
-
-    if (!classData) {
-      return NextResponse.json(
-        { success: false, error: '班级不存在' },
-        { status: 404 }
-      )
-    }
-
-    await prisma.class.update({
-      where: { id },
-      data: { isPublic }
-    })
-
-    return NextResponse.json({
-      success: true,
-      message: isPublic ? '班级已设为公开' : '班级已设为私有'
-    })
-  } catch (error) {
-    console.error('更新班级失败:', error)
-    return NextResponse.json(
-      { success: false, error: '服务器错误' },
-      { status: 500 }
-    )
+/**
+ * PATCH /api/admin/classes/[id] - 更新班级可见性（管理员）
+ */
+export const PATCH = withApi.auth(async (req, ctx, { user }) => {
+  if (user.role !== 'admin' && user.role !== 'super_admin') {
+    throw403('需要管理员权限')
   }
-}
+  const { id } = (ctx as any).params
+  if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
-// DELETE /api/admin/classes/[id] - 删除班级
-export async function DELETE(
-  request: NextRequest,
-  context: RouteContext
-) {
-  try {
-    const { id } = await context.params
-    const auth = await requireAdmin(request)
-    if (!auth.isAdmin) {
-      return NextResponse.json(
-        { success: false, error: auth.error || '需要管理员权限' },
-        { status: 403 }
-      )
-    }
+  const body = await readJson<{ isPublic?: boolean }>(req)
+  const { isPublic } = body
 
-    await prisma.class.delete({
-      where: { id }
-    })
+  const classData = await prisma.class.findUnique({
+    where: { id },
+  })
 
-    return NextResponse.json({
-      success: true,
-      message: '班级已删除'
-    })
-  } catch (error) {
-    console.error('删除班级失败:', error)
-    return NextResponse.json(
-      { success: false, error: '服务器错误' },
-      { status: 500 }
-    )
+  if (!classData) throw404('班级不存在')
+
+  await prisma.class.update({
+    where: { id },
+    data: { isPublic },
+  })
+
+  return ok({ message: isPublic ? '班级已设为公开' : '班级已设为私有' })
+})
+
+/**
+ * DELETE /api/admin/classes/[id] - 删除班级（管理员）
+ */
+export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
+  if (user.role !== 'admin' && user.role !== 'super_admin') {
+    throw403('需要管理员权限')
   }
-}
+  const { id } = (ctx as any).params
+  if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
+
+  await prisma.class.delete({
+    where: { id },
+  })
+
+  return ok({ message: '班级已删除' })
+})

@@ -1,43 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getUserFromRequest } from '@/lib/auth'
+/**
+ * /api/users/avatar/upload/init - 初始化头像分片上传
+ */
+import { withApi, ok, readJson, throw400, throw401 } from '@/lib/api/withApi'
 import { randomUUID } from 'crypto'
 import { cleanOldTempFiles } from '@/lib/upload'
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = getUserFromRequest(request)
-    
-    // Probabilistic cleanup (1% chance)
-    if (Math.random() < 0.01) {
-      cleanOldTempFiles().catch(console.error)
-    }
-
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { filename, fileSize } = body
-
-    // Validation
-    if (!filename || !fileSize) {
-      return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 })
-    }
-
-    if (fileSize > 5 * 1024 * 1024) {
-       return NextResponse.json({ success: false, error: 'File too large (Max 5MB)' }, { status: 400 })
-    }
-
-    const uploadId = randomUUID()
-    
-    return NextResponse.json({
-      success: true,
-      data: {
-        uploadId,
-        chunkSize: 1024 * 1024 // 1MB chunks recommended
-      }
-    })
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  // Probabilistic cleanup (1% chance)
+  if (Math.random() < 0.01) {
+    cleanOldTempFiles().catch(console.error)
   }
-}
+
+  const body = await readJson<{ filename?: string; fileSize?: number }>(req)
+  const { filename, fileSize } = body
+
+  // Validation
+  if (!filename || !fileSize) {
+    throw400('INVALID_REQUEST', 'Invalid request')
+  }
+
+  if (fileSize! > 5 * 1024 * 1024) {
+    throw400('FILE_TOO_LARGE', 'File too large (Max 5MB)')
+  }
+
+  const uploadId = randomUUID()
+
+  return ok({
+    data: {
+      uploadId,
+      chunkSize: 1024 * 1024, // 1MB chunks recommended
+    },
+  })
+})
