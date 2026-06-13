@@ -50,22 +50,25 @@ export default function TrainingPage() {
       const data = await response.json()
 
       if (data.success) {
-        const trainingsWithProgress = data.data.map((t: Training) => ({
+        const items = Array.isArray(data.data?.items) ? data.data.items : []
+        const trainingsWithProgress = items.map((t: Training) => ({
           ...t,
           completedCount: t.userProgress?.solvedCount || 0,
           estimatedTime: t.estimatedTime || '2周',
           tags: t.tags || [],
         }))
         setTrainings(trainingsWithProgress)
-        setTotalPages(data.pagination.totalPages)
+        setTotalPages(data.data?.pagination?.totalPages || Math.ceil((data.data?.pagination?.total || 0) / 10) || 1)
       } else {
         setError(data.error || '获取训练计划失败')
         setTrainings([])
+        setTotalPages(1)
       }
     } catch (err) {
       console.error('获取训练计划失败:', err)
       setError('网络错误，获取训练计划失败')
       setTrainings([])
+      setTotalPages(1)
     } finally {
       setLoading(false)
     }
