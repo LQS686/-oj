@@ -99,39 +99,39 @@ export default function CreatePostPage() {
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="flex items-center justify-between mb-8">
-          <Link 
+          <Link
             href="/discuss"
-            className="group flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+            className="group flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             返回讨论区
           </Link>
-          
+
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/50 border border-white/10 text-sm text-slate-400">
-              <span className="w-2 h-2 rounded-full bg-secondary/100 animate-pulse"></span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted border border-border text-sm text-muted-foreground">
+              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
               自动保存已开启
             </div>
           </div>
         </div>
 
         <div className="card-static rounded-2xl overflow-hidden">
-          <div className="px-6 py-5 border-b border-white/10 bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="px-6 py-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/20">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">发布新帖子</h1>
-                <p className="text-sm text-slate-400">分享你的想法、问题或经验</p>
+                <h1 className="text-xl font-bold text-foreground">发布新帖子</h1>
+                <p className="text-sm text-muted-foreground">分享你的想法、问题或经验</p>
               </div>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             {error && (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-error/100/10 border border-red-500/20 text-red-400">
-                <div className="w-8 h-8 rounded-lg bg-error/100/20 flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-error/10 border border-error/20 text-error">
+                <div className="w-8 h-8 rounded-lg bg-error/20 flex items-center justify-center flex-shrink-0">
                   <span className="text-lg">⚠</span>
                 </div>
                 <span>{error}</span>
@@ -139,20 +139,20 @@ export default function CreatePostPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                帖子标题 <span className="text-red-400">*</span>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                帖子标题 <span className="text-error">*</span>
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-white placeholder-slate-500 transition-all"
+                className="w-full px-4 py-3 rounded-xl bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-foreground placeholder:text-muted-foreground transition-all"
                 placeholder="输入一个吸引人的标题..."
                 required
                 maxLength={100}
               />
               <div className="flex justify-end mt-1">
-                <span className={`text-xs ${title.length > 80 ? 'text-accent-light' : 'text-muted-foreground'}`}>
+                <span className={`text-xs ${title.length > 80 ? 'text-accent' : 'text-muted-foreground'}`}>
                   {title.length}/100
                 </span>
               </div>
@@ -160,36 +160,36 @@ export default function CreatePostPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  选择分类 <span className="text-red-400">*</span>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  选择分类 <span className="text-error">*</span>
                 </label>
                 {categories.length > 0 ? (
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-white transition-all appearance-none cursor-pointer"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '20px' }}
+                    className="w-full px-4 py-3 rounded-xl bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-foreground transition-all appearance-none cursor-pointer"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '20px' }}
                   >
                     {categories.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 ) : (
-                  <div className="w-full px-4 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-accent-light text-sm">
+                  <div className="w-full px-4 py-3 rounded-xl bg-warning/10 border border-warning/30 text-warning text-sm">
                     正在加载分类...
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   标签
                 </label>
                 <input
                   type="text"
                   value={tags}
                   onChange={(e) => setTags(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-white placeholder-slate-500 transition-all"
+                  className="w-full px-4 py-3 rounded-xl bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-foreground placeholder:text-muted-foreground transition-all"
                   placeholder="算法, C++, 题解（用逗号分隔）"
                 />
               </div>
@@ -197,42 +197,42 @@ export default function CreatePostPage() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-slate-300">
-                  帖子内容 <span className="text-red-400">*</span>
+                <label className="block text-sm font-medium text-foreground">
+                  帖子内容 <span className="text-error">*</span>
                 </label>
                 <span className="text-xs text-muted-foreground">
                   已输入 {wordCount} 字
                 </span>
               </div>
-              <MarkdownEditor 
-                value={content} 
-                onChange={setContent} 
-                height="450px" 
+              <MarkdownEditor
+                value={content}
+                onChange={setContent}
+                height="450px"
                 placeholder="支持 Markdown 格式，分享你的想法..."
               />
             </div>
 
-            <div className="flex items-center justify-between pt-6 border-t border-white/10">
-              <div className="flex items-center gap-4 text-sm text-slate-400">
+            <div className="flex items-center justify-between pt-6 border-t border-border">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 {!canSubmit && (
                   <span className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-warning"></span>
                     标题至少2字，内容至少10字
                   </span>
                 )}
                 {canSubmit && (
-                  <span className="flex items-center gap-2 text-green-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-secondary/100"></span>
+                  <span className="flex items-center gap-2 text-secondary-dark">
+                    <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
                     可以发布啦
                   </span>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => window.open('/discuss', '_blank')}
-                  className="px-5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-all flex items-center gap-2"
                 >
                   <Eye className="w-4 h-4" />
                   预览
@@ -244,13 +244,13 @@ export default function CreatePostPage() {
                     relative px-6 py-2.5 rounded-xl font-medium transition-all duration-300 flex items-center gap-2 overflow-hidden
                     ${canSubmit && !isSubmitting
                       ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5'
-                      : 'bg-slate-700/50 text-muted-foreground cursor-not-allowed'
+                      : 'bg-muted text-muted-foreground cursor-not-allowed'
                     }
                   `}
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-5 h-5 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
                       <span>发布中...</span>
                     </>
                   ) : (
@@ -259,7 +259,7 @@ export default function CreatePostPage() {
                       <span>发布帖子</span>
                     </>
                   )}
-                  
+
                   {canSubmit && !isSubmitting && (
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer"></div>
                   )}

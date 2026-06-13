@@ -148,9 +148,9 @@ export default function CreateProblemPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-slate-400" />
+            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -158,8 +158,8 @@ export default function CreateProblemPage() {
               <FileText className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">创建题目</h1>
-              <p className="text-sm text-slate-400">添加新的编程题目</p>
+              <h1 className="text-2xl font-bold text-foreground">创建题目</h1>
+            <p className="text-sm text-muted-foreground">添加新的编程题目</p>
             </div>
           </div>
           {aiData && (
@@ -171,18 +171,18 @@ export default function CreateProblemPage() {
         </div>
 
         {error && (
-          <div className="bg-error/100/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg">
+          <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="card p-6 space-y-4">
-            <h2 className="text-lg font-bold text-white mb-4">基本信息</h2>
+            <h2 className="text-lg font-bold text-foreground mb-4">基本信息</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   题目编号（可选）
                 </label>
                 <input
@@ -195,8 +195,8 @@ export default function CreateProblemPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  难度 <span className="text-red-400">*</span>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  难度 <span className="text-error">*</span>
                 </label>
                 <select
                   value={difficulty}
@@ -211,8 +211,8 @@ export default function CreateProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                题目标题 <span className="text-red-400">*</span>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                题目标题 <span className="text-error">*</span>
               </label>
               <input
                 type="text"
@@ -225,7 +225,7 @@ export default function CreateProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">标签</label>
+              <label className="block text-sm font-medium text-foreground mb-2">标签</label>
               <div className="flex gap-2 mb-2">
                 <input
                   type="text"
@@ -253,7 +253,7 @@ export default function CreateProblemPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(idx)}
-                      className="hover:text-red-400"
+                      className="hover:text-error"
                     >
                       ×
                     </button>
@@ -264,7 +264,7 @@ export default function CreateProblemPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   时间限制（ms）
                 </label>
                 <input
@@ -278,7 +278,7 @@ export default function CreateProblemPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-foreground mb-2">
                   内存限制（MB）
                 </label>
                 <input
@@ -293,7 +293,7 @@ export default function CreateProblemPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-slate-300">题目可见性：</label>
+              <label className="text-sm font-medium text-foreground">题目可见性：</label>
               <select
                 value={visibility}
                 onChange={(e) => setVisibility(e.target.value)}
@@ -312,11 +312,11 @@ export default function CreateProblemPage() {
           </div>
 
           <div className="card p-6 space-y-4">
-            <h2 className="text-lg font-bold text-white mb-4">题目描述</h2>
+            <h2 className="text-lg font-bold text-foreground mb-4">题目描述</h2>
             
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                题目描述 <span className="text-red-400">*</span>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                题目描述 <span className="text-error">*</span>
               </label>
               <textarea
                 value={description}
@@ -329,7 +329,7 @@ export default function CreateProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">输入格式</label>
+              <label className="block text-sm font-medium text-foreground mb-2">输入格式</label>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -340,7 +340,7 @@ export default function CreateProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">输出格式</label>
+              <label className="block text-sm font-medium text-foreground mb-2">输出格式</label>
               <textarea
                 value={output}
                 onChange={(e) => setOutput(e.target.value)}
@@ -351,7 +351,7 @@ export default function CreateProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">提示（可选）</label>
+              <label className="block text-sm font-medium text-foreground mb-2">提示（可选）</label>
               <textarea
                 value={hint}
                 onChange={(e) => setHint(e.target.value)}
@@ -362,7 +362,7 @@ export default function CreateProblemPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">来源（可选）</label>
+              <label className="block text-sm font-medium text-foreground mb-2">来源（可选）</label>
               <input
                 type="text"
                 value={source}
@@ -375,7 +375,7 @@ export default function CreateProblemPage() {
 
           <div className="card p-6 space-y-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-white">样例</h2>
+              <h2 className="text-lg font-bold text-foreground">样例</h2>
               <button
                 type="button"
                 onClick={handleAddSample}
@@ -387,14 +387,14 @@ export default function CreateProblemPage() {
             </div>
 
             {samples.map((sample, idx) => (
-              <div key={idx} className="p-4 rounded-lg bg-white/5 border border-white/10 space-y-3">
+              <div key={idx} className="p-4 rounded-lg bg-muted border border-border space-y-3">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-medium text-slate-300">样例 {idx + 1}</h3>
+                  <h3 className="font-medium text-foreground">样例 {idx + 1}</h3>
                   {samples.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveSample(idx)}
-                      className="text-red-400 hover:text-red-300"
+                      className="text-error hover:text-error/80"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -402,7 +402,7 @@ export default function CreateProblemPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-2">输入</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">输入</label>
                     <textarea
                       value={sample.input}
                       onChange={(e) => {
@@ -415,7 +415,7 @@ export default function CreateProblemPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-2">输出</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">输出</label>
                     <textarea
                       value={sample.output}
                       onChange={(e) => {
@@ -429,7 +429,7 @@ export default function CreateProblemPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">说明（可选）</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">说明（可选）</label>
                   <input
                     type="text"
                     value={sample.explanation || ''}
