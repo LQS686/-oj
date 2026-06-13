@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useRef, use } from 'react'
 import { 
   BookOpen, 
   Send, 
@@ -136,6 +136,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     localStorage.setItem(langKey, language)
   }, [language, problemId, classId, fromAssignment])
   
+  // 用 ref 跟踪当前提交 ID，避免回调闭包拿到陈旧值
+  const currentSubmissionIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    currentSubmissionIdRef.current = currentSubmissionId
+  }, [currentSubmissionId])
+
   const fetchSubmissions = async () => {
     try {
       setSubmissionsLoading(true)
@@ -144,7 +150,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       if (fromAssignment && classId) {
         url = `/api/classes/${classId}/assignments/${fromAssignment}/submissions?problemId=${problemId}`
         
-        const response = await fetchWithAuth(url)
+        const response = await fetchWithAuth(url, { cache: 'no-store' })
         const data = await response.json()
         
         if (data.success) {
@@ -157,7 +163,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           ? `/api/problems/${problemId}/submissions?userId=${user.id}` 
           : `/api/problems/${problemId}/submissions`
         
-        const response = await fetch(url)
+        const response = await fetch(url, { cache: 'no-store' })
         const data = await response.json()
         
         if (data.success) {
@@ -179,11 +185,59 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     }
   }, [activeTab, problemId, user, fromAssignment, classId])
 
+  // 轮询兜底：只要在"提交记录" tab 且有非终态提交，就每 3s 拉一次。
+  // 解决 WebSocket 断连 / 漏推 / 跨标签页 等场景下前端永远不刷新的问题。
+  useEffect(() => {
+    if (activeTab !== 'submissions') return
+    const hasNonFinal = submissions.some(
+      (s) => s?.status === 'Pending' || s?.status === 'Judging' || s?.status === 'Running'
+    )
+    if (!hasNonFinal) return
+    const timer = setInterval(() => {
+      fetchSubmissions()
+    }, 3000)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, submissions])
+
   const { isConnected } = useSubmissionSocket({
     userId: user?.id || '',
     enabled: !!user,
     onSubmissionUpdate: (data) => {
-      if (data.id === currentSubmissionId) {
+      // 1) 乐观更新提交列表：让"提交记录" tab 立即反映出最新状态，
+      //    无需等待服务器再次回包 / 不依赖 currentSubmissionId 是否对得上。
+      if (data?.id) {
+        setSubmissions((prev) => {
+          if (!Array.isArray(prev)) return prev
+          const idx = prev.findIndex((s) => s?.id === data.id)
+          if (idx === -1) {
+            // 列表里还没这条记录（极少见：刚提交但还没拉过列表），不强行插入，
+            // 后续轮询 / 下次切 tab 会自动同步
+            return prev
+          }
+          const next = prev.slice()
+          next[idx] = {
+            ...next[idx],
+            status: data.status,
+            score: typeof data.score === 'number' ? data.score : next[idx].score,
+            time: typeof data.time === 'number' ? data.time : next[idx].time,
+            memory: typeof data.memory === 'number' ? data.memory : next[idx].memory,
+            passedTests: typeof data.passedTests === 'number' ? data.passedTests : next[idx].passedTests,
+            totalTests: typeof data.totalTests === 'number' ? data.totalTests : next[idx].totalTests,
+            message: data.message ?? next[idx].message,
+          }
+          return next
+        })
+
+        // 兜底：服务端为准的完整刷新，确保列表与评分等字段绝对一致
+        if (activeTab === 'submissions') {
+          fetchSubmissions()
+        }
+      }
+
+      // 2) 仅当是"当前提交"时，才驱动中间的进度条 / 结果横条
+      const isCurrentSubmission = data.id === currentSubmissionIdRef.current
+      if (isCurrentSubmission) {
         setJudgeStatus({
           submissionId: data.id,
           status: data.status,
@@ -192,22 +246,18 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           testResults: data.testResults || [],
         })
         
-        if (data.status !== 'Pending' && data.status !== 'Judging') {
+        if (data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running') {
           setSubmitting(false)
           setJudgeProgress(null)
           setLastResult({
             status: data.status,
-            // 不要再做 passedTests * 10 的兜底 — 后端 judge worker 已通过
-            // `result.score += testCase.score` 计算精确分数；若 data.score 缺失
-            // 显示 0（更诚实），避免显示 50/100 这种误导性数值
             score: typeof data.score === 'number' ? data.score : 0
           })
-          fetchSubmissions()
         }
       }
     },
     onJudgeProgress: (data) => {
-      if (data.submissionId === currentSubmissionId) {
+      if (data?.submissionId === currentSubmissionIdRef.current) {
         setJudgeProgress({
           currentTest: data.currentTest,
           totalTests: data.totalTests,
