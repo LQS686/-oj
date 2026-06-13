@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { withApi, ok } from '@/lib/api/withApi'
 import { getMongoClient } from '@/lib/mongodb-direct'
+import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,7 +61,7 @@ export const GET = withApi.public(async () => {
       uptime: process.uptime(),
     })
   } catch (error: any) {
-    console.error('Health check failed:', error)
+    logger.error('Health check failed:', error)
     return NextResponse.json(
       {
         status: 'down',

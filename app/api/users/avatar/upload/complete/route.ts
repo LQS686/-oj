@@ -5,6 +5,7 @@ import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import { mergeChunks } from '@/lib/upload'
 import clientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
+import { logger } from '@/lib/logger'
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
   const { uploadId, filename, totalChunks } = await readJson<{
@@ -45,7 +46,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
       createdAt: new Date(),
     })
   } catch (historyError) {
-    console.error('Failed to save avatar history:', historyError)
+    logger.error('Failed to save avatar history:', historyError)
     // Non-blocking error
   }
 

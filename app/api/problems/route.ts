@@ -11,6 +11,7 @@ import {
 } from '@/lib/problem/service'
 import { getUserFullInfo } from '@/lib/user/service'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
+import { logger } from '@/lib/logger'
 
 export const GET = withApi.public(async (req) => {
   const q = readQuery<{
@@ -114,8 +115,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     if (err?.code === 'P2002') {
       throw400('TITLE_TAKEN', '已存在同名题目')
     }
-    // eslint-disable-next-line no-console
-    console.error('Create problem failed:', err)
+    logger.error('Create problem failed:', err)
     throw400('CREATE_FAILED', '题目创建失败')
   }
 })

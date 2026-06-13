@@ -3,6 +3,7 @@
  */
 import { withApi, ok, throw400 } from '@/lib/api/withApi'
 import { parseTestCaseZip } from '@/lib/problem/testcase'
+import { logger } from '@/lib/logger'
 
 // 禁用 Next.js 默认的 body parser
 export const dynamic = 'force-dynamic'
@@ -13,47 +14,47 @@ export const bodyParser = false
  */
 export const POST = withApi.admin(async (req, _ctx, { user }) => {
 
-  console.log('📥 收到测试点上传请求')
+  logger.info('📥 收到测试点上传请求')
 
   // 获取上传的文件
-  console.log('📦 开始解析 FormData...')
+  logger.info('📦 开始解析 FormData...')
   const formData = await req.formData()
   const file = formData.get('file') as File
 
-  console.log('📄 文件信息:', {
+  logger.info('📄 文件信息:', {
     name: file?.name,
     type: file?.type,
     size: file?.size,
   })
 
   if (!file) {
-    console.error('❌ 未选择文件')
+    logger.error('❌ 未选择文件')
     throw400('NO_FILE', '未选择文件')
   }
 
   // 验证文件类型
   if (!file.type.includes('zip') && !file.name.endsWith('.zip')) {
-    console.error('❌ 文件类型错误:', file.type)
+    logger.error('❌ 文件类型错误:', file.type)
     throw400('INVALID_FILE_TYPE', '只支持 ZIP 格式压缩包')
   }
 
   // 读取文件内容
-  console.log('📖 开始读取文件内容...')
+  logger.info('📖 开始读取文件内容...')
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
-  console.log('✅ 文件读取完成，大小:', buffer.length, 'bytes')
+  logger.info('✅ 文件读取完成，大小: ' + buffer.length + ' bytes')
 
   // 解析和验证测试点
-  console.log('🔍 开始解析测试点...')
+  logger.info('🔍 开始解析测试点...')
   const result = await parseTestCaseZip(buffer)
-  console.log('📊 解析结果:', { success: result.success, count: result.testCases?.length })
+  logger.info('📊 解析结果:', { success: result.success, count: result.testCases?.length })
 
   if (!result.success) {
-    console.error('❌ 测试点验证失败:', result.error)
+    logger.error('❌ 测试点验证失败:', result.error)
     throw400('TEST_CASES_INVALID', result.error || '解析失败')
   }
 
-  console.log('✅ 测试点解析成功')
+  logger.info('✅ 测试点解析成功')
   // 返回解析结果
   return ok({
     data: {

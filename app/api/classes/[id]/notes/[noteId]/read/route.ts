@@ -6,6 +6,7 @@ import { withApi, ok, throw400, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import { getClassNoteBasic } from '@/lib/class/service'
 import { awardNoteReadPoints } from '@/lib/points/award'
+import { logger } from '@/lib/logger'
 
 export const POST = withApi.auth(async (_req, ctx, { user }) => {
   const { id: classId, noteId } = (ctx as any).params
@@ -28,8 +29,7 @@ export const POST = withApi.auth(async (_req, ctx, { user }) => {
 
   if (!awardResult.success) {
     // 即使发放失败也返回成功，不影响阅读体验
-    // eslint-disable-next-line no-console
-    console.error('[API] 发放积分失败:', 'error' in awardResult ? awardResult.error : '未知错误')
+    logger.error('[API] 发放积分失败:', 'error' in awardResult ? awardResult.error : '未知错误')
   }
 
   return ok({

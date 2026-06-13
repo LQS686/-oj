@@ -4,11 +4,12 @@
 import { withApi, ok, readJson, throw400, throw401 } from '@/lib/api/withApi'
 import { randomUUID } from 'crypto'
 import { cleanOldTempFiles } from '@/lib/upload'
+import { logger } from '@/lib/logger'
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
   // Probabilistic cleanup (1% chance)
   if (Math.random() < 0.01) {
-    cleanOldTempFiles().catch(console.error)
+    cleanOldTempFiles().catch(err => logger.error('cleanOldTempFiles failed', err))
   }
 
   const body = await readJson<{ filename?: string; fileSize?: number }>(req)

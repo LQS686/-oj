@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { exchangeItem } from '@/lib/points/shop'
+import { logger } from '@/lib/logger'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -52,7 +53,7 @@ export async function POST(
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
-    console.error('[API] 兑换商品失败:', error)
+    logger.error('[API] 兑换商品失败:', error)
     return NextResponse.json(
       { success: false, error: '服务器错误' },
       { status: 500 }

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/auth'
 import { getClassPointsStats } from '@/lib/points/history'
+import { logger } from '@/lib/logger'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -34,7 +35,7 @@ export async function GET(
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('[API] 查询积分统计失败:', error)
+    logger.error('[API] 查询积分统计失败:', error)
     return NextResponse.json(
       { success: false, error: '服务器错误' },
       { status: 500 }
