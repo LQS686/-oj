@@ -55,8 +55,8 @@ export default function PointsHistoryPage() {
 
       const data = await res.json()
       if (data.success) {
-        setRecords(data.data.records)
-        setPagination(data.data.pagination)
+        setRecords(data.data.records || [])
+        setPagination(data.data.pagination || { page: 1, pageSize: 20, total: 0, totalPages: 1 })
       }
 
       setLoading(false)

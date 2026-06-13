@@ -37,7 +37,7 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
       const data = await res.json()
       
       if (data.success) {
-        setIsRegistered(data.data.isRegistered)
+        setIsRegistered(!!data.data.isRegistered)
         const authRes = await fetch('/api/auth/me')
         setIsLoggedIn(authRes.ok)
       }

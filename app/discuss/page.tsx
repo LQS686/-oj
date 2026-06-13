@@ -113,11 +113,12 @@ export default function DiscussPage() {
       const data = await response.json()
 
       if (data.success) {
-        setPosts(data.data.posts)
-        setTotalPages(data.data.pagination.totalPages)
+        setPosts(data.data.posts || [])
+        setTotalPages(data.data.pagination?.totalPages || Math.ceil((data.data.pagination?.total || 0) / 10))
       } else {
         setError(data.error || '获取帖子列表失败')
         setPosts([])
+        setTotalPages(1)
       }
     } catch (err) {
       console.error('获取帖子列表失败:', err)

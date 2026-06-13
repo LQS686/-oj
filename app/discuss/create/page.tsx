@@ -26,7 +26,7 @@ export default function CreatePostPage() {
         if (!data.success) {
           router.push('/login?redirect=/discuss/create')
         } else {
-          setIsAdmin(data.data.isAdmin)
+          setIsAdmin(!!data.data.isAdmin)
         }
       })
       .catch(() => router.push('/login?redirect=/discuss/create'))

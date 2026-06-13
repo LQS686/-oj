@@ -61,11 +61,16 @@ export default function ClassesPage() {
       const data = await response.json()
 
       if (data.success) {
-        setClasses(data.data.classes)
-        setTotalPages(data.data.totalPages)
+        setClasses(data.data.classes || [])
+        setTotalPages(data.data.totalPages || 1)
+      } else {
+        setClasses([])
+        setTotalPages(1)
       }
     } catch (error) {
       logger.error('获取班级列表失败', error)
+      setClasses([])
+      setTotalPages(1)
     } finally {
       setLoading(false)
       setInitialLoading(false)

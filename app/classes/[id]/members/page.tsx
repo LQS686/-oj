@@ -60,7 +60,7 @@ export default function ClassMembersPage() {
       const data = await response.json()
 
       if (data.success) {
-        setMembers(data.data.members)
+        setMembers(data.data.members || [])
         const currentMember = data.data.members.find((m: Member) => m.userId === user?.id)
         setIsAdmin(['owner', 'assistant'].includes(currentMember?.role))
       } else {

@@ -148,16 +148,18 @@ export default function ContestsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setContests(data.data.contests)
-        setTotalPages(data.data.pagination.totalPages)
+        setContests(data.data.contests || [])
+        setTotalPages(data.data.pagination?.totalPages || Math.ceil((data.data.pagination?.total || 0) / 10))
       } else {
         setError(data.error || '获取竞赛列表失败')
         setContests([])
+        setTotalPages(1)
       }
     } catch (err) {
       console.error('获取竞赛列表失败:', err)
       setError('网络错误，获取竞赛列表失败')
       setContests([])
+      setTotalPages(1)
     } finally {
       setLoading(false)
     }

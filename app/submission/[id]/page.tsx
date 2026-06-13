@@ -103,7 +103,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       const data = await response.json()
 
       if (data.success) {
-        setSubmissionHistory(data.data.submissions.slice(0, 10))
+        setSubmissionHistory(Array.isArray(data.data.submissions) ? data.data.submissions.slice(0, 10) : [])
+      } else {
+        setSubmissionHistory([])
       }
     } catch (err) {
       console.error('获取提交历史失败:', err)

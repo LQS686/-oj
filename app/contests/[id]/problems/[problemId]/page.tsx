@@ -126,8 +126,10 @@ export default function ContestProblemDetailPage({ params }: { params: Promise<{
       const res = await fetch(`/api/contests/${contestId}/submissions?problemId=${problemId}&userId=${user?.id || ''}`)
       const data = await res.json()
       if (data.success) {
-        setSubmissions(data.data.submissions)
-      }
+          setSubmissions(data.data.submissions || [])
+        } else {
+          setSubmissions([])
+        }
     } catch (err) {
       logger.error('Fetch submissions failed', err)
     }

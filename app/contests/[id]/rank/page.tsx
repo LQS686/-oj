@@ -51,16 +51,20 @@ export default function ContestRankPage() {
       const data = await res.json()
       
       if (data.success) {
-        setRankings(data.data.rankings)
-        setProblems(data.data.problems)
+        setRankings(data.data.rankings || [])
+        setProblems(data.data.problems || [])
         if (data.data.contestType) {
             setContestType(data.data.contestType)
         }
       } else {
         setError(data.error)
+        setRankings([])
+        setProblems([])
       }
     } catch (err) {
       setError('加载失败')
+      setRankings([])
+      setProblems([])
     } finally {
       setLoading(false)
     }

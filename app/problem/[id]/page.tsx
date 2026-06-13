@@ -148,7 +148,9 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         const data = await response.json()
         
         if (data.success) {
-          setSubmissions(data.data.submissions)
+          setSubmissions(data.data.submissions || [])
+        } else {
+          setSubmissions([])
         }
       } else {
         url = user 
@@ -159,7 +161,9 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         const data = await response.json()
         
         if (data.success) {
-          setSubmissions(data.data.submissions)
+          setSubmissions(data.data.submissions || [])
+        } else {
+          setSubmissions([])
         }
       }
     } catch (error) {

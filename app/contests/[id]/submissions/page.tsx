@@ -45,13 +45,17 @@ export default function ContestSubmissionsPage() {
       const data = await res.json()
       
       if (data.success) {
-        setSubmissions(data.data.submissions)
-        setTotalPages(data.data.pagination.totalPages)
+        setSubmissions(data.data.submissions || [])
+        setTotalPages(data.data.pagination?.totalPages || Math.ceil((data.data.pagination?.total || 0) / 20))
       } else {
         setError(data.error)
+        setSubmissions([])
+        setTotalPages(1)
       }
     } catch (err) {
       setError('加载失败')
+      setSubmissions([])
+      setTotalPages(1)
     } finally {
       setLoading(false)
     }

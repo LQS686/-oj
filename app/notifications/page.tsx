@@ -39,9 +39,9 @@ export default function NotificationsPage() {
 
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20'
+        pageSize: '20'
       })
-      
+
       if (filter === 'unread') {
         params.append('unreadOnly', 'true')
       }
@@ -51,9 +51,11 @@ export default function NotificationsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setNotifications(data.data.notifications)
-        setUnreadCount(data.data.unreadCount)
-        setTotalPages(data.data.totalPages)
+        setNotifications(data.data.items || [])
+        setUnreadCount(data.data.unreadCount || 0)
+        const total = data.data.total || 0
+        const pageSize = data.data.pageSize || 20
+        setTotalPages(Math.max(1, Math.ceil(total / pageSize)))
       }
     } catch (error) {
       console.error('获取通知失败:', error)

@@ -118,7 +118,7 @@ export default function AssignmentDetailPage() {
       const response = await fetchWithAuth(`/api/classes/${params.id}/assignments/${params.assignmentId}`)
       const data = await response.json()
       if (data.success) {
-        setAssignment(data.data.assignment)
+        setAssignment(data.data.assignment || null)
         setSubmissions(Array.isArray(data.data.submissions) ? data.data.submissions : [])
         setAllSubmissions(Array.isArray(data.data.allSubmissions) ? data.data.allSubmissions : [])
       } else {

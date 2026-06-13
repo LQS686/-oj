@@ -88,10 +88,10 @@ function SubmissionsContent() {
       const data = await response.json()
       
       if (data.success) {
-        setSubmissions(data.data.submissions)
-        const totalPagesValue = data.data.pagination?.totalPages || Math.ceil((data.data.total || 0) / 20)
+        setSubmissions(data.data.submissions || [])
+        const totalPagesValue = data.data.pagination?.totalPages || Math.ceil((data.data.pagination?.total || 0) / 20)
         setTotalPages(totalPagesValue)
-        console.log(`✅ 加载了 ${data.data.submissions.length} 条提交记录`)
+        console.log(`✅ 加载了 ${(data.data.submissions || []).length} 条提交记录`)
       } else {
         console.error('获取提交记录失败:', data.error)
         setSubmissions([])
