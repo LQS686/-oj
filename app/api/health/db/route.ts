@@ -1,14 +1,20 @@
+/**
+ * GET /api/health/db - DB 健康检查
+ *
+ * 迁移到 withApi 中间件模式
+ */
 import { NextResponse } from 'next/server'
+import { withApi, ok } from '@/lib/api/withApi'
 import { getMongoClient } from '@/lib/mongodb-direct'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export const GET = withApi.public(async () => {
   try {
     const start = Date.now()
     const client = await getMongoClient()
     const db = client.db()
-    
+
     // 执行一个轻量级命令来检查连接
     const pingStart = Date.now()
     await db.command({ ping: 1 })
@@ -16,22 +22,22 @@ export async function GET() {
 
     // 获取副本集状态
     let replicaStatus = 'Unknown'
-    let members = []
-    let primary = null
-    
+    let members: any[] = []
+    let primary: string | null = null
+
     try {
       const adminDb = client.db('assistant')
       const status = await adminDb.command({ replSetGetStatus: 1 })
-      
+
       if (status.ok) {
         replicaStatus = 'Healthy'
         members = status.members.map((m: any) => ({
           name: m.name,
           state: m.stateStr,
           health: m.health,
-          uptime: m.uptime
+          uptime: m.uptime,
         }))
-        
+
         const primaryNode = members.find((m: any) => m.state === 'PRIMARY')
         primary = primaryNode ? primaryNode.name : 'None'
       }
@@ -39,7 +45,7 @@ export async function GET() {
       replicaStatus = 'Error: ' + e.message
     }
 
-    return NextResponse.json({
+    return ok({
       status: 'up',
       latency: pingTime,
       database: {
@@ -47,21 +53,21 @@ export async function GET() {
         replicaSet: {
           status: replicaStatus,
           primary: primary,
-          members: members.length
-        }
+          members: members.length,
+        },
       },
       timestamp: new Date().toISOString(),
-      uptime: process.uptime()
+      uptime: process.uptime(),
     })
   } catch (error: any) {
     console.error('Health check failed:', error)
     return NextResponse.json(
-      { 
-        status: 'down', 
-        error: error.message,
-        timestamp: new Date().toISOString()
+      {
+        status: 'down',
+        error: error?.message,
+        timestamp: new Date().toISOString(),
       },
       { status: 503 }
     )
   }
-}
+})

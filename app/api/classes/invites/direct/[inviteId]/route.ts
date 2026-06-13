@@ -1,264 +1,64 @@
-import { NextRequest, NextResponse } from 'next/server'
+/**
+ * /api/classes/invites/direct/[inviteId] - 直接邀请详情/响应
+ *
+ * GET  获取邀请详情
+ * PUT  接受/拒绝邀请
+ *
+ * 迁移到 withApi 中间件模式
+ */
+import { withApi, ok, readJson, throw400, fail } from '@/lib/api/withApi'
+import { isObjectId } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
-import { createNotification } from '@/lib/notifications'
-
-interface RouteContext {
-  params: Promise<{
-    inviteId: string
-  }>
-}
-
-// 辅助函数：验证 MongoDB ObjectId
-function isValidObjectId(id: string) {
-  return /^[0-9a-fA-F]{24}$/.test(id)
-}
+import {
+  getDirectInviteDetail,
+  respondDirectInvite,
+  notifyInviterForDirectInvite,
+} from '@/lib/class/service'
 
 // 获取邀请详情
-export async function GET(request: NextRequest, { params }: RouteContext) {
-  try {
-    const { inviteId } = await params
-    const user = getUserFromRequest(request)
+export const GET = withApi.auth(async (req, ctx, { user }) => {
+  const { inviteId } = (ctx as any).params
+  if (!isObjectId(inviteId)) throw400('INVALID_ID', '无效的邀请ID')
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权' },
-        { status: 401 }
-      )
-    }
-
-    if (!isValidObjectId(inviteId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的邀请ID' },
-        { status: 400 }
-      )
-    }
-
-    const currentUserId = user.userId
-
-    // 获取邀请信息
-    const invite = await prisma.classDirectInvite.findUnique({
-      where: { id: inviteId }
-    })
-
-    if (!invite) {
-      return NextResponse.json(
-        { success: false, error: '邀请不存在' },
-        { status: 404 }
-      )
-    }
-
-    // 验证当前用户是否是被邀请人
-    if (invite.inviteeId !== currentUserId) {
-      return NextResponse.json(
-        { success: false, error: '无权访问此邀请' },
-        { status: 403 }
-      )
-    }
-
-    // 获取班级信息
-    const classData = await prisma.class.findUnique({
-      where: { id: invite.classId }
-    })
-
-    // 获取邀请人信息
-    const inviter = await prisma.user.findUnique({
-      where: { id: invite.inviterId },
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        avatar: true
-      }
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        invite: {
-          id: invite.id,
-          classId: invite.classId,
-          status: invite.status,
-          message: invite.message,
-          expiresAt: invite.expiresAt?.toISOString(),
-          createdAt: invite.createdAt.toISOString()
-        },
-        class: classData ? {
-          id: classData.id,
-          name: classData.name,
-          description: classData.description,
-          avatar: classData.avatar
-        } : null,
-        inviter: inviter ? {
-          id: inviter.id,
-          username: inviter.username,
-          nickname: inviter.nickname,
-          avatar: inviter.avatar
-        } : null
-      }
-    })
-
-  } catch (error: any) {
-    console.error('获取邀请详情失败:', error)
-    return NextResponse.json(
-      { success: false, error: error.message || '获取邀请详情失败' },
-      { status: 500 }
-    )
+  const result = await getDirectInviteDetail(inviteId!, user.id)
+  if ('error' in result) {
+    return fail('ERR', result.error, result.code)
   }
-}
+  return ok(result)
+})
 
 // 响应邀请
-export async function PUT(request: NextRequest, { params }: RouteContext) {
-  try {
-    const { inviteId } = await params
-    const user = getUserFromRequest(request)
+export const PUT = withApi.auth(async (req, ctx, { user }) => {
+  const { inviteId } = (ctx as any).params
+  if (!isObjectId(inviteId)) throw400('INVALID_ID', '无效的邀请ID')
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未授权' },
-        { status: 401 }
-      )
-    }
+  const body = await readJson<{ action: string }>(req)
+  const { action } = body
+  if (!['accept', 'reject'].includes(action)) {
+    throw400('INVALID_ACTION', '无效的操作')
+  }
 
-    if (!isValidObjectId(inviteId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的邀请ID' },
-        { status: 400 }
-      )
-    }
+  const result = await respondDirectInvite(inviteId!, user.id, action as 'accept' | 'reject')
+  if (!result.ok) {
+    return fail('ERR', result.error, result.code)
+  }
 
-    const currentUserId = user.userId
-    const body = await request.json()
-    const { action } = body // 'accept' or 'reject'
+  // 获取班级和被邀请人信息（用于通知邀请人）
+  const invite = await prisma.classDirectInvite.findUnique({ where: { id: inviteId } })
+  const classData = invite
+    ? await prisma.class.findUnique({ where: { id: invite.classId } })
+    : null
+  const invitee = await prisma.user.findUnique({ where: { id: user.id } })
 
-    if (!['accept', 'reject'].includes(action)) {
-      return NextResponse.json(
-        { success: false, error: '无效的操作' },
-        { status: 400 }
-      )
-    }
-
-    // 获取邀请信息
-    const invite = await prisma.classDirectInvite.findUnique({
-      where: { id: inviteId }
-    })
-
-    if (!invite) {
-      return NextResponse.json(
-        { success: false, error: '邀请不存在' },
-        { status: 404 }
-      )
-    }
-
-    // 验证当前用户是否是被邀请人
-    if (invite.inviteeId !== currentUserId) {
-      return NextResponse.json(
-        { success: false, error: '无权响应此邀请' },
-        { status: 403 }
-      )
-    }
-
-    // 检查邀请状态
-    if (invite.status !== 'pending') {
-      return NextResponse.json(
-        { success: false, error: '该邀请已被处理' },
-        { status: 400 }
-      )
-    }
-
-    // 检查是否过期
-    if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-      await prisma.classDirectInvite.update({
-        where: { id: inviteId },
-        data: {
-          status: 'expired',
-          respondedAt: new Date()
-        }
-      })
-      return NextResponse.json(
-        { success: false, error: '邀请已过期' },
-        { status: 400 }
-      )
-    }
-
-    // 更新邀请状态
-    const newStatus = action === 'accept' ? 'accepted' : 'rejected'
-
-    await prisma.classDirectInvite.update({
-      where: { id: inviteId },
-      data: {
-        status: newStatus,
-        respondedAt: new Date()
-      }
-    })
-
-    // 如果接受邀请，添加成员
-    if (action === 'accept') {
-      const existingMember = await prisma.classMember.findUnique({
-        where: {
-          classId_userId: {
-            classId: invite.classId,
-            userId: currentUserId
-          }
-        }
-      })
-
-      if (!existingMember) {
-        await prisma.classMember.create({
-          data: {
-            classId: invite.classId,
-            userId: currentUserId,
-            role: 'student',
-            permissions: {
-              canViewProblems: true,
-              canSubmit: true,
-              canViewNotes: true,
-              canCreateNotes: false,
-              canManageAssignments: false,
-              canInviteMembers: false,
-              canManageMembers: false,
-              canViewStats: false
-            },
-            joinedAt: new Date(),
-            lastActiveAt: new Date()
-          }
-        })
-      }
-    }
-
-    // 获取班级和被邀请人信息
-    const classData = await prisma.class.findUnique({
-      where: { id: invite.classId }
-    })
-
-    const invitee = await prisma.user.findUnique({
-      where: { id: currentUserId }
-    })
-
-    // 通知邀请人
-    await createNotification({
-      userId: invite.inviterId,
-      type: 'class_invite_result',
-      title: action === 'accept' ? '邀请已接受' : '邀请被拒绝',
-      content: action === 'accept'
-        ? `${invitee?.nickname || invitee?.username} 已接受您的班级邀请并加入 "${classData?.name}"`
-        : `${invitee?.nickname || invitee?.username} 拒绝了您的班级邀请`,
-      link: action === 'accept' ? `/classes/${invite.classId}` : null
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        status: newStatus,
-        classId: invite.classId
-      }
-    })
-
-  } catch (error: any) {
-    console.error('响应邀请失败:', error)
-    return NextResponse.json(
-      { success: false, error: error.message || '响应邀请失败' },
-      { status: 500 }
+  if (invite) {
+    await notifyInviterForDirectInvite(
+      invite.inviterId,
+      invitee,
+      classData,
+      invite.classId,
+      action === 'accept'
     )
   }
-}
+
+  return ok({ status: result.status, classId: result.classId })
+})

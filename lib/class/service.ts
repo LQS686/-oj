@@ -12,7 +12,7 @@ import {
   updateClassAssignmentSubmissionDirect,
   updateSubmissionDirect,
 } from '@/lib/mongodb-direct'
-import { createNotification } from '@/lib/notifications'
+import { createNotification, createNotifications } from '@/lib/notifications'
 
 /* ============================================================================
  * 班级 CRUD
@@ -1255,7 +1255,6 @@ export async function sendClassDirectInviteNotification(
 /* ============================================================================
  * 加入班级（通过邀请码）
  * ========================================================================== */
-
 export interface JoinClassResult {
   ok: boolean
   code?: number
@@ -1339,6 +1338,486 @@ export async function joinClassByCode(
   }
 
   return { ok: true, classId, className: classData.name }
+}
+
+/* ============================================================================
+ * 直接邀请响应（GET / PUT 路由使用）
+ * ========================================================================== */
+
+export interface DirectInviteDetailResult {
+  invite: {
+    id: string
+    classId: string
+    status: string
+    message: string | null
+    expiresAt: string | null
+    createdAt: string
+  }
+  class: {
+    id: string
+    name: string
+    description: string | null
+    avatar: string | null
+  } | null
+  inviter: {
+    id: string
+    username: string
+    nickname: string | null
+    avatar: string | null
+  } | null
+}
+
+export async function getDirectInviteDetail(
+  inviteId: string,
+  currentUserId: string
+): Promise<DirectInviteDetailResult | { error: string; code: number }> {
+  const invite = await prisma.classDirectInvite.findUnique({
+    where: { id: inviteId },
+  })
+  if (!invite) return { error: '邀请不存在', code: 404 }
+  if (invite.inviteeId !== currentUserId) {
+    return { error: '无权访问此邀请', code: 403 }
+  }
+
+  const [classData, inviter] = await Promise.all([
+    prisma.class.findUnique({ where: { id: invite.classId } }),
+    prisma.user.findUnique({
+      where: { id: invite.inviterId },
+      select: { id: true, username: true, nickname: true, avatar: true },
+    }),
+  ])
+
+  return {
+    invite: {
+      id: invite.id,
+      classId: invite.classId,
+      status: invite.status,
+      message: invite.message,
+      expiresAt: invite.expiresAt?.toISOString() || null,
+      createdAt: invite.createdAt.toISOString(),
+    },
+    class: classData
+      ? {
+          id: classData.id,
+          name: classData.name,
+          description: classData.description,
+          avatar: classData.avatar,
+        }
+      : null,
+    inviter: inviter
+      ? {
+          id: inviter.id,
+          username: inviter.username,
+          nickname: inviter.nickname,
+          avatar: inviter.avatar,
+        }
+      : null,
+  }
+}
+
+export type RespondDirectInviteResult =
+  | { ok: true; status: 'accepted' | 'rejected' | 'expired'; classId: string }
+  | { ok: false; error: string; code: number }
+
+export async function respondDirectInvite(
+  inviteId: string,
+  currentUserId: string,
+  action: 'accept' | 'reject'
+): Promise<RespondDirectInviteResult> {
+  const invite = await prisma.classDirectInvite.findUnique({
+    where: { id: inviteId },
+  })
+  if (!invite) return { ok: false, error: '邀请不存在', code: 404 }
+  if (invite.inviteeId !== currentUserId) {
+    return { ok: false, error: '无权响应此邀请', code: 403 }
+  }
+  if (invite.status !== 'pending') {
+    return { ok: false, error: '该邀请已被处理', code: 400 }
+  }
+
+  // 过期
+  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+    await prisma.classDirectInvite.update({
+      where: { id: inviteId },
+      data: { status: 'expired', respondedAt: new Date() },
+    })
+    return { ok: false, error: '邀请已过期', code: 400 }
+  }
+
+  const newStatus = action === 'accept' ? 'accepted' : 'rejected'
+  await prisma.classDirectInvite.update({
+    where: { id: inviteId },
+    data: { status: newStatus, respondedAt: new Date() },
+  })
+
+  if (action === 'accept') {
+    const existingMember = await prisma.classMember.findUnique({
+      where: {
+        classId_userId: { classId: invite.classId, userId: currentUserId },
+      },
+    })
+    if (!existingMember) {
+      await prisma.classMember.create({
+        data: {
+          classId: invite.classId,
+          userId: currentUserId,
+          role: 'student',
+          permissions: {
+            canViewProblems: true,
+            canSubmit: true,
+            canViewNotes: true,
+            canCreateNotes: false,
+            canManageAssignments: false,
+            canInviteMembers: false,
+            canManageMembers: false,
+            canViewStats: false,
+          },
+          joinedAt: new Date(),
+          lastActiveAt: new Date(),
+        },
+      })
+    }
+  }
+
+  return { ok: true, status: newStatus, classId: invite.classId }
+}
+
+/** 通知邀请人（接受/拒绝结果） */
+export async function notifyInviterForDirectInvite(
+  inviterId: string,
+  invitee: { nickname: string | null; username: string } | null | undefined,
+  classData: { name: string } | null,
+  classId: string,
+  accepted: boolean
+) {
+  await createNotification({
+    userId: inviterId,
+    type: 'class_invite_result',
+    title: accepted ? '邀请已接受' : '邀请被拒绝',
+    content: accepted
+      ? `${invitee?.nickname || invitee?.username} 已接受您的班级邀请并加入 "${classData?.name}"`
+      : `${invitee?.nickname || invitee?.username} 拒绝了您的班级邀请`,
+    link: accepted ? `/classes/${classId}` : null,
+  })
+}
+
+/* ============================================================================
+ * 加入申请
+ * ========================================================================== */
+
+export type CreateJoinRequestResult =
+  | { ok: true; requestId: string }
+  | { ok: false; error: string; code: number }
+
+export async function createOrReuseJoinRequest(
+  classId: string,
+  userId: string,
+  message?: string | null
+): Promise<CreateJoinRequestResult> {
+  const classData = await prisma.class.findUnique({ where: { id: classId } })
+  if (!classData) return { ok: false, error: '班级不存在', code: 404 }
+
+  const existingMember = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+  if (existingMember) return { ok: false, error: '您已是班级成员', code: 400 }
+
+  const existingRequest = await prisma.classJoinRequest.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+
+  if (existingRequest) {
+    if (existingRequest.status === 'pending') {
+      return { ok: false, error: '您已提交过申请，请等待审批', code: 400 }
+    }
+    // 已被处理（approved/rejected）：更新为新申请
+    const updated = await prisma.classJoinRequest.update({
+      where: { id: existingRequest.id },
+      data: {
+        status: 'pending',
+        message: message || null,
+        reviewerId: null,
+        reviewedAt: null,
+        createdAt: new Date(),
+      },
+    })
+    return { ok: true, requestId: updated.id }
+  }
+
+  const created = await prisma.classJoinRequest.create({
+    data: {
+      classId,
+      userId,
+      status: 'pending',
+      message: message || null,
+    },
+  })
+  return { ok: true, requestId: created.id }
+}
+
+/** 通知班级创建人和管理员有新申请 */
+export async function notifyAdminsAboutJoinRequest(
+  classId: string,
+  applicant: { nickname: string | null; username: string } | null | undefined,
+  className: string
+) {
+  const adminMembers = await prisma.classMember.findMany({
+    where: { classId, role: { in: ['owner', 'assistant'] } },
+  })
+  const notifications = adminMembers.map((member) => ({
+    userId: member.userId,
+    type: 'class_join_request',
+    title: '班级加入申请',
+    content: `${applicant?.nickname || applicant?.username} 申请加入班级 "${className}"`,
+    link: `/classes/${classId}/requests`,
+  }))
+  if (notifications.length > 0) {
+    await createNotifications(notifications)
+  }
+}
+
+export async function listClassJoinRequestsDetailed(classId: string) {
+  const requests = await prisma.classJoinRequest.findMany({
+    where: { classId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      user: { select: { id: true, username: true, nickname: true, avatar: true } },
+      reviewer: { select: { id: true, username: true, nickname: true, avatar: true } },
+    },
+  })
+  return requests.map((r) => ({
+    id: r.id,
+    classId: r.classId,
+    applicant: {
+      id: r.user.id,
+      username: r.user.username,
+      nickname: r.user.nickname,
+      avatar: r.user.avatar,
+    },
+    reviewer: r.reviewer
+      ? {
+          id: r.reviewer.id,
+          username: r.reviewer.username,
+          nickname: r.reviewer.nickname,
+          avatar: r.reviewer.avatar,
+        }
+      : null,
+    status: r.status,
+    message: r.message,
+    reviewedAt: r.reviewedAt?.toISOString() || null,
+    createdAt: r.createdAt.toISOString(),
+  }))
+}
+
+/* ============================================================================
+ * 班级统计
+ * ========================================================================== */
+
+export interface ClassStatisticsResult {
+  members: {
+    total: number
+    roles: Record<string, number>
+  }
+  submissions: {
+    total: number
+    today: number
+    thisWeek: number
+  }
+  problems: {
+    totalSolved: number
+    averageSolved: number
+  }
+  activity: {
+    last7Days: number
+    last30Days: number
+  }
+  assignments: {
+    inProgress: number
+    overdue: number
+    completed: number
+  }
+  recentActivity: Array<{
+    id: string
+    userId: string
+    username: string
+    avatar: string | null
+    problemId: string
+    problemTitle: string
+    assignmentId: string
+    status: string | null
+    score: number | null
+    language: string | null
+    submittedAt: Date
+  }>
+}
+
+export async function computeClassStatistics(
+  classId: string,
+  now: Date = new Date()
+): Promise<ClassStatisticsResult> {
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
+  const weekStart = new Date(now)
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+  weekStart.setHours(0, 0, 0, 0)
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  const [
+    memberStats,
+    roleCounts,
+    submissionStats,
+    problemStats,
+    activeStats,
+    assignmentStats,
+    recentSubmissions,
+  ] = await Promise.all([
+    prisma.classMember.count({ where: { classId } }),
+    prisma.classMember.groupBy({ by: ['role'], where: { classId }, _count: true }),
+    Promise.all([
+      prisma.classAssignmentSubmission.count({ where: { assignment: { classId } } }),
+      prisma.classAssignmentSubmission.count({
+        where: { assignment: { classId }, submittedAt: { gte: todayStart } },
+      }),
+      prisma.classAssignmentSubmission.count({
+        where: { assignment: { classId }, submittedAt: { gte: weekStart } },
+      }),
+    ]),
+    (async () => {
+      const submissions = await prisma.classAssignmentSubmission.findMany({
+        where: { assignment: { classId }, status: 'AC' },
+        select: { userId: true, problemId: true },
+        distinct: ['userId', 'problemId'],
+      })
+      const totalSolved = new Set(submissions.map((s) => `${s.userId}-${s.problemId}`)).size
+      const memberCount = await prisma.classMember.count({ where: { classId } })
+      return {
+        totalSolved,
+        averageSolved: memberCount > 0 ? Math.round((totalSolved / memberCount) * 10) / 10 : 0,
+      }
+    })(),
+    Promise.all([
+      prisma.classAssignmentSubmission
+        .findMany({
+          where: { assignment: { classId }, submittedAt: { gte: sevenDaysAgo } },
+          select: { userId: true },
+          distinct: ['userId'],
+        })
+        .then((s) => s.length),
+      prisma.classAssignmentSubmission
+        .findMany({
+          where: { assignment: { classId }, submittedAt: { gte: thirtyDaysAgo } },
+          select: { userId: true },
+          distinct: ['userId'],
+        })
+        .then((s) => s.length),
+    ]),
+    (async () => {
+      const assignments = await prisma.classAssignment.findMany({
+        where: { classId },
+        select: { id: true, endTime: true },
+      })
+      let inProgress = 0
+      let overdue = 0
+      for (const a of assignments) {
+        if (a.endTime && new Date(a.endTime) < now) overdue++
+        else inProgress++
+      }
+      return { inProgress, overdue, completed: 0 }
+    })(),
+    prisma.classAssignmentSubmission.findMany({
+      where: { assignment: { classId } },
+      orderBy: { submittedAt: 'desc' },
+      take: 10,
+    }),
+  ])
+
+  const userMap = new Map<
+    string,
+    { nickname: string | null; username: string; avatar: string | null }
+  >()
+  const problemMap = new Map<string, string>()
+  if (recentSubmissions.length > 0) {
+    const userIds = [...new Set(recentSubmissions.map((s) => s.userId))]
+    const problemIds = [
+      ...new Set(recentSubmissions.map((s) => s.problemId).filter(Boolean) as string[]),
+    ]
+    const [users, problems] = await Promise.all([
+      userIds.length > 0
+        ? prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, nickname: true, username: true, avatar: true },
+          })
+        : Promise.resolve([] as any[]),
+      problemIds.length > 0
+        ? prisma.problem.findMany({
+            where: { id: { in: problemIds } },
+            select: { id: true, title: true },
+          })
+        : Promise.resolve([] as any[]),
+    ])
+    users.forEach((u) => userMap.set(u.id, u))
+    problems.forEach((p) => problemMap.set(p.id, p.title))
+  }
+
+  const roleBreakdown: Record<string, number> = {}
+  for (const role of roleCounts) {
+    roleBreakdown[role.role] = role._count
+  }
+
+  return {
+    members: { total: memberStats, roles: roleBreakdown },
+    submissions: {
+      total: submissionStats[0],
+      today: submissionStats[1],
+      thisWeek: submissionStats[2],
+    },
+    problems: {
+      totalSolved: problemStats.totalSolved,
+      averageSolved: problemStats.averageSolved,
+    },
+    activity: { last7Days: activeStats[0], last30Days: activeStats[1] },
+    assignments: {
+      inProgress: assignmentStats.inProgress,
+      overdue: assignmentStats.overdue,
+      completed: assignmentStats.completed,
+    },
+    recentActivity: recentSubmissions.map((sub) => {
+      const u = userMap.get(sub.userId)
+      return {
+        id: sub.id,
+        userId: sub.userId,
+        username: u?.nickname || u?.username || '未知用户',
+        avatar: u?.avatar || null,
+        problemId: sub.problemId,
+        problemTitle: problemMap.get(sub.problemId) || '未知题目',
+        assignmentId: sub.assignmentId,
+        status: sub.status,
+        score: sub.score,
+        language: sub.language,
+        submittedAt: sub.submittedAt,
+      }
+    }),
+  }
+}
+
+/** 检查当前用户对班级有访问权（公开直接通过，私有需是成员） */
+export async function ensureClassAccessible(
+  classId: string,
+  userId: string
+): Promise<{ ok: true } | { ok: false; code: number; error: string }> {
+  const classData = await prisma.class.findUnique({ where: { id: classId } })
+  if (!classData) return { ok: false, code: 404, error: '班级不存在' }
+  if (classData.isPublic) return { ok: true }
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+  if (!member) {
+    return { ok: false, code: 403, error: '私有班级，只有受邀成员可访问' }
+  }
+  return { ok: true }
 }
 
 /* ============================================================================
