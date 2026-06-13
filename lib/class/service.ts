@@ -1839,3 +1839,274 @@ export function canManageMember(
   if (operatorRole === 'admin') return targetRole !== 'owner' && targetRole !== 'admin'
   return false
 }
+
+/* ============================================================================
+ * 班级作业详情视图 / 更新 / 删除（原 /api/classes/[id]/assignments/[assignmentId]）
+ * ========================================================================== */
+
+import { ApiError } from '@/lib/api/withApi'
+
+/** 班级作业详情视图：题目 + 成员完成进度 + 当前用户提交 + 题目统计 */
+export async function buildClassAssignmentDetail(
+  classId: string,
+  assignmentId: string,
+  viewerUserId: string,
+  viewerRole: string
+) {
+  const detail = await getClassAssignmentDetail(classId, assignmentId)
+  if (!detail) return null
+  const { assignment, members, submissions } = detail
+
+  const problems = await prisma.problem.findMany({
+    where: { id: { in: assignment.problemIds } },
+    select: {
+      id: true,
+      title: true,
+      problemNumber: true,
+      difficulty: true,
+      tags: true,
+      totalSubmit: true,
+      totalAccepted: true,
+    },
+  })
+
+  // 成员完成情况
+  const memberProgress: any[] = members
+    .map((m: any) => {
+      const us = submissions.filter((s: any) => s.userId === m.userId)
+      if (us.length === 0) return null
+      const solved = new Set(us.filter((s: any) => s.status === 'AC').map((s: any) => s.problemId))
+      return {
+        userId: m.userId,
+        username: m.user.username,
+        nickname: m.user.nickname,
+        avatar: m.user.avatar,
+        role: m.role,
+        progress: {
+          solved: solved.size,
+          total: assignment.problemIds.length,
+          percentage:
+            assignment.problemIds.length > 0
+              ? Math.round((solved.size / assignment.problemIds.length) * 100)
+              : 0,
+        },
+      }
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => b.progress.solved - a.progress.solved)
+
+  const userSubmissions = submissions.filter((s: any) => s.userId === viewerUserId)
+  const isAdminOrOwner = viewerRole === 'owner' || viewerRole === 'admin'
+  const allSubmissions = isAdminOrOwner
+    ? submissions.map((s: any) => ({
+        id: s.id,
+        userId: s.userId,
+        problemId: s.problemId,
+        status: s.status,
+        score: s.score || 0,
+        submittedAt: s.submittedAt,
+      }))
+    : []
+
+  // 题目统计
+  const problemStats: Record<
+    string,
+    { submitCount: number; acceptedCount: number; acceptedUsers: Set<string> }
+  > = {}
+  assignment.problemIds.forEach((problemId: string) => {
+    const ps = submissions.filter((s: any) => s.problemId === problemId)
+    const accepted: Set<string> = new Set(
+      ps.filter((s: any) => s.status === 'AC').map((s: any) => s.userId as string)
+    )
+    problemStats[problemId] = {
+      submitCount: ps.length,
+      acceptedCount: accepted.size,
+      acceptedUsers: accepted,
+    }
+  })
+
+  return {
+    assignment: {
+      id: assignment.id,
+      title: assignment.title,
+      description: assignment.description,
+      startTime: assignment.startTime,
+      endTime: assignment.endTime,
+      deadline: assignment.endTime,
+      problems: problems.map((p) => ({
+        id: p.id,
+        title: p.title,
+        problemNumber: p.problemNumber || '',
+        difficulty: p.difficulty,
+        totalSubmit: problemStats[p.id]?.submitCount || 0,
+        totalAccepted: problemStats[p.id]?.acceptedCount || 0,
+      })),
+      classId: assignment.classId,
+      memberProgress,
+      createdAt: assignment.createdAt,
+      createdBy: assignment.createdBy,
+    },
+    submissions: userSubmissions.map((s: any) => ({
+      id: s.id,
+      problemId: s.problemId,
+      status: s.status,
+      score: s.score || 0,
+      submittedAt: s.submittedAt,
+    })),
+    allSubmissions,
+  }
+}
+
+/** 班级管理员更新作业：含校验、默认值补全、写入 */
+export async function updateClassAssignment(
+  classId: string,
+  assignmentId: string,
+  body: {
+    title?: string
+    description?: string
+    startTime?: string | Date
+    endTime?: string | Date
+    deadline?: string | Date
+    problemIds?: string[]
+  }
+) {
+  const finalEndTime = body.endTime || body.deadline
+  if (!body.title || !body.problemIds || body.problemIds.length === 0) {
+    throw new ApiError('MISSING_FIELDS', '请填写完整的作业信息', 400)
+  }
+  const existing = await prisma.classAssignment.findUnique({
+    where: { id: assignmentId, classId },
+  })
+  if (!existing) {
+    throw new ApiError('NOT_FOUND', '作业不存在', 404)
+  }
+  const valid = await validateAssignmentProblems(body.problemIds)
+  if (!valid) {
+    throw new ApiError('INVALID_PROBLEMS', '部分题目不存在或未公开', 400)
+  }
+
+  const finalStartTime = body.startTime
+    ? new Date(body.startTime)
+    : existing.startTime || undefined
+  const finalEndDate = finalEndTime ? new Date(finalEndTime) : existing.endTime || undefined
+
+  const { updateClassAssignmentDirect } = await import('@/lib/mongodb-direct')
+  await updateClassAssignmentDirect(assignmentId, {
+    title: body.title,
+    description: body.description || '',
+    startTime: finalStartTime,
+    endTime: finalEndDate,
+    problemIds: body.problemIds,
+  })
+  return { id: assignmentId }
+}
+
+/** 班级管理员删除作业：先校验存在，再删除 */
+export async function deleteClassAssignment(classId: string, assignmentId: string) {
+  const assignment = await prisma.classAssignment.findUnique({
+    where: { id: assignmentId, classId },
+  })
+  if (!assignment) {
+    throw new ApiError('NOT_FOUND', '作业不存在', 404)
+  }
+  const { deleteClassAssignmentDirect } = await import('@/lib/mongodb-direct')
+  await deleteClassAssignmentDirect(assignmentId)
+  return { message: '作业删除成功' }
+}
+
+/* ============================================================================
+ * 班级加入申请处理：批准 / 拒绝（原 /api/classes/[id]/requests/[requestId]）
+ * ========================================================================== */
+
+export interface DecideJoinRequestInput {
+  classId: string
+  requestId: string
+  action: 'approve' | 'reject'
+  operatorUserId: string
+  operatorRole: string
+}
+
+/**
+ * 校验班级加入申请：班级存在性、申请存在性、操作者权限（owner / admin）
+ */
+export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
+  const classRecord = await prisma.class.findUnique({ where: { id: input.classId } })
+  if (!classRecord) throw new ApiError('NOT_FOUND', '班级不存在', 404)
+
+  if (input.operatorRole !== 'owner' && input.operatorRole !== 'admin') {
+    throw new ApiError('FORBIDDEN', '无权处理加入申请', 403)
+  }
+
+  const request = await prisma.classJoinRequest.findUnique({
+    where: { id: input.requestId },
+  })
+  if (!request) throw new ApiError('NOT_FOUND', '申请不存在', 404)
+  if (request.classId !== input.classId) {
+    throw new ApiError('BAD_REQUEST', '申请与班级不匹配', 400)
+  }
+  if (request.status !== 'pending') {
+    throw new ApiError('ALREADY_PROCESSED', `该申请已被${request.status === 'approved' ? '批准' : '拒绝'}`, 400)
+  }
+  if (input.action === 'approve') {
+    // 检查班级容量
+    if (classRecord.maxMembers > 0) {
+      const currentCount = await prisma.classMember.count({ where: { classId: input.classId } })
+      if (currentCount >= classRecord.maxMembers) {
+        throw new ApiError('CLASS_FULL', '班级已满员', 400)
+      }
+    }
+    // 检查是否已存在成员
+    const existing = await prisma.classMember.findUnique({
+      where: { classId_userId: { classId: input.classId, userId: request.userId } },
+    })
+    if (existing) {
+      // 已经存在成员，仅更新申请状态
+      await prisma.classJoinRequest.update({
+        where: { id: input.requestId },
+        data: { status: 'approved' },
+      })
+      return { message: '该用户已是班级成员' }
+    }
+    // 创建成员 + 更新申请
+    await prisma.$transaction([
+      prisma.classMember.create({
+        data: { classId: input.classId, userId: request.userId, role: 'student' },
+      }),
+      prisma.classJoinRequest.update({
+        where: { id: input.requestId },
+        data: { status: 'approved' },
+      }),
+    ])
+    return { message: '已批准加入申请' }
+  }
+
+  // 拒绝
+  await prisma.classJoinRequest.update({
+    where: { id: input.requestId },
+    data: { status: 'rejected' },
+  })
+  return { message: '已拒绝加入申请' }
+}
+
+/**
+ * 申请者撤销自己提交的加入申请
+ */
+export async function cancelClassJoinRequest(
+  classId: string,
+  requestId: string,
+  userId: string
+) {
+  const request = await prisma.classJoinRequest.findUnique({ where: { id: requestId } })
+  if (!request) throw new ApiError('NOT_FOUND', '申请不存在', 404)
+  if (request.classId !== classId) {
+    throw new ApiError('BAD_REQUEST', '申请与班级不匹配', 400)
+  }
+  if (request.userId !== userId) {
+    throw new ApiError('FORBIDDEN', '只能撤销自己的申请', 403)
+  }
+  if (request.status !== 'pending') {
+    throw new ApiError('ALREADY_PROCESSED', '该申请已处理，无法撤销', 400)
+  }
+  await prisma.classJoinRequest.delete({ where: { id: requestId } })
+  return { message: '已撤销申请' }
+}
