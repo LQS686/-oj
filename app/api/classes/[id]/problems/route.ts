@@ -14,23 +14,25 @@ import {
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
-  listClassProblems,
+  assertClassAdmin,
   cloneProblemToClass,
   createNewClassProblem,
+  getClassById,
+  getCurrentClassMember,
+  listClassProblems,
 } from '@/lib/class/service'
-import { prisma } from '@/lib/prisma'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const classData = await prisma.class.findUnique({ where: { id } })
-  if (!classData) throw404('班级不存在')
+  const classDataResult = await getClassById(id)
+  if (!classDataResult) throw404('班级不存在')
+  const classData = classDataResult!
+  const classIsPublic = classData.isPublic
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
-  if (!classData!.isPublic && !member) throw403('无权访问该班级')
+  const member = await getCurrentClassMember(id, user.id)
+  if (!classIsPublic && !member) throw403('无权访问该班级')
 
   const q = readQuery<{ page?: string; pageSize?: string; difficulty?: string; search?: string }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)
@@ -49,12 +51,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
-    throw403('只有管理员可以添加题目')
-  }
+  await assertClassAdmin(id, user.id, '只有管理员可以添加题目')
 
   const body = await readJson<{
     type?: 'existing' | 'new'
@@ -69,9 +66,11 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
 
   if (body.type === 'existing') {
     if (!body.problemId) throw400('MISSING_FIELDS', '请提供题目ID')
-    const created = await cloneProblemToClass(body.problemId!, id, user.id)
-    if (!created) throw404('题目不存在')
-    return ok({ id: created!.id }, { status: 201 })
+    const createdResult = await cloneProblemToClass(body.problemId!, id, user.id)
+    if (!createdResult) throw404('题目不存在')
+    const created = createdResult!
+    const createdId = created.id
+    return ok({ id: createdId }, { status: 201 })
   } else if (body.type === 'new') {
     if (!body.title || !body.description) {
       throw400('MISSING_FIELDS', '请提供题目标题和描述')
@@ -84,7 +83,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
       timeLimit: body.timeLimit,
       memoryLimit: body.memoryLimit,
     })
-    return ok({ id: created!.id }, { status: 201 })
+    return ok({ id: created.id }, { status: 201 })
   } else {
     throw400('INVALID_TYPE', '无效的类型')
   }

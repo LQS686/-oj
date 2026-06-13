@@ -533,6 +533,32 @@ export async function togglePostLikeMongo(userId: string, postId: string) {
   }
 }
 
+/* ============================================================================
+ * 管理员帖子管理（原 /api/admin/posts*）
+ * ========================================================================== */
+
+/** 管理员列出所有帖子（未删除） */
+export async function listAllPostsForAdmin() {
+  return prisma.post.findMany({
+    orderBy: { createdAt: 'desc' },
+    where: { isDeleted: false },
+    include: {
+      author: { select: { username: true } },
+      _count: { select: { comments: true, postLikes: true } },
+    },
+  })
+}
+
+/** 管理员通过 MongoDB 直接驱动更新帖子后，重新查询（绕过 Prisma 事务限制） */
+export async function getPostAfterMongoDirectUpdate(id: string) {
+  return prisma.post.findUnique({ where: { id } })
+}
+
+/** 读帖子基础信息（仅 authorId）用于权限校验 */
+export async function getPostAuthor(id: string) {
+  return prisma.post.findUnique({ where: { id } })
+}
+
 /**
  * 最新评论（公开 + 含所属帖子）
  */

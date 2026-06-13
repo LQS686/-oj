@@ -14,13 +14,16 @@ import {
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
-  getClassProblem,
-  updateClassProblemFields,
+  assertClassAdmin,
   deleteClassProblem,
+  findClassProblem,
+  getClassById,
+  getClassProblem,
+  getCurrentClassMember,
+  updateClassProblemFields,
 } from '@/lib/class/service'
-import { prisma } from '@/lib/prisma'
 
-export const GET = withApi.auth(async (req, ctx, { user }) => {
+export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const { id, problemId } = (ctx as any).params
   if (!isObjectId(id) || !isObjectId(problemId)) {
     throw400('INVALID_ID', '无效的ID')
@@ -28,42 +31,42 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
 
   const problem = await getClassProblem(id, problemId)
   if (!problem) throw404('题目不存在')
+  const safeProblem = problem!
 
-  const classData = await prisma.class.findUnique({ where: { id } })
+  const classData = await getClassById(id)
   if (!classData) throw404('班级不存在')
+  const classIsPublic = classData!.isPublic
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
-  if (!classData!.isPublic && !member) throw403('无权访问该班级')
+  const member = await getCurrentClassMember(id, user.id)
+  if (!classIsPublic && !member) throw403('无权访问该班级')
 
   const acRate =
-    problem!.totalSubmit > 0
-      ? Math.round((problem!.totalAccepted / problem!.totalSubmit) * 100)
+    safeProblem.totalSubmit > 0
+      ? Math.round((safeProblem.totalAccepted / safeProblem.totalSubmit) * 100)
       : 0
 
   return ok({
-    id: problem!.id,
-    title: problem!.title,
-    description: problem!.description,
-    difficulty: problem!.difficulty,
-    tags: problem!.tags || [],
-    timeLimit: problem!.timeLimit,
-    memoryLimit: problem!.memoryLimit,
-    testCases: problem!.testCases.map((tc) => ({
+    id: safeProblem.id,
+    title: safeProblem.title,
+    description: safeProblem.description,
+    difficulty: safeProblem.difficulty,
+    tags: safeProblem.tags || [],
+    timeLimit: safeProblem.timeLimit,
+    memoryLimit: safeProblem.memoryLimit,
+    testCases: safeProblem.testCases.map((tc) => ({
       id: tc.id,
       input: tc.input,
       expectedOutput: tc.output,
       isHidden: !tc.isSample,
     })),
     stats: {
-      acCount: problem!.totalAccepted,
-      totalSubmissions: problem!.totalSubmit,
+      acCount: safeProblem.totalAccepted,
+      totalSubmissions: safeProblem.totalSubmit,
       acRate,
     },
-    createdBy: problem!.authorId,
-    createdAt: problem!.createdAt,
-    updatedAt: problem!.updatedAt,
+    createdBy: safeProblem.authorId,
+    createdAt: safeProblem.createdAt,
+    updatedAt: safeProblem.updatedAt,
   })
 })
 
@@ -73,16 +76,9 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     throw400('INVALID_ID', '无效的ID')
   }
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
-    throw403('只有管理员可以编辑题目')
-  }
+  await assertClassAdmin(id, user.id, '只有管理员可以编辑题目')
 
-  const problem = await prisma.problem.findUnique({
-    where: { id: problemId, classId: id },
-  })
+  const problem = await findClassProblem(problemId, id)
   if (!problem) throw404('题目不存在')
 
   const body = await readJson<{
@@ -106,22 +102,15 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   return ok({ message: '题目更新成功' })
 })
 
-export const DELETE = withApi.auth(async (req, ctx, { user }) => {
+export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id, problemId } = (ctx as any).params
   if (!isObjectId(id) || !isObjectId(problemId)) {
     throw400('INVALID_ID', '无效的ID')
   }
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
-    throw403('只有管理员可以删除题目')
-  }
+  await assertClassAdmin(id, user.id, '只有管理员可以删除题目')
 
-  const problem = await prisma.problem.findUnique({
-    where: { id: problemId, classId: id },
-  })
+  const problem = await findClassProblem(problemId, id)
   if (!problem) throw404('题目不存在')
 
   await deleteClassProblem(problemId)

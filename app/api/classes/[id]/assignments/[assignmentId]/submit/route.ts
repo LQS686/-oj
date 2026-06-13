@@ -4,8 +4,7 @@
  */
 import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { submitAssignmentCode } from '@/lib/class/service'
-import { prisma } from '@/lib/prisma'
+import { getCurrentClassMember, submitAssignmentCode } from '@/lib/class/service'
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id, assignmentId } = (ctx as any).params
@@ -21,9 +20,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     throw400('CODE_TOO_SHORT', '代码长度不能少于10个字符')
   }
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
+  const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以提交代码')
 
   const result = await submitAssignmentCode({

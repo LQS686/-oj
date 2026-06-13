@@ -5,9 +5,9 @@
  * POST 鉴权：仅管理员可创建（含批量绑定题目）
  */
 import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
-import { listPublicTrainingsAdvanced, createTrainingWithProblems } from '@/lib/training/service'
+import { createTrainingWithProblems, listPublicTrainingsAdvanced } from '@/lib/training/service'
 import { toInt } from '@/lib/api/validation'
-import { prisma } from '@/lib/prisma'
+import { getUserFullInfo } from '@/lib/user/service'
 
 export const GET = withApi.public(async (req) => {
   const q = readQuery<{ page?: string; limit?: string; keyword?: string; difficulty?: string }>(req)
@@ -29,7 +29,7 @@ export const GET = withApi.public(async (req) => {
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
   // 管理员鉴权：非 dynamic 路由用 auth + DB 二次确认
-  const currentUser = await prisma.user.findUnique({ where: { id: user.id } })
+  const currentUser = await getUserFullInfo(user.id)
   if (!currentUser?.isAdmin) throw403('只有管理员可以创建训练计划')
 
   const body = await readJson<{

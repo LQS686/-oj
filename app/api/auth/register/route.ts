@@ -1,11 +1,11 @@
 /**
  * POST /api/auth/register - 用户注册
  *
- * 迁移到 withApi 中间件模式（使用 NextResponse 以便设置 cookie）
+ * 注：使用 NextResponse 自行构造响应以便设置 cookie
  */
 import { NextResponse } from 'next/server'
 import { withApi, readJson, fail } from '@/lib/api/withApi'
-import { prisma } from '@/lib/prisma'
+import { registerNewUser } from '@/lib/user/service'
 import bcrypt from 'bcryptjs'
 import { signToken } from '@/lib/auth'
 import {
@@ -52,52 +52,13 @@ export const POST = withApi.public(async (req) => {
   const sanitizedEmail = (email as string).toLowerCase()
   const sanitizedNickname = nickname ? escapeHtml(nickname as string) : sanitizedUsername
 
-  const existingUsername = await prisma.user.findUnique({
-    where: { username: sanitizedUsername },
-  })
-  if (existingUsername) {
-    return fail('BAD_REQUEST', '用户名已被使用', 400)
-  }
-
-  const existingEmail = await prisma.user.findUnique({
-    where: { email: sanitizedEmail },
-  })
-  if (existingEmail) {
-    return fail('BAD_REQUEST', '邮箱已被注册', 400)
-  }
-
   const hashedPassword = await bcrypt.hash(password as string, 10)
 
-  const userCount = await prisma.user.count()
-  const isFirstUser = userCount === 0
-
-  const user = await prisma.user.create({
-    data: {
-      username: sanitizedUsername,
-      email: sanitizedEmail,
-      password: hashedPassword,
-      nickname: sanitizedNickname,
-      rating: 1500,
-      rank: isFirstUser ? '管理员' : '新手',
-      color: isFirstUser ? '#FF6B6B' : '#808080',
-      isAdmin: isFirstUser,
-      role: isFirstUser ? 'ADMIN' : 'USER',
-      isSuperAdmin: isFirstUser,
-      isBanned: false,
-    },
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      nickname: true,
-      rating: true,
-      rank: true,
-      color: true,
-      isAdmin: true,
-      role: true,
-      isSuperAdmin: true,
-      createdAt: true,
-    },
+  const user = await registerNewUser({
+    sanitizedUsername,
+    sanitizedEmail,
+    sanitizedNickname,
+    hashedPassword,
   })
 
   const token = signToken({

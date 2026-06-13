@@ -14,19 +14,19 @@ import {
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
+  assertClassAdmin,
+  getClassById,
+  getCurrentClassMember,
   listClassAssignmentsWithStats,
   validateAssignmentProblems,
 } from '@/lib/class/service'
 import { createClassAssignment } from '@/lib/class/assignment'
-import { prisma } from '@/lib/prisma'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
+  const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以查看作业')
 
   const q = readQuery<{ page?: string; pageSize?: string; status?: 'ongoing' | 'ended' }>(req)
@@ -45,12 +45,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
-    throw403('只有管理员可以创建作业')
-  }
+  await assertClassAdmin(id, user.id, '只有管理员可以创建作业')
 
   const body = await readJson<{
     title?: string
@@ -68,7 +63,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   }
 
   // 检查班级是否存在
-  const classData = await prisma.class.findUnique({ where: { id } })
+  const classData = await getClassById(id)
   if (!classData) throw404('班级不存在')
 
   // 验证题目是否存在并公开

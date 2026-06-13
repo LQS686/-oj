@@ -766,3 +766,76 @@ export async function listContestProblemsWithStatus(
     }
   })
 }
+
+/* ============================================================================
+ * 管理员竞赛管理（原 /api/admin/contests）
+ * ========================================================================== */
+
+/** 管理员列出所有竞赛（带作者 + 题目/参赛者计数） */
+export async function listAdminContests() {
+  return prisma.contest.findMany({
+    orderBy: { startTime: 'desc' },
+    include: {
+      author: { select: { username: true } },
+      _count: { select: { problems: true, participants: true } },
+    },
+  })
+}
+
+export interface AdminCreateContestInput {
+  title: string
+  description: string
+  type: string
+  startTime: string
+  endTime: string
+  isPublic?: boolean
+  password?: string | null
+  problems?: string[]
+}
+
+/** 管理员创建竞赛 */
+export async function adminCreateContest(
+  input: AdminCreateContestInput,
+  authorId: string
+) {
+  const start = new Date(input.startTime)
+  const end = new Date(input.endTime)
+  const duration = Math.floor((end.getTime() - start.getTime()) / 1000 / 60)
+  if (duration <= 0) {
+    throw new ApiError('INVALID_TIME', '结束时间必须晚于开始时间', 400)
+  }
+  return prisma.contest.create({
+    data: {
+      title: input.title,
+      description: input.description,
+      type: input.type,
+      startTime: start,
+      endTime: end,
+      duration,
+      isPublic: input.isPublic || false,
+      password: input.password || null,
+      authorId,
+      problems: {
+        create: input.problems && Array.isArray(input.problems)
+          ? input.problems.map((problemId, index) => ({
+              problemId,
+              orderIndex: index,
+            }))
+          : [],
+      },
+    },
+  })
+}
+
+/** 读竞赛信息（用于报名） */
+export async function getContestForRegistration(contestId: string) {
+  return prisma.contest.findUnique({ where: { id: contestId } })
+}
+
+/** 用户是否已报名 */
+export async function isUserRegistered(contestId: string, userId: string) {
+  const p = await prisma.contestParticipant.findUnique({
+    where: { contestId_userId: { contestId, userId } },
+  })
+  return !!p
+}

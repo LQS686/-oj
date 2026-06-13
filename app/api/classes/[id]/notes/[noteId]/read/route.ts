@@ -2,74 +2,39 @@
  * 笔记阅读记录（触发积分发放）
  * POST /api/classes/[id]/notes/[noteId]/read
  */
-
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getUserFromRequest } from '@/lib/auth'
+import { withApi, ok, throw400, throw404 } from '@/lib/api/withApi'
+import { isObjectId } from '@/lib/api/validation'
+import { getClassNoteBasic } from '@/lib/class/service'
 import { awardNoteReadPoints } from '@/lib/points/award'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; noteId: string }> }
-) {
-  try {
-    const user = getUserFromRequest(request)
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: '未登录' },
-        { status: 401 }
-      )
-    }
-
-    const { id: classId, noteId } = await params
-    const userId = user.userId
-
-    // 验证 ObjectId 格式
-    const objectIdRegex = /^[0-9a-fA-F]{24}$/
-    if (!objectIdRegex.test(classId) || !objectIdRegex.test(noteId)) {
-      return NextResponse.json(
-        { success: false, error: '无效的ID' },
-        { status: 400 }
-      )
-    }
-
-    // 查询笔记信息
-    const note = await prisma.classNote.findUnique({
-      where: {
-        id: noteId,
-        classId: classId
-      }
-    })
-
-    if (!note) {
-      return NextResponse.json(
-        { success: false, error: '笔记不存在' },
-        { status: 404 }
-      )
-    }
-
-    // 发放积分（如果是首次阅读）
-    const awardResult = await awardNoteReadPoints(
-      classId,
-      userId,
-      noteId,
-      note.title
-    )
-
-    if (!awardResult.success) {
-      console.error('[API] 发放积分失败:', 'error' in awardResult ? awardResult.error : '未知错误')
-      // 即使发放失败也返回成功，不影响阅读体验
-    }
-
-    return NextResponse.json({
-      success: true,
-      pointsAwarded: awardResult.success && !('alreadyRead' in awardResult && awardResult.alreadyRead)
-    })
-  } catch (error) {
-    console.error('[API] 记录笔记阅读失败:', error)
-    return NextResponse.json(
-      { success: false, error: '服务器错误' },
-      { status: 500 }
-    )
+export const POST = withApi.auth(async (_req, ctx, { user }) => {
+  const { id: classId, noteId } = (ctx as any).params
+  if (!isObjectId(classId) || !isObjectId(noteId)) {
+    throw400('INVALID_ID', '无效的ID')
   }
-}
+
+  // 查询笔记信息
+  const note = await getClassNoteBasic(noteId, classId)
+  if (!note) throw404('笔记不存在')
+  const noteTitle = note!.title
+
+  // 发放积分（如果是首次阅读）
+  const awardResult = await awardNoteReadPoints(
+    classId,
+    user.id,
+    noteId,
+    noteTitle
+  )
+
+  if (!awardResult.success) {
+    // 即使发放失败也返回成功，不影响阅读体验
+    // eslint-disable-next-line no-console
+    console.error('[API] 发放积分失败:', 'error' in awardResult ? awardResult.error : '未知错误')
+  }
+
+  return ok({
+    success: true,
+    pointsAwarded:
+      awardResult.success && !('alreadyRead' in awardResult && awardResult.alreadyRead),
+  })
+})

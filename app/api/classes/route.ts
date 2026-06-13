@@ -4,8 +4,7 @@
  * - POST /api/classes  创建班级
  */
 import { withApi, ok, readJson, readQuery, throw400, throw409 } from '@/lib/api/withApi'
-import { listClasses, createClass } from '@/lib/class/service'
-import { prisma } from '@/lib/prisma'
+import { createClass, findClassByName, listClasses } from '@/lib/class/service'
 
 export const GET = withApi.public(async (req) => {
   const q = readQuery<{ page?: string; pageSize?: string; search?: string; myClasses?: string }>(req)
@@ -18,8 +17,11 @@ export const GET = withApi.public(async (req) => {
   if (myClasses) {
     const { getUserFromRequest } = await import('@/lib/auth')
     const session = getUserFromRequest(req)
-    if (!session?.userId) throw400('UNAUTHORIZED', '请先登录')
-    userId = session!.userId
+    if (session === null || session.userId === undefined) {
+      throw400('UNAUTHORIZED', '请先登录')
+    } else {
+      userId = session.userId
+    }
   }
 
   const result = await listClasses({
@@ -40,17 +42,19 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     isPublic?: boolean
     maxMembers?: number
   }>(req)
+  const className = body.name
 
-  if (!body.name || !body.name.trim()) {
+  if (!className || !className.trim()) {
     throw400('INVALID_NAME', '班级名称不能为空')
   }
+  const trimmedName = className!.trim()
 
   // 检查班级名是否已存在
-  const existing = await prisma.class.findUnique({ where: { name: body.name!.trim() } })
+  const existing = await findClassByName(trimmedName)
   if (existing) throw409('班级名称已存在')
 
   const classData = await createClass({
-    name: body.name!,
+    name: trimmedName,
     description: body.description,
     avatar: body.avatar,
     isPublic: body.isPublic,

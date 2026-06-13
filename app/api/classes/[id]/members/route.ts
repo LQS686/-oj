@@ -5,7 +5,7 @@ import { withApi, ok, readQuery, throw400, throw404 } from '@/lib/api/withApi'
 import { listClassMembers } from '@/lib/class/member'
 import { isObjectId } from '@/lib/api/validation'
 import { getUserFromRequest } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { getClassById, getCurrentClassMember } from '@/lib/class/service'
 
 export const GET = withApi.public(async (req, ctx) => {
   const { id } = (ctx as any).params
@@ -13,16 +13,16 @@ export const GET = withApi.public(async (req, ctx) => {
 
   const q = readQuery<{ sortBy?: string; sortOrder?: string; role?: string; active?: string; search?: string }>(req)
   const auth = getUserFromRequest(req)
+  const authUserId = auth?.userId
 
-  const classData = await prisma.class.findUnique({ where: { id } })
+  const classData = await getClassById(id)
   if (!classData) throw404('班级不存在')
+  const classIsPublic = classData!.isPublic
 
   // 私有班级需要登录 + 成员
-  if (!classData!.isPublic) {
-    if (!auth) throw404('私有班级，只有受邀成员可访问')
-    const member = await prisma.classMember.findUnique({
-      where: { classId_userId: { classId: id, userId: auth!.userId } },
-    })
+  if (!classIsPublic) {
+    if (!auth || !authUserId) throw404('私有班级，只有受邀成员可访问')
+    const member = await getCurrentClassMember(id, authUserId!)
     if (!member) throw404('私有班级，只有受邀成员可访问')
   }
 

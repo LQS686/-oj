@@ -4,9 +4,9 @@
  * PUT    更新模型
  * DELETE 删除模型
  */
-import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { prisma } from '@/lib/prisma'
+import { deleteAiModel, updateAiModel } from '@/lib/ai/service'
 
 /**
  * PUT /api/admin/ai/models/[id]
@@ -34,23 +34,10 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     maxTokens, temperature, timeout, isActive, params: modelParams,
   } = body
 
-  const existing = await prisma.aiModel.findUnique({ where: { id } })
-  if (!existing) throw404('Model not found')
-
-  const updatedModel = await prisma.aiModel.update({
-    where: { id },
-    data: {
-      name,
-      model,
-      providerId,
-      type,
-      maxTokens,
-      temperature,
-      timeout,
-      // 高级参数（DeepSeek v4 thinking / topP 等），允许为空对象
-      params: (modelParams && typeof modelParams === 'object' ? modelParams : {}) as any,
-      isActive: isActive !== undefined ? isActive : existing!.isActive,
-    },
+  const updatedModel = await updateAiModel(id, {
+    name, model, providerId, type,
+    maxTokens, temperature, timeout, isActive,
+    params: modelParams,
   })
 
   return ok({ data: updatedModel })
@@ -66,9 +53,6 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
-  await prisma.aiModel.delete({
-    where: { id },
-  })
-
+  await deleteAiModel(id)
   return ok({})
 })

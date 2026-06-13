@@ -10,8 +10,12 @@
 import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import bcrypt from 'bcryptjs'
-import { updateContestWithProblems } from '@/lib/contest/service'
-import { getContestDetailWithRegistration } from '@/lib/contest/service'
+import {
+  deleteContest,
+  ensureContestManageAccess,
+  getContestDetailWithRegistration,
+  updateContestWithProblems,
+} from '@/lib/contest/service'
 import { getUserFromRequest } from '@/lib/auth'
 
 // GET /api/contests/[id] - 获取竞赛详情
@@ -30,12 +34,11 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const existing = await (await import('@/lib/prisma')).prisma.contest.findUnique({
-    where: { id },
-  })
-  if (!existing) throw404('竞赛不存在')
-  if (existing!.authorId !== user.id && user.role !== 'admin' && user.role !== 'super_admin') {
-    throw403('无权修改此竞赛')
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const access = await ensureContestManageAccess(id, user.id, isAdmin)
+  if (!access.ok) {
+    if (access.status === 404) throw404(access.error)
+    throw403(access.error)
   }
 
   const body = await readJson<{
@@ -76,18 +79,17 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 })
 
 // DELETE /api/contests/[id] - 删除竞赛
-export const DELETE = withApi.auth(async (req, ctx, { user }) => {
+export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const existing = await (await import('@/lib/prisma')).prisma.contest.findUnique({
-    where: { id },
-  })
-  if (!existing) throw404('竞赛不存在')
-  if (existing!.authorId !== user.id && user.role !== 'admin' && user.role !== 'super_admin') {
-    throw403('无权删除此竞赛')
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
+  const access = await ensureContestManageAccess(id, user.id, isAdmin)
+  if (!access.ok) {
+    if (access.status === 404) throw404(access.error)
+    throw403(access.error)
   }
 
-  await (await import('@/lib/prisma')).prisma.contest.delete({ where: { id } })
+  await deleteContest(id)
   return ok({ message: '竞赛删除成功' })
 })

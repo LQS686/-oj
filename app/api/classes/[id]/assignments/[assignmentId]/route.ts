@@ -4,30 +4,33 @@
  * - PUT    /api/classes/[id]/assignments/[assignmentId]
  * - DELETE /api/classes/[id]/assignments/[assignmentId]
  */
-import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readJson,
+  throw400,
+  throw403,
+  throw404,
+} from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
+  assertClassAdmin,
   buildClassAssignmentDetail,
-  updateClassAssignment,
   deleteClassAssignment,
+  getCurrentClassMember,
+  updateClassAssignment,
 } from '@/lib/class/service'
-import { prisma } from '@/lib/prisma'
 
-async function getMember(classId: string, userId: string) {
-  return prisma.classMember.findUnique({
-    where: { classId_userId: { classId, userId } },
-  })
-}
-
-export const GET = withApi.auth(async (req, ctx, { user }) => {
+export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const { id, assignmentId } = (ctx as any).params
   if (!isObjectId(id) || !isObjectId(assignmentId)) {
     throw400('INVALID_ID', '无效的ID')
   }
-  const member = await getMember(id, user.id)
+  const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以查看作业')
+  const memberRole = member!.role
 
-  const detail = await buildClassAssignmentDetail(id, assignmentId, user.id, member!.role)
+  const detail = await buildClassAssignmentDetail(id, assignmentId, user.id, memberRole)
   if (!detail) throw404('作业不存在')
   return ok(detail)
 })
@@ -45,21 +48,15 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     deadline?: string | Date
     problemIds?: string[]
   }>(req)
-  const member = await getMember(id, user.id)
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
-    throw403('只有管理员可以更新作业')
-  }
+  await assertClassAdmin(id, user.id, '只有管理员可以更新作业')
   return ok(await updateClassAssignment(id, assignmentId, body))
 })
 
-export const DELETE = withApi.auth(async (req, ctx, { user }) => {
+export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id, assignmentId } = (ctx as any).params
   if (!isObjectId(id) || !isObjectId(assignmentId)) {
     throw400('INVALID_ID', '无效的ID')
   }
-  const member = await getMember(id, user.id)
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
-    throw403('只有管理员可以删除作业')
-  }
+  await assertClassAdmin(id, user.id, '只有管理员可以删除作业')
   return ok(await deleteClassAssignment(id, assignmentId))
 })

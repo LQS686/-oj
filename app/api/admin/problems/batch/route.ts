@@ -3,9 +3,14 @@
  *
  * action: 'visibility' | 'difficulty' | 'delete'
  */
-import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw403 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { prisma } from '@/lib/prisma'
+import {
+  batchDeleteProblems,
+  batchUpdateProblemDifficulty,
+  batchUpdateProblemVisibility,
+  validateBatchProblemInput,
+} from '@/lib/problem/service'
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
   if (user.role !== 'admin' && user.role !== 'super_admin') {
@@ -19,81 +24,17 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     difficulty?: string
   }>(req)
 
-  const { action, problemIds } = body
+  const validated = validateBatchProblemInput({ ...body, isObjectId })
 
-  if (!Array.isArray(problemIds) || problemIds.length === 0) {
-    throw400('INVALID_PROBLEM_IDS', 'problemIds 必须是非空数组')
+  if (validated.action === 'visibility') {
+    const updateRes = await batchUpdateProblemVisibility(validated.problemIds, validated.visibility!)
+    return ok({ updatedCount: updateRes.count, deletedCount: 0 })
   }
-
-  // 校验所有 ID
-  const invalidIds = problemIds!.filter((id) => !isObjectId(id))
-  if (invalidIds.length > 0) {
-    throw400('INVALID_IDS', `以下 ID 格式无效: ${invalidIds.slice(0, 3).join(', ')}`)
+  if (validated.action === 'difficulty') {
+    const updateRes = await batchUpdateProblemDifficulty(validated.problemIds, validated.difficulty!)
+    return ok({ updatedCount: updateRes.count, deletedCount: 0 })
   }
-
-  let result: any = { updatedCount: 0, deletedCount: 0 }
-
-  switch (action) {
-    case 'visibility': {
-      const { visibility } = body
-      if (!['public', 'private', 'contest'].includes(visibility!)) {
-        throw400('INVALID_VISIBILITY', '无效的可见性')
-      }
-      const updateRes = await prisma.problem.updateMany({
-        where: { id: { in: problemIds } },
-        data: {
-          visibility: visibility!,
-          isPublic: visibility === 'public',
-        },
-      })
-      result.updatedCount = updateRes.count
-      break
-    }
-
-    case 'difficulty': {
-      const { difficulty } = body
-      if (!['简单', '中等', '困难'].includes(difficulty!)) {
-        throw400('INVALID_DIFFICULTY', '无效的难度')
-      }
-      const updateRes = await prisma.problem.updateMany({
-        where: { id: { in: problemIds } },
-        data: { difficulty: difficulty! },
-      })
-      result.updatedCount = updateRes.count
-      break
-    }
-
-    case 'delete': {
-      // 显式删除关联数据
-      await prisma.submission.deleteMany({
-        where: { problemId: { in: problemIds } },
-      })
-      await prisma.solution.deleteMany({
-        where: { problemId: { in: problemIds } },
-      })
-      await prisma.contestProblem.deleteMany({
-        where: { problemId: { in: problemIds } },
-      })
-      await prisma.trainingProblem.deleteMany({
-        where: { problemId: { in: problemIds } },
-      })
-      await prisma.favorite.deleteMany({
-        where: { problemId: { in: problemIds } },
-      })
-      await prisma.testCase.deleteMany({
-        where: { problemId: { in: problemIds } },
-      })
-
-      const deleteRes = await prisma.problem.deleteMany({
-        where: { id: { in: problemIds } },
-      })
-      result.deletedCount = deleteRes.count
-      break
-    }
-
-    default:
-      throw400('INVALID_ACTION', '无效的操作类型')
-  }
-
-  return ok(result)
+  // delete
+  const deleteRes = await batchDeleteProblems(validated.problemIds)
+  return ok({ updatedCount: 0, deletedCount: deleteRes.count })
 })

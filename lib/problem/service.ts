@@ -18,6 +18,28 @@ export interface ProblemListFilter {
   categoryId?: string
 }
 
+export async function listProblemTags(): Promise<string[]> {
+  const problems = await prisma.problem.findMany({
+    where: {
+      OR: [{ isPublic: true }, { visibility: 'public' }],
+    },
+    select: { tags: true },
+  })
+
+  const tagSet = new Set<string>()
+  problems.forEach((p) => {
+    if (Array.isArray(p.tags)) {
+      p.tags.forEach((tag) => {
+        if (tag && typeof tag === 'string' && tag.trim()) {
+          tagSet.add(tag.trim())
+        }
+      })
+    }
+  })
+
+  return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+}
+
 export async function listProblems(
   filter: ProblemListFilter = {},
   options: ListOptions = {}
@@ -654,4 +676,250 @@ export async function deleteAdminProblem(id: string) {
   await prisma.testCase.deleteMany({ where: { problemId: id } })
   await prisma.problem.delete({ where: { id } })
   return { message: '题目已删除' }
+}
+
+/* ============================================================================
+ * 管理员批量题目操作 / 导出 / 审核 / 重生成题解
+ * ========================================================================== */
+
+export type BatchProblemAction = 'visibility' | 'difficulty' | 'delete'
+export type BatchProblemVisibility = 'public' | 'private' | 'contest'
+
+const VALID_VISIBILITY: BatchProblemVisibility[] = ['public', 'private', 'contest']
+const VALID_DIFFICULTY = ['简单', '中等', '困难']
+
+/**
+ * 批量修改题目可见性
+ */
+export async function batchUpdateProblemVisibility(
+  problemIds: string[],
+  visibility: BatchProblemVisibility
+) {
+  return prisma.problem.updateMany({
+    where: { id: { in: problemIds } },
+    data: {
+      visibility,
+      isPublic: visibility === 'public',
+    },
+  })
+}
+
+/**
+ * 批量修改题目难度
+ */
+export async function batchUpdateProblemDifficulty(problemIds: string[], difficulty: string) {
+  return prisma.problem.updateMany({
+    where: { id: { in: problemIds } },
+    data: { difficulty },
+  })
+}
+
+/**
+ * 批量删除题目：级联删除 submissions / solutions / contestProblems / trainingProblems / favorites / testCases
+ */
+export async function batchDeleteProblems(problemIds: string[]) {
+  await prisma.submission.deleteMany({ where: { problemId: { in: problemIds } } })
+  await prisma.solution.deleteMany({ where: { problemId: { in: problemIds } } })
+  await prisma.contestProblem.deleteMany({ where: { problemId: { in: problemIds } } })
+  await prisma.trainingProblem.deleteMany({ where: { problemId: { in: problemIds } } })
+  await prisma.favorite.deleteMany({ where: { problemId: { in: problemIds } } })
+  await prisma.testCase.deleteMany({ where: { problemId: { in: problemIds } } })
+  return prisma.problem.deleteMany({ where: { id: { in: problemIds } } })
+}
+
+/**
+ * 校验批量操作的入参 + ID 合法性
+ */
+export function validateBatchProblemInput(input: {
+  action?: string
+  problemIds?: string[]
+  visibility?: string
+  difficulty?: string
+  isObjectId: (s: string) => boolean
+}): { action: BatchProblemAction; problemIds: string[]; visibility?: BatchProblemVisibility; difficulty?: string } {
+  const { action, problemIds, visibility, difficulty, isObjectId } = input
+  if (!Array.isArray(problemIds) || problemIds.length === 0) {
+    throw new ApiError('INVALID_PROBLEM_IDS', 'problemIds 必须是非空数组', 400)
+  }
+  const invalidIds = problemIds.filter((id) => !isObjectId(id))
+  if (invalidIds.length > 0) {
+    throw new ApiError(
+      'INVALID_IDS',
+      `以下 ID 格式无效: ${invalidIds.slice(0, 3).join(', ')}`,
+      400
+    )
+  }
+  switch (action) {
+    case 'visibility': {
+      if (!visibility || !VALID_VISIBILITY.includes(visibility as BatchProblemVisibility)) {
+        throw new ApiError('INVALID_VISIBILITY', '无效的可见性', 400)
+      }
+      return { action, problemIds, visibility: visibility as BatchProblemVisibility }
+    }
+    case 'difficulty': {
+      if (!difficulty || !VALID_DIFFICULTY.includes(difficulty)) {
+        throw new ApiError('INVALID_DIFFICULTY', '无效的难度', 400)
+      }
+      return { action, problemIds, difficulty }
+    }
+    case 'delete':
+      return { action, problemIds }
+    default:
+      throw new ApiError('INVALID_ACTION', '无效的操作类型', 400)
+  }
+}
+
+/**
+ * 批量更新题目的来源标记（AI/MANUAL/AI_ASSISTED），并写入审计日志
+ */
+export async function batchUpdateProblemSource(
+  operatorId: string,
+  problemIds: string[],
+  source: 'MANUAL_CREATED' | 'AI_ASSISTED' | 'AI_GENERATED',
+  ip: string
+) {
+  if (!['MANUAL_CREATED', 'AI_ASSISTED', 'AI_GENERATED'].includes(source)) {
+    throw new ApiError('INVALID_SOURCE', '无效的来源标记', 400)
+  }
+  const result = await prisma.problem.updateMany({
+    where: { id: { in: problemIds } },
+    data: { aiStatus: source },
+  })
+  await prisma.auditLog.create({
+    data: {
+      userId: operatorId,
+      action: 'UPDATE_PROBLEM_SOURCE',
+      resource: 'problems',
+      details: {
+        count: result.count,
+        targetSource: source,
+        problemIds,
+      },
+      ip,
+    },
+  })
+  return result
+}
+
+/**
+ * 导出题目列表（按 source 过滤）
+ */
+export async function listProblemsForExport(source: string = 'all') {
+  const where: any = {}
+  if (source !== 'all') {
+    where.aiStatus = source
+  }
+  return prisma.problem.findMany({
+    where,
+    select: {
+      id: true,
+      title: true,
+      aiStatus: true,
+      createdAt: true,
+      updatedAt: true,
+      totalSubmit: true,
+      totalAccepted: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+}
+
+/**
+ * 待审核题目列表（isAiGenerated=false）
+ */
+export async function listProblemsForReview() {
+  return prisma.problem.findMany({
+    where: { isAiGenerated: false },
+    include: {
+      testCases: { orderBy: { orderIndex: 'asc' } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+}
+
+/**
+ * 删除题目的所有 AI_OFFICIAL 题解（保留 USER 题解）
+ */
+export async function deleteAiOfficialSolutionsForProblem(problemId: string) {
+  return prisma.solution.deleteMany({
+    where: { problemId, sourceType: 'AI_OFFICIAL' } as any,
+  })
+}
+
+/**
+ * 获取"重新生成 AI 官方题解"所需题目信息
+ */
+export async function getProblemForSolutionRegeneration(problemId: string) {
+  return prisma.problem.findUnique({
+    where: { id: problemId },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      input: true,
+      output: true,
+      samples: true,
+      stdCode: true,
+      stdLang: true,
+      authorId: true,
+    },
+  })
+}
+
+/**
+ * 获取当前操作者的管理员/教师信息
+ */
+export async function getOperatorForSolutionRegen(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, isAdmin: true, isBanned: true },
+  })
+}
+
+/* ============================================================================
+ * 公共题库列表 / 创建（原 /api/problems）
+ * ========================================================================== */
+
+export interface ListPublicProblemsResult {
+  items: any[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+/** 公共题库列表（分页 + 关键字 + 难度 + tag 过滤） */
+export async function listPublicProblems(filter: {
+  page: number
+  pageSize: number
+  search?: string
+  difficulty?: string
+  tag?: string
+}): Promise<ListPublicProblemsResult> {
+  const { page, pageSize, search, difficulty, tag } = filter
+  const where: any = { isPublic: true }
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { id: { contains: search } },
+    ]
+  }
+  if (difficulty) where.difficulty = difficulty
+  if (tag) where.tags = { has: tag }
+
+  const [items, total] = await Promise.all([
+    prisma.problem.findMany({
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.problem.count({ where }),
+  ])
+
+  return { items, total, page, pageSize }
+}
+
+/** 按 title 检查是否已存在同名题目 */
+export async function findProblemByTitle(title: string) {
+  return prisma.problem.findFirst({ where: { title } })
 }

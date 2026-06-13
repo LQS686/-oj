@@ -13,20 +13,24 @@ import {
   throw404,
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { listClassNotesPaged, createClassNoteSimple } from '@/lib/class/service'
-import { prisma } from '@/lib/prisma'
+import {
+  getClassById,
+  getCurrentClassMember,
+  listClassNotesPaged,
+  createClassNoteSimple,
+} from '@/lib/class/service'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const classData = await prisma.class.findUnique({ where: { id } })
-  if (!classData) throw404('班级不存在')
+  const classDataResult = await getClassById(id)
+  if (!classDataResult) throw404('班级不存在')
+  const classData = classDataResult!
+  const classIsPublic = classData.isPublic
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
-  if (!classData!.isPublic && !member) throw403('无权访问该班级')
+  const member = await getCurrentClassMember(id, user.id)
+  if (!classIsPublic && !member) throw403('无权访问该班级')
 
   const q = readQuery<{ page?: string; pageSize?: string; category?: string; search?: string }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)
@@ -53,14 +57,13 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   }>(req)
   if (!body.title || !body.content) throw400('MISSING_FIELDS', '请提供标题和内容')
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
+  const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以发布笔记')
+  const memberRole = member!.role
+  const memberPerms = (member!.permissions as any) || {}
 
-  const permissions = (member!.permissions as any) || {}
-  const isAdmin = member!.role === 'owner' || member!.role === 'admin'
-  const canCreate = !!permissions.canCreateNotes
+  const isAdmin = memberRole === 'owner' || memberRole === 'admin'
+  const canCreate = !!memberPerms.canCreateNotes
   if (!isAdmin && !canCreate) throw403('没有权限发布笔记')
 
   const created = await createClassNoteSimple(id, user.id, {

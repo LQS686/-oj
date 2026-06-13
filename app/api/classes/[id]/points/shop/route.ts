@@ -6,23 +6,20 @@
 import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import { getShopItems, createShopItem } from '@/lib/points/shop'
-import { isClassAdminRole } from '@/lib/class/service'
-import { prisma } from '@/lib/prisma'
+import { getCurrentClassMember, isClassAdminRole } from '@/lib/class/service'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
   const { id: classId } = (ctx as any).params
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId, userId: user.id } },
-  })
+  const member = await getCurrentClassMember(classId, user.id)
   if (!member) throw403('只有班级成员可以查看商城')
 
   const q = readQuery<{ category?: string; isActive?: string; page?: string; limit?: string }>(req)
   const page = parseInt(q.page || '1') || 1
   const limit = parseInt(q.limit || '20') || 20
 
-  const result = await getShopItems(classId!, {
+  const result = await getShopItems(classId, {
     category: q.category,
     isActive: q.isActive === 'true',
     page,
@@ -37,9 +34,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id: classId } = (ctx as any).params
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId, userId: user.id } },
-  })
+  const member = await getCurrentClassMember(classId, user.id)
   if (!member || !isClassAdminRole(member.role)) throw403('需要管理员权限')
 
   const body = await readJson<{
@@ -59,7 +54,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     throw400('INVALID_POINTS', '积分必须大于0')
   }
 
-  const result = await createShopItem(classId!, {
+  const result = await createShopItem(classId, {
     name: body.name!,
     description: body.description,
     category: body.category!,

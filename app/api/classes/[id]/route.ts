@@ -5,11 +5,25 @@
  * PATCH  更新班级信息（教师/助教）
  * DELETE 解散班级（仅创建人）
  */
-import { withApi, ok, readJson, throw400, throw403, throw404, readQuery } from '@/lib/api/withApi'
-import { getClassDetail, updateClass, deleteClass } from '@/lib/class/service'
+import {
+  withApi,
+  ok,
+  readJson,
+  throw400,
+  throw403,
+  throw404,
+  readQuery,
+} from '@/lib/api/withApi'
+import {
+  assertClassAdmin,
+  getClassById,
+  getClassDetail,
+  getCurrentClassMember,
+  updateClass,
+  deleteClass,
+} from '@/lib/class/service'
 import { isObjectId } from '@/lib/api/validation'
 import { getUserFromRequest } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/classes/[id]
@@ -21,21 +35,21 @@ export const GET = withApi.public(async (req, ctx) => {
 
   const q = readQuery<{ sortBy?: string; sortOrder?: string; role?: string; active?: string; search?: string }>(req)
   const auth = getUserFromRequest(req)
+  const authUserId = auth?.userId
 
-  const detail = await getClassDetail(id)
-  if (!detail) throw404('班级不存在')
+  const detailResult = await getClassDetail(id)
+  if (!detailResult) throw404('班级不存在')
+  const safeDetail = detailResult!
 
   // 私有班级必须登录且为成员
-  if (!detail!.isPublic) {
-    if (!auth) throw404('私有班级，只有受邀成员可访问')
-    const member = await prisma.classMember.findUnique({
-      where: { classId_userId: { classId: id, userId: auth!.userId } },
-    })
+  if (!safeDetail.isPublic) {
+    if (!auth || !authUserId) throw404('私有班级，只有受邀成员可访问')
+    const member = await getCurrentClassMember(id, authUserId!)
     if (!member) throw404('私有班级，只有受邀成员可访问')
   }
 
   // 角色 + 活跃度 + 搜索 + 排序
-  let members = detail!.members
+  let members = safeDetail.members
   if (q.role) members = members.filter((m) => m.role === q.role)
   if (q.active) {
     const cutoff = new Date()
@@ -77,7 +91,7 @@ export const GET = withApi.public(async (req, ctx) => {
     return av > bv ? sortOrder : av < bv ? -sortOrder : 0
   })
 
-  return ok({ ...detail, members })
+  return ok({ ...safeDetail, members })
 })
 
 /**
@@ -88,12 +102,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId: id, userId: user.id } },
-  })
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
-    throw403('需要管理员权限')
-  }
+  await assertClassAdmin(id, user.id, '需要管理员权限')
 
   const body = await readJson<{
     name?: string
@@ -111,13 +120,14 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
  * DELETE /api/classes/[id]
  * 仅班级创建人可解散
  */
-export const DELETE = withApi.auth(async (req, ctx, { user }) => {
+export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const classData = await prisma.class.findUnique({ where: { id } })
-  if (!classData) throw404('班级不存在')
-  if (classData!.ownerId !== user.id) throw403('只有班级创建人可以解散班级')
+  const classDataResult = await getClassById(id)
+  if (!classDataResult) throw404('班级不存在')
+  const safeClassData = classDataResult!
+  if (safeClassData.ownerId !== user.id) throw403('只有班级创建人可以解散班级')
 
   await deleteClass(id)
   return ok({ message: '班级已解散' })

@@ -5,8 +5,7 @@
  * POST 创建模型
  */
 import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
-import { prisma } from '@/lib/prisma'
-import { logger } from '@/lib/logger'
+import { createAiModel, listActiveAiModelsEnriched } from '@/lib/ai/service'
 
 /**
  * GET /api/admin/ai/models
@@ -24,32 +23,8 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
     throw403('需要管理员权限')
   }
 
-  const allModels = await prisma.aiModel.findMany({
-    where: { isActive: true },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  if (allModels.length === 0) {
-    return ok({ data: [] })
-  }
-
-  const providerIds = Array.from(new Set(allModels.map((m) => m.providerId)))
-  const providers = await prisma.aiProvider.findMany({
-    where: { id: { in: providerIds }, isActive: true },
-    select: { id: true, name: true, slug: true },
-  })
-  const providerMap = new Map(providers.map((p) => [p.id, p]))
-
-  const validModels = allModels
-    .filter((m) => providerMap.has(m.providerId))
-    .map((m) => ({ ...m, provider: providerMap.get(m.providerId) }))
-
-  const orphanCount = allModels.length - validModels.length
-  if (orphanCount > 0) {
-    logger.warn(`[ai/models] 过滤孤儿/挂载在已禁用 Provider 上的模型 ${orphanCount} 条`)
-  }
-
-  return ok({ data: validModels })
+  const { data, orphanCount } = await listActiveAiModelsEnriched()
+  return ok({ data, _orphanFiltered: orphanCount })
 })
 
 /**
@@ -79,19 +54,12 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     throw400('MISSING_FIELDS', 'Missing required fields')
   }
 
-  const newModel = await prisma.aiModel.create({
-    data: {
-      name: name!,
-      model: model!,
-      providerId: providerId!,
-      type: type!, // 'generation' or 'thinking'
-      maxTokens: maxTokens || 2048,
-      temperature: temperature !== undefined ? temperature : 0.7,
-      timeout: timeout || 60000,
-      // 高级参数（DeepSeek v4 thinking / topP 等），默认空对象
-      params: (params && typeof params === 'object' ? params : {}) as any,
-      isActive: true,
-    },
+  const newModel = await createAiModel({
+    name: name!,
+    model: model!,
+    providerId: providerId!,
+    type: type!,
+    maxTokens, temperature, timeout, params,
   })
 
   return ok({ data: newModel })

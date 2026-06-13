@@ -4,8 +4,12 @@
  * - POST /api/problems  创建题目（管理员）
  */
 import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
-import { createProblemWithTestcases } from '@/lib/problem/service'
-import { prisma } from '@/lib/prisma'
+import {
+  createProblemWithTestcases,
+  findProblemByTitle,
+  listPublicProblems,
+} from '@/lib/problem/service'
+import { getUserFullInfo } from '@/lib/user/service'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
 
 export const GET = withApi.public(async (req) => {
@@ -19,31 +23,18 @@ export const GET = withApi.public(async (req) => {
   const page = Math.max(1, parseInt(q.page || '1') || 1)
   const pageSize = Math.min(50, Math.max(1, parseInt(q.pageSize || '20') || 20))
 
-  const where: any = { isPublic: true }
-  if (q.search) {
-    where.OR = [
-      { title: { contains: q.search, mode: 'insensitive' } },
-      { id: { contains: q.search } },
-    ]
-  }
-  if (q.difficulty) where.difficulty = q.difficulty
-  if (q.tag) where.tags = { has: q.tag }
-
-  const [items, total] = await Promise.all([
-    prisma.problem.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.problem.count({ where }),
-  ])
-
-  return ok({ items, total, page, pageSize })
+  const result = await listPublicProblems({
+    page,
+    pageSize,
+    search: q.search,
+    difficulty: q.difficulty,
+    tag: q.tag,
+  })
+  return ok(result)
 })
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  const currentUser = await prisma.user.findUnique({ where: { id: user.id } })
+  const currentUser = await getUserFullInfo(user.id)
   if (!currentUser?.isAdmin) throw403('只有管理员可以创建题目')
 
   const body = await readJson<{
@@ -66,6 +57,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   if (!body.title || !body.description || !body.difficulty) {
     throw400('MISSING_FIELDS', '请填写完整的题目信息')
   }
+  const problemTitle = body.title!
 
   // 测试用例处理
   let processedTestCases: any[] | undefined
@@ -95,16 +87,14 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   }
 
   // 题目去重
-  const existing = await prisma.problem.findFirst({
-    where: { title: body.title },
-  })
+  const existing = await findProblemByTitle(problemTitle)
   if (existing) {
     throw400('TITLE_TAKEN', '已存在同名题目')
   }
 
   try {
     const problem = await createProblemWithTestcases({
-      title: body.title!,
+      title: problemTitle,
       description: body.description!,
       input: body.input || '',
       output: body.output || '',
@@ -124,6 +114,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     if (err?.code === 'P2002') {
       throw400('TITLE_TAKEN', '已存在同名题目')
     }
+    // eslint-disable-next-line no-console
     console.error('Create problem failed:', err)
     throw400('CREATE_FAILED', '题目创建失败')
   }

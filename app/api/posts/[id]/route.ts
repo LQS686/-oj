@@ -6,12 +6,12 @@
  * DELETE 鉴权：逻辑删除（作者或管理员）
  */
 import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
-import { prisma } from '@/lib/prisma'
 import { verifyToken } from '@/lib/auth'
 import {
+  getPostAuthor,
   getPostDetailWithComments,
-  updateUserPost,
   softDeleteUserPost,
+  updateUserPost,
 } from '@/lib/post/service'
 import { isObjectId } from '@/lib/api/validation'
 
@@ -32,11 +32,12 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的帖子ID')
 
-  const post = await prisma.post.findUnique({ where: { id } })
+  const post = await getPostAuthor(id)
   if (!post) throw404('帖子不存在')
+  const safePost = post!
 
   const isAdmin = user.role === 'admin' || user.role === 'super_admin'
-  if (post!.authorId !== user.id && !isAdmin) {
+  if (safePost.authorId !== user.id && !isAdmin) {
     throw403('无权修改此帖子')
   }
 
@@ -63,15 +64,16 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   return ok({ message: '帖子更新成功' })
 })
 
-export const DELETE = withApi.auth(async (req, ctx, { user }) => {
+export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的帖子ID')
 
-  const post = await prisma.post.findUnique({ where: { id } })
+  const post = await getPostAuthor(id)
   if (!post) throw404('帖子不存在')
+  const safePost = post!
 
   const isAdmin = user.role === 'admin' || user.role === 'super_admin'
-  if (post!.authorId !== user.id && !isAdmin) {
+  if (safePost.authorId !== user.id && !isAdmin) {
     throw403('无权删除此帖子')
   }
 

@@ -449,6 +449,177 @@ export async function listClassAssignmentsWithStats(
   }
 }
 
+/* ============================================================================
+ * 班级直接邀请（按用户名）
+ * ========================================================================== */
+
+/** 创建一条直接邀请（含 upsert：未邀请过则新建，邀请过且非 pending 则重置） */
+export async function createOrReactivateDirectInvite(input: {
+  classId: string
+  inviterId: string
+  inviteeId: string
+  message?: string | null
+  expiresAt: Date
+}): Promise<string> {
+  const existingInvite = await findDirectInvite(input.classId, input.inviteeId)
+  if (existingInvite) {
+    if (existingInvite.status === 'pending') {
+      throw new ApiError('PENDING_INVITE', '已向该用户发送过邀请，请等待对方响应', 400)
+    }
+    const updated = await updateDirectInvite(existingInvite.id, {
+      inviterId: input.inviterId,
+      status: 'pending',
+      message: input.message || null,
+      expiresAt: input.expiresAt,
+      respondedAt: null,
+      createdAt: new Date(),
+    })
+    return updated.id
+  }
+  const created = await prisma.classDirectInvite.create({
+    data: {
+      classId: input.classId,
+      inviterId: input.inviterId,
+      inviteeId: input.inviteeId,
+      status: 'pending',
+      message: input.message || null,
+      expiresAt: input.expiresAt,
+      respondedAt: null,
+    },
+  })
+  return created.id
+}
+
+/** 邀请者本人信息（用于通知展示） */
+export async function getInviterProfile(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { username: true, nickname: true },
+  })
+}
+
+/** 读某用户在某班级中的成员记录（无则返回 null） */
+export async function getCurrentClassMember(classId: string, userId: string) {
+  return prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+}
+
+/** 按 id 读取班级（无则返回 null） */
+export async function getClassById(classId: string) {
+  return prisma.class.findUnique({ where: { id: classId } })
+}
+
+/** 按用户名读用户（无则返回 null） */
+export async function findUserByUsername(username: string) {
+  return prisma.user.findUnique({ where: { username } })
+}
+
+/** 是否已是班级成员 */
+export async function isUserClassMember(classId: string, userId: string) {
+  const m = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+    select: { id: true },
+  })
+  return !!m
+}
+
+/** 校验当前用户是否是班级 owner/admin */
+export async function assertClassAdmin(classId: string, userId: string, failMsg: string) {
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
+    throw new ApiError('FORBIDDEN', failMsg, 403)
+  }
+  return member
+}
+
+/** 按 id + classId 查题目（确保题目归属该班级） */
+export async function findClassProblem(problemId: string, classId: string) {
+  return prisma.problem.findUnique({
+    where: { id: problemId, classId },
+  })
+}
+
+/** 按 id + classId 查作业（确保作业归属该班级） */
+export async function findClassAssignment(assignmentId: string, classId: string) {
+  return prisma.classAssignment.findUnique({
+    where: { id: assignmentId, classId },
+  })
+}
+
+/** 读当前用户的 isAdmin 标志（系统级） */
+export async function getUserIsAdmin(userId: string) {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true },
+  })
+  return u?.isAdmin === true
+}
+
+/** 检查当前用户是否在指定题上获得满分（用于提交记录越权校验） */
+export async function hasFullScoreOnProblem(
+  userId: string,
+  assignmentId: string,
+  problemId: string
+) {
+  const submissions = await prisma.classAssignmentSubmission.findMany({
+    where: { assignmentId, userId, problemId },
+    select: { score: true },
+  })
+  if (submissions.length === 0) return false
+  const maxScore = Math.max(...submissions.map((s) => s.score || 0))
+  return maxScore === 100
+}
+
+/** 校验当前操作者是班级 owner/admin，否则 throw403 */
+export async function requireClassAdminRole(classId: string, userId: string) {
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+  if (!member || !isClassAdminRole(member.role)) {
+    throw new ApiError('FORBIDDEN', '您没有权限管理成员', 403)
+  }
+  return member
+}
+
+/** 校验目标成员存在 + 当前操作者可管理其角色 */
+export async function requireManageableTarget(classId: string, memberId: string, operatorRole: string) {
+  const target = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId: memberId } },
+  })
+  if (!target) {
+    throw new ApiError('NOT_FOUND', '成员不存在', 404)
+  }
+  if (!canManageMember(operatorRole, target.role)) {
+    throw new ApiError('FORBIDDEN', '没有权限管理该成员', 403)
+  }
+  return target
+}
+
+/** 读取当前用户的基础 profile（用于加入申请通知） */
+export async function getUserProfile(userId: string) {
+  return prisma.user.findUnique({ where: { id: userId } })
+}
+
+/** 读直接邀请详情（含班级/邀请人/被邀请人） */
+export async function getDirectInviteRaw(inviteId: string) {
+  return prisma.classDirectInvite.findUnique({ where: { id: inviteId } })
+}
+
+/** 读班级笔记的最小信息（id/classId/title） */
+export async function getClassNoteBasic(noteId: string, classId: string) {
+  return prisma.classNote.findUnique({
+    where: { id: noteId, classId },
+  })
+}
+
+/** 查找同名班级（创建班级时校验重名） */
+export async function findClassByName(name: string) {
+  return prisma.class.findUnique({ where: { name } })
+}
+
 /** 校验作业内的所有题目是否都在公共题库中且公开 */
 export async function validateAssignmentProblems(problemIds: string[]) {
   const problems = await prisma.problem.findMany({
@@ -2109,4 +2280,46 @@ export async function cancelClassJoinRequest(
   }
   await prisma.classJoinRequest.delete({ where: { id: requestId } })
   return { message: '已撤销申请' }
+}
+
+/* ============================================================================
+ * 管理员班级管理（原 /api/admin/classes*）
+ * ========================================================================== */
+
+/** 管理员列出所有班级（带成员/作业/笔记计数 + owner 用户名） */
+export async function listAllClassesForAdmin() {
+  const classes = await prisma.class.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      _count: { select: { members: true, assignments: true, notes: true } },
+    },
+  })
+  const ownerIds = [...new Set(classes.map((t) => t.ownerId))]
+  const owners = ownerIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: ownerIds } },
+        select: { id: true, username: true },
+      })
+    : []
+  const ownerMap = new Map(owners.map((o) => [o.id, o.username]))
+  return classes.map((classData) => ({
+    ...classData,
+    owner: { username: ownerMap.get(classData.ownerId) || '未知用户' },
+  }))
+}
+
+/** 管理员切换班级可见性（公开/私有） */
+export async function adminUpdateClassVisibility(classId: string, isPublic: boolean | undefined) {
+  const classData = await prisma.class.findUnique({ where: { id: classId } })
+  if (!classData) {
+    throw new ApiError('NOT_FOUND', '班级不存在', 404)
+  }
+  await prisma.class.update({ where: { id: classId }, data: { isPublic } })
+  return isPublic ? '班级已设为公开' : '班级已设为私有'
+}
+
+/** 管理员删除班级 */
+export async function adminDeleteClass(classId: string) {
+  await prisma.class.delete({ where: { id: classId } })
+  return '班级已删除'
 }

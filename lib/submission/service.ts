@@ -280,3 +280,90 @@ export async function getSubmissionDetailOrClassAssignment(id: string) {
     testResults: [],
   }
 }
+
+/* ============================================================================
+ * 管理员提交列表（原 /api/admin/submissions）
+ * ========================================================================== */
+
+export interface ListAdminSubmissionsResult {
+  submissions: Array<any>
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+/**
+ * 管理员提交记录列表（带 user/problem enrich）
+ */
+export async function listAdminSubmissions(filter: {
+  page?: number
+  pageSize?: number
+  status?: string
+}): Promise<ListAdminSubmissionsResult> {
+  const page = filter.page ?? 1
+  const pageSize = filter.pageSize ?? 50
+  const where: any = {}
+  if (filter.status && filter.status !== 'all') {
+    where.status = filter.status
+  }
+  const [total, submissionsRaw] = await Promise.all([
+    prisma.submission.count({ where }),
+    prisma.submission.findMany({
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { submittedAt: 'desc' },
+      select: {
+        id: true,
+        userId: true,
+        problemId: true,
+        language: true,
+        code: true,
+        status: true,
+        score: true,
+        time: true,
+        memory: true,
+        passedTests: true,
+        totalTests: true,
+        message: true,
+        submittedAt: true,
+      },
+    }),
+  ])
+  // 手动查询用户和题目信息，优雅处理已删除的数据
+  const submissions = await Promise.all(
+    submissionsRaw.map(async (sub) => {
+      const [user, problem] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: sub.userId },
+          select: { id: true, username: true, nickname: true },
+        }),
+        prisma.problem.findUnique({
+          where: { id: sub.problemId },
+          select: { id: true, problemNumber: true, title: true },
+        }),
+      ])
+      return {
+        ...sub,
+        user: user || {
+          id: sub.userId,
+          username: '未知用户',
+          nickname: '未知用户',
+        },
+        problem: problem || {
+          id: sub.problemId,
+          problemNumber: '',
+          title: '题目已删除',
+        },
+      }
+    })
+  )
+  return {
+    submissions,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  }
+}

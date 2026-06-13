@@ -825,3 +825,358 @@ export async function batchRegisterUsers(
   }
   return result
 }
+
+/* ============================================================================
+ * 管理员用户管理（原 /api/admin/users/* 路由）
+ * ========================================================================== */
+
+const VALID_ADMIN_ROLES = ['ADMIN', 'TEACHER', 'USER']
+
+/**
+ * 列出所有用户（管理员）
+ */
+export async function listAllUsersForAdmin() {
+  return prisma.user.findMany({
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      nickname: true,
+      avatar: true,
+      rating: true,
+      rank: true,
+      isAdmin: true,
+      role: true,
+      isSuperAdmin: true,
+      isBanned: true,
+      createdAt: true,
+      _count: {
+        select: {
+          submissions: true,
+          problems: true,
+        },
+      },
+    },
+  })
+}
+
+/**
+ * 校验入参中的角色字段
+ */
+export function assertValidRole(role: string | undefined): asserts role is 'ADMIN' | 'TEACHER' | 'USER' {
+  if (!role || !VALID_ADMIN_ROLES.includes(role)) {
+    const err: any = new Error('无效的角色类型')
+    err.status = 400
+    err.code = 'INVALID_ROLE'
+    throw err
+  }
+}
+
+/**
+ * 校验管理员更新用户的合法性：自己不能改 / 超级管理员不能改
+ */
+export async function assertCanUpdateUser(
+  targetUserId: string,
+  operatorUserId: string,
+  body: { role?: string; isAdmin?: boolean; isBanned?: boolean }
+) {
+  if (targetUserId === operatorUserId) {
+    if ('isAdmin' in body || 'isBanned' in body || 'role' in body) {
+      const err: any = new Error('不能修改自己的权限或状态')
+      err.status = 400
+      err.code = 'CANNOT_MODIFY_SELF'
+      throw err
+    }
+  }
+  const target = await prisma.user.findUnique({ where: { id: targetUserId } })
+  if (!target) {
+    const err: any = new Error('用户不存在')
+    err.status = 404
+    err.code = 'NOT_FOUND'
+    throw err
+  }
+  if (target.isSuperAdmin) {
+    const err: any = new Error('超级管理员不可被修改')
+    err.status = 403
+    err.code = 'FORBIDDEN'
+    throw err
+  }
+  return target
+}
+
+/**
+ * 校验管理员删除用户的合法性
+ */
+export async function assertCanDeleteUser(targetUserId: string, operatorUserId: string) {
+  if (targetUserId === operatorUserId) {
+    const err: any = new Error('不能删除自己的账号')
+    err.status = 400
+    err.code = 'CANNOT_DELETE_SELF'
+    throw err
+  }
+  const target = await prisma.user.findUnique({ where: { id: targetUserId } })
+  if (!target) {
+    const err: any = new Error('用户不存在')
+    err.status = 404
+    err.code = 'NOT_FOUND'
+    throw err
+  }
+  if (target.isSuperAdmin) {
+    const err: any = new Error('超级管理员不可被删除')
+    err.status = 403
+    err.code = 'FORBIDDEN'
+    throw err
+  }
+}
+
+/**
+ * 管理员更新用户：role / isAdmin / isBanned / password
+ */
+export async function adminUpdateUser(
+  targetUserId: string,
+  body: {
+    role?: 'ADMIN' | 'TEACHER' | 'USER'
+    isAdmin?: boolean
+    isBanned?: boolean
+    password?: string
+  },
+  bcryptModule: typeof import('bcryptjs')
+) {
+  const updateData: any = {}
+  if ('role' in body) {
+    assertValidRole(body.role)
+    updateData.role = body.role
+    updateData.isAdmin = body.role === 'ADMIN'
+  }
+  if ('isAdmin' in body) {
+    updateData.isAdmin = Boolean(body.isAdmin)
+  }
+  if ('isBanned' in body) {
+    updateData.isBanned = Boolean(body.isBanned)
+  }
+  if (body.password) {
+    if (body.password.length < 6) {
+      const err: any = new Error('密码长度至少为6位')
+      err.status = 400
+      err.code = 'PASSWORD_TOO_SHORT'
+      throw err
+    }
+    updateData.password = await bcryptModule.hash(body.password, 10)
+  }
+  return prisma.user.update({
+    where: { id: targetUserId },
+    data: updateData,
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      isAdmin: true,
+      role: true,
+      isBanned: true,
+    },
+  })
+}
+
+/**
+ * 管理员删除用户
+ */
+export async function adminDeleteUser(targetUserId: string) {
+  return prisma.user.delete({ where: { id: targetUserId } })
+}
+
+/**
+ * 过滤掉自己 + 超级管理员
+ */
+export async function filterUserIdsForBatchAction(
+  userIds: string[],
+  operatorUserId: string,
+  action: 'update' | 'delete'
+) {
+  // 跳过自己
+  const filtered = userIds.filter((id) => id !== operatorUserId)
+  if (filtered.length === 0) {
+    const err: any = new Error(action === 'update' ? '不能修改自己的角色' : '不能删除自己的账号')
+    err.status = 400
+    err.code = action === 'update' ? 'CANNOT_MODIFY_SELF' : 'CANNOT_DELETE_SELF'
+    throw err
+  }
+  // 跳过超级管理员
+  const superAdmins = await prisma.user.findMany({
+    where: { id: { in: filtered }, isSuperAdmin: true },
+    select: { id: true },
+  })
+  const superAdminIds = new Set(superAdmins.map((u) => u.id))
+  const finalUserIds = filtered.filter((id) => !superAdminIds.has(id))
+  if (finalUserIds.length === 0) {
+    const err: any = new Error('选中的用户包含超级管理员，不可被' + (action === 'update' ? '修改' : '删除'))
+    err.status = 403
+    err.code = 'FORBIDDEN'
+    throw err
+  }
+  return { finalUserIds, skippedCount: userIds.length - finalUserIds.length }
+}
+
+/**
+ * 批量更新用户角色
+ */
+export async function batchUpdateUserRole(finalUserIds: string[], role: 'ADMIN' | 'TEACHER' | 'USER') {
+  return prisma.user.updateMany({
+    where: { id: { in: finalUserIds } },
+    data: {
+      role,
+      isAdmin: role === 'ADMIN',
+    },
+  })
+}
+
+/**
+ * 批量删除用户
+ */
+export async function batchDeleteUsers(finalUserIds: string[]) {
+  return prisma.user.deleteMany({ where: { id: { in: finalUserIds } } })
+}
+
+/* ============================================================================
+ * 当前用户 email / password 修改（原 /api/users/profile/email 路由）
+ * ========================================================================== */
+
+export async function changeCurrentUserEmail(
+  userId: string,
+  newEmail: string
+): Promise<{ email: string }> {
+  if (!newEmail || typeof newEmail !== 'string') {
+    const err: any = new Error('请提供新邮箱')
+    err.status = 400
+    throw err
+  }
+  // 简单邮箱格式校验
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+    const err: any = new Error('邮箱格式不正确')
+    err.status = 400
+    throw err
+  }
+  const existing = await prisma.user.findUnique({ where: { email: newEmail } })
+  if (existing && existing.id !== userId) {
+    const err: any = new Error('该邮箱已被使用')
+    err.status = 409
+    throw err
+  }
+  await prisma.user.update({ where: { id: userId }, data: { email: newEmail } })
+  return { email: newEmail }
+}
+
+/* ============================================================================
+ * 用户邮箱修改 — 辅助函数（原 /api/users/profile/email）
+ * ========================================================================== */
+
+/** 读用户的 id/email/password 记录（用于密码校验 / 邮箱比较） */
+export async function getUserWithPassword(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, password: true },
+  })
+}
+
+/** 检查邮箱是否已被其他用户占用 */
+export async function isEmailTaken(email: string, excludeUserId: string) {
+  const u = await prisma.user.findUnique({ where: { email } })
+  return !!(u && u.id !== excludeUserId)
+}
+
+/** 别名：与 changeCurrentUserEmail 保持一致（getUserService 自带别名也行） */
+export { changeCurrentUserEmail as updateCurrentUserEmail }
+
+/** 读用户角色位（role / isAdmin）— 用于题解鉴权 */
+export async function getUserRoleFlags(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, isAdmin: true },
+  })
+}
+
+/** 读用户完整信息（用于创建训练计划等需要 isAdmin 鉴权） */
+export async function getUserFullInfo(userId: string) {
+  return prisma.user.findUnique({ where: { id: userId } })
+}
+
+/* ============================================================================
+ * 注册流程（原 /api/auth/register）
+ * ========================================================================== */
+
+export interface RegisterResult {
+  id: string
+  username: string
+  email: string
+  nickname: string | null
+  rating: number
+  rank: string
+  color: string
+  isAdmin: boolean
+  role: string
+  isSuperAdmin: boolean
+  createdAt: Date
+  isFirstUser: boolean
+}
+
+/** 注册新用户：检查重名/重邮箱 + 创建 + 返回 isFirstUser */
+export async function registerNewUser(input: {
+  sanitizedUsername: string
+  sanitizedEmail: string
+  sanitizedNickname: string
+  hashedPassword: string
+}): Promise<RegisterResult> {
+  // 检查用户名
+  const existingUsername = await prisma.user.findUnique({
+    where: { username: input.sanitizedUsername },
+  })
+  if (existingUsername) {
+    const err: any = new Error('用户名已被使用')
+    err.status = 400
+    err.code = 'BAD_REQUEST'
+    throw err
+  }
+  // 检查邮箱
+  const existingEmail = await prisma.user.findUnique({
+    where: { email: input.sanitizedEmail },
+  })
+  if (existingEmail) {
+    const err: any = new Error('邮箱已被注册')
+    err.status = 400
+    err.code = 'BAD_REQUEST'
+    throw err
+  }
+
+  const userCount = await prisma.user.count()
+  const isFirstUser = userCount === 0
+
+  const user = await prisma.user.create({
+    data: {
+      username: input.sanitizedUsername,
+      email: input.sanitizedEmail,
+      password: input.hashedPassword,
+      nickname: input.sanitizedNickname,
+      rating: 1500,
+      rank: isFirstUser ? '管理员' : '新手',
+      color: isFirstUser ? '#FF6B6B' : '#808080',
+      isAdmin: isFirstUser,
+      role: isFirstUser ? 'ADMIN' : 'USER',
+      isSuperAdmin: isFirstUser,
+      isBanned: false,
+    },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      nickname: true,
+      rating: true,
+      rank: true,
+      color: true,
+      isAdmin: true,
+      role: true,
+      isSuperAdmin: true,
+      createdAt: true,
+    },
+  })
+  return { ...user, isFirstUser }
+}

@@ -1,8 +1,8 @@
 /**
  * /api/admin/problems/export - 导出题库列表为 CSV（管理员）
  */
-import { withApi, ok, throw403 } from '@/lib/api/withApi'
-import { prisma } from '@/lib/prisma'
+import { withApi, throw403 } from '@/lib/api/withApi'
+import { listProblemsForExport } from '@/lib/problem/service'
 
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
   if (user.role !== 'admin' && user.role !== 'super_admin') {
@@ -12,24 +12,7 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
   const { searchParams } = new URL(req.url)
   const source = searchParams.get('source') || 'all'
 
-  const where: any = {}
-  if (source !== 'all') {
-    where.aiStatus = source
-  }
-
-  const problems = await prisma.problem.findMany({
-    where,
-    select: {
-      id: true,
-      title: true,
-      aiStatus: true,
-      createdAt: true,
-      updatedAt: true,
-      totalSubmit: true,
-      totalAccepted: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+  const problems = await listProblemsForExport(source)
 
   // Generate CSV
   const headers = ['ID', 'Title', 'Source', 'Created At', 'Updated At', 'Submissions', 'Accepted']

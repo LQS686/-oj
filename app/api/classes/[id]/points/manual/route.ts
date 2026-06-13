@@ -1,12 +1,10 @@
 /**
  * 管理员手动发放/扣除积分
  * POST /api/classes/[id]/points/manual
- *
- * 迁移到 withApi 中间件模式
  */
 import { withApi, ok, readJson, throw400, throw403, fail } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { prisma } from '@/lib/prisma'
+import { getCurrentClassMember, isClassAdminRole } from '@/lib/class/service'
 import { addPoints, deductPoints } from '@/lib/points/account'
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
@@ -14,14 +12,11 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
   // 检查管理员权限
-  const member = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId, userId: user.id } },
-  })
-  if (!member || !['owner', 'assistant'].includes(member.role)) {
+  const member = await getCurrentClassMember(classId, user.id)
+  if (!member || !isClassAdminRole(member.role)) {
     throw403('需要管理员权限')
   }
 
-  // 解析请求数据
   const body = await readJson<{
     targetUserId: string
     points: number
@@ -37,9 +32,9 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
 
   let result
   if (type === 'ADD') {
-    result = await addPoints(classId!, targetUserId, points, reason, 'MANUAL_AWARD')
+    result = await addPoints(classId, targetUserId, points, reason, 'MANUAL_AWARD')
   } else if (type === 'DEDUCT') {
-    result = await deductPoints(classId!, targetUserId, points, reason, 'MANUAL_DEDUCT')
+    result = await deductPoints(classId, targetUserId, points, reason, 'MANUAL_DEDUCT')
   } else {
     throw400('INVALID_TYPE', '无效的操作类型')
   }

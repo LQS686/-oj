@@ -6,7 +6,6 @@
  * DELETE 鉴权：删除（作者 / 管理员 / 教师，级联删评论）
  */
 import { withApi, ok, readJson, readQuery, throw400, throw403, throw404 } from '@/lib/api/withApi'
-import { prisma } from '@/lib/prisma'
 import { verifyToken } from '@/lib/auth'
 import {
   getSolutionDetailWithPermission,
@@ -14,6 +13,7 @@ import {
   deleteUserSolution,
   loadSolutionViewUser,
 } from '@/lib/solution/service'
+import { getUserRoleFlags } from '@/lib/user/service'
 import { isObjectId } from '@/lib/api/validation'
 
 function getClientIp(req: Request): string {
@@ -66,10 +66,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   }>(req)
 
   // 鉴权：作者本人 或 管理员/教师
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { role: true, isAdmin: true },
-  })
+  const dbUser = await getUserRoleFlags(user.id)
   const isAdmin = user.role === 'admin' || user.role === 'super_admin' || dbUser?.isAdmin === true
   const isTeacher = dbUser?.role === 'TEACHER'
 
@@ -84,14 +81,11 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   }
 })
 
-export const DELETE = withApi.auth(async (req, ctx, { user }) => {
+export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题解ID')
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { role: true, isAdmin: true },
-  })
+  const dbUser = await getUserRoleFlags(user.id)
   const isAdmin = user.role === 'admin' || user.role === 'super_admin' || dbUser?.isAdmin === true
   const isTeacher = dbUser?.role === 'TEACHER'
 

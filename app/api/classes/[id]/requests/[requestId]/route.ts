@@ -6,17 +6,11 @@
  */
 import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { prisma } from '@/lib/prisma'
 import {
-  decideClassJoinRequest,
   cancelClassJoinRequest,
+  decideClassJoinRequest,
+  getCurrentClassMember,
 } from '@/lib/class/service'
-
-async function getMember(classId: string, userId: string) {
-  return prisma.classMember.findUnique({
-    where: { classId_userId: { classId, userId } },
-  })
-}
 
 /**
  * PUT /api/classes/[id]/requests/[requestId]
@@ -31,8 +25,9 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   if (!body.action || !['approve', 'reject'].includes(body.action)) {
     throw400('INVALID_ACTION', '无效的操作类型')
   }
-  const member = await getMember(id, user.id)
+  const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以操作')
+  const memberRole = member!.role
 
   return ok(
     await decideClassJoinRequest({
@@ -40,7 +35,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
       requestId,
       action: body.action as 'approve' | 'reject',
       operatorUserId: user.id,
-      operatorRole: member!.role,
+      operatorRole: memberRole,
     })
   )
 })
