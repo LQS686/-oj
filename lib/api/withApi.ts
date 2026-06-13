@@ -110,6 +110,19 @@ async function safeCall(
  * 无需鉴权的快速路由
  * ========================================================================== */
 
+/**
+ * 解析 Next.js 16 的 ctx.params（可能是 Promise），统一为对象。
+ * 兼容 Next.js 14 同步 params 与 15/16 异步 params 两种形态。
+ */
+async function resolveCtxParams(ctx: any): Promise<any> {
+  if (!ctx) return ctx
+  const rawParams = ctx.params
+  if (rawParams && typeof rawParams.then === 'function') {
+    return { ...ctx, params: await rawParams }
+  }
+  return ctx
+}
+
 export interface RouteHandler {
   (req: NextRequest, ctx: ApiContext): Promise<Response | unknown> | Response | unknown
 }
@@ -120,7 +133,10 @@ export const withApi = {
    */
   public(handler: RouteHandler) {
     return async (req: NextRequest, ctx: any) => {
-      return safeCall(async () => handler(req, ctx), 'PUBLIC', req)
+      return safeCall(async () => {
+        const resolved = await resolveCtxParams(ctx)
+        return handler(req, resolved)
+      }, 'PUBLIC', req)
     }
   },
 
@@ -136,7 +152,8 @@ export const withApi = {
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId)
         if (!user) throw throw401('用户不存在')
-        return handler(req, ctx, { user })
+        const resolved = await resolveCtxParams(ctx)
+        return handler(req, resolved, { user })
       }, 'AUTH', req)
     }
   },
@@ -156,7 +173,8 @@ export const withApi = {
         if (user.role !== 'admin' && user.role !== 'super_admin') {
           throw throw403('需要管理员权限')
         }
-        return handler(req, ctx, { user })
+        const resolved = await resolveCtxParams(ctx)
+        return handler(req, resolved, { user })
       }, 'ADMIN', req)
     }
   },
@@ -184,7 +202,8 @@ export const withApi = {
         if (!allowedRoles.includes(membership.role)) {
           throw throw403('权限不足')
         }
-        return handler(req, ctx, { user, membership, classId })
+        const resolved = { ...ctx, params: resolvedParams }
+        return handler(req, resolved, { user, membership, classId })
       }, 'CLASS_ROLE', req)
     }
   },
