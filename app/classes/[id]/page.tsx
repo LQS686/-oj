@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
+import { usePermission } from '@/hooks/usePermission'
 import Link from 'next/link'
 
 interface Assignment {
@@ -89,6 +90,9 @@ export default function ClassDetailPage() {
 
   const [notes, setNotes] = useState<Note[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
+
+  // 注意：usePermission 必须在所有 early return 之前调用（Rules of Hooks）
+  const canManageMembers = usePermission('class.member.manage')
 
   useEffect(() => {
     fetchClassDetail()
@@ -190,7 +194,7 @@ export default function ClassDetailPage() {
             </div>
 
             <div className="flex gap-2 shrink-0">
-              {isMember && isAdmin && (
+              {isMember && isAdmin && canManageMembers && (
                 <Link href={`/classes/${classId}/manage`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm hover:bg-muted transition-colors">
                   <Settings className="w-3.5 h-3.5" /> 管理
                 </Link>

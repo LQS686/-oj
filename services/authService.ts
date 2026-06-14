@@ -97,6 +97,7 @@ class AuthService {
           color: true,
           isAdmin: true,
           role: true,
+          isSuperAdmin: true,
           isBanned: true,
           createdAt: true,
         },
@@ -124,6 +125,8 @@ class AuthService {
         email: user.email,
         username: user.username,
         isAdmin: user.isAdmin,
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin,
       });
 
       const userResponse = mapUserToResponse(user);

@@ -84,10 +84,19 @@ export default function EditProblemPage() {
   const fetchProblemData = useCallback(async () => {
     try {
       setLoading(true)
+      setError('')
       const response = await fetchWithAuth(`/api/admin/problems/${problemId}`)
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        let detail = `HTTP ${response.status}`
+        try {
+          const body = await response.json().catch(() => null)
+          if (body?.error) detail = `${body.error.code || ''} ${body.error.message || body.error}`.trim()
+          else if (body?.message) detail = body.message
+        } catch {
+          // ignore JSON parse errors
+        }
+        throw new Error(detail)
       }
 
       const data = await response.json()
@@ -95,23 +104,27 @@ export default function EditProblemPage() {
       if (data.success) {
         const problem = data.data
         setProblemNumber(problem.problemNumber || '')
-        setTitle(problem.title)
-        setDescription(problem.description)
+        setTitle(problem.title || '')
+        setDescription(problem.description || '')
         setInput(problem.input || '')
         setOutput(problem.output || '')
         setHint(problem.hint || '')
         setSource(problem.source || '')
-        setDifficulty(problem.difficulty)
-        setTags(problem.tags || [])
-        setTimeLimit(problem.timeLimit)
-        setMemoryLimit(problem.memoryLimit)
+        setDifficulty(problem.difficulty || '入门')
+        setTags(Array.isArray(problem.tags) ? problem.tags : [])
+        setTimeLimit(typeof problem.timeLimit === 'number' ? problem.timeLimit : 1000)
+        setMemoryLimit(typeof problem.memoryLimit === 'number' ? problem.memoryLimit : 128)
         setVisibility(problem.visibility || (problem.isPublic ? 'public' : 'private'))
-        setSamples(problem.samples?.length > 0 ? problem.samples : [{ input: '', output: '', explanation: '' }])
+        setSamples(
+          Array.isArray(problem.samples) && problem.samples.length > 0
+            ? problem.samples
+            : [{ input: '', output: '', explanation: '' }]
+        )
       } else {
-        setError(data.error || '获取题目数据失败')
+        setError(data.error?.message || data.message || '获取题目数据失败')
       }
-    } catch {
-      setError('网络错误')
+    } catch (err: any) {
+      setError(err?.message || '网络错误，请稍后重试')
     } finally {
       setLoading(false)
     }
@@ -277,10 +290,10 @@ export default function EditProblemPage() {
       if (data.success) {
         router.push('/admin/problems')
       } else {
-        setError(data.error || '更新失败')
+        setError(data.error?.message || data.error || '更新失败')
       }
-    } catch {
-      setError('网络错误')
+    } catch (err: any) {
+      setError(err?.message || '网络错误，请稍后重试')
     } finally {
       setSubmitting(false)
     }
@@ -315,21 +328,22 @@ export default function EditProblemPage() {
               <Edit className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">编辑题目</h1>
+              <h1 className="text-2xl font-bold text-foreground">编辑题目</h1>
               <p className="text-sm text-muted-foreground">修改题目基本信息和描述</p>
             </div>
           </div>
         </div>
 
         {error && (
-          <div className="bg-error/100/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg">
-            {error}
+          <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="card p-6 space-y-4">
-            <h2 className="text-lg font-bold text-white mb-4">基本信息</h2>
+            <h2 className="text-lg font-bold text-foreground mb-4">基本信息</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -347,7 +361,7 @@ export default function EditProblemPage() {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  难度 <span className="text-red-400">*</span>
+                  难度 <span className="text-error">*</span>
                 </label>
                 <select
                   value={difficulty}
@@ -363,7 +377,7 @@ export default function EditProblemPage() {
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                题目标题 <span className="text-red-400">*</span>
+                题目标题 <span className="text-error">*</span>
               </label>
               <input
                 type="text"
@@ -404,7 +418,7 @@ export default function EditProblemPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(idx)}
-                      className="hover:text-red-400"
+                      className="hover:text-error"
                     >
                       ×
                     </button>
@@ -463,11 +477,11 @@ export default function EditProblemPage() {
           </div>
 
           <div className="card p-6 space-y-4">
-            <h2 className="text-lg font-bold text-white mb-4">题目描述</h2>
+            <h2 className="text-lg font-bold text-foreground mb-4">题目描述</h2>
             
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                题目描述 <span className="text-red-400">*</span>
+                题目描述 <span className="text-error">*</span>
               </label>
               <textarea
                 value={description}
@@ -526,7 +540,7 @@ export default function EditProblemPage() {
 
           <div className="card p-6 space-y-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-white">样例</h2>
+              <h2 className="text-lg font-bold text-foreground">样例</h2>
               <button
                 type="button"
                 onClick={handleAddSample}
@@ -545,7 +559,7 @@ export default function EditProblemPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveSample(idx)}
-                      className="text-red-400 hover:text-red-300"
+                      className="text-error hover:text-error/80"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -637,7 +651,7 @@ export default function EditProblemPage() {
                 <MessageSquare className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">
+                <h2 className="text-lg font-bold text-foreground">
                   题解管理（{solutions.length}）
                 </h2>
                 <p className="text-xs text-muted-foreground">
@@ -665,8 +679,8 @@ export default function EditProblemPage() {
             <div
               className={`px-4 py-3 rounded-lg text-sm border ${
                 actionMessage.type === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-red-500/10 border-red-500/30 text-red-300'
+                  ? 'bg-success/10 border-success/30 text-success'
+                  : 'bg-error/10 border-error/30 text-error'
               }`}
             >
               {actionMessage.text}
@@ -693,7 +707,7 @@ export default function EditProblemPage() {
           )}
 
           {!solutionsLoading && solutionsError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg flex items-center gap-2">
+            <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
               <span>{solutionsError}</span>
             </div>
@@ -713,8 +727,11 @@ export default function EditProblemPage() {
               {solutions.map((s) => (
                 <div
                   key={s.id}
-                  className="rounded-xl bg-muted border border-border p-4 hover:border-primary/40 transition-colors"
+                  className="rounded-xl bg-card border border-border p-4 hover:border-primary/50 hover:shadow-md transition-all relative overflow-hidden"
                 >
+                  {s.isAiGenerated && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-purple-500 to-purple-700" />
+                  )}
                   <div className="flex items-start gap-3 flex-wrap">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
                       <div className="avatar avatar-md flex-shrink-0">
@@ -734,7 +751,7 @@ export default function EditProblemPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h3 className="text-sm font-semibold text-white line-clamp-1">
+                          <h3 className="text-sm font-semibold text-foreground line-clamp-1">
                             {s.title}
                           </h3>
                           {s.isAiGenerated && (
@@ -777,7 +794,7 @@ export default function EditProblemPage() {
                       <button
                         type="button"
                         onClick={() => handleViewSolution(s.id)}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-muted hover:bg-muted text-slate-200 border border-border flex items-center gap-1"
+                        className="px-3 py-1.5 text-xs rounded-lg bg-muted hover:bg-primary/10 text-foreground hover:text-primary border border-border hover:border-primary/40 transition-colors flex items-center gap-1"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         查看
@@ -787,7 +804,7 @@ export default function EditProblemPage() {
                           type="button"
                           onClick={handleRegenerateSolution}
                           disabled={regenerating}
-                          className="px-3 py-1.5 text-xs rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-200 border border-purple-500/30 flex items-center gap-1"
+                          className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white border border-purple-600/50 flex items-center gap-1 shadow-sm transition-all"
                           title="删除此题解并重新生成"
                         >
                           {regenerating ? (
@@ -802,7 +819,7 @@ export default function EditProblemPage() {
                         type="button"
                         onClick={() => handleDeleteSolution(s.id)}
                         disabled={deletingSolutionId === s.id}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1"
+                        className="px-3 py-1.5 text-xs rounded-lg bg-error/10 hover:bg-error/20 text-error border border-error/30 hover:border-error/50 transition-colors flex items-center gap-1"
                       >
                         {deletingSolutionId === s.id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -8,6 +8,7 @@
  * 迁移到 withApi 中间件模式
  */
 import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
 import { isObjectId } from '@/lib/api/validation'
 import bcrypt from 'bcryptjs'
 import {
@@ -30,7 +31,7 @@ export const GET = withApi.public(async (req, ctx) => {
 })
 
 // PUT /api/contests/[id] - 更新竞赛信息
-export const PUT = withApi.auth(async (req, ctx, { user }) => {
+export const PUT = withApi.auth(withPermission('contest.edit')(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
@@ -76,7 +77,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   })
 
   return ok({ ...updatedContest, message: '竞赛更新成功' })
-})
+}))
 
 // DELETE /api/contests/[id] - 删除竞赛
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {

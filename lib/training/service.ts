@@ -122,6 +122,8 @@ export async function listPublicTrainingsAdvanced(
     keyword?: string
     difficulty?: string
     categoryId?: string
+    categoryType?: 'official' | 'contest' | null
+    isRecommended?: boolean
     userId?: string | null
   }
 ): Promise<PaginatedResponse<TrainingListItem>> {
@@ -146,6 +148,18 @@ export async function listPublicTrainingsAdvanced(
   }
   if (filter.difficulty) extra.push({ difficulty: filter.difficulty })
   if (filter.categoryId) extra.push({ categoryId: filter.categoryId })
+  // categoryType / isRecommended 在 DB 层过滤，避免分页后过滤造成空页
+  // 兼容老数据：'official' 过滤同时匹配 categoryType='official' 和 categoryType=null
+  if (filter.categoryType === 'official') {
+    extra.push({
+      OR: [{ categoryType: 'official' }, { categoryType: null }],
+    })
+  } else if (filter.categoryType === 'contest') {
+    extra.push({ categoryType: 'contest' })
+  }
+  if (filter.isRecommended === true) {
+    extra.push({ isRecommended: true })
+  }
   const where: Prisma.TrainingWhereInput = extra.length > 0
     ? { AND: [baseScope, ...extra] }
     : baseScope

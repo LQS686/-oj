@@ -17,6 +17,14 @@ import { BookOpen, AlertCircle, RefreshCw, Plus, UserCheck } from 'lucide-react'
 import TrainingCard from '@/components/training/TrainingCard'
 import SourceFilterCards, { type TrainingSource } from '@/components/training/SourceFilterCards'
 import type { TrainingListItem } from '@/lib/training/types'
+import { usePermission } from '@/hooks/usePermission'
+
+const SOURCE_LABELS: Record<TrainingSource, string> = {
+  all: '全部题单',
+  official: '官方题单',
+  contest: '竞赛/考级真题',
+  mine: '我的题单',
+}
 
 export default function TrainingListPage() {
   const [trainings, setTrainings] = useState<TrainingListItem[]>([])
@@ -25,11 +33,11 @@ export default function TrainingListPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
-  const [source, setSource] = useState<TrainingSource>('all')
+  const [source, setSource] = useState<TrainingSource>('official')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  const fetchTrainings = useCallback(async () => {
+  const fetchTrainings = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true)
       setError(null)
@@ -37,57 +45,41 @@ export default function TrainingListPage() {
         page: String(page),
         limit: '18',
       })
-      // 后端过滤：official 用 isRecommended；contest 用 categoryType
+      // 后端 DB 层过滤（不再做后置 filter）
       if (source === 'official') {
-        params.set('recommended', 'true')
+        params.set('categoryType', 'official')
       } else if (source === 'contest') {
         params.set('categoryType', 'contest')
       }
 
       const res = await fetch(`/api/trainings?${params.toString()}`, {
         cache: 'no-store',
+        signal,
         headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' },
       })
       const data = await res.json()
-      if (data.success) {
-        let items: TrainingListItem[] = Array.isArray(data.data?.items) ? data.data.items : []
-
-        // 来源筛选：客户端再过滤一次（确保精准）
-        if (source === 'contest') {
-          // 1) 优先按 categoryType === 'contest' 匹配（admin 创建时打标）
-          // 2) 兼容老题单：tag/title 包含竞赛/考级/CSP/NOIP 等关键词
-          const contestKeywords = ['竞赛', '考级', '真题', 'CSP', 'NOIP', 'NOI', 'ICPC', 'GESP', '省选']
-          items = items.filter(t => {
-            if (t.categoryType === 'contest') return true
-            const haystack = [
-              ...(t.tags || []),
-              t.title,
-              t.category?.name || '',
-            ].join(' ').toLowerCase()
-            return contestKeywords.some(k => haystack.includes(k.toLowerCase()))
-          })
-        } else if (source === 'mine') {
-          // 我的题单：已加入 + 自己创建的
-          items = items.filter(t =>
-            t.userProgress?.isJoined || t.author?.id === currentUserId
-          )
-        } else if (source === 'official') {
-          // 官方题单：categoryType === 'official' 或 isRecommended（兼容老数据）
-          items = items.filter(t => t.categoryType === 'official' || t.isRecommended)
-        }
-
-        // 添加编号（基于倒序，1-based）
-        items = items.map((item, idx) => ({ ...item, number: (page - 1) * 18 + idx + 1 } as any))
-        setTrainings(items)
-        setTotal(typeof data.data?.total === 'number' ? data.data.total : 0)
-        setTotalPages(typeof data.data?.totalPages === 'number' ? data.data.totalPages : 1)
-      } else {
+      if (!data.success) {
         setError(data.error || '获取题单失败')
         setTrainings([])
         setTotal(0)
         setTotalPages(1)
+        return
       }
-    } catch (e) {
+      let items: TrainingListItem[] = Array.isArray(data.data?.items) ? data.data.items : []
+
+      // "我的题单"：客户端再过滤（基于当前用户加入/创建）
+      if (source === 'mine') {
+        items = items.filter(t =>
+          t.userProgress?.isJoined || t.author?.id === currentUserId
+        )
+      }
+
+      items = items.map((item, idx) => ({ ...item, number: (page - 1) * 18 + idx + 1 } as any))
+      setTrainings(items)
+      setTotal(typeof data.data?.total === 'number' ? data.data.total : 0)
+      setTotalPages(typeof data.data?.totalPages === 'number' ? data.data.totalPages : 1)
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return
       setError('网络错误')
       setTrainings([])
     } finally {
@@ -114,12 +106,19 @@ export default function TrainingListPage() {
       })
   }, [])
 
-  useEffect(() => { fetchTrainings() }, [fetchTrainings])
+  // 切换 source/page 时拉取，AbortController 取消旧请求
+  useEffect(() => {
+    const ac = new AbortController()
+    fetchTrainings(ac.signal)
+    return () => ac.abort()
+  }, [fetchTrainings])
 
   const handleSourceChange = (s: TrainingSource) => {
     setSource(s)
     setPage(1)
   }
+
+  const canCreateTraining = usePermission('training.create')
 
   return (
     <div className="min-h-screen">
@@ -140,7 +139,7 @@ export default function TrainingListPage() {
               <span className="text-primary-light font-bold">{total}</span>
               <span className="text-muted-foreground ml-1.5 text-sm">个题单</span>
             </div>
-            {isLoggedIn && (
+            {isLoggedIn && canCreateTraining && (
               <Link
                 href="/training/create"
                 className="btn-primary btn"
@@ -155,10 +154,27 @@ export default function TrainingListPage() {
 
         {/* 3 大来源分类卡片 */}
         <SourceFilterCards
-          active={source === 'all' ? 'official' : source}
+          active={source}
           onChange={handleSourceChange}
           isLoggedIn={isLoggedIn}
         />
+
+        {/* 列表区：明确的 section header + 分割线，与导航分层 */}
+        <div className="mt-8 mb-4 flex items-center justify-between gap-3 border-b border-border pb-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold text-foreground">
+              {SOURCE_LABELS[source] ?? '题单列表'}
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              共 <span className="text-primary-light font-semibold">{total}</span> 个题单
+            </span>
+          </div>
+          {source !== 'mine' && (
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              点击题单查看详情
+            </span>
+          )}
+        </div>
 
         {/* 列表 */}
         {loading ? (
@@ -176,7 +192,7 @@ export default function TrainingListPage() {
             </div>
             <div className="text-foreground text-xl font-semibold mb-2">加载失败</div>
             <p className="text-muted-foreground mb-6">{error}</p>
-            <button onClick={fetchTrainings} className="btn-primary btn">
+            <button onClick={() => fetchTrainings()} className="btn-primary btn">
               <RefreshCw className="w-4 h-4" />
               重试
             </button>

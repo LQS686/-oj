@@ -6,14 +6,16 @@
  * - 跳过超级管理员
  */
 import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
+import { isSystemAdmin } from '@/lib/permissions'
 import {
   batchDeleteUsers,
   filterUserIdsForBatchAction,
 } from '@/lib/user/service'
 
-export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
 
   const body = await readJson<{ userIds?: string[] }>(req)
@@ -36,4 +38,4 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     requestedCount: userIds.length,
     skippedCount,
   })
-})
+}))

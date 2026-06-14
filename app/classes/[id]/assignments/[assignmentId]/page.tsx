@@ -19,6 +19,10 @@ import {
   AlertCircle,
   FileCode,
   X,
+  BarChart3,
+  Target,
+  TrendingUp,
+  Activity,
 } from 'lucide-react'
 import StudentCompletionTable from '@/components/StudentCompletionTable'
 import ProblemDescription from '@/components/problem/ProblemDescription'
@@ -85,7 +89,7 @@ export default function AssignmentDetailPage() {
   const [userRole, setUserRole] = useState<string>('student')
   const [showActions, setShowActions] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'problems' | 'ranking'>('problems')
+  const [activeTab, setActiveTab] = useState<'problems' | 'ranking' | 'stats'>('problems')
   const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
   const [problemDetail, setProblemDetail] = useState<any>(null)
   const [problemLoading, setProblemLoading] = useState(false)
@@ -360,9 +364,25 @@ export default function AssignmentDetailPage() {
   const selectedProblem = assignment.problems?.[selectedProblemIndex]
   const selectedProblemStatus = selectedProblem ? getProblemStatus(selectedProblem.id) : null
 
+  // 当前用户自己的完成情况统计
+  const totalProblems = assignment.problems?.length || 0
+  const myProblemStatuses: Array<{ problem: Problem; status: Submission | null; submitCount: number }> = (assignment.problems || []).map(p => {
+    const problemSubs = submissions.filter(s => s.problemId === p.id)
+    const best = problemSubs.length > 0
+      ? problemSubs.reduce((b, c) => (c.score || 0) > (b.score || 0) ? c : b)
+      : null
+    return { problem: p, status: best, submitCount: problemSubs.length }
+  })
+  const myCompletedCount = myProblemStatuses.filter(s => s.status?.status === 'AC').length
+  const myTotalScore = myProblemStatuses.reduce((sum, s) => sum + (s.status?.score || 0), 0)
+  const mySubmitCount = submissions.length
+  const myCompletionRate = totalProblems > 0 ? Math.round((myCompletedCount / totalProblems) * 100) : 0
+  const myAttemptedCount = myProblemStatuses.filter(s => s.submitCount > 0).length
+
   const tabs = [
     { key: 'problems' as const, label: '题目', icon: FileText },
-    ...(isAdminOrOwner ? [{ key: 'ranking' as const, label: '完成情况', icon: Users }] : [])
+    { key: 'stats' as const, label: '完成情况统计', icon: BarChart3 },
+    ...(isAdminOrOwner ? [{ key: 'ranking' as const, label: '全员完成情况', icon: Users }] : [])
   ]
 
   return (
@@ -669,6 +689,134 @@ export default function AssignmentDetailPage() {
                 ) : (
                   <div className="py-16 text-center text-sm text-muted-foreground">暂无题目</div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'stats' && (
+              <div className="space-y-4">
+                {/* 顶部 4 个统计卡片 */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="rounded-xl border border-border bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/40 dark:to-emerald-900/20 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">完成题数</span>
+                      <Target className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{myCompletedCount}</span>
+                      <span className="text-sm text-muted-foreground">/ {totalProblems}</span>
+                    </div>
+                    <div className="mt-2 h-1.5 bg-emerald-100 dark:bg-emerald-950/60 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 transition-all" style={{ width: `${myCompletionRate}%` }} />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">总得分</span>
+                      <TrendingUp className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{myTotalScore}</span>
+                      <span className="text-sm text-muted-foreground">分</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2">
+                      平均 {totalProblems > 0 ? Math.round(myTotalScore / totalProblems) : 0} 分/题
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/40 dark:to-amber-900/20 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">提交次数</span>
+                      <Activity className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{mySubmitCount}</span>
+                      <span className="text-sm text-muted-foreground">次</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2">
+                      尝试 {myAttemptedCount}/{totalProblems} 题
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border bg-gradient-to-br from-violet-50 to-violet-100/50 dark:from-violet-950/40 dark:to-violet-900/20 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">完成率</span>
+                      <BarChart3 className="w-4 h-4 text-violet-600" />
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-violet-600 dark:text-violet-400">{myCompletionRate}</span>
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2">
+                      {myCompletionRate >= 100 ? '已全部完成 🎉' : myCompletionRate >= 60 ? '进展不错' : '继续加油'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 每题完成情况列表 */}
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
+                    <h3 className="font-semibold text-foreground flex items-center gap-2">
+                      <FileCode className="w-4 h-4 text-muted-foreground" />
+                      题目完成明细
+                    </h3>
+                    <span className="text-xs text-muted-foreground">
+                      {myCompletedCount} / {totalProblems} 已通过
+                    </span>
+                  </div>
+                  {totalProblems > 0 ? (
+                    <div className="divide-y divide-border/60">
+                      {myProblemStatuses.map(({ problem, status, submitCount }, idx) => {
+                        const isAC = status?.status === 'AC'
+                        return (
+                          <div
+                            key={problem.id}
+                            className="px-4 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors"
+                          >
+                            <span className={`shrink-0 w-7 h-7 rounded-md flex items-center justify-center font-mono text-sm font-bold ${
+                              isAC
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+                                : status
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
+                                  : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {LETTERS[idx]}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-foreground truncate">{problem.title}</h4>
+                                <span className={`shrink-0 px-1.5 py-0.5 rounded text-[11px] font-medium border ${getDifficultyColor(problem.difficulty)}`}>
+                                  {problem.difficulty}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                                {status ? (
+                                  <span>
+                                    最佳状态：<span className={isAC ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>{status.status}</span>
+                                  </span>
+                                ) : (
+                                  <span>未提交</span>
+                                )}
+                                <span>· 提交 {submitCount} 次</span>
+                              </div>
+                            </div>
+                            <div className="shrink-0 flex items-center gap-2">
+                              {status ? (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                                  isAC ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
+                                }`}>
+                                  {isAC && <CheckCircle2 className="w-3 h-3" />}
+                                  {status.score} 分
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/60">—</span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-12 text-center text-sm text-muted-foreground">暂无题目</div>
+                  )}
+                </div>
               </div>
             )}
 

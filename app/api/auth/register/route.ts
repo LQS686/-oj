@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { withApi, readJson, fail } from '@/lib/api/withApi'
 import { registerNewUser } from '@/lib/user/service'
+import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { signToken } from '@/lib/auth'
 import {
@@ -54,11 +55,16 @@ export const POST = withApi.public(async (req) => {
 
   const hashedPassword = await bcrypt.hash(password as string, 10)
 
+  // 首用户判定：User 表为空时，该新用户自动成为 SYSTEM_ADMIN
+  const userCount = await prisma.user.count()
+  const isFirstUser = userCount === 0
+
   const user = await registerNewUser({
     sanitizedUsername,
     sanitizedEmail,
     sanitizedNickname,
     hashedPassword,
+    isFirstUser,
   })
 
   const token = signToken({
@@ -66,6 +72,8 @@ export const POST = withApi.public(async (req) => {
     email: user.email,
     username: user.username,
     isAdmin: user.isAdmin,
+    role: user.role,
+    isSuperAdmin: user.isSuperAdmin,
   })
 
   const response = NextResponse.json(

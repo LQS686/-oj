@@ -2,11 +2,12 @@
  * /api/admin/problems/export - 导出题库列表为 CSV（管理员）
  */
 import { withApi, throw403 } from '@/lib/api/withApi'
+import { isSystemAdmin } from '@/lib/permissions'
 import { listProblemsForExport } from '@/lib/problem/service'
 
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
 
   const { searchParams } = new URL(req.url)

@@ -5,6 +5,8 @@
  * POST 入队生成任务
  */
 import { withApi, ok, readJson, throw403 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
+import { isSystemAdmin } from '@/lib/permissions'
 import {
   enqueueAiGeneration,
   getAiLogById,
@@ -20,8 +22,8 @@ import {
  *   有 logId -> 返回单条
  */
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
 
   const { searchParams } = new URL(req.url)
@@ -36,9 +38,9 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
 /**
  * POST /api/admin/ai/generate
  */
-export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
 
   const body = await readJson<AiGenerateBody>(req)
@@ -51,4 +53,4 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
 
   validateAiGenerateBody(body)
   return ok(await enqueueAiGeneration(user.id, body))
-})
+}))

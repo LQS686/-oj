@@ -7,16 +7,19 @@
  * DELETE 删除题目
  */
 import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
 import { isObjectId } from '@/lib/api/validation'
+import { isSystemAdmin } from '@/lib/permissions'
+import type { PermissionUser } from '@/lib/permissions'
 import {
   getAdminProblemById,
   updateAdminProblem,
   deleteAdminProblem,
 } from '@/lib/problem/service'
 
-function ensureAdmin(user: { role: string }) {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+function ensureAdmin(user: PermissionUser) {
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
 }
 
@@ -35,31 +38,31 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
 /**
  * PATCH /api/admin/problems/[id] - 更新题目（管理员）
  */
-export const PATCH = withApi.auth(async (req, ctx, { user }) => {
+export const PATCH = withApi.auth(withPermission('admin.access')(async (req, ctx, { user }) => {
   ensureAdmin(user)
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
   return ok(await updateAdminProblem(id, body))
-})
+}))
 
 /**
  * PUT /api/admin/problems/[id] - 更新题目（管理员）
  */
-export const PUT = withApi.auth(async (req, ctx, { user }) => {
+export const PUT = withApi.auth(withPermission('admin.access')(async (req, ctx, { user }) => {
   ensureAdmin(user)
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
   return ok(await updateAdminProblem(id, body))
-})
+}))
 
 /**
  * DELETE /api/admin/problems/[id] - 删除题目（管理员）
  */
-export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
+export const DELETE = withApi.auth(withPermission('admin.access')(async (_req, ctx, { user }) => {
   ensureAdmin(user)
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   return ok(await deleteAdminProblem(id))
-})
+}))

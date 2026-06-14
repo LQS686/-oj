@@ -3,11 +3,12 @@
  */
 import { withApi, ok, throw400, throw403 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
+import { isSystemAdmin } from '@/lib/permissions'
 import { listProblemVerificationLogs } from '@/lib/admin/logs'
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')

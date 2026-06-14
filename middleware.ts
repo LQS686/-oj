@@ -20,8 +20,69 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/auth/forgot-password': { maxRequests: 3, windowMs: 300000 },
 }
 
+/**
+ * 解析 JWT payload（不验证签名），用于快速判断 token 角色。
+ * 使用 Web Crypto API 校验 HS256 签名，兼容 edge / node runtime。
+ */
+async function isAdminPayload(token: string): Promise<boolean> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return false
+    const [headerB64, payloadB64, signatureB64] = parts
+
+    const secret = process.env.JWT_SECRET || 'dev-secret-change-me'
+    const keyMaterial = new TextEncoder().encode(secret)
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyMaterial,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    )
+
+    // base64url -> Uint8Array
+    const sigB64 = signatureB64.replace(/-/g, '+').replace(/_/g, '/')
+    const sigPadded = sigB64 + '='.repeat((4 - (sigB64.length % 4)) % 4)
+    const sigBin = Uint8Array.from(atob(sigPadded), (c) => c.charCodeAt(0))
+
+    const signedData = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
+    const valid = await crypto.subtle.verify('HMAC', key, sigBin, signedData)
+    if (!valid) return false
+
+    const payloadB64Std = payloadB64.replace(/-/g, '+').replace(/_/g, '/')
+    const payloadPadded = payloadB64Std + '='.repeat((4 - (payloadB64Std.length % 4)) % 4)
+    const payloadJson = atob(payloadPadded)
+    const payload = JSON.parse(payloadJson) as {
+      role?: string
+      isSuperAdmin?: boolean
+      isAdmin?: boolean
+    }
+
+    if (payload.isSuperAdmin === true) return true
+    if (payload.role === 'SYSTEM_ADMIN') return true
+    // 兼容旧版仅 isAdmin=true 的 token（已废弃字段，仅作降级兜底）
+    if (payload.isAdmin === true) return true
+    return false
+  } catch {
+    return false
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // 拦截 /admin/* 路径：仅 SYSTEM_ADMIN 可访问
+  if (pathname.startsWith('/admin')) {
+    const token = request.cookies.get('token')?.value
+    if (!token) {
+      return NextResponse.redirect(new URL('/403', request.url))
+    }
+    const ok = await isAdminPayload(token)
+    if (!ok) {
+      return NextResponse.redirect(new URL('/403', request.url))
+    }
+    return NextResponse.next()
+  }
 
   if (pathname.startsWith('/api/')) {
     const rateLimitConfig = API_RATE_LIMITS[pathname] || { maxRequests: 100, windowMs: 60000 }
@@ -57,5 +118,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/api/:path*',
+  matcher: ['/api/:path*', '/admin/:path*'],
 }

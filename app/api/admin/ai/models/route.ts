@@ -5,6 +5,8 @@
  * POST 创建模型
  */
 import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
+import { isSystemAdmin } from '@/lib/permissions'
 import { createAiModel, listActiveAiModelsEnriched } from '@/lib/ai/service'
 
 /**
@@ -19,8 +21,8 @@ import { createAiModel, listActiveAiModelsEnriched } from '@/lib/ai/service'
  * 也不会让"挂在已禁用 Provider 上的模型"出现在前端 UI 上。
  */
 export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
 
   const { data, orphanCount } = await listActiveAiModelsEnriched()
@@ -30,9 +32,9 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
 /**
  * POST /api/admin/ai/models
  */
-export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
 
   const body = await readJson<{
@@ -63,4 +65,4 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   })
 
   return ok(newModel)
-})
+}))

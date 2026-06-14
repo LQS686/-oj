@@ -22,6 +22,11 @@ export interface UserProfile {
   bio: string | null
   email: string | null
   role: string
+  /** 已废弃：兼容老数据，与 isSuperAdmin 重复 */
+  isAdmin: boolean
+  /** SYSTEM_ADMIN 唯一性硬卡，等同 role === 'SYSTEM_ADMIN' */
+  isSuperAdmin: boolean
+  isBanned: boolean
   createdAt: Date
 }
 
@@ -37,6 +42,9 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
         bio: true,
         email: true,
         role: true,
+        isAdmin: true,
+        isSuperAdmin: true,
+        isBanned: true,
         createdAt: true,
       },
     }) as Promise<UserProfile | null>
@@ -1143,12 +1151,18 @@ export interface RegisterResult {
   isFirstUser: boolean
 }
 
-/** 注册新用户：检查重名/重邮箱 + 创建 + 返回 isFirstUser */
+/** 注册新用户：检查重名/重邮箱 + 创建 + 返回 isFirstUser
+ *
+ * isFirstUser 由调用方传入（基于 prisma.user.count() === 0 判定），service 内部不读 DB 决定首用户
+ *  - isFirstUser=true  → role=SYSTEM_ADMIN, isSuperAdmin=true
+ *  - isFirstUser=false → role=STUDENT
+ */
 export async function registerNewUser(input: {
   sanitizedUsername: string
   sanitizedEmail: string
   sanitizedNickname: string
   hashedPassword: string
+  isFirstUser?: boolean
 }): Promise<RegisterResult> {
   // 检查用户名
   const existingUsername = await prisma.user.findUnique({
@@ -1171,8 +1185,7 @@ export async function registerNewUser(input: {
     throw err
   }
 
-  const userCount = await prisma.user.count()
-  const isFirstUser = userCount === 0
+  const isFirstUser = input.isFirstUser === true
 
   const user = await prisma.user.create({
     data: {
@@ -1183,8 +1196,8 @@ export async function registerNewUser(input: {
       rating: 1500,
       rank: isFirstUser ? '管理员' : '新手',
       color: isFirstUser ? '#FF6B6B' : '#808080',
-      isAdmin: isFirstUser,
-      role: isFirstUser ? 'ADMIN' : 'USER',
+      isAdmin: isFirstUser, // 兼容字段
+      role: isFirstUser ? 'SYSTEM_ADMIN' : 'STUDENT',
       isSuperAdmin: isFirstUser,
       isBanned: false,
     },

@@ -6,9 +6,10 @@
 import { withApi, ok, readQuery } from '@/lib/api/withApi'
 import { prisma } from '@/lib/prisma'
 import { toInt } from '@/lib/api/validation'
+import { isSystemAdmin } from '@/lib/permissions'
 
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+  if (!isSystemAdmin(user)) {
     return ok({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 })
   }
   const q = readQuery<{

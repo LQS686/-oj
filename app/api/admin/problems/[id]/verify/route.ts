@@ -2,10 +2,12 @@
  * POST /api/admin/problems/[id]/verify - 验证 AI 生成的题目
  */
 import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
 import { isObjectId } from '@/lib/api/validation'
+import { isSystemAdmin } from '@/lib/permissions'
 import { applyProblemVerification } from '@/lib/problem/service'
 
-export const POST = withApi.auth(async (req, ctx, { user }) => {
+export const POST = withApi.auth(withPermission('admin.access')(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目ID')
 
@@ -19,16 +21,14 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     throw400('INVALID_ACTION', '无效的操作类型')
   }
 
-  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
-
   return ok(
     await applyProblemVerification({
       id: id!,
       verifierId: user.id,
-      isAdmin,
+      isAdmin: isSystemAdmin(user),
       decision: body.action as 'accept' | 'reject' | 'fix' | 'archive',
       message: body.message,
       isAiGenerated: body.isAiGenerated ?? true,
     })
   )
-})
+}))

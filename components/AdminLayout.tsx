@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
+import { isSystemAdmin } from '@/lib/permissions'
 import {
   LayoutDashboard,
   FileText,
@@ -21,7 +22,9 @@ import {
   User,
   ChevronDown,
   Cpu,
-  BookOpen
+  BookOpen,
+  KeyRound,
+  ShieldCheck
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
@@ -33,7 +36,7 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout } = useUser()
+  const { user, isLoading, logout } = useUser()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
@@ -41,6 +44,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [unreadCount, setUnreadCount] = useState(0)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
+
+  // 权限门：仅 SYSTEM_ADMIN 可访问 /admin，未通过则跳到 /403
+  useEffect(() => {
+    if (isLoading) return
+    if (!user || !isSystemAdmin(user)) {
+      router.push('/403')
+    }
+  }, [user, isLoading, router])
 
   useEffect(() => {
     document.body.style.paddingTop = '0'
@@ -150,8 +161,27 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: Settings,
       label: '系统设置',
       href: '/admin/settings'
+    },
+    {
+      icon: KeyRound,
+      label: '权限点',
+      href: '/admin/permissions'
+    },
+    {
+      icon: ShieldCheck,
+      label: '角色权限',
+      href: '/admin/roles'
     }
   ]
+
+  // 鉴权完成前或鉴权未通过时，不渲染后台内容，避免短暂闪现
+  if (isLoading || !user || !isSystemAdmin(user)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+        <div className="text-muted-foreground text-sm">加载中...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex">

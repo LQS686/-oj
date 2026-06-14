@@ -4,8 +4,26 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Users, Search, Shield, User, Mail, Calendar, MoreHorizontal, Edit, Trash2, ShieldCheck, ShieldOff, UserPlus, Upload, X, Plus, CheckSquare, Square, FileText, AlertCircle, CheckCircle, Loader2, Download } from 'lucide-react'
-import { getRoleLabel, getRoleColor, isAdmin } from '@/lib/permissions'
+import { Users, Search, Shield, User, Mail, Calendar, MoreHorizontal, Edit, Trash2, ShieldCheck, ShieldOff, UserPlus, Upload, X, Plus, CheckSquare, Square, FileText, AlertCircle, CheckCircle, Loader2, Download, KeyRound } from 'lucide-react'
+
+/**
+ * 本地角色展示映射（新版三角色体系：SYSTEM_ADMIN / TEACHER / STUDENT）
+ * 与 lib/permissions.ts 的旧 API 保持独立，避免污染权限系统实现。
+ */
+const ROLE_DISPLAY: Record<string, { label: string; color: string }> = {
+  SYSTEM_ADMIN: { label: '系统管理员', color: 'tag-error' },
+  TEACHER: { label: '教师', color: 'tag-warning' },
+  STUDENT: { label: '学生', color: 'tag-info' },
+}
+
+function getRoleDisplay(role?: string, isSuperAdmin?: boolean) {
+  if (isSuperAdmin || role === 'SYSTEM_ADMIN') return ROLE_DISPLAY.SYSTEM_ADMIN
+  if (role === 'TEACHER') return ROLE_DISPLAY.TEACHER
+  if (role === 'STUDENT') return ROLE_DISPLAY.STUDENT
+  // 旧值（USER/ADMIN）回退到新体系
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return ROLE_DISPLAY.SYSTEM_ADMIN
+  return ROLE_DISPLAY.STUDENT
+}
 
 interface User {
   id: string
@@ -51,7 +69,7 @@ export default function AdminUsersPage() {
   
   const [showBatchRegisterModal, setShowBatchRegisterModal] = useState(false)
   const [batchUsers, setBatchUsers] = useState<BatchUser[]>([
-    { username: '', password: '', role: 'USER' }
+    { username: '', password: '', role: 'STUDENT' }
   ])
   const [batchRegistering, setBatchRegistering] = useState(false)
   const [batchResults, setBatchResults] = useState<BatchResult[]>([])
@@ -69,7 +87,7 @@ export default function AdminUsersPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set())
   const [showBatchEditModal, setShowBatchEditModal] = useState(false)
   const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false)
-  const [batchEditRole, setBatchEditRole] = useState('USER')
+  const [batchEditRole, setBatchEditRole] = useState('STUDENT')
   const [batchOperating, setBatchOperating] = useState(false)
 
   useEffect(() => {
@@ -146,9 +164,11 @@ export default function AdminUsersPage() {
   }
 
   const getUserRole = (user: User): string => {
-    if (isAdmin(user)) return 'ADMIN'
-    if (user.role && user.role !== 'USER') return user.role
-    return user.role || 'USER'
+    if (user.isSuperAdmin) return 'SYSTEM_ADMIN'
+    if (user.role === 'SYSTEM_ADMIN' || user.role === 'SUPER_ADMIN') return 'SYSTEM_ADMIN'
+    if (user.role === 'TEACHER') return 'TEACHER'
+    if (user.role === 'STUDENT' || user.role === 'USER') return 'STUDENT'
+    return 'STUDENT'
   }
 
   const filteredUsers = users.filter(user => {
@@ -160,7 +180,7 @@ export default function AdminUsersPage() {
   })
 
   const addBatchUser = () => {
-    setBatchUsers([...batchUsers, { username: '', password: '', role: 'USER' }])
+    setBatchUsers([...batchUsers, { username: '', password: '', role: 'STUDENT' }])
   }
 
   const removeBatchUser = (index: number) => {
@@ -412,7 +432,7 @@ export default function AdminUsersPage() {
 
   const closeBatchRegisterModal = () => {
     setShowBatchRegisterModal(false)
-    setBatchUsers([{ username: '', password: '', role: 'USER' }])
+    setBatchUsers([{ username: '', password: '', role: 'STUDENT' }])
     setBatchResults([])
     setCsvFile(null)
     setCsvResults([])
@@ -477,9 +497,9 @@ export default function AdminUsersPage() {
             <div className="text-2xl font-bold text-foreground mt-1">{users.length}</div>
           </div>
           <div className="card p-4">
-            <div className="text-muted-foreground text-sm">管理员</div>
+            <div className="text-muted-foreground text-sm">系统管理员</div>
             <div className="text-2xl font-bold text-error mt-1">
-              {users.filter(u => getUserRole(u) === 'ADMIN').length}
+              {users.filter(u => getUserRole(u) === 'SYSTEM_ADMIN').length}
             </div>
           </div>
           <div className="card p-4">
@@ -489,9 +509,9 @@ export default function AdminUsersPage() {
             </div>
           </div>
           <div className="card p-4">
-            <div className="text-muted-foreground text-sm">普通用户</div>
-            <div className="text-2xl font-bold text-primary-light mt-1">
-              {users.filter(u => getUserRole(u) === 'USER').length}
+            <div className="text-muted-foreground text-sm">学生</div>
+            <div className="text-2xl font-bold text-info mt-1">
+              {users.filter(u => getUserRole(u) === 'STUDENT').length}
             </div>
           </div>
         </div>
@@ -516,9 +536,9 @@ export default function AdminUsersPage() {
               className="input w-auto"
             >
               <option value="all">全部角色</option>
-              <option value="ADMIN">管理员</option>
+              <option value="SYSTEM_ADMIN">系统管理员</option>
               <option value="TEACHER">教师</option>
-              <option value="USER">用户</option>
+              <option value="STUDENT">学生</option>
             </select>
           </div>
         </div>
@@ -625,8 +645,8 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className={`tag ${getRoleColor(user.role, user.isAdmin)}`}>
-                          {getRoleLabel(user.role, user.isAdmin)}
+                        <span className={`tag ${getRoleDisplay(user.role, user.isSuperAdmin).color}`}>
+                          {getRoleDisplay(user.role, user.isSuperAdmin).label}
                         </span>
                         {user.isSuperAdmin && (
                           <span className="text-xs text-accent-light bg-amber-400/10 px-2 py-0.5 rounded">
@@ -650,6 +670,13 @@ export default function AdminUsersPage() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => router.push(`/admin/users/${user.id}/permissions`)}
+                          className="p-2 rounded-lg transition-colors text-secondary hover:bg-secondary/10"
+                          title="用户权限"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => {
                             setSelectedUser(user)
                             setEditRole(getUserRole(user))
@@ -657,8 +684,8 @@ export default function AdminUsersPage() {
                           }}
                           disabled={user.isSuperAdmin}
                           className={`p-2 rounded-lg transition-colors ${
-                            user.isSuperAdmin 
-                              ? 'text-muted-foreground cursor-not-allowed' 
+                            user.isSuperAdmin
+                              ? 'text-muted-foreground cursor-not-allowed'
                               : 'text-primary hover:bg-primary/5'
                           }`}
                           title={user.isSuperAdmin ? '超级管理员不可修改' : '编辑'}
@@ -716,9 +743,9 @@ export default function AdminUsersPage() {
                 onChange={(e) => setEditRole(e.target.value)}
                 className="input"
               >
-                <option value="USER">用户</option>
+                <option value="STUDENT">学生</option>
                 <option value="TEACHER">教师</option>
-                <option value="ADMIN">管理员</option>
+                <option value="SYSTEM_ADMIN">系统管理员</option>
               </select>
             </div>
             <div className="flex gap-3 justify-end">
@@ -872,9 +899,9 @@ export default function AdminUsersPage() {
                           onChange={(e) => updateBatchUser(index, 'role', e.target.value)}
                           className="input text-sm"
                         >
-                          <option value="USER">用户</option>
+                          <option value="STUDENT">学生</option>
                           <option value="TEACHER">教师</option>
-                          <option value="ADMIN">管理员</option>
+                          <option value="SYSTEM_ADMIN">系统管理员</option>
                         </select>
                       </div>
                       <div className="col-span-1 flex justify-center">
@@ -956,7 +983,7 @@ export default function AdminUsersPage() {
                     选择文件
                   </button>
                   <p className="text-muted-foreground text-xs mt-4">
-                    格式: 用户名,密码,角色(USER/TEACHER/ADMIN)，邮箱可选
+                    格式: 用户名,密码,角色(STUDENT/TEACHER/SYSTEM_ADMIN)，邮箱可选
                   </p>
                   <a
                     href="/templates/users-template.csv"
@@ -1045,9 +1072,9 @@ export default function AdminUsersPage() {
                 onChange={(e) => setBatchEditRole(e.target.value)}
                 className="input"
               >
-                <option value="USER">用户</option>
+                <option value="STUDENT">学生</option>
                 <option value="TEACHER">教师</option>
-                <option value="ADMIN">管理员</option>
+                <option value="SYSTEM_ADMIN">系统管理员</option>
               </select>
             </div>
             <div className="flex gap-3 justify-end">

@@ -4,7 +4,9 @@
  * action: 'visibility' | 'difficulty' | 'delete'
  */
 import { withApi, ok, readJson, throw403 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
 import { isObjectId } from '@/lib/api/validation'
+import { isSystemAdmin } from '@/lib/permissions'
 import {
   batchDeleteProblems,
   batchUpdateProblemDifficulty,
@@ -12,9 +14,9 @@ import {
   validateBatchProblemInput,
 } from '@/lib/problem/service'
 
-export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
 
   const body = await readJson<{
@@ -37,4 +39,4 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   // delete
   const deleteRes = await batchDeleteProblems(validated.problemIds)
   return ok({ updatedCount: 0, deletedCount: deleteRes.count })
-})
+}))

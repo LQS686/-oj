@@ -22,13 +22,13 @@ model User {
   solvedCount   Int       @default(0) // 解题数
   rank          String    @default("新手")
   color         String    @default("#808080")
-  isAdmin       Boolean   @default(false)
-  role          String    @default("USER") // ADMIN, TEACHER, USER
-  isSuperAdmin  Boolean   @default(false) // 超级管理员，不可被删除或修改角色
+  isAdmin       Boolean   @default(false) // 已废弃：语义被 role 覆盖，保留用于兼容旧代码，请勿继续读取
+  role          String    @default("USER") // SYSTEM_ADMIN, TEACHER, STUDENT（统一角色：唯一真相源）
+  isSuperAdmin  Boolean   @default(false) // 等同于 role=SYSTEM_ADMIN，唯一性硬卡（业务层校验），不可被降级/删除
   isBanned      Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  
+
   // 关系
   submissions   Submission[]
   problems      Problem[]
@@ -45,6 +45,9 @@ model User {
   favorites     Favorite[]
   classNotes    ClassNote[]
   notifications Notification[]
+
+  // 用户级权限覆盖
+  userPermissions UserPermission[]
 
   // 邀请关系
   sentDirectInvites     ClassDirectInvite[] @relation("InviterRelation")
@@ -73,6 +76,48 @@ model User {
   @@index([rating])
   @@index([solvedCount])
   @@index([role])
+}
+
+// 权限点：原子能力
+model Permission {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  code        String   @unique  // 'problem.create' / 'class.member.manage'
+  module      String              // 'user' / 'class' / 'problem' / 'contest' / 'training' / 'system'
+  name        String              // 中文名：'创建题目'
+  description String?             // 描述
+  createdAt   DateTime @default(now())
+
+  rolePermissions  RolePermission[]
+  // 注：UserPermission 仅以 permissionCode 字符串存储，不建外键（避免权限点删除时崩溃），
+  //     因此 Permission 端不维护 userPermissions 反向关系。
+
+  @@index([module])
+}
+
+// 角色默认权限集
+model RolePermission {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  role         String              // 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT'
+  permissionId String   @db.ObjectId
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([role, permissionId])
+  @@index([role])
+}
+
+// 用户级权限覆盖
+model UserPermission {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @db.ObjectId
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionCode   String              // 直接存 code，不做外键（避免权限点删除时崩溃）
+  value            Boolean             // true=额外授予，false=显式拒绝（覆盖默认）
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, permissionCode])
+  @@index([userId])
 }
 
 // 头像历史记录

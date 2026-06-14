@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef, use } from 'react'
-import { 
-  BookOpen, 
-  Send, 
-  AlertCircle, 
-  Wifi, 
-  WifiOff, 
-  ArrowLeft, 
-  XCircle, 
+import {
+  BookOpen,
+  Send,
+  AlertCircle,
+  Wifi,
+  WifiOff,
+  ArrowLeft,
+  XCircle,
   Code as CodeIcon,
   CheckCircle2,
   Timer,
@@ -16,7 +16,8 @@ import {
   FileCode,
   MessageSquare,
   ListChecks,
-  X
+  X,
+  Edit3
 } from 'lucide-react'
 import { getStatusColor } from '@/lib/status'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -28,6 +29,8 @@ import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
+import { usePermission } from '@/hooks/usePermission'
+import Link from 'next/link'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -83,6 +86,9 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const [submissions, setSubmissions] = useState<any[]>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null)
+
+  // 注意：usePermission 必须在所有 early return 之前调用（Rules of Hooks）
+  const canEditProblem = usePermission('problem.edit')
 
   useEffect(() => {
     const fetchProblem = async () => {
@@ -435,6 +441,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           }`}>
             {problem.difficulty}
           </span>
+          {canEditProblem && problem?.id && (
+            <Link
+              href={`/admin/problems/${problem.id}/edit`}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary-light hover:bg-primary/10 transition-colors"
+            >
+              <Edit3 className="w-3.5 h-3.5" /> 编辑
+            </Link>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-muted-foreground">

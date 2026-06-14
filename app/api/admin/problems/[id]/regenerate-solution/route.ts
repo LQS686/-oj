@@ -9,6 +9,7 @@
  *  3. 入队新的 AI 题解生成
  */
 import { withApi, ok, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
 import { isObjectId } from '@/lib/api/validation'
 import {
   deleteAiOfficialSolutionsForProblem,
@@ -18,7 +19,7 @@ import {
 import { logger } from '@/lib/logger'
 import { enqueueSolutionJob } from '@/lib/ai/solution-queue'
 
-export const POST = withApi.auth(async (_req, ctx, { user }) => {
+export const POST = withApi.auth(withPermission('admin.access')(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
 
@@ -65,4 +66,4 @@ export const POST = withApi.auth(async (_req, ctx, { user }) => {
   })
 
   return ok({ logId })
-})
+}))

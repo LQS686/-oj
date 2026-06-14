@@ -3,9 +3,11 @@
 /**
  * components/training/TrainingCard.tsx
  * 题单卡片（洛谷风格：编号+标题+作者+收藏+进度环）
+ *
+ * 视觉差异化：左侧分类色条 + 大标题 + 简洁内容区
  */
 import Link from 'next/link'
-import { User as UserIcon, Heart, Sparkles } from 'lucide-react'
+import { User as UserIcon, Heart, Sparkles, BookOpen, Trophy } from 'lucide-react'
 import { ProgressCircle } from './ProgressCircle'
 
 export interface TrainingCardData {
@@ -14,6 +16,7 @@ export interface TrainingCardData {
   title: string
   description?: string
   difficulty?: string | null
+  categoryType?: 'official' | 'contest' | null
   isRecommended?: boolean
   tags?: string[]
   cover?: string | null
@@ -35,28 +38,55 @@ interface TrainingCardProps {
   variant?: 'default' | 'compact'
 }
 
+/** 分类对应的色条/徽标 */
+const CATEGORY_STYLE: Record<string, { bar: string; badge: string; icon: typeof BookOpen; label: string }> = {
+  official: {
+    bar: 'bg-gradient-to-b from-blue-500 to-blue-600',
+    badge: 'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
+    icon: BookOpen,
+    label: '官方',
+  },
+  contest: {
+    bar: 'bg-gradient-to-b from-amber-500 to-orange-500',
+    badge: 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400',
+    icon: Trophy,
+    label: '竞赛',
+  },
+}
+
 export function TrainingCard({ training, variant = 'default' }: TrainingCardProps) {
   const progress = training.userProgress?.progressPercentage ?? 0
   const solved = training.userProgress?.solvedCount ?? 0
   const isJoined = training.userProgress?.isJoined ?? false
+  const cat = training.categoryType ? CATEGORY_STYLE[training.categoryType] : null
+  const CatIcon = cat?.icon
 
   return (
     <Link
       href={`/training/${training.id}`}
-      className="card p-5 group block hover:border-primary/50 transition-colors relative"
+      className="card-static group block relative overflow-hidden hover:border-primary/50 hover:shadow-md transition-all p-4 pl-5"
     >
-      <div className="flex items-start gap-4">
+      {/* 左侧分类色条 */}
+      {cat && <span className={`absolute left-0 top-0 bottom-0 w-1 ${cat.bar}`} />}
+
+      <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          {/* 编号 + 标题 */}
-          <div className="flex items-center gap-2 mb-1.5">
+          {/* 编号 + 推荐 + 分类徽标 */}
+          <div className="flex items-center gap-1.5 mb-2">
             {training.number !== undefined && (
-              <span className="text-xs font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+              <span className="text-xs font-mono text-muted-foreground">
                 #{training.number}
               </span>
             )}
             {training.isRecommended && (
-              <span className="text-warning inline-flex items-center gap-0.5">
-                <Sparkles className="w-3 h-3" />
+              <span className="text-warning inline-flex items-center" title="推荐">
+                <Sparkles className="w-3.5 h-3.5" />
+              </span>
+            )}
+            {cat && CatIcon && (
+              <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${cat.badge}`}>
+                <CatIcon className="w-3 h-3" />
+                {cat.label}
               </span>
             )}
             {variant === 'default' && training.tags && training.tags.length > 0 && (
@@ -65,7 +95,9 @@ export function TrainingCard({ training, variant = 'default' }: TrainingCardProp
               </span>
             )}
           </div>
-          <h3 className="text-base font-semibold text-foreground group-hover:text-primary-light transition-colors line-clamp-1 mb-2">
+
+          {/* 标题（更醒目） */}
+          <h3 className="text-lg font-bold text-foreground group-hover:text-primary-light transition-colors line-clamp-1 mb-2">
             {training.title}
           </h3>
 
@@ -87,6 +119,9 @@ export function TrainingCard({ training, variant = 'default' }: TrainingCardProp
                 {formatCount(training.joinCount)}
               </span>
             )}
+            <span className="text-muted-foreground/70">
+              · {training.problemCount} 题
+            </span>
           </div>
         </div>
 
@@ -100,7 +135,7 @@ export function TrainingCard({ training, variant = 'default' }: TrainingCardProp
 }
 
 /** 数字格式化：36135 -> 36.13k */
-function formatCount(n: number): string {
+function formatCount(n: number): number | string {
   if (n >= 10000) {
     return (n / 1000).toFixed(1) + 'k'
   }

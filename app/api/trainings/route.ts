@@ -38,16 +38,12 @@ export const GET = withApi.public(async (req) => {
     keyword: q.keyword,
     difficulty: q.difficulty,
     categoryId: q.categoryId,
+    categoryType: q.categoryType === 'official' || q.categoryType === 'contest'
+      ? q.categoryType
+      : undefined,
+    isRecommended: q.recommended === 'true' ? true : undefined,
     userId,
   })
-
-  // 客户端可叠加 recommended / categoryType 过滤
-  if (q.recommended === 'true') {
-    data.items = data.items.filter(t => t.isRecommended)
-  }
-  if (q.categoryType === 'official' || q.categoryType === 'contest') {
-    data.items = data.items.filter(t => t.categoryType === q.categoryType)
-  }
 
   return ok(data)
 })

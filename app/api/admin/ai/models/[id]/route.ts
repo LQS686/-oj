@@ -5,15 +5,17 @@
  * DELETE 删除模型
  */
 import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
 import { isObjectId } from '@/lib/api/validation'
+import { isSystemAdmin } from '@/lib/permissions'
 import { deleteAiModel, updateAiModel } from '@/lib/ai/service'
 
 /**
  * PUT /api/admin/ai/models/[id]
  */
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
@@ -46,13 +48,13 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 /**
  * DELETE /api/admin/ai/models/[id]
  */
-export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-    throw403('需要管理员权限')
+export const DELETE = withApi.auth(withPermission('admin.access')(async (_req, ctx, { user }) => {
+  if (!isSystemAdmin(user)) {
+    throw403('需要系统管理员权限')
   }
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   await deleteAiModel(id)
   return ok({})
-})
+}))

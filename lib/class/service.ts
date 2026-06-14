@@ -529,7 +529,7 @@ export async function assertClassAdmin(classId: string, userId: string, failMsg:
   const member = await prisma.classMember.findUnique({
     where: { classId_userId: { classId, userId } },
   })
-  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
+  if (!member || (member.role !== 'owner' && member.role !== 'assistant')) {
     throw new ApiError('FORBIDDEN', failMsg, 403)
   }
   return member
@@ -1997,17 +1997,17 @@ export async function ensureClassAccessible(
 
 /** 检查用户是否班级管理员 */
 export function isClassAdminRole(dbRole: string | undefined | null) {
-  return dbRole === 'owner' || dbRole === 'admin'
+  return dbRole === 'owner' || dbRole === 'assistant'
 }
 
-/** 检查当前用户是否可管理目标成员（owner / assistant 但 assistant 不能动 assistant） */
+/** 检查当前用户是否可管理目标成员（owner 可管所有；assistant 不能管 owner 和 assistant） */
 export function canManageMember(
   operatorRole: string | null | undefined,
   targetRole: string | null | undefined
 ) {
   if (!operatorRole) return false
   if (operatorRole === 'owner') return targetRole !== 'owner'
-  if (operatorRole === 'admin') return targetRole !== 'owner' && targetRole !== 'admin'
+  if (operatorRole === 'assistant') return targetRole !== 'owner' && targetRole !== 'assistant'
   return false
 }
 
@@ -2067,7 +2067,7 @@ export async function buildClassAssignmentDetail(
     .sort((a: any, b: any) => b.progress.solved - a.progress.solved)
 
   const userSubmissions = submissions.filter((s: any) => s.userId === viewerUserId)
-  const isAdminOrOwner = viewerRole === 'owner' || viewerRole === 'admin'
+  const isAdminOrOwner = viewerRole === 'owner' || viewerRole === 'assistant'
   const allSubmissions = isAdminOrOwner
     ? submissions.map((s: any) => ({
         id: s.id,
@@ -2204,7 +2204,7 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
   const classRecord = await prisma.class.findUnique({ where: { id: input.classId } })
   if (!classRecord) throw new ApiError('NOT_FOUND', '班级不存在', 404)
 
-  if (input.operatorRole !== 'owner' && input.operatorRole !== 'admin') {
+  if (input.operatorRole !== 'owner' && input.operatorRole !== 'assistant') {
     throw new ApiError('FORBIDDEN', '无权处理加入申请', 403)
   }
 

@@ -391,7 +391,7 @@ export default function ProblemTestCasesPage() {
                 <Database className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
                   测试数据管理
                   <span className="text-sm font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded">
                     {problemTitle}
@@ -436,14 +436,14 @@ export default function ProblemTestCasesPage() {
         </div>
 
         {error && (
-          <div className="bg-error/100/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-2">
+          <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
             {error}
           </div>
         )}
 
         {successMsg && (
-          <div className="bg-secondary/100/20 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg flex items-center gap-2">
+          <div className="bg-success/10 border border-success/30 text-success px-4 py-3 rounded-lg flex items-center gap-2">
             <CheckCircle className="w-5 h-5" />
             {successMsg}
           </div>
@@ -451,7 +451,7 @@ export default function ProblemTestCasesPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="card p-6">
-            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+            <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <Upload className="w-5 h-5 text-primary-light" />
               批量上传
             </h3>
@@ -481,7 +481,7 @@ export default function ProblemTestCasesPage() {
               </div>
             </div>
             {uploadResult && (
-              <div className={`mt-4 text-sm p-3 rounded-lg ${uploadResult.success ? 'bg-secondary/100/20 text-green-400' : 'bg-error/100/20 text-red-400'}`}>
+              <div className={`mt-4 text-sm p-3 rounded-lg border ${uploadResult.success ? 'bg-success/10 border-success/30 text-success' : 'bg-error/10 border-error/30 text-error'}`}>
                 {uploadResult.message}
                 {uploadResult.count !== undefined && ` (共 ${uploadResult.count} 个)`}
               </div>
@@ -489,7 +489,7 @@ export default function ProblemTestCasesPage() {
           </div>
 
           <div className="card p-6">
-            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+            <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-purple-400" />
               AI 智能生成
             </h3>
@@ -508,7 +508,7 @@ export default function ProblemTestCasesPage() {
 
         <div className="card overflow-hidden">
           <div className="p-4 border-b border-border flex justify-between items-center">
-            <h3 className="font-bold text-white">测试点列表</h3>
+            <h3 className="font-bold text-foreground">测试点列表</h3>
             <button
               onClick={handleAddTestCase}
               className="btn btn-ghost text-sm flex items-center gap-1"
@@ -529,7 +529,7 @@ export default function ProblemTestCasesPage() {
                   <div className="flex items-start gap-4">
                     <div className="w-12 pt-2 flex flex-col items-center gap-1">
                       <span className="text-xs font-bold text-muted-foreground uppercase">Case</span>
-                      <span className="text-lg font-bold text-white">{idx + 1}</span>
+                      <span className="text-lg font-bold text-foreground">{idx + 1}</span>
                     </div>
 
                     <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -585,7 +585,7 @@ export default function ProblemTestCasesPage() {
                       </div>
                       <button
                         onClick={() => handleRemoveTestCase(idx)}
-                        className="w-full py-1 text-xs text-red-400 hover:bg-error/100/20 rounded-lg transition-colors"
+                        className="w-full py-1 text-xs text-error hover:bg-error/10 rounded-lg transition-colors"
                       >
                         删除
                       </button>
@@ -601,7 +601,7 @@ export default function ProblemTestCasesPage() {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="card p-6 max-w-2xl w-full mx-4">
               <div className="flex justify-between items-center mb-6 border-b border-border pb-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-purple-400" />
                   AI 生成配置
                 </h3>
@@ -655,7 +655,7 @@ export default function ProblemTestCasesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    标程代码 <span className="text-red-400">*</span>
+                    标程代码 <span className="text-error">*</span>
                   </label>
                   <textarea
                     value={solutionCode}
@@ -690,7 +690,7 @@ export default function ProblemTestCasesPage() {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="card p-6 max-w-2xl w-full mx-4">
               <div className="flex justify-between items-center mb-6 border-b border-border pb-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-indigo-400" />
                   标程验证与输出纠正
                 </h3>
@@ -724,7 +724,7 @@ export default function ProblemTestCasesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    标程代码 <span className="text-red-400">*</span>
+                    标程代码 <span className="text-error">*</span>
                   </label>
                   <textarea
                     value={solutionCode}
@@ -769,7 +769,7 @@ export default function ProblemTestCasesPage() {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="card p-6 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
               <div className="flex justify-between items-center mb-4 border-b border-border pb-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
                   <Clock className="w-5 h-5 text-muted-foreground" />
                   验证日志
                 </h3>
@@ -788,9 +788,9 @@ export default function ProblemTestCasesPage() {
                 ) : (
                   <div className="space-y-4">
                     {logs.map(log => (
-                      <div key={log.id} className={`p-4 rounded-lg border ${log.status === 'SUCCESS' ? 'bg-secondary/100/10 border-green-500/20' : 'bg-error/100/10 border-red-500/20'}`}>
+                      <div key={log.id} className={`p-4 rounded-lg border ${log.status === 'SUCCESS' ? 'bg-success/10 border-success/30' : 'bg-error/10 border-error/30'}`}>
                         <div className="flex justify-between items-start mb-2">
-                          <span className={`text-sm font-bold ${log.status === 'SUCCESS' ? 'text-green-400' : 'text-red-400'}`}>
+                          <span className={`text-sm font-bold ${log.status === 'SUCCESS' ? 'text-success' : 'text-error'}`}>
                             {log.status === 'SUCCESS' ? '验证通过' : '验证失败'}
                           </span>
                           <span className="text-xs text-muted-foreground">

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { motion, easeOut } from 'framer-motion'
+import { usePermission } from '@/hooks/usePermission'
 
 interface Contest {
   id: string
@@ -126,6 +127,9 @@ export default function ContestsPage() {
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+
+  // 注意：usePermission 必须在所有 early return 之前调用（Rules of Hooks）
+  const canCreateContest = usePermission('contest.create')
 
   useEffect(() => {
     fetchContests()
@@ -248,13 +252,15 @@ export default function ContestsPage() {
               <p className="text-muted-foreground text-sm mt-1">参加竞赛，挑战自我</p>
             </div>
           </div>
-          <button 
-            onClick={handleCreateContest}
-            className="btn-primary btn px-6 py-3 rounded-2xl"
-          >
-            <Plus className="w-5 h-5" />
-            创建竞赛
-          </button>
+          {canCreateContest && (
+            <button
+              onClick={handleCreateContest}
+              className="btn-primary btn px-6 py-3 rounded-2xl"
+            >
+              <Plus className="w-5 h-5" />
+              创建竞赛
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 mb-10">
