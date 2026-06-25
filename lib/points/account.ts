@@ -110,7 +110,7 @@ export async function addPoints(
 ) {
   try {
     // 使用事务确保原子性
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // 1. 确保账户存在并更新积分
       // upsert: 如果存在则更新，不存在则创建
       await tx.pointsAccount.upsert({
@@ -171,7 +171,7 @@ export async function deductPoints(
   sourceId?: string
 ) {
   try {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // 1. 检查余额
       const account = await tx.pointsAccount.findUnique({
         where: {
@@ -239,7 +239,7 @@ export async function getClassPointsRanking(classId: string, limit: number = 10)
     })
 
     // 获取用户信息
-    const userIds = rankings.map(r => r.userId)
+    const userIds = rankings.map((r: any) => r.userId)
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
       select: {
@@ -250,9 +250,9 @@ export async function getClassPointsRanking(classId: string, limit: number = 10)
       }
     })
 
-    const userMap = new Map(users.map(u => [u.id, u]))
+    const userMap = new Map<any, any>(users.map((u: any) => [u.id, u]))
 
-    const result = rankings.map((rank, index) => {
+    const result = rankings.map((rank: any, index: any) => {
       const user = userMap.get(rank.userId)
       return {
         rank: index + 1,

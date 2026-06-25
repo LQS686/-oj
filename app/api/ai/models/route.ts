@@ -19,7 +19,7 @@ export const GET = withApi.public(async (req) => {
 
   if (user) {
     const all = await listUserAiPreferences(user.userId)
-    preferences = all.filter((p) => models.some((m) => m.id === p.modelId))
+    preferences = all.filter((p: any) => models.some((m: any) => m.id === p.modelId))
 
     // 优先：用户显式 default 且 model 仍存在
     const defaultPref = preferences.find((p) => p.isDefault)
@@ -27,7 +27,7 @@ export const GET = withApi.public(async (req) => {
       defaultModelId = defaultPref.modelId
     } else {
       // 其次：最后一次使用且 model 仍存在
-      const lastUsedValid = preferences.find((p) => models.some((m) => m.id === p.modelId))
+      const lastUsedValid = preferences.find((p: any) => models.some((m: any) => m.id === p.modelId))
       if (lastUsedValid) defaultModelId = lastUsedValid.modelId
     }
   }

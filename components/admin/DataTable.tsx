@@ -3,7 +3,7 @@
 import React, { useState, useMemo, ReactNode } from 'react'
 import { ChevronDown, ChevronUp, MoreHorizontal, Trash2 } from 'lucide-react'
 
-interface Column<T> {
+export interface Column<T> {
   key: keyof T
   label: string
   sortable?: boolean
@@ -11,7 +11,7 @@ interface Column<T> {
   render?: (value: any, row: T) => ReactNode
 }
 
-interface DataTableProps<T> {
+export interface DataTableProps<T> {
   data: T[]
   columns: Column<T>[]
   batchActions?: Array<{
@@ -37,6 +37,63 @@ interface SortConfig {
   direction: 'asc' | 'desc' | null
 }
 
+/**
+ * DataTable — reusable, generic table for admin list pages.
+ *
+ * Provides client-side sorting, row selection with batch actions,
+ * pagination, row-click navigation, a loading skeleton state, and an
+ * empty state. Built with design tokens (bg-card, text-foreground,
+ * border-border, bg-muted, text-muted-foreground) so it adapts to the
+ * light/dark theme automatically.
+ *
+ * @typeParam T - The row data type.
+ *
+ * @example
+ * ```tsx
+ * import { DataTable, type Column } from '@/components/admin'
+ *
+ * interface User { id: string; name: string; status: 'active' | 'banned' }
+ *
+ * const columns: Column<User>[] = [
+ *   { key: 'name', label: '用户名', sortable: true },
+ *   {
+ *     key: 'status',
+ *     label: '状态',
+ *     render: (value) => <span className="tag tag-primary">{value}</span>,
+ *   },
+ * ]
+ *
+ * <DataTable<User>
+ *   data={users}
+ *   columns={columns}
+ *   idKey="id"
+ *   loading={isLoading}
+ *   onRowClick={(row) => router.push(`/admin/users/${row.id}`)}
+ *   pagination={{ page, pageSize, total, onPageChange, onPageSizeChange }}
+ *   batchActions={[{ label: '删除', action: deleteUsers, danger: true }]}
+ * />
+ * ```
+ *
+ * `Column<T>`:
+ * - `key: keyof T` — field to read from each row. Supports dot paths (e.g. `'user.name'`).
+ * - `label: string` — header text.
+ * - `sortable?: boolean` — enables client-side sort on this column.
+ * - `className?: string` — extra classes applied to the column's `<th>` and `<td>`.
+ * - `render?: (value: any, row: T) => ReactNode` — custom cell renderer; use it for
+ *   badges, status tags, formatted dates, links, etc. Returns ReactNode so any JSX works.
+ *
+ * `DataTableProps<T>`:
+ * - `data: T[]` — rows to render.
+ * - `columns: Column<T>[]` — column definitions.
+ * - `batchActions?: Array<{ label: string; action: (selectedIds: string[]) => void; danger?: boolean }>`
+ *   — when provided, renders a selection checkbox column and an action bar shown when rows are selected.
+ * - `loading?: boolean` — when true, renders shimmer placeholder rows instead of data.
+ * - `emptyMessage?: string` — text shown when `data` is empty (default `'暂无数据'`).
+ * - `pagination?: { page: number; pageSize: number; total: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }`
+ *   — optional pagination footer.
+ * - `idKey: string` — name of the field that uniquely identifies a row (used for keys & selection).
+ * - `onRowClick?: (row: T) => void` — row click handler; typically used to navigate to a detail page.
+ */
 export default function DataTable<T>({
   data,
   columns,
@@ -93,8 +150,8 @@ export default function DataTable<T>({
       if (aValue === undefined || aValue === null) return 0
       if (bValue === undefined || bValue === null) return 0
       if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortConfig.direction === 'asc' 
-          ? aValue.localeCompare(bValue) 
+        return sortConfig.direction === 'asc'
+          ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue)
       }
       if (typeof aValue === 'number' && typeof bValue === 'number') {
@@ -106,23 +163,23 @@ export default function DataTable<T>({
 
   const renderHeader = () => (
     <thead>
-      <tr className="border-b border-white/10">
+      <tr className="border-b border-border">
         {batchActions && batchActions.length > 0 && (
-          <th className="px-6 py-3 w-4">
+          <th className="px-4 py-3 w-4">
             <input
               type="checkbox"
               checked={selectedRows.size === data.length && data.length > 0}
               onChange={handleSelectAll}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-primary focus:ring-primary/50"
+              className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary/50"
             />
           </th>
         )}
         {columns.map((column) => (
           <th
             key={String(column.key)}
-            className={`px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider ${column.className || ''}`}
+            className={`px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider ${column.className || ''}`}
           >
-            <div 
+            <div
               className={`flex items-center gap-1 ${column.sortable ? 'cursor-pointer select-none' : ''}`}
               onClick={column.sortable ? () => handleSort(String(column.key)) : undefined}
             >
@@ -140,7 +197,7 @@ export default function DataTable<T>({
           </th>
         ))}
         {batchActions && batchActions.length > 0 && (
-          <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+          <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
             操作
           </th>
         )}
@@ -150,16 +207,34 @@ export default function DataTable<T>({
 
   const renderBody = () => {
     if (loading) {
+      const skeletonRowCount = 5
+      const skeletonWidths = ['w-3/4', 'w-1/2', 'w-2/3', 'w-5/6', 'w-1/3']
       return (
-        <tbody>
-          <tr>
-            <td colSpan={columns.length + (batchActions ? 2 : 1)} className="px-6 py-20 text-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                <p className="text-slate-400">加载中...</p>
-              </div>
-            </td>
-          </tr>
+        <tbody className="divide-y divide-border">
+          {Array.from({ length: skeletonRowCount }).map((_, rowIdx) => (
+            <tr key={`skeleton-${rowIdx}`}>
+              {batchActions && batchActions.length > 0 && (
+                <td className="px-4 py-3">
+                  <div className="w-4 h-4 rounded bg-muted animate-pulse"></div>
+                </td>
+              )}
+              {columns.map((column, colIdx) => (
+                <td
+                  key={`skeleton-${rowIdx}-${String(column.key)}`}
+                  className={`px-4 py-3 ${column.className || ''}`}
+                >
+                  <div
+                    className={`h-4 rounded bg-muted animate-pulse ${skeletonWidths[(rowIdx + colIdx) % skeletonWidths.length]}`}
+                  ></div>
+                </td>
+              ))}
+              {batchActions && batchActions.length > 0 && (
+                <td className="px-4 py-3 text-right">
+                  <div className="w-8 h-4 rounded bg-muted animate-pulse ml-auto"></div>
+                </td>
+              )}
+            </tr>
+          ))}
         </tbody>
       )
     }
@@ -167,7 +242,7 @@ export default function DataTable<T>({
       return (
         <tbody>
           <tr>
-            <td colSpan={columns.length + (batchActions ? 2 : 1)} className="px-6 py-12 text-center text-slate-500">
+            <td colSpan={columns.length + (batchActions ? 2 : 1)} className="px-4 py-12 text-center text-muted-foreground">
               {emptyMessage}
             </td>
           </tr>
@@ -175,23 +250,23 @@ export default function DataTable<T>({
       )
     }
     return (
-      <tbody className="divide-y divide-white/5">
+      <tbody className="divide-y divide-border">
         {sortedData.map((row) => {
           const rowId = String(row[idKey as keyof T])
           const isSelected = selectedRows.has(rowId)
           return (
             <tr
               key={rowId}
-              className={`transition-colors hover:bg-white/5 ${onRowClick ? 'cursor-pointer' : ''}`}
+              className={`transition-colors hover:bg-muted ${onRowClick ? 'cursor-pointer' : ''}`}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >
               {batchActions && batchActions.length > 0 && (
-                <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
+                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={(e) => handleSelectRow(rowId, e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-primary focus:ring-primary/50"
+                    className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary/50"
                   />
                 </td>
               )}
@@ -200,18 +275,18 @@ export default function DataTable<T>({
                   ? column.key.split('.').reduce((acc: any, key: any) => acc?.[key], row)
                   : row[column.key as keyof T]
                 return (
-                  <td key={String(column.key)} className={`px-6 py-4 ${column.className || ''}`}>
+                  <td key={String(column.key)} className={`px-4 py-3 ${column.className || ''}`}>
                     {column.render ? column.render(value, row) : (
-                      <span className="text-slate-300">{String(value ?? '')}</span>
+                      <span className="text-foreground">{String(value ?? '')}</span>
                     )}
                   </td>
                 )
               })}
               {batchActions && batchActions.length > 0 && (
-                <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-2">
                     <button
-                      className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                      className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                       title="更多操作"
                     >
                       <MoreHorizontal className="w-4 h-4" />
@@ -231,8 +306,8 @@ export default function DataTable<T>({
     const { page, pageSize, total, onPageChange, onPageSizeChange } = pagination
     const totalPages = Math.ceil(total / pageSize)
     return (
-      <div className="px-4 md:px-6 py-4 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="text-sm text-slate-400">
+      <div className="px-4 md:px-6 py-4 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="text-sm text-muted-foreground">
           显示 {pageSize * (page - 1) + 1} 到 {Math.min(pageSize * page, total)} 共 {total} 条
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -254,7 +329,7 @@ export default function DataTable<T>({
             >
               <ChevronDown className="w-4 h-4 rotate-90" />
             </button>
-            <span className="px-3 text-sm text-slate-400">{page} / {totalPages || 1}</span>
+            <span className="px-3 text-sm text-muted-foreground">{page} / {totalPages || 1}</span>
             <button
               onClick={() => onPageChange(Math.min(totalPages, page + 1))}
               disabled={page === totalPages || totalPages === 0}
@@ -271,7 +346,7 @@ export default function DataTable<T>({
   return (
     <div className="card overflow-hidden">
       {batchActions && batchActions.length > 0 && selectedRows.size > 0 && (
-        <div className="px-4 md:px-6 py-3 border-b border-white/10 flex flex-wrap items-center gap-3 bg-primary/5">
+        <div className="px-4 md:px-6 py-3 border-b border-border flex flex-wrap items-center gap-3 bg-primary/5">
           <span className="text-sm text-primary-light font-medium">已选择 {selectedRows.size} 项</span>
           <div className="flex flex-wrap gap-2">
             {batchActions.map((action, index) => (
@@ -280,7 +355,7 @@ export default function DataTable<T>({
                 onClick={() => action.action(Array.from(selectedRows))}
                 className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
                   action.danger
-                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                    ? 'bg-error/20 text-error hover:bg-error/30'
                     : 'bg-primary/20 text-primary-light hover:bg-primary/30'
                 }`}
               >

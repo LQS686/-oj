@@ -3,51 +3,63 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, AlertCircle, Info, ArrowLeft } from 'lucide-react'
+import { Shield, AlertCircle, Info } from 'lucide-react'
 import type { ClassMember, ClassPermissions } from '@/types/models'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
+import { ClassWorkspaceShell, PageLoading } from '@/components/common'
+import { useClass } from '@/hooks/useClass'
 
 type Permissions = ClassPermissions
 
 const permissionDescriptions: Record<keyof Permissions, { title: string; description: string }> = {
   canViewProblems: {
     title: '查看题目',
-    description: '允许成员查看班级共享的题目'
+    description: '允许成员查看班级共享的题目',
   },
   canSubmit: {
     title: '提交代码',
-    description: '允许成员提交代码到题目'
+    description: '允许成员提交代码到题目',
   },
   canViewNotes: {
     title: '查看笔记',
-    description: '允许成员查看班级笔记'
+    description: '允许成员查看班级笔记',
   },
   canCreateNotes: {
     title: '创建笔记',
-    description: '允许成员创建和发布笔记'
+    description: '允许成员创建和发布笔记',
   },
   canManageAssignments: {
     title: '管理作业',
-    description: '允许成员创建、编辑和删除作业'
+    description: '允许成员创建、编辑和删除作业',
   },
   canInviteMembers: {
     title: '邀请成员',
-    description: '允许成员创建邀请码并邀请新成员'
+    description: '允许成员创建邀请码并邀请新成员',
   },
   canManageMembers: {
     title: '管理成员',
-    description: '允许成员管理其他成员的权限（仅管理员）'
+    description: '允许成员管理其他成员的权限（仅管理员）',
   },
   canViewStats: {
     title: '查看统计',
-    description: '允许成员查看班级统计数据'
-  }
+    description: '允许成员查看班级统计数据',
+  },
+}
+
+function roleLabel(role?: string) {
+  if (role === 'owner') return '所有者'
+  if (role === 'assistant') return '管理员'
+  return '普通成员'
 }
 
 export default function MemberPermissionsPage() {
   const params = useParams()
   const router = useRouter()
+  const classId = params.id as string
+  const memberId = params.memberId as string
+  const { classData } = useClass(classId)
+
   const [permissions, setPermissions] = useState<Permissions>({
     canViewProblems: true,
     canSubmit: true,
@@ -56,7 +68,7 @@ export default function MemberPermissionsPage() {
     canManageAssignments: false,
     canInviteMembers: false,
     canManageMembers: false,
-    canViewStats: false
+    canViewStats: false,
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -65,7 +77,7 @@ export default function MemberPermissionsPage() {
 
   useEffect(() => {
     fetchMemberInfo()
-  }, [])
+  }, [classId, memberId])
 
   const fetchMemberInfo = async () => {
     const token = localStorage.getItem('token')
@@ -75,12 +87,12 @@ export default function MemberPermissionsPage() {
     }
 
     try {
-      const response = await fetchWithAuth(`/api/classes/${params.id}`)
+      const response = await fetchWithAuth(`/api/classes/${classId}`)
 
       if (response.ok) {
         const data = await response.json()
-        const member = data.data.members?.find((m: ClassMember) => m.id === params.memberId)
-        
+        const member = data.data.members?.find((m: ClassMember) => m.id === memberId)
+
         if (member) {
           setMemberInfo(member)
           if (member.permissions) {
@@ -88,7 +100,9 @@ export default function MemberPermissionsPage() {
           }
         }
 
-        const currentMember = data.data.members?.find((m: ClassMember) => m.userId === data.data.currentUserId)
+        const currentMember = data.data.members?.find(
+          (m: ClassMember) => m.userId === data.data.currentUserId
+        )
         if (currentMember) {
           setCurrentUserRole(currentMember.role)
         }
@@ -104,9 +118,9 @@ export default function MemberPermissionsPage() {
   }
 
   const handleTogglePermission = (key: keyof Permissions) => {
-    setPermissions(prev => ({
+    setPermissions((prev) => ({
       ...prev,
-      [key]: !prev[key]
+      [key]: !prev[key],
     }))
   }
 
@@ -125,19 +139,17 @@ export default function MemberPermissionsPage() {
 
     try {
       const response = await fetchWithAuth(
-        `/api/classes/${params.id}/members/${params.memberId}/permissions`,
+        `/api/classes/${classId}/members/${memberId}/permissions`,
         {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ permissions })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ permissions }),
         }
       )
 
       if (response.ok) {
         alert('权限更新成功！')
-        router.push(`/classes/${params.id}/members`)
+        router.push(`/classes/${classId}/members`)
       } else {
         const data = await response.json()
         alert(data.error || '权限更新失败')
@@ -151,178 +163,134 @@ export default function MemberPermissionsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-6">
-            <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
-            <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-          </div>
-          <p className="text-muted-foreground text-lg">加载权限配置中...</p>
-        </div>
-      </div>
-    )
+    return <PageLoading label="加载权限配置中..." />
   }
 
   if (currentUserRole !== 'assistant' && currentUserRole !== 'owner') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center card-static rounded-2xl p-12 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8 text-error" />
-          </div>
-          <p className="text-error text-lg mb-6">权限不足</p>
-          <button
-            onClick={() => router.push(`/classes/${params.id}/members`)}
-            className="btn btn-primary"
-          >
+      <ClassWorkspaceShell
+        classId={classId}
+        className={classData?.name}
+        title="权限配置"
+        icon={Shield}
+      >
+        <div className="card-static rounded-lg p-8 text-center border border-border">
+          <AlertCircle className="w-10 h-10 text-error mx-auto mb-3" />
+          <p className="text-error mb-4">权限不足</p>
+          <Link href={`/classes/${classId}/members`} className="btn btn-primary">
             返回成员列表
-          </button>
+          </Link>
         </div>
-      </div>
+      </ClassWorkspaceShell>
     )
   }
 
   if (!memberInfo) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-error">成员不存在</p>
-      </div>
+      <ClassWorkspaceShell classId={classId} className={classData?.name} title="权限配置" icon={Shield}>
+        <p className="text-error text-center py-8">成员不存在</p>
+      </ClassWorkspaceShell>
     )
   }
 
+  const memberName = memberInfo.nickname || memberInfo.username
+
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center gap-2 text-sm mb-6">
-          <Link
-            href={`/classes/${params.id}`}
-            className="text-muted-foreground hover:text-primary-light transition-colors"
-          >
-            班级详情
-          </Link>
-          <span className="text-muted-foreground/50">/</span>
-          <Link
-            href={`/classes/${params.id}/members`}
-            className="text-muted-foreground hover:text-primary-light transition-colors"
-          >
-            成员管理
-          </Link>
-          <span className="text-muted-foreground/50">/</span>
-          <span className="text-foreground font-medium">权限配置</span>
-        </div>
-
-        <div className="card-static rounded-2xl p-6 mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30">
-              <Shield className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">配置成员权限</h1>
-              <p className="text-muted-foreground text-sm">
-                成员: {memberInfo.username || memberInfo.nickname}
-                {' · '}
-                角色: {memberInfo.role === 'owner' ? '所有者' : memberInfo.role === 'assistant' ? '管理员' : '普通成员'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass rounded-2xl p-4 mb-6 border border-primary/20">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Info className="w-5 h-5 text-primary-light" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">权限说明</h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• 所有者拥有所有权限，无法修改</li>
-                <li>• 管理员权限由所有者分配</li>
-                <li>• 修改权限后将立即生效</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div className="card-static rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">权限配置</h2>
-          </div>
-
-          <div className="divide-y divide-border">
-            {(Object.keys(permissionDescriptions) as Array<keyof Permissions>).map((key) => {
-              const permission = permissionDescriptions[key]
-              const isDisabled = memberInfo.role === 'owner' || 
-                               (memberInfo.role === 'assistant' && key === 'canManageMembers')
-
-              return (
-                <div key={key} className={`px-6 py-4 ${isDisabled ? 'bg-muted/30' : 'hover:bg-muted/30'} transition-colors`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-medium text-foreground">
-                          {permission.title}
-                        </h3>
-                        {isDisabled && (
-                          <span className="tag text-xs">
-                            {memberInfo.role === 'owner' ? '所有者默认拥有' : '管理员默认拥有'}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {permission.description}
-                      </p>
-                    </div>
-
-                    <div className="ml-4">
-                      <button
-                        onClick={() => handleTogglePermission(key)}
-                        disabled={isDisabled}
-                        className={`
-                          relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 
-                          transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background
-                          ${permissions[key] ? 'bg-primary' : 'bg-muted'}
-                          ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
-                        `}
-                      >
-                        <span
-                          className={`
-                            pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 
-                            transition duration-200 ease-in-out
-                            ${permissions[key] ? 'translate-x-5' : 'translate-x-0'}
-                          `}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-4">
-          <button
-            onClick={() => router.push(`/classes/${params.id}/members`)}
-            className="btn btn-ghost"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleSavePermissions}
-            disabled={saving || memberInfo.role === 'owner'}
-            className={`btn ${memberInfo.role === 'owner' ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'btn-primary'}`}
-          >
-            {saving ? '保存中...' : '保存权限'}
-          </button>
-        </div>
-
-        {memberInfo.role === 'owner' && (
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            所有者拥有所有权限，无法修改
-          </div>
-        )}
+    <ClassWorkspaceShell
+      classId={classId}
+      className={classData?.name}
+      title="配置成员权限"
+      description={`${memberName} · ${roleLabel(memberInfo.role)}`}
+      icon={Shield}
+      width="narrow"
+      actions={
+        <Link href={`/classes/${classId}/members`} className="btn btn-ghost btn-sm">
+          成员列表
+        </Link>
+      }
+    >
+      <div className="rounded-lg border border-border bg-muted/30 p-4 mb-4 flex gap-3">
+        <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+        <ul className="text-sm text-muted-foreground space-y-1">
+          <li>所有者拥有所有权限，无法修改</li>
+          <li>管理员权限由所有者分配</li>
+          <li>修改权限后将立即生效</li>
+        </ul>
       </div>
-    </div>
+
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">权限项</h2>
+        </div>
+
+        <div className="divide-y divide-border">
+          {(Object.keys(permissionDescriptions) as Array<keyof Permissions>).map((key) => {
+            const permission = permissionDescriptions[key]
+            const isDisabled =
+              memberInfo.role === 'owner' ||
+              (memberInfo.role === 'assistant' && key === 'canManageMembers')
+
+            return (
+              <div
+                key={key}
+                className={`px-4 py-3 flex items-center justify-between gap-4 ${
+                  isDisabled ? 'bg-muted/50' : 'hover:bg-muted'
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-medium text-foreground">{permission.title}</h3>
+                    {isDisabled && (
+                      <span className="tag text-xs">
+                        {memberInfo.role === 'owner' ? '所有者默认拥有' : '管理员默认拥有'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{permission.description}</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleTogglePermission(key)}
+                  disabled={isDisabled}
+                  className={`
+                    relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                    transition-colors focus:outline-none focus:ring-2 focus:ring-primary
+                    ${permissions[key] ? 'bg-primary' : 'bg-muted'}
+                    ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                >
+                  <span
+                    className={`
+                      pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow
+                      transition duration-200
+                      ${permissions[key] ? 'translate-x-5' : 'translate-x-0'}
+                    `}
+                  />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 flex justify-end gap-2">
+        <Link href={`/classes/${classId}/members`} className="btn btn-ghost">
+          取消
+        </Link>
+        <button
+          type="button"
+          onClick={handleSavePermissions}
+          disabled={saving || memberInfo.role === 'owner'}
+          className="btn btn-primary"
+        >
+          {saving ? '保存中...' : '保存权限'}
+        </button>
+      </div>
+
+      {memberInfo.role === 'owner' && (
+        <p className="mt-3 text-center text-sm text-muted-foreground">所有者拥有所有权限，无法修改</p>
+      )}
+    </ClassWorkspaceShell>
   )
 }

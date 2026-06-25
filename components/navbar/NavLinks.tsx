@@ -6,7 +6,6 @@ import {
   Trophy,
   Dumbbell,
   GraduationCap,
-  MessageSquare,
   BarChart3
 } from 'lucide-react'
 
@@ -24,12 +23,11 @@ export default function NavLinks() {
     { href: '/contests', label: '竞赛', icon: Trophy },
     { href: '/training', label: '训练', icon: Dumbbell },
     { href: '/classes', label: '班级', icon: GraduationCap },
-    { href: '/discuss', label: '社区', icon: MessageSquare },
     { href: '/rank', label: '排行榜', icon: BarChart3 },
   ]
 
   return (
-    <div className="hidden lg:flex items-center gap-1">
+    <div className="hidden lg:flex items-center gap-0.5">
       {navLinks.map((link) => {
         const Icon = link.icon
         const isActive = pathname === link.href
@@ -38,14 +36,8 @@ export default function NavLinks() {
             key={link.href}
             href={link.href}
             className={`nav-link ${isActive ? 'active' : ''}`}
-            onMouseEnter={(e) => {
-              e.currentTarget.classList.add('scale-105')
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.classList.remove('scale-105')
-            }}
           >
-            <Icon className="w-[18px] h-[18px] transition-transform duration-300 group-hover:rotate-3" />
+            <Icon className="w-4 h-4" />
             <span>{link.label}</span>
           </Link>
         )

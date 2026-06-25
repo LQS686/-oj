@@ -2,14 +2,14 @@ import React from 'react'
 import MarkdownContent from './MarkdownContent'
 
 interface MarkdownRendererProps {
-  content: string
+ content: string
 }
 
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  return (
-    <MarkdownContent 
-      content={content} 
-      preprocessContent={true}
-    />
-  )
+ return (
+ <MarkdownContent 
+ content={content} 
+ preprocessContent={true}
+ />
+ )
 }

@@ -36,7 +36,7 @@ export const GET = withApi.public(async (req, ctx) => {
     isPublic: p.isPublic,
     problemNumber: p.problemNumber,
     author: p.author,
-    testCases: p.testCases.map((tc) => ({
+    testCases: p.testCases.map((tc: any) => ({
       id: tc.id,
       input: tc.input,
       expectedOutput: tc.output,

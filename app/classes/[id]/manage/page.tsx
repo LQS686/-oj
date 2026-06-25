@@ -4,12 +4,17 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Settings, Users, Mail, ArrowLeft, ClipboardList, AlertCircle } from 'lucide-react'
+import { Settings, Users, Mail, ClipboardList, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
+import { ClassWorkspaceShell, PageLoading } from '@/components/common'
+import { useClass } from '@/hooks/useClass'
 
 export default function ClassManagePage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useUser()
+  const classId = params.id as string
+  const { classData } = useClass(classId)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
@@ -20,12 +25,11 @@ export default function ClassManagePage() {
       return
     }
     checkPermission()
-  }, [user, params.id])
+  }, [user, classId])
 
   const checkPermission = async () => {
     try {
-      const response = await fetchWithAuth(`/api/classes/${params.id}`)
-
+      const response = await fetchWithAuth(`/api/classes/${classId}`)
       const data = await response.json()
 
       if (!data.success) {
@@ -34,7 +38,7 @@ export default function ClassManagePage() {
         return
       }
 
-      const currentMember = data.data.members.find((m: any) => m.userId === user?.id)
+      const currentMember = data.data.members.find((m: { userId: string }) => m.userId === user?.id)
       if (!currentMember) {
         setError('您不是班级成员')
         setLoading(false)
@@ -47,7 +51,7 @@ export default function ClassManagePage() {
       if (!admin) {
         setError('只有管理员可以访问管理页面')
       }
-    } catch (err) {
+    } catch {
       setError('加载失败')
     } finally {
       setLoading(false)
@@ -55,114 +59,70 @@ export default function ClassManagePage() {
   }
 
   if (loading) {
+    return <PageLoading label="加载中..." />
+  }
+
+  if (error || !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-6">
-            <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
-            <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-          </div>
-          <p className="text-muted-foreground text-lg">加载中...</p>
+      <ClassWorkspaceShell
+        classId={classId}
+        className={classData?.name}
+        title="班级管理"
+        icon={Settings}
+      >
+        <div className="card-static rounded-lg p-8 text-center border border-border">
+          <AlertCircle className="w-10 h-10 text-error mx-auto mb-3" />
+          <p className="text-error mb-4">{error || '无权限'}</p>
+          <Link href={`/classes/${classId}`} className="btn btn-primary">
+            返回班级概览
+          </Link>
         </div>
-      </div>
+      </ClassWorkspaceShell>
     )
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center bg-white rounded-xl border border-border shadow-sm p-12 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-          </div>
-          <p className="text-red-500 text-lg mb-6">{error}</p>
-          <button
-            onClick={() => router.push(`/classes/${params.id}`)}
-            className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            返回班级详情
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const links = [
+    {
+      href: `/classes/${classId}/members`,
+      icon: Users,
+      title: '成员管理',
+      desc: '成员列表、权限与活动统计',
+    },
+    {
+      href: `/classes/${classId}/invites`,
+      icon: Mail,
+      title: '邀请管理',
+      desc: '邀请码与邀请链接',
+    },
+    {
+      href: `/classes/${classId}/requests`,
+      icon: ClipboardList,
+      title: '加入申请',
+      desc: '审批学生加入班级',
+    },
+  ]
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8">
-        <button
-          onClick={() => router.push(`/classes/${params.id}`)}
-          className="flex items-center gap-2 text-muted-foreground hover:text-primary-light mb-6 transition-colors group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          返回班级详情
-        </button>
-
-        <div className="bg-white rounded-xl border border-border shadow-sm p-8">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30">
-              <Settings className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">班级管理</h1>
-              <p className="text-muted-foreground text-sm">管理班级设置和内容</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <button
-              onClick={() => router.push(`/classes/${params.id}/members`)}
-              className="bg-white rounded-xl border border-border p-6 text-left group hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Users className="w-6 h-6 text-primary-light" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-foreground text-lg mb-1 group-hover:text-primary-light transition-colors">成员管理</div>
-                  <div className="text-sm text-muted-foreground">
-                    查看成员列表、管理权限、查看成员活动统计
-                  </div>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => router.push(`/classes/${params.id}/invites`)}
-              className="bg-white rounded-xl border border-border p-6 text-left group hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/15 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Mail className="w-6 h-6 text-purple-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-foreground text-lg mb-1 group-hover:text-purple-400 transition-colors">邀请管理</div>
-                  <div className="text-sm text-muted-foreground">
-                    创建邀请码、查看邀请记录、管理邀请链接
-                  </div>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => router.push(`/classes/${params.id}/requests`)}
-              className="bg-white rounded-xl border border-border p-6 text-left group hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-secondary/15 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <ClipboardList className="w-6 h-6 text-secondary-light" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-foreground text-lg mb-1 group-hover:text-secondary-light transition-colors">申请管理</div>
-                  <div className="text-sm text-muted-foreground">
-                    审批加入申请、查看申请记录、管理申请状态
-                  </div>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
+    <ClassWorkspaceShell
+      classId={classId}
+      className={classData?.name}
+      title="班级管理"
+      description="教学运营：成员、邀请与入班申请"
+      icon={Settings}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {links.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="card-static rounded-lg p-5 border border-border hover:border-primary transition-colors"
+          >
+            <item.icon className="w-6 h-6 text-primary mb-3" />
+            <h3 className="font-semibold text-foreground mb-1">{item.title}</h3>
+            <p className="text-sm text-muted-foreground">{item.desc}</p>
+          </Link>
+        ))}
       </div>
-    </div>
+    </ClassWorkspaceShell>
   )
 }

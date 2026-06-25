@@ -40,7 +40,7 @@ export const GET = withApi.auth(withPermission('admin.access')(async (_req, ctx)
     include: { permission: true },
     orderBy: { permission: { code: 'asc' } },
   })
-  const rolePermList = rolePermissions.map(rp => rp.permission)
+  const rolePermList = rolePermissions.map((rp: any) => rp.permission)
 
   // 用户级覆盖
   const userPermissions = await prisma.userPermission.findMany({
@@ -100,7 +100,7 @@ export const PUT = withApi.auth(withPermission('admin.access')(async (req, ctx) 
   }
 
   // 全量替换
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     await tx.userPermission.deleteMany({ where: { userId: id } })
     if (cleaned.length > 0) {
       await tx.userPermission.createMany({

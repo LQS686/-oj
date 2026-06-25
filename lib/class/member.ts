@@ -54,7 +54,7 @@ export async function listClassMembers(
     },
   })
 
-  let details = members.map(m => ({
+  let details = members.map((m: any) => ({
     id: m.id,
     userId: m.userId,
     username: m.user.username,
@@ -71,14 +71,14 @@ export async function listClassMembers(
   if (search) {
     const q = search.toLowerCase()
     details = details.filter(
-      m =>
+      (m: any) =>
         m.username?.toLowerCase().includes(q) ||
         (m.nickname && m.nickname.toLowerCase().includes(q)) ||
         (m.remark && m.remark.toLowerCase().includes(q))
     )
   }
 
-  details.sort((a, b) => {
+  details.sort((a: any, b: any) => {
     let av: any
     let bv: any
     switch (sortBy) {

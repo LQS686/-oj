@@ -158,8 +158,8 @@ export async function listSolutionsWithPermission(
     prisma.solution.count({ where }),
   ])
 
-  const likedSet = await getLikedSolutionIds(viewer?.id, items.map((it) => it.id))
-  const itemsWithLiked = items.map((it) => ({ ...it, isLiked: likedSet.has(it.id) }))
+  const likedSet = await getLikedSolutionIds(viewer?.id, items.map((it: any) => it.id))
+  const itemsWithLiked = items.map((it: any) => ({ ...it, isLiked: likedSet.has(it.id) }))
   return {
     found: true as const,
     allowed: true,

@@ -29,8 +29,8 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link 
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap" 
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
@@ -51,9 +51,8 @@ export default function RootLayout({
                     color: 'var(--foreground)',
                     border: '1px solid var(--border)',
                     borderRadius: 'var(--radius)',
-                    padding: '1rem',
-                    backdropFilter: 'blur(24px)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+                    padding: '0.75rem 1rem',
+                    boxShadow: 'var(--shadow-lg)',
                   },
                   success: {
                     iconTheme: {

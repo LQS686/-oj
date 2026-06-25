@@ -48,7 +48,7 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
   ])
 
   return ok({
-    items: items.map(t => ({
+    items: items.map((t: any) => ({
       id: t.id,
       title: t.title,
       description: t.description,

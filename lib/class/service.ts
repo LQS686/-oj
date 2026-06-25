@@ -70,7 +70,7 @@ export async function getClassDetail(classId: string): Promise<ClassDetailResult
     maxMembers: classData.maxMembers,
     ownerId: classData.ownerId,
     createdAt: classData.createdAt,
-    members: members.map((m) => ({
+    members: members.map((m: any) => ({
       id: m.id,
       userId: m.userId,
       username: m.user.username,
@@ -158,7 +158,7 @@ export async function listClasses(filter: ListClassesFilter = {}) {
   ])
 
   return {
-    classes: classes.map((c) => ({
+    classes: classes.map((c: any) => ({
       id: c.id,
       name: c.name,
       description: c.description,
@@ -288,27 +288,27 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
   ])
 
   const recentActivities = [
-    ...submissions.map((s) => ({
+    ...submissions.map((s: any) => ({
       type: 'submission',
       title: `提交了作业 "${s.assignment.title}"`,
       status: s.status,
       score: s.score,
       createdAt: s.submittedAt,
     })),
-    ...notes.map((n) => ({
+    ...notes.map((n: any) => ({
       type: 'note',
       title: `发布了笔记 "${n.title}"`,
       status: 'published',
       createdAt: n.createdAt,
     })),
-    ...points.map((p) => ({
+    ...points.map((p: any) => ({
       type: 'points',
       title: `获得了 ${p.amount} 积分: ${p.reason}`,
       status: 'earned',
       createdAt: p.createdAt,
     })),
   ]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 20)
 
   return {
@@ -364,7 +364,7 @@ export async function listClassAssignmentsWithStats(
 
   // 批量拉取创建者
   const creatorIds = Array.from(
-    new Set(assignments.map((a) => a.createdBy).filter(Boolean) as string[])
+    new Set(assignments.map((a: any) => a.createdBy).filter(Boolean) as string[])
   )
   let creatorMap = new Map<string, string>()
   if (creatorIds.length) {
@@ -372,11 +372,11 @@ export async function listClassAssignmentsWithStats(
       where: { id: { in: creatorIds } },
       select: { id: true, nickname: true, username: true },
     })
-    creatorMap = new Map(creators.map((u) => [u.id, u.nickname || u.username || '']))
+    creatorMap = new Map(creators.map((u: any) => [u.id, u.nickname || u.username || '']))
   }
 
   // 拉取所有作业的提交（一次查询）
-  const assignmentIds = assignments.map((a) => a.id)
+  const assignmentIds = assignments.map((a: any) => a.id)
   const allSubmissions =
     assignmentIds.length > 0
       ? await prisma.classAssignmentSubmission.findMany({
@@ -391,13 +391,13 @@ export async function listClassAssignmentsWithStats(
     submissionsByAssignment.set(s.assignmentId, list)
   }
 
-  const items = assignments.map((a) => {
+  const items = assignments.map((a: any) => {
     const submissions = submissionsByAssignment.get(a.id) || []
     const problemIds = a.problemIds || []
     const problemCount = problemIds.length
 
     const memberProblemScores = new Map<string, Map<string, number>>()
-    submissions.forEach((sub) => {
+    submissions.forEach((sub: any) => {
       let m = memberProblemScores.get(sub.userId)
       if (!m) {
         m = new Map()
@@ -569,7 +569,7 @@ export async function hasFullScoreOnProblem(
     select: { score: true },
   })
   if (submissions.length === 0) return false
-  const maxScore = Math.max(...submissions.map((s) => s.score || 0))
+  const maxScore = Math.max(...submissions.map((s: any) => s.score || 0))
   return maxScore === 100
 }
 
@@ -676,9 +676,9 @@ export async function computeAssignmentStatistics(
   const deadline = assignment.endTime ? new Date(assignment.endTime) : null
 
   const memberCompletionMap = new Map<string, Set<string>>()
-  members.forEach((m) => memberCompletionMap.set(m.userId, new Set()))
+  members.forEach((m: any) => memberCompletionMap.set(m.userId, new Set()))
 
-  submissions.forEach((sub) => {
+  submissions.forEach((sub: any) => {
     if (sub.status === 'AC' && memberCompletionMap.has(sub.userId)) {
       memberCompletionMap.get(sub.userId)!.add(sub.problemId)
     }
@@ -691,8 +691,8 @@ export async function computeAssignmentStatistics(
   // 平均分 / 正确率
   const memberScores = Array.from(memberCompletionMap.entries()).map(
     ([userId, solvedSet]) => {
-      const ms = submissions.filter((s) => s.userId === userId)
-      const totalScore = ms.reduce((sum, s) => {
+      const ms = submissions.filter((s: any) => s.userId === userId)
+      const totalScore = ms.reduce((sum: any, s: any) => {
         const isLate = s.isLate || (deadline ? s.submittedAt > deadline : false)
         return sum + (isLate ? 0 : s.score || 0)
       }, 0)
@@ -712,14 +712,14 @@ export async function computeAssignmentStatistics(
       : 0
 
   // 题目维度
-  const problemMap = new Map(problems.map((p) => [p.id, p]))
-  const problemStats = assignment.problemIds.map((problemId) => {
+  const problemMap = new Map<any, any>(problems.map((p: any) => [p.id, p]))
+  const problemStats = assignment.problemIds.map((problemId: any) => {
     const info = problemMap.get(problemId)
-    const ps = submissions.filter((s) => s.problemId === problemId)
-    const acs = ps.filter((s) => s.status === 'AC')
-    const uniqueUsers = new Set(ps.map((s) => s.userId))
-    const acUsers = new Set(acs.map((s) => s.userId))
-    const totalScore = ps.reduce((sum, s) => {
+    const ps = submissions.filter((s: any) => s.problemId === problemId)
+    const acs = ps.filter((s: any) => s.status === 'AC')
+    const uniqueUsers = new Set(ps.map((s: any) => s.userId))
+    const acUsers = new Set(acs.map((s: any) => s.userId))
+    const totalScore = ps.reduce((sum: any, s: any) => {
       const isLate = s.isLate || (deadline ? s.submittedAt > deadline : false)
       return sum + (isLate ? 0 : s.score || 0)
     }, 0)
@@ -738,30 +738,30 @@ export async function computeAssignmentStatistics(
   })
 
   // 成员维度
-  const memberStats = members.map((m) => {
+  const memberStats = members.map((m: any) => {
     const userId = m.userId
-    const us = submissions.filter((s) => s.userId === userId)
+    const us = submissions.filter((s: any) => s.userId === userId)
     const solved = memberCompletionMap.get(userId) || new Set()
-    const totalUserScore = us.reduce((sum, s) => {
+    const totalUserScore = us.reduce((sum: any, s: any) => {
       const isLate = s.isLate || (deadline ? s.submittedAt > deadline : false)
       return sum + (isLate ? 0 : s.score || 0)
     }, 0)
     const avgUserScore = us.length > 0 ? totalUserScore / us.length : 0
     const accuracy = totalProblems > 0 ? (solved.size / totalProblems) * 100 : 0
-    const lateSubmissions = us.filter((s) => {
+    const lateSubmissions = us.filter((s: any) => {
       return s.isLate || (deadline ? s.submittedAt > deadline : false)
     }).length
 
     const problemScores: { [k: string]: number | string } = {}
     const problemStatuses: { [k: string]: string } = {}
-    assignment.problemIds.forEach((problemId) => {
-      const ps = us.filter((s) => s.problemId === problemId)
+    assignment.problemIds.forEach((problemId: any) => {
+      const ps = us.filter((s: any) => s.problemId === problemId)
       if (ps.length > 0) {
-        const valid = ps.map((s) => {
+        const valid = ps.map((s: any) => {
           const isLate = s.isLate || (deadline ? s.submittedAt > deadline : false)
           return { score: isLate ? 0 : s.score || 0, status: s.status, isLate }
         })
-        const max = valid.reduce((m, c) => (c.score > m.score ? c : m))
+        const max = valid.reduce((m: any, c: any) => (c.score > m.score ? c : m))
         problemScores[problemId] = max.score
         problemStatuses[problemId] = max.status
       } else {
@@ -791,7 +791,7 @@ export async function computeAssignmentStatistics(
     }
   })
 
-  memberStats.sort((a, b) => {
+  memberStats.sort((a: any, b: any) => {
     if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore
     if (b.solved !== a.solved) return b.solved - a.solved
     return b.avgScore - a.avgScore
@@ -799,7 +799,7 @@ export async function computeAssignmentStatistics(
 
   // 提交趋势
   const trendMap = new Map<string, { date: string; count: number; acCount: number }>()
-  submissions.forEach((s) => {
+  submissions.forEach((s: any) => {
     const date = new Date(s.submittedAt).toISOString().split('T')[0]
     let row = trendMap.get(date)
     if (!row) {
@@ -862,8 +862,8 @@ export async function listAssignmentSubmissions(
   ])
 
   // 批量回填 user + problem 信息
-  const userIds = Array.from(new Set(submissions.map((s) => s.userId)))
-  const problemIds = Array.from(new Set(submissions.map((s) => s.problemId)))
+  const userIds = Array.from(new Set(submissions.map((s: any) => s.userId)))
+  const problemIds = Array.from(new Set(submissions.map((s: any) => s.problemId)))
   const [users, problems] = await Promise.all([
     userIds.length
       ? prisma.user.findMany({
@@ -878,10 +878,10 @@ export async function listAssignmentSubmissions(
         })
       : Promise.resolve([] as any[]),
   ])
-  const userMap = new Map(users.map((u) => [u.id, u]))
-  const problemMap = new Map(problems.map((p) => [p.id, p]))
+  const userMap = new Map<any, any>(users.map((u: any) => [u.id, u]))
+  const problemMap = new Map<any, any>(problems.map((p: any) => [p.id, p]))
 
-  const items = submissions.map((s) => {
+  const items = submissions.map((s: any) => {
     const u = userMap.get(s.userId)
     const p = problemMap.get(s.problemId)
     return {
@@ -983,7 +983,7 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
       language: input.language,
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
-      testCases: problem.testCases.map((tc) => ({
+      testCases: problem.testCases.map((tc: any) => ({
         id: tc.id,
         input: tc.input,
         output: tc.output,
@@ -1028,10 +1028,10 @@ export async function getMyAssignmentProgress(
   })
 
   const problemScores: { [k: string]: { score: number; submitted: boolean } } = {}
-  assignment.problemIds.forEach((problemId) => {
-    const ps = submissions.filter((s) => s.problemId === problemId)
+  assignment.problemIds.forEach((problemId: any) => {
+    const ps = submissions.filter((s: any) => s.problemId === problemId)
     if (ps.length > 0) {
-      const maxScore = Math.max(...ps.map((s) => s.score || 0))
+      const maxScore = Math.max(...ps.map((s: any) => s.score || 0))
       problemScores[problemId] = { score: maxScore, submitted: true }
     } else {
       problemScores[problemId] = { score: 0, submitted: false }
@@ -1079,7 +1079,7 @@ export async function listClassProblems(
   ])
 
   return {
-    problems: problems.map((p) => ({
+    problems: problems.map((p: any) => ({
       id: p.id,
       title: p.title,
       problemNumber: p.problemNumber,
@@ -1158,7 +1158,7 @@ export async function cloneProblemToClass(
       isPublic: false,
       authorId,
       testCases: {
-        create: source.testCases.map((tc, idx) => ({
+        create: source.testCases.map((tc: any, idx: any) => ({
           input: tc.input,
           output: tc.output,
           isSample: tc.isSample,
@@ -1243,7 +1243,7 @@ export async function listClassNotesPaged(classId: string, filter: ListClassNote
   ])
 
   return {
-    notes: notes.map((n) => ({
+    notes: notes.map((n: any) => ({
       id: n.id,
       title: n.title,
       content: n.content,
@@ -1317,16 +1317,16 @@ export async function listClassInvitesWithCreators(classId: string) {
     where: { classId },
     orderBy: { createdAt: 'desc' },
   })
-  const userIds = Array.from(new Set(invites.map((i) => i.createdBy)))
+  const userIds = Array.from(new Set(invites.map((i: any) => i.createdBy)))
   const users = userIds.length
     ? await prisma.user.findMany({
         where: { id: { in: userIds } },
         select: { id: true, username: true, nickname: true },
       })
     : []
-  const userMap = new Map(users.map((u) => [u.id, u]))
+  const userMap = new Map<any, any>(users.map((u: any) => [u.id, u]))
 
-  return invites.map((invite) => {
+  return invites.map((invite: any) => {
     const creator = userMap.get(invite.createdBy)
     const isExpired = invite.expiresAt && new Date(invite.expiresAt) < new Date()
     const isExhausted = invite.maxUses !== -1 && invite.usedCount >= invite.maxUses
@@ -1735,7 +1735,7 @@ export async function notifyAdminsAboutJoinRequest(
   const adminMembers = await prisma.classMember.findMany({
     where: { classId, role: { in: ['owner', 'assistant'] } },
   })
-  const notifications = adminMembers.map((member) => ({
+  const notifications = adminMembers.map((member: any) => ({
     userId: member.userId,
     type: 'class_join_request',
     title: '班级加入申请',
@@ -1756,7 +1756,7 @@ export async function listClassJoinRequestsDetailed(classId: string) {
       reviewer: { select: { id: true, username: true, nickname: true, avatar: true } },
     },
   })
-  return requests.map((r) => ({
+  return requests.map((r: any) => ({
     id: r.id,
     classId: r.classId,
     applicant: {
@@ -1862,7 +1862,7 @@ export async function computeClassStatistics(
         select: { userId: true, problemId: true },
         distinct: ['userId', 'problemId'],
       })
-      const totalSolved = new Set(submissions.map((s) => `${s.userId}-${s.problemId}`)).size
+      const totalSolved = new Set(submissions.map((s: any) => `${s.userId}-${s.problemId}`)).size
       const memberCount = await prisma.classMember.count({ where: { classId } })
       return {
         totalSolved,
@@ -1876,14 +1876,14 @@ export async function computeClassStatistics(
           select: { userId: true },
           distinct: ['userId'],
         })
-        .then((s) => s.length),
+        .then((s: any) => s.length),
       prisma.classAssignmentSubmission
         .findMany({
           where: { assignment: { classId }, submittedAt: { gte: thirtyDaysAgo } },
           select: { userId: true },
           distinct: ['userId'],
         })
-        .then((s) => s.length),
+        .then((s: any) => s.length),
     ]),
     (async () => {
       const assignments = await prisma.classAssignment.findMany({
@@ -1911,9 +1911,9 @@ export async function computeClassStatistics(
   >()
   const problemMap = new Map<string, string>()
   if (recentSubmissions.length > 0) {
-    const userIds = [...new Set(recentSubmissions.map((s) => s.userId))]
+    const userIds = [...new Set(recentSubmissions.map((s: any) => s.userId))]
     const problemIds = [
-      ...new Set(recentSubmissions.map((s) => s.problemId).filter(Boolean) as string[]),
+      ...new Set(recentSubmissions.map((s: any) => s.problemId).filter(Boolean) as string[]),
     ]
     const [users, problems] = await Promise.all([
       userIds.length > 0
@@ -1929,8 +1929,8 @@ export async function computeClassStatistics(
           })
         : Promise.resolve([] as any[]),
     ])
-    users.forEach((u) => userMap.set(u.id, u))
-    problems.forEach((p) => problemMap.set(p.id, p.title))
+    users.forEach((u: any) => userMap.set(u.id, u))
+    problems.forEach((p: any) => problemMap.set(p.id, p.title))
   }
 
   const roleBreakdown: Record<string, number> = {}
@@ -1955,7 +1955,7 @@ export async function computeClassStatistics(
       overdue: assignmentStats.overdue,
       completed: assignmentStats.completed,
     },
-    recentActivity: recentSubmissions.map((sub) => {
+    recentActivity: recentSubmissions.map((sub: any) => {
       const u = userMap.get(sub.userId)
       return {
         id: sub.id,
@@ -2104,7 +2104,7 @@ export async function buildClassAssignmentDetail(
       startTime: assignment.startTime,
       endTime: assignment.endTime,
       deadline: assignment.endTime,
-      problems: problems.map((p) => ({
+      problems: problems.map((p: any) => ({
         id: p.id,
         title: p.title,
         problemNumber: p.problemNumber || '',
@@ -2294,15 +2294,15 @@ export async function listAllClassesForAdmin() {
       _count: { select: { members: true, assignments: true, notes: true } },
     },
   })
-  const ownerIds = [...new Set(classes.map((t) => t.ownerId))]
+  const ownerIds = [...new Set(classes.map((t: any) => t.ownerId))]
   const owners = ownerIds.length
     ? await prisma.user.findMany({
         where: { id: { in: ownerIds } },
         select: { id: true, username: true },
       })
     : []
-  const ownerMap = new Map(owners.map((o) => [o.id, o.username]))
-  return classes.map((classData) => ({
+  const ownerMap = new Map<any, any>(owners.map((o: any) => [o.id, o.username]))
+  return classes.map((classData: any) => ({
     ...classData,
     owner: { username: ownerMap.get(classData.ownerId) || '未知用户' },
   }))

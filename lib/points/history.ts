@@ -72,7 +72,7 @@ export async function getPointsHistory(
     return {
       success: true,
       data: {
-        records: records.map(r => ({
+        records: records.map((r: any) => ({
           id: r.id,
           type: r.action, // mapping back to type expected by frontend?
           // Frontend might expect 'EARN'/'SPEND'.
@@ -156,7 +156,7 @@ export async function getClassPointsStats(classId: string) {
       _count: true
     })
 
-    const sourceStats = sourceStatsGroup.map(g => ({
+    const sourceStats = sourceStatsGroup.map((g: any) => ({
       sourceType: g.type,
       totalPoints: g._sum.amount || 0,
       count: g._count

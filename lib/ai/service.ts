@@ -218,7 +218,7 @@ export async function listActiveAiModelsForUser() {
     where: { isActive: true },
     orderBy: { name: 'asc' },
   })
-  const providerIds = Array.from(new Set(allModels.map((m) => m.providerId)))
+  const providerIds = Array.from(new Set(allModels.map((m: any) => m.providerId)))
   const providers =
     providerIds.length === 0
       ? []
@@ -226,10 +226,10 @@ export async function listActiveAiModelsForUser() {
           where: { id: { in: providerIds }, isActive: true },
           select: { id: true, name: true, slug: true },
         })
-  const providerMap = new Map(providers.map((p) => [p.id, p]))
+  const providerMap = new Map<any, any>(providers.map((p: any) => [p.id, p]))
   const models = allModels
-    .filter((m) => providerMap.has(m.providerId))
-    .map((m) => ({
+    .filter((m: any) => providerMap.has(m.providerId))
+    .map((m: any) => ({
       id: m.id,
       name: m.name,
       model: m.model,
@@ -310,7 +310,7 @@ export type ProviderWithMaskedKey = {
 /** 列出所有 AI 服务商（apiKey 脱敏） */
 export async function listAiProvidersForAdmin() {
   const providers = await prisma.aiProvider.findMany({ orderBy: { createdAt: 'desc' } })
-  return providers.map((p) => ({
+  return providers.map((p: any) => ({
     ...p,
     apiKey: p.apiKey ? maskApiKey(p.apiKey) : null,
   })) as ProviderWithMaskedKey[]
@@ -420,16 +420,16 @@ export async function listActiveAiModelsEnriched() {
   })
   if (allModels.length === 0) return { data: [], orphanCount: 0 }
 
-  const providerIds = Array.from(new Set(allModels.map((m) => m.providerId)))
+  const providerIds = Array.from(new Set(allModels.map((m: any) => m.providerId)))
   const providers = await prisma.aiProvider.findMany({
     where: { id: { in: providerIds }, isActive: true },
     select: { id: true, name: true, slug: true },
   })
-  const providerMap = new Map(providers.map((p) => [p.id, p]))
+  const providerMap = new Map<any, any>(providers.map((p: any) => [p.id, p]))
 
   const validModels = allModels
-    .filter((m) => providerMap.has(m.providerId))
-    .map((m) => ({ ...m, provider: providerMap.get(m.providerId) }))
+    .filter((m: any) => providerMap.has(m.providerId))
+    .map((m: any) => ({ ...m, provider: providerMap.get(m.providerId) }))
 
   const orphanCount = allModels.length - validModels.length
   if (orphanCount > 0) {

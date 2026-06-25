@@ -60,7 +60,7 @@ export async function listTrainings(
 ): Promise<{ items: any[]; total: number; page: number; pageSize: number }> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const where: Prisma.TrainingWhereInput = {}
+  const where: any = {}
   if (filter.keyword) {
     where.OR = [
       { title: { contains: filter.keyword, mode: 'insensitive' } },
@@ -90,11 +90,11 @@ export async function getTrainingById(id: string) {
   }, { ttl: TRAINING_DETAIL_TTL })
 }
 
-export async function createTraining(data: Prisma.TrainingCreateInput) {
+export async function createTraining(data: any) {
   return prisma.training.create({ data })
 }
 
-export async function updateTraining(id: string, data: Prisma.TrainingUpdateInput) {
+export async function updateTraining(id: string, data: any) {
   cache.delete(byIdKey(id))
   cache.deleteByPrefix('training:list:')
   return prisma.training.update({ where: { id }, data })
@@ -129,7 +129,7 @@ export async function listPublicTrainingsAdvanced(
 ): Promise<PaginatedResponse<TrainingListItem>> {
   // 公开题单：isPublic + published
   // 登录用户：额外可看到自己创建的私有/草稿题单（用于"我的题单"分类）
-  const baseScope: Prisma.TrainingWhereInput = filter.userId
+  const baseScope: any = filter.userId
     ? {
         OR: [
           { isPublic: true, status: 'published' },
@@ -137,7 +137,7 @@ export async function listPublicTrainingsAdvanced(
         ],
       }
     : { isPublic: true, status: 'published' }
-  const extra: Prisma.TrainingWhereInput[] = []
+  const extra: any[] = []
   if (filter.keyword) {
     extra.push({
       OR: [
@@ -160,7 +160,7 @@ export async function listPublicTrainingsAdvanced(
   if (filter.isRecommended === true) {
     extra.push({ isRecommended: true })
   }
-  const where: Prisma.TrainingWhereInput = extra.length > 0
+  const where: any = extra.length > 0
     ? { AND: [baseScope, ...extra] }
     : baseScope
 
@@ -182,30 +182,30 @@ export async function listPublicTrainingsAdvanced(
   // 批量拉取当前用户在这些题单上的进度
   let progressMap = new Map<string, { solvedCount: number; attemptedCount: number; isJoined: boolean }>()
   if (filter.userId && trainings.length > 0) {
-    const trainingIds = trainings.map(t => t.id)
+    const trainingIds = trainings.map((t: any) => t.id)
     const enrollments = await prisma.trainingEnrollment.findMany({
       where: { userId: filter.userId, trainingId: { in: trainingIds } },
       select: { trainingId: true },
     })
-    const enrolledSet = new Set(enrollments.map(e => e.trainingId))
+    const enrolledSet = new Set(enrollments.map((e: any) => e.trainingId))
 
     const allProblems = await prisma.trainingProblem.findMany({
       where: { trainingId: { in: trainingIds } },
       select: { id: true, trainingId: true, problemId: true },
     })
-    const problemIds = [...new Set(allProblems.map(p => p.problemId))]
+    const problemIds = [...new Set(allProblems.map((p: any) => p.problemId))]
     const submissions = problemIds.length > 0 ? await prisma.submission.findMany({
       where: { userId: filter.userId, problemId: { in: problemIds } },
       select: { problemId: true, status: true },
     }) : []
-    const acSet = new Set(submissions.filter(s => s.status === 'AC').map(s => s.problemId))
-    const attSet = new Set(submissions.map(s => s.problemId))
+    const acSet = new Set(submissions.filter((s: any) => s.status === 'AC').map((s: any) => s.problemId))
+    const attSet = new Set(submissions.map((s: any) => s.problemId))
 
     for (const t of trainings) {
-      const tProblems = allProblems.filter(p => p.trainingId === t.id)
+      const tProblems = allProblems.filter((p: any) => p.trainingId === t.id)
       const total = tProblems.length
-      const solvedCount = tProblems.filter(p => acSet.has(p.problemId)).length
-      const attemptedCount = tProblems.filter(p => attSet.has(p.problemId)).length
+      const solvedCount = tProblems.filter((p: any) => acSet.has(p.problemId)).length
+      const attemptedCount = tProblems.filter((p: any) => attSet.has(p.problemId)).length
       progressMap.set(t.id, {
         solvedCount,
         attemptedCount,
@@ -215,7 +215,7 @@ export async function listPublicTrainingsAdvanced(
     }
   }
 
-  const items: TrainingListItem[] = trainings.map(t => {
+  const items: TrainingListItem[] = trainings.map((t: any) => {
     const p = progressMap.get(t.id)
     const total = t._count.problems
     return {
@@ -272,7 +272,7 @@ export async function listRecommendedTrainings(limit = 3, userId: string | null 
         category: { select: { id: true, name: true } },
       },
     })
-    return trainings.map(t => ({
+    return trainings.map((t: any) => ({
       id: t.id,
       title: t.title,
       description: t.description,
@@ -296,7 +296,7 @@ export async function listCategories(): Promise<TrainingCategory[]> {
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       include: { _count: { select: { trainings: true } } },
     })
-    return items.map(c => ({
+    return items.map((c: any) => ({
       id: c.id,
       name: c.name,
       description: c.description,
@@ -409,7 +409,7 @@ export async function addTrainingProblems(
     select: { orderIndex: true },
   })
   let next = (existing[0]?.orderIndex ?? -1) + 1
-  const data = problems.map(p => ({
+  const data = problems.map((p: any) => ({
     trainingId,
     problemId: p.problemId,
     orderIndex: p.orderIndex ?? next++,
@@ -456,7 +456,7 @@ export async function updateTrainingProblemItem(
 ) {
   cache.delete(byIdKey(trainingId))
   await prisma.$transaction(
-    updates.map(u =>
+    updates.map((u: any) =>
       prisma.trainingProblem.update({
         where: { trainingId_problemId: { trainingId, problemId: u.problemId } },
         data: {
@@ -526,7 +526,7 @@ export async function getUserEnrollments(userId: string) {
         },
       },
     })
-    return enrollments.map(e => ({
+    return enrollments.map((e: any) => ({
       trainingId: e.trainingId,
       joinedAt: e.joinedAt,
       training: {
@@ -616,7 +616,7 @@ export async function getTrainingWithProblemStatuses(
     })
     isJoined = !!enrollment
 
-    const problemIds = training.problems.map(p => p.problemId)
+    const problemIds = training.problems.map((p: any) => p.problemId)
     if (problemIds.length > 0) {
       const submissions = await prisma.submission.findMany({
         where: { userId, problemId: { in: problemIds } },
@@ -634,7 +634,7 @@ export async function getTrainingWithProblemStatuses(
     }
   }
 
-  const problems: TrainingProblemItem[] = training.problems.map(p => {
+  const problems: TrainingProblemItem[] = training.problems.map((p: any) => {
     const st = problemStatuses[p.problemId]
     return {
       id: p.id,
@@ -650,8 +650,8 @@ export async function getTrainingWithProblemStatuses(
   })
 
   const totalProblems = problems.length
-  const solvedCount = problems.filter(p => p.status === 'AC').length
-  const attemptedCount = problems.filter(p => p.status === 'AC' || p.status === 'ATTEMPTED').length
+  const solvedCount = problems.filter((p: any) => p.status === 'AC').length
+  const attemptedCount = problems.filter((p: any) => p.status === 'AC' || p.status === 'ATTEMPTED').length
 
   return {
     id: training.id,
@@ -707,7 +707,7 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
 
   let problemStatuses: Record<string, TrainingProblemStatus> = {}
   if (userId) {
-    const problemIds = trainingProblems.map(p => p.problemId)
+    const problemIds = trainingProblems.map((p: any) => p.problemId)
     if (problemIds.length > 0) {
       const submissions = await prisma.submission.findMany({
         where: { userId, problemId: { in: problemIds } },
@@ -721,7 +721,7 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
     }
   }
 
-  const problems = trainingProblems.map(tp => ({
+  const problems = trainingProblems.map((tp: any) => ({
     ...tp.problem,
     orderIndex: tp.orderIndex,
     score: tp.score,
@@ -742,7 +742,7 @@ export async function getUserTrainingProgressDetail(
   })
   if (!training) return null
 
-  const problemIds = training.problems.map(p => p.problemId)
+  const problemIds = training.problems.map((p: any) => p.problemId)
   const totalProblems = problemIds.length
 
   const submissions = problemIds.length > 0 ? await prisma.submission.findMany({
@@ -793,7 +793,7 @@ export async function getUserTrainingProgressDetail(
       progressPercentage: totalProblems > 0 ? Math.round((solvedCount / totalProblems) * 100) : 0,
     },
     problemProgress,
-    recentSubmissions: recentSubmissions.map(s => ({
+    recentSubmissions: recentSubmissions.map((s: any) => ({
       id: s.id,
       problemId: s.problemId,
       status: s.status,

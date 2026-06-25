@@ -48,14 +48,14 @@ async function main() {
       emptyCount++
       continue
     }
-    const total = p.testCases.reduce((s, tc) => s + (tc.score || 0), 0)
+    const total = p.testCases.reduce((s: any, tc: any) => s + (tc.score || 0), 0)
     if (total === 100) {
       okCount++
       continue
     }
     toFixCount++
     const newCases = ensureTotalScoreIs100(
-      p.testCases.map((tc) => ({ id: tc.id, score: tc.score }))
+      p.testCases.map((tc: any) => ({ id: tc.id, score: tc.score }))
     )
     const newScores = newCases.map((tc: any) => tc.score)
     fixes.push({
@@ -100,7 +100,7 @@ async function main() {
     try {
       // 逐点 update（避免 createMany 触发校验）
       const newCases = ensureTotalScoreIs100(
-        (await prisma.testCase.findMany({ where: { problemId: f.problemId } })).map((tc) => ({
+        (await prisma.testCase.findMany({ where: { problemId: f.problemId } })).map((tc: any) => ({
           id: tc.id,
           score: tc.score
         }))
@@ -113,7 +113,7 @@ async function main() {
       }
       // 验证
       const updated = await prisma.testCase.findMany({ where: { problemId: f.problemId } })
-      const total = updated.reduce((s, tc) => s + (tc.score || 0), 0)
+      const total = updated.reduce((s: any, tc: any) => s + (tc.score || 0), 0)
       if (total === 100) {
         success++
         console.log(`  ✅ ${f.problemNumber} (new total: ${total})`)

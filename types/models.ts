@@ -132,41 +132,9 @@ export interface ContestProblem {
   isPublic: boolean
 }
 
-export interface Post {
-  id: string
-  title: string
-  content: string
-  authorId: string
-  categoryId: string | null
-  tags: string[]
-  views: number
-  likes: number
-  isPinned: boolean
-  isLocked: boolean
-  status: string
-  createdAt: string
-  updatedAt: string
-  author: {
-    id: string
-    username: string
-    nickname: string
-    rating: number
-    color: string
-    avatar?: string
-  }
-  category?: {
-    id: string
-    name: string
-  }
-  _count?: {
-    comments: number
-  }
-}
-
 export interface Comment {
   id: string
   content: string
-  postId: string | null
   solutionId: string | null
   authorId: string
   parentId: string | null

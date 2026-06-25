@@ -16,15 +16,15 @@ const Navbar = () => {
   }, [pathname])
 
   const isAdminRoute = pathname?.startsWith('/admin')
-  
+
   if (isAdminRoute) {
     return null
   }
 
   return (
-    <nav className="glass-strong fixed top-4 left-4 right-4 z-[100] rounded-2xl transition-all duration-300 hover:shadow-lg hover:shadow-primary/20">
-      <div className="container mx-auto px-5">
-        <div className="flex items-center justify-between h-16">
+    <nav className="fixed top-0 left-0 right-0 z-[100] border-b border-border bg-background-secondary">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-14">
           <Logo />
 
           <NavLinks />

@@ -78,7 +78,7 @@ export async function calculateScore(problemId: string, submissionOutputs: strin
   const testcases = await listTestcases(problemId)
   if (!testcases.length) return 0
   let total = 0
-  testcases.forEach((tc, idx) => {
+  testcases.forEach((tc: any, idx: any) => {
     if (submissionOutputs[idx]?.trim() === tc.output.trim()) {
       total += tc.score ?? 0
     }
@@ -100,7 +100,7 @@ export async function redistributeTestScores(problemId: string): Promise<void> {
     const totalScore = 100
     const baseScore = Math.floor(totalScore / testCases.length)
     const remainder = totalScore % testCases.length
-    const updates = testCases.map((tc, index) =>
+    const updates = testCases.map((tc: any, index: any) =>
       prisma.testCase.update({
         where: { id: tc.id },
         data: { score: baseScore + (index < remainder ? 1 : 0) },

@@ -383,7 +383,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   if (problemError || !problem) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center card-static rounded-2xl p-12 max-w-md">
+        <div className="text-center card-static rounded-lg p-12 max-w-md">
           <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
             <AlertCircle className="w-8 h-8 text-error" />
           </div>
@@ -453,24 +453,24 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
         <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <Timer className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+            <Timer className="w-4 h-4 transition-transform duration-300" />
             <span>时间限制: {problem.timeLimit}ms</span>
           </div>
           <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <MemoryStick className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+            <MemoryStick className="w-4 h-4 transition-transform duration-300" />
             <span>内存限制: {problem.memoryLimit}MB</span>
           </div>
           <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <CheckCircle2 className="w-4 h-4 text-green-400 group-hover:scale-110 transition-transform duration-300" />
+            <CheckCircle2 className="w-4 h-4 text-green-400 transition-transform duration-300" />
             <span>通过率 {acceptRate}%</span>
           </div>
           <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <FileCode className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+            <FileCode className="w-4 h-4 transition-transform duration-300" />
             <span>{problem.totalSubmit?.toLocaleString() || '0'} 提交</span>
           </div>
           {user && isConnected && (
             <div className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 transition-colors duration-300 group">
-              <Wifi className="w-3.5 h-3.5 group-hover:scale-110 transition-transform duration-300 animate-pulse-slow" />
+              <Wifi className="w-3.5 h-3.5 transition-transform duration-300" />
               <span>实时连接</span>
             </div>
           )}
@@ -507,7 +507,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {lastResult.status === 'AC' ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-400 animate-pulse-slow" />
+                  <CheckCircle2 className="w-5 h-5 text-green-400" />
                 ) : (
                   <XCircle className="w-5 h-5 text-red-400" />
                 )}
@@ -530,7 +530,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
           {/* 左栏：题面 / 题解 / 提交记录（原 tab + 内容） */}
-          <div className="card-static rounded-2xl overflow-hidden shadow-lg shadow-primary/5">
+          <div className="card-static rounded-lg overflow-hidden">
             <div className="flex border-b border-border overflow-x-auto">
               {[
                 { key: 'description', label: '题目描述', icon: BookOpen },
@@ -550,10 +550,10 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                           : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 transition-transform duration-300 ${activeTab === tab.key ? 'rotate-3' : 'group-hover:rotate-3'}`} />
+                      <Icon className={`w-4 h-4 transition-transform duration-300 ${activeTab === tab.key ? 'rotate-3' : ''}`} />
                       {tab.label}
                       {activeTab === tab.key && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full animate-gradient" />
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                       )}
                     </button>
                   )
@@ -588,8 +588,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
           {/* 右栏：提交代码（宽屏 sticky，窄屏堆叠在左栏下方） */}
           <div className="lg:sticky lg:top-4">
-            <div className="card-static rounded-2xl overflow-hidden shadow-lg shadow-primary/5">
-              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border bg-muted/30">
+            <div className="card-static rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border bg-muted">
                 <CodeIcon className="w-4 h-4 text-primary-light" />
                 <h3 className="font-medium text-foreground">提交代码</h3>
               </div>
@@ -659,11 +659,11 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
       {selectedSubmission && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fadeIn"
           onClick={() => setSelectedSubmission(null)}
         >
           <div 
-            className="card-static rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl shadow-primary/10 hover:shadow-primary/20 transition-all duration-300"
+            className="card-static rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl transition-all duration-300"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted">
@@ -677,17 +677,17 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                <div className="glass rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
                   <p className="text-xs text-muted-foreground mb-1">语言</p>
                   <p className="font-semibold text-foreground">{selectedSubmission.language}</p>
                 </div>
-                <div className="glass rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
                   <p className="text-xs text-muted-foreground mb-1">状态</p>
                   <span className={`font-medium ${getStatusColor(selectedSubmission.status)}`}>
                     {selectedSubmission.status}
                   </span>
                 </div>
-                <div className="glass rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
                   <p className="text-xs text-muted-foreground mb-1">得分</p>
                   <p className="font-semibold text-foreground">
                     {selectedSubmission.score}
@@ -698,11 +698,11 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     )}
                   </p>
                 </div>
-                <div className="glass rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
                   <p className="text-xs text-muted-foreground mb-1">耗时</p>
                   <p className="font-semibold text-foreground">{selectedSubmission.time}ms</p>
                 </div>
-                <div className="glass rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
                   <p className="text-xs text-muted-foreground mb-1">内存</p>
                   <p className="font-semibold text-foreground">
                     {selectedSubmission.memory > 0 
@@ -710,7 +710,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                       : '0MB'}
                   </p>
                 </div>
-                <div className="glass rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
                   <p className="text-xs text-muted-foreground mb-1">提交时间</p>
                   <p className="font-semibold text-foreground text-sm">
                     {new Date(selectedSubmission.submittedAt).toLocaleString('zh-CN')}

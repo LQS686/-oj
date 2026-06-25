@@ -48,18 +48,6 @@ export interface SubmissionWhereInput {
   contestId?: string
 }
 
-export interface PostWhereInput {
-  isDeleted?: boolean
-  status?: string
-  tags?: { has: string }
-  categoryId?: string
-  type?: string
-  OR?: Array<{
-    title?: { contains: string; mode: 'insensitive' }
-    content?: { contains: string; mode: 'insensitive' }
-  }>
-}
-
 export interface NotificationWhereInput {
   userId: string
   isRead?: boolean

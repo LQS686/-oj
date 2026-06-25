@@ -172,18 +172,18 @@ export async function listPublicContests(
 
   let registeredSet = new Set<string>()
   if (currentUserId) {
-    const ids = contests.map((c) => c.id)
+    const ids = contests.map((c: any) => c.id)
     if (ids.length > 0) {
       const participations = await prisma.contestParticipant.findMany({
         where: { userId: currentUserId, contestId: { in: ids } },
         select: { contestId: true },
       })
-      registeredSet = new Set(participations.map((p) => p.contestId))
+      registeredSet = new Set(participations.map((p: any) => p.contestId))
     }
   }
 
   return {
-    contests: contests.map((c) => ({
+    contests: contests.map((c: any) => ({
       ...c,
       isRegistered: registeredSet.has(c.id),
     })) as any,
@@ -353,7 +353,7 @@ export async function computeContestRankings(contestId: string) {
   const userStatsMap = new Map<string, ContestUserStats>()
 
   // 预填充
-  contest.participants.forEach((p) => {
+  contest.participants.forEach((p: any) => {
     userStatsMap.set(p.userId, {
       user: p.user,
       solved: 0,
@@ -363,7 +363,7 @@ export async function computeContestRankings(contestId: string) {
     })
   })
 
-  submissions.forEach((sub) => {
+  submissions.forEach((sub: any) => {
     if (!userStatsMap.has(sub.userId)) return
     const stats = userStatsMap.get(sub.userId)!
 
@@ -433,7 +433,7 @@ export async function computeContestRankings(contestId: string) {
   return {
     rankings: finalRankList,
     contestType: contest.type,
-    problems: contest.problems.map((cp) => ({
+    problems: contest.problems.map((cp: any) => ({
       id: cp.problem.id,
       title: cp.problem.title,
       problemNumber: cp.problem.problemNumber,
@@ -705,7 +705,7 @@ export async function listContestProblemsWithStatus(
     },
   })
 
-  const problemIds = contestProblems.map((cp) => cp.problemId)
+  const problemIds = contestProblems.map((cp: any) => cp.problemId)
   const userSubmissionStatus: Record<string, 'Accepted' | 'Attempted' | null> = {}
   const contestStats: Record<string, { accepted: number; submitted: number }> = {}
 
@@ -746,7 +746,7 @@ export async function listContestProblemsWithStatus(
     }),
   ])
 
-  const acceptedMap = new Map(acceptedSubmissions.map((s) => [s.problemId, s._count._all]))
+  const acceptedMap = new Map<any, any>(acceptedSubmissions.map((s: any) => [s.problemId, s._count._all]))
   for (const sub of contestSubmissions) {
     contestStats[sub.problemId] = {
       accepted: acceptedMap.get(sub.problemId) || 0,
@@ -754,7 +754,7 @@ export async function listContestProblemsWithStatus(
     }
   }
 
-  return contestProblems.map((cp) => {
+  return contestProblems.map((cp: any) => {
     const stats = contestStats[cp.problemId] || { accepted: 0, submitted: 0 }
     return {
       id: cp.problemId,

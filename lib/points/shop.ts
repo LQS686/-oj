@@ -51,7 +51,7 @@ export async function getShopItems(
     return {
       success: true,
       data: {
-        items: items.map(item => ({
+        items: items.map((item: any) => ({
           id: item.id,
           name: item.name,
           description: item.description,
@@ -182,7 +182,7 @@ export async function exchangeItem(
   deliveryInfo?: any
 ) {
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: any) => {
       // 1. 查询商品信息并锁定（乐观锁或直接检查）
       const item = await tx.pointsShopItem.findUnique({
         where: { id: itemId }
@@ -324,18 +324,18 @@ export async function getExchangeRecords(
     // 获取用户信息（如果是查询所有用户的记录）
     let userMap = new Map()
     if (!userId && records.length > 0) {
-      const userIds = [...new Set(records.map(r => r.userId))]
+      const userIds = [...new Set(records.map((r: any) => r.userId))]
       const users = await prisma.user.findMany({
         where: { id: { in: userIds } },
         select: { id: true, username: true, nickname: true }
       })
-      userMap = new Map(users.map(u => [u.id, u]))
+      userMap = new Map<any, any>(users.map((u: any) => [u.id, u]))
     }
 
     return {
       success: true,
       data: {
-        records: records.map(r => {
+        records: records.map((r: any) => {
           const user = userMap.get(r.userId)
           return {
             id: r.id,

@@ -10,128 +10,128 @@ export function getStatusConfig(status: string): StatusConfig {
   const configs: Record<string, StatusConfig> = {
     'AC': {
       icon: 'check-circle-2',
-      className: 'bg-secondary/15 text-secondary-light border-secondary/25',
-      iconBg: 'bg-secondary/20',
+      className: 'status-ac',
+      iconBg: 'bg-[var(--difficulty-easy-bg)]',
       text: 'Accepted',
-      color: 'text-secondary-light'
+      color: 'text-[var(--difficulty-easy)]'
     },
     'Accepted': {
       icon: 'check-circle-2',
-      className: 'bg-secondary/15 text-secondary-light border-secondary/25',
-      iconBg: 'bg-secondary/20',
+      className: 'status-ac',
+      iconBg: 'bg-[var(--difficulty-easy-bg)]',
       text: 'Accepted',
-      color: 'text-secondary-light'
+      color: 'text-[var(--difficulty-easy)]'
     },
     'WA': {
       icon: 'x-circle',
-      className: 'bg-error/15 text-error border-error/25',
-      iconBg: 'bg-error/20',
+      className: 'status-wa',
+      iconBg: 'bg-[var(--difficulty-hard-bg)]',
       text: 'Wrong Answer',
-      color: 'text-error'
+      color: 'text-[var(--difficulty-hard)]'
     },
     'Wrong Answer': {
       icon: 'x-circle',
-      className: 'bg-error/15 text-error border-error/25',
-      iconBg: 'bg-error/20',
+      className: 'status-wa',
+      iconBg: 'bg-[var(--difficulty-hard-bg)]',
       text: 'Wrong Answer',
-      color: 'text-error'
+      color: 'text-[var(--difficulty-hard)]'
     },
     'TLE': {
       icon: 'timer',
-      className: 'bg-accent/15 text-accent border-accent/25',
-      iconBg: 'bg-accent/20',
+      className: 'status-tle',
+      iconBg: 'bg-[var(--difficulty-medium-bg)]',
       text: 'Time Limit Exceeded',
-      color: 'text-accent'
+      color: 'text-[var(--difficulty-medium)]'
     },
     'Time Limit Exceeded': {
       icon: 'timer',
-      className: 'bg-accent/15 text-accent border-accent/25',
-      iconBg: 'bg-accent/20',
+      className: 'status-tle',
+      iconBg: 'bg-[var(--difficulty-medium-bg)]',
       text: 'Time Limit Exceeded',
-      color: 'text-accent'
+      color: 'text-[var(--difficulty-medium)]'
     },
     'MLE': {
       icon: 'alert-circle',
-      className: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
-      iconBg: 'bg-purple-500/20',
+      className: 'status-mle',
+      iconBg: 'bg-[var(--difficulty-expert-bg)]',
       text: 'Memory Limit Exceeded',
-      color: 'text-purple-400'
+      color: 'text-[var(--difficulty-expert)]'
     },
     'Memory Limit Exceeded': {
       icon: 'alert-circle',
-      className: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
-      iconBg: 'bg-purple-500/20',
+      className: 'status-mle',
+      iconBg: 'bg-[var(--difficulty-expert-bg)]',
       text: 'Memory Limit Exceeded',
-      color: 'text-purple-400'
+      color: 'text-[var(--difficulty-expert)]'
     },
     'RE': {
       icon: 'x-circle',
-      className: 'bg-error/15 text-error border-error/25',
-      iconBg: 'bg-error/20',
+      className: 'status-re',
+      iconBg: 'bg-[var(--difficulty-hard-bg)]',
       text: 'Runtime Error',
-      color: 'text-error'
+      color: 'text-[var(--difficulty-hard)]'
     },
     'Runtime Error': {
       icon: 'x-circle',
-      className: 'bg-error/15 text-error border-error/25',
-      iconBg: 'bg-error/20',
+      className: 'status-re',
+      iconBg: 'bg-[var(--difficulty-hard-bg)]',
       text: 'Runtime Error',
-      color: 'text-error'
+      color: 'text-[var(--difficulty-hard)]'
     },
     'CE': {
       icon: 'alert-circle',
-      className: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
-      iconBg: 'bg-purple-500/20',
+      className: 'status-ce',
+      iconBg: 'bg-[var(--difficulty-expert-bg)]',
       text: 'Compile Error',
-      color: 'text-purple-400'
+      color: 'text-[var(--difficulty-expert)]'
     },
     'Compile Error': {
       icon: 'alert-circle',
-      className: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
-      iconBg: 'bg-purple-500/20',
+      className: 'status-ce',
+      iconBg: 'bg-[var(--difficulty-expert-bg)]',
       text: 'Compile Error',
-      color: 'text-purple-400'
+      color: 'text-[var(--difficulty-expert)]'
     },
     'SE': {
       icon: 'alert-circle',
-      className: 'bg-muted/50 text-muted-foreground border-border',
+      className: 'bg-muted text-muted-foreground',
       iconBg: 'bg-muted',
       text: 'System Error',
       color: 'text-muted-foreground'
     },
     'System Error': {
       icon: 'alert-circle',
-      className: 'bg-muted/50 text-muted-foreground border-border',
+      className: 'bg-muted text-muted-foreground',
       iconBg: 'bg-muted',
       text: 'System Error',
       color: 'text-muted-foreground'
     },
     'Pending': {
       icon: 'loader-2',
-      className: 'bg-primary/15 text-primary-light border-primary/25',
-      iconBg: 'bg-primary/20',
+      className: 'status-pending',
+      iconBg: 'bg-primary-50',
       text: 'Pending',
-      color: 'text-primary-light'
+      color: 'text-primary'
     },
     'Judging': {
       icon: 'loader-2',
-      className: 'bg-primary/15 text-primary-light border-primary/25',
-      iconBg: 'bg-primary/20',
+      className: 'status-pending',
+      iconBg: 'bg-primary-50',
       text: 'Judging',
-      color: 'text-primary-light'
+      color: 'text-primary'
     },
     'Running': {
       icon: 'loader-2',
-      className: 'bg-primary/15 text-primary-light border-primary/25',
-      iconBg: 'bg-primary/20',
+      className: 'status-pending',
+      iconBg: 'bg-primary-50',
       text: 'Running',
-      color: 'text-primary-light'
+      color: 'text-primary'
     }
   }
 
   return configs[status] || {
     icon: 'alert-circle',
-    className: 'bg-muted/50 text-muted-foreground border-border',
+    className: 'bg-muted text-muted-foreground',
     iconBg: 'bg-muted',
     text: status,
     color: 'text-muted-foreground'
@@ -147,24 +147,28 @@ export function getStatusText(status: string): string {
 }
 
 export function getDifficultyColor(difficulty: string): string {
-  const colorMap: Record<string, string> = {
-    '入门': 'bg-muted/50 text-muted-foreground border border-border',
-    '普及-': 'bg-secondary/15 text-secondary-light border border-secondary/25',
-    '普及': 'bg-info/15 text-cyan-400 border border-info/25',
-    '普及+': 'bg-accent/15 text-accent-light border border-accent/25',
-    '提高': 'bg-accent/15 text-accent-light border border-accent/25',
-    '提高+': 'bg-error/15 text-red-400 border border-error/25',
-    '省选': 'bg-error/15 text-red-400 border border-error/25',
-    'NOI': 'bg-purple-500/15 text-purple-400 border border-purple-500/25',
-    '简单': 'bg-secondary/15 text-secondary-light border border-secondary/25',
-    '中等': 'bg-accent/15 text-accent-light border border-accent/25',
-    '困难': 'bg-error/15 text-red-400 border border-error/25',
-    'easy': 'bg-secondary/15 text-secondary-light border border-secondary/25',
-    'medium': 'bg-accent/15 text-accent-light border border-accent/25',
-    'hard': 'bg-error/15 text-red-400 border border-error/25',
-    'Easy': 'bg-secondary/15 text-secondary-light border border-secondary/25',
-    'Medium': 'bg-accent/15 text-accent-light border border-accent/25',
-    'Hard': 'bg-error/15 text-red-400 border border-error/25'
+  const classMap: Record<string, string> = {
+    '入门': 'difficulty-easy',
+    '普及-': 'difficulty-medium-easy',
+    '普及': 'difficulty-medium-easy',
+    '普及+': 'difficulty-medium',
+    '提高': 'difficulty-medium',
+    '提高+': 'difficulty-medium-hard',
+    '省选': 'difficulty-hard',
+    'NOI': 'difficulty-expert',
+    '简单': 'difficulty-easy',
+    '中等': 'difficulty-medium',
+    '困难': 'difficulty-hard',
+    'easy': 'difficulty-easy',
+    'Easy': 'difficulty-easy',
+    'medium': 'difficulty-medium',
+    'Medium': 'difficulty-medium',
+    'hard': 'difficulty-hard',
+    'Hard': 'difficulty-hard'
   }
-  return colorMap[difficulty] || 'bg-muted/50 text-muted-foreground border border-border'
+  return classMap[difficulty] || 'difficulty-easy'
+}
+
+export function getDifficultyClass(difficulty: string): string {
+  return getDifficultyColor(difficulty)
 }

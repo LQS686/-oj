@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Users, Search, Plus, Calendar, TrendingUp, X, ChevronLeft, ChevronRight, Globe, Lock } from 'lucide-react'
+import { Users, Search, Plus, Calendar, TrendingUp, X, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useRouter } from 'next/navigation'
+import { EducationalPageShell, PageLoading } from '@/components/common'
 
 interface Class {
   id: string
@@ -49,7 +50,7 @@ export default function ClassesPage() {
       }
       const params = new URLSearchParams({
         page: page.toString(),
-        pageSize: '12'
+        pageSize: '24'
       })
       
       if (searchQuery) params.append('search', searchQuery)
@@ -153,44 +154,25 @@ export default function ClassesPage() {
   }
 
   if (initialLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-6">
-            <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
-            <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-          </div>
-          <p className="text-muted-foreground text-lg">加载班级中...</p>
-        </div>
-      </div>
-    )
+    return <PageLoading label="加载班级中..." />
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30">
-              <Users className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">班级</h1>
-              <p className="text-muted-foreground text-sm mt-0.5">加入班级，与伙伴一起学习和进步</p>
-            </div>
-          </div>
-          {user && (
-            <Link
-              href="/classes/create"
-              className="btn btn-primary"
-            >
-              <Plus className="w-5 h-5" />
-              创建班级
-            </Link>
-          )}
-        </div>
-
-        <div className="rounded-2xl p-6 bg-white dark:bg-card shadow-lg border border-border mb-8">
+    <>
+    <EducationalPageShell
+      title="班级"
+      description="加入班级，与伙伴一起学习和进步"
+      icon={Users}
+      actions={
+        user ? (
+          <Link href="/classes/create" className="btn btn-primary">
+            <Plus className="w-5 h-5" />
+            创建班级
+          </Link>
+        ) : undefined
+      }
+      toolbar={
+        <div className="card-static rounded-lg p-4 border border-border">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <div className="flex-1 relative min-w-[200px]">
               <div className="relative">
@@ -213,8 +195,8 @@ export default function ClassesPage() {
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     showMyClasses
-                      ? 'bg-primary text-white shadow-md shadow-primary/30'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
+                      ? 'bg-primary text-white shadow-md'
+                      : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
                   }`}
                 >
                   我的班级
@@ -226,8 +208,8 @@ export default function ClassesPage() {
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     !showMyClasses
-                      ? 'bg-primary text-white shadow-md shadow-primary/30'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
+                      ? 'bg-primary text-white shadow-md'
+                      : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
                   }`}
                 >
                   所有班级
@@ -236,10 +218,11 @@ export default function ClassesPage() {
             )}
           </div>
         </div>
-
+      }
+    >
         {classes.length === 0 ? (
-          <div className="rounded-2xl p-16 text-center bg-white dark:bg-card shadow-lg border border-border">
-            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
+          <div className="card-static rounded-lg p-16 text-center border border-border">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
               <Users className="w-8 h-8 text-muted-foreground" />
             </div>
             <div className="text-foreground text-xl font-semibold mb-2">
@@ -249,7 +232,7 @@ export default function ClassesPage() {
               {showMyClasses ? '加入一个班级开始协作学习吧' : '成为第一个创建班级的人'}
             </div>
             {user && !showMyClasses && (
-              <Link href="/classes/create" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-white font-medium shadow-md shadow-primary/30 hover:shadow-lg hover:shadow-primary/40 transition-all">
+              <Link href="/classes/create" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all">
                 <Plus className="w-5 h-5" />
                 创建第一个班级
               </Link>
@@ -262,7 +245,7 @@ export default function ClassesPage() {
                 <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
               {classes.map((classData) => (
                 <ClassCard key={classData.id} classData={classData} onClassClick={handleClassClick} />
               ))}
@@ -270,7 +253,7 @@ export default function ClassesPage() {
 
             {totalPages > 1 && (
               <div className="flex justify-center">
-                <div className="flex items-center gap-2 glass-strong rounded-xl p-2">
+                <div className="flex items-center gap-2 card-static rounded-xl p-2">
                   <button
                     onClick={() => setPage(page - 1)}
                     disabled={page === 1}
@@ -287,7 +270,7 @@ export default function ClassesPage() {
                           onClick={() => setPage(pageNum)}
                           className={`w-10 h-10 rounded-lg font-semibold transition-all ${
                             page === pageNum
-                              ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                              ? 'bg-primary text-white shadow-lg'
                               : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
                           }`}
                         >
@@ -302,7 +285,7 @@ export default function ClassesPage() {
                           onClick={() => setPage(totalPages)}
                           className={`w-10 h-10 rounded-lg font-semibold transition-all ${
                             page === totalPages
-                              ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                              ? 'bg-primary text-white shadow-lg'
                               : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
                           }`}
                         >
@@ -323,7 +306,7 @@ export default function ClassesPage() {
             )}
           </>
         )}
-      </div>
+    </EducationalPageShell>
 
       {showClassModal && selectedClass && (
         <ClassDetailModal
@@ -333,7 +316,7 @@ export default function ClassesPage() {
           router={router}
         />
       )}
-    </div>
+    </>
   )
 }
 
@@ -383,8 +366,8 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="glass-strong rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="card-static rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h3 className="text-lg font-semibold text-foreground">班级详情</h3>
           <button
@@ -404,7 +387,7 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
                 className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20"
               />
             ) : (
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/30">
+              <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg">
                 <Users className="w-10 h-10 text-white" />
               </div>
             )}
@@ -514,73 +497,60 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
   )
 }
 
-function ClassCard({ classData, onClassClick }: { classData: Class, onClassClick: (classData: Class) => void }) {
-  const memberPercentage = Math.round((classData.memberCount / classData.maxMembers) * 100)
-
+function ClassCard({
+  classData,
+  onClassClick,
+}: {
+  classData: Class
+  onClassClick: (classData: Class) => void
+}) {
   return (
-    <div
-      onClick={() => onClassClick(classData)}
-      className="bg-white dark:bg-card rounded-xl shadow-md border border-border overflow-hidden cursor-pointer group hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+    <Link
+      href={`/classes/${classData.id}`}
+      onClick={(e) => {
+        e.preventDefault()
+        onClassClick(classData)
+      }}
+      className="card-static rounded-xl p-5 block hover:border-primary/30 transition-colors h-full group cursor-pointer"
     >
-      <div className="p-6">
-        <div className="flex items-center gap-4 mb-4">
-          {classData.avatar ? (
-            <img
-              src={classData.avatar}
-              alt={classData.name}
-              className="w-16 h-16 rounded-full object-cover ring-2 ring-primary/20 shadow-sm"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/30">
-              <Users className="w-8 h-8 text-white" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-lg text-foreground mb-1 group-hover:text-primary-light transition-colors truncate">
-              {classData.name}
-            </h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Users className="w-4 h-4 text-primary-light" />
-              <span>{classData.memberCount} / {classData.maxMembers} 成员</span>
-            </div>
+      <div className="flex items-center justify-between mb-3">
+        {classData.avatar ? (
+          <img
+            src={classData.avatar}
+            alt={classData.name}
+            className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20 shrink-0"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5 text-primary-foreground" />
           </div>
-        </div>
-
-        <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
-          {classData.description || '暂无描述'}
-        </p>
-
-        <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-primary-light" />
-            <span>{new Date(classData.createdAt).toLocaleDateString()}</span>
-          </div>
-          {classData.isPublic ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-secondary/20 text-secondary">
-              <Globe className="w-3 h-3" />
-              公开
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-accent/20 text-accent">
-              <Lock className="w-3 h-3" />
-              私有
-            </span>
-          )}
-        </div>
-
-        <div className="pt-4 border-t border-border">
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span>成员进度</span>
-            <span className="font-medium text-primary-light">{memberPercentage}%</span>
-          </div>
-          <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-primary to-secondary h-2 rounded-full transition-all duration-500"
-              style={{ width: `${memberPercentage}%` }}
-            />
-          </div>
-        </div>
+        )}
+        {classData.isPublic ? (
+          <Globe className="w-4 h-4 text-secondary shrink-0" title="公开" />
+        ) : (
+          <Lock className="w-4 h-4 text-accent shrink-0" title="私密" />
+        )}
       </div>
-    </div>
+      <h3 className="text-sm font-semibold text-foreground line-clamp-2 mb-1 group-hover:text-primary-light transition-colors">
+        {classData.name}
+      </h3>
+      <p className="text-xs text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem]">
+        {classData.description || '暂无描述'}
+      </p>
+      <div className="space-y-1.5 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <Users className="w-3.5 h-3.5 shrink-0" />
+          {classData.memberCount}/{classData.maxMembers} 成员
+        </span>
+        <span className="flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5 shrink-0" />
+          {classData.stats?.assignmentCount ?? 0} 作业
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 shrink-0" />
+          {new Date(classData.createdAt).toLocaleDateString('zh-CN')}
+        </span>
+      </div>
+    </Link>
   )
 }

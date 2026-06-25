@@ -7,18 +7,15 @@ export default function Logo() {
   const { settings } = useSettings()
 
   return (
-    <Link href="/" className="flex items-center gap-3 group">
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-300 rounded-xl animate-pulse-slow"></div>
-        <div className="relative w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform duration-300">
-          <Code2 className="w-5 h-5 text-white" />
-        </div>
+    <Link href="/" className="flex items-center gap-2.5 group">
+      <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+        <Code2 className="w-4 h-4 text-white" />
       </div>
       <div className="hidden sm:flex flex-col">
-        <span className="text-lg font-bold text-foreground tracking-tight group-hover:text-primary-light transition-colors duration-300">
+        <span className="text-sm font-bold text-foreground tracking-tight group-hover:text-primary transition-colors">
           {settings.siteName}
         </span>
-        <span className="text-[10px] text-muted-foreground -mt-0.5 group-hover:text-primary/70 transition-colors duration-300">
+        <span className="text-[10px] text-muted-foreground -mt-0.5">
           {settings.siteDescription}
         </span>
       </div>

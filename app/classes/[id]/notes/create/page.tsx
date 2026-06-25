@@ -4,12 +4,17 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
-import { FileText, Tag, AlertCircle, ArrowLeft } from 'lucide-react'
+import { FileText, Tag, AlertCircle } from 'lucide-react'
+import { ClassWorkspaceShell } from '@/components/common'
+import { useClass } from '@/hooks/useClass'
 
 export default function CreateNotePage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useUser()
+  const classId = params.id as string
+  const { classData } = useClass(classId)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -18,7 +23,7 @@ export default function CreateNotePage() {
     title: '',
     content: '',
     category: 'General',
-    tags: ''
+    tags: '',
   })
 
   const categories = [
@@ -29,13 +34,12 @@ export default function CreateNotePage() {
     '图论',
     '字符串',
     '数学',
-    '其他'
+    '其他',
   ]
 
   useEffect(() => {
     if (!user) {
       router.push('/login')
-      return
     }
   }, [user, router])
 
@@ -57,17 +61,18 @@ export default function CreateNotePage() {
     try {
       setLoading(true)
 
-      const response = await fetchWithAuth(`/api/classes/${params.id}/notes`, {
+      const response = await fetchWithAuth(`/api/classes/${classId}/notes`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: formData.title,
           content: formData.content,
           category: formData.category,
-          tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean)
-        })
+          tags: formData.tags
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+        }),
       })
 
       const data = await response.json()
@@ -75,12 +80,12 @@ export default function CreateNotePage() {
       if (data.success) {
         setSuccess('笔记创建成功')
         setTimeout(() => {
-          router.push(`/classes/${params.id}`)
-        }, 1500)
+          router.push(`/classes/${classId}/notes`)
+        }, 1200)
       } else {
         setError(data.error || '创建失败')
       }
-    } catch (err) {
+    } catch {
       setError('创建失败，请重试')
     } finally {
       setLoading(false)
@@ -88,164 +93,130 @@ export default function CreateNotePage() {
   }
 
   return (
-    <div className="min-h-screen py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回
-        </button>
-
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">创建班级笔记</h1>
-          <p className="mt-1 text-muted-foreground">分享学习心得和解题思路</p>
-        </div>
-
-        <div className="card">
-          <div className="p-6">
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    笔记标题 <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="例如：二分查找算法总结"
-                    maxLength={100}
-                    className="input w-full"
-                    required
-                  />
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formData.title.length}/100
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      分类
-                    </label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="input w-full"
-                    >
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      标签
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={formData.tags}
-                        onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                        placeholder="多个标签用逗号分隔"
-                        className="input w-full pr-10"
-                      />
-                      <Tag className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      例如：贪心算法,基础题
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    笔记内容 <span className="text-red-400">*</span>
-                  </label>
-                  <textarea
-                    value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    placeholder="支持Markdown格式&#10;&#10;## 标题&#10;- 列表项&#10;**加粗文本**&#10;`代码`&#10;```&#10;代码块&#10;```"
-                    rows={16}
-                    className="input w-full font-mono text-sm"
-                    required
-                  />
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    支持Markdown格式，{formData.content.length} 字符
-                  </p>
-                </div>
-
-                <div className="bg-muted border border-border rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <FileText className="w-5 h-5 text-muted-foreground mt-0.5" />
-                    <div className="text-sm text-foreground">
-                      <p className="font-medium mb-2">Markdown 语法提示</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <p><code className="bg-muted px-1 rounded text-indigo-400"># 标题</code> - 一级标题</p>
-                          <p><code className="bg-muted px-1 rounded text-indigo-400">## 标题</code> - 二级标题</p>
-                          <p><code className="bg-muted px-1 rounded text-indigo-400">**粗体**</code> - 加粗文本</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p><code className="bg-muted px-1 rounded text-indigo-400">- 项目</code> - 无序列表</p>
-                          <p><code className="bg-muted px-1 rounded text-indigo-400">`代码`</code> - 行内代码</p>
-                          <p><code className="bg-muted px-1 rounded text-indigo-400">```代码块```</code> - 代码块</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-indigo-400 mt-0.5" />
-                    <div className="text-sm text-indigo-300">
-                      <p className="font-medium mb-1">温馨提示</p>
-                      <ul className="list-disc list-inside space-y-1">
-                        <li>笔记创建后，所有班级成员都可以查看</li>
-                        <li>只有笔记作者可以编辑和删除笔记</li>
-                        <li>建议使用清晰的标题和适当的标签，方便他人搜索</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="p-4 bg-error/100/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-400">{error}</p>
-                  </div>
-                )}
-
-                {success && (
-                  <div className="p-4 bg-secondary/100/10 border border-green-500/20 rounded-lg">
-                    <p className="text-sm text-green-400">{success}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="btn-primary flex-1"
-                  >
-                    {loading ? '创建中...' : '创建笔记'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/classes/${params.id}`)}
-                    className="px-6 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 font-medium transition-colors"
-                  >
-                    取消
-                  </button>
-                </div>
-              </div>
-            </form>
+    <ClassWorkspaceShell
+      classId={classId}
+      className={classData?.name}
+      title="创建笔记"
+      description="分享学习心得和解题思路（支持 Markdown）"
+      icon={FileText}
+      width="narrow"
+    >
+      <div className="bg-card rounded-lg border border-border p-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              笔记标题 <span className="text-error">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="例如：二分查找算法总结"
+              maxLength={100}
+              className="input w-full"
+              required
+            />
+            <p className="mt-1 text-sm text-muted-foreground">{formData.title.length}/100</p>
           </div>
-        </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">分类</label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="input w-full"
+              >
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">标签</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.tags}
+                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                  placeholder="多个标签用逗号分隔"
+                  className="input w-full pr-10"
+                />
+                <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">例如：贪心算法, 基础题</p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              笔记内容 <span className="text-error">*</span>
+            </label>
+            <textarea
+              value={formData.content}
+              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+              placeholder="支持 Markdown…"
+              rows={16}
+              className="input w-full font-mono text-sm"
+              required
+            />
+            <p className="mt-1 text-sm text-muted-foreground">{formData.content.length} 字符</p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <div className="flex items-start gap-2">
+              <FileText className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium text-foreground mb-2">Markdown 提示</p>
+                <p>
+                  <code className="bg-muted px-1 rounded text-xs"># 标题</code>、
+                  <code className="bg-muted px-1 rounded text-xs">**粗体**</code>、
+                  <code className="bg-muted px-1 rounded text-xs">`代码`</code>、代码块用三个反引号
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/30 p-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li>笔记创建后班级成员可查看</li>
+                <li>仅作者可编辑、删除</li>
+                <li>建议使用清晰标题与标签便于搜索</li>
+              </ul>
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-4 bg-error/10 border border-error/20 rounded-lg">
+              <p className="text-sm text-error">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="p-4 bg-secondary/10 border border-secondary/20 rounded-lg">
+              <p className="text-sm text-secondary">{success}</p>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button type="submit" disabled={loading} className="btn btn-primary flex-1">
+              {loading ? '创建中...' : '创建笔记'}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/classes/${classId}/notes`)}
+              className="btn btn-ghost"
+            >
+              取消
+            </button>
+          </div>
+        </form>
       </div>
-    </div>
+    </ClassWorkspaceShell>
   )
 }

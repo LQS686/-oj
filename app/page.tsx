@@ -1,458 +1,451 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { 
-  Code2, 
-  Trophy, 
-  Users, 
-  BookOpen, 
-  ArrowRight, 
-  Sparkles, 
-  Terminal, 
-  Cpu, 
-  Brain,
-  Zap,
-  Target,
-  Medal,
-  TrendingUp,
+import {
+  Code2,
+  Trophy,
+  Users,
+  BookOpen,
+  ArrowRight,
+  Cpu,
+  Dumbbell,
   Clock,
   CheckCircle2,
   Star,
-  Rocket,
+  Flame,
+  Calendar,
+  BarChart3,
+  TrendingUp,
   ChevronRight,
-  Layers,
-  GitBranch,
-  Shield
+  Loader2,
+  Megaphone,
+  Pin,
 } from 'lucide-react'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useUser } from '@/contexts/UserContext'
-import { motion, easeOut } from 'framer-motion'
+import { fetchWithAuth } from '@/lib/api/base'
+import type { HomeDashboardData } from '@/lib/home/dashboard'
+import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 
-const MotionLink = motion(Link)
+/* ---------- non-logged-in feature cards ---------- */
+
+const guestFeatures = [
+  {
+    icon: BookOpen,
+    title: '海量题库',
+    description: '涵盖入门到NOI难度，算法、数据结构、数学等多个领域的优质题目',
+  },
+  {
+    icon: Cpu,
+    title: '实时评测',
+    description: '支持C++、Python、Java等多种语言，毫秒级响应，精准反馈',
+  },
+  {
+    icon: Trophy,
+    title: '竞赛系统',
+    description: 'ACM、OI、IOI多种赛制，实时排行榜和详细数据分析',
+  },
+  {
+    icon: Dumbbell,
+    title: '训练计划',
+    description: '系统化学习路径，循序渐进提升编程能力和算法思维',
+  },
+]
+
+/* ---------- components ---------- */
+
+function AnnouncementsGrid({ items }: { items: PublicAnnouncementItem[] }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Megaphone className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-bold text-foreground">系统公告</h2>
+        </div>
+        <Link href="/announcements" className="text-sm text-primary hover:underline flex items-center gap-1">
+          查看全部 <ChevronRight className="w-4 h-4" />
+        </Link>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">暂无系统公告</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {items.map((item) => (
+            <Link
+              key={item.id}
+              href={`/announcements/${item.id}`}
+              className={`card-static rounded-xl p-5 block hover:border-primary/30 transition-colors h-full ${
+                item.isPinned ? 'ring-1 ring-primary/30' : ''
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2 gap-1">
+                {item.isPinned ? (
+                  <Pin className="w-3.5 h-3.5 text-primary shrink-0" aria-label="置顶" />
+                ) : (
+                  <span className="w-3.5" />
+                )}
+                <span className="text-xs text-muted-foreground truncate">
+                  {item.publishedAt
+                    ? new Date(item.publishedAt).toLocaleDateString('zh-CN')
+                    : new Date(item.createdAt).toLocaleDateString('zh-CN')}
+                </span>
+              </div>
+              <h3 className="text-sm font-semibold text-foreground line-clamp-2 mb-2">{item.title}</h3>
+              <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">{item.content}</p>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colorMap: Record<string, string> = {
+    '进行中': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    '未开始': 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    '已截止': 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+  }
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colorMap[status] || 'bg-muted text-muted-foreground'}`}>
+      {status}
+    </span>
+  )
+}
+
+/* ---------- logged-in dashboard ---------- */
+
+function DashboardView() {
+  const [data, setData] = useState<HomeDashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        setError('')
+        const res = await fetchWithAuth('/api/home/dashboard')
+        const json = await res.json()
+        if (!json.success && !json.ok) {
+          throw new Error(json.error || '加载失败')
+        }
+        if (!cancelled) setData(json.data)
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : '加载失败')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="text-sm">加载学习数据…</span>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="card-static rounded-xl p-10 text-center">
+        <p className="text-error mb-4">{error || '暂无数据'}</p>
+        <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
+          重试
+        </button>
+      </div>
+    )
+  }
+
+  const { stats, announcements, recentAssignments, upcomingContests } = data
+
+  return (
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card-static rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+            </div>
+            <span className="text-sm text-muted-foreground font-medium">今日解题</span>
+          </div>
+          <div className="text-3xl font-bold text-foreground">{stats.todaySolved}</div>
+          <div className="text-xs text-muted-foreground mt-1">累计 {stats.totalSolved} 题</div>
+        </div>
+
+        <div className="card-static rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+              <Flame className="w-5 h-5 text-orange-500" />
+            </div>
+            <span className="text-sm text-muted-foreground font-medium">连续打卡</span>
+          </div>
+          <div className="text-3xl font-bold text-foreground">
+            {stats.streak} <span className="text-base font-normal text-muted-foreground">天</span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">{stats.streak > 0 ? '继续加油' : '今日开始打卡'}</div>
+        </div>
+
+        <div className="card-static rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <span className="text-sm text-muted-foreground font-medium">本周通过率</span>
+          </div>
+          <div className="text-3xl font-bold text-foreground">
+            {stats.weeklyPassRate}
+            <span className="text-base font-normal text-muted-foreground">%</span>
+          </div>
+          {stats.weeklyPassRateDelta !== null && (
+            <div
+              className={`text-xs mt-1 ${
+                stats.weeklyPassRateDelta >= 0
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              较上周 {stats.weeklyPassRateDelta >= 0 ? '+' : ''}
+              {stats.weeklyPassRateDelta}%
+            </div>
+          )}
+        </div>
+
+        <div className="card-static rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span className="text-sm text-muted-foreground font-medium">Rating</span>
+          </div>
+          <div className="text-3xl font-bold text-foreground">{stats.rating}</div>
+          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">{stats.rank}</div>
+        </div>
+      </div>
+
+      <AnnouncementsGrid items={announcements} />
+
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-foreground">近期作业</h2>
+          <Link href="/classes" className="text-sm text-primary hover:underline flex items-center gap-1">
+            查看全部 <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+        {recentAssignments.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">暂无班级作业，加入班级后可在此查看</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {recentAssignments.map((item) => (
+              <Link
+                key={item.id}
+                href={`/classes/${item.classId}/assignments/${item.id}`}
+                className="card-static rounded-xl p-5 block hover:border-primary/30 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-foreground truncate flex-1 mr-2">{item.title}</h3>
+                  <StatusBadge status={item.status} />
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">{item.className}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{item.deadline ? `截止 ${item.deadline}` : '无截止时间'}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {item.submitted}/{item.total} 已提交
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-foreground">即将开始的竞赛</h2>
+          <Link href="/contests" className="text-sm text-primary hover:underline flex items-center gap-1">
+            查看全部 <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+        {upcomingContests.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">暂无即将开始的公开竞赛</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {upcomingContests.map((item) => (
+              <Link
+                key={item.id}
+                href={`/contests/${item.id}`}
+                className="card-static rounded-xl p-5 block hover:border-primary/30 transition-colors"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">
+                    {item.type}
+                  </span>
+                </div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">{item.title}</h3>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>{item.startTime}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{item.durationLabel}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{item.participants} 人报名</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
+  )
+}
+
+/* ---------- non-logged-in intro view ---------- */
+
+function GuestView() {
+  const [announcements, setAnnouncements] = useState<PublicAnnouncementItem[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/announcements?limit=6')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && (json.success || json.ok) && json.data?.items) {
+          setAnnouncements(json.data.items)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <div className="space-y-16">
+      <section className="pt-6">
+        <div className="container mx-auto px-4">
+          <AnnouncementsGrid items={announcements} />
+        </div>
+      </section>
+
+      {/* Hero */}
+      <section className="py-20 md:py-28">
+        <div className="container mx-auto px-4 text-center max-w-3xl mx-auto">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-foreground mb-6 leading-tight">
+            在线编程学习平台
+          </h1>
+          <p className="text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed">
+            海量精选题库、实时评测系统、专业竞赛平台，<br className="hidden sm:block" />
+            助你从入门到精通，成为编程高手
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/register" className="btn btn-primary text-base px-8 py-3">
+              开始学习
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <Link href="/problems" className="btn btn-outline text-base px-8 py-3">
+              <BookOpen className="w-5 h-5" />
+              查看题库
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature Cards */}
+      <section className="pb-16 md:pb-24">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {guestFeatures.map((feature, index) => {
+              const Icon = feature.icon
+              return (
+                <div key={index} className="card-static rounded-xl p-6">
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4">
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-base font-bold text-foreground mb-2">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Login / Register CTA */}
+      <section className="pb-16 md:pb-24">
+        <div className="container mx-auto px-4">
+          <div className="card-static rounded-2xl p-10 md:p-14 text-center max-w-2xl mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-6">
+              <Star className="w-7 h-7 text-white" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">准备好开始了吗？</h2>
+            <p className="text-muted-foreground mb-8 leading-relaxed">
+              立即注册，加入平台，开启你的编程学习之旅
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/register" className="btn btn-primary text-base px-8 py-3">
+                免费注册
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link href="/login" className="btn btn-outline text-base px-8 py-3">
+                已有账号？登录
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+/* ---------- main page ---------- */
 
 export default function Home() {
   const { settings } = useSettings()
   const { user } = useUser()
-  
-  const features = [
-    {
-      icon: Terminal,
-      title: "海量题库",
-      description: "涵盖入门到NOI难度，算法、数据结构、数学等多个领域的优质题目",
-      gradient: "from-primary to-primary-dark",
-      shadowColor: "shadow-primary/30",
-      delay: 0.1
-    },
-    {
-      icon: Cpu,
-      title: "实时评测",
-      description: "支持C++、Python、Java等多种语言，毫秒级响应，精准反馈",
-      gradient: "from-secondary to-secondary-dark",
-      shadowColor: "shadow-secondary/30",
-      delay: 0.2
-    },
-    {
-      icon: Trophy,
-      title: "竞赛系统",
-      description: "ACM、OI、IOI多种赛制，实时排行榜和详细数据分析",
-      gradient: "from-accent to-accent-dark",
-      shadowColor: "shadow-accent/30",
-      delay: 0.3
-    },
-    {
-      icon: Users,
-      title: "社区交流",
-      description: "题解分享、讨论区、博客系统，与志同道合的伙伴共同进步",
-      gradient: "from-info to-cyan-600",
-      shadowColor: "shadow-info/30",
-      delay: 0.4
-    },
-    {
-      icon: BookOpen,
-      title: "训练计划",
-      description: "系统化学习路径，循序渐进提升编程能力和算法思维",
-      gradient: "from-primary to-primary-dark",
-      shadowColor: "shadow-primary/30",
-      delay: 0.5
-    },
-    {
-      icon: Brain,
-      title: "能力评估",
-      description: "Rating系统、成就徽章，可视化追踪学习进度和能力成长",
-      gradient: "from-secondary to-secondary-dark",
-      shadowColor: "shadow-secondary/30",
-      delay: 0.6
-    }
-  ]
-
-  const stats = [
-    { number: "10,000+", label: "精选题目", icon: BookOpen },
-    { number: "100,000+", label: "活跃用户", icon: Users },
-    { number: "1,000,000+", label: "代码提交", icon: Code2 },
-    { number: "500+", label: "精彩竞赛", icon: Trophy }
-  ]
-
-  const highlights = [
-    {
-      icon: Target,
-      title: "精准定位",
-      description: "智能推荐适合你水平的题目"
-    },
-    {
-      icon: Medal,
-      title: "成就系统",
-      description: "解锁徽章，记录成长历程"
-    },
-    {
-      icon: TrendingUp,
-      title: "数据分析",
-      description: "可视化追踪学习进度"
-    },
-    {
-      icon: Clock,
-      title: "实时反馈",
-      description: "毫秒级评测，即时结果"
-    }
-  ]
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  }
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.5,
-        ease: easeOut
-      }
-    }
-  }
 
   return (
     <div className="min-h-screen">
-      <section className="relative py-24 md:py-40 overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/8 rounded-full blur-[150px] animate-pulse-slow"></div>
-          <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-secondary/6 rounded-full blur-[120px] animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent/4 rounded-full blur-[180px]"></div>
-        </div>
-        
-        <div className="container mx-auto px-4 relative z-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="text-center max-w-5xl mx-auto"
-          >
-            <div className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-primary/8 border border-primary/20 mb-10 backdrop-blur-md shadow-sm hover:shadow-md transition-shadow">
-              <Sparkles className="w-4.5 h-4.5 text-primary-light" />
-              <span className="text-primary-light font-semibold text-sm">提升编程能力，从这里开始</span>
-            </div>
-            
-            <h1 className="section-title text-4xl sm:text-5xl md:text-6xl lg:text-7xl mb-8 leading-tight">
-              <span className="text-foreground">在线编程</span>
-              <br />
-              <span className="gradient-text glow">学习平台</span>
-            </h1>
-            
-            <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
-              海量精选题库、实时评测系统、专业竞赛平台，<br className="hidden sm:block" />
-              助你从入门到精通，成为编程高手
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <MotionLink
-                href="/problems"
-                className="btn-primary btn text-base px-10 py-4.5 group shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Rocket className="w-5 h-5" />
-                开始刷题
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
-              </MotionLink>
-              <MotionLink
-                href="/contests"
-                className="btn-outline btn text-base px-10 py-4.5"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Trophy className="w-5 h-5" />
-                参加竞赛
-              </MotionLink>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+      <div className="container mx-auto px-4 py-8 md:py-12">
+        {user ? <DashboardView /> : <GuestView />}
+      </div>
 
-      <section className="py-20 md:py-28">
+      <footer className="py-10 border-t border-border">
         <div className="container mx-auto px-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="glass-strong rounded-3xl p-10 md:p-16 border border-primary/5"
-          >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
-              {stats.map((stat, index) => {
-                const Icon = stat.icon
-                return (
-                  <motion.div 
-                    key={index} 
-                    className="text-center group"
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                  >
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/8 mb-5 group-hover:scale-115 transition-all duration-300 group-hover:bg-primary/12">
-                      <Icon className="w-7 h-7 text-primary-light" />
-                    </div>
-                    <div className="text-3xl md:text-4xl lg:text-5xl font-extrabold gradient-text mb-2.5">
-                      {stat.number}
-                    </div>
-                    <div className="text-muted-foreground font-medium text-sm md:text-base">
-                      {stat.label}
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      <section className="py-20 md:py-32">
-        <div className="container mx-auto px-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
-          >
-            <h2 className="section-title text-3xl md:text-4xl lg:text-5xl text-foreground mb-5">
-              平台<span className="gradient-text">特色</span>
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              全方位提升你的编程能力，打造专业的学习体验
-            </p>
-          </motion.div>
-          
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7"
-          >
-            {features.map((feature, index) => {
-              const Icon = feature.icon
-              return (
-                <motion.div 
-                  key={index} 
-                  variants={itemVariants}
-                  transition={{ delay: feature.delay }}
-                  className="card p-8 group cursor-pointer hover:border-primary/20"
-                >
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 text-white shadow-xl ${feature.shadowColor} group-hover:scale-110 group-hover:rotate-3 transition-all duration-400`}>
-                    <Icon className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-xl font-bold text-foreground mb-3 group-hover:text-primary-light transition-colors">
-                    {feature.title}
-                  </h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {feature.description}
-                  </p>
-                </motion.div>
-              )
-            })}
-          </motion.div>
-        </div>
-      </section>
-
-      <section className="py-20 md:py-32">
-        <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <motion.div 
-              initial={{ opacity: 0, x: -40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.7 }}
-            >
-              <h2 className="section-title text-3xl md:text-4xl text-foreground mb-7">
-                为什么选择<span className="gradient-text">我们</span>
-              </h2>
-              <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
-                我们致力于为每一位编程爱好者提供最优质的学习环境和最专业的评测系统，帮助你高效提升编程能力。
-              </p>
-              
-              <div className="grid sm:grid-cols-2 gap-7">
-                {highlights.map((item, index) => {
-                  const Icon = item.icon
-                  return (
-                    <motion.div 
-                      key={index}
-                      initial={{ opacity: 0, y: 15 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5, delay: index * 0.1 }}
-                      className="flex items-start gap-4 group"
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-primary/8 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/15 group-hover:scale-105 transition-all">
-                        <Icon className="w-5.5 h-5.5 text-primary-light" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-1.5 group-hover:text-primary-light transition-colors">{item.title}</h4>
-                        <p className="text-sm text-muted-foreground">{item.description}</p>
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </div>
-            </motion.div>
-            
-            <motion.div 
-              initial={{ opacity: 0, x: 40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.7 }}
-              className="relative"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/15 to-secondary/12 rounded-3xl blur-3xl"></div>
-              <div className="relative glass-strong rounded-3xl p-9 border border-primary/8 shadow-xl">
-                <div className="flex items-center gap-3 mb-7">
-                  <div className="flex gap-2">
-                    <div className="w-3.5 h-3.5 rounded-full bg-error/100"></div>
-                    <div className="w-3.5 h-3.5 rounded-full bg-accent/100"></div>
-                    <div className="w-3.5 h-3.5 rounded-full bg-secondary/100"></div>
-                  </div>
-                  <div className="ml-4 flex-1 text-center py-1.5 px-3 rounded-lg bg-muted/40">
-                    <span className="text-xs text-muted-foreground font-mono">solution.cpp</span>
-                  </div>
-                </div>
-                <div className="bg-muted/30 rounded-2xl p-5 overflow-x-auto">
-                  <pre className="text-sm font-mono text-foreground leading-relaxed">
-                    <code>{`#include <bits/stdc++.h>
-using namespace std;
-
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    
-    int n;
-    cin >> n;
-    
-    // Your solution here
-    cout << "Hello, OJ Platform!" << endl;
-    
-    return 0;
-}`}</code>
-                  </pre>
-                </div>
-                <div className="mt-7 flex flex-wrap items-center gap-5">
-                  <div className="flex items-center gap-2.5 text-secondary bg-secondary/10 px-4 py-2.5 rounded-xl">
-                    <CheckCircle2 className="w-5.5 h-5.5" />
-                    <span className="text-sm font-semibold">编译成功</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="w-4.5 h-4.5" />
-                    <span className="text-sm font-medium">耗时: 1ms</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Cpu className="w-4.5 h-4.5" />
-                    <span className="text-sm font-medium">内存: 256KB</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {!user && (
-        <section className="py-20 md:py-32">
-          <div className="container mx-auto px-4">
-            <motion.div 
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.7 }}
-              className="relative overflow-hidden rounded-3xl shadow-2xl"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary via-purple-600 to-secondary animate-gradient"></div>
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-25"></div>
-              
-              <div className="relative p-12 md:p-20 text-center text-white">
-                <div className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white/12 backdrop-blur-md mb-8 border border-white/20">
-                  <Star className="w-4.5 h-4.5 text-yellow-300" />
-                  <span className="text-sm font-medium">免费使用</span>
-                </div>
-                
-                <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold mb-6 leading-tight">
-                  准备好开始了吗？
-                </h2>
-                <p className="text-lg md:text-xl text-white/85 mb-12 max-w-2xl mx-auto leading-relaxed">
-                  立即注册，加入我们的编程社区，<br className="hidden sm:block" />
-                  开启你的编程之旅，挑战无限可能
-                </p>
-                
-                <div className="flex flex-col sm:flex-row gap-5 justify-center">
-                  <MotionLink
-                    href="/register"
-                    className="inline-flex items-center justify-center gap-2.5 bg-white text-primary px-10 py-4.5 rounded-2xl font-bold text-base hover:bg-gray-100 transition-all hover:scale-105 hover:shadow-2xl"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Zap className="w-5.5 h-5.5" />
-                    免费注册
-                    <ArrowRight className="w-5.5 h-5.5" />
-                  </MotionLink>
-                  <MotionLink
-                    href="/login"
-                    className="inline-flex items-center justify-center gap-2.5 bg-white/12 backdrop-blur-md text-white px-10 py-4.5 rounded-2xl font-bold text-base hover:bg-white/20 transition-all border border-white/30"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    已有账号？登录
-                  </MotionLink>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-      )}
-
-      <footer className="py-16 border-t border-border bg-gradient-to-b from-transparent to-muted/10">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="flex items-center gap-4">
-              <div className="w-11 h-11 bg-gradient-to-br from-primary to-primary-dark rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
-                <Code2 className="w-5.5 h-5.5 text-white" />
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
+                <Code2 className="w-4.5 h-4.5 text-white" />
               </div>
               <div>
-                <span className="font-bold text-foreground text-lg">{settings.siteName}</span>
-                <p className="text-xs text-muted-foreground mt-0.5">{settings.siteDescription}</p>
+                <span className="font-bold text-foreground text-base">{settings.siteName}</span>
+                <p className="text-xs text-muted-foreground">{settings.siteDescription}</p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-7 text-sm text-muted-foreground">
-              <Link href="/problems" className="hover:text-primary-light transition-colors font-medium">题库</Link>
-              <Link href="/contests" className="hover:text-primary-light transition-colors font-medium">竞赛</Link>
-              <Link href="/discuss" className="hover:text-primary-light transition-colors font-medium">社区</Link>
-              <Link href="/rank" className="hover:text-primary-light transition-colors font-medium">排行榜</Link>
+
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <Link href="/problems" className="hover:text-primary transition-colors font-medium">题库</Link>
+              <Link href="/contests" className="hover:text-primary transition-colors font-medium">竞赛</Link>
+              <Link href="/training" className="hover:text-primary transition-colors font-medium">训练</Link>
+              <Link href="/rank" className="hover:text-primary transition-colors font-medium">排行榜</Link>
             </div>
-            
+
             <div className="text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} {settings.siteName}. All rights reserved.
             </div>

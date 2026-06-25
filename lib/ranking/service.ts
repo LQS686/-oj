@@ -33,7 +33,7 @@ export async function getGlobalRanking(limit = 100): Promise<RankingItem[]> {
         _count: { select: { submissions: true } },
       },
     })
-    return Promise.all(users.map(async (u, idx) => {
+    return Promise.all(users.map(async (u: any, idx: any) => {
       const solved = await prisma.submission.count({ where: { userId: u.id, status: 'ACCEPTED' } })
       return {
         rank: idx + 1,
@@ -67,8 +67,8 @@ export async function getClassRanking(classId: string, limit = 100): Promise<Ran
         },
       },
     })
-    members.sort((a, b) => (b.user.rating || 0) - (a.user.rating || 0))
-    return Promise.all(members.map(async (m, idx) => {
+    members.sort((a: any, b: any) => (b.user.rating || 0) - (a.user.rating || 0))
+    return Promise.all(members.map(async (m: any, idx: any) => {
       const solved = await prisma.submission.count({
         where: { userId: m.user.id, status: 'ACCEPTED' },
       })
@@ -125,7 +125,7 @@ export interface RankingPage {
  */
 export async function listRankingByType(type: 'rating' | 'solved', page: number, limit: number): Promise<RankingPage> {
   return cache.get('ranking:list', [type, page, limit], async () => {
-    const orderBy: Prisma.UserOrderByWithRelationInput[] = type === 'solved'
+    const orderBy: any[] = type === 'solved'
       ? [{ solvedCount: 'desc' }, { rating: 'desc' }]
       : [{ rating: 'desc' }, { solvedCount: 'desc' }]
 
@@ -149,7 +149,7 @@ export async function listRankingByType(type: 'rating' | 'solved', page: number,
       prisma.user.count({ where: { isBanned: false } }),
     ])
 
-    const rankedUsers: RankingUser[] = users.map((user, index) => ({
+    const rankedUsers: RankingUser[] = users.map((user: any, index: any) => ({
       ...user,
       position: (page - 1) * limit + index + 1,
       solvedProblems: user.solvedCount,

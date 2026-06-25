@@ -46,7 +46,7 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
 
   // 手动补全 user / problem 信息（避免 MongoDB include 触发 500）
   const recentSubmissions: DashboardRecentSubmission[] = await Promise.all(
-    recentSubmissionsRaw.map(async (sub) => {
+    recentSubmissionsRaw.map(async (sub: any) => {
       const [user, problem] = await Promise.all([
         prisma.user.findUnique({
           where: { id: sub.userId },

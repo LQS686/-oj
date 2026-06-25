@@ -53,7 +53,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
     tags: safeProblem.tags || [],
     timeLimit: safeProblem.timeLimit,
     memoryLimit: safeProblem.memoryLimit,
-    testCases: safeProblem.testCases.map((tc) => ({
+    testCases: safeProblem.testCases.map((tc: any) => ({
       id: tc.id,
       input: tc.input,
       expectedOutput: tc.output,

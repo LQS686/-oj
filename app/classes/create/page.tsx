@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, Users, Globe, Lock, Check } from 'lucide-react'
+import { Users, Globe, Lock, Check } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { canCreateClass } from '@/lib/permissions'
+import { EducationalPageShell } from '@/components/common'
 
 export default function CreateClassPage() {
   const router = useRouter()
@@ -27,40 +28,34 @@ export default function CreateClassPage() {
     description: '',
     avatar: '',
     isPublic: true,
-    maxMembers: 50
+    maxMembers: 50,
   })
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
-            <Users className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <p className="text-foreground text-xl font-semibold mb-2">请先登录</p>
-          <p className="text-muted-foreground mb-6">登录后即可创建班级</p>
+      <EducationalPageShell title="创建班级" icon={Users} backHref="/classes" backLabel="返回班级列表" width="narrow">
+        <div className="bg-card rounded-lg border border-border p-12 text-center">
+          <p className="text-foreground font-semibold mb-2">请先登录</p>
+          <p className="text-muted-foreground text-sm mb-6">登录后即可创建班级</p>
           <Link href="/login" className="btn btn-primary">
             前往登录
           </Link>
         </div>
-      </div>
+      </EducationalPageShell>
     )
   }
 
   if (!canCreateClass(user)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
-            <Users className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <p className="text-foreground text-xl font-semibold mb-2">权限不足</p>
-          <p className="text-muted-foreground mb-6">只有教师和管理员可以创建班级</p>
+      <EducationalPageShell title="创建班级" icon={Users} backHref="/classes" backLabel="返回班级列表" width="narrow">
+        <div className="bg-card rounded-lg border border-border p-12 text-center">
+          <p className="text-foreground font-semibold mb-2">权限不足</p>
+          <p className="text-muted-foreground text-sm mb-6">只有教师和管理员可以创建班级</p>
           <Link href="/classes" className="btn btn-primary">
             返回班级列表
           </Link>
         </div>
-      </div>
+      </EducationalPageShell>
     )
   }
 
@@ -93,10 +88,8 @@ export default function CreateClassPage() {
 
       const response = await fetchWithAuth('/api/classes', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
       })
 
       const data = await response.json()
@@ -106,7 +99,7 @@ export default function CreateClassPage() {
       } else {
         setError(data.error || '创建失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误，请重试')
     } finally {
       setLoading(false)
@@ -114,228 +107,164 @@ export default function CreateClassPage() {
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        <Link
-          href="/classes"
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary-light transition-colors mb-6"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          返回班级列表
-        </Link>
+    <EducationalPageShell
+      title="创建班级"
+      description="建立学习班级，与伙伴一起进步"
+      icon={Users}
+      backHref="/classes"
+      backLabel="返回班级列表"
+      width="narrow"
+    >
+      <div className="bg-card rounded-lg border border-border p-6 md:p-8">
+        {error && (
+          <div className="mb-6 p-4 rounded-lg border border-error/30 bg-error/5">
+            <p className="text-error text-sm">{error}</p>
+          </div>
+        )}
 
-        <div className="card-static rounded-2xl p-8">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30">
-              <Users className="w-7 h-7 text-white" />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              班级名称 <span className="text-error">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="输入班级名称（2-20个字符）"
+              className="input"
+              maxLength={20}
+              required
+            />
+            <p className="text-sm text-muted-foreground mt-1.5">{formData.name.length} / 20</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">班级描述</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="介绍一下你的班级..."
+              rows={4}
+              className="input min-h-[120px] resize-none"
+              maxLength={500}
+            />
+            <p className="text-sm text-muted-foreground mt-1.5">{formData.description.length} / 500</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">班级头像（URL）</label>
+            <div className="flex gap-4">
+              <input
+                type="url"
+                value={formData.avatar}
+                onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
+                placeholder="https://example.com/avatar.png"
+                className="input flex-1"
+              />
+              {formData.avatar ? (
+                <img
+                  src={formData.avatar}
+                  alt="头像预览"
+                  className="w-12 h-12 rounded-full object-cover border border-border"
+                  onError={(e) => {
+                    e.currentTarget.src = ''
+                    setFormData({ ...formData, avatar: '' })
+                    setError('头像加载失败，请检查URL')
+                  }}
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+              )}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">创建班级</h1>
-              <p className="text-muted-foreground mt-1">建立你的学习班级，与伙伴一起进步</p>
+            <p className="text-sm text-muted-foreground mt-1.5">留空则使用默认头像</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">最大成员数</label>
+            <input
+              type="number"
+              value={formData.maxMembers}
+              onChange={(e) => setFormData({ ...formData, maxMembers: parseInt(e.target.value, 10) || 50 })}
+              min={2}
+              max={200}
+              className="input"
+            />
+            <p className="text-sm text-muted-foreground mt-1.5">班级可容纳的最大人数（2-200）</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-3">班级可见性</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, isPublic: true })}
+                className={`p-4 rounded-lg border text-left transition-colors ${
+                  formData.isPublic
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                      formData.isPublic ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    <Globe className="w-4 h-4" />
+                  </div>
+                  <div className="font-medium text-foreground text-sm">公开班级</div>
+                  {formData.isPublic && <Check className="w-4 h-4 text-primary ml-auto" />}
+                </div>
+                <p className="text-xs text-muted-foreground">在班级列表展示，用户可申请加入</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, isPublic: false })}
+                className={`p-4 rounded-lg border text-left transition-colors ${
+                  !formData.isPublic
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                      !formData.isPublic ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div className="font-medium text-foreground text-sm">私有班级</div>
+                  {!formData.isPublic && <Check className="w-4 h-4 text-primary ml-auto" />}
+                </div>
+                <p className="text-xs text-muted-foreground">不在列表显示，仅邀请加入</p>
+              </button>
             </div>
           </div>
 
-          {error && (
-            <div className="mb-6 p-4 card-static rounded-xl border border-error/30 bg-error/5">
-              <p className="text-error">{error}</p>
-            </div>
-          )}
+          <div className="rounded-lg p-4 border border-border bg-muted/30">
+            <h3 className="text-sm font-semibold text-foreground mb-2">温馨提示</h3>
+            <ul className="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
+              <li>创建后你将成为班级所有者（Owner）</li>
+              <li>可邀请成员并设置管理员</li>
+              <li>班级名称在全站范围内必须唯一</li>
+            </ul>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                班级名称 <span className="text-error">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="输入班级名称（2-20个字符）"
-                className="input"
-                maxLength={20}
-                required
-              />
-              <p className="text-sm text-muted-foreground mt-1.5">
-                {formData.name.length} / 20
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                班级描述
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="介绍一下你的班级..."
-                rows={4}
-                className="input min-h-[120px] resize-none"
-                maxLength={500}
-              />
-              <p className="text-sm text-muted-foreground mt-1.5">
-                {formData.description.length} / 500
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                班级头像（URL）
-              </label>
-              <div className="flex gap-4">
-                <input
-                  type="url"
-                  value={formData.avatar}
-                  onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
-                  placeholder="https://example.com/avatar.png"
-                  className="input flex-1"
-                />
-                {formData.avatar ? (
-                  <img
-                    src={formData.avatar}
-                    alt="头像预览"
-                    className="w-12 h-12 rounded-full object-cover ring-2 ring-primary/20"
-                    onError={(e) => {
-                      e.currentTarget.src = ''
-                      setFormData({ ...formData, avatar: '' })
-                      setError('头像加载失败，请检查URL')
-                    }}
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                    <Users className="w-6 h-6 text-white" />
-                  </div>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1.5">
-                留空则使用默认头像
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                最大成员数
-              </label>
-              <input
-                type="number"
-                value={formData.maxMembers}
-                onChange={(e) => setFormData({ ...formData, maxMembers: parseInt(e.target.value) || 50 })}
-                min="2"
-                max="200"
-                className="input"
-              />
-              <p className="text-sm text-muted-foreground mt-1.5">
-                班级可容纳的最大人数（2-200）
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-3">
-                班级可见性
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, isPublic: true })}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    formData.isPublic
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      formData.isPublic ? 'bg-primary text-white' : 'bg-muted/50 text-muted-foreground'
-                    }`}>
-                      <Globe className="w-5 h-5" />
-                    </div>
-                    <div className="font-medium text-foreground">公开班级</div>
-                    {formData.isPublic && (
-                      <Check className="w-5 h-5 text-primary ml-auto" />
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    公开班级会在班级列表中展示，其他用户可以申请加入
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, isPublic: false })}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    !formData.isPublic
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      !formData.isPublic ? 'bg-primary text-white' : 'bg-muted/50 text-muted-foreground'
-                    }`}>
-                      <Lock className="w-5 h-5" />
-                    </div>
-                    <div className="font-medium text-foreground">私有班级</div>
-                    {!formData.isPublic && (
-                      <Check className="w-5 h-5 text-primary ml-auto" />
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    私有班级不会在列表中显示，只能通过邀请加入
-                  </p>
-                </button>
-              </div>
-            </div>
-
-            <div className="card-static rounded-xl p-5 border border-primary/20 bg-primary/5">
-              <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Check className="w-4 h-4 text-primary-light" />
-                温馨提示
-              </h3>
-              <ul className="text-sm text-muted-foreground space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="text-primary-light mt-0.5">•</span>
-                  创建班级后，你将自动成为班级创建人（Owner）
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary-light mt-0.5">•</span>
-                  你可以邀请其他用户加入班级，并设置管理员
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary-light mt-0.5">•</span>
-                  班级名称在全站范围内必须唯一
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary-light mt-0.5">•</span>
-                  创建后可以在班级管理页面修改班级信息
-                </li>
-              </ul>
-            </div>
-
-            <div className="flex gap-4 pt-4">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="btn btn-outline flex-1"
-              >
-                取消
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn btn-primary flex-1"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    创建中...
-                  </>
-                ) : (
-                  '创建班级'
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => router.back()} className="btn btn-ghost flex-1">
+              取消
+            </button>
+            <button type="submit" disabled={loading} className="btn btn-primary flex-1">
+              {loading ? '创建中...' : '创建班级'}
+            </button>
+          </div>
+        </form>
       </div>
-    </div>
+    </EducationalPageShell>
   )
 }

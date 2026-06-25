@@ -32,7 +32,7 @@ async function main() {
   if (allProviders.length === 0) {
     console.log('    (无)\n')
   } else {
-    allProviders.forEach(p => {
+    allProviders.forEach((p: any) => {
       console.log(`    - [${p.id}] name="${p.name}" slug="${p.slug}" isActive=${p.isActive}`)
     })
     console.log()
@@ -46,8 +46,8 @@ async function main() {
   if (allModels.length === 0) {
     console.log('    (无)\n')
   } else {
-    const providerMap = new Map(allProviders.map(p => [p.id, p]))
-    allModels.forEach(m => {
+    const providerMap = new Map<any, any>(allProviders.map((p: any) => [p.id, p]))
+    allModels.forEach((m: any) => {
       const provider = providerMap.get(m.providerId)
       const providerStatus = provider
         ? `挂载在 [${provider.slug || provider.id}] isActive=${provider.isActive}`
@@ -81,7 +81,7 @@ async function main() {
   console.log('开始强制清空…')
 
   const prefDel = await prisma.userAiPreference.deleteMany({
-    where: { modelId: { in: allModels.map(m => m.id) } }
+    where: { modelId: { in: allModels.map((m: any) => m.id) } }
   })
   console.log(`  - 已删除 ${prefDel.count} 条 UserAiPreference 记录`)
 

@@ -17,7 +17,7 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
 
   // Generate CSV
   const headers = ['ID', 'Title', 'Source', 'Created At', 'Updated At', 'Submissions', 'Accepted']
-  const rows = problems.map((p) => [
+  const rows = problems.map((p: any) => [
     p.id,
     p.title,
     p.aiStatus,
@@ -29,7 +29,7 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
 
   const csvContent = [
     headers.join(','),
-    ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')),
+    ...rows.map((r: any) => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(',')),
   ].join('\n')
 
   // Return as download

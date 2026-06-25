@@ -189,7 +189,7 @@ export async function listSubmissionsAdvanced(
   limit: number,
   filter: { problemId?: string; userId?: string; status?: string }
 ) {
-  const where: Prisma.SubmissionWhereInput = {}
+  const where: any = {}
   if (filter.problemId) where.problemId = filter.problemId
   if (filter.userId) where.userId = filter.userId
   if (filter.status) where.status = filter.status
@@ -208,7 +208,7 @@ export async function listSubmissionsAdvanced(
     prisma.submission.count({ where }),
   ])
 
-  const validSubmissions = submissions.filter((sub) => sub.problem !== null)
+  const validSubmissions = submissions.filter((sub: any) => sub.problem !== null)
   if (validSubmissions.length < submissions.length) {
     logger.warn(`发现 ${submissions.length - validSubmissions.length} 条无效提交记录（对应题目不存在）`)
   }
@@ -333,7 +333,7 @@ export async function listAdminSubmissions(filter: {
   ])
   // 手动查询用户和题目信息，优雅处理已删除的数据
   const submissions = await Promise.all(
-    submissionsRaw.map(async (sub) => {
+    submissionsRaw.map(async (sub: any) => {
       const [user, problem] = await Promise.all([
         prisma.user.findUnique({
           where: { id: sub.userId },

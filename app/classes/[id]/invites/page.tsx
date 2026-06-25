@@ -10,15 +10,15 @@ import {
   Plus,
   Trash2,
   Copy,
-  Calendar,
   Users,
   CheckCircle,
   XCircle,
   Clock,
-  ArrowLeft,
   UserPlus,
-  Send
+  Send,
 } from 'lucide-react'
+import { ClassWorkspaceShell, PageLoading } from '@/components/common'
+import { useClass } from '@/hooks/useClass'
 
 interface Invite {
   id: string
@@ -62,6 +62,8 @@ export default function ClassInvitesPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useUser()
+  const classId = params.id as string
+  const { classData } = useClass(classId)
 
   const [currentTab, setCurrentTab] = useState<'code' | 'direct'>('code')
   const [invites, setInvites] = useState<Invite[]>([])
@@ -92,8 +94,7 @@ export default function ClassInvitesPage() {
     try {
       setLoading(true)
 
-      const response = await fetchWithAuth(`/api/classes/${params.id}/invites`)
-
+      const response = await fetchWithAuth(`/api/classes/${classId}/invites`)
       const data = await response.json()
 
       if (data.success) {
@@ -101,7 +102,7 @@ export default function ClassInvitesPage() {
       } else {
         setError(data.error || '获取邀请码列表失败')
       }
-    } catch (err) {
+    } catch {
       setError('获取邀请码列表失败')
     } finally {
       setLoading(false)
@@ -110,8 +111,7 @@ export default function ClassInvitesPage() {
 
   const fetchDirectInvites = async () => {
     try {
-      const response = await fetchWithAuth(`/api/classes/${params.id}/invites/direct`)
-
+      const response = await fetchWithAuth(`/api/classes/${classId}/invites/direct`)
       const data = await response.json()
 
       if (data.success) {
@@ -126,20 +126,18 @@ export default function ClassInvitesPage() {
     try {
       setCreating(true)
 
-      const body: any = {
-        maxUses: parseInt(maxUses)
+      const body: { maxUses: number; expiresAt?: string } = {
+        maxUses: parseInt(maxUses, 10),
       }
 
       if (expiresAt) {
         body.expiresAt = new Date(expiresAt).toISOString()
       }
 
-      const response = await fetchWithAuth(`/api/classes/${params.id}/invites`, {
+      const response = await fetchWithAuth(`/api/classes/${classId}/invites`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       })
 
       const data = await response.json()
@@ -154,7 +152,7 @@ export default function ClassInvitesPage() {
       } else {
         alert(data.error || '创建邀请码失败')
       }
-    } catch (err) {
+    } catch {
       alert('创建邀请码失败')
     } finally {
       setCreating(false)
@@ -165,8 +163,8 @@ export default function ClassInvitesPage() {
     if (!confirm('确定要删除这个邀请码吗？')) return
 
     try {
-      const response = await fetchWithAuth(`/api/classes/${params.id}/invites/${inviteId}`, {
-        method: 'DELETE'
+      const response = await fetchWithAuth(`/api/classes/${classId}/invites/${inviteId}`, {
+        method: 'DELETE',
       })
 
       const data = await response.json()
@@ -176,7 +174,7 @@ export default function ClassInvitesPage() {
       } else {
         alert(data.error || '删除邀请码失败')
       }
-    } catch (err) {
+    } catch {
       alert('删除邀请码失败')
     }
   }
@@ -190,15 +188,13 @@ export default function ClassInvitesPage() {
     try {
       setInviting(true)
 
-      const response = await fetchWithAuth(`/api/classes/${params.id}/invites/direct`, {
+      const response = await fetchWithAuth(`/api/classes/${classId}/invites/direct`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: inviteeUsername,
-          message: inviteMessage
-        })
+          message: inviteMessage,
+        }),
       })
 
       const data = await response.json()
@@ -212,7 +208,7 @@ export default function ClassInvitesPage() {
       } else {
         alert(data.error || '发送邀请失败')
       }
-    } catch (err) {
+    } catch {
       alert('发送邀请失败')
     } finally {
       setInviting(false)
@@ -225,17 +221,19 @@ export default function ClassInvitesPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    const badges: Record<string, { text: string; className: string; icon: any }> = {
+    const badges: Record<string, { text: string; className: string; icon: typeof CheckCircle }> = {
       active: { text: '活跃', className: 'bg-secondary/10 text-secondary', icon: CheckCircle },
       expired: { text: '已过期', className: 'bg-warning/10 text-warning', icon: Clock },
-      exhausted: { text: '已用完', className: 'bg-error/10 text-error', icon: XCircle }
+      exhausted: { text: '已用完', className: 'bg-error/10 text-error', icon: XCircle },
     }
 
     const badge = badges[status] || badges.active
     const Icon = badge.icon
 
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
+      >
         <Icon className="w-3 h-3" />
         {badge.text}
       </span>
@@ -247,163 +245,160 @@ export default function ClassInvitesPage() {
       pending: { text: '待响应', className: 'bg-warning/10 text-warning' },
       accepted: { text: '已接受', className: 'bg-secondary/10 text-secondary' },
       rejected: { text: '已拒绝', className: 'bg-error/10 text-error' },
-      expired: { text: '已过期', className: 'bg-muted text-muted-foreground' }
+      expired: { text: '已过期', className: 'bg-muted text-muted-foreground' },
     }
     const item = map[status] || map.pending
-    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.className}`}>{item.text}</span>
-  }
-
-  if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">加载中...</p>
-        </div>
-      </div>
+      <span
+        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.className}`}
+      >
+        {item.text}
+      </span>
     )
   }
 
+  if (loading) {
+    return <PageLoading label="加载邀请管理中..." />
+  }
+
+  const toolbar = (
+    <div className="flex border-b border-border -mb-px" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={currentTab === 'code'}
+        onClick={() => setCurrentTab('code')}
+        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          currentTab === 'code'
+            ? 'border-primary text-primary'
+            : 'border-transparent text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        邀请码 ({invites.length})
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={currentTab === 'direct'}
+        onClick={() => setCurrentTab('direct')}
+        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          currentTab === 'direct'
+            ? 'border-primary text-primary'
+            : 'border-transparent text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        直接邀请 ({directInvites.length})
+      </button>
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <button
-          onClick={() => router.push(`/classes/${params.id}`)}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回班级详情
-        </button>
+    <>
+      <ClassWorkspaceShell
+        classId={classId}
+        className={classData?.name}
+        title="邀请管理"
+        description="管理邀请码与定向邀请"
+        icon={Mail}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setShowCreateModal(true)} className="btn btn-primary">
+              <Plus className="w-4 h-4" />
+              创建邀请码
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDirectInviteModal(true)}
+              className="btn btn-secondary"
+            >
+              <Send className="w-4 h-4" />
+              直接邀请
+            </button>
+          </div>
+        }
+        toolbar={toolbar}
+      >
+        {error && (
+          <div className="mb-4 p-4 bg-error/10 border border-error/20 rounded-lg">
+            <p className="text-error text-sm">{error}</p>
+          </div>
+        )}
 
-        <div className="bg-white dark:bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-border/40">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Mail className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">邀请管理</h1>
-                  <p className="text-sm text-muted-foreground">管理班级邀请码和直接邀请</p>
-                </div>
+        {currentTab === 'code' &&
+          (invites.length === 0 ? (
+            <div className="bg-card rounded-lg border border-border p-16 text-center">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+                <Mail className="w-8 h-8 text-muted-foreground" />
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
-                >
-                  <Plus className="w-4 h-4" />
-                  创建邀请码
-                </button>
-                <button
-                  onClick={() => setShowDirectInviteModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors text-sm font-medium"
-                >
-                  <Send className="w-4 h-4" />
-                  直接邀请
-                </button>
-              </div>
+              <div className="text-foreground text-xl font-semibold mb-2">暂无邀请码</div>
+              <div className="text-muted-foreground text-sm">点击「创建邀请码」生成分享链接</div>
             </div>
-          </div>
-
-          <div className="flex border-b border-border/40">
-            <button
-              onClick={() => setCurrentTab('code')}
-              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
-                currentTab === 'code'
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              邀请码列表
-            </button>
-            <button
-              onClick={() => setCurrentTab('direct')}
-              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
-                currentTab === 'direct'
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              直接邀请列表
-            </button>
-          </div>
-        </div>
-
-        {currentTab === 'code' && (
-          <div className="bg-white dark:bg-card rounded-xl border border-border shadow-sm overflow-hidden mt-6">
-            {invites.length === 0 ? (
-              <div className="p-12 text-center">
-                <Mail className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-foreground">暂无邀请码</p>
-                <p className="text-sm text-muted-foreground mt-2">点击上方按钮创建邀请码</p>
-              </div>
-            ) : (
+          ) : (
+            <div className="bg-card rounded-lg border border-border overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-border/40">
-                  <thead className="bg-muted/50">
+                <table className="min-w-full">
+                  <thead className="bg-muted">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         邀请码
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         状态
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         使用情况
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         过期时间
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         创建者
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         创建时间
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         操作
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/40">
+                  <tbody className="divide-y divide-border">
                     {invites.map((invite) => (
-                      <tr key={invite.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                      <tr key={invite.id} className="hover:bg-muted transition-colors">
+                        <td className="px-6 py-3 whitespace-nowrap">
                           <code className="px-2 py-1 bg-primary/10 rounded text-sm font-mono text-primary">
                             {invite.code}
                           </code>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(invite.status)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        <td className="px-6 py-3 whitespace-nowrap">{getStatusBadge(invite.status)}</td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-foreground">
                           {invite.usedCount} / {invite.maxUses === -1 ? '∞' : invite.maxUses}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-muted-foreground">
                           {invite.expiresAt
                             ? new Date(invite.expiresAt).toLocaleDateString('zh-CN')
                             : '永久有效'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-foreground">
                           {invite.creator.nickname || invite.creator.username}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-muted-foreground">
                           {new Date(invite.createdAt).toLocaleDateString('zh-CN')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <td className="px-6 py-3 whitespace-nowrap text-sm">
                           <div className="flex items-center gap-2">
                             <button
+                              type="button"
                               onClick={() => handleCopyLink(invite.inviteLink)}
-                              className="text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+                              className="text-primary hover:text-primary/80 p-1"
                               title="复制链接"
                             >
                               <Copy className="w-4 h-4" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDeleteInvite(invite.id)}
-                              className="text-error hover:text-error/80 flex items-center gap-1 transition-colors"
+                              className="text-error hover:text-error/80 p-1"
                               title="删除"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -415,50 +410,55 @@ export default function ClassInvitesPage() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          ))}
 
-        {currentTab === 'direct' && (
-          <div className="bg-white dark:bg-card rounded-xl border border-border shadow-sm overflow-hidden mt-6">
-            {directInvites.length === 0 ? (
-              <div className="p-12 text-center">
-                <UserPlus className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-foreground">暂无直接邀请</p>
-                <p className="text-sm text-muted-foreground mt-2">点击上方按钮发送邀请</p>
+        {currentTab === 'direct' &&
+          (directInvites.length === 0 ? (
+            <div className="bg-card rounded-lg border border-border p-16 text-center">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+                <UserPlus className="w-8 h-8 text-muted-foreground" />
               </div>
-            ) : (
+              <div className="text-foreground text-xl font-semibold mb-2">暂无直接邀请</div>
+              <div className="text-muted-foreground text-sm">通过用户名向指定用户发送邀请</div>
+            </div>
+          ) : (
+            <div className="bg-card rounded-lg border border-border overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-border/40">
-                  <thead className="bg-muted/50">
+                <table className="min-w-full">
+                  <thead className="bg-muted">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         被邀请人
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         邀请人
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         状态
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         留言
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         邀请时间
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         响应时间
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/40">
+                  <tbody className="divide-y divide-border">
                     {directInvites.map((invite) => (
-                      <tr key={invite.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                      <tr key={invite.id} className="hover:bg-muted transition-colors">
+                        <td className="px-6 py-3 whitespace-nowrap">
                           <div className="flex items-center">
                             {invite.invitee.avatar ? (
-                              <img src={invite.invitee.avatar} alt="" className="w-8 h-8 rounded-full mr-2" />
+                              <img
+                                src={invite.invitee.avatar}
+                                alt=""
+                                className="w-8 h-8 rounded-full mr-2 object-cover"
+                              />
                             ) : (
                               <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center mr-2">
                                 <Users className="w-4 h-4 text-muted-foreground" />
@@ -468,51 +468,46 @@ export default function ClassInvitesPage() {
                               <div className="text-sm font-medium text-foreground">
                                 {invite.invitee.nickname || invite.invitee.username}
                               </div>
-                              <div className="text-xs text-muted-foreground">@{invite.invitee.username}</div>
+                              <div className="text-xs text-muted-foreground">
+                                @{invite.invitee.username}
+                              </div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-foreground">
                           {invite.inviter.nickname || invite.inviter.username}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-3 whitespace-nowrap">
                           {getDirectStatusBadge(invite.status)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground max-w-xs truncate">
+                        <td className="px-6 py-3 text-sm text-muted-foreground max-w-xs truncate">
                           {invite.message || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-muted-foreground">
                           {new Date(invite.createdAt).toLocaleDateString('zh-CN')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                          {invite.respondedAt ? new Date(invite.respondedAt).toLocaleDateString('zh-CN') : '-'}
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                          {invite.respondedAt
+                            ? new Date(invite.respondedAt).toLocaleDateString('zh-CN')
+                            : '-'}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-4 p-4 bg-error/10 border border-error/20 rounded-lg">
-            <p className="text-error">{error}</p>
-          </div>
-        )}
-      </div>
+            </div>
+          ))}
+      </ClassWorkspaceShell>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full shadow-md">
             <h3 className="text-lg font-semibold text-foreground mb-4">创建邀请码</h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  最大使用次数
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">最大使用次数</label>
                 <input
                   type="number"
                   value={maxUses}
@@ -525,9 +520,7 @@ export default function ClassInvitesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  过期时间（可选）
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">过期时间（可选）</label>
                 <input
                   type="datetime-local"
                   value={expiresAt}
@@ -540,15 +533,17 @@ export default function ClassInvitesPage() {
 
             <div className="flex items-center gap-3 mt-6">
               <button
+                type="button"
                 onClick={handleCreateInvite}
                 disabled={creating}
-                className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                className="btn btn-primary flex-1 justify-center"
               >
                 {creating ? '创建中...' : '创建'}
               </button>
               <button
+                type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="flex-1 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors text-sm font-medium"
+                className="btn btn-ghost flex-1 justify-center"
               >
                 取消
               </button>
@@ -558,15 +553,13 @@ export default function ClassInvitesPage() {
       )}
 
       {showDirectInviteModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full shadow-md">
             <h3 className="text-lg font-semibold text-foreground mb-4">直接邀请用户</h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  用户名 *
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">用户名 *</label>
                 <input
                   type="text"
                   value={inviteeUsername}
@@ -578,9 +571,7 @@ export default function ClassInvitesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  邀请留言（可选）
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">邀请留言（可选）</label>
                 <textarea
                   value={inviteMessage}
                   onChange={(e) => setInviteMessage(e.target.value)}
@@ -588,25 +579,27 @@ export default function ClassInvitesPage() {
                   className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm resize-none"
                   placeholder="写下您的邀请留言..."
                 />
-                <p className="text-xs text-muted-foreground mt-1">邀请将在7天后过期</p>
+                <p className="text-xs text-muted-foreground mt-1">邀请将在 7 天后过期</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3 mt-6">
               <button
+                type="button"
                 onClick={handleSendDirectInvite}
                 disabled={inviting || !inviteeUsername.trim()}
-                className="flex-1 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                className="btn btn-secondary flex-1 justify-center"
               >
                 {inviting ? '发送中...' : '发送邀请'}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setShowDirectInviteModal(false)
                   setInviteeUsername('')
                   setInviteMessage('')
                 }}
-                className="flex-1 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors text-sm font-medium"
+                className="btn btn-ghost flex-1 justify-center"
               >
                 取消
               </button>
@@ -614,6 +607,6 @@ export default function ClassInvitesPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

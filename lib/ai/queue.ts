@@ -203,7 +203,7 @@ class AiQueue extends EventEmitter {
             }
 
             // Combine existing and new cases
-            const existingCases = targetProblem.testCases.map(tc => ({
+            const existingCases = targetProblem.testCases.map((tc: any) => ({
                 input: tc.input,
                 output: tc.output,
                 isSample: tc.isSample,
@@ -232,7 +232,7 @@ class AiQueue extends EventEmitter {
             }))
 
             // Transactional update
-            await prisma.$transaction(async (tx) => {
+            await prisma.$transaction(async (tx: any) => {
                 // Delete old cases
                 await tx.testCase.deleteMany({
                     where: { problemId }

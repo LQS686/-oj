@@ -46,6 +46,14 @@ const config: Config = {
           DEFAULT: 'var(--card)',
           foreground: 'var(--card-foreground)',
         },
+        difficulty: {
+          easy: 'var(--difficulty-easy)',
+          'medium-easy': 'var(--difficulty-medium-easy)',
+          medium: 'var(--difficulty-medium)',
+          'medium-hard': 'var(--difficulty-medium-hard)',
+          hard: 'var(--difficulty-hard)',
+          expert: 'var(--difficulty-expert)',
+        },
       },
       fontFamily: {
         sans: ['var(--font-sans)'],
@@ -60,36 +68,17 @@ const config: Config = {
         xl: 'var(--radius-xl)',
       },
       boxShadow: {
-        glow: 'var(--shadow-glow)',
-        soft: 'var(--shadow-soft)',
-        card: 'var(--shadow-card)',
-      },
-      animation: {
-        'float': 'float 6s ease-in-out infinite',
-        'pulse-slow': 'pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'gradient': 'gradient-shift 8s ease infinite',
-      },
-      keyframes: {
-        float: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-15px)' },
-        },
-        'pulse-slow': {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.6' },
-        },
-        'gradient-shift': {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-        },
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
       },
       transitionDuration: {
-        fast: '150ms',
-        normal: '250ms',
-        slow: '400ms',
+        fast: '100ms',
+        normal: '150ms',
+        slow: '250ms',
       },
       transitionTimingFunction: {
-        default: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        default: 'ease',
       },
     },
   },

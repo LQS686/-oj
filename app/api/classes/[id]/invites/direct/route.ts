@@ -84,7 +84,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   }
 
   const invites = await listClassDirectInvitesDetailed(classId)
-  const items = invites.map((invite) => ({
+  const items = invites.map((invite: any) => ({
     id: invite.id,
     classId: invite.classId,
     inviter: {

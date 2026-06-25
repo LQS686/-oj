@@ -63,11 +63,11 @@ export async function listClassNotes(
   if (search) {
     const q = search.toLowerCase()
     return notes.filter(
-      n =>
+      (n: any) =>
         n.title.toLowerCase().includes(q) ||
         n.content.toLowerCase().includes(q) ||
         n.category.toLowerCase().includes(q) ||
-        n.tags.some(t => t.toLowerCase().includes(q))
+        n.tags.some((t: any) => t.toLowerCase().includes(q))
     )
   }
   return notes

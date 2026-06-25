@@ -127,7 +127,7 @@ export async function getUserPublicInfo(userId: string) {
           select: {
             submissions: true,
             problems: { where: { isPublic: true } },
-            posts: { where: { status: 'published', isDeleted: false } },
+            solutions: true,
             comments: { where: { isDeleted: false } },
           },
         },
@@ -177,7 +177,7 @@ export async function getUserFullStats(userId: string) {
   type SubmissionData = (typeof submissions)[number]
 
   // 最近10条提交
-  const recentSubmissions = submissions.slice(0, 10).map(sub => ({
+  const recentSubmissions = submissions.slice(0, 10).map((sub: any) => ({
     id: sub.id,
     problemId: sub.problem?.problemNumber || sub.problemId,
     realProblemId: sub.problemId,
@@ -190,12 +190,12 @@ export async function getUserFullStats(userId: string) {
 
   // AC 提交
   const acSubmissions = submissions.filter(
-    sub => sub.status === 'AC' || sub.status === 'Accepted'
+    (sub: any) => sub.status === 'AC' || sub.status === 'Accepted'
   )
 
   // 难度分布（AC 唯一题）
   const solvedProblemsMap = new Map<string, string | null>()
-  acSubmissions.forEach(sub => {
+  acSubmissions.forEach((sub: any) => {
     if (sub.problem && !solvedProblemsMap.has(sub.problemId)) {
       solvedProblemsMap.set(sub.problemId, sub.problem.difficulty)
     }
@@ -207,8 +207,8 @@ export async function getUserFullStats(userId: string) {
     }
   })
   const difficultyDistribution = Object.entries(difficultyCount)
-    .map(([difficulty, count]) => ({ difficulty, count }))
-    .sort((a, b) => b.count - a.count)
+    .map(([difficulty, count]: [string, number]) => ({ difficulty, count }))
+    .sort((a: any, b: any) => b.count - a.count)
 
   // 各状态提交数
   const statusCount: Record<string, number> = submissions.reduce(
@@ -266,9 +266,9 @@ export async function getUserFullStats(userId: string) {
   const heatmapData = buildHeatmap(lastWeekSubmissions)
   const yearHeatmap = buildHeatmap(yearSubmissions)
 
-  const [createdProblems, postsCount, commentsCount, contestsCount] = await Promise.all([
+  const [createdProblems, solutionsCount, commentsCount, contestsCount] = await Promise.all([
     prisma.problem.count({ where: { authorId: userId } }),
-    prisma.post.count({ where: { authorId: userId } }),
+    prisma.solution.count({ where: { authorId: userId } }),
     prisma.comment.count({ where: { authorId: userId } }),
     prisma.contestParticipant.count({ where: { userId } }),
   ])
@@ -292,7 +292,7 @@ export async function getUserFullStats(userId: string) {
       created: createdProblems,
     },
     languages: languageCount,
-    community: { posts: postsCount, comments: commentsCount },
+    community: { solutions: solutionsCount, comments: commentsCount },
     contests: { participated: contestsCount },
     activity: {
       lastWeek: heatmapData,
@@ -328,7 +328,7 @@ export async function getCurrentUserProfile(userId: string) {
         select: {
           submissions: true,
           problems: true,
-          posts: true,
+          solutions: true,
           comments: true,
         },
       },
@@ -383,7 +383,7 @@ export async function updateCurrentUserBasic(
       isAdmin: true,
       updatedAt: true,
     },
-  }).then((result) => {
+  }).then((result: any) => {
     if (result) clearUserCache(userId)
     return result
   })
@@ -575,32 +575,57 @@ export async function uploadUserAvatar(
 }
 
 /**
- * 活跃用户列表（综合发帖权重 3 + 评论权重 1）
+ * 活跃用户列表（题解权重 3 + 评论权重 1 + 近期提交）
  */
 export async function listActiveUsers(limit = 5) {
-  const [postCounts, commentCounts] = await Promise.all([
-    prisma.post.groupBy({
+  const since = new Date()
+  since.setDate(since.getDate() - 30)
+
+  const [solutionCounts, commentCounts, recentSubmitters] = await Promise.all([
+    prisma.solution.groupBy({
       by: ['authorId'],
       _count: { id: true },
-      where: { isDeleted: false, status: 'published' },
     }),
     prisma.comment.groupBy({
       by: ['authorId'],
       _count: { id: true },
       where: { isDeleted: false },
     }),
+    prisma.submission.groupBy({
+      by: ['userId'],
+      _count: { id: true },
+      where: { submittedAt: { gte: since } },
+    }),
   ])
   const userScores = new Map<string, number>()
-  postCounts.forEach(item => {
+  solutionCounts.forEach((item: any) => {
     userScores.set(item.authorId, (userScores.get(item.authorId) || 0) + item._count.id * 3)
   })
-  commentCounts.forEach(item => {
+  commentCounts.forEach((item: any) => {
     userScores.set(item.authorId, (userScores.get(item.authorId) || 0) + item._count.id)
   })
+  recentSubmitters.forEach((item: any) => {
+    userScores.set(item.userId, (userScores.get(item.userId) || 0) + item._count.id)
+  })
   const sortedUserIds = Array.from(userScores.entries())
-    .sort((a, b) => b[1] - a[1])
+    .sort((a: any, b: any) => b[1] - a[1])
     .slice(0, limit)
-    .map(entry => entry[0])
+    .map((entry: any) => entry[0])
+  if (sortedUserIds.length === 0) {
+    return prisma.user.findMany({
+      take: limit,
+      orderBy: { rating: 'desc' },
+      select: {
+        id: true,
+        username: true,
+        nickname: true,
+        rating: true,
+        color: true,
+        avatar: true,
+        _count: { select: { solutions: true, comments: { where: { isDeleted: false } } } },
+      },
+    })
+  }
   const users = await prisma.user.findMany({
     where: { id: { in: sortedUserIds } },
     select: {
@@ -612,13 +637,13 @@ export async function listActiveUsers(limit = 5) {
       avatar: true,
       _count: {
         select: {
-          posts: { where: { isDeleted: false, status: 'published' } },
+          solutions: true,
           comments: { where: { isDeleted: false } },
         },
       },
     },
   })
-  return sortedUserIds.map(id => users.find(u => u.id === id)).filter(u => u !== undefined)
+  return sortedUserIds.map((id: any) => users.find((u: any) => u.id === id)).filter((u: any) => u !== undefined)
 }
 
 /**
@@ -1033,7 +1058,7 @@ export async function filterUserIdsForBatchAction(
     where: { id: { in: filtered }, isSuperAdmin: true },
     select: { id: true },
   })
-  const superAdminIds = new Set(superAdmins.map((u) => u.id))
+  const superAdminIds = new Set(superAdmins.map((u: any) => u.id))
   const finalUserIds = filtered.filter((id) => !superAdminIds.has(id))
   if (finalUserIds.length === 0) {
     const err: any = new Error('选中的用户包含超级管理员，不可被' + (action === 'update' ? '修改' : '删除'))

@@ -27,9 +27,9 @@ export async function listProblemTags(): Promise<string[]> {
   })
 
   const tagSet = new Set<string>()
-  problems.forEach((p) => {
+  problems.forEach((p: any) => {
     if (Array.isArray(p.tags)) {
-      p.tags.forEach((tag) => {
+      p.tags.forEach((tag: any) => {
         if (tag && typeof tag === 'string' && tag.trim()) {
           tagSet.add(tag.trim())
         }
@@ -111,7 +111,7 @@ export async function getProblemStatusCounts(problemId: string) {
       where: { problemId },
       _count: { status: true },
     })
-    return groups.reduce((acc: any, g) => {
+    return groups.reduce((acc: any, g: any) => {
       acc[g.status] = g._count.status
       return acc
     }, {} as Record<string, number>)
@@ -277,16 +277,16 @@ export async function listProblemSubmissionsMerged(
       }),
     ])
 
-  const classUserIds = Array.from(new Set(classSubmissions.map((s) => s.userId)))
+  const classUserIds = Array.from(new Set(classSubmissions.map((s: any) => s.userId)))
   const users = classUserIds.length
     ? await prisma.user.findMany({
         where: { id: { in: classUserIds } },
         select: { id: true, username: true, nickname: true },
       })
     : []
-  const userMap = new Map(users.map((u) => [u.id, u]))
+  const userMap = new Map(users.map((u: any) => [u.id, u]))
 
-  const formattedClass = classSubmissions.map((s) => ({
+  const formattedClass = classSubmissions.map((s: any) => ({
     id: s.id,
     status: s.status,
     language: s.language,
@@ -305,7 +305,7 @@ export async function listProblemSubmissionsMerged(
 
   const all = [...submissions, ...formattedClass]
     .sort(
-      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      (a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
     )
     .slice((page - 1) * limit, page * limit)
 
@@ -478,7 +478,7 @@ export async function createAdminProblem(
   const timeLimitValue = parseLimit(timeLimit, 1000)
   const memoryLimitValue = parseLimit(memoryLimit, 128)
 
-  const problemData: Prisma.ProblemCreateInput = {
+  const problemData: any = {
     problemNumber: finalProblemNumber,
     title: sanitizedTitle,
     description: sanitizedDescription,
@@ -511,7 +511,7 @@ export async function createAdminProblem(
   }
 
   const problem = await prisma.problem.create({
-    data: problemData as Prisma.ProblemCreateInput,
+    data: problemData,
     include: { testCases: true },
   })
 
@@ -674,7 +674,7 @@ export async function updateAdminProblem(
   return prisma.problem.findUnique({
     where: { id },
     include: { testCases: { orderBy: { orderIndex: 'asc' } } },
-  }).then((result) => {
+  }).then((result: any) => {
     clearProblemCache(id)
     return result
   })

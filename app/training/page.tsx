@@ -18,6 +18,7 @@ import TrainingCard from '@/components/training/TrainingCard'
 import SourceFilterCards, { type TrainingSource } from '@/components/training/SourceFilterCards'
 import type { TrainingListItem } from '@/lib/training/types'
 import { usePermission } from '@/hooks/usePermission'
+import { EducationalPageShell, PageLoading } from '@/components/common'
 
 const SOURCE_LABELS: Record<TrainingSource, string> = {
   all: '全部题单',
@@ -43,7 +44,7 @@ export default function TrainingListPage() {
       setError(null)
       const params = new URLSearchParams({
         page: String(page),
-        limit: '18',
+        limit: '24',
       })
       // 后端 DB 层过滤（不再做后置 filter）
       if (source === 'official') {
@@ -74,7 +75,7 @@ export default function TrainingListPage() {
         )
       }
 
-      items = items.map((item, idx) => ({ ...item, number: (page - 1) * 18 + idx + 1 } as any))
+      items = items.map((item, idx) => ({ ...item, number: (page - 1) * 24 + idx + 1 } as any))
       setTrainings(items)
       setTotal(typeof data.data?.total === 'number' ? data.data.total : 0)
       setTotalPages(typeof data.data?.totalPages === 'number' ? data.data.totalPages : 1)
@@ -121,46 +122,23 @@ export default function TrainingListPage() {
   const canCreateTraining = usePermission('training.create')
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8">
-        {/* 大标题 */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30">
-              <BookOpen className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">训练题单</h1>
-              <p className="text-muted-foreground text-sm mt-0.5">分组学习，循序渐进</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex glass px-4 py-2 rounded-xl border border-primary/20">
-              <span className="text-primary-light font-bold">{total}</span>
-              <span className="text-muted-foreground ml-1.5 text-sm">个题单</span>
-            </div>
-            {isLoggedIn && canCreateTraining && (
-              <Link
-                href="/training/create"
-                className="btn-primary btn"
-                title="创建我自己的题单"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">创建题单</span>
-              </Link>
-            )}
-          </div>
-        </div>
-
-        {/* 3 大来源分类卡片 */}
-        <SourceFilterCards
-          active={source}
-          onChange={handleSourceChange}
-          isLoggedIn={isLoggedIn}
-        />
-
-        {/* 列表区：明确的 section header + 分割线，与导航分层 */}
-        <div className="mt-8 mb-4 flex items-center justify-between gap-3 border-b border-border pb-3">
+    <EducationalPageShell
+      title="训练题单"
+      description={`分组学习，循序渐进 · 共 ${total} 个题单`}
+      icon={BookOpen}
+      actions={
+        isLoggedIn && canCreateTraining ? (
+          <Link href="/training/create" className="btn-primary btn" title="创建我自己的题单">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">创建题单</span>
+          </Link>
+        ) : undefined
+      }
+      toolbar={
+        <SourceFilterCards active={source} onChange={handleSourceChange} isLoggedIn={isLoggedIn} />
+      }
+    >
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-border pb-3">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-foreground">
               {SOURCE_LABELS[source] ?? '题单列表'}
@@ -178,15 +156,9 @@ export default function TrainingListPage() {
 
         {/* 列表 */}
         {loading ? (
-          <div className="py-20 text-center">
-            <div className="relative w-12 h-12 mx-auto mb-4">
-              <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
-              <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-            </div>
-            <p className="text-muted-foreground">加载中...</p>
-          </div>
+          <PageLoading label="加载题单中..." />
         ) : error ? (
-          <div className="card-static rounded-2xl p-12 text-center max-w-md mx-auto">
+          <div className="card-static rounded-lg p-12 text-center max-w-md mx-auto">
             <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
               <AlertCircle className="w-8 h-8 text-error" />
             </div>
@@ -198,8 +170,8 @@ export default function TrainingListPage() {
             </button>
           </div>
         ) : trainings.length === 0 ? (
-          <div className="card-static rounded-2xl p-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
+          <div className="card-static rounded-lg p-16 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
               {source === 'mine' ? <UserCheck className="w-8 h-8 text-muted-foreground" /> : <BookOpen className="w-8 h-8 text-muted-foreground" />}
             </div>
             <div className="text-foreground text-xl font-semibold mb-2">
@@ -218,9 +190,9 @@ export default function TrainingListPage() {
             )}
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-            {trainings.map(t => (
-              <TrainingCard key={t.id} training={t} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            {trainings.map((t) => (
+              <TrainingCard key={t.id} training={t} variant="grid" />
             ))}
           </div>
         )}
@@ -247,7 +219,6 @@ export default function TrainingListPage() {
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </EducationalPageShell>
   )
 }

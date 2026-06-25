@@ -90,7 +90,7 @@ export const PUT = withApi.auth(withPermission('admin.access')(async (req) => {
   }
 
   // 事务：先删后插
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     await tx.rolePermission.deleteMany({ where: { role } })
     if (permissionIds.length > 0) {
       await tx.rolePermission.createMany({
