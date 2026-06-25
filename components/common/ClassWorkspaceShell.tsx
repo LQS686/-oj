@@ -34,7 +34,6 @@ const defaultNav = (classId: string): ClassNavItem[] => [
   { href: `/classes/${classId}/problems`, label: '题目', match: 'prefix' },
   { href: `/classes/${classId}/notes`, label: '笔记', match: 'prefix' },
   { href: `/classes/${classId}/members`, label: '成员', match: 'prefix' },
-  { href: `/classes/${classId}/points`, label: '积分', match: 'prefix' },
   { href: `/classes/${classId}/manage`, label: '管理', match: 'prefix' },
 ]
 

@@ -244,7 +244,7 @@ export async function mergeClassMemberPermissions(
   })
 }
 
-/** 获取成员活动概况（提交 / 笔记 / 积分） */
+/** 获取成员活动概况（提交 / 笔记） */
 export async function getClassMemberActivity(classId: string, memberId: string) {
   const target = await prisma.classMember.findUnique({
     where: { classId_userId: { classId, userId: memberId } },
@@ -254,7 +254,7 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
   })
   if (!target) return null
 
-  const [submissions, notes, points] = await Promise.all([
+  const [submissions, notes] = await Promise.all([
     prisma.classAssignmentSubmission.findMany({
       where: { assignment: { classId }, userId: memberId },
       orderBy: { submittedAt: 'desc' },
@@ -266,14 +266,9 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
       orderBy: { createdAt: 'desc' },
       take: 20,
     }),
-    prisma.pointsHistory.findMany({
-      where: { classId, userId: memberId },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    }),
   ])
 
-  const [totalSubmissions, acCount, totalNotes, account] = await Promise.all([
+  const [totalSubmissions, acCount, totalNotes] = await Promise.all([
     prisma.classAssignmentSubmission.count({
       where: { assignment: { classId }, userId: memberId },
     }),
@@ -281,10 +276,6 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
       where: { assignment: { classId }, userId: memberId, status: 'AC' },
     }),
     prisma.classNote.count({ where: { classId, authorId: memberId } }),
-    prisma.pointsAccount.findUnique({
-      where: { classId_userId: { classId, userId: memberId } },
-      select: { total: true },
-    }),
   ])
 
   const recentActivities = [
@@ -300,12 +291,6 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
       title: `发布了笔记 "${n.title}"`,
       status: 'published',
       createdAt: n.createdAt,
-    })),
-    ...points.map((p: any) => ({
-      type: 'points',
-      title: `获得了 ${p.amount} 积分: ${p.reason}`,
-      status: 'earned',
-      createdAt: p.createdAt,
     })),
   ]
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -324,7 +309,6 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
       totalSubmissions,
       acCount,
       totalNotes,
-      totalPoints: account?.total || 0,
     },
     recentActivities,
   }
