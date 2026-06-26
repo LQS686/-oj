@@ -8,6 +8,7 @@ import { formatTime, formatMemory } from '@/lib/utils'
 import { getStatusText } from '@/lib/status'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 interface TestResult {
  testId: string
@@ -76,6 +77,13 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  const [isRefreshing, setIsRefreshing] = useState(false)
  // 防止与 socket 推送/轮询产生竞态
  const isRefreshingRef = useRef(false)
+
+ const submissionTabTitle = submission?.problem?.title
+   ? `${submission.problem.title} - 提交`
+   : submission
+     ? '提交详情'
+     : undefined
+ useDocumentTitle(submissionTabTitle)
 
  const fetchSubmission = useCallback(async (showRefreshing = false) => {
  if (isRefreshingRef.current) return

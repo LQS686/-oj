@@ -20,7 +20,9 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { usePermission } from '@/hooks/usePermission'
 import Link from 'next/link'
+import AssignmentOpenLink from '@/components/assignment/AssignmentOpenLink'
 import { ClassWorkspaceShell, PageLoading } from '@/components/common'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 interface Assignment {
  id: string
@@ -94,6 +96,7 @@ export default function ClassDetailPage() {
 
  // 注意：usePermission 必须在所有 early return 之前调用（Rules of Hooks）
  const canManageMembers = usePermission('class.member.manage')
+ useDocumentTitle(classData?.name)
 
  useEffect(() => {
  fetchClassDetail()
@@ -279,7 +282,13 @@ export default function ClassDetailPage() {
  : { text: '进行中', cls: 'text-secondary bg-secondary/10' }
  const fmt = (d?: string) => d ? `${new Date(d).getMonth()+1}/${new Date(d).getDate()} ${String(new Date(d).getHours()).padStart(2,'0')}:${String(new Date(d).getMinutes()).padStart(2,'0')}` : '-'
  return (
- <Link key={a.id} href={`/classes/${classId}/assignments/${a.id}`} className="block p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/[0.02] transition-colors">
+ <AssignmentOpenLink
+ key={a.id}
+ href={`/classes/${classId}/assignments/${a.id}`}
+ assignmentTitle={a.title}
+ classLabel={classData.name}
+ className="block p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-primary/[0.02] transition-colors"
+ >
  <div className="flex items-start justify-between gap-2">
  <div className="min-w-0 flex-1">
  <div className="flex items-center gap-1.5 mb-1">
@@ -293,7 +302,7 @@ export default function ClassDetailPage() {
  </div>
  </div>
  </div>
- </Link>
+ </AssignmentOpenLink>
  )
  })}
  </div>

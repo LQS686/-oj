@@ -3,10 +3,17 @@ import MarkdownRenderer from '../common/MarkdownRenderer'
 import { FileCode, FileInput, FileOutput, Lightbulb, Tag, Copy, Check, ArrowUp } from 'lucide-react'
 
 interface ProblemDescriptionProps {
- problem: any
+  problem: any
+  /** 竞赛等场景：弱化区块标题、不重复标签区 */
+  compact?: boolean
+  hideTags?: boolean
 }
 
-export default function ProblemDescription({ problem }: ProblemDescriptionProps) {
+export default function ProblemDescription({
+  problem,
+  compact = false,
+  hideTags = false,
+}: ProblemDescriptionProps) {
  const [copied, setCopied] = useState<string | null>(null)
 
  const copyToClipboard = (text: string, id: string) => {
@@ -19,51 +26,69 @@ export default function ProblemDescription({ problem }: ProblemDescriptionProps)
  window.scrollTo({ top: 0, behavior: 'smooth' })
  }
 
+ const sectionTitle = (icon: React.ReactNode, title: string) =>
+    compact ? (
+      <h3 className="text-sm font-semibold text-foreground mb-2">{title}</h3>
+    ) : (
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">{icon}</div>
+        <h3 className="text-lg font-bold text-foreground">{title}</h3>
+      </div>
+    )
+
  return (
- <div className="space-y-8 relative">
+ <div className={compact ? 'space-y-6 relative' : 'space-y-8 relative'}>
  <section className="animate-fadeIn">
+ {!compact && (
  <div className="flex items-center gap-2.5 mb-4">
  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
  <FileCode className="w-4 h-4 text-primary-light" />
  </div>
  <h3 className="text-lg font-bold text-foreground">题目描述</h3>
  </div>
+ )}
  <div className="prose prose-slate max-w-none">
  <MarkdownRenderer content={problem.description} />
  </div>
  </section>
 
  <section className="animate-fadeIn">
+ {compact ? sectionTitle(null, '输入格式') : (
  <div className="flex items-center gap-2.5 mb-4">
  <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
  <FileInput className="w-4 h-4 text-secondary-light" />
  </div>
  <h3 className="text-lg font-bold text-foreground">输入格式</h3>
  </div>
+ )}
  <div className="prose prose-slate max-w-none">
  <MarkdownRenderer content={problem.input} />
  </div>
  </section>
 
  <section className="animate-fadeIn">
+ {compact ? sectionTitle(null, '输出格式') : (
  <div className="flex items-center gap-2.5 mb-4">
  <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
  <FileOutput className="w-4 h-4 text-accent-light" />
  </div>
  <h3 className="text-lg font-bold text-foreground">输出格式</h3>
  </div>
+ )}
  <div className="prose prose-slate max-w-none">
  <MarkdownRenderer content={problem.output} />
  </div>
  </section>
 
  <section className="animate-fadeIn">
+ {compact ? sectionTitle(null, '样例') : (
  <div className="flex items-center gap-2.5 mb-4">
  <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
  <FileCode className="w-4 h-4 text-cyan-400" />
  </div>
  <h3 className="text-lg font-bold text-foreground">样例</h3>
  </div>
+ )}
  <div>
  {(problem.samples && problem.samples.length > 0) ? (
  problem.samples.map((sample: any, index: number) => (
@@ -136,12 +161,14 @@ export default function ProblemDescription({ problem }: ProblemDescriptionProps)
 
  {problem.hint && (
  <section className="animate-fadeIn">
+ {compact ? sectionTitle(null, '提示') : (
  <div className="flex items-center gap-2.5 mb-4">
  <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
  <Lightbulb className="w-4 h-4 text-accent-light" />
  </div>
  <h3 className="text-lg font-bold text-foreground">提示</h3>
  </div>
+ )}
  <div className="bg-primary/5 border-l-4 border-primary p-5 rounded-xl animate-fadeIn">
  <div className="prose prose-slate max-w-none text-muted-foreground">
  <MarkdownRenderer content={problem.hint} />
@@ -150,7 +177,7 @@ export default function ProblemDescription({ problem }: ProblemDescriptionProps)
  </section>
  )}
 
- {problem.tags && problem.tags.length > 0 && (
+ {!hideTags && problem.tags && problem.tags.length > 0 && (
  <section className="animate-fadeIn">
  <div className="flex items-center gap-2.5 mb-4">
  <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">

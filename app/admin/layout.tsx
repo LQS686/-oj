@@ -1,9 +1,8 @@
-export const dynamic = 'force-dynamic'
+import { pageMetadata } from '@/lib/metadata'
 
-export default function AdminRootLayout({
- children,
-}: {
- children: React.ReactNode
-}) {
- return children
+export const dynamic = 'force-dynamic'
+export const metadata = pageMetadata('管理后台')
+
+export default function AdminRootLayout({ children }: { children: React.ReactNode }) {
+  return children
 }

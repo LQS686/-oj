@@ -6,160 +6,187 @@ import { Clock, FileText, List, BarChart2, Info, Play, Timer, CheckCircle2 } fro
 import { useEffect, useState } from 'react'
 
 interface Contest {
- id: string
- title: string
- startTime: Date
- endTime: Date
- type: string
+  id: string
+  title: string
+  startTime: Date
+  endTime: Date
+  type: string
 }
 
-export default function ContestHeader({ contest, canViewDetails = false }: { contest: Contest, canViewDetails?: boolean }) {
- const pathname = usePathname()
- const [timeLeft, setTimeLeft] = useState<string>('')
- const [status, setStatus] = useState<string>('')
- const [progress, setProgress] = useState(0)
+function formatDuration(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
 
- const formatDuration = (ms: number) => {
- const totalSeconds = Math.floor(ms / 1000)
- const hours = Math.floor(totalSeconds / 3600)
- const minutes = Math.floor((totalSeconds % 3600) / 60)
- const seconds = totalSeconds % 60
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24)
+    const h = hours % 24
+    return h > 0 ? `${days}天 ${h}小时` : `${days}天`
+  }
 
- if (hours > 24) {
- const days = Math.floor(hours / 24)
- return `${days}天 ${hours % 24}小时`
- }
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+}
 
- return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
- }
+function formatContestRange(start: Date, end: Date) {
+  const fmt = (d: Date) =>
+    d.toLocaleString('zh-CN', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+  return `${fmt(new Date(start))} — ${fmt(new Date(end))}`
+}
 
- useEffect(() => {
- const timer = setInterval(() => {
- const now = new Date().getTime()
- const start = new Date(contest.startTime).getTime()
- const end = new Date(contest.endTime).getTime()
- 
- if (now < start) {
- setStatus('即将开始')
- const diff = start - now
- setTimeLeft(formatDuration(diff))
- setProgress(0)
- } else if (now > end) {
- setStatus('已结束')
- setTimeLeft('00:00:00')
- setProgress(100)
- } else {
- setStatus('进行中')
- const diff = end - now
- setTimeLeft(formatDuration(diff))
- const total = end - start
- const current = now - start
- setProgress(Math.min(100, (current / total) * 100))
- }
- }, 1000)
+export default function ContestHeader({
+  contest,
+  canViewDetails = false,
+}: {
+  contest: Contest
+  canViewDetails?: boolean
+}) {
+  const pathname = usePathname()
+  const [timeLeft, setTimeLeft] = useState('')
+  const [status, setStatus] = useState('')
+  const [progress, setProgress] = useState(0)
 
- return () => clearInterval(timer)
- }, [contest])
+  useEffect(() => {
+    const tick = () => {
+      const now = Date.now()
+      const start = new Date(contest.startTime).getTime()
+      const end = new Date(contest.endTime).getTime()
 
- const getStatusConfig = () => {
- switch (status) {
- case '进行中':
- return { tag: 'tag-success', icon: Play, bgClass: 'bg-secondary/10', iconClass: 'text-secondary-light' }
- case '即将开始':
- return { tag: 'tag-primary', icon: Timer, bgClass: 'bg-primary/10', iconClass: 'text-primary-light' }
- case '已结束':
- return { tag: 'tag', icon: CheckCircle2, bgClass: 'bg-muted', iconClass: 'text-muted-foreground' }
- default:
- return { tag: 'tag', icon: Clock, bgClass: 'bg-muted', iconClass: 'text-muted-foreground' }
- }
- }
+      if (now < start) {
+        setStatus('即将开始')
+        setTimeLeft(formatDuration(start - now))
+        setProgress(0)
+      } else if (now > end) {
+        setStatus('已结束')
+        setTimeLeft('00:00:00')
+        setProgress(100)
+      } else {
+        setStatus('进行中')
+        setTimeLeft(formatDuration(end - now))
+        const total = end - start
+        setProgress(total > 0 ? Math.min(100, ((now - start) / total) * 100) : 0)
+      }
+    }
+    tick()
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
+  }, [contest])
 
- const baseTabs = [
- { name: '概览', path: `/contests/${contest.id}`, icon: Info },
- ]
- 
- const detailTabs = [
- { name: '题目', path: `/contests/${contest.id}/problems`, icon: FileText },
- { name: '提交', path: `/contests/${contest.id}/submissions`, icon: List },
- { name: '排名', path: `/contests/${contest.id}/rank`, icon: BarChart2 },
- ]
- 
- const tabs = canViewDetails ? [...baseTabs, ...detailTabs] : baseTabs
+  const getStatusConfig = () => {
+    switch (status) {
+      case '进行中':
+        return {
+          tag: 'tag-success',
+          icon: Play,
+          ring: 'ring-secondary/20',
+          bar: 'bg-gradient-to-r from-secondary to-secondary-light',
+        }
+      case '即将开始':
+        return {
+          tag: 'tag-primary',
+          icon: Timer,
+          ring: 'ring-primary/20',
+          bar: 'bg-gradient-to-r from-primary to-primary-light',
+        }
+      case '已结束':
+        return {
+          tag: 'tag',
+          icon: CheckCircle2,
+          ring: 'ring-border',
+          bar: 'bg-muted-foreground/50',
+        }
+      default:
+        return {
+          tag: 'tag',
+          icon: Clock,
+          ring: 'ring-border',
+          bar: 'bg-primary',
+        }
+    }
+  }
 
- const isActive = (path: string) => {
- if (path === `/contests/${contest.id}`) {
- return pathname === path
- }
- return pathname.startsWith(path)
- }
+  const baseTabs = [{ name: '概览', path: `/contests/${contest.id}`, icon: Info }]
+  const detailTabs = [
+    { name: '题目', path: `/contests/${contest.id}/problems`, icon: FileText },
+    { name: '提交', path: `/contests/${contest.id}/submissions`, icon: List },
+    { name: '排名', path: `/contests/${contest.id}/rank`, icon: BarChart2 },
+  ]
+  const tabs = canViewDetails ? [...baseTabs, ...detailTabs] : baseTabs
 
- const statusConfig = getStatusConfig()
- const StatusIcon = statusConfig.icon
+  const isActive = (path: string) => {
+    if (path === `/contests/${contest.id}`) return pathname === path
+    return pathname.startsWith(path)
+  }
 
- return (
- <div className="card-static border-b border-border">
- <div className="container mx-auto px-4 pt-6">
- <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
- <div>
- <div className="flex items-center gap-3 mb-2 flex-wrap">
- <div className={`w-10 h-10 rounded-xl ${statusConfig.bgClass} flex items-center justify-center`}>
- <StatusIcon className={`w-5 h-5 ${statusConfig.iconClass}`} />
- </div>
- <h1 className="text-2xl font-bold text-foreground">{contest.title}</h1>
- <span className={statusConfig.tag}>
- {status || '加载中...'}
- </span>
- <span className="tag tag-primary">
- {contest.type}
- </span>
- </div>
- <div className="flex items-center gap-4 text-sm text-muted-foreground">
- <div className="flex items-center gap-1">
- <Clock className="w-4 h-4 text-primary-light" />
- <span>{new Date(contest.startTime).toLocaleString('zh-CN')} ~ {new Date(contest.endTime).toLocaleString('zh-CN')}</span>
- </div>
- </div>
- </div>
+  const statusConfig = getStatusConfig()
+  const StatusIcon = statusConfig.icon
+  const countdownLabel =
+    status === '已结束' ? '已结束' : status === '即将开始' ? '距开始' : '剩余'
 
- <div className="w-full md:w-64">
- <div className="flex justify-between text-sm mb-1">
- <span className="text-muted-foreground">{status === '已结束' ? '已结束' : status === '即将开始' ? '距离开始' : '剩余时间'}</span>
- <span className="font-mono font-medium text-primary-light">{timeLeft}</span>
- </div>
- <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
- <div 
- className={`h-2.5 rounded-full transition-all duration-1000 ${
- status === '已结束' ? 'bg-muted-foreground' : 
- status === '进行中' ? 'bg-gradient-to-r from-secondary to-secondary-light' : 
- 'bg-gradient-to-r from-primary to-primary-light'
- }`}
- style={{ width: `${progress}%` }}
- ></div>
- </div>
- </div>
- </div>
+  return (
+    <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-30">
+      <div className="container mx-auto px-4">
+        {/* 主信息：单行优先，窄屏自动换行 */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 min-h-[52px]">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div
+              className={`shrink-0 w-9 h-9 rounded-lg bg-muted flex items-center justify-center ring-1 ${statusConfig.ring}`}
+            >
+              <StatusIcon className="w-4 h-4 text-primary-light" />
+            </div>
+            <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">{contest.title}</h1>
+            <span className={`shrink-0 ${statusConfig.tag} text-xs`}>{status || '…'}</span>
+            <span className="tag tag-primary text-xs shrink-0">{contest.type}</span>
+          </div>
 
- <div className="card-static p-1.5 rounded-xl flex gap-1 overflow-x-auto pb-4">
- {tabs.map((tab) => {
- const Icon = tab.icon
- const active = isActive(tab.path)
- return (
- <Link
- key={tab.path}
- href={tab.path}
- className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap ${
- active
- ? 'bg-primary text-white shadow-lg'
- : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
- }`}
- >
- <Icon className="w-4 h-4" />
- {tab.name}
- </Link>
- )
- })}
- </div>
- </div>
- </div>
- )
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground shrink-0">
+            <span className="hidden md:inline-flex items-center gap-1.5 max-w-[280px] lg:max-w-none truncate">
+              <Clock className="w-3.5 h-3.5 shrink-0 text-primary-light" />
+              {formatContestRange(contest.startTime, contest.endTime)}
+            </span>
+            <div className="flex items-center gap-2 min-w-[140px] sm:min-w-[168px]">
+              <span className="text-muted-foreground whitespace-nowrap">{countdownLabel}</span>
+              <span className="font-mono font-semibold text-primary-light tabular-nums">{timeLeft}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 细进度条：不占独立大块 */}
+        <div className="h-0.5 w-full bg-muted rounded-full overflow-hidden -mt-0.5 mb-0">
+          <div
+            className={`h-full rounded-full transition-all duration-1000 ${statusConfig.bar}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        {/* Tab：与题目页一致的底边线样式 */}
+        <nav className="flex gap-0 overflow-x-auto -mb-px scrollbar-none" aria-label="竞赛导航">
+          {tabs.map((tab) => {
+            const Icon = tab.icon
+            const active = isActive(tab.path)
+            return (
+              <Link
+                key={tab.path}
+                href={tab.path}
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  active
+                    ? 'border-primary text-primary-light'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {tab.name}
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
+    </header>
+  )
 }

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Megaphone, Pin, ArrowLeft, Loader2 } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import type { PublicAnnouncementDetail } from '@/lib/announcement/service'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 export default function AnnouncementDetailPage() {
   const params = useParams()
@@ -14,6 +15,8 @@ export default function AnnouncementDetailPage() {
   const [item, setItem] = useState<PublicAnnouncementDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  useDocumentTitle(item?.title)
 
   useEffect(() => {
     if (!id) return

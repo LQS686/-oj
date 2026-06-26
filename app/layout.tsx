@@ -5,14 +5,16 @@ import { UserProvider } from "@/contexts/UserContext"
 import { SettingsProvider } from "@/contexts/SettingsContext"
 import { SwrProvider } from "@/components/SwrProvider"
 import { Toaster } from "react-hot-toast"
+import DocumentTitleProvider from "@/components/DocumentTitleProvider"
+import { SITE_TITLE_SUFFIX } from "@/lib/document-title"
 
 export const metadata: Metadata = {
-  title: "OJ Platform - 在线编程学习平台",
+  title: `首页 - ${SITE_TITLE_SUFFIX}`,
   description: "海量题库、实时评测、专业竞赛，助你从入门到精通",
   keywords: ["OJ", "编程", "算法", "竞赛", "题库", "在线评测"],
   authors: [{ name: "OJ Platform Class" }],
   openGraph: {
-    title: "OJ Platform - 在线编程学习平台",
+    title: `首页 - ${SITE_TITLE_SUFFIX}`,
     description: "海量题库、实时评测、专业竞赛，助你从入门到精通",
     type: "website",
     locale: "zh_CN",
@@ -38,6 +40,7 @@ export default function RootLayout({
         <SwrProvider>
           <SettingsProvider>
             <UserProvider>
+              <DocumentTitleProvider />
               <Navbar />
               <main className="relative">
                 {children}

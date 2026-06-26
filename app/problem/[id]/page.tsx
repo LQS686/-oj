@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, use } from 'react'
+import { useState, useEffect, useRef, use, useMemo } from 'react'
 import {
   BookOpen,
   Send,
   AlertCircle,
   Wifi,
   WifiOff,
-  ArrowLeft,
   XCircle,
   Code as CodeIcon,
   CheckCircle2,
@@ -31,6 +30,7 @@ import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { usePermission } from '@/hooks/usePermission'
 import Link from 'next/link'
+import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -67,6 +67,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const returnTab = searchParams.get('returnTab') || 'info'
   const fromTraining = searchParams.get('from') === 'training'
   const trainingId = searchParams.get('trainingId')
+  const trainingTitle = searchParams.get('trainingTitle')
+  const classNameParam = searchParams.get('className')
 
   const isAssignmentContext = fromAssignment === '1'
   
@@ -89,6 +91,41 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
   // 注意：usePermission 必须在所有 early return 之前调用（Rules of Hooks）
   const canEditProblem = usePermission('problem.edit')
+
+  const titleContext = useMemo(() => {
+    if (fromAssignment && classId) {
+      return {
+        kind: 'assignment' as const,
+        assignmentTitle: assignmentTitle || undefined,
+      }
+    }
+    if (fromTraining) {
+      return {
+        kind: 'training' as const,
+        trainingTitle: trainingTitle || undefined,
+      }
+    }
+    if (classId || classNameParam) {
+      return {
+        kind: 'class' as const,
+        className: classNameParam || undefined,
+      }
+    }
+    return {
+      kind: 'library' as const,
+      problemNumber: problem?.problemNumber ?? undefined,
+    }
+  }, [
+    fromAssignment,
+    classId,
+    assignmentTitle,
+    fromTraining,
+    trainingTitle,
+    classNameParam,
+    problem?.problemNumber,
+  ])
+
+  useProblemDocumentTitle(problem?.title, titleContext)
 
   useEffect(() => {
     const fetchProblem = async () => {
@@ -388,11 +425,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             <AlertCircle className="w-8 h-8 text-error" />
           </div>
           <p className="text-error text-lg mb-6">{problemError || '题目不存在'}</p>
-          <button
-            onClick={() => router.push('/problems')}
-            className="btn-primary btn"
-          >
-            返回题库
+          <button onClick={() => router.back()} className="btn-primary btn" type="button">
+            返回
           </button>
         </div>
       </div>
@@ -406,28 +440,6 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   return (
     <div className="min-h-screen pb-8">
       <div className="container mx-auto px-4 pt-6">
-        <button
-          onClick={() => {
-            if (fromAssignment && classId) {
-              router.replace(`/classes/${classId}/assignments/${fromAssignment}?tab=${returnTab}`)
-            } else if (fromTraining && trainingId) {
-              router.push(`/training/${trainingId}`)
-            } else {
-              router.push('/problems')
-            }
-          }}
-          className="flex items-center gap-2 text-muted-foreground hover:text-primary-light mb-4 transition-colors cursor-pointer group"
-        >
-          <ArrowLeft className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-[-2px]" />
-          <span className="transition-colors duration-300 group-hover:text-primary-light">
-            {fromAssignment && classId
-              ? `返回作业`
-              : fromTraining && trainingId
-                ? '返回题单'
-                : '返回题库'}
-          </span>
-        </button>
-
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <span className="font-mono text-sm font-bold text-primary-light bg-primary/10 px-3 py-1 rounded-lg">
             {problem.problemNumber || problem.id}

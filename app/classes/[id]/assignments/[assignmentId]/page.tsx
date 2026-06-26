@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import {
- ArrowLeft,
  Clock,
  CheckCircle2,
  XCircle,
@@ -29,6 +28,8 @@ import ProblemDescription from '@/components/problem/ProblemDescription'
 import { getDifficultyColor } from '@/lib/status'
 import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
+import { useClass } from '@/hooks/useClass'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -78,8 +79,10 @@ interface ClassMember {
 
 export default function AssignmentDetailPage() {
  const params = useParams()
+ const classId = params.id as string
  const router = useRouter()
  const { user } = useUser()
+ const { classData } = useClass(classId)
  const [assignment, setAssignment] = useState<Assignment | null>(null)
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
@@ -113,6 +116,11 @@ export default function AssignmentDetailPage() {
  fetchAssignment()
  fetchClassMembers()
  }, [params.id, params.assignmentId])
+
+ useDocumentTitle(assignment?.title, {
+   mode: 'assignment',
+   className: classData?.name,
+ })
 
  useEffect(() => {
  if (!classMembers.length || !user) return
@@ -388,14 +396,6 @@ export default function AssignmentDetailPage() {
  return (
  <div className="min-h-screen bg-background">
  <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
- <button
- onClick={() => router.push(`/classes/${params.id}?tab=assignments`)}
- className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
- >
- <ArrowLeft className="w-4 h-4" />
- 返回作业列表
- </button>
-
  <div className="bg-card rounded-xl border border-border overflow-hidden mb-4 shadow-sm">
  <div className="px-5 py-4 border-b border-border">
  <div className="flex items-start justify-between gap-3">

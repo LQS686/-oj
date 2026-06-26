@@ -85,3 +85,47 @@
 {"timestamp":"2026-06-05T07:52:18.445Z","level":"warn","message":"[generateProblems] 质量自检发现 1 条问题","meta":{"issues":[{"problemIndex":0,"reason":"test_cases 覆盖维度不足 8 个（实际 5），缺失：a, b, c, d, e","details":["test_cases 覆盖维度不足 8 个（实际 5），缺失：a, b, c, d, e"]}]}}
 {"timestamp":"2026-06-05T07:52:19.813Z","level":"warn","message":"[ai-queue] AI 返回的 solution_article 缺失，跳过题解创建","meta":{"problemId":"6a228033a5a6fab6e8847882","problemNumber":"P1021"}}
 {"timestamp":"2026-06-05T08:52:42.960Z","level":"warn","message":"[generateProblems] 质量自检发现 1 条问题","meta":{"issues":[{"problemIndex":0,"reason":"test_cases 覆盖维度不足 8 个（实际 7），缺失：b, d, e","details":["test_cases 覆盖维度不足 8 个（实际 7），缺失：b, d, e"]}]}}
+{"timestamp":"2026-06-26T08:26:54.857Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=m9nE9cDlpLSFerbXAAAj"}
+{"timestamp":"2026-06-26T09:14:51.573Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=V8AEgF1oEQVVYoxWAAB2"}
+{"timestamp":"2026-06-26T09:14:52.336Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=m-WduGiPlsbp3yqMAAB4"}
+{"timestamp":"2026-06-26T09:14:52.963Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=w7wnjducrFjOm_2vAAB6"}
+{"timestamp":"2026-06-26T09:14:53.516Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=zMwqtj_qPPOZiLfJAAB8"}
+{"timestamp":"2026-06-26T09:14:54.408Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=kJtsICkj0xcpat_3AAB-"}
+{"timestamp":"2026-06-26T09:15:03.144Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=P-ZBbU4QE16C55wpAACA"}
+{"timestamp":"2026-06-26T09:15:04.810Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=ce4b5FKccnQvuXPrAACC"}
+{"timestamp":"2026-06-26T09:15:06.136Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=HOtVQye94uRlGdafAACE"}
+{"timestamp":"2026-06-26T09:15:14.680Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=F5-69eAuZY36t6UuAACG"}
+{"timestamp":"2026-06-26T09:15:21.128Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=vd470S0uqEVBgLSeAACI"}
+{"timestamp":"2026-06-26T09:15:21.965Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=KSLbc85wtLI-Z4h4AACK"}
+{"timestamp":"2026-06-26T09:15:22.829Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=tn4l-moqrh9whb4AAACM"}
+{"timestamp":"2026-06-26T09:15:23.835Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=Oo7GraUQrR96EP90AACO"}
+{"timestamp":"2026-06-26T09:15:25.109Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=k-eVooj5jbYff63AAACQ"}
+{"timestamp":"2026-06-26T09:15:26.987Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=Ndgo0h_PH1C2PFJ8AACS"}
+{"timestamp":"2026-06-26T09:29:22.268Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=MqV_tA-mdRODkxIJAACu"}
+{"timestamp":"2026-06-26T09:45:39.406Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=Zizawq6CD8XExkzmAADU"}
+{"timestamp":"2026-06-26T09:45:39.492Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=X-OTbk8HsEiMIUHOAADX"}
+{"timestamp":"2026-06-26T10:30:36.150Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=Hx9UcCtNvdH7PNqJAAEJ"}
+{"timestamp":"2026-06-26T10:30:36.685Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=HgcBwTmnv9CaBGQaAAEL"}
+{"timestamp":"2026-06-26T10:30:37.136Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=ku1CwdTiPrdR5WQmAAEN"}
+{"timestamp":"2026-06-26T10:30:37.621Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=N2nVsdtIpvfZHqGVAAEP"}
+{"timestamp":"2026-06-26T10:30:38.775Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=y1cd4qt5QzGMhUzJAAER"}
+{"timestamp":"2026-06-26T10:30:39.177Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=GGJf20eSnwjeuV7gAAET"}
+{"timestamp":"2026-06-26T12:08:16.318Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=a-E5gCHmmYITHbESAAGR"}
+{"timestamp":"2026-06-26T12:08:16.895Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=H5DlFS1K0S2JKR7FAAGT"}
+{"timestamp":"2026-06-26T12:08:17.398Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=LjpbBgwYAZxJ5-rXAAGV"}
+{"timestamp":"2026-06-26T12:08:17.931Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=NMAfoYPc3kjqrI-VAAGX"}
+{"timestamp":"2026-06-26T12:08:18.393Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=czSD2Uoftovf5DCzAAGZ"}
+{"timestamp":"2026-06-26T12:08:18.814Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=n2gLlLbBAyOxSJyfAAGb"}
+{"timestamp":"2026-06-26T12:08:19.207Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=-Coqvn5SwMBF52z-AAGd"}
+{"timestamp":"2026-06-26T12:08:19.588Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=gpSAz8QpXfvs7Oy0AAGf"}
+{"timestamp":"2026-06-26T12:08:20.419Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=DVuZSYNOdHwZtW_6AAGh"}
+{"timestamp":"2026-06-26T12:08:21.587Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=K01Rle2-AXu-vK0uAAGj"}
+{"timestamp":"2026-06-26T12:08:22.150Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=vSRk6TnnabUCpT1MAAGl"}
+{"timestamp":"2026-06-26T12:08:23.052Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=NRvyIlPb8xiJNP0eAAGn"}
+{"timestamp":"2026-06-26T12:08:23.432Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=f7UGrr2j0nF8CsfcAAGp"}
+{"timestamp":"2026-06-26T12:08:23.964Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=Y1AeO1nZIiTo36kBAAGr"}
+{"timestamp":"2026-06-26T12:08:24.662Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=1QbdJOcJ5ZB6An--AAGt"}
+{"timestamp":"2026-06-26T12:08:25.342Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=cNPwL1RYFsZepxHKAAGv"}
+{"timestamp":"2026-06-26T12:08:28.748Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=xQVAsrprM5O-cRJKAAGx"}
+{"timestamp":"2026-06-26T12:08:31.403Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=WBG2cWq9jMEIYh2PAAGz"}
+{"timestamp":"2026-06-26T12:08:31.433Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=l8PtR_lbyXG_26rSAAG1"}

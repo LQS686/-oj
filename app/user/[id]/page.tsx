@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { User, Mail, Calendar, Trophy, Code, Target, TrendingUp, AlertCircle, Sparkles } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { User as UserType, ActivityData, RecentSubmission, DifficultyDistribution } from '@/types/models'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { motion, easeOut } from 'framer-motion'
 
 export default function UserProfilePage() {
@@ -18,6 +19,11 @@ export default function UserProfilePage() {
  const [activityData, setActivityData] = useState<ActivityData[]>([])
  const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([])
  const [difficultyDistribution, setDifficultyDistribution] = useState<DifficultyDistribution[]>([])
+
+ const profileTitle = user
+   ? `${user.nickname || user.username} - 用户主页`
+   : undefined
+ useDocumentTitle(profileTitle)
 
  useEffect(() => {
  fetchUserInfo()

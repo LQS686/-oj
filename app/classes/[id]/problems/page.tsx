@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
 import { fetchWithAuth } from '@/lib/api/base'
 import { BookOpen, Search, AlertCircle, CheckCircle2, Filter } from 'lucide-react'
 import {
@@ -163,9 +164,11 @@ export default function ClassProblemsPage() {
                 : '0.0'
 
             return (
-              <Link
+              <ProblemOpenLink
                 key={problem.id}
-                href={`/problem/${problem.id}?classId=${classId}`}
+                href={`/problem/${problem.id}?classId=${classId}${classData?.name ? `&className=${encodeURIComponent(classData.name)}` : ''}`}
+                problemTitle={problem.title}
+                titleContext={{ kind: 'class', className: classData?.name }}
                 className={`${denseListRowClass} group`}
               >
                 <div className="col-span-6 md:col-span-6 flex items-center gap-3 min-w-0">
@@ -213,7 +216,7 @@ export default function ClassProblemsPage() {
                     <span className="text-sm text-muted-foreground">-</span>
                   )}
                 </div>
-              </Link>
+              </ProblemOpenLink>
             )
           })}
         </DenseListShell>

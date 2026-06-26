@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
+import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
 import { CheckCircle, XCircle, MinusCircle, AlertCircle, FileText } from 'lucide-react'
 
 interface Problem {
@@ -21,11 +21,18 @@ export default function ContestProblemsPage() {
  const params = useParams()
  const router = useRouter()
  const [problems, setProblems] = useState<Problem[]>([])
+ const [contestTitle, setContestTitle] = useState('')
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
 
  useEffect(() => {
  fetchProblems()
+ fetch(`/api/contests/${params.id}`)
+ .then((r) => r.json())
+ .then((d) => {
+ if (d.success && d.data?.title) setContestTitle(d.data.title)
+ })
+ .catch(() => {})
  }, [])
 
  const fetchProblems = async () => {
@@ -103,12 +110,18 @@ export default function ContestProblemsPage() {
  </span>
  </td>
  <td className="px-6 py-4">
- <Link 
- href={`/contests/${params.id}/problems/${p.id}`} 
+ <ProblemOpenLink
+ href={`/contests/${params.id}/problems/${p.id}`}
+ problemTitle={p.title}
+ titleContext={{
+ kind: 'contest',
+ label: p.label,
+ contestTitle: contestTitle || undefined,
+ }}
  className="text-foreground hover:text-primary-light font-medium text-lg transition-colors"
  >
  {p.title}
- </Link>
+ </ProblemOpenLink>
  </td>
  <td className="px-6 py-4 whitespace-nowrap">
  <div className="text-muted-foreground">

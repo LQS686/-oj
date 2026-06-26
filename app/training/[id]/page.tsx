@@ -15,6 +15,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
 import {
  BookOpen, Users, Eye, Calendar, User as UserIcon,
  AlertCircle, RefreshCw, Sparkles, Tag, CheckCircle2,
@@ -24,6 +25,7 @@ import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import JoinTrainingButton from '@/components/training/JoinTrainingButton'
 import { ProgressCircle } from '@/components/training/ProgressCircle'
 import type { TrainingDetail, TrainingProblemStatus } from '@/lib/training/types'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 interface User {
  id: string
@@ -33,6 +35,8 @@ interface User {
 }
 
 type Tab = 'intro' | 'problems'
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 function statusBadge(status: TrainingProblemStatus | undefined) {
  switch (status) {
@@ -71,6 +75,8 @@ export default function TrainingDetailPage() {
  const [activeTab, setActiveTab] = useState<Tab>('intro')
  const [judgeStatus, setJudgeStatus] = useState<{ problemId: string; status: string } | null>(null)
  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+
+ useDocumentTitle(training?.title)
 
  const fetchDetail = useCallback(async (showLoading = true) => {
  if (!trainingId) return
@@ -315,14 +321,16 @@ export default function TrainingDetailPage() {
  const accepted = (item.problem as any)?.totalAccepted || 0
  const submit = (item.problem as any)?.totalSubmit || 0
  const rate = submit > 0 ? (accepted / submit) * 100 : 0
+ const letter =
+   LETTERS[item.orderIndex] || LETTERS[training.problems.indexOf(item)] || String(item.orderIndex + 1)
+ const problemHref = `/training/${trainingId}/problems/${problemId}`
  return (
  <tr
  key={problemId}
- className="border-t border-border hover:bg-primary/5 cursor-pointer"
- onClick={() => window.location.href = `/problem/${problemId}?from=training&trainingId=${trainingId}`}
+ className="border-t border-border hover:bg-primary/5"
  >
- <td className="px-4 py-3 text-center font-mono text-muted-foreground text-xs">
- {(item.problem as any)?.problemNumber || item.orderIndex + 1}
+ <td className="px-4 py-3 text-center font-mono font-bold text-primary-light text-sm">
+ {letter}
  </td>
  <td className="px-4 py-3">
  <div className="flex items-center gap-2">
@@ -333,13 +341,18 @@ export default function TrainingDetailPage() {
  {statusBadge(isJudging ? undefined : item.status)}
  </span>
  )}
- <Link
- href={`/problem/${problemId}?from=training&trainingId=${trainingId}`}
+ <ProblemOpenLink
+ href={problemHref}
+ problemTitle={item.problem?.title || '题目'}
+ titleContext={{
+ kind: 'training',
+ label: letter,
+ trainingTitle: training?.title,
+ }}
  className="text-primary-light hover:underline line-clamp-1"
- onClick={e => e.stopPropagation()}
  >
  {item.problem?.title}
- </Link>
+ </ProblemOpenLink>
  {item.required && (
  <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning border border-warning/20 flex-shrink-0">
  必做

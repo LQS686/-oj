@@ -732,6 +732,74 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
   return { training, problems }
 }
 
+/** 题单做题页：A/B/C 编号 + 通过/尝试状态（对齐竞赛题目列表） */
+export async function listTrainingProblemsWithStatus(
+  trainingId: string,
+  userId: string | null
+) {
+  const training = await prisma.training.findUnique({
+    where: { id: trainingId },
+    select: { id: true, title: true, status: true, isPublic: true, authorId: true },
+  })
+  if (!training) return null
+
+  const trainingProblems = await prisma.trainingProblem.findMany({
+    where: { trainingId },
+    orderBy: { orderIndex: 'asc' },
+    include: {
+      problem: {
+        select: {
+          id: true,
+          title: true,
+          problemNumber: true,
+          difficulty: true,
+        },
+      },
+    },
+  })
+
+  const problemIds = trainingProblems.map((tp) => tp.problemId)
+  const userSubmissionStatus: Record<string, 'Accepted' | 'Attempted' | null> = {}
+
+  if (userId && problemIds.length > 0) {
+    const submissions = await prisma.submission.findMany({
+      where: { userId, problemId: { in: problemIds } },
+      select: { problemId: true, status: true },
+      orderBy: { submittedAt: 'desc' },
+    })
+    const map = new Map<string, Set<string>>()
+    for (const sub of submissions) {
+      if (!map.has(sub.problemId)) map.set(sub.problemId, new Set())
+      map.get(sub.problemId)!.add(sub.status)
+    }
+    for (const pid of problemIds) {
+      const statuses = map.get(pid)
+      if (statuses?.has('Accepted') || statuses?.has('AC')) {
+        userSubmissionStatus[pid] = 'Accepted'
+      } else if (statuses && statuses.size > 0) {
+        userSubmissionStatus[pid] = 'Attempted'
+      } else {
+        userSubmissionStatus[pid] = null
+      }
+    }
+  }
+
+  const problems = trainingProblems.map((tp) => ({
+    id: tp.problemId,
+    orderIndex: tp.orderIndex,
+    label: String.fromCharCode(65 + tp.orderIndex),
+    title: tp.problem.title,
+    problemNumber: tp.problem.problemNumber,
+    difficulty: tp.problem.difficulty,
+    status: userId ? userSubmissionStatus[tp.problemId] ?? null : null,
+  }))
+
+  return {
+    training: { id: training.id, title: training.title },
+    problems,
+  }
+}
+
 export async function getUserTrainingProgressDetail(
   trainingId: string,
   userId: string

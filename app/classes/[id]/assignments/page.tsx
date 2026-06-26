@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import AssignmentOpenLink from '@/components/assignment/AssignmentOpenLink'
 import { FileText, Plus, Calendar } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { ClassWorkspaceShell, PageLoading, DenseListShell, denseListRowClass } from '@/components/common'
@@ -179,8 +180,9 @@ function AssignmentRow({ assignment, classId }: { assignment: Assignment; classI
 	const problemCount = assignment.problemCount || 0
 
 	return (
-		<Link
+		<AssignmentOpenLink
 			href={`/classes/${classId}/assignments/${assignment.id}`}
+			assignmentTitle={assignment.title}
 			className={`${denseListRowClass} group`}
 		>
 			<div className="col-span-6 md:col-span-5 flex items-center">
@@ -208,6 +210,6 @@ function AssignmentRow({ assignment, classId }: { assignment: Assignment; classI
 					{status.text}
 				</span>
 			</div>
-		</Link>
+		</AssignmentOpenLink>
 	)
 }

@@ -1,8 +1,25 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
-import ContestHeader from './ContestHeader'
+import ContestHeaderShell from './ContestHeaderShell'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
+import { formatPageDocumentTitle } from '@/lib/page-titles'
+import type { Metadata } from 'next'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const { id } = await params
+  const contest = await prisma.contest.findUnique({
+    where: { id },
+    select: { title: true },
+  })
+  return {
+    title: formatPageDocumentTitle(contest?.title?.trim() || '竞赛详情'),
+  }
+}
 
 export default async function ContestLayout({
  children,
@@ -68,11 +85,8 @@ export default async function ContestLayout({
  }
 
  return (
- <div className="min-h-screen bg-background">
- <ContestHeader contest={contest} canViewDetails={canViewDetails} />
- <div className="container mx-auto px-4 py-6">
+ <ContestHeaderShell contest={contest} canViewDetails={canViewDetails}>
  {children}
- </div>
- </div>
+ </ContestHeaderShell>
  )
 }

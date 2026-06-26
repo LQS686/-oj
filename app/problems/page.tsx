@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import Link from 'next/link'
+import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
 import {
   Search,
   Check,
@@ -311,9 +311,14 @@ export default function ProblemsPage() {
                 const isSolved = score === 100
 
                 return (
-                  <Link
+                  <ProblemOpenLink
                     key={problem.id}
                     href={`/problem/${problem.problemNumber || problem.id}`}
+                    problemTitle={problem.title}
+                    titleContext={{
+                      kind: 'library',
+                      problemNumber: problem.problemNumber || problem.id,
+                    }}
                     className={`${denseListRowClass} group`}
                   >
                     <div className="col-span-1 flex items-center justify-center">
@@ -368,7 +373,7 @@ export default function ProblemsPage() {
                     <div className="col-span-1 flex items-center justify-center">
                       <MoreHorizontal className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                     </div>
-                  </Link>
+                  </ProblemOpenLink>
                 )
               })}
             </DenseListShell>
