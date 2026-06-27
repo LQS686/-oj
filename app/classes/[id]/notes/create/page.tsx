@@ -40,8 +40,31 @@ export default function CreateNotePage() {
   useEffect(() => {
     if (!user) {
       router.push('/login')
+      return
     }
-  }, [user, router])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetchWithAuth(`/api/classes/${classId}`)
+        const data = await res.json()
+        if (cancelled) return
+        if (!data.success) {
+          router.replace(`/classes/${classId}`)
+          return
+        }
+        const me = data.data?.members?.find((m: { userId: string }) => m.userId === user.id)
+        const canCreate = me && ['owner', 'assistant'].includes(me.role)
+        if (!canCreate) {
+          router.replace(`/classes/${classId}`)
+        }
+      } catch {
+        if (!cancelled) router.replace(`/classes/${classId}`)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user, classId, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

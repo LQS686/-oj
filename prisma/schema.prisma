@@ -287,6 +287,7 @@ model Class {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
   name        String       @unique
   description String?
+  announcement String?
   avatar      String?
   isPublic    Boolean      @default(true)
   maxMembers  Int          @default(50)  // 最大成员数

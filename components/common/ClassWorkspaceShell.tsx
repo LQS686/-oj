@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import type { LucideIcon } from 'lucide-react'
 import { EducationalPageShell } from './EducationalPageShell'
 
@@ -11,6 +11,8 @@ export interface ClassNavItem {
   label: string
   /** 精确匹配或前缀匹配（默认前缀，首页仅精确） */
   match?: 'exact' | 'prefix'
+  /** 与 href 同时匹配 searchParams tab（如 manage） */
+  tab?: string
 }
 
 export interface ClassWorkspaceShellProps {
@@ -21,32 +23,28 @@ export interface ClassWorkspaceShellProps {
   icon?: LucideIcon
   iconClassName?: string
   actions?: ReactNode
-  /** 覆盖默认班级导航 */
   navItems?: ClassNavItem[]
   toolbar?: ReactNode
   children: ReactNode
   width?: 'default' | 'narrow' | 'full'
+  /** 默认不显示返回班级列表 */
+  showBack?: boolean
 }
 
-const defaultNav = (classId: string): ClassNavItem[] => [
-  { href: `/classes/${classId}`, label: '概览', match: 'exact' },
-  { href: `/classes/${classId}/assignments`, label: '作业', match: 'prefix' },
-  { href: `/classes/${classId}/problems`, label: '题目', match: 'prefix' },
-  { href: `/classes/${classId}/notes`, label: '笔记', match: 'prefix' },
-  { href: `/classes/${classId}/members`, label: '成员', match: 'prefix' },
-  { href: `/classes/${classId}/manage`, label: '管理', match: 'prefix' },
+export const classOverviewNav = (classId: string): ClassNavItem[] => [
+  { href: `/classes/${classId}`, label: '概览', match: 'exact', tab: 'overview' },
+  { href: `/classes/${classId}`, label: '管理', match: 'exact', tab: 'manage' },
 ]
 
-function isNavActive(pathname: string, item: ClassNavItem): boolean {
-  if (item.match === 'exact') {
-    return pathname === item.href || pathname === `${item.href}/`
-  }
-  return pathname === item.href || pathname.startsWith(`${item.href}/`)
+function isNavActive(pathname: string, classId: string, tab: string | null, item: ClassNavItem): boolean {
+  const base = `/classes/${classId}`
+  const onClassHome =
+    pathname === base || pathname === `${base}/`
+  if (!onClassHome) return false
+  if (item.tab === 'manage') return tab === 'manage'
+  return tab !== 'manage'
 }
 
-/**
- * 班级教学工作区：班级列表返回 + 横向功能导航 + 统一标题区。
- */
 export function ClassWorkspaceShell({
   classId,
   className: classTitle,
@@ -59,25 +57,30 @@ export function ClassWorkspaceShell({
   toolbar,
   children,
   width = 'default',
+  showBack = false,
 }: ClassWorkspaceShellProps) {
   const pathname = usePathname()
-  const items = navItems ?? defaultNav(classId)
+  const searchParams = useSearchParams()
+  const tab = searchParams.get('tab')
+  const items = navItems ?? classOverviewNav(classId)
 
   const nav = (
     <nav
-      className="flex flex-wrap gap-1 border-b border-border pb-0 -mb-px"
+      className="flex gap-1 border-b border-border"
       aria-label="班级功能导航"
     >
       {items.map((item) => {
-        const active = isNavActive(pathname, item)
+        const active = isNavActive(pathname, classId, tab, item)
+        const href =
+          item.tab === 'manage' ? `/classes/${classId}?tab=manage` : `/classes/${classId}`
         return (
           <Link
-            key={item.href}
-            href={item.href}
-            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors rounded-t-md ${
+            key={item.label}
+            href={href}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               active
                 ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {item.label}
@@ -97,11 +100,11 @@ export function ClassWorkspaceShell({
   return (
     <EducationalPageShell
       title={title}
-      description={description ?? (classTitle ? `班级：${classTitle}` : undefined)}
+      description={description}
       icon={icon}
       iconClassName={iconClassName}
       actions={actions}
-      backHref="/classes"
+      backHref={showBack ? '/classes' : undefined}
       backLabel="返回班级列表"
       toolbar={combinedToolbar}
       width={width}

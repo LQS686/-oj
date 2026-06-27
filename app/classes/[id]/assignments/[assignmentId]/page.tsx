@@ -30,6 +30,7 @@ import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useClass } from '@/hooks/useClass'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import EditAssignmentModal from '@/components/class/EditAssignmentModal'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -91,6 +92,7 @@ export default function AssignmentDetailPage() {
  const [classMembers, setClassMembers] = useState<ClassMember[]>([])
  const [userRole, setUserRole] = useState<string>('student')
  const [showActions, setShowActions] = useState(false)
+ const [editOpen, setEditOpen] = useState(false)
 
  const [activeTab, setActiveTab] = useState<'problems' | 'ranking' | 'stats'>('problems')
  const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
@@ -406,27 +408,35 @@ export default function AssignmentDetailPage() {
  </span>
  </div>
  {isAdminOrOwner && (
- <div className="relative shrink-0">
+ <div className="flex items-center gap-2 shrink-0">
  <button
+ type="button"
+ onClick={() => setEditOpen(true)}
+ className="btn btn-ghost btn-sm border border-border inline-flex items-center gap-1.5"
+ >
+ <Edit className="w-4 h-4" /> 编辑
+ </button>
+ <div className="relative">
+ <button
+ type="button"
  onClick={() => setShowActions(!showActions)}
  className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
  onBlur={() => setTimeout(() => setShowActions(false), 150)}
+ aria-label="更多操作"
  >
  <MoreHorizontal className="w-5 h-5" />
  </button>
  {showActions && (
  <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-10 py-1 min-w-[100px]">
- <Link
- href={`/classes/${params.id}/assignments/${params.assignmentId}/edit`}
- className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-foreground transition-colors"
+ <button
+ type="button"
+ className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted text-error transition-colors"
  >
- <Edit className="w-4 h-4" /> 编辑
- </Link>
- <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted text-error transition-colors">
  <Trash2 className="w-4 h-4" /> 删除
  </button>
  </div>
  )}
+ </div>
  </div>
  )}
  </div>
@@ -867,6 +877,18 @@ export default function AssignmentDetailPage() {
  </div>
  </div>
  </div>
+ <EditAssignmentModal
+ classId={classId}
+ assignmentId={params.assignmentId as string}
+ open={editOpen}
+ onClose={() => setEditOpen(false)}
+ onSaved={() => {
+ void fetchAssignment()
+ }}
+ onDeleted={() => {
+ router.push(`/classes/${classId}`)
+ }}
+ />
  </div>
  )
 }

@@ -22,6 +22,7 @@ export interface ClassDetailResult {
   id: string
   name: string
   description: string | null
+  announcement: string | null
   avatar: string | null
   isPublic: boolean
   maxMembers: number | null
@@ -65,6 +66,7 @@ export async function getClassDetail(classId: string): Promise<ClassDetailResult
     id: classData.id,
     name: classData.name,
     description: classData.description,
+    announcement: classData.announcement ?? null,
     avatar: classData.avatar,
     isPublic: classData.isPublic,
     maxMembers: classData.maxMembers,
@@ -88,6 +90,7 @@ export async function getClassDetail(classId: string): Promise<ClassDetailResult
 export interface ClassUpdateInput {
   name?: string
   description?: string | null
+  announcement?: string | null
   avatar?: string | null
   isPublic?: boolean
   maxMembers?: number
@@ -97,6 +100,7 @@ export async function updateClass(classId: string, data: ClassUpdateInput) {
   const updateData: any = {}
   if (data.name !== undefined) updateData.name = data.name.trim()
   if (data.description !== undefined) updateData.description = data.description
+  if (data.announcement !== undefined) updateData.announcement = data.announcement
   if (data.avatar !== undefined) updateData.avatar = data.avatar
   if (data.isPublic !== undefined) updateData.isPublic = data.isPublic
   if (data.maxMembers !== undefined) updateData.maxMembers = data.maxMembers
@@ -122,7 +126,7 @@ export interface ListClassesFilter {
 
 export interface CreateClassInput {
   name: string
-  description?: string
+  announcement?: string | null
   avatar?: string
   isPublic?: boolean
   maxMembers?: number
@@ -179,7 +183,8 @@ export async function createClass(input: CreateClassInput) {
   return prisma.class.create({
     data: {
       name: input.name.trim(),
-      description: input.description || '',
+      description: '',
+      announcement: input.announcement?.trim() || null,
       avatar: input.avatar || '',
       isPublic: input.isPublic !== false,
       maxMembers: input.maxMembers || 50,
@@ -2012,7 +2017,7 @@ export async function buildClassAssignmentDetail(
   if (!detail) return null
   const { assignment, members, submissions } = detail
 
-  const problems = await prisma.problem.findMany({
+  const problemsRaw = await prisma.problem.findMany({
     where: { id: { in: assignment.problemIds } },
     select: {
       id: true,
@@ -2024,6 +2029,10 @@ export async function buildClassAssignmentDetail(
       totalAccepted: true,
     },
   })
+  const problemById = new Map(problemsRaw.map((p) => [p.id, p]))
+  const problems = assignment.problemIds
+    .map((id) => problemById.get(id))
+    .filter(Boolean) as typeof problemsRaw
 
   // 成员完成情况
   const memberProgress: any[] = members

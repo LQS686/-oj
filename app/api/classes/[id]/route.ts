@@ -107,6 +107,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   const body = await readJson<{
     name?: string
     description?: string | null
+    announcement?: string | null
     avatar?: string | null
     isPublic?: boolean
     maxMembers?: number

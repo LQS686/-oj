@@ -31,7 +31,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const currentMemberRole = currentMember!.role
   const currentMemberPerms = (currentMember!.permissions as any) || {}
 
-  const isAdmin = currentMemberRole === 'owner' || currentMemberRole === 'admin'
+  const isAdmin = currentMemberRole === 'owner' || currentMemberRole === 'assistant'
   const hasInvitePermission = !!currentMemberPerms.canInviteMembers
   if (!isAdmin && !hasInvitePermission) throw403('您没有邀请权限')
 
@@ -79,7 +79,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const currentMember = await getCurrentClassMember(classId, user.id)
   if (!currentMember) throw403('您不是班级成员')
   const currentMemberRole = currentMember!.role
-  if (currentMemberRole !== 'owner' && currentMemberRole !== 'admin') {
+  if (currentMemberRole !== 'owner' && currentMemberRole !== 'assistant') {
     throw403('只有管理员可以查看邀请列表')
   }
 

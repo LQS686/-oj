@@ -3,8 +3,9 @@
  * - GET /api/classes  公开列表（含 / 排除我的班级）
  * - POST /api/classes  创建班级
  */
-import { withApi, ok, readJson, readQuery, throw400, throw409 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, readQuery, throw400, throw403, throw409 } from '@/lib/api/withApi'
 import { createClass, findClassByName, listClasses } from '@/lib/class/service'
+import { canCreateClass } from '@/lib/permissions'
 
 export const GET = withApi.public(async (req) => {
   const q = readQuery<{ page?: string; pageSize?: string; search?: string; myClasses?: string }>(req)
@@ -35,9 +36,13 @@ export const GET = withApi.public(async (req) => {
 })
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  if (!canCreateClass(user)) {
+    throw403('只有教师和管理员可以创建班级')
+  }
+
   const body = await readJson<{
     name?: string
-    description?: string
+    announcement?: string | null
     avatar?: string
     isPublic?: boolean
     maxMembers?: number
@@ -55,7 +60,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
 
   const classData = await createClass({
     name: trimmedName,
-    description: body.description,
+    announcement: body.announcement,
     avatar: body.avatar,
     isPublic: body.isPublic,
     maxMembers: body.maxMembers,
@@ -66,7 +71,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     {
       id: classData.id,
       name: classData.name,
-      description: classData.description,
+      announcement: classData.announcement,
       avatar: classData.avatar,
       isPublic: classData.isPublic,
       maxMembers: classData.maxMembers,

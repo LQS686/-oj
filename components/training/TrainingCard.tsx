@@ -8,6 +8,13 @@
  */
 import Link from 'next/link'
 import { User as UserIcon, Heart, Sparkles, BookOpen, Trophy } from 'lucide-react'
+import {
+  LIST_GRID_CARD_FOOTER,
+  LIST_GRID_CARD_META_ROW,
+  LIST_GRID_CARD_MIDDLE,
+  LIST_GRID_CARD_TITLE,
+  listGridCardLinkClass,
+} from '@/components/common/ListGridCard'
 import { ProgressCircle } from './ProgressCircle'
 
 export interface TrainingCardData {
@@ -63,9 +70,9 @@ export function TrainingCard({ training, variant = 'default' }: TrainingCardProp
  return (
  <Link
  href={`/training/${training.id}`}
- className="card-static rounded-xl p-5 block hover:border-primary/30 transition-colors h-full group"
+ className={listGridCardLinkClass()}
  >
- <div className="flex items-center justify-between gap-1 mb-2 flex-wrap">
+ <div className={LIST_GRID_CARD_META_ROW}>
  {cat && CatIcon ? (
  <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${cat.badge}`}>
  <CatIcon className="w-3 h-3" />
@@ -78,20 +85,22 @@ export function TrainingCard({ training, variant = 'default' }: TrainingCardProp
  <span className="text-xs font-mono text-muted-foreground">#{training.number}</span>
  )}
  </div>
+ <div className={LIST_GRID_CARD_MIDDLE}>
  <div className="flex items-start gap-1 mb-1.5">
  {training.isRecommended && (
  <Sparkles className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" title="推荐" />
  )}
- <h3 className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary-light transition-colors">
+ <h3 className={LIST_GRID_CARD_TITLE}>
  {training.title}
  </h3>
  </div>
  {training.author && (
- <p className="text-xs text-muted-foreground truncate mb-3">
+ <p className="text-xs text-muted-foreground truncate">
  {training.author.nickname || training.author.username}
  </p>
  )}
- <div className="flex items-center justify-between gap-2">
+ </div>
+ <div className={`flex items-center justify-between gap-2 ${LIST_GRID_CARD_FOOTER}`}>
  <ProgressCircle solved={solved} total={training.problemCount} size={40} />
  <div className="text-right text-xs text-muted-foreground">
  {typeof training.joinCount === 'number' && (

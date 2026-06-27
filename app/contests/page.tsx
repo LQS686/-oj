@@ -19,7 +19,16 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { usePermission } from '@/hooks/usePermission'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import {
+  EducationalPageShell,
+  PageLoading,
+  LIST_GRID_CLASS,
+  LIST_GRID_CARD_META_ROW,
+  LIST_GRID_CARD_TITLE,
+  LIST_GRID_CARD_FOOTER,
+  LIST_GRID_CARD_MIDDLE,
+  listGridCardLinkClass,
+} from '@/components/common'
 
 interface Contest {
  id: string
@@ -272,7 +281,7 @@ export default function ContestsPage() {
  )}
  </div>
  ) : (
- <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+ <div className={LIST_GRID_CLASS}>
  {contests.map((contest) => {
  const status = getContestStatus(contest.startTime, contest.endTime)
  const statusConfig = getStatusConfig(status)
@@ -283,27 +292,33 @@ export default function ContestsPage() {
  <Link
  key={contest.id}
  href={rowHref}
- className="card-static rounded-xl p-5 block hover:border-primary/30 transition-colors h-full group"
+ className={listGridCardLinkClass()}
  >
- <div className="flex items-center justify-between gap-1 mb-2">
+ <div className={LIST_GRID_CARD_META_ROW}>
  <StatusIcon className={`w-4 h-4 ${statusConfig.iconClass} shrink-0`} />
  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">
  {contest.type}
  </span>
  </div>
- <div className="flex items-start gap-1 mb-2">
- {!contest.isPublic && <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
- <h3 className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary-light transition-colors flex-1">
+ <div className={LIST_GRID_CARD_MIDDLE}>
+ <div className="flex items-center gap-1.5 min-w-0">
+ {!contest.isPublic && (
+ <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+ )}
+ <h3 className={`${LIST_GRID_CARD_TITLE} flex-1 min-w-0 !line-clamp-1`}>
  {contest.title}
  </h3>
+ <span
+ className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusConfig.tag}`}
+ >
+ {status}
+ </span>
  </div>
- <div className="flex flex-wrap items-center gap-1.5 mb-3">
- <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusConfig.tag}`}>{status}</span>
  {status === '即将开始' && contest.isRegistered && (
- <span className="text-xs text-secondary-light font-semibold">已报名</span>
+ <span className="text-xs text-secondary-light font-semibold mt-1 block">已报名</span>
  )}
  </div>
- <div className="space-y-1.5 text-xs text-muted-foreground">
+ <div className={`space-y-1 overflow-hidden ${LIST_GRID_CARD_FOOTER}`}>
  <span className="flex items-center gap-1.5">
  <Calendar className="w-3.5 h-3.5 shrink-0" />
  <span className="truncate">{formatTime(contest.startTime)}</span>

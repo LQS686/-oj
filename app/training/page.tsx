@@ -18,7 +18,7 @@ import TrainingCard from '@/components/training/TrainingCard'
 import SourceFilterCards, { type TrainingSource } from '@/components/training/SourceFilterCards'
 import type { TrainingListItem } from '@/lib/training/types'
 import { usePermission } from '@/hooks/usePermission'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { EducationalPageShell, PageLoading, LIST_GRID_CLASS } from '@/components/common'
 
 const SOURCE_LABELS: Record<TrainingSource, string> = {
   all: '全部题单',
@@ -190,7 +190,7 @@ export default function TrainingListPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          <div className={LIST_GRID_CLASS}>
             {trainings.map((t) => (
               <TrainingCard key={t.id} training={t} variant="grid" />
             ))}

@@ -14,6 +14,7 @@ import {
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
+  assertClassAdmin,
   getClassById,
   getCurrentClassMember,
   listClassNotesPaged,
@@ -57,14 +58,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   }>(req)
   if (!body.title || !body.content) throw400('MISSING_FIELDS', '请提供标题和内容')
 
-  const member = await getCurrentClassMember(id, user.id)
-  if (!member) throw403('只有班级成员可以发布笔记')
-  const memberRole = member!.role
-  const memberPerms = (member!.permissions as any) || {}
-
-  const isAdmin = memberRole === 'owner' || memberRole === 'admin'
-  const canCreate = !!memberPerms.canCreateNotes
-  if (!isAdmin && !canCreate) throw403('没有权限发布笔记')
+  await assertClassAdmin(id, user.id, '只有管理员或老师可以发布笔记')
 
   const created = await createClassNoteSimple(id, user.id, {
     title: body.title!,

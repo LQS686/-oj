@@ -1,13 +1,24 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { Users, Search, Plus, Calendar, TrendingUp, X, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { useRouter } from 'next/navigation'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { canCreateClass } from '@/lib/permissions'
+import CreateClassModal from '@/components/class/CreateClassModal'
+import {
+  EducationalPageShell,
+  PageLoading,
+  LIST_GRID_CLASS,
+  LIST_GRID_CARD_META_ROW,
+  LIST_GRID_CARD_TITLE,
+  LIST_GRID_CARD_MIDDLE,
+  LIST_GRID_CARD_FOOTER,
+  listGridCardLinkClass,
+} from '@/components/common'
 
 interface Class {
   id: string
@@ -27,9 +38,10 @@ interface Class {
   }
 }
 
-export default function ClassesPage() {
+function ClassesPageContent() {
   const { user } = useUser()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
   const [initialLoading, setInitialLoading] = useState(true)
@@ -38,8 +50,16 @@ export default function ClassesPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [showClassModal, setShowClassModal] = useState(false)
+  const [createClassOpen, setCreateClassOpen] = useState(false)
   const [selectedClass, setSelectedClass] = useState<Class | null>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1' && user && canCreateClass(user)) {
+      setCreateClassOpen(true)
+      router.replace('/classes', { scroll: false })
+    }
+  }, [searchParams, user, router])
 
   const fetchClasses = useCallback(async (isInitial = false) => {
     try {
@@ -164,11 +184,11 @@ export default function ClassesPage() {
       description="加入班级，与伙伴一起学习和进步"
       icon={Users}
       actions={
-        user ? (
-          <Link href="/classes/create" className="btn btn-primary">
+        user && canCreateClass(user) ? (
+          <button type="button" onClick={() => setCreateClassOpen(true)} className="btn btn-primary">
             <Plus className="w-5 h-5" />
             创建班级
-          </Link>
+          </button>
         ) : undefined
       }
       toolbar={
@@ -231,11 +251,15 @@ export default function ClassesPage() {
             <div className="text-muted-foreground mb-6">
               {showMyClasses ? '加入一个班级开始协作学习吧' : '成为第一个创建班级的人'}
             </div>
-            {user && !showMyClasses && (
-              <Link href="/classes/create" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all">
+            {user && !showMyClasses && canCreateClass(user) && (
+              <button
+                type="button"
+                onClick={() => setCreateClassOpen(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all"
+              >
                 <Plus className="w-5 h-5" />
                 创建第一个班级
-              </Link>
+              </button>
             )}
           </div>
         ) : (
@@ -245,7 +269,7 @@ export default function ClassesPage() {
                 <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
               </div>
             )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <div className={LIST_GRID_CLASS}>
               {classes.map((classData) => (
                 <ClassCard key={classData.id} classData={classData} onClassClick={handleClassClick} />
               ))}
@@ -316,7 +340,20 @@ export default function ClassesPage() {
           router={router}
         />
       )}
+      <CreateClassModal
+        open={createClassOpen}
+        onClose={() => setCreateClassOpen(false)}
+        onCreated={() => void fetchClasses()}
+      />
     </>
+  )
+}
+
+export default function ClassesPage() {
+  return (
+    <Suspense fallback={<PageLoading label="加载班级中..." />}>
+      <ClassesPageContent />
+    </Suspense>
   )
 }
 
@@ -511,18 +548,18 @@ function ClassCard({
         e.preventDefault()
         onClassClick(classData)
       }}
-      className="card-static rounded-xl p-5 block hover:border-primary/30 transition-colors h-full group cursor-pointer"
+      className={listGridCardLinkClass('cursor-pointer')}
     >
-      <div className="flex items-center justify-between mb-3">
+      <div className={LIST_GRID_CARD_META_ROW}>
         {classData.avatar ? (
           <img
             src={classData.avatar}
             alt={classData.name}
-            className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20 shrink-0"
+            className="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20 shrink-0"
           />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
-            <Users className="w-5 h-5 text-primary-foreground" />
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+            <Users className="w-4 h-4 text-primary-foreground" />
           </div>
         )}
         {classData.isPublic ? (
@@ -531,13 +568,10 @@ function ClassCard({
           <Lock className="w-4 h-4 text-accent shrink-0" title="私密" />
         )}
       </div>
-      <h3 className="text-sm font-semibold text-foreground line-clamp-2 mb-1 group-hover:text-primary-light transition-colors">
-        {classData.name}
-      </h3>
-      <p className="text-xs text-muted-foreground line-clamp-2 mb-3 min-h-[2.5rem]">
-        {classData.description || '暂无描述'}
-      </p>
-      <div className="space-y-1.5 text-xs text-muted-foreground">
+      <div className={LIST_GRID_CARD_MIDDLE}>
+        <h3 className={LIST_GRID_CARD_TITLE}>{classData.name}</h3>
+      </div>
+      <div className={`space-y-1 overflow-hidden ${LIST_GRID_CARD_FOOTER}`}>
         <span className="flex items-center gap-1.5">
           <Users className="w-3.5 h-3.5 shrink-0" />
           {classData.memberCount}/{classData.maxMembers} 成员
