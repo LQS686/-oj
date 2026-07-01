@@ -15,5 +15,5 @@ export const GET = withApi.auth(withPermission('admin.access')(async () => {
   const permissions = await prisma.permission.findMany({
     orderBy: [{ module: 'asc' }, { code: 'asc' }],
   })
-  return ok({ data: permissions })
+  return ok(permissions)
 }))

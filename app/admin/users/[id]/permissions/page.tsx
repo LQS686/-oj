@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { UserCog, Save, Loader2, AlertCircle, CheckCircle, ShieldCheck, ShieldX, ArrowLeft } from 'lucide-react'
+import { unwrapApiList, unwrapApiPayload } from '@/lib/admin/apiData'
 
 interface Permission {
  id: string
@@ -91,7 +92,15 @@ export default function AdminUserPermissionsPage() {
  const permsData = await permsRes.json()
 
  if (detailData.success) {
- const d = detailData.data
+ const d = unwrapApiPayload<{
+ user: UserInfo
+ rolePermissions: Permission[]
+ userPermissions: UserPermission[]
+ }>(detailData)
+ if (!d?.user) {
+ setError('用户数据格式异常')
+ return
+ }
  setUser(d.user)
  setRolePermissions(d.rolePermissions || [])
  setUserPermissions(d.userPermissions || [])
@@ -107,12 +116,7 @@ export default function AdminUserPermissionsPage() {
  }
 
  if (permsData.success) {
- const list = Array.isArray(permsData.data?.data)
- ? permsData.data.data
- : Array.isArray(permsData.data)
- ? permsData.data
- : []
- setAllPermissions(list)
+ setAllPermissions(unwrapApiList<Permission>(permsData))
  }
  } catch (err) {
  setError('网络错误')

@@ -14,7 +14,9 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "migrate:class-member-roles": "tsx scripts/migrate-class-member-roles.ts",
+    "migrate:class-member-roles:dry": "tsx scripts/migrate-class-member-roles.ts --dry-run"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

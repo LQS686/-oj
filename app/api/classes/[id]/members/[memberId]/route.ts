@@ -32,7 +32,12 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   if (body.role !== undefined) updateData.role = body.role
 
   const updated = await patchClassMember(id, memberId, updateData)
-  return ok({ id: updated!.userId, remark: updated!.remark, role: updated!.role })
+  const { normalizeClassRoleToApi } = await import('@/lib/class/roles')
+  return ok({
+    id: updated!.userId,
+    remark: updated!.remark,
+    role: normalizeClassRoleToApi(updated!.role),
+  })
 })
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {

@@ -13,6 +13,7 @@ import {
   updateSubmissionDirect,
 } from '@/lib/mongodb-direct'
 import { createNotification, createNotifications } from '@/lib/notifications'
+import { normalizeClassRoleToApi, apiRoleToDb, isClassAdminApiRole } from '@/lib/class/roles'
 
 /* ============================================================================
  * 班级 CRUD
@@ -78,7 +79,7 @@ export async function getClassDetail(classId: string): Promise<ClassDetailResult
       username: m.user.username,
       nickname: m.user.nickname,
       avatar: m.user.avatar,
-      role: m.role,
+      role: normalizeClassRoleToApi(m.role),
       permissions: (m.permissions || {}) as Record<string, any>,
       joinedAt: m.joinedAt,
       lastActiveAt: m.lastActiveAt,
@@ -226,9 +227,12 @@ export async function patchClassMember(
   userId: string,
   data: { remark?: string; role?: 'student' | 'assistant' | 'owner' }
 ) {
+  const update: { remark?: string; role?: string } = {}
+  if (data.remark !== undefined) update.remark = data.remark
+  if (data.role !== undefined) update.role = apiRoleToDb(data.role)
   return prisma.classMember.update({
     where: { classId_userId: { classId, userId } },
-    data,
+    data: update,
   })
 }
 
@@ -518,7 +522,7 @@ export async function assertClassAdmin(classId: string, userId: string, failMsg:
   const member = await prisma.classMember.findUnique({
     where: { classId_userId: { classId, userId } },
   })
-  if (!member || (member.role !== 'owner' && member.role !== 'assistant')) {
+  if (!member || !isClassAdminApiRole(member.role)) {
     throw new ApiError('FORBIDDEN', failMsg, 403)
   }
   return member
@@ -538,13 +542,17 @@ export async function findClassAssignment(assignmentId: string, classId: string)
   })
 }
 
-/** 读当前用户的 isAdmin 标志（系统级） */
+/** 读当前用户是否为站点管理员/教师（与前端 isAdmin/isTeacher 语义对齐） */
 export async function getUserIsAdmin(userId: string) {
   const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { isAdmin: true },
+    select: { isAdmin: true, isSuperAdmin: true, role: true },
   })
-  return u?.isAdmin === true
+  if (!u) return false
+  if (u.isSuperAdmin === true) return true
+  if (u.role === 'SYSTEM_ADMIN' || u.role === 'ADMIN' || u.role === 'SUPER_ADMIN') return true
+  if (u.isAdmin === true) return true
+  return u.role === 'TEACHER'
 }
 
 /** 检查当前用户是否在指定题上获得满分（用于提交记录越权校验） */
@@ -1473,7 +1481,7 @@ export async function joinClassByCode(
       data: {
         classId,
         userId,
-        role: 'student',
+        role: apiRoleToDb('student'),
         permissions: {
           canViewProblems: true,
           canSubmit: true,
@@ -1621,7 +1629,7 @@ export async function respondDirectInvite(
         data: {
           classId: invite.classId,
           userId: currentUserId,
-          role: 'student',
+          role: apiRoleToDb('student'),
           permissions: {
             canViewProblems: true,
             canSubmit: true,
@@ -1722,7 +1730,7 @@ export async function notifyAdminsAboutJoinRequest(
   className: string
 ) {
   const adminMembers = await prisma.classMember.findMany({
-    where: { classId, role: { in: ['owner', 'assistant'] } },
+    where: { classId, role: { in: ['owner', 'admin', 'assistant'] } },
   })
   const notifications = adminMembers.map((member: any) => ({
     userId: member.userId,
@@ -1984,9 +1992,9 @@ export async function ensureClassAccessible(
  * 权限检查 helper（业务层使用）
  * ========================================================================== */
 
-/** 检查用户是否班级管理员 */
+/** 检查用户是否班级管理员（兼容 DB / API 角色值） */
 export function isClassAdminRole(dbRole: string | undefined | null) {
-  return dbRole === 'owner' || dbRole === 'assistant'
+  return isClassAdminApiRole(dbRole)
 }
 
 /** 检查当前用户是否可管理目标成员（owner 可管所有；assistant 不能管 owner 和 assistant） */
@@ -1994,9 +2002,10 @@ export function canManageMember(
   operatorRole: string | null | undefined,
   targetRole: string | null | undefined
 ) {
-  if (!operatorRole) return false
-  if (operatorRole === 'owner') return targetRole !== 'owner'
-  if (operatorRole === 'assistant') return targetRole !== 'owner' && targetRole !== 'assistant'
+  const op = normalizeClassRoleToApi(operatorRole)
+  const tgt = normalizeClassRoleToApi(targetRole)
+  if (op === 'owner') return tgt !== 'owner'
+  if (op === 'assistant') return tgt === 'student'
   return false
 }
 
@@ -2045,7 +2054,7 @@ export async function buildClassAssignmentDetail(
         username: m.user.username,
         nickname: m.user.nickname,
         avatar: m.user.avatar,
-        role: m.role,
+        role: normalizeClassRoleToApi(m.role),
         progress: {
           solved: solved.size,
           total: assignment.problemIds.length,
@@ -2060,8 +2069,10 @@ export async function buildClassAssignmentDetail(
     .sort((a: any, b: any) => b.progress.solved - a.progress.solved)
 
   const userSubmissions = submissions.filter((s: any) => s.userId === viewerUserId)
-  const isAdminOrOwner = viewerRole === 'owner' || viewerRole === 'assistant'
-  const allSubmissions = isAdminOrOwner
+  const viewerIsClassAdmin = isClassAdminApiRole(viewerRole)
+  const viewerIsSiteAdmin = await getUserIsAdmin(viewerUserId)
+  const canViewAllSubmissions = viewerIsClassAdmin || viewerIsSiteAdmin
+  const allSubmissions = canViewAllSubmissions
     ? submissions.map((s: any) => ({
         id: s.id,
         userId: s.userId,
@@ -2234,7 +2245,7 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
     // 创建成员 + 更新申请
     await prisma.$transaction([
       prisma.classMember.create({
-        data: { classId: input.classId, userId: request.userId, role: 'student' },
+        data: { classId: input.classId, userId: request.userId, role: apiRoleToDb('student') },
       }),
       prisma.classJoinRequest.update({
         where: { id: input.requestId },

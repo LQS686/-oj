@@ -42,7 +42,13 @@ const PERMISSIONS: PermissionDef[] = [
   { code: 'class.delete',         module: 'class',    name: '删除班级',   description: '删除班级' },
   { code: 'class.member.manage',  module: 'class',    name: '管理班级成员', description: '增减/移除班级成员' },
   { code: 'class.invite.manage',  module: 'class',    name: '管理班级邀请', description: '生成/撤销班级邀请码' },
-  { code: 'class.assignment.manage', module: 'class', name: '管理班级作业', description: '创建/编辑/删除班级作业' },
+  { code: 'class.assignment.manage', module: 'class', name: '管理班级作业（全部）', description: '作业增删改查（含统计）' },
+  { code: 'class.assignment.view', module: 'class', name: '查看班级作业', description: '查看作业列表与详情' },
+  { code: 'class.assignment.create', module: 'class', name: '创建班级作业', description: '新建班级作业' },
+  { code: 'class.assignment.edit', module: 'class', name: '编辑班级作业', description: '修改作业信息与题目' },
+  { code: 'class.assignment.delete', module: 'class', name: '删除班级作业', description: '删除班级作业' },
+  { code: 'class.stats.view', module: 'class', name: '查看班级统计', description: '作业完成统计、班级数据看板' },
+  { code: 'class.note.manage', module: 'class', name: '管理班级笔记', description: '创建/编辑/删除班级笔记' },
 
   // problem
   { code: 'problem.create',       module: 'problem',  name: '创建题目',   description: '创建新题目' },

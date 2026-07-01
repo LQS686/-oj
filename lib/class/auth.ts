@@ -9,15 +9,18 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { normalizeClassRoleToApi, isClassAdminApiRole } from './roles'
 
 export type ClassRole = 'teacher' | 'assistant' | 'student'
 
 /**
  * 数据库存储值（保持向后兼容）→ 业务角色
  */
+
 export function mapClassRole(dbRole: string): ClassRole {
-  if (dbRole === 'owner') return 'teacher'
-  if (dbRole === 'admin') return 'assistant'
+  const api = normalizeClassRoleToApi(dbRole)
+  if (api === 'owner') return 'teacher'
+  if (api === 'assistant') return 'assistant'
   return 'student'
 }
 
@@ -65,10 +68,10 @@ export async function getClassMembership(
     dbRole: member.role,
     role,
     permissions: (member.permissions as Record<string, any>) || null,
-    isOwner: member.role === 'owner',
+    isOwner: normalizeClassRoleToApi(member.role) === 'owner',
     isTeacher: role === 'teacher',
     isAssistant: role === 'assistant',
-    isAdmin: member.role === 'owner' || member.role === 'admin',
+    isAdmin: isClassAdminApiRole(member.role),
     isStudent: role === 'student',
     isMember: true,
   }

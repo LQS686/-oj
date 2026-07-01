@@ -49,16 +49,14 @@ export const GET = withApi.auth(withPermission('admin.access')(async (_req, ctx)
   })
 
   return ok({
-    data: {
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        isSuperAdmin: user.isSuperAdmin,
-      },
-      rolePermissions: rolePermList,
-      userPermissions,
+    user: {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
     },
+    rolePermissions: rolePermList,
+    userPermissions,
   })
 }))
 

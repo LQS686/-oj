@@ -6,6 +6,7 @@ import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Shield, Save, Loader2, AlertCircle, CheckCircle, Lock } from 'lucide-react'
 import type { RoleCode } from '@/lib/permissions/types'
+import { unwrapApiList } from '@/lib/admin/apiData'
 
 interface Permission {
  id: string
@@ -83,19 +84,13 @@ export default function AdminRolesPage() {
  const permsData = await permsRes.json()
 
  if (rolesData.success) {
- const list = Array.isArray(rolesData.data?.data) ? rolesData.data.data : []
- setRoles(list)
+ setRoles(unwrapApiList<RoleData>(rolesData))
  } else {
  setError(rolesData.error || '获取角色失败')
  }
 
  if (permsData.success) {
- const list = Array.isArray(permsData.data?.data)
- ? permsData.data.data
- : Array.isArray(permsData.data)
- ? permsData.data
- : []
- setAllPermissions(list)
+ setAllPermissions(unwrapApiList<Permission>(permsData))
  }
  } catch (err) {
  setError('网络错误')
@@ -104,7 +99,10 @@ export default function AdminRolesPage() {
  }
  }
 
+ const isSystemAdminTab = activeRole === 'SYSTEM_ADMIN'
+
  const togglePermission = (permId: string) => {
+ if (isSystemAdminTab) return
  setSelectedIds(prev => {
  const next = new Set(prev)
  if (next.has(permId)) next.delete(permId)
@@ -114,6 +112,7 @@ export default function AdminRolesPage() {
  }
 
  const toggleModule = (modulePerms: Permission[], allSelected: boolean) => {
+ if (isSystemAdminTab) return
  setSelectedIds(prev => {
  const next = new Set(prev)
  if (allSelected) {
@@ -125,12 +124,13 @@ export default function AdminRolesPage() {
  })
  }
 
- // SYSTEM_ADMIN 下的 system.permission.manage 必须始终勾选
- const isLocked = (perm: Permission): boolean => {
- return activeRole === 'SYSTEM_ADMIN' && perm.code === 'system.permission.manage'
- }
+ const isLocked = (_perm: Permission): boolean => isSystemAdminTab
 
  const handleSave = async () => {
+ if (isSystemAdminTab) {
+ setError('系统管理员默认拥有全部权限，请切换到「教师」或「学生」进行配置')
+ return
+ }
  setSaving(true)
  setError('')
  setSuccess('')
@@ -245,6 +245,12 @@ export default function AdminRolesPage() {
  </div>
 
  <div className="p-5">
+ {isSystemAdminTab && (
+ <div className="mb-4 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
+ <Lock className="w-4 h-4 shrink-0" />
+ 系统管理员在运行时拥有全部权限点，此处为只读展示。请切换到「教师」或「学生」标签自由勾选并保存。
+ </div>
+ )}
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm text-muted-foreground">
  已选 <span className="text-foreground font-medium">{totalSelected}</span> / {totalAll} 个权限点
@@ -324,7 +330,7 @@ export default function AdminRolesPage() {
  <div className="flex justify-end">
  <button
  onClick={handleSave}
- disabled={saving}
+ disabled={saving || isSystemAdminTab}
  className="btn btn-primary flex items-center gap-2"
  >
  {saving ? (

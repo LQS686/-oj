@@ -15230,3 +15230,488 @@
 {"timestamp":"2026-06-27T09:50:55.420Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
 {"timestamp":"2026-06-27T09:51:25.430Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
 {"timestamp":"2026-06-27T09:51:55.445Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:52:25.445Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:52:55.459Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:53:25.472Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:53:55.478Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:54:25.478Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:54:45.359Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:54:45.500Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:54:51.280Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:54:54.523Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:54:55.239Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:54:55.483Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:54:55.753Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:54:56.487Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:54:56.987Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:55:00.203Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:55:02.081Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:55:25.494Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:55:47.577Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:55:47.602Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:55:49.146Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-06-27T09:55:55.499Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:56:25.507Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-06-27T09:56:55.509Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:22:45.378Z","level":"info","message":"WebSocket 服务器已启动"}
+{"timestamp":"2026-07-01T09:22:45.378Z","level":"info","message":"WebSocket 实例状态: 已初始化"}
+{"timestamp":"2026-07-01T09:22:45.379Z","level":"info","message":"WebSocket 服务器初始化完成"}
+{"timestamp":"2026-07-01T09:22:45.379Z","level":"info","message":"启动评测 Worker"}
+{"timestamp":"2026-07-01T09:22:45.530Z","level":"info","message":"评测 Worker 启动完成"}
+{"timestamp":"2026-07-01T09:22:46.023Z","level":"info","message":"评测Worker已启动"}
+{"timestamp":"2026-07-01T09:22:46.023Z","level":"info","message":"正在监听评测队列..."}
+{"timestamp":"2026-07-01T09:22:46.024Z","level":"info","message":"评测系统已初始化"}
+{"timestamp":"2026-07-01T09:22:46.077Z","level":"info","message":"服务器运行在 http://localhost:3000"}
+{"timestamp":"2026-07-01T09:22:46.077Z","level":"info","message":"WebSocket 服务在 ws://localhost:3000/socket.io"}
+{"timestamp":"2026-07-01T09:22:53.308Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T09:23:06.826Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T09:23:06.839Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T09:23:16.033Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:23:46.034Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:24:16.047Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:24:46.049Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:24:59.426Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T09:24:59.439Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T09:25:16.061Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:25:46.062Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:26:16.067Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:26:46.073Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:27:16.077Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:27:46.080Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:28:16.089Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:28:46.097Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:29:16.100Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:29:46.107Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:30:16.120Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:30:46.128Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:31:16.142Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:31:46.143Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:32:16.147Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:32:46.150Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:33:16.163Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:33:46.169Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:34:16.170Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:34:46.171Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:35:16.184Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:35:46.188Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:35:55.030Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T09:36:16.198Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:36:46.206Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:37:16.209Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:37:46.214Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:38:16.221Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:38:46.237Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:39:16.249Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:39:46.254Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:40:16.266Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:40:46.277Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:41:16.288Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:41:46.298Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:42:16.309Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:42:46.322Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:43:16.327Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:43:46.338Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:44:16.350Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:44:46.362Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:45:16.375Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:45:46.390Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:46:16.396Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:46:46.410Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:47:16.422Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:47:46.437Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:48:16.448Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:48:46.460Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:49:16.464Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:49:46.475Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:50:16.480Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:50:46.489Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:51:16.491Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:51:46.498Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:52:16.499Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:52:46.499Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:53:16.499Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:53:46.502Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:54:16.514Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:54:46.526Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:55:16.526Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:55:46.536Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:56:16.546Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:56:46.559Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:57:16.573Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:57:46.586Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:58:16.596Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:58:46.611Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:59:16.624Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T09:59:46.632Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:00:16.639Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:00:46.651Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:01:16.654Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:01:46.656Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:02:16.672Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:02:46.685Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:03:16.687Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:03:46.696Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:04:16.697Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:04:17.641Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:04:17.717Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:04:46.709Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:05:16.712Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:05:46.714Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:06:16.726Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:06:46.734Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:07:16.735Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:07:46.740Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:08:16.743Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:08:46.747Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:09:16.754Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:09:46.761Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:10:16.767Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:10:46.775Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:11:16.775Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:11:46.790Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:12:16.796Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:12:33.510Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:12:33.535Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:12:45.442Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:12:45.507Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:12:46.806Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:12:59.689Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:13:16.818Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:13:46.830Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:14:16.843Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:14:46.851Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:15:16.857Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:15:46.872Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:16:16.883Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:16:46.890Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:17:16.893Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:17:46.899Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:18:16.908Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:18:46.916Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:19:16.920Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:19:46.929Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:19:51.798Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:19:57.038Z","level":"info","message":"正在关闭Worker..."}
+{"timestamp":"2026-07-01T10:20:02.509Z","level":"info","message":"WebSocket 服务器已启动"}
+{"timestamp":"2026-07-01T10:20:02.510Z","level":"info","message":"WebSocket 实例状态: 已初始化"}
+{"timestamp":"2026-07-01T10:20:02.510Z","level":"info","message":"WebSocket 服务器初始化完成"}
+{"timestamp":"2026-07-01T10:20:02.511Z","level":"info","message":"启动评测 Worker"}
+{"timestamp":"2026-07-01T10:20:02.541Z","level":"info","message":"评测 Worker 启动完成"}
+{"timestamp":"2026-07-01T10:20:02.864Z","level":"info","message":"评测Worker已启动"}
+{"timestamp":"2026-07-01T10:20:02.864Z","level":"info","message":"正在监听评测队列..."}
+{"timestamp":"2026-07-01T10:20:02.864Z","level":"info","message":"评测系统已初始化"}
+{"timestamp":"2026-07-01T10:20:02.874Z","level":"info","message":"服务器运行在 http://localhost:3000"}
+{"timestamp":"2026-07-01T10:20:02.874Z","level":"info","message":"WebSocket 服务在 ws://localhost:3000/socket.io"}
+{"timestamp":"2026-07-01T10:20:02.904Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:20:02.922Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:20:02.935Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:20:02.950Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:20:07.304Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:20:07.721Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:20:07.788Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:20:07.797Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:20:32.866Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:21:02.873Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:21:32.880Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:22:02.880Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:22:32.883Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:23:02.891Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:23:32.906Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:24:02.921Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:24:32.937Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:25:02.951Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:25:09.951Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:25:09.997Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:25:32.957Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:25:38.298Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:25:38.315Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:25:55.726Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:26:02.963Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:26:07.631Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:26:07.652Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:26:32.967Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:27:02.976Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:27:32.983Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:28:02.997Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:28:33.001Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:29:03.008Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:29:33.020Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:30:03.025Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:30:33.035Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:31:03.042Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:31:33.050Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:32:03.054Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:32:33.058Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:33:03.071Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:33:33.086Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:33:55.216Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:34:03.096Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:34:17.087Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:34:33.109Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:35:03.125Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:35:33.127Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:36:03.138Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:36:33.150Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:37:03.161Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:37:33.174Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:38:03.178Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:38:33.190Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:39:03.203Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:39:33.214Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:40:03.226Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:40:33.240Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:41:03.250Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:41:33.255Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:42:03.258Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:42:33.261Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:43:03.271Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:43:33.285Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:44:03.288Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:44:33.296Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:45:03.312Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:45:33.321Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:46:03.334Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:46:33.345Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:47:03.360Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:47:33.372Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:48:03.377Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:48:33.379Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:49:03.390Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:49:33.394Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:50:03.411Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:50:33.412Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:51:03.416Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:51:33.427Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:51:52.050Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:51:52.128Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:51:52.205Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T10:52:03.438Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:52:33.450Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:53:03.455Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:53:33.457Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:54:03.466Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:54:33.467Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:55:03.477Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:55:33.491Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:56:03.505Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:56:33.514Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:57:03.522Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:57:33.524Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:58:03.531Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:58:33.537Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:59:03.540Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T10:59:33.552Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:00:03.556Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:00:33.567Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:01:03.584Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:01:33.587Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:02:03.592Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:02:33.600Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:03:03.611Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:03:33.620Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:04:03.565Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T11:04:03.568Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T11:04:03.675Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:04:14.852Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T11:04:14.931Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T11:04:33.689Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:05:03.694Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:05:33.703Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:06:03.709Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:06:33.720Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:07:03.736Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:07:33.736Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:08:03.738Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:08:33.751Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:09:03.762Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:09:33.772Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:10:03.784Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:10:33.798Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:11:03.804Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:11:33.817Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:12:03.823Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:12:33.830Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:13:03.840Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:13:33.854Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:14:03.899Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:14:33.869Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:15:03.871Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:15:33.881Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:16:03.896Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:16:33.900Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:17:03.916Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:17:33.925Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:18:03.935Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:18:33.940Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:19:03.941Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:19:33.956Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:20:03.968Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:20:33.978Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:21:03.987Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:21:33.999Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:22:04.010Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:22:34.020Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:23:04.022Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:23:34.027Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:24:04.036Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:24:34.043Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:25:04.044Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:25:34.055Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:26:04.071Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:26:34.084Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:27:04.084Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:27:34.098Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:28:04.111Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:28:34.113Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:29:04.128Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:29:34.133Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:30:04.142Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:30:34.151Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:31:04.161Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:31:34.170Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:32:04.182Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:32:34.185Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:33:04.198Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:33:34.206Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:34:04.210Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:34:34.219Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:35:04.220Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:35:34.236Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:36:04.248Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:36:34.250Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:37:04.259Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:37:34.270Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:38:04.282Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:38:34.296Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:39:04.310Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:39:34.314Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:40:04.313Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:40:34.327Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:41:04.337Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:41:34.337Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:42:04.342Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:42:34.347Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:43:04.349Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:43:34.351Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:44:04.356Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:44:34.368Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:45:04.367Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:45:34.368Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:46:04.370Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:46:34.380Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:47:04.388Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:47:34.401Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:48:04.414Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:48:34.429Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:49:04.442Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:49:34.444Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:50:04.444Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:50:34.451Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:51:04.453Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:51:34.464Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:52:04.467Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:52:34.470Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:53:04.479Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:53:34.481Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:54:04.481Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:54:34.496Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:55:04.504Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:55:26.541Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T11:55:26.565Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T11:55:34.516Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:56:04.531Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:56:34.535Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:57:04.536Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:57:34.548Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:58:04.559Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:58:34.575Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:59:04.585Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T11:59:34.585Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:00:04.590Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:00:34.598Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:01:04.612Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:01:34.615Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:02:04.618Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:02:34.622Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:03:04.632Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:03:34.645Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:04:04.650Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:04:34.662Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:05:04.675Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:05:34.678Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:06:04.679Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:06:34.688Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:07:04.693Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:07:34.699Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:08:04.714Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:08:34.728Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:09:04.736Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:09:34.745Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:10:04.753Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:10:34.759Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:11:04.761Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:11:34.775Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:12:04.784Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:12:34.785Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:13:04.787Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:13:34.794Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:14:04.806Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:14:34.811Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:15:04.821Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:15:34.833Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:16:04.841Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:16:34.850Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:17:04.860Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:17:34.871Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:18:04.880Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:18:34.894Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:19:04.896Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:19:34.904Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:20:04.904Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:20:34.920Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:21:04.924Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:21:34.931Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:22:04.939Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:22:34.950Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:23:04.954Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:23:34.964Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:24:04.975Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:24:34.990Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:25:04.993Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:25:34.997Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:26:05.004Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:26:35.019Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:27:05.023Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:27:35.028Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:28:05.029Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:28:35.033Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:29:05.046Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:29:35.048Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:30:05.060Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:30:35.062Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:31:05.070Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:31:35.083Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:32:05.092Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:32:35.105Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:32:45.152Z","level":"info","message":"正在关闭Worker..."}
+{"timestamp":"2026-07-01T12:32:57.353Z","level":"info","message":"WebSocket 服务器已启动"}
+{"timestamp":"2026-07-01T12:32:57.354Z","level":"info","message":"WebSocket 实例状态: 已初始化"}
+{"timestamp":"2026-07-01T12:32:57.354Z","level":"info","message":"WebSocket 服务器初始化完成"}
+{"timestamp":"2026-07-01T12:32:57.354Z","level":"info","message":"启动评测 Worker"}
+{"timestamp":"2026-07-01T12:32:57.371Z","level":"info","message":"评测 Worker 启动完成"}
+{"timestamp":"2026-07-01T12:32:57.693Z","level":"info","message":"评测Worker已启动"}
+{"timestamp":"2026-07-01T12:32:57.694Z","level":"info","message":"正在监听评测队列..."}
+{"timestamp":"2026-07-01T12:32:57.694Z","level":"info","message":"评测系统已初始化"}
+{"timestamp":"2026-07-01T12:32:57.705Z","level":"info","message":"服务器运行在 http://localhost:3000"}
+{"timestamp":"2026-07-01T12:32:57.705Z","level":"info","message":"WebSocket 服务在 ws://localhost:3000/socket.io"}
+{"timestamp":"2026-07-01T12:33:02.375Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T12:33:09.589Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T12:33:27.700Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:33:57.706Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:34:24.349Z","level":"info","message":"登录成功","meta":{"userId":"69a3ec72487e34177a2a6dfe","username":"a123","isAdmin":false}}
+{"timestamp":"2026-07-01T12:34:24.365Z","level":"info","message":"用户 69a3ec72487e34177a2a6dfe 加入房间: user:69a3ec72487e34177a2a6dfe"}
+{"timestamp":"2026-07-01T12:34:27.707Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}
+{"timestamp":"2026-07-01T12:34:35.932Z","level":"info","message":"用户 69a3ec72487e34177a2a6dfe 加入房间: user:69a3ec72487e34177a2a6dfe"}
+{"timestamp":"2026-07-01T12:34:44.621Z","level":"info","message":"登录成功","meta":{"userId":"68f8bab446da009b2020a224","username":"admin","isAdmin":true}}
+{"timestamp":"2026-07-01T12:34:44.653Z","level":"info","message":"用户 68f8bab446da009b2020a224 加入房间: user:68f8bab446da009b2020a224"}
+{"timestamp":"2026-07-01T12:34:57.709Z","level":"info","message":"队列状态","meta":{"waiting":0,"active":0,"completed":0}}

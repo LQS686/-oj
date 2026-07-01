@@ -13,6 +13,7 @@ import {
   toDbRole,
   type ClassMembership,
 } from './auth'
+import { normalizeClassRoleToApi, dbRolesMatchingApiFilter } from './roles'
 
 export interface MemberListFilter {
   role?: string
@@ -32,7 +33,10 @@ export async function listClassMembers(
   const { role, search, active, sortBy = 'joinedAt', sortOrder = 'desc' } = filter
 
   const where: any = { classId }
-  if (role) where.role = role
+  if (role) {
+    const dbRoles = dbRolesMatchingApiFilter(role)
+    where.role = dbRoles.length === 1 ? dbRoles[0] : { in: dbRoles }
+  }
 
   if (active) {
     const thirtyDaysAgo = new Date()
@@ -60,7 +64,7 @@ export async function listClassMembers(
     username: m.user.username,
     nickname: m.user.nickname,
     avatar: m.user.avatar,
-    role: mapClassRole(m.role),
+    role: normalizeClassRoleToApi(m.role),
     dbRole: m.role,
     permissions: m.permissions || {},
     joinedAt: m.joinedAt,
@@ -83,9 +87,9 @@ export async function listClassMembers(
     let bv: any
     switch (sortBy) {
       case 'role': {
-        const order: any = { teacher: 3, assistant: 2, student: 1 }
-        av = order[a.role] || 0
-        bv = order[b.role] || 0
+        const order: Record<string, number> = { owner: 3, assistant: 2, student: 1 }
+        av = order[a.role] ?? 0
+        bv = order[b.role] ?? 0
         break
       }
       case 'lastActiveAt':

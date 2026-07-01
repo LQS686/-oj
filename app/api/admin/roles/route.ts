@@ -46,7 +46,7 @@ export const GET = withApi.auth(withPermission('admin.access')(async () => {
     rolePermissions: grouped[role],
   }))
 
-  return ok({ data: roles })
+  return ok(roles)
 }))
 
 /**
@@ -61,6 +61,10 @@ export const PUT = withApi.auth(withPermission('admin.access')(async (req) => {
     throw400('INVALID_ROLE', '无效的角色，必须是 SYSTEM_ADMIN / TEACHER / STUDENT')
   }
   const role = body.role as RoleCode
+
+  if (role === 'SYSTEM_ADMIN') {
+    throw400('SYSTEM_ADMIN_LOCKED', '系统管理员默认拥有全部权限，请配置「教师」或「学生」角色')
+  }
 
   const incomingIds = Array.isArray(body.permissionIds) ? body.permissionIds : []
   if (!Array.isArray(body.permissionIds)) {
@@ -77,17 +81,7 @@ export const PUT = withApi.auth(withPermission('admin.access')(async (req) => {
     }
   }
 
-  // SYSTEM_ADMIN 必须始终包含 system.permission.manage
   const permissionIds = [...new Set(incomingIds)]
-  if (role === 'SYSTEM_ADMIN') {
-    const requiredPerm = await prisma.permission.findUnique({
-      where: { code: 'system.permission.manage' },
-      select: { id: true },
-    })
-    if (requiredPerm && !permissionIds.includes(requiredPerm.id)) {
-      permissionIds.push(requiredPerm.id)
-    }
-  }
 
   // 事务：先删后插
   await prisma.$transaction(async (tx: any) => {

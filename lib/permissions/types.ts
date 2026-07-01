@@ -7,7 +7,9 @@ export type RoleCode = 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT'
 
 export type PermissionCode =
   | 'user.view' | 'user.edit' | 'user.ban' | 'user.delete' | 'user.role.assign'
-  | 'class.create' | 'class.edit' | 'class.delete' | 'class.member.manage' | 'class.invite.manage' | 'class.assignment.manage'
+  | 'class.create' | 'class.edit' | 'class.delete' | 'class.member.manage' | 'class.invite.manage'
+  | 'class.assignment.manage' | 'class.assignment.view' | 'class.assignment.create' | 'class.assignment.edit' | 'class.assignment.delete'
+  | 'class.stats.view' | 'class.note.manage'
   | 'problem.create' | 'problem.edit' | 'problem.delete' | 'problem.review' | 'problem.testcase.manage'
   | 'contest.create' | 'contest.edit' | 'contest.delete' | 'contest.participate.manage' | 'contest.scoreboard.view'
   | 'training.create' | 'training.edit' | 'training.delete' | 'training.publish' | 'training.category.manage'

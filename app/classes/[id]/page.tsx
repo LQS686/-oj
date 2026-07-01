@@ -28,6 +28,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import ClassManageInlinePanel from '@/components/class/ClassManageInlinePanel'
 import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
+import { classRoleDisplayLabel, normalizeClassRoleToApi } from '@/lib/class/roles'
 
 interface Assignment {
   id: string
@@ -72,9 +73,7 @@ interface Class {
 }
 
 function roleLabel(role: string) {
-  if (role === 'owner') return '管理员'
-  if (role === 'assistant') return '老师'
-  return '学生'
+  return classRoleDisplayLabel(role)
 }
 
 function ClassDetailContent() {
@@ -231,8 +230,10 @@ function ClassDetailContent() {
 
   const canManageTarget = useCallback(
     (targetRole: string, operatorRole: string) => {
-      if (operatorRole === 'owner') return targetRole !== 'owner'
-      if (operatorRole === 'assistant') return targetRole === 'student'
+      const op = normalizeClassRoleToApi(operatorRole)
+      const tgt = normalizeClassRoleToApi(targetRole)
+      if (op === 'owner') return tgt !== 'owner'
+      if (op === 'assistant') return tgt === 'student'
       return false
     },
     []
@@ -255,17 +256,22 @@ function ClassDetailContent() {
 
   const myMember = classData.members.find((m) => m.userId === user?.id)
   const isMember = !!myMember
-  const operatorRole = myMember?.role || ''
-  const isClassAdmin = ['owner', 'assistant'].includes(operatorRole)
+  const operatorRole = myMember ? normalizeClassRoleToApi(myMember.role) : ''
+  const isClassAdmin = operatorRole === 'owner' || operatorRole === 'assistant'
 
   const ownerMember = classData.members.find((m) => m.userId === classData.ownerId)
-  const teacherCount = classData.members.filter((m) => m.role === 'assistant').length
-  const studentCount = classData.members.filter((m) => m.role === 'student').length
+  const teacherCount = classData.members.filter(
+    (m) => normalizeClassRoleToApi(m.role) === 'assistant'
+  ).length
+  const studentCount = classData.members.filter(
+    (m) => normalizeClassRoleToApi(m.role) === 'student'
+  ).length
 
   const roleSortOrder = (role: string) => {
-    if (role === 'owner') return 0
-    if (role === 'assistant') return 1
-    if (role === 'student') return 2
+    const r = normalizeClassRoleToApi(role)
+    if (r === 'owner') return 0
+    if (r === 'assistant') return 1
+    if (r === 'student') return 2
     return 3
   }
   const sortedMembers = [...classData.members].sort(

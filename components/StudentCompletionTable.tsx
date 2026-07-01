@@ -50,6 +50,18 @@ interface StudentCompletionTableProps {
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
+function formatSubmittedAt(iso?: string) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 const statusConfig: Record<string, { label: string; className: string; iconColor: string }> = {
  AC: { label: '通过', className: 'text-secondary bg-secondary/10', iconColor: 'text-secondary' },
  WA: { label: '错误', className: 'text-error bg-error/10', iconColor: 'text-error' },
@@ -280,9 +292,15 @@ export default function StudentCompletionTable({ students, problems, assignmentT
  subs: RawSubmission[]
  } | null>(null)
 
- const filteredStudents = students.filter(student => {
- if (searchTerm && !student.name.toLowerCase().includes(searchTerm.toLowerCase())) return false
- return true
+ const filteredStudents = students.filter((student) => {
+   if (searchTerm && !student.name.toLowerCase().includes(searchTerm.toLowerCase())) return false
+   if (statusFilter === 'AC') {
+     return problems.length > 0 && student.completedCount >= problems.length
+   }
+   if (statusFilter === 'pending') {
+     return student.completedCount < problems.length
+   }
+   return true
  })
 
  const sortedStudents = [...filteredStudents].sort((a, b) => {
@@ -319,40 +337,49 @@ export default function StudentCompletionTable({ students, problems, assignmentT
  }
 
  const getStatusDisplay = (submission?: StudentSubmission) => {
- if (!submission) {
- return <span className="text-muted-foreground/50 text-xs">-</span>
- }
+   if (!submission) {
+     return <span className="text-muted-foreground/50 text-xs">未提交</span>
+   }
 
- if (submission.status === 'AC') {
- return (
- <div className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity">
- <CheckCircle2 className="w-4 h-4 text-secondary" />
- <span className="text-[11px] text-secondary mt-0.5">{submission.score}分</span>
- </div>
- )
- }
+   const cfg = statusConfig[submission.status]
+   const statusLabel = cfg?.label || submission.status
+   const scoreClass =
+     submission.status === 'AC'
+       ? 'text-secondary'
+       : submission.score > 0
+         ? 'text-accent'
+         : 'text-muted-foreground'
 
- if (submission.status === 'Pending') {
- return (
- <div className="flex flex-col items-center">
- <Clock className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
- </div>
- )
- }
+   if (submission.status === 'Pending' || submission.status === 'Judging' || submission.status === 'Running') {
+     return (
+       <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem]">
+         <Clock className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
+         <span className="text-[10px] text-muted-foreground">评测中</span>
+       </div>
+     )
+   }
 
- return (
- <div className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity">
- <XCircle className="w-4 h-4 text-error" />
- <span className="text-[11px] text-error mt-0.5">{submission.score}分</span>
- </div>
- )
+   return (
+     <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem] cursor-pointer hover:opacity-90 transition-opacity">
+       <span className={`text-xs font-semibold tabular-nums ${scoreClass}`}>{submission.score} 分</span>
+       <span className={`text-[10px] font-medium ${cfg?.iconColor || 'text-muted-foreground'}`}>{statusLabel}</span>
+       <span className="text-[10px] text-muted-foreground tabular-nums leading-tight">
+         {formatSubmittedAt(submission.submittedAt)}
+       </span>
+     </div>
+   )
  }
 
  return (
  <>
  <div className="bg-card rounded-lg border border-border overflow-hidden">
  <div className="px-5 py-3 border-b border-border flex items-center justify-between gap-3">
- <h2 className="text-base font-semibold text-foreground">学生完成情况</h2>
+ <div>
+            <h2 className="text-base font-semibold text-foreground">学生作业完成情况</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              每格为该题最高分提交：分数、状态、提交时间（点击可查看全部提交）
+            </p>
+          </div>
  <div className="flex items-center gap-2">
  <div className="relative">
  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -387,7 +414,7 @@ export default function StudentCompletionTable({ students, problems, assignmentT
  <th
  key={problem.id}
  onClick={() => onProblemClick?.(index)}
- className={`px-3 py-2.5 font-mono font-bold text-sm text-center w-[72px] select-none text-foreground/60 ${
+ className={`px-2 py-2 font-mono font-bold text-sm text-center min-w-[5.25rem] select-none text-foreground/60 ${
  onProblemClick ? 'cursor-pointer hover:text-primary-light transition-colors' : ''
  }`}
  title={problem.title}

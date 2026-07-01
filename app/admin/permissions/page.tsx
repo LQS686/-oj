@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { KeyRound, Search, ShieldCheck } from 'lucide-react'
+import { unwrapApiList } from '@/lib/admin/apiData'
 
 interface Permission {
  id: string
@@ -48,12 +49,7 @@ export default function AdminPermissionsPage() {
 
  const data = await response.json()
  if (data.success) {
- const list = Array.isArray(data.data?.data)
- ? data.data.data
- : Array.isArray(data.data)
- ? data.data
- : []
- setPermissions(list)
+ setPermissions(unwrapApiList<Permission>(data))
  } else {
  setError(data.error || '获取权限点失败')
  }
