@@ -1,7 +1,7 @@
 /**
  * /api/admin/users/batch-update - 批量更新用户角色（管理员）
  *
- * POST { userIds: string[], role: 'ADMIN' | 'TEACHER' | 'USER' }
+ * POST { userIds: string[], role: 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT' }
  * - 跳过自己
  * - 跳过超级管理员
  */
@@ -34,7 +34,7 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
     'update'
   )
 
-  const result = await batchUpdateUserRole(finalUserIds, role as 'ADMIN' | 'TEACHER' | 'USER')
+  const result = await batchUpdateUserRole(finalUserIds, role as 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT')
 
   return ok({
     updatedCount: result.count,

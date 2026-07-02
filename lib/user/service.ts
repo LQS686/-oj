@@ -7,6 +7,7 @@ import { cache } from '@/lib/cache'
 import { getMongoClient } from '@/lib/mongodb-direct'
 import { clearRankingCache } from '@/lib/ranking/service'
 import bcrypt from 'bcryptjs'
+import { ObjectId } from 'mongodb'
 import {
   validateEmail,
   validateUsername,
@@ -357,7 +358,7 @@ export async function updateCurrentUserBasic(
   const client = await getMongoClient()
   const db = client.db()
   await db.collection('User').updateOne(
-    { _id: new (require('mongodb').ObjectId)(userId) },
+    { _id: new ObjectId(userId) },
     {
       $set: {
         ...(data.nickname !== undefined && { nickname: data.nickname }),
@@ -428,7 +429,7 @@ export async function changeCurrentUserPassword(
   const client = await getMongoClient()
   const db = client.db()
   await db.collection('User').updateOne(
-    { _id: new (require('mongodb').ObjectId)(userId) },
+    { _id: new ObjectId(userId) },
     { $set: { password: hashedPassword, updatedAt: new Date() } }
   )
   clearUserCache(userId)
@@ -661,7 +662,7 @@ export async function listAvatarHistory(userId: string, take = 20) {
  * 批量注册用户（原 /api/admin/users/batch-register）
  * ========================================================================== */
 
-export type BatchUserRole = 'ADMIN' | 'TEACHER' | 'USER'
+export type BatchUserRole = 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT'
 
 export interface BatchUserInput {
   username: string
@@ -684,7 +685,7 @@ export interface BatchRegisterResult {
   errors: BatchRegisterError[]
 }
 
-const BATCH_VALID_ROLES: BatchUserRole[] = ['ADMIN', 'TEACHER', 'USER']
+const BATCH_VALID_ROLES: BatchUserRole[] = ['SYSTEM_ADMIN', 'TEACHER', 'STUDENT']
 
 function isBatchUserRole(role: unknown): role is BatchUserRole {
   return typeof role === 'string' && BATCH_VALID_ROLES.includes(role as BatchUserRole)
@@ -692,11 +693,11 @@ function isBatchUserRole(role: unknown): role is BatchUserRole {
 
 function getBatchRoleDefaults(role: BatchUserRole) {
   switch (role) {
-    case 'ADMIN':
+    case 'SYSTEM_ADMIN':
       return { isAdmin: true, rank: '管理员', color: '#FF6B6B' }
     case 'TEACHER':
       return { isAdmin: false, rank: '教师', color: '#4ECDC4' }
-    default:
+    case 'STUDENT':
       return { isAdmin: false, rank: '新手', color: '#808080' }
   }
 }
@@ -808,7 +809,7 @@ export async function batchRegisterUsers(
         continue
       }
 
-      const role = isBatchUserRole(user.role) ? user.role : 'USER'
+      const role = isBatchUserRole(user.role) ? user.role : 'STUDENT'
       const sanitizedUsername = escapeHtml(trimmedUsername)
       const sanitizedEmail = trimmedEmail
 
@@ -878,7 +879,7 @@ export async function batchRegisterUsers(
  * 管理员用户管理（原 /api/admin/users/* 路由）
  * ========================================================================== */
 
-const VALID_ADMIN_ROLES = ['ADMIN', 'TEACHER', 'USER']
+const VALID_ADMIN_ROLES = ['SYSTEM_ADMIN', 'TEACHER', 'STUDENT']
 
 /**
  * 列出所有用户（管理员）
@@ -912,7 +913,7 @@ export async function listAllUsersForAdmin() {
 /**
  * 校验入参中的角色字段
  */
-export function assertValidRole(role: string | undefined): asserts role is 'ADMIN' | 'TEACHER' | 'USER' {
+export function assertValidRole(role: string | undefined): asserts role is 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT' {
   if (!role || !VALID_ADMIN_ROLES.includes(role)) {
     const err: any = new Error('无效的角色类型')
     err.status = 400
@@ -984,7 +985,7 @@ export async function assertCanDeleteUser(targetUserId: string, operatorUserId: 
 export async function adminUpdateUser(
   targetUserId: string,
   body: {
-    role?: 'ADMIN' | 'TEACHER' | 'USER'
+    role?: 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT'
     isAdmin?: boolean
     isBanned?: boolean
     password?: string
@@ -995,7 +996,7 @@ export async function adminUpdateUser(
   if ('role' in body) {
     assertValidRole(body.role)
     updateData.role = body.role
-    updateData.isAdmin = body.role === 'ADMIN'
+    updateData.isAdmin = body.role === 'SYSTEM_ADMIN'
   }
   if ('isAdmin' in body) {
     updateData.isAdmin = Boolean(body.isAdmin)
@@ -1072,12 +1073,12 @@ export async function filterUserIdsForBatchAction(
 /**
  * 批量更新用户角色
  */
-export async function batchUpdateUserRole(finalUserIds: string[], role: 'ADMIN' | 'TEACHER' | 'USER') {
+export async function batchUpdateUserRole(finalUserIds: string[], role: 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT') {
   const result = await prisma.user.updateMany({
     where: { id: { in: finalUserIds } },
     data: {
       role,
-      isAdmin: role === 'ADMIN',
+      isAdmin: role === 'SYSTEM_ADMIN',
     },
   })
   finalUserIds.forEach(clearUserCache)

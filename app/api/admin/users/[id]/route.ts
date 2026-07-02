@@ -37,7 +37,7 @@ export const PATCH = withApi.auth(withPermission('admin.access')(async (req, ctx
   await assertCanUpdateUser(id, user.id, body)
 
   // narrow role 到合法 union
-  const validRoles = ['TEACHER', 'ADMIN', 'USER'] as const
+  const validRoles = ['SYSTEM_ADMIN', 'TEACHER', 'STUDENT'] as const
   type ValidRole = (typeof validRoles)[number]
   const safeBody: {
     role?: ValidRole

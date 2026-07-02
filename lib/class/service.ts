@@ -42,6 +42,7 @@ export interface ClassDetailResult {
   }>
   stats: {
     memberCount: number
+    problemCount: number
     assignmentCount: number
     noteCount: number
   }
@@ -51,7 +52,7 @@ export async function getClassDetail(classId: string): Promise<ClassDetailResult
   const classData = await prisma.class.findUnique({ where: { id: classId } })
   if (!classData) return null
 
-  const [members, memberCount, assignmentCount, noteCount] = await Promise.all([
+  const [members, memberCount, assignmentCount, noteCount, problemCount] = await Promise.all([
     prisma.classMember.findMany({
       where: { classId },
       include: {
@@ -61,6 +62,7 @@ export async function getClassDetail(classId: string): Promise<ClassDetailResult
     prisma.classMember.count({ where: { classId } }),
     prisma.classAssignment.count({ where: { classId } }),
     prisma.classNote.count({ where: { classId } }),
+    prisma.problem.count({ where: { classId } }),
   ])
 
   return {
@@ -84,7 +86,7 @@ export async function getClassDetail(classId: string): Promise<ClassDetailResult
       joinedAt: m.joinedAt,
       lastActiveAt: m.lastActiveAt,
     })),
-    stats: { memberCount, assignmentCount, noteCount },
+    stats: { memberCount, problemCount, assignmentCount, noteCount },
   }
 }
 
@@ -157,10 +159,25 @@ export async function listClasses(filter: ListClassesFilter = {}) {
       skip: (page - 1) * pageSize,
       take: pageSize,
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { members: true } } },
+      include: {
+        _count: { select: { members: true, assignments: true, notes: true } },
+      },
     }),
     prisma.class.count({ where }),
   ])
+
+  // 班级私有题目数（Problem.classId 无反向关系，需单独聚合）
+  const classIds = classes.map((c: any) => c.id)
+  const problemCountsRaw = classIds.length
+    ? await prisma.problem.groupBy({
+        by: ['classId'],
+        where: { classId: { in: classIds } },
+        _count: { _all: true },
+      })
+    : []
+  const problemCountMap = new Map<string, number>(
+    problemCountsRaw.map((r: any) => [r.classId, r._count._all])
+  )
 
   return {
     classes: classes.map((c: any) => ({
@@ -172,6 +189,12 @@ export async function listClasses(filter: ListClassesFilter = {}) {
       maxMembers: c.maxMembers,
       memberCount: c._count.members,
       createdAt: c.createdAt,
+      stats: {
+        memberCount: c._count.members,
+        problemCount: problemCountMap.get(c.id) || 0,
+        assignmentCount: c._count.assignments,
+        noteCount: c._count.notes,
+      },
     })),
     total,
     page,
@@ -221,7 +244,18 @@ export async function getClassMemberByUserId(classId: string, userId: string) {
   })
 }
 
-/** 更新成员角色 / 备注 */
+/**
+ * 班级 API 角色 → 系统角色（用于同步 User.role）
+ * owner / assistant 在系统层面均映射为 TEACHER，student 映射为 STUDENT
+ */
+function classApiRoleToSystemRole(
+  classRole: 'student' | 'assistant' | 'owner'
+): 'STUDENT' | 'TEACHER' {
+  if (classRole === 'owner' || classRole === 'assistant') return 'TEACHER'
+  return 'STUDENT'
+}
+
+/** 更新成员角色 / 备注（角色变更时同步到 User.role，保护 SYSTEM_ADMIN 不被降级） */
 export async function patchClassMember(
   classId: string,
   userId: string,
@@ -230,10 +264,33 @@ export async function patchClassMember(
   const update: { remark?: string; role?: string } = {}
   if (data.remark !== undefined) update.remark = data.remark
   if (data.role !== undefined) update.role = apiRoleToDb(data.role)
-  return prisma.classMember.update({
+
+  const updated = await prisma.classMember.update({
     where: { classId_userId: { classId, userId } },
     data: update,
   })
+
+  // 角色变更同步到系统 User.role（SYSTEM_ADMIN / 超管不被动降级）
+  if (data.role !== undefined) {
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, isSuperAdmin: true },
+    })
+    if (target && !target.isSuperAdmin && target.role !== 'SYSTEM_ADMIN') {
+      const newSystemRole = classApiRoleToSystemRole(data.role)
+      if (target.role !== newSystemRole) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { role: newSystemRole, isAdmin: false },
+        })
+        // 清掉用户 profile / 榜单缓存，避免登录态与后台列表读到旧角色
+        const { clearUserCache } = await import('@/lib/user/service')
+        clearUserCache(userId)
+      }
+    }
+  }
+
+  return updated
 }
 
 /** 合并成员权限位 */

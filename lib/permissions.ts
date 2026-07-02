@@ -46,15 +46,17 @@ export function canAccessAdmin(user: User | null): boolean {
 export function getRoleLabel(role?: string, isAdminFlag?: boolean): string {
   if (role === 'SYSTEM_ADMIN') return '系统管理员'
   if (isAdminFlag === true) return '管理员'
-  if (role === 'ADMIN') return '管理员'
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return '管理员'
   if (role === 'TEACHER') return '教师'
+  if (role === 'STUDENT') return '学生'
   return '用户'
 }
 
 export function getRoleColor(role?: string, isAdminFlag?: boolean): string {
   if (role === 'SYSTEM_ADMIN') return 'tag-error'
-  if (isAdminFlag === true || role === 'ADMIN') return 'tag-error'
+  if (isAdminFlag === true || role === 'ADMIN' || role === 'SUPER_ADMIN') return 'tag-error'
   if (role === 'TEACHER') return 'tag-warning'
+  if (role === 'STUDENT') return 'tag-info'
   return 'tag-info'
 }
 
