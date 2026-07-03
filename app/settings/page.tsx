@@ -149,7 +149,7 @@ export default function SettingsPage() {
  setLoading(true)
  try {
  const response = await fetchWithAuth('/api/users/profile/password', {
- method: 'PATCH',
+ method: 'PUT',
  headers: {
  'Content-Type': 'application/json',
  },

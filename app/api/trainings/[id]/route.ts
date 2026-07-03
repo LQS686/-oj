@@ -2,7 +2,6 @@
  * /api/trainings/[id] - 训练计划详情
  */
 import { withApi, ok, readJson, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
 import {
   getTrainingWithProblemStatuses,
   updateTrainingAndProblems,
@@ -12,7 +11,7 @@ import {
 import { isObjectId } from '@/lib/api/validation'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { hasPermission, isAdmin } from '@/lib/permissions'
+import { canAccessAdmin, canManageContent, isAdmin } from '@/lib/permissions'
 
 export const GET = withApi.public(async (req, ctx) => {
   const { id } = (ctx as any).params
@@ -40,7 +39,9 @@ export const GET = withApi.public(async (req, ctx) => {
   return ok(training)
 })
 
-export const PUT = withApi.auth(withPermission('training.edit')(async (req, ctx, { user }) => {
+export const PUT = withApi.auth(async (req, ctx, { user }) => {
+  if (!canManageContent(user)) throw throw403('无权限编辑训练计划')
+
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
@@ -68,8 +69,8 @@ export const PUT = withApi.auth(withPermission('training.edit')(async (req, ctx,
     cover?: string
   }>(req)
 
-  // 发布/推荐等高级设置仅有 training.publish 权限的用户可改
-  const canPublish = await hasPermission(user, 'training.publish')
+  // 发布/推荐等高级设置仅管理员可改
+  const canPublish = canAccessAdmin(user)
   if (!canPublish) {
     delete (body as any).categoryType
     delete (body as any).isRecommended
@@ -79,9 +80,11 @@ export const PUT = withApi.auth(withPermission('training.edit')(async (req, ctx,
 
   const updated = await updateTrainingAndProblems(id, body)
   return ok(updated)
-}))
+})
 
-export const DELETE = withApi.auth(withPermission('training.delete')(async (_req, ctx, { user }) => {
+export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
+  if (!canManageContent(user)) throw throw403('无权限删除训练计划')
+
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
@@ -96,4 +99,4 @@ export const DELETE = withApi.auth(withPermission('training.delete')(async (_req
   }
   await deleteTraining(id)
   return ok({ id })
-}))
+})

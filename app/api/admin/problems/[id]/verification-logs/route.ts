@@ -1,15 +1,11 @@
 /**
  * /api/admin/problems/[id]/verification-logs - 题目的验证日志（管理员）
  */
-import { withApi, ok, throw400, throw403 } from '@/lib/api/withApi'
+import { withApi, ok, throw400 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { isSystemAdmin } from '@/lib/permissions'
 import { listProblemVerificationLogs } from '@/lib/admin/logs'
 
-export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
+export const GET = withApi.admin(async (_req, ctx) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 

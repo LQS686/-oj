@@ -18,13 +18,9 @@ const MAX_HEARTBEATS_PER_MINUTE = 30
 const ALLOWED_EVENT_TYPES = [
   'join',
   'leave',
-  'join_post',
-  'leave_post',
   'ping',
   'pong',
 ] as const
-
-const PUBLIC_ROOMS = ['post:']
 
 const connectionRateLimit = new Map<string, { count: number; resetAt: number }>()
 
@@ -101,10 +97,6 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
   return { allowed: true, remaining: RATE_LIMIT_MAX_CONNECTIONS - record.count }
 }
 
-function isPublicRoom(room: string): boolean {
-  return PUBLIC_ROOMS.some(prefix => room.startsWith(prefix))
-}
-
 /**
  * 初始化 WebSocket 服务器
  */
@@ -132,7 +124,6 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     socketId: string, 
     userId: string | null, 
     connectedAt: number, 
-    currentPostId?: string,
     heartbeatCount: number,
     heartbeatWindowStart: number,
     isAuthenticated: boolean
@@ -187,34 +178,6 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       }
       
       next()
-    })
-
-    socket.on('join_post', (postId: string) => {
-      const room = `post:${postId}`
-      socket.join(room)
-      
-      const client = connectedClients.get(socket.id)
-      if (client) {
-        client.currentPostId = postId
-        connectedClients.set(socket.id, client)
-      }
-
-      const count = io?.sockets.adapter.rooms.get(room)?.size || 0
-      io?.to(room).emit('post:online_count', { postId, count })
-    })
-
-    socket.on('leave_post', (postId: string) => {
-      const room = `post:${postId}`
-      socket.leave(room)
-      
-      const client = connectedClients.get(socket.id)
-      if (client && client.currentPostId === postId) {
-        client.currentPostId = undefined
-        connectedClients.set(socket.id, client)
-      }
-
-      const count = io?.sockets.adapter.rooms.get(room)?.size || 0
-      io?.to(room).emit('post:online_count', { postId, count })
     })
 
     socket.on('join', (data: string | { userId: string; token?: string }) => {
@@ -284,14 +247,6 @@ export function initWebSocketServer(httpServer: HTTPServer) {
 
     socket.on('disconnect', (reason) => {
       console.log(`❌ 客户端断开: ${socket.id}, 原因: ${reason}`)
-      
-      const client = connectedClients.get(socket.id)
-      if (client && client.currentPostId) {
-         const postId = client.currentPostId
-         const room = `post:${postId}`
-         const count = io?.sockets.adapter.rooms.get(room)?.size || 0
-         io?.to(room).emit('post:online_count', { postId, count })
-      }
 
       connectedClients.delete(socket.id)
     })

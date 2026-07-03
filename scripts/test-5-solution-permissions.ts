@@ -75,19 +75,19 @@ const cases: TestCase[] = [
     }
   },
 
-  // 用例 2：教师（role=TEACHER）→ TEACHER
+  // 用例 2：教师（role=TEACHER）→ ADMIN（canManageContent 对 TEACHER 返回 true，统一返回 ADMIN）
   {
-    name: '2. 教师 role=TEACHER → 允许 / TEACHER',
-    expected: { allowed: true, reason: 'TEACHER' },
+    name: '2. 教师 role=TEACHER → 允许 / ADMIN',
+    expected: { allowed: true, reason: 'ADMIN' },
     run: async () => {
       findFirstCallCount = 0
       const result = await canViewSolutions(
         { id: 'u-teacher-1', role: 'TEACHER' },
         'p-2'
       )
-      assertResult(result, { allowed: true, reason: 'TEACHER' })
+      assertResult(result, { allowed: true, reason: 'ADMIN' })
       if (findFirstCallCount !== 0) {
-        throw new Error('教师应短路，不应查 DB')
+        throw new Error('教师不应查 submission DB')
       }
     }
   },
@@ -176,10 +176,10 @@ function assertResult(
 }
 
 // 额外的纯函数分支覆盖（保证 LOW_SCORE 也能跑通）
-function runPureFunctionExtraCases() {
+async function runPureFunctionExtraCases() {
   // 6) 普通用户分数 < 60 → LOW_SCORE
   {
-    const result = decideSolutionView(
+    const result = await decideSolutionView(
       { id: 'u-low', role: 'STUDENT' },
       30,
       {}
@@ -190,7 +190,7 @@ function runPureFunctionExtraCases() {
 
   // 7) role=SYSTEM_ADMIN → ADMIN
   {
-    const result = decideSolutionView(
+    const result = await decideSolutionView(
       { id: 'u-flag', role: 'SYSTEM_ADMIN' },
       0,
       {}
@@ -201,7 +201,7 @@ function runPureFunctionExtraCases() {
 
   // 8) 边界：bestScore=60 → ENOUGH_SCORE
   {
-    const result = decideSolutionView(
+    const result = await decideSolutionView(
       { id: 'u-edge', role: 'STUDENT' },
       60,
       {}
@@ -212,7 +212,7 @@ function runPureFunctionExtraCases() {
 
   // 9) 边界：bestScore=59 → LOW_SCORE
   {
-    const result = decideSolutionView(
+    const result = await decideSolutionView(
       { id: 'u-edge2', role: 'STUDENT' },
       59,
       {}
@@ -272,7 +272,7 @@ async function main() {
 
   console.log('\n— 纯函数分支补充 —')
   try {
-    runPureFunctionExtraCases()
+    await runPureFunctionExtraCases()
     pass += 4
   } catch (e: any) {
     fail += 4

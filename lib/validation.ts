@@ -241,29 +241,6 @@ export function validateClassDescription(description: string): boolean {
   return description.length <= 1000
 }
 
-export function validatePostTitle(title: string): boolean {
-  if (!title || typeof title !== 'string') {
-    return false
-  }
-  const trimmed = title.trim()
-  return trimmed.length >= 1 && trimmed.length <= 200
-}
-
-export function validatePostContent(content: string): boolean {
-  if (!content || typeof content !== 'string') {
-    return false
-  }
-  return content.trim().length >= 10
-}
-
-export function validateCommentContent(content: string): boolean {
-  if (!content || typeof content !== 'string') {
-    return false
-  }
-  const trimmed = content.trim()
-  return trimmed.length >= 1 && trimmed.length <= 1000
-}
-
 export function validateSolutionTitle(title: string): boolean {
   if (!title || typeof title !== 'string') {
     return false

@@ -162,11 +162,15 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
       language: body.language,
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
+      comparisonMode: problem.comparisonMode as any,
+      realPrecision: problem.realPrecision,
       testCases: (problem.testCases as any[]).map((tc) => ({
         id: tc.id,
         input: tc.input,
         output: tc.output,
         score: tc.score,
+        timeLimit: tc.timeLimit ?? undefined,
+        memoryLimit: tc.memoryLimit ?? undefined,
       })),
     })
     logger.info(`提交 ${submission.id} 已加入评测队列`)

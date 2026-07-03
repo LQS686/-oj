@@ -5,11 +5,8 @@
  * PATCH  更新竞赛
  * DELETE 删除竞赛
  */
-import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
+import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { isSystemAdmin } from '@/lib/permissions'
-import type { PermissionUser } from '@/lib/permissions'
 import {
   adminGetContestWithProblems,
   adminUpdateContest,
@@ -17,17 +14,10 @@ import {
   type AdminUpdateContestInput,
 } from '@/lib/contest/service'
 
-function ensureAdmin(user: PermissionUser) {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-}
-
 /**
  * GET /api/admin/contests/[id] - 获取单个竞赛详情（管理员）
  */
-export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  ensureAdmin(user)
+export const GET = withApi.admin(async (_req, ctx) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
@@ -39,20 +29,18 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
 /**
  * PATCH /api/admin/contests/[id] - 更新竞赛（管理员）
  */
-export const PATCH = withApi.auth(withPermission('admin.access')(async (req, ctx, { user }) => {
-  ensureAdmin(user)
+export const PATCH = withApi.admin(async (req, ctx) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   const body = await readJson<AdminUpdateContestInput>(req)
   return ok(await adminUpdateContest(id, body))
-}))
+})
 
 /**
  * DELETE /api/admin/contests/[id] - 删除竞赛（管理员）
  */
-export const DELETE = withApi.auth(withPermission('admin.access')(async (_req, ctx, { user }) => {
-  ensureAdmin(user)
+export const DELETE = withApi.admin(async (_req, ctx) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
@@ -61,4 +49,4 @@ export const DELETE = withApi.auth(withPermission('admin.access')(async (_req, c
   // schema 中 ContestProblem 有 onDelete: Cascade 指向 Contest，所以 Prisma Client 会处理
   await adminDeleteContest(id)
   return ok({ message: '删除成功' })
-}))
+})

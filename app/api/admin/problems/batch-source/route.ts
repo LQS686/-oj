@@ -1,16 +1,10 @@
 /**
  * /api/admin/problems/batch-source - 批量更新题目的来源标记（管理员）
  */
-import { withApi, ok, readJson, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson } from '@/lib/api/withApi'
 import { batchUpdateProblemSource } from '@/lib/problem/service'
 
-export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const { ids, source } = await readJson<{ ids?: string[]; source?: string }>(req)
 
   const result = await batchUpdateProblemSource(
@@ -21,4 +15,4 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
   )
 
   return ok({ message: `成功更新 ${result.count} 个题目的来源标记` })
-}))
+})

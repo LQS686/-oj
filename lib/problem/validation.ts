@@ -24,6 +24,11 @@ export function parseProblemCreate(body: any) {
     difficulty: required(body?.difficulty, '难度'),
     timeLimit: toInt(body?.timeLimit, '时间限制', 1000),
     memoryLimit: toInt(body?.memoryLimit, '内存限制', 256),
+    comparisonMode:
+      body?.comparisonMode && typeof body.comparisonMode === 'string'
+        ? body.comparisonMode
+        : 'default',
+    realPrecision: toInt(body?.realPrecision, '浮点数精度', 3),
     isPublic: body?.isPublic ? toBool(body.isPublic) : false,
     tags: body?.tags || [],
   }

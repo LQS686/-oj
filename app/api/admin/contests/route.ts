@@ -4,18 +4,13 @@
  * GET  竞赛列表
  * POST 创建竞赛
  */
-import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import { adminCreateContest, listAdminContests } from '@/lib/contest/service'
 
 /**
  * GET /api/admin/contests - 获取竞赛列表（管理员）
  */
-export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
+export const GET = withApi.admin(async () => {
   const data = await listAdminContests()
   return ok(data)
 })
@@ -23,11 +18,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
 /**
  * POST /api/admin/contests - 创建竞赛（管理员）
  */
-export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const body = await readJson<{
     title?: string
     description?: string
@@ -56,4 +47,4 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
   }, user.id)
 
   return ok(contest)
-}))
+})

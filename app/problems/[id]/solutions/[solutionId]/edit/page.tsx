@@ -18,6 +18,7 @@ import {
 import MarkdownEditor from '@/components/solution/MarkdownEditor'
 import { useUser } from '@/contexts/UserContext'
 import { logger } from '@/lib/logger'
+import { canManageContent } from '@/lib/permissions'
 
 const CODE_LANGUAGES: { value: string; label: string }[] = [
  { value: 'cpp', label: 'C++' },
@@ -79,6 +80,7 @@ export default function EditSolutionPage() {
 
  const [submitting, setSubmitting] = useState(false)
  const [error, setError] = useState<string | null>(null)
+ const [canEditPerm, setCanEditPerm] = useState(false)
 
  // 加载题解详情
  useEffect(() => {
@@ -154,12 +156,18 @@ export default function EditSolutionPage() {
  }
  }, [solutionId])
 
+ useEffect(() => {
+ if (!user) {
+ setCanEditPerm(false)
+ return
+ }
+ setCanEditPerm(canManageContent(user))
+ }, [user])
+
  // 权限校验（在 user 与 solution 都就绪后判断）
  const userId = user?.id ?? null
- const isAdmin = user?.role === 'SYSTEM_ADMIN'
- const isTeacher = (user?.role ?? '').toUpperCase() === 'TEACHER'
  const isAuthor = !!(userId && solution?.author?.id && userId === solution.author.id)
- const canEdit = isAuthor || isAdmin || isTeacher
+ const canEdit = isAuthor || canEditPerm
 
  const titleLength = title.length
  const contentLength = content.length

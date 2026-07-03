@@ -197,3 +197,8 @@
 {"timestamp":"2026-06-27T09:55:29.789Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=m3ZFHJUhek88DETJAABi"}
 {"timestamp":"2026-06-27T09:55:32.368Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=OVtoZA8MRr5QTHuyAABk"}
 {"timestamp":"2026-06-27T09:55:39.905Z","level":"warn","message":"连接被速率限制拒绝: IP=::1, Socket=xcG6jEmI6T2Oyf4aAABm"}
+{"timestamp":"2026-07-02T12:23:29.584Z","level":"warn","message":"用户ID不匹配: Socket=4XTrS8Y-75NydHfPAAAB, 认证用户=68f8bab446da009b2020a224, 请求用户=69a3ec72487e34177a2a6dfe"}
+{"timestamp":"2026-07-02T12:23:30.628Z","level":"warn","message":"用户ID不匹配: Socket=aXwUOqVEfEPubSWQAAAD, 认证用户=68f8bab446da009b2020a224, 请求用户=69a3ec72487e34177a2a6dfe"}
+{"timestamp":"2026-07-02T12:23:30.644Z","level":"warn","message":"用户ID不匹配: Socket=SjaxQhbt5o-BhqYwAAAF, 认证用户=68f8bab446da009b2020a224, 请求用户=69a3ec72487e34177a2a6dfe"}
+{"timestamp":"2026-07-02T12:23:31.642Z","level":"warn","message":"用户ID不匹配: Socket=ahkwD68TmG1NkebqAAAJ, 认证用户=68f8bab446da009b2020a224, 请求用户=69a3ec72487e34177a2a6dfe"}
+{"timestamp":"2026-07-02T12:23:31.674Z","level":"warn","message":"用户ID不匹配: Socket=HuqmsQK_sGwJ0J-XAAAN, 认证用户=68f8bab446da009b2020a224, 请求用户=69a3ec72487e34177a2a6dfe"}

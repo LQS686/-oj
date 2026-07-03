@@ -1,14 +1,12 @@
 /**
  * /api/admin/announcements/[id]
  */
-import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { isSystemAdmin } from '@/lib/permissions'
 import { deleteAnnouncement, updateAnnouncement } from '@/lib/announcement/service'
 import { prisma } from '@/lib/prisma'
 
-export const PATCH = withApi.auth(async (req, ctx, { user }) => {
-  if (!isSystemAdmin(user)) throw403('需要系统管理员权限')
+export const PATCH = withApi.admin(async (req, ctx) => {
   const { id: resolved } = await (ctx as any).params
   if (!isObjectId(resolved)) throw400('INVALID_ID', '无效的公告 ID')
 
@@ -42,8 +40,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   return ok({ id: updated?.id })
 })
 
-export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  if (!isSystemAdmin(user)) throw403('需要系统管理员权限')
+export const DELETE = withApi.admin(async (_req, ctx) => {
   const { id: resolved } = await (ctx as any).params
   if (!isObjectId(resolved)) throw400('INVALID_ID', '无效的公告 ID')
 

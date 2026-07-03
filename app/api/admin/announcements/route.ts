@@ -1,22 +1,18 @@
 /**
  * /api/admin/announcements — 系统公告管理
  */
-import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import {
   createAnnouncement,
   listAllAnnouncementsForAdmin,
 } from '@/lib/announcement/service'
 
-export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) throw403('需要系统管理员权限')
+export const GET = withApi.admin(async () => {
   const items = await listAllAnnouncementsForAdmin()
   return ok({ items })
 })
 
-export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) throw403('需要系统管理员权限')
-
+export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const body = await readJson<{
     title?: string
     content?: string

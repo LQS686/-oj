@@ -28,6 +28,7 @@ export interface ExecuteResult {
   timeout: boolean
   memoryExceeded: boolean
   runtimeError: boolean
+  cannotStart: boolean
 }
 
 export async function executeCode(options: ExecuteOptions): Promise<ExecuteResult> {
@@ -67,6 +68,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     let timeout = false
     let runtimeError = false
     let memoryExceeded = false
+    let cannotStart = false
     let peakMemoryKB = 0
     let startTime = 0
     let endTime = 0
@@ -130,6 +132,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           clearTimeout(timeoutId)
           endTime = Date.now()
           runtimeError = true
+          cannotStart = true
           error = err.message
           resolve()
         })
@@ -255,6 +258,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           processKilled = true
           endTime = Date.now()
           runtimeError = true
+          cannotStart = true
           error = err.message
           resolve()
         })
@@ -313,6 +317,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       timeout,
       memoryExceeded,
       runtimeError,
+      cannotStart,
     }
   } catch (err) {
     try {

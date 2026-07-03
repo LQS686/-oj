@@ -35,6 +35,7 @@ import { logger } from '@/lib/logger'
 import { getUserFromRequest } from '@/lib/auth'
 import { getClassMembership, type ClassMembership } from '@/lib/class/auth'
 import { getCachedUser, type AuthUser, type ApiContext } from './handler'
+import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
 
 export type { AuthUser, ApiContext }
 
@@ -159,7 +160,7 @@ export const withApi = {
   },
 
   /**
-   * 管理员鉴权（基于 hasPermission('admin.access')，SYSTEM_ADMIN 默认通过）
+   * 管理员鉴权（SYSTEM_ADMIN 或 ADMIN 可访问后台）
    */
   admin(
     handler: (req: NextRequest, ctx: ApiContext, context: AuthContext) => Promise<Response | unknown> | Response | unknown
@@ -170,14 +171,33 @@ export const withApi = {
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId)
         if (!user) throw throw401('用户不存在')
-        const { hasPermission } = await import('@/lib/permissions/permissions')
-        const ok = await hasPermission(user, 'admin.access')
-        if (!ok) {
+        if (!canAccessAdmin(user)) {
           throw throw403('需要管理员权限')
         }
         const resolved = await resolveCtxParams(ctx)
         return handler(req, resolved, { user })
       }, 'ADMIN', req)
+    }
+  },
+
+  /**
+   * 系统管理员鉴权（仅 SYSTEM_ADMIN 可访问）
+   */
+  systemAdmin(
+    handler: (req: NextRequest, ctx: ApiContext, context: AuthContext) => Promise<Response | unknown> | Response | unknown
+  ) {
+    return async (req: NextRequest, ctx: any) => {
+      return safeCall(async () => {
+        const session = getUserFromRequest(req)
+        if (!session?.userId) throw throw401()
+        const user = await getCachedUser(session.userId)
+        if (!user) throw throw401('用户不存在')
+        if (!isSystemAdmin(user)) {
+          throw throw403('需要系统管理员权限')
+        }
+        const resolved = await resolveCtxParams(ctx)
+        return handler(req, resolved, { user })
+      }, 'SYSTEM_ADMIN', req)
     }
   },
 

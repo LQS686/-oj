@@ -5,11 +5,13 @@ import { promisify } from 'util'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { logger } from '@/lib/logger'
+import { CompileState } from './types'
 
 const execPromise = promisify(exec)
 
 export interface CompileResult {
   success: boolean
+  compileState: CompileState
   compiledPath?: string
   error?: string
   stderr?: string
@@ -49,11 +51,20 @@ const languageConfigs: Record<string, {
 // 编译代码
 export async function compileCode(code: string, language: string): Promise<CompileResult> {
   const config = languageConfigs[language]
-  
+
   if (!config) {
     return {
       success: false,
+      compileState: CompileState.NoValidSourceFile,
       error: `不支持的语言: ${language}`,
+    }
+  }
+
+  if (!code || !code.trim()) {
+    return {
+      success: false,
+      compileState: CompileState.NoValidSourceFile,
+      error: '源代码为空',
     }
   }
 
@@ -76,6 +87,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
     if (!config.needsCompile) {
       return {
         success: true,
+        compileState: CompileState.CompileSuccessfully,
         compiledPath: sourcePath,
       }
     }
@@ -101,20 +113,32 @@ export async function compileCode(code: string, language: string): Promise<Compi
       // 编译成功
       return {
         success: true,
+        compileState: CompileState.CompileSuccessfully,
         compiledPath: outputPath,
         stderr: stderr || undefined,
       }
     } catch (error) {
+      const err = error as { killed?: boolean; signal?: string; stderr?: string; message?: string }
+      // 编译超时
+      if (err.killed === true || err.signal === 'SIGTERM') {
+        return {
+          success: false,
+          compileState: CompileState.CompileTimeLimitExceeded,
+          error: '编译超时',
+        }
+      }
       // 编译失败
       return {
         success: false,
+        compileState: CompileState.CompileError,
         error: '编译错误',
-        stderr: (error as { stderr?: string; message?: string }).stderr || (error as { stderr?: string; message?: string }).message,
+        stderr: err.stderr || err.message,
       }
     }
   } catch (error) {
     return {
       success: false,
+      compileState: CompileState.CompileError,
       error: error instanceof Error ? error.message : '未知错误',
     }
   }

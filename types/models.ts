@@ -16,7 +16,6 @@ export interface User {
   updatedAt: string
   _count?: {
     submissions: number
-    posts: number
     comments: number
   }
 }

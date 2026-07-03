@@ -40,6 +40,8 @@ export default function CreateProblemPage() {
  const [tagInput, setTagInput] = useState('')
  const [timeLimit, setTimeLimit] = useState(1000)
  const [memoryLimit, setMemoryLimit] = useState(128)
+ const [comparisonMode, setComparisonMode] = useState('default')
+ const [realPrecision, setRealPrecision] = useState(3)
  const [visibility, setVisibility] = useState('private')
 
  const [description, setDescription] = useState('')
@@ -122,6 +124,8 @@ export default function CreateProblemPage() {
  tags,
  timeLimit,
  memoryLimit,
+ comparisonMode,
+ realPrecision: comparisonMode === 'real-number' ? realPrecision : 3,
  isPublic: visibility === 'public',
  visibility,
  aiStatus: aiData ? 'AI_ASSISTED' : 'MANUAL_CREATED'
@@ -292,6 +296,48 @@ export default function CreateProblemPage() {
  </div>
  </div>
 
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+ <div>
+ <label className="block text-sm font-medium text-foreground mb-2">
+ 输出比较模式
+ </label>
+ <select
+ value={comparisonMode}
+ onChange={(e) => setComparisonMode(e.target.value)}
+ className="input"
+ >
+ <option value="default">默认（NOI 忽略行末空格）</option>
+ <option value="strict">严格逐行匹配</option>
+ <option value="ignore-spaces">忽略所有空白</option>
+ <option value="real-number">浮点数比较</option>
+ </select>
+ </div>
+
+ <div>
+ {comparisonMode === 'real-number' ? (
+ <>
+ <label className="block text-sm font-medium text-foreground mb-2">
+ 精度（小数位数）
+ </label>
+ <input
+ type="number"
+ value={realPrecision}
+ onChange={(e) => setRealPrecision(parseInt(e.target.value) || 3)}
+ min="0"
+ max="12"
+ className="input"
+ />
+ </>
+ ) : (
+ <p className="text-xs text-muted-foreground pt-7">
+ {comparisonMode === 'default' && 'NOI 规则：忽略每行行末多余空格与文件末尾多余空行'}
+ {comparisonMode === 'strict' && '逐字符严格比较，所有空白与换行均参与对比'}
+ {comparisonMode === 'ignore-spaces' && '比较时忽略所有空白字符（含空格、制表符、换行）'}
+ </p>
+ )}
+ </div>
+ </div>
+ 
  <div className="flex items-center gap-4">
  <label className="text-sm font-medium text-foreground">题目可见性：</label>
  <select

@@ -5,10 +5,6 @@
 import { prisma } from '@/lib/prisma'
 
 export const DEFAULT_CATEGORIES = [
-  { id: '1', name: '综合讨论', description: '综合话题讨论', sortOrder: 1 },
-  { id: '2', name: '题解分享', description: '题目解答分享', sortOrder: 2 },
-  { id: '3', name: '求助问答', description: '问题求助和解答', sortOrder: 3 },
-  { id: '4', name: '技术交流', description: '技术讨论与交流', sortOrder: 4 },
   { id: '5', name: '公告', description: '系统公告', sortOrder: 0 },
 ]
 

@@ -155,12 +155,15 @@ export interface CreateProblemInput {
   tags?: string[]
   timeLimit?: number
   memoryLimit?: number
+  comparisonMode?: string
+  realPrecision?: number
   isPublic?: boolean
   testCases?: TestCaseInput[]
   authorId: string
 }
 
 export async function createProblemWithTestcases(input: CreateProblemInput) {
+  const VALID_COMPARISON_MODES = ['default', 'strict', 'ignore-spaces', 'real-number']
   const problem = await prisma.problem.create({
     data: {
       title: input.title,
@@ -174,6 +177,13 @@ export async function createProblemWithTestcases(input: CreateProblemInput) {
       tags: input.tags || [],
       timeLimit: input.timeLimit || 1000,
       memoryLimit: input.memoryLimit || 128,
+      comparisonMode: VALID_COMPARISON_MODES.includes(input.comparisonMode as string)
+        ? (input.comparisonMode as string)
+        : 'default',
+      realPrecision:
+        typeof input.realPrecision === 'number' && input.realPrecision >= 0
+          ? input.realPrecision
+          : 3,
       isPublic: input.isPublic ?? false,
       authorId: input.authorId,
     },
@@ -186,6 +196,8 @@ export async function createProblemWithTestcases(input: CreateProblemInput) {
         output: tc.output,
         isSample: tc.isSample || false,
         score: tc.score || 0,
+        timeLimit: tc.timeLimit,
+        memoryLimit: tc.memoryLimit,
         orderIndex: index + 1,
       }))
     )
@@ -198,6 +210,8 @@ export async function createProblemWithTestcases(input: CreateProblemInput) {
             output: tc.output,
             isSample: tc.isSample,
             score: tc.score,
+            timeLimit: tc.timeLimit ?? null,
+            memoryLimit: tc.memoryLimit ?? null,
             orderIndex: tc.orderIndex,
           },
         })
@@ -423,6 +437,8 @@ export async function createAdminProblem(
     tags,
     timeLimit,
     memoryLimit,
+    comparisonMode,
+    realPrecision,
     isPublic,
     visibility,
     testCases,
@@ -451,6 +467,22 @@ export async function createAdminProblem(
     const m = parseLimit(memoryLimit, 128)
     if (m < 1 || m > 1024) {
       throw new ApiError('INVALID_MEMORY_LIMIT', '内存限制必须在1-1024MB之间', 400)
+    }
+  }
+  const VALID_COMPARISON_MODES = ['default', 'strict', 'ignore-spaces', 'real-number']
+  if (comparisonMode !== undefined && comparisonMode !== null) {
+    if (!VALID_COMPARISON_MODES.includes(comparisonMode as string)) {
+      throw new ApiError(
+        'INVALID_COMPARISON_MODE',
+        '比较模式无效，必须是：default、strict、ignore-spaces、real-number',
+        400
+      )
+    }
+  }
+  if (realPrecision !== undefined && realPrecision !== null) {
+    const p = parseLimit(realPrecision, 3)
+    if (p < 0 || p > 12) {
+      throw new ApiError('INVALID_REAL_PRECISION', '浮点数精度必须在0-12之间', 400)
     }
   }
   if (tags !== undefined && tags !== null && !Array.isArray(tags)) {
@@ -491,6 +523,10 @@ export async function createAdminProblem(
     tags: (tags as string[]) || [],
     timeLimit: timeLimitValue,
     memoryLimit: memoryLimitValue,
+    comparisonMode: VALID_COMPARISON_MODES.includes(comparisonMode as string)
+      ? (comparisonMode as string)
+      : 'default',
+    realPrecision: parseLimit(realPrecision, 3),
     isPublic: visibility === 'public',
     visibility: (visibility as string) || 'public',
     totalSubmit: 0,
@@ -505,6 +541,12 @@ export async function createAdminProblem(
         output: String(tc.output || ''),
         isSample: Boolean(tc.isSample),
         score: Number(tc.score) || 10,
+        timeLimit:
+          tc.timeLimit === undefined || tc.timeLimit === null ? null : Number(tc.timeLimit),
+        memoryLimit:
+          tc.memoryLimit === undefined || tc.memoryLimit === null
+            ? null
+            : Number(tc.memoryLimit),
         orderIndex: idx,
       })),
     }
@@ -610,6 +652,8 @@ const ADMIN_PROBLEM_EDITABLE_FIELDS = [
   'tags',
   'timeLimit',
   'memoryLimit',
+  'comparisonMode',
+  'realPrecision',
   'isPublic',
   'visibility',
 ] as const
@@ -664,6 +708,12 @@ export async function updateAdminProblem(
           output: tc.output || '',
           isSample: tc.isSample || false,
           score: tc.score || 10,
+          timeLimit:
+            tc.timeLimit === undefined || tc.timeLimit === null ? null : Number(tc.timeLimit),
+          memoryLimit:
+            tc.memoryLimit === undefined || tc.memoryLimit === null
+              ? null
+              : Number(tc.memoryLimit),
           orderIndex: idx,
         })),
       })

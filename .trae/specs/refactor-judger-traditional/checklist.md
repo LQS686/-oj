@@ -1,0 +1,29 @@
+- [x] `lib/judge/types.ts` 存在并导出 `ResultState`、`CompileState`、`ComparisonMode`、`CompareInput`、`CompareResult`、`JudgeVerdict`
+- [x] `lib/judge/comparator.ts` 存在并导出 `compareOutput(input, options)`，内部实现 default/strict/ignore-spaces/real-number 四种模式
+- [x] `comparator.ts` 使用 128KB 缓冲流式读取，未将整个输出一次性读入内存（BufferedStreamReader 包装 Node.js Readable，BUFFER_SIZE=128KB，无 split()）
+- [x] `default` 比较模式与重构前 `compareOutput` 行为完全一致（去行末空格 + 去文末空行后逐行精确匹配）
+- [x] `strict` 模式逐字节逐行精确匹配，行末空格差异判定 WA
+- [x] `ignore-spaces` 模式 token 序列相同但行分布不同时返回 PE
+- [x] `real-number` 模式按 `eps = 10^(-realPrecision)` 比较，message 含行号与期望/实际值
+- [x] `lib/judge/compiler.ts` 的 `CompileResult` 包含 `compileState` 字段，能区分 NoValidSourceFile/CompileError/CompileTimeLimitExceeded/InvalidCompiler
+- [x] `lib/judge/executor.ts` 的 `ExecuteResult` 包含 `cannotStart` 字段，spawn 失败时为 true
+- [x] `lib/judge/judger.ts` 不再包含内联比较逻辑，改为调用 `comparator.compareOutput`
+- [x] `judger.ts` 编译失败时短路返回 CE，message 标注 CompileState 细分原因（拼接 `${COMPILE_STATE_MESSAGES[compileState]}: ${detail}`）
+- [x] `judger.ts` 执行 spawn 失败时标记 CSP 状态
+- [x] `judger.ts` 单测点限制覆盖生效：`testCase.timeLimit ?? job.timeLimit`
+- [x] `judger.ts` 临界 TLE 重测：`rejudgeTimes=0` 时不触发，`rejudgeTimes>0` 时临界超时触发重测
+- [x] `lib/judge/queue.ts` 的 `JudgeJob` 包含 `comparisonMode`、`realPrecision`、`rejudgeTimes`、`extraTimeRatio` 可选字段
+- [x] `JudgeResult.status` 类型包含 PC/PE/OLE/CSP
+- [x] `prisma/schema.prisma` 的 `Problem` 包含 `comparisonMode String @default("default")` 与 `realPrecision Int @default(3)`
+- [x] `prisma/schema.prisma` 的 `TestCase` 包含 `timeLimit Int?` 与 `memoryLimit Int?`
+- [x] `npx prisma generate` 成功，生成的客户端类型包含新字段
+- [x] `lib/submission/service.ts` 入队时透传 `comparisonMode`、`realPrecision`、单测点 `timeLimit`/`memoryLimit`
+- [x] `lib/class/service.ts`、`lib/contest/service.ts` 入队时同步透传比较配置
+- [x] `components/submission/JudgeStatus.tsx` 展示 PE/OLE/CSP/PC 的文案与颜色
+- [x] 题目创建/编辑页有比较模式下拉选择，real-number 模式下显示 realPrecision 输入
+- [x] 测点管理页有可选的单测点 timeLimit/memoryLimit 输入（留空=使用题目默认）
+- [x] 题目创建/更新 API 持久化 `comparisonMode`、`realPrecision`、单测点限制（admin 路径与 `createProblemWithTestcases` 均已透传）
+- [x] 旧题目（未设 comparisonMode）评测结果与重构前完全一致
+- [x] 旧测点（未设 timeLimit/memoryLimit）回退到题目级限制
+- [x] `npx tsc --noEmit` 通过
+- [x] `npx eslint lib/judge app/admin/problems --max-warnings 0` 通过（重构文件 comparator.ts/judger.ts/queue.ts/types.ts 均 0 警告；余 71 条为 codeAnalyzer/executor/worker 及 admin/problems UI 页面的存量警告，与本次评测机重构无关）

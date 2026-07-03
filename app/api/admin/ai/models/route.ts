@@ -4,9 +4,7 @@
  * GET  列出可用模型（已过滤掉孤儿/挂载在已禁用 Provider 上的模型）
  * POST 创建模型
  */
-import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import { createAiModel, listActiveAiModelsEnriched } from '@/lib/ai/service'
 
 /**
@@ -20,11 +18,7 @@ import { createAiModel, listActiveAiModelsEnriched } from '@/lib/ai/service'
  * 严格过滤的目的：即使数据库中残留历史脏数据（如 provider 已被软删除），
  * 也不会让"挂在已禁用 Provider 上的模型"出现在前端 UI 上。
  */
-export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const GET = withApi.admin(async () => {
   const { data, orphanCount } = await listActiveAiModelsEnriched()
   return ok({ items: data, _orphanFiltered: orphanCount })
 })
@@ -32,11 +26,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
 /**
  * POST /api/admin/ai/models
  */
-export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const POST = withApi.admin(async (req, _ctx) => {
   const body = await readJson<{
     name?: string
     model?: string
@@ -65,4 +55,4 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
   })
 
   return ok(newModel)
-}))
+})

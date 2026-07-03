@@ -200,10 +200,6 @@ export default function UserProfilePage() {
  <span className="font-bold text-xl text-primary-light">{user._count?.submissions || 0}</span>
  </div>
  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/25 hover:bg-muted transition-all">
- <span className="text-muted-foreground font-medium">发表帖子</span>
- <span className="font-bold text-xl text-accent-light">{user._count?.posts || 0}</span>
- </div>
- <div className="flex items-center justify-between p-4 rounded-lg bg-muted/25 hover:bg-muted transition-all">
  <span className="text-muted-foreground font-medium">通过率</span>
  <span className="font-bold text-xl text-info">
  {(user._count?.submissions ?? 0) > 0 

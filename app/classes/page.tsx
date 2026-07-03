@@ -53,13 +53,22 @@ function ClassesPageContent() {
   const [createClassOpen, setCreateClassOpen] = useState(false)
   const [selectedClass, setSelectedClass] = useState<Class | null>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [canCreate, setCanCreate] = useState(false)
 
   useEffect(() => {
-    if (searchParams.get('create') === '1' && user && canCreateClass(user)) {
+    if (!user) {
+      setCanCreate(false)
+      return
+    }
+    setCanCreate(canCreateClass(user))
+  }, [user])
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1' && user && canCreate) {
       setCreateClassOpen(true)
       router.replace('/classes', { scroll: false })
     }
-  }, [searchParams, user, router])
+  }, [searchParams, user, router, canCreate])
 
   const fetchClasses = useCallback(async (isInitial = false) => {
     try {
@@ -184,7 +193,7 @@ function ClassesPageContent() {
       description="加入班级，与伙伴一起学习和进步"
       icon={Users}
       actions={
-        user && canCreateClass(user) ? (
+        user && canCreate ? (
           <button type="button" onClick={() => setCreateClassOpen(true)} className="btn btn-primary">
             <Plus className="w-5 h-5" />
             创建班级
@@ -251,7 +260,7 @@ function ClassesPageContent() {
             <div className="text-muted-foreground mb-6">
               {showMyClasses ? '加入一个班级开始协作学习吧' : '成为第一个创建班级的人'}
             </div>
-            {user && !showMyClasses && canCreateClass(user) && (
+            {user && !showMyClasses && canCreate && (
               <button
                 type="button"
                 onClick={() => setCreateClassOpen(true)}

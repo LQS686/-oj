@@ -18,7 +18,8 @@ import {
  ChevronRight,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { usePermission } from '@/hooks/usePermission'
+import { useUser } from '@/contexts/UserContext'
+import { canCreateContest } from '@/lib/permissions'
 import {
   EducationalPageShell,
   PageLoading,
@@ -126,6 +127,7 @@ function getTimeRemaining(startTime: string): string {
 
 export default function ContestsPage() {
  const router = useRouter()
+ const { user } = useUser()
  const [contests, setContests] = useState<Contest[]>([])
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState<string | null>(null)
@@ -134,8 +136,8 @@ export default function ContestsPage() {
  const [page, setPage] = useState(1)
  const [totalPages, setTotalPages] = useState(1)
 
- // 注意：usePermission 必须在所有 early return 之前调用（Rules of Hooks）
- const canCreateContest = usePermission('contest.create')
+ // 是否可创建竞赛（SYSTEM_ADMIN / ADMIN / TEACHER）
+ const canCreate = canCreateContest(user)
 
  useEffect(() => {
  fetchContests()
@@ -212,7 +214,7 @@ export default function ContestsPage() {
  icon={Trophy}
  iconClassName="bg-accent text-white"
  actions={
- canCreateContest ? (
+ canCreate ? (
  <button onClick={handleCreateContest} className="btn-primary btn">
  <Plus className="w-5 h-5" />
  创建竞赛

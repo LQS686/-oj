@@ -4,9 +4,7 @@
  * GET  查日志列表 / 单条日志状态
  * POST 入队生成任务
  */
-import { withApi, ok, readJson, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson } from '@/lib/api/withApi'
 import {
   enqueueAiGeneration,
   getAiLogById,
@@ -21,11 +19,7 @@ import {
  *   无 logId -> 返回当前用户最近 20 条
  *   有 logId -> 返回单条
  */
-export const GET = withApi.auth(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const GET = withApi.admin(async (req, _ctx, { user }) => {
   const { searchParams } = new URL(req.url)
   const logId = searchParams.get('logId')
 
@@ -38,11 +32,7 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
 /**
  * POST /api/admin/ai/generate
  */
-export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const body = await readJson<AiGenerateBody>(req)
   const { retryFromLogId, reduceTemperature } = body
 
@@ -53,4 +43,4 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
 
   validateAiGenerateBody(body)
   return ok(await enqueueAiGeneration(user.id, body))
-}))
+})

@@ -6,8 +6,8 @@
  *
  * 迁移到 withApi 中间件模式
  */
-import { withApi, ok, readJson, readQuery } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
+import { withApi, ok, readJson, readQuery, throw403 } from '@/lib/api/withApi'
+import { canManageContent } from '@/lib/permissions'
 import { toInt } from '@/lib/api/validation'
 import { createContestDirect } from '@/lib/mongodb-direct'
 import { listPublicContests } from '@/lib/contest/service'
@@ -31,7 +31,9 @@ export const GET = withApi.public(async (req) => {
 })
 
 // POST /api/contests - 创建竞赛
-export const POST = withApi.auth(withPermission('contest.create')(async (req, _ctx, { user }) => {
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  if (!canManageContent(user)) throw throw403('无权限创建竞赛')
+
   const body = await readJson<{
     title: string
     description?: string
@@ -59,5 +61,5 @@ export const POST = withApi.auth(withPermission('contest.create')(async (req, _c
   })
 
   return ok(contest, { status: 201 })
-}))
+})
 

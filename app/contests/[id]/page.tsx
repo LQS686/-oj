@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import ContestRegistration from './ContestRegistration'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
+import { canManageContent } from '@/lib/permissions'
 import Link from 'next/link'
 import { Edit, FileText } from 'lucide-react'
 
@@ -24,7 +25,7 @@ export default async function ContestOverviewPage({ params }: { params: Promise<
  if (token) {
  const payload = verifyToken(token)
  if (payload) {
- if (payload.userId === contest.authorId || payload.role === 'SYSTEM_ADMIN') {
+ if (payload.userId === contest.authorId || canManageContent({ role: payload.role })) {
  const now = new Date()
  if (now < contest.startTime) {
  canEdit = true

@@ -27,7 +27,7 @@ import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useClass } from '@/hooks/useClass'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
-import { isAdmin, isTeacher } from '@/lib/permissions'
+import { canManageContent } from '@/lib/permissions'
 import { isClassAdminApiRole, isClassStudentApiRole, normalizeClassRoleToApi } from '@/lib/class/roles'
 
 const languageOptions = [
@@ -91,6 +91,7 @@ export default function AssignmentDetailPage() {
  const [userRole, setUserRole] = useState<string>('student')
  const [showActions, setShowActions] = useState(false)
  const [editOpen, setEditOpen] = useState(false)
+ const [canManage, setCanManage] = useState(false)
 
  const [activeTab, setActiveTab] = useState<'problems' | 'completion'>('problems')
  const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
@@ -130,6 +131,14 @@ export default function AssignmentDetailPage() {
  if (r !== userRole) setUserRole(r)
  }
  }, [user, classMembers])
+
+ useEffect(() => {
+ if (!user) {
+ setCanManage(false)
+ return
+ }
+ setCanManage(canManageContent(user))
+ }, [user])
 
  const fetchAssignment = async () => {
  try {
@@ -347,7 +356,7 @@ export default function AssignmentDetailPage() {
 
  /** 班级班主任/助教，或站点管理员/教师，均可查看完成情况统计 */
  const isAdminOrOwner =
-   isClassAdminApiRole(userRole) || isAdmin(user) || isTeacher(user)
+   isClassAdminApiRole(userRole) || canManage
 
  if (loading) {
  return (

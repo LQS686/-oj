@@ -5,20 +5,24 @@ import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
+import { useUser } from '@/contexts/UserContext'
+import { isSystemAdmin } from '@/lib/permissions'
 import { Users, Search, Shield, User, Mail, Calendar, MoreHorizontal, Edit, Trash2, ShieldCheck, ShieldOff, UserPlus, Upload, X, Plus, CheckSquare, Square, FileText, AlertCircle, CheckCircle, Loader2, Download, KeyRound } from 'lucide-react'
 
 /**
- * 本地角色展示映射（新版三角色体系：SYSTEM_ADMIN / TEACHER / STUDENT）
+ * 本地角色展示映射（四级角色体系：SYSTEM_ADMIN / ADMIN / TEACHER / STUDENT）
  * 与 lib/permissions.ts 的旧 API 保持独立，避免污染权限系统实现。
  */
 const ROLE_DISPLAY: Record<string, { label: string; color: string }> = {
  SYSTEM_ADMIN: { label: '系统管理员', color: 'tag-error' },
+ ADMIN: { label: '管理员', color: 'tag-error' },
  TEACHER: { label: '教师', color: 'tag-warning' },
  STUDENT: { label: '学生', color: 'tag-info' },
 }
 
 function getRoleDisplay(role?: string) {
  if (role === 'SYSTEM_ADMIN') return ROLE_DISPLAY.SYSTEM_ADMIN
+ if (role === 'ADMIN') return ROLE_DISPLAY.ADMIN
  if (role === 'TEACHER') return ROLE_DISPLAY.TEACHER
  if (role === 'STUDENT') return ROLE_DISPLAY.STUDENT
  return ROLE_DISPLAY.STUDENT
@@ -54,6 +58,9 @@ interface BatchResult {
 
 export default function AdminUsersPage() {
  const router = useRouter()
+ const { user: currentUser } = useUser()
+ // 当前操作者是否为系统管理员（系统管理员可赋予 ADMIN/TEACHER/STUDENT；管理员只能赋予 TEACHER/STUDENT）
+ const operatorIsSystemAdmin = isSystemAdmin(currentUser)
  const [users, setUsers] = useState<User[]>([])
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
@@ -63,6 +70,10 @@ export default function AdminUsersPage() {
  const [showEditModal, setShowEditModal] = useState(false)
  const [showDeleteModal, setShowDeleteModal] = useState(false)
  const [editRole, setEditRole] = useState('')
+ // 重置密码（独立操作，仅 SYSTEM_ADMIN 可用）
+ const [resetTarget, setResetTarget] = useState<User | null>(null)
+ const [resetPassword, setResetPassword] = useState('')
+ const [resetting, setResetting] = useState(false)
  
  const [showBatchRegisterModal, setShowBatchRegisterModal] = useState(false)
  const [batchUsers, setBatchUsers] = useState<BatchUser[]>([
@@ -137,6 +148,40 @@ export default function AdminUsersPage() {
  }
  } catch (err) {
  alert('网络错误')
+ }
+ }
+
+ const handleResetPassword = async () => {
+ if (!resetTarget) return
+
+ if (!resetPassword) {
+ alert('请输入新密码')
+ return
+ }
+ if (resetPassword.length < 6) {
+ alert('密码长度至少为6位')
+ return
+ }
+
+ setResetting(true)
+ try {
+ const response = await fetchWithAuth(`/api/admin/users/${resetTarget.id}`, {
+ method: 'PATCH',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ password: resetPassword })
+ })
+
+ const data = await response.json()
+ if (data.success) {
+ setResetTarget(null)
+ setResetPassword('')
+ } else {
+ alert(data.error || '重置失败')
+ }
+ } catch (err) {
+ alert('网络错误')
+ } finally {
+ setResetting(false)
  }
  }
 
@@ -466,48 +511,68 @@ export default function AdminUsersPage() {
  {
  key: 'id',
  label: '操作',
- render: (_, user) => (
- <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
- <button
- onClick={() => router.push(`/admin/users/${user.id}/permissions`)}
- className="p-2 rounded-lg transition-colors text-secondary hover:bg-secondary/10"
- title="用户权限"
- >
- <KeyRound className="w-4 h-4" />
- </button>
+ className: 'w-44',
+ render: (_, user) => {
+ // SYSTEM_ADMIN 不可被管理；ADMIN 操作者不能管理其他 ADMIN
+ const locked = user.role === 'SYSTEM_ADMIN' || (!operatorIsSystemAdmin && user.role === 'ADMIN')
+ const lockReason = user.role === 'SYSTEM_ADMIN'
+ ? '系统管理员不可修改'
+ : (!operatorIsSystemAdmin && user.role === 'ADMIN' ? '管理员不能管理其他管理员' : '')
+ // 重置密码：仅 SYSTEM_ADMIN 可操作，且目标不能是 SYSTEM_ADMIN
+ const canReset = operatorIsSystemAdmin && user.role !== 'SYSTEM_ADMIN'
+ return (
+ <div className="flex items-center justify-start gap-2" onClick={e => e.stopPropagation()}>
  <button
  onClick={() => {
  setSelectedUser(user)
  setEditRole(getUserRole(user))
  setShowEditModal(true)
  }}
- disabled={user.role === 'SYSTEM_ADMIN'}
+ disabled={locked}
  className={`p-2 rounded-lg transition-colors ${
- user.role === 'SYSTEM_ADMIN'
+ locked
  ? 'text-muted-foreground cursor-not-allowed'
  : 'text-primary hover:bg-primary/5'
  }`}
- title={user.role === 'SYSTEM_ADMIN' ? '系统管理员不可修改' : '编辑'}
+ title={locked ? lockReason : '编辑'}
  >
  <Edit className="w-4 h-4" />
  </button>
+ {operatorIsSystemAdmin && (
+ <button
+ onClick={() => {
+ setResetTarget(user)
+ setResetPassword('')
+ }}
+ disabled={!canReset}
+ className={`p-2 rounded-lg transition-colors ${
+ !canReset
+ ? 'text-muted-foreground cursor-not-allowed'
+ : 'text-yellow-600 hover:bg-yellow-600/10'
+ }`}
+ title={!canReset ? '系统管理员密码不可重置' : '重置密码'}
+ >
+ <KeyRound className="w-4 h-4" />
+ </button>
+ )}
  <button
  onClick={() => {
  setSelectedUser(user)
  setShowDeleteModal(true)
  }}
- disabled={user.role === 'SYSTEM_ADMIN'}
+ disabled={locked}
  className={`p-2 rounded-lg transition-colors ${
- user.role === 'SYSTEM_ADMIN'
+ locked
  ? 'text-muted-foreground cursor-not-allowed'
  : 'text-error hover:bg-error/10'
  }`}
- title={user.role === 'SYSTEM_ADMIN' ? '系统管理员不可删除' : '删除'}
+ title={locked ? lockReason : '删除'}
  >
  <Trash2 className="w-4 h-4" />
  </button>
  </div>
- ),
+ )
+ },
  },
  ]
 
@@ -572,7 +637,7 @@ export default function AdminUsersPage() {
  </button>
  </div>
 
- <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+ <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
  <div className="card p-4">
  <div className="text-muted-foreground text-sm">总用户数</div>
  <div className="text-2xl font-bold text-foreground mt-1">{users.length}</div>
@@ -581,6 +646,12 @@ export default function AdminUsersPage() {
  <div className="text-muted-foreground text-sm">系统管理员</div>
  <div className="text-2xl font-bold text-error mt-1">
  {users.filter(u => getUserRole(u) === 'SYSTEM_ADMIN').length}
+ </div>
+ </div>
+ <div className="card p-4">
+ <div className="text-muted-foreground text-sm">管理员</div>
+ <div className="text-2xl font-bold text-warning mt-1">
+ {users.filter(u => getUserRole(u) === 'ADMIN').length}
  </div>
  </div>
  <div className="card p-4">
@@ -618,6 +689,7 @@ export default function AdminUsersPage() {
  >
  <option value="all">全部角色</option>
  <option value="SYSTEM_ADMIN">系统管理员</option>
+ <option value="ADMIN">管理员</option>
  <option value="TEACHER">教师</option>
  <option value="STUDENT">学生</option>
  </select>
@@ -660,7 +732,7 @@ export default function AdminUsersPage() {
  >
  <option value="STUDENT">学生</option>
  <option value="TEACHER">教师</option>
- <option value="SYSTEM_ADMIN">系统管理员</option>
+ {operatorIsSystemAdmin && <option value="ADMIN">管理员</option>}
  </select>
  </div>
  <div className="flex gap-3 justify-end">
@@ -678,6 +750,47 @@ export default function AdminUsersPage() {
  className="btn btn-primary"
  >
  保存
+ </button>
+ </div>
+ </div>
+ </div>
+ )}
+
+ {resetTarget && (
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="card p-6 max-w-md w-full mx-4">
+ <h3 className="text-lg font-bold text-foreground mb-1">重置密码</h3>
+ <p className="text-sm text-muted-foreground mb-4">
+ 为用户 <span className="text-foreground font-medium">{resetTarget.username}</span> 设置新密码
+ </p>
+ <div className="mb-6">
+ <label className="block text-sm font-medium text-muted-foreground mb-2">新密码</label>
+ <input
+ type="password"
+ value={resetPassword}
+ onChange={(e) => setResetPassword(e.target.value)}
+ placeholder="至少6位"
+ className="input"
+ autoComplete="new-password"
+ />
+ </div>
+ <div className="flex gap-3 justify-end">
+ <button
+ onClick={() => {
+ setResetTarget(null)
+ setResetPassword('')
+ }}
+ disabled={resetting}
+ className="btn btn-ghost"
+ >
+ 取消
+ </button>
+ <button
+ onClick={handleResetPassword}
+ disabled={resetting}
+ className="btn btn-primary"
+ >
+ {resetting ? '重置中...' : '确认重置'}
  </button>
  </div>
  </div>
@@ -816,7 +929,7 @@ export default function AdminUsersPage() {
  >
  <option value="STUDENT">学生</option>
  <option value="TEACHER">教师</option>
- <option value="SYSTEM_ADMIN">系统管理员</option>
+ {operatorIsSystemAdmin && <option value="ADMIN">管理员</option>}
  </select>
  </div>
  <div className="col-span-1 flex justify-center">
@@ -898,7 +1011,7 @@ export default function AdminUsersPage() {
  选择文件
  </button>
  <p className="text-muted-foreground text-xs mt-4">
- 格式: 用户名,密码,角色(STUDENT/TEACHER/SYSTEM_ADMIN)，邮箱可选
+ 格式: 用户名,密码,角色(STUDENT/TEACHER{operatorIsSystemAdmin ? '/ADMIN' : ''})，邮箱可选
  </p>
  <a
  href="/templates/users-template.csv"
@@ -989,7 +1102,7 @@ export default function AdminUsersPage() {
  >
  <option value="STUDENT">学生</option>
  <option value="TEACHER">教师</option>
- <option value="SYSTEM_ADMIN">系统管理员</option>
+ {operatorIsSystemAdmin && <option value="ADMIN">管理员</option>}
  </select>
  </div>
  <div className="flex gap-3 justify-end">

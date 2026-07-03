@@ -28,7 +28,7 @@ import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { usePermission } from '@/hooks/usePermission'
+import { canManageContent } from '@/lib/permissions'
 import Link from 'next/link'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 
@@ -89,8 +89,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null)
 
-  // 注意：usePermission 必须在所有 early return 之前调用（Rules of Hooks）
-  const canEditProblem = usePermission('problem.edit')
+  // 是否可编辑题目（SYSTEM_ADMIN / ADMIN / TEACHER）
+  const canEditProblem = canManageContent(user)
 
   const titleContext = useMemo(() => {
     if (fromAssignment && classId) {

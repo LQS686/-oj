@@ -1,0 +1,11 @@
+BasedOnStyle: LLVM
+BreakBeforeBraces: Attach
+IndentWidth: 4
+TabWidth: 4
+UseTab: ForIndentation
+ColumnLimit: 110
+
+ContinuationIndentWidth: 4
+IndentCaseLabels: true
+NamespaceIndentation: All
+SpaceAfterLogicalNot: true

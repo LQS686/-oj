@@ -6,7 +6,7 @@
  * DELETE 鉴权：删除（作者 / 管理员 / 教师，级联删评论）
  */
 import { withApi, ok, readJson, readQuery, throw400, throw403, throw404 } from '@/lib/api/withApi'
-import { isAdmin } from '@/lib/permissions'
+import { isAdmin, canManageContent } from '@/lib/permissions'
 import { verifyToken } from '@/lib/auth'
 import {
   getSolutionDetailWithPermission,
@@ -69,10 +69,10 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   // 鉴权：作者本人 或 管理员/教师
   const dbUser = await getUserRoleFlags(user.id)
   const adminFlag = isAdmin(user)
-  const isTeacher = dbUser?.role === 'TEACHER'
+  const canManage = canManageContent(dbUser)
 
   try {
-    const updated = await updateUserSolution(id, user.id, adminFlag, isTeacher, body)
+    const updated = await updateUserSolution(id, user.id, adminFlag, canManage, body)
     return ok(updated)
   } catch (err: any) {
     if (err?.status === 400) throw400('VALIDATION', err.message)
@@ -88,10 +88,10 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
 
   const dbUser = await getUserRoleFlags(user.id)
   const adminFlag = isAdmin(user)
-  const isTeacher = dbUser?.role === 'TEACHER'
+  const canManage = canManageContent(dbUser)
 
   try {
-    await deleteUserSolution(id, user.id, adminFlag, isTeacher)
+    await deleteUserSolution(id, user.id, adminFlag, canManage)
     return ok({ message: '题解已删除' })
   } catch (err: any) {
     if (err?.status === 403) throw403(err.message)

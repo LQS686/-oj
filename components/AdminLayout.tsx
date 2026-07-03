@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { canAccessAdmin } from '@/lib/permissions'
+import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
 import {
   LayoutDashboard,
   FileText,
@@ -22,18 +22,24 @@ import {
   User,
   ChevronDown,
   Cpu,
-  BookOpen,
-  KeyRound,
-  ShieldCheck
+  BookOpen
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
+
+interface AdminMenuItem {
+  icon: any
+  label: string
+  href: string
+  /** 仅 SYSTEM_ADMIN 可见 */
+  systemAdminOnly?: boolean
+}
 
 interface AdminLayoutProps {
   children: React.ReactNode
 }
 
-const menuGroups = [
+const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
   {
     label: '内容管理',
     items: [
@@ -57,9 +63,7 @@ const menuGroups = [
     label: '系统管理',
     items: [
       { icon: Shield, label: '提交记录', href: '/admin/submissions' },
-      { icon: Settings, label: '系统设置', href: '/admin/settings' },
-      { icon: KeyRound, label: '权限点', href: '/admin/permissions' },
-      { icon: ShieldCheck, label: '角色权限', href: '/admin/roles' },
+      { icon: Settings, label: '系统设置', href: '/admin/settings', systemAdminOnly: true },
     ]
   }
 ]
@@ -68,6 +72,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, isLoading, logout } = useUser()
+  const canAccess = canAccessAdmin(user)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
@@ -76,13 +81,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
 
-  // 权限门：仅 SYSTEM_ADMIN / TEACHER 可访问 /admin，未通过则跳到 /403
+  // 权限门：仅 SYSTEM_ADMIN / ADMIN 可访问后台，未通过则跳到 /403
+  // 等待用户信息加载完成后再判定，避免短暂闪现 / 误判
   useEffect(() => {
     if (isLoading) return
-    if (!user || !canAccessAdmin(user)) {
+    if (!user || !canAccess) {
       router.push('/403')
     }
-  }, [user, isLoading, router])
+  }, [user, isLoading, canAccess, router])
 
   useEffect(() => {
     document.body.style.paddingTop = '0'
@@ -137,10 +143,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }
 
-  const allMenuItems = menuGroups.flatMap(g => g.items)
+  // 按角色过滤菜单项：默认 SYSTEM_ADMIN/ADMIN 可见，systemAdminOnly 项仅 SYSTEM_ADMIN 可见
+  const visibleGroups = menuGroups
+    .map((g) => ({ ...g, items: g.items.filter((item) => (item.systemAdminOnly ? isSystemAdmin(user) : true)) }))
+    .filter((g) => g.items.length > 0)
+  const allMenuItems = visibleGroups.flatMap((g) => g.items)
 
   // 鉴权完成前或鉴权未通过时，不渲染后台内容，避免短暂闪现
-  if (isLoading || !user || !canAccessAdmin(user)) {
+  if (isLoading || !user || !canAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-muted-foreground text-sm">加载中...</div>
@@ -183,7 +193,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
 
             <nav className="space-y-1">
-              {menuGroups.map((group, groupIdx) => (
+              {visibleGroups.map((group, groupIdx) => (
                 <div key={group.label}>
                   {groupIdx > 0 && (
                     <div className="my-3 border-t border-border" />

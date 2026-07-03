@@ -4,9 +4,7 @@
  * GET  读取配置 + 累计 token 用量
  * POST 写入配置（敏感字段加密存储）
  */
-import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import { getSystemSettings } from '@/lib/settings'
 import {
   getGlobalAiConfig,
@@ -29,11 +27,7 @@ interface AiConfigBody {
 /**
  * GET /api/admin/ai/config
  */
-export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const GET = withApi.admin(async () => {
   const { data, config, totalTokens } = await getGlobalAiConfig()
   if (data) return ok(data)
 
@@ -53,11 +47,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
 /**
  * POST /api/admin/ai/config
  */
-export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const POST = withApi.admin(async (req, _ctx) => {
   const body = await readJson<AiConfigBody>(req)
   const {
     provider, model, apiKey, baseUrl,
@@ -78,4 +68,4 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
   })
 
   return ok({})
-}))
+})

@@ -7,9 +7,7 @@
  *
  * 每行返回 { total, succeeded, failed, errors: [{ row, username, email, error }] }
  */
-import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import {
   batchRegisterUsers,
   parseBatchRegisterCSV,
@@ -23,11 +21,7 @@ const MAX_JSON_USERS = 100
  * - 管理员批量注册用户
  * - 支持 JSON body 或 multipart/form-data 上传 CSV
  */
-export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const contentType = req.headers.get('content-type') || ''
   let users: BatchUserInput[] = []
   let startRow = 1
@@ -66,6 +60,6 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
     startRow = 1
   }
 
-  const result = await batchRegisterUsers(users, startRow)
+  const result = await batchRegisterUsers(users, startRow, user.role)
   return ok(result)
-}))
+})

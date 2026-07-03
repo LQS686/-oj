@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { JWTPayload } from '@/lib/auth'
+import { canManageContent } from '@/lib/permissions'
 import { NextRequest } from 'next/server'
 
 // 审计日志记录函数
@@ -55,7 +56,7 @@ export async function checkContestAccess(
   const now = new Date()
   const isStarted = now >= contest.startTime
   const isEnded = now > contest.endTime
-  const isAdmin = currentUser?.role === 'SYSTEM_ADMIN' || contest.authorId === currentUser?.userId
+  const isAdmin = canManageContent(currentUser ? { id: currentUser.userId, role: currentUser.role } : null) || contest.authorId === currentUser?.userId
 
   if (isAdmin) {
     return { allowed: true, contest }

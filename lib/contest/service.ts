@@ -561,13 +561,15 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
       language: input.language,
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
+      comparisonMode: problem.comparisonMode as any,
+      realPrecision: problem.realPrecision,
       testCases: problem.testCases.map((tc: any) => ({
         id: tc.id,
         input: tc.input,
         output: tc.output,
         score: tc.score,
-        timeLimit: tc.timeLimit,
-        memoryLimit: tc.memoryLimit,
+        timeLimit: tc.timeLimit ?? undefined,
+        memoryLimit: tc.memoryLimit ?? undefined,
       })),
     })
     console.log(`✅ 竞赛提交 ${submission.id} 已加入评测队列`)

@@ -52,35 +52,37 @@ export function UserProvider({ children }: { children: ReactNode }) {
     verifyUser()
   }, [])
 
+  const refreshUser = async () => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const userData = await authApi.getCurrentUser()
+      setUser(userData)
+    } catch (error) {
+      console.error('刷新用户信息失败:', error)
+      setUser(null)
+    }
+  }
+
   const login = (userData: User, token?: string) => {
     if (typeof window === 'undefined') return
     if (token) {
       localStorage.setItem('token', token)
     }
+    // 乐观更新：先用登录返回的用户信息渲染，再拉取完整资料
     setUser(userData)
+    refreshUser()
   }
 
   const logout = async () => {
     if (typeof window === 'undefined') return
-    
+
     try {
       await authApi.logout()
     } catch (error) {
       console.error('退出登录失败:', error)
     } finally {
       localStorage.removeItem('token')
-      setUser(null)
-    }
-  }
-
-  const refreshUser = async () => {
-    if (typeof window === 'undefined') return
-    
-    try {
-      const userData = await authApi.getCurrentUser()
-      setUser(userData)
-    } catch (error) {
-      console.error('刷新用户信息失败:', error)
       setUser(null)
     }
   }

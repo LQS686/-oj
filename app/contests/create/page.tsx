@@ -26,11 +26,10 @@ export default function CreateContestPage() {
  router.push('/login?redirect=/contests/create')
  return
  }
- 
+
  if (!canCreateContest(user)) {
  toast.error('权限不足：只有教师和管理员可以创建竞赛')
  router.push('/contests')
- return
  }
  }, [user, router])
  

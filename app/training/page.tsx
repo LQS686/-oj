@@ -17,7 +17,7 @@ import { BookOpen, AlertCircle, RefreshCw, Plus, UserCheck } from 'lucide-react'
 import TrainingCard from '@/components/training/TrainingCard'
 import SourceFilterCards, { type TrainingSource } from '@/components/training/SourceFilterCards'
 import type { TrainingListItem } from '@/lib/training/types'
-import { usePermission } from '@/hooks/usePermission'
+import { canManageContent } from '@/lib/permissions'
 import { EducationalPageShell, PageLoading, LIST_GRID_CLASS } from '@/components/common'
 
 const SOURCE_LABELS: Record<TrainingSource, string> = {
@@ -37,6 +37,7 @@ export default function TrainingListPage() {
   const [source, setSource] = useState<TrainingSource>('official')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
 
   const fetchTrainings = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -96,14 +97,17 @@ export default function TrainingListPage() {
         if (data?.success && data.data) {
           setIsLoggedIn(true)
           setCurrentUserId(data.data.id)
+          setCurrentUserRole(data.data.role ?? null)
         } else {
           setIsLoggedIn(false)
           setCurrentUserId(null)
+          setCurrentUserRole(null)
         }
       })
       .catch(() => {
         setIsLoggedIn(false)
         setCurrentUserId(null)
+        setCurrentUserRole(null)
       })
   }, [])
 
@@ -119,7 +123,7 @@ export default function TrainingListPage() {
     setPage(1)
   }
 
-  const canCreateTraining = usePermission('training.create')
+  const canCreateTraining = canManageContent({ role: currentUserRole })
 
   return (
     <EducationalPageShell

@@ -656,7 +656,7 @@ export async function listAvatarHistory(userId: string, take = 20) {
  * 批量注册用户（原 /api/admin/users/batch-register）
  * ========================================================================== */
 
-export type BatchUserRole = 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT'
+export type BatchUserRole = 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT'
 
 export interface BatchUserInput {
   username: string
@@ -679,7 +679,7 @@ export interface BatchRegisterResult {
   errors: BatchRegisterError[]
 }
 
-const BATCH_VALID_ROLES: BatchUserRole[] = ['SYSTEM_ADMIN', 'TEACHER', 'STUDENT']
+const BATCH_VALID_ROLES: BatchUserRole[] = ['SYSTEM_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT']
 
 function isBatchUserRole(role: unknown): role is BatchUserRole {
   return typeof role === 'string' && BATCH_VALID_ROLES.includes(role as BatchUserRole)
@@ -688,6 +688,8 @@ function isBatchUserRole(role: unknown): role is BatchUserRole {
 function getBatchRoleDefaults(role: BatchUserRole) {
   switch (role) {
     case 'SYSTEM_ADMIN':
+      return { rank: '管理员', color: '#FF6B6B' }
+    case 'ADMIN':
       return { rank: '管理员', color: '#FF6B6B' }
     case 'TEACHER':
       return { rank: '教师', color: '#4ECDC4' }
@@ -739,7 +741,8 @@ export function parseBatchRegisterCSV(csvText: string): BatchUserInput[] {
  */
 export async function batchRegisterUsers(
   users: BatchUserInput[],
-  startRow: number = 1
+  startRow: number = 1,
+  operatorRole: string | undefined | null = 'SYSTEM_ADMIN'
 ): Promise<BatchRegisterResult> {
   const result: BatchRegisterResult = {
     total: users.length,
@@ -803,7 +806,20 @@ export async function batchRegisterUsers(
         continue
       }
 
-      const role = isBatchUserRole(user.role) ? user.role : 'STUDENT'
+      const requestedRole = isBatchUserRole(user.role) ? user.role : 'STUDENT'
+      // 校验操作者是否有权分配该角色（SYSTEM_ADMIN 不可被赋予；ADMIN 只能赋予 TEACHER/STUDENT）
+      const assignable = getAssignableRoles(operatorRole)
+      if (!assignable.includes(requestedRole)) {
+        result.failed++
+        result.errors.push({
+          row: rowNumber,
+          username: trimmedUsername,
+          email: trimmedEmail,
+          error: `无权分配该角色: ${requestedRole}`,
+        })
+        continue
+      }
+      const role = requestedRole
       const sanitizedUsername = escapeHtml(trimmedUsername)
       const sanitizedEmail = trimmedEmail
 
@@ -872,7 +888,39 @@ export async function batchRegisterUsers(
  * 管理员用户管理（原 /api/admin/users/* 路由）
  * ========================================================================== */
 
-const VALID_ADMIN_ROLES = ['SYSTEM_ADMIN', 'TEACHER', 'STUDENT']
+const VALID_ADMIN_ROLES = ['SYSTEM_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT']
+
+/**
+ * 可被分配的角色（不含 SYSTEM_ADMIN —— 系统管理员唯一且不可被赋予）
+ */
+const ASSIGNABLE_ROLES = ['ADMIN', 'TEACHER', 'STUDENT']
+
+/**
+ * 根据操作者角色返回其可分配的目标角色列表
+ * - SYSTEM_ADMIN 可赋予 ADMIN / TEACHER / STUDENT
+ * - ADMIN 只能赋予 TEACHER / STUDENT（不能管理其他管理员）
+ */
+export function getAssignableRoles(operatorRole: string | undefined | null): string[] {
+  if (operatorRole === 'SYSTEM_ADMIN') return ASSIGNABLE_ROLES
+  if (operatorRole === 'ADMIN') return ['TEACHER', 'STUDENT']
+  return []
+}
+
+/**
+ * 校验目标角色是否可被当前操作者分配
+ */
+export function assertAssignableRole(
+  role: string | undefined,
+  operatorRole: string | undefined | null
+): asserts role is 'ADMIN' | 'TEACHER' | 'STUDENT' {
+  const assignable = getAssignableRoles(operatorRole)
+  if (!role || !assignable.includes(role)) {
+    const err: any = new Error('无效的角色类型或无权分配该角色')
+    err.status = 400
+    err.code = 'INVALID_ROLE'
+    throw err
+  }
+}
 
 /**
  * 列出所有用户（管理员）
@@ -904,7 +952,7 @@ export async function listAllUsersForAdmin() {
 /**
  * 校验入参中的角色字段
  */
-export function assertValidRole(role: string | undefined): asserts role is 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT' {
+export function assertValidRole(role: string | undefined): asserts role is 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT' {
   if (!role || !VALID_ADMIN_ROLES.includes(role)) {
     const err: any = new Error('无效的角色类型')
     err.status = 400
@@ -914,11 +962,15 @@ export function assertValidRole(role: string | undefined): asserts role is 'SYST
 }
 
 /**
- * 校验管理员更新用户的合法性：自己不能改 / 超级管理员不能改
+ * 校验管理员更新用户的合法性
+ * - 自己不能改
+ * - 超级管理员不能改
+ * - 管理员不能修改其他管理员
  */
 export async function assertCanUpdateUser(
   targetUserId: string,
   operatorUserId: string,
+  operatorRole: string | undefined | null,
   body: { role?: string; isBanned?: boolean }
 ) {
   if (targetUserId === operatorUserId) {
@@ -942,13 +994,27 @@ export async function assertCanUpdateUser(
     err.code = 'FORBIDDEN'
     throw err
   }
+  // 管理员不能管理其他管理员
+  if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
+    const err: any = new Error('管理员不能管理其他管理员')
+    err.status = 403
+    err.code = 'FORBIDDEN'
+    throw err
+  }
   return target
 }
 
 /**
  * 校验管理员删除用户的合法性
+ * - 不能删除自己
+ * - 超级管理员不能删除
+ * - 管理员不能删除其他管理员
  */
-export async function assertCanDeleteUser(targetUserId: string, operatorUserId: string) {
+export async function assertCanDeleteUser(
+  targetUserId: string,
+  operatorUserId: string,
+  operatorRole: string | undefined | null
+) {
   if (targetUserId === operatorUserId) {
     const err: any = new Error('不能删除自己的账号')
     err.status = 400
@@ -968,6 +1034,13 @@ export async function assertCanDeleteUser(targetUserId: string, operatorUserId: 
     err.code = 'FORBIDDEN'
     throw err
   }
+  // 管理员不能管理其他管理员
+  if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
+    const err: any = new Error('管理员不能管理其他管理员')
+    err.status = 403
+    err.code = 'FORBIDDEN'
+    throw err
+  }
 }
 
 /**
@@ -976,7 +1049,7 @@ export async function assertCanDeleteUser(targetUserId: string, operatorUserId: 
 export async function adminUpdateUser(
   targetUserId: string,
   body: {
-    role?: 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT'
+    role?: 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT'
     isBanned?: boolean
     password?: string
   },
@@ -1024,11 +1097,15 @@ export async function adminDeleteUser(targetUserId: string) {
 }
 
 /**
- * 过滤掉自己 + 超级管理员
+ * 过滤批量操作的目标用户
+ * - 跳过自己
+ * - 跳过超级管理员
+ * - ADMIN 操作时跳过其他管理员
  */
 export async function filterUserIdsForBatchAction(
   userIds: string[],
   operatorUserId: string,
+  operatorRole: string | undefined | null,
   action: 'update' | 'delete'
 ) {
   // 跳过自己
@@ -1039,15 +1116,16 @@ export async function filterUserIdsForBatchAction(
     err.code = action === 'update' ? 'CANNOT_MODIFY_SELF' : 'CANNOT_DELETE_SELF'
     throw err
   }
-  // 跳过超级管理员
-  const superAdmins = await prisma.user.findMany({
-    where: { id: { in: filtered }, role: 'SYSTEM_ADMIN' },
+  // 跳过超级管理员；ADMIN 操作时还要跳过其他管理员
+  const protectedRoles = operatorRole === 'ADMIN' ? ['SYSTEM_ADMIN', 'ADMIN'] : ['SYSTEM_ADMIN']
+  const protectedUsers = await prisma.user.findMany({
+    where: { id: { in: filtered }, role: { in: protectedRoles } },
     select: { id: true },
   })
-  const superAdminIds = new Set(superAdmins.map((u: any) => u.id))
-  const finalUserIds = filtered.filter((id) => !superAdminIds.has(id))
+  const protectedIds = new Set(protectedUsers.map((u: any) => u.id))
+  const finalUserIds = filtered.filter((id) => !protectedIds.has(id))
   if (finalUserIds.length === 0) {
-    const err: any = new Error('选中的用户包含超级管理员，不可被' + (action === 'update' ? '修改' : '删除'))
+    const err: any = new Error('选中的用户不可被' + (action === 'update' ? '修改' : '删除'))
     err.status = 403
     err.code = 'FORBIDDEN'
     throw err
@@ -1058,7 +1136,7 @@ export async function filterUserIdsForBatchAction(
 /**
  * 批量更新用户角色
  */
-export async function batchUpdateUserRole(finalUserIds: string[], role: 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT') {
+export async function batchUpdateUserRole(finalUserIds: string[], role: 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT') {
   const result = await prisma.user.updateMany({
     where: { id: { in: finalUserIds } },
     data: {

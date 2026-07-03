@@ -4,19 +4,13 @@
  * GET  读取系统设置
  * PUT  保存系统设置
  */
-import { withApi, ok, readJson, throw400, throw403, throw500 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson, throw400, throw500 } from '@/lib/api/withApi'
 import { getSystemSettings, saveSystemSettings } from '@/lib/settings'
 
 /**
  * GET /api/admin/settings
  */
-export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const GET = withApi.systemAdmin(async () => {
   const settings = await getSystemSettings()
   return ok(settings)
 })
@@ -24,11 +18,7 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
 /**
  * PUT /api/admin/settings
  */
-export const PUT = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const PUT = withApi.systemAdmin(async (req, _ctx) => {
   const body = await readJson<Record<string, any>>(req)
   const saved = await saveSystemSettings(body)
 
@@ -39,4 +29,4 @@ export const PUT = withApi.auth(withPermission('admin.access')(async (req, _ctx,
   const newSettings = await getSystemSettings()
 
   return ok({ message: '设置已保存', data: newSettings })
-}))
+})

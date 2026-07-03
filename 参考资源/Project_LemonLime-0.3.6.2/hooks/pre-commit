@@ -1,0 +1,4 @@
+#!/bin/bash
+# Pre-commit hook - no longer increments build version
+# Build version now uses git commit hash instead
+echo 'Using git commit hash for build version - no manual increment needed'

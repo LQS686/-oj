@@ -47,6 +47,17 @@ export default function JudgeStatus({
  case 'RE':
  case 'Runtime Error':
  return <AlertCircle className="w-5 h-5 text-error" />
+ case 'PE':
+ case 'Presentation Error':
+ return <AlertCircle className="w-5 h-5 text-accent" />
+ case 'OLE':
+ case 'Output Limit Exceeded':
+ return <AlertCircle className="w-5 h-5 text-accent" />
+ case 'CSP':
+ return <AlertCircle className="w-5 h-5 text-error" />
+ case 'PC':
+ case 'Partially Correct':
+ return <CheckCircle2 className="w-5 h-5 text-primary-light" />
  case 'Judging':
  case 'Pending':
  return <Loader2 className="w-5 h-5 text-primary-light animate-spin" />
@@ -72,6 +83,16 @@ export default function JudgeStatus({
  case 'RE':
  case 'Runtime Error':
  return 'bg-error/10 border-error/30'
+ case 'PE':
+ case 'Presentation Error':
+ case 'OLE':
+ case 'Output Limit Exceeded':
+ return 'bg-accent/10 border-accent/30'
+ case 'CSP':
+ return 'bg-error/10 border-error/30'
+ case 'PC':
+ case 'Partially Correct':
+ return 'bg-primary/10 border-primary/30'
  case 'Judging':
  case 'Pending':
  return 'bg-primary/10 border-primary/30'
@@ -94,6 +115,15 @@ export default function JudgeStatus({
  'Runtime Error': '运行错误',
  CE: '编译错误',
  'Compile Error': '编译错误',
+ PE: '格式错误',
+ 'Presentation Error': '格式错误',
+ OLE: '输出超限',
+ 'Output Limit Exceeded': '输出超限',
+ CSP: '无法启动',
+ PC: '部分正确',
+ 'Partially Correct': '部分正确',
+ SE: '系统错误',
+ 'System Error': '系统错误',
  Judging: '评测中',
  Pending: '等待评测',
  }
@@ -109,13 +139,21 @@ export default function JudgeStatus({
  case 'Wrong Answer':
  case 'RE':
  case 'Runtime Error':
+ case 'CSP':
  return 'text-error'
  case 'TLE':
  case 'Time Limit Exceeded':
+ case 'PE':
+ case 'Presentation Error':
+ case 'OLE':
+ case 'Output Limit Exceeded':
  return 'text-accent'
  case 'MLE':
  case 'Memory Limit Exceeded':
  return 'text-purple-400'
+ case 'PC':
+ case 'Partially Correct':
+ return 'text-primary-light'
  case 'Judging':
  case 'Pending':
  return 'text-primary-light'

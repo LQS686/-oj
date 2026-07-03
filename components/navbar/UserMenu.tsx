@@ -13,7 +13,7 @@ import {
  Users
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { canAccessAdmin, isAdmin, getRoleLabel } from '@/lib/permissions'
+import { canAccessAdmin, getRoleLabel } from '@/lib/permissions'
 import { useNotificationSocket } from '@/hooks/useNotificationSocket'
 import { notificationApi } from '@/lib/api'
 import { logger } from '@/lib/logger'
@@ -26,7 +26,6 @@ export default function UserMenu() {
  const { user, logout: contextLogout } = useUser()
 
  const canAccessAdminUser = canAccessAdmin(user)
- const isAdminUser = isAdmin(user)
 
  const fetchUnreadCount = useCallback(async () => {
  try {
@@ -157,7 +156,7 @@ export default function UserMenu() {
  <User className="w-[18px] h-[18px] transition-transform duration-300" />
  个人主页
  </Link>
- {isAdminUser && (
+ {canAccessAdminUser && (
  <Link
  href="/submissions"
  className="dropdown-item group"

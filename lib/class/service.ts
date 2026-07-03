@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { canManageContent } from '@/lib/permissions'
 import { addJudgeJob } from '@/lib/judge/queue'
 import {
   createClassAssignmentSubmissionDirect,
@@ -244,18 +245,7 @@ export async function getClassMemberByUserId(classId: string, userId: string) {
   })
 }
 
-/**
- * 班级 API 角色 → 系统角色（用于同步 User.role）
- * owner / assistant 在系统层面均映射为 TEACHER，student 映射为 STUDENT
- */
-function classApiRoleToSystemRole(
-  classRole: 'student' | 'assistant' | 'owner'
-): 'STUDENT' | 'TEACHER' {
-  if (classRole === 'owner' || classRole === 'assistant') return 'TEACHER'
-  return 'STUDENT'
-}
-
-/** 更新成员角色 / 备注（角色变更时同步到 User.role，保护 SYSTEM_ADMIN 不被降级） */
+/** 更新成员角色 / 备注（班级角色与系统角色解耦，不再同步 User.role） */
 export async function patchClassMember(
   classId: string,
   userId: string,
@@ -270,26 +260,7 @@ export async function patchClassMember(
     data: update,
   })
 
-  // 角色变更同步到系统 User.role（SYSTEM_ADMIN 不被动降级）
-  if (data.role !== undefined) {
-    const target = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    })
-    if (target && target.role !== 'SYSTEM_ADMIN') {
-      const newSystemRole = classApiRoleToSystemRole(data.role)
-      if (target.role !== newSystemRole) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: { role: newSystemRole },
-        })
-        // 清掉用户 profile / 榜单缓存，避免登录态与后台列表读到旧角色
-        const { clearUserCache } = await import('@/lib/user/service')
-        clearUserCache(userId)
-      }
-    }
-  }
-
+  // 班级角色与系统角色彻底解耦：班级角色变更不再同步修改 User.role
   return updated
 }
 
@@ -603,11 +574,10 @@ export async function findClassAssignment(assignmentId: string, classId: string)
 export async function getUserIsAdmin(userId: string) {
   const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true },
+    select: { id: true, role: true },
   })
   if (!u) return false
-  if (u.role === 'SYSTEM_ADMIN') return true
-  return u.role === 'TEACHER'
+  return canManageContent(u)
 }
 
 /** 检查当前用户是否在指定题上获得满分（用于提交记录越权校验） */
@@ -1035,13 +1005,15 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
       language: input.language,
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
+      comparisonMode: problem.comparisonMode as any,
+      realPrecision: problem.realPrecision,
       testCases: problem.testCases.map((tc: any) => ({
         id: tc.id,
         input: tc.input,
         output: tc.output,
         score: tc.score,
-        timeLimit: problem.timeLimit,
-        memoryLimit: problem.memoryLimit,
+        timeLimit: tc.timeLimit ?? undefined,
+        memoryLimit: tc.memoryLimit ?? undefined,
       })),
     })
   } catch (err) {

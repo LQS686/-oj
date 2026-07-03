@@ -17,7 +17,7 @@ import {
  LogOut
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { canAccessAdmin, isAdmin } from '@/lib/permissions'
+import { canAccessAdmin } from '@/lib/permissions'
 import { useRouter } from 'next/navigation'
 
 export default function MobileMenu() {
@@ -27,7 +27,6 @@ export default function MobileMenu() {
  const { user, logout: contextLogout } = useUser()
 
  const canAccessAdminUser = canAccessAdmin(user)
- const isAdminUser = isAdmin(user)
 
  const navLinks = [
  { href: '/problems', label: '题库', icon: BookOpen },
@@ -123,7 +122,7 @@ export default function MobileMenu() {
  </Link>
  )}
 
- {isAdminUser && (
+ {canAccessAdminUser && (
  <Link
  href="/submissions"
  onClick={() => setIsMenuOpen(false)}

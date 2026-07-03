@@ -14,6 +14,8 @@ interface TestCase {
  output: string
  isSample: boolean
  score: number
+ timeLimit?: number | null
+ memoryLimit?: number | null
 }
 
 export default function ProblemTestCasesPage() {
@@ -134,7 +136,9 @@ export default function ProblemTestCasesPage() {
  input: tc.input,
  output: tc.output,
  isSample: tc.isSample,
- score: tc.score
+ score: tc.score,
+ timeLimit: tc.timeLimit ?? null,
+ memoryLimit: tc.memoryLimit ?? null
  }))
  setTestCases(cases)
  }
@@ -155,7 +159,7 @@ export default function ProblemTestCasesPage() {
  }
 
  const handleAddTestCase = () => {
- const newCases = [...testCases, { input: '', output: '', isSample: false, score: 0 }]
+ const newCases = [...testCases, { input: '', output: '', isSample: false, score: 0, timeLimit: null, memoryLimit: null }]
  setTestCases(distributeScores(newCases))
  }
 
@@ -590,6 +594,46 @@ export default function ProblemTestCasesPage() {
  删除
  </button>
  </div>
+ </div>
+
+ <div className="mt-3 pl-16 flex flex-wrap items-center gap-3">
+ <div className="flex items-center gap-2">
+ <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">时间限制(ms)</label>
+ <input
+ type="number"
+ value={tc.timeLimit ?? ''}
+ onChange={(e) => {
+ const newCases = [...testCases]
+ const v = e.target.value
+ const n = parseInt(v, 10)
+ newCases[idx].timeLimit = v === '' || Number.isNaN(n) ? null : n
+ setTestCases(newCases)
+ }}
+ placeholder="默认"
+ min="100"
+ max="30000"
+ className="input w-24 text-sm"
+ />
+ </div>
+ <div className="flex items-center gap-2">
+ <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">内存限制(MB)</label>
+ <input
+ type="number"
+ value={tc.memoryLimit ?? ''}
+ onChange={(e) => {
+ const newCases = [...testCases]
+ const v = e.target.value
+ const n = parseInt(v, 10)
+ newCases[idx].memoryLimit = v === '' || Number.isNaN(n) ? null : n
+ setTestCases(newCases)
+ }}
+ placeholder="默认"
+ min="32"
+ max="1024"
+ className="input w-24 text-sm"
+ />
+ </div>
+ <span className="text-xs text-muted-foreground">留空使用题目默认限制</span>
  </div>
  </div>
  ))

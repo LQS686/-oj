@@ -2,7 +2,6 @@
  * /api/trainings/[id]/problems - 训练题目管理（PATCH add/remove/reorder/update）
  */
 import { withApi, ok, readJson, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
 import {
   addTrainingProblems,
   removeTrainingProblems,
@@ -12,9 +11,11 @@ import {
 import type { TrainingProblemPatchInput } from '@/lib/training/types'
 import { isObjectId } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
-import { isAdmin } from '@/lib/permissions'
+import { canManageContent, isAdmin } from '@/lib/permissions'
 
-export const PATCH = withApi.auth(withPermission('training.edit')(async (req, ctx, { user }) => {
+export const PATCH = withApi.auth(async (req, ctx, { user }) => {
+  if (!canManageContent(user)) throw throw403('无权限修改训练题目')
+
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
@@ -62,4 +63,4 @@ export const PATCH = withApi.auth(withPermission('training.edit')(async (req, ct
       throw400('VALIDATION', `未知 action: ${body.action}`)
   }
   return ok(result)
-}))
+})

@@ -8,6 +8,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { canManageContent } from '@/lib/permissions'
 
 /** 查看题解所需的最低分 */
 export const REQUIRED_SOLUTION_SCORE = 60
@@ -68,29 +69,20 @@ export async function getUserBestScore(
 }
 
 /**
- * 纯函数：基于已知的最高分做最终决策
- * （不访问数据库，便于单元测试）
+ * 基于已知的最高分做最终决策
+ * （会通过 canManageContent 校验内容管理权限）
  */
-export function decideSolutionView(
+export async function decideSolutionView(
   user: SolutionViewUser | null,
   bestScore: number,
   options: CanViewOptions = {}
-): SolutionViewResult {
-  // 1) 管理员 / 教师直接放行
-  if (user) {
-    if (user.role === 'SYSTEM_ADMIN') {
-      return {
-        allowed: true,
-        reason: 'ADMIN',
-        requiredScore: REQUIRED_SOLUTION_SCORE
-      }
-    }
-    if (user.role === 'TEACHER') {
-      return {
-        allowed: true,
-        reason: 'TEACHER',
-        requiredScore: REQUIRED_SOLUTION_SCORE
-      }
+): Promise<SolutionViewResult> {
+  // 1) 可管理内容的管理员 / 教师直接放行
+  if (user && canManageContent(user)) {
+    return {
+      allowed: true,
+      reason: 'ADMIN',
+      requiredScore: REQUIRED_SOLUTION_SCORE
     }
   }
 
@@ -144,21 +136,12 @@ export async function canViewSolutions(
   problemId: string,
   options: CanViewOptions = {}
 ): Promise<SolutionViewResult> {
-  // 1) 管理员 / 教师短路返回（无需查 DB）
-  if (user) {
-    if (user.role === 'SYSTEM_ADMIN') {
-      return {
-        allowed: true,
-        reason: 'ADMIN',
-        requiredScore: REQUIRED_SOLUTION_SCORE
-      }
-    }
-    if (user.role === 'TEACHER') {
-      return {
-        allowed: true,
-        reason: 'TEACHER',
-        requiredScore: REQUIRED_SOLUTION_SCORE
-      }
+  // 1) 可管理内容的管理员 / 教师短路返回
+  if (user && canManageContent(user)) {
+    return {
+      allowed: true,
+      reason: 'ADMIN',
+      requiredScore: REQUIRED_SOLUTION_SCORE
     }
   }
 

@@ -71,6 +71,8 @@ export interface TestCaseInput {
   output: string
   isSample?: boolean
   score?: number
+  timeLimit?: number | null
+  memoryLimit?: number | null
 }
 
 export interface CacheEntry<T = unknown> {

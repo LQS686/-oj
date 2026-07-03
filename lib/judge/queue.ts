@@ -3,6 +3,7 @@
 
 import { EventEmitter } from 'events'
 import { logger } from '@/lib/logger'
+import type { ResultState, ComparisonMode } from './types'
 
 // 评测任务数据类型
 export interface JudgeJob {
@@ -13,20 +14,24 @@ export interface JudgeJob {
   language: string
   timeLimit: number
   memoryLimit: number
+  comparisonMode?: ComparisonMode    // 输出比较模式，默认 'default'
+  realPrecision?: number             // 浮点数比较精度，默认 3
+  rejudgeTimes?: number              // 临界 TLE 重测次数，默认 0（关闭）
+  extraTimeRatio?: number            // 临界 TLE 容差比例，默认 0
   testCases: Array<{
     id: string
     input: string
     output: string
     score: number
-    timeLimit?: number
-    memoryLimit?: number
+    timeLimit?: number               // 单测点时间限制覆盖
+    memoryLimit?: number             // 单测点内存限制覆盖
   }>
 }
 
 // 评测结果类型
 export interface JudgeResult {
   submissionId: string
-  status: 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' | 'SE' | 'Judging' | 'Pending'
+  status: ResultState
   score: number
   time: number
   memory: number
@@ -35,7 +40,7 @@ export interface JudgeResult {
   message?: string
   testResults?: Array<{
     testId: string
-    status: string
+    status: ResultState
     time: number
     memory: number
     message?: string

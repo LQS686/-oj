@@ -4,7 +4,7 @@
  * - POST /api/problems  创建题目（管理员）
  */
 import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
+import { canManageContent } from '@/lib/permissions'
 import {
   createProblemWithTestcases,
   findProblemByTitle,
@@ -35,7 +35,9 @@ export const GET = withApi.public(async (req) => {
   return ok(result)
 })
 
-export const POST = withApi.auth(withPermission('problem.create')(async (req, _ctx, { user }) => {
+export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  if (!canManageContent(user)) throw throw403('无权限创建题目')
+
   const body = await readJson<{
     title?: string
     description?: string
@@ -116,4 +118,4 @@ export const POST = withApi.auth(withPermission('problem.create')(async (req, _c
     logger.error('Create problem failed:', err)
     throw400('CREATE_FAILED', '题目创建失败')
   }
-}))
+})

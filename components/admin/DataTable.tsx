@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, ReactNode } from 'react'
-import { ChevronDown, ChevronUp, MoreHorizontal, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 
 export interface Column<T> {
   key: keyof T
@@ -188,19 +188,14 @@ export default function DataTable<T>({
                 sortConfig.key === column.key ? (
                   sortConfig.direction === 'asc' ? (
                     <ChevronUp className="w-4 h-4 text-primary-light" />
-                  ) : sortConfig.direction === 'desc' ? (
+                  ) : (
                     <ChevronDown className="w-4 h-4 text-primary-light" />
-                  ) : null
+                  )
                 ) : null
               )}
             </div>
           </th>
         ))}
-        {batchActions && batchActions.length > 0 && (
-          <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            操作
-          </th>
-        )}
       </tr>
     </thead>
   )
@@ -228,11 +223,6 @@ export default function DataTable<T>({
                   ></div>
                 </td>
               ))}
-              {batchActions && batchActions.length > 0 && (
-                <td className="px-4 py-3 text-right">
-                  <div className="w-8 h-4 rounded bg-muted animate-pulse ml-auto"></div>
-                </td>
-              )}
             </tr>
           ))}
         </tbody>
@@ -282,18 +272,6 @@ export default function DataTable<T>({
                   </td>
                 )
               })}
-              {batchActions && batchActions.length > 0 && (
-                <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                      title="更多操作"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              )}
             </tr>
           )
         })}

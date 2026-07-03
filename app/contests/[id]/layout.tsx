@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import ContestHeaderShell from './ContestHeaderShell'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
+import { canManageContent } from '@/lib/permissions'
 import { formatPageDocumentTitle } from '@/lib/page-titles'
 import type { Metadata } from 'next'
 
@@ -59,7 +60,7 @@ export default async function ContestLayout({
  user = verifyToken(token)
  }
 
- if (user && user.role === 'SYSTEM_ADMIN') {
+ if (user && canManageContent({ role: user.role })) {
  canViewDetails = true
  } else {
  // 1. Not Started -> False (Already default)

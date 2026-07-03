@@ -4,29 +4,21 @@
  * GET  题目列表
  * POST 创建题目
  */
-import { withApi, ok, readJson, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
-import { isSystemAdmin } from '@/lib/permissions'
+import { withApi, ok, readJson } from '@/lib/api/withApi'
 import { listAllProblemsForAdmin, createAdminProblem } from '@/lib/problem/service'
 import { enqueueSolutionJob } from '@/lib/ai/solution-queue'
 
 /**
  * GET /api/admin/problems - 获取题目列表（管理员）
  */
-export const GET = withApi.auth(async (_req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
+export const GET = withApi.admin(async () => {
   return ok(await listAllProblemsForAdmin())
 })
 
 /**
  * POST /api/admin/problems - 创建题目（管理员）
  */
-export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
+export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const body = await readJson<Record<string, any>>(req)
   const problem = await createAdminProblem(body, user.id)
 
@@ -44,4 +36,4 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
   } catch (aiError) {
     return ok({ problem, message: '题目创建成功', solutionGenerationStatus: 'failed' })
   }
-}))
+})

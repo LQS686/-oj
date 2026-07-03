@@ -19,6 +19,7 @@ import {
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { formatRelativeTime } from '@/lib/utils'
+import { canManageContent } from '@/lib/permissions'
 import MarkdownRenderer from '@/components/solution/MarkdownRenderer'
 
 interface SolutionDetail {
@@ -88,6 +89,7 @@ export default function SolutionDetailPage() {
  const [liking, setLiking] = useState(false)
  const [deleting, setDeleting] = useState(false)
  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+ const [canEditPerm, setCanEditPerm] = useState(false)
 
  useEffect(() => {
  if (!pid || !sid) return
@@ -95,6 +97,14 @@ export default function SolutionDetailPage() {
  fetchProblem()
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [pid, sid])
+
+ useEffect(() => {
+ if (!user) {
+ setCanEditPerm(false)
+ return
+ }
+ setCanEditPerm(canManageContent(user))
+ }, [user])
 
  const fetchSolution = async () => {
  try {
@@ -195,7 +205,7 @@ export default function SolutionDetailPage() {
  const canEditOrDelete =
  !!user &&
  !!solution &&
- (user.id === solution.authorId || user.role === 'SYSTEM_ADMIN' || user.role === 'TEACHER')
+ (user.id === solution.authorId || canEditPerm)
 
  if (loading) {
  return (

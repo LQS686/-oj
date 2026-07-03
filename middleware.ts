@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { getUserFromRequest } from '@/lib/auth'
+import { canAccessAdmin } from '@/lib/permissions'
 
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for')
@@ -20,61 +22,15 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/auth/forgot-password': { maxRequests: 3, windowMs: 300000 },
 }
 
-/**
- * 解析 JWT payload，校验签名后返回 role。
- * 使用 Web Crypto API 校验 HS256 签名，兼容 edge / node runtime。
- */
-async function getRoleFromToken(token: string): Promise<string | null> {
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return null
-    const [headerB64, payloadB64, signatureB64] = parts
-
-    const secret = process.env.JWT_SECRET || 'dev-secret-change-me'
-    const keyMaterial = new TextEncoder().encode(secret)
-    const key = await crypto.subtle.importKey(
-      'raw',
-      keyMaterial,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    )
-
-    // base64url -> Uint8Array
-    const sigB64 = signatureB64.replace(/-/g, '+').replace(/_/g, '/')
-    const sigPadded = sigB64 + '='.repeat((4 - (sigB64.length % 4)) % 4)
-    const sigBin = Uint8Array.from(atob(sigPadded), (c) => c.charCodeAt(0))
-
-    const signedData = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
-    const valid = await crypto.subtle.verify('HMAC', key, sigBin, signedData)
-    if (!valid) return null
-
-    const payloadB64Std = payloadB64.replace(/-/g, '+').replace(/_/g, '/')
-    const payloadPadded = payloadB64Std + '='.repeat((4 - (payloadB64Std.length % 4)) % 4)
-    const payloadJson = atob(payloadPadded)
-    const payload = JSON.parse(payloadJson) as {
-      role?: string
-    }
-
-    return payload.role ?? null
-  } catch {
-    return null
-  }
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // 拦截 /admin/* 页面路由（不含 /api/admin/*）：
-  // 快速过滤——仅允许 SYSTEM_ADMIN 和 TEACHER 通过（两者均可能拥有 admin.access 权限）。
-  // 细粒度权限校验由 API 路由的 withPermission('admin.access') 完成。
+  // 基于 JWT payload 中的 role 判定，仅 SYSTEM_ADMIN 和 ADMIN 可放行。
+  // /api/admin/* 由 API 路由的 withApi.admin 处理，此处不拦截。
   if (pathname.startsWith('/admin') && !pathname.startsWith('/api/')) {
-    const token = request.cookies.get('token')?.value
-    if (!token) {
-      return NextResponse.redirect(new URL('/403', request.url))
-    }
-    const role = await getRoleFromToken(token)
-    if (role !== 'SYSTEM_ADMIN' && role !== 'TEACHER') {
+    const payload = getUserFromRequest(request)
+    if (!payload || !canAccessAdmin({ role: payload.role })) {
       return NextResponse.redirect(new URL('/403', request.url))
     }
     return NextResponse.next()
@@ -112,6 +68,9 @@ export async function middleware(request: NextRequest) {
 
   return NextResponse.next()
 }
+
+// middleware 需解析 JWT（jsonwebtoken 为 Node 库），使用 Node.js runtime
+export const runtime = 'nodejs'
 
 export const config = {
   matcher: ['/api/:path*', '/admin/:path*'],

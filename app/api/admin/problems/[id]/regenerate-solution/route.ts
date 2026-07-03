@@ -9,7 +9,6 @@
  *  3. 入队新的 AI 题解生成
  */
 import { withApi, ok, throw400, throw403, throw404 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
 import { isObjectId } from '@/lib/api/validation'
 import {
   deleteAiOfficialSolutionsForProblem,
@@ -19,11 +18,11 @@ import {
 import { logger } from '@/lib/logger'
 import { enqueueSolutionJob } from '@/lib/ai/solution-queue'
 
-export const POST = withApi.auth(withPermission('admin.access')(async (_req, ctx, { user }) => {
+export const POST = withApi.admin(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
 
-  // admin.access 权限已由 withPermission 校验，这里仅校验账号可用性
+  // 管理员权限已由 withApi.admin 校验，这里仅校验账号可用性
   const dbUserResult = await getOperatorForSolutionRegen(user.id)
   const dbUser = dbUserResult as NonNullable<typeof dbUserResult>
   if (dbUser.isBanned) throw403('账号不可用')
@@ -61,4 +60,4 @@ export const POST = withApi.auth(withPermission('admin.access')(async (_req, ctx
   })
 
   return ok({ logId })
-}))
+})

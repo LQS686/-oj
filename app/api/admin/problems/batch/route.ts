@@ -3,10 +3,8 @@
  *
  * action: 'visibility' | 'difficulty' | 'delete'
  */
-import { withApi, ok, readJson, throw403 } from '@/lib/api/withApi'
-import { withPermission } from '@/lib/api/withPermission'
+import { withApi, ok, readJson } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { isSystemAdmin } from '@/lib/permissions'
 import {
   batchDeleteProblems,
   batchUpdateProblemDifficulty,
@@ -14,11 +12,7 @@ import {
   validateBatchProblemInput,
 } from '@/lib/problem/service'
 
-export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx, { user }) => {
-  if (!isSystemAdmin(user)) {
-    throw403('需要系统管理员权限')
-  }
-
+export const POST = withApi.admin(async (req, _ctx) => {
   const body = await readJson<{
     action?: string
     problemIds?: string[]
@@ -39,4 +33,4 @@ export const POST = withApi.auth(withPermission('admin.access')(async (req, _ctx
   // delete
   const deleteRes = await batchDeleteProblems(validated.problemIds)
   return ok({ updatedCount: 0, deletedCount: deleteRes.count })
-}))
+})
