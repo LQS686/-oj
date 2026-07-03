@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { isSystemAdmin } from '@/lib/permissions'
+import { canAccessAdmin } from '@/lib/permissions'
 import {
   LayoutDashboard,
   FileText,
@@ -76,10 +76,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
 
-  // 权限门：仅 SYSTEM_ADMIN 可访问 /admin，未通过则跳到 /403
+  // 权限门：仅 SYSTEM_ADMIN / TEACHER 可访问 /admin，未通过则跳到 /403
   useEffect(() => {
     if (isLoading) return
-    if (!user || !isSystemAdmin(user)) {
+    if (!user || !canAccessAdmin(user)) {
       router.push('/403')
     }
   }, [user, isLoading, router])
@@ -140,7 +140,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const allMenuItems = menuGroups.flatMap(g => g.items)
 
   // 鉴权完成前或鉴权未通过时，不渲染后台内容，避免短暂闪现
-  if (isLoading || !user || !isSystemAdmin(user)) {
+  if (isLoading || !user || !canAccessAdmin(user)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-muted-foreground text-sm">加载中...</div>

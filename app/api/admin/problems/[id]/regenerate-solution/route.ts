@@ -23,15 +23,10 @@ export const POST = withApi.auth(withPermission('admin.access')(async (_req, ctx
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
 
-  // 校验管理员 / 教师
+  // admin.access 权限已由 withPermission 校验，这里仅校验账号可用性
   const dbUserResult = await getOperatorForSolutionRegen(user.id)
   const dbUser = dbUserResult as NonNullable<typeof dbUserResult>
   if (dbUser.isBanned) throw403('账号不可用')
-  const isAdmin = dbUser.role === 'SYSTEM_ADMIN'
-  const isTeacher = dbUser.role === 'TEACHER'
-  if (!isAdmin && !isTeacher) {
-    throw403('需要管理员或教师权限')
-  }
 
   // 读取题目
   const problemResult = await getProblemForSolutionRegeneration(id)

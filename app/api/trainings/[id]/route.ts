@@ -2,6 +2,7 @@
  * /api/trainings/[id] - 训练计划详情
  */
 import { withApi, ok, readJson, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
 import {
   getTrainingWithProblemStatuses,
   updateTrainingAndProblems,
@@ -11,6 +12,7 @@ import {
 import { isObjectId } from '@/lib/api/validation'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { hasPermission, isAdmin } from '@/lib/permissions'
 
 export const GET = withApi.public(async (req, ctx) => {
   const { id } = (ctx as any).params
@@ -29,7 +31,7 @@ export const GET = withApi.public(async (req, ctx) => {
     if (!userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
     const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
     const authorId: string | null = training.author?.id ?? null
-    if (u?.role !== 'SYSTEM_ADMIN' && authorId !== userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
+    if (!isAdmin(u) && authorId !== userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
   }
 
   // 异步 viewCount++（不阻塞响应）
@@ -38,7 +40,7 @@ export const GET = withApi.public(async (req, ctx) => {
   return ok(training)
 })
 
-export const PUT = withApi.auth(async (req, ctx, { user }) => {
+export const PUT = withApi.auth(withPermission('training.edit')(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
@@ -49,7 +51,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
-  if (u?.role !== 'SYSTEM_ADMIN' && found.authorId !== user.id) {
+  if (!isAdmin(u) && found.authorId !== user.id) {
     throw403('只有作者或管理员可以编辑')
   }
 
@@ -66,8 +68,9 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     cover?: string
   }>(req)
 
-  // 分类仅 admin 可选；普通用户若传则丢弃
-  if (u?.role !== 'SYSTEM_ADMIN') {
+  // 发布/推荐等高级设置仅有 training.publish 权限的用户可改
+  const canPublish = await hasPermission(user, 'training.publish')
+  if (!canPublish) {
     delete (body as any).categoryType
     delete (body as any).isRecommended
     delete (body as any).status
@@ -76,9 +79,9 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 
   const updated = await updateTrainingAndProblems(id, body)
   return ok(updated)
-})
+}))
 
-export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
+export const DELETE = withApi.auth(withPermission('training.delete')(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
@@ -88,9 +91,9 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
-  if (u?.role !== 'SYSTEM_ADMIN' && found.authorId !== user.id) {
+  if (!isAdmin(u) && found.authorId !== user.id) {
     throw403('只有作者或管理员可以删除')
   }
   await deleteTraining(id)
   return ok({ id })
-})
+}))

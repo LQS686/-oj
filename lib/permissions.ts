@@ -14,31 +14,36 @@ export interface User {
   [key: string]: any
 }
 
+/** 角色判定的最小入参类型（仅需 role 字段） */
+export interface RoleUser {
+  role?: string | null
+}
+
 /** 是否为系统管理员（SYSTEM_ADMIN） */
-export function isAdmin(user: User | null): boolean {
+export function isAdmin(user: RoleUser | null): boolean {
   if (!user) return false
   return user.role === 'SYSTEM_ADMIN'
 }
 
 /** 是否为教师（TEACHER） */
-export function isTeacher(user: User | null): boolean {
+export function isTeacher(user: RoleUser | null): boolean {
   if (!user) return false
   return user.role === 'TEACHER'
 }
 
 /** 是否可创建竞赛 */
-export function canCreateContest(user: User | null): boolean {
+export function canCreateContest(user: RoleUser | null): boolean {
   return isAdmin(user) || isTeacher(user)
 }
 
 /** 是否可创建班级 */
-export function canCreateClass(user: User | null): boolean {
+export function canCreateClass(user: RoleUser | null): boolean {
   return isAdmin(user) || isTeacher(user)
 }
 
-/** 是否可访问后台 */
-export function canAccessAdmin(user: User | null): boolean {
-  return isAdmin(user)
+/** 是否可访问后台（SYSTEM_ADMIN 和 TEACHER 均可，细粒度由 hasPermission 控制） */
+export function canAccessAdmin(user: RoleUser | null): boolean {
+  return isAdmin(user) || isTeacher(user)
 }
 
 /** 角色中文标签 */

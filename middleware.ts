@@ -21,13 +21,13 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
 }
 
 /**
- * 解析 JWT payload（不验证签名），用于快速判断 token 角色。
+ * 解析 JWT payload，校验签名后返回 role。
  * 使用 Web Crypto API 校验 HS256 签名，兼容 edge / node runtime。
  */
-async function isAdminPayload(token: string): Promise<boolean> {
+async function getRoleFromToken(token: string): Promise<string | null> {
   try {
     const parts = token.split('.')
-    if (parts.length !== 3) return false
+    if (parts.length !== 3) return null
     const [headerB64, payloadB64, signatureB64] = parts
 
     const secret = process.env.JWT_SECRET || 'dev-secret-change-me'
@@ -47,7 +47,7 @@ async function isAdminPayload(token: string): Promise<boolean> {
 
     const signedData = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
     const valid = await crypto.subtle.verify('HMAC', key, sigBin, signedData)
-    if (!valid) return false
+    if (!valid) return null
 
     const payloadB64Std = payloadB64.replace(/-/g, '+').replace(/_/g, '/')
     const payloadPadded = payloadB64Std + '='.repeat((4 - (payloadB64Std.length % 4)) % 4)
@@ -56,23 +56,25 @@ async function isAdminPayload(token: string): Promise<boolean> {
       role?: string
     }
 
-    return payload.role === 'SYSTEM_ADMIN'
+    return payload.role ?? null
   } catch {
-    return false
+    return null
   }
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // 拦截 /admin/* 路径：仅 SYSTEM_ADMIN 可访问
-  if (pathname.startsWith('/admin')) {
+  // 拦截 /admin/* 页面路由（不含 /api/admin/*）：
+  // 快速过滤——仅允许 SYSTEM_ADMIN 和 TEACHER 通过（两者均可能拥有 admin.access 权限）。
+  // 细粒度权限校验由 API 路由的 withPermission('admin.access') 完成。
+  if (pathname.startsWith('/admin') && !pathname.startsWith('/api/')) {
     const token = request.cookies.get('token')?.value
     if (!token) {
       return NextResponse.redirect(new URL('/403', request.url))
     }
-    const ok = await isAdminPayload(token)
-    if (!ok) {
+    const role = await getRoleFromToken(token)
+    if (role !== 'SYSTEM_ADMIN' && role !== 'TEACHER') {
       return NextResponse.redirect(new URL('/403', request.url))
     }
     return NextResponse.next()

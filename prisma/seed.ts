@@ -28,6 +28,9 @@ async function main() {
     await db.collection('Training').deleteMany({})
     await db.collection('TrainingProblem').deleteMany({})
     await db.collection('Achievement').deleteMany({})
+    await db.collection('Permission').deleteMany({})
+    await db.collection('RolePermission').deleteMany({})
+    await db.collection('UserPermission').deleteMany({})
 
     // 创建管理员用户
     const adminPassword = await bcrypt.hash('admin123', 10)
@@ -305,6 +308,118 @@ async function main() {
     }
 
     logger.info(`创建${achievements.length}个成就`)
+
+    // ============ 权限点 + 角色默认权限 ============
+    logger.info('开始填充权限点与角色权限...')
+
+    // 权限点定义：code → { module, name, description }
+    const permissionDefs: Array<{ code: string; module: string; name: string; description: string }> = [
+      // user 模块
+      { code: 'user.view', module: 'user', name: '查看用户', description: '查看用户列表与详情' },
+      { code: 'user.edit', module: 'user', name: '编辑用户', description: '编辑用户基本信息' },
+      { code: 'user.ban', module: 'user', name: '封禁用户', description: '封禁/解封用户账号' },
+      { code: 'user.delete', module: 'user', name: '删除用户', description: '删除用户账号' },
+      { code: 'user.role.assign', module: 'user', name: '分配角色', description: '修改用户的系统角色' },
+      // class 模块
+      { code: 'class.create', module: 'class', name: '创建班级', description: '创建新班级' },
+      { code: 'class.edit', module: 'class', name: '编辑班级', description: '编辑班级信息' },
+      { code: 'class.delete', module: 'class', name: '删除班级', description: '删除班级' },
+      { code: 'class.member.manage', module: 'class', name: '管理成员', description: '添加/移除/修改班级成员' },
+      { code: 'class.invite.manage', module: 'class', name: '管理邀请', description: '管理班级邀请链接' },
+      { code: 'class.assignment.manage', module: 'class', name: '管理作业', description: '创建/编辑/删除班级作业' },
+      { code: 'class.assignment.view', module: 'class', name: '查看作业', description: '查看班级作业列表' },
+      { code: 'class.assignment.create', module: 'class', name: '创建作业', description: '创建班级作业' },
+      { code: 'class.assignment.edit', module: 'class', name: '编辑作业', description: '编辑班级作业' },
+      { code: 'class.assignment.delete', module: 'class', name: '删除作业', description: '删除班级作业' },
+      { code: 'class.stats.view', module: 'class', name: '查看统计', description: '查看班级数据统计' },
+      { code: 'class.note.manage', module: 'class', name: '管理笔记', description: '管理班级笔记' },
+      // problem 模块
+      { code: 'problem.create', module: 'problem', name: '创建题目', description: '创建新题目' },
+      { code: 'problem.edit', module: 'problem', name: '编辑题目', description: '编辑题目内容' },
+      { code: 'problem.delete', module: 'problem', name: '删除题目', description: '删除题目' },
+      { code: 'problem.review', module: 'problem', name: '审核题目', description: '审核题目内容' },
+      { code: 'problem.testcase.manage', module: 'problem', name: '管理测试用例', description: '管理题目测试用例' },
+      // contest 模块
+      { code: 'contest.create', module: 'contest', name: '创建竞赛', description: '创建新竞赛' },
+      { code: 'contest.edit', module: 'contest', name: '编辑竞赛', description: '编辑竞赛信息' },
+      { code: 'contest.delete', module: 'contest', name: '删除竞赛', description: '删除竞赛' },
+      { code: 'contest.participate.manage', module: 'contest', name: '管理参赛者', description: '管理竞赛报名/参赛者' },
+      { code: 'contest.scoreboard.view', module: 'contest', name: '查看排行榜', description: '查看竞赛排行榜' },
+      // training 模块
+      { code: 'training.create', module: 'training', name: '创建题单', description: '创建新题单' },
+      { code: 'training.edit', module: 'training', name: '编辑题单', description: '编辑题单内容' },
+      { code: 'training.delete', module: 'training', name: '删除题单', description: '删除题单' },
+      { code: 'training.publish', module: 'training', name: '发布题单', description: '发布/推荐/公开题单' },
+      { code: 'training.category.manage', module: 'training', name: '管理分类', description: '管理题单分类' },
+      // post 模块
+      { code: 'post.create', module: 'post', name: '发布帖子', description: '创建讨论帖' },
+      { code: 'post.edit', module: 'post', name: '编辑帖子', description: '编辑帖子内容' },
+      { code: 'post.delete', module: 'post', name: '删除帖子', description: '删除帖子' },
+      { code: 'post.pin', module: 'post', name: '置顶帖子', description: '置顶/取消置顶帖子' },
+      { code: 'post.lock', module: 'post', name: '锁定帖子', description: '锁定/解锁帖子' },
+      // system 模块
+      { code: 'system.settings', module: 'system', name: '系统设置', description: '修改系统全局设置' },
+      { code: 'system.permission.manage', module: 'system', name: '权限管理', description: '管理权限点与角色权限' },
+      { code: 'admin.access', module: 'system', name: '后台访问', description: '访问管理后台' },
+    ]
+
+    // 插入权限点，记录 code → _id 映射
+    const permIdMap = new Map<string, ObjectId>()
+    for (const p of permissionDefs) {
+      const result = await db.collection('Permission').insertOne({
+        code: p.code,
+        module: p.module,
+        name: p.name,
+        description: p.description,
+        createdAt: new Date(),
+      })
+      permIdMap.set(p.code, result.insertedId)
+    }
+    logger.info(`创建${permissionDefs.length}个权限点`)
+
+    // TEACHER 默认权限集（业务管理类，不含 system.settings / system.permission.manage / user.ban / user.delete / user.role.assign）
+    const teacherPermCodes: string[] = [
+      'admin.access',
+      'user.view', 'user.edit',
+      'class.create', 'class.edit', 'class.delete', 'class.member.manage', 'class.invite.manage',
+      'class.assignment.manage', 'class.assignment.view', 'class.assignment.create', 'class.assignment.edit', 'class.assignment.delete',
+      'class.stats.view', 'class.note.manage',
+      'problem.create', 'problem.edit', 'problem.delete', 'problem.review', 'problem.testcase.manage',
+      'contest.create', 'contest.edit', 'contest.delete', 'contest.participate.manage', 'contest.scoreboard.view',
+      'training.create', 'training.edit', 'training.delete', 'training.publish', 'training.category.manage',
+      'post.create', 'post.edit', 'post.delete', 'post.pin', 'post.lock',
+    ]
+
+    // STUDENT 默认权限集（基础参与类）
+    const studentPermCodes: string[] = [
+      'post.create', 'post.edit',
+      'contest.participate.manage',
+    ]
+
+    // SYSTEM_ADMIN 默认拥有全部权限（虽然 hasPermission 对 SYSTEM_ADMIN 短路返回 true，
+    // 但写入 RolePermission 可让 /admin/roles 页面正确展示）
+    const allPermCodes = permissionDefs.map((p) => p.code)
+
+    const rolePermPairs: Array<{ role: string; codes: string[] }> = [
+      { role: 'SYSTEM_ADMIN', codes: allPermCodes },
+      { role: 'TEACHER', codes: teacherPermCodes },
+      { role: 'STUDENT', codes: studentPermCodes },
+    ]
+
+    let rolePermCount = 0
+    for (const { role, codes } of rolePermPairs) {
+      for (const code of codes) {
+        const permId = permIdMap.get(code)
+        if (!permId) continue
+        await db.collection('RolePermission').insertOne({
+          role,
+          permissionId: permId,
+          createdAt: new Date(),
+        })
+        rolePermCount++
+      }
+    }
+    logger.info(`创建${rolePermCount}条角色权限记录（SYSTEM_ADMIN 全部 / TEACHER ${teacherPermCodes.length} / STUDENT ${studentPermCodes.length}）`)
 
     logger.info('种子数据填充完成')
     logger.info('登录信息：')

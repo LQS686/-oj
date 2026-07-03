@@ -2,6 +2,7 @@
  * /api/trainings/[id]/problems - 训练题目管理（PATCH add/remove/reorder/update）
  */
 import { withApi, ok, readJson, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
+import { withPermission } from '@/lib/api/withPermission'
 import {
   addTrainingProblems,
   removeTrainingProblems,
@@ -11,8 +12,9 @@ import {
 import type { TrainingProblemPatchInput } from '@/lib/training/types'
 import { isObjectId } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
+import { isAdmin } from '@/lib/permissions'
 
-export const PATCH = withApi.auth(async (req, ctx, { user }) => {
+export const PATCH = withApi.auth(withPermission('training.edit')(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
@@ -23,7 +25,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
-  if (u?.role !== 'SYSTEM_ADMIN' && found.authorId !== user.id) {
+  if (!isAdmin(u) && found.authorId !== user.id) {
     throw403('只有作者或管理员可以修改题目')
   }
 
@@ -60,4 +62,4 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
       throw400('VALIDATION', `未知 action: ${body.action}`)
   }
   return ok(result)
-})
+}))

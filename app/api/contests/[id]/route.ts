@@ -81,7 +81,7 @@ export const PUT = withApi.auth(withPermission('contest.edit')(async (req, ctx, 
 }))
 
 // DELETE /api/contests/[id] - 删除竞赛
-export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
+export const DELETE = withApi.auth(withPermission('contest.delete')(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
@@ -94,4 +94,4 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
 
   await deleteContest(id)
   return ok({ message: '竞赛删除成功' })
-})
+}))

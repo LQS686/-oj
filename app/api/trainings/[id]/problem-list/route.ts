@@ -6,6 +6,7 @@ import { isObjectId } from '@/lib/api/validation'
 import { verifyToken } from '@/lib/auth'
 import { listTrainingProblemsWithStatus } from '@/lib/training/service'
 import { prisma } from '@/lib/prisma'
+import { isAdmin } from '@/lib/permissions'
 
 export const GET = withApi.public(async (req, ctx) => {
   const { id } = (ctx as { params: { id: string } }).params
@@ -22,7 +23,7 @@ export const GET = withApi.public(async (req, ctx) => {
     const userId = token ? verifyToken(token)?.userId : null
     if (!userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
     const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
-    if (u?.role !== 'SYSTEM_ADMIN' && training.authorId !== userId) {
+    if (!isAdmin(u) && training.authorId !== userId) {
       throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
     }
   }
