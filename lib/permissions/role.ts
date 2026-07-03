@@ -7,12 +7,9 @@ import type { PermissionUser } from './types'
 
 /**
  * 是否为系统管理员（SYSTEM_ADMIN）
- * - role 字段为 SYSTEM_ADMIN，或
- * - isSuperAdmin 标记为 true（硬卡唯一性，保留字段）
  */
 export function isSystemAdmin(user: PermissionUser | null | undefined): boolean {
   if (!user) return false
-  if (user.isSuperAdmin === true) return true
   return user.role === 'SYSTEM_ADMIN'
 }
 

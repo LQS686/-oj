@@ -133,7 +133,7 @@ export default function UserMenu() {
  {user.nickname || user.username}
  </span>
  <span className="text-xs text-muted-foreground leading-tight group-hover:text-primary/70 transition-colors duration-300">
- {getRoleLabel(user?.role, user?.isAdmin)}
+ {getRoleLabel(user?.role)}
  </span>
  </div>
  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 hidden sm:block group-hover:text-primary-light`} />

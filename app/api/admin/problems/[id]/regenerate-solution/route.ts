@@ -27,7 +27,7 @@ export const POST = withApi.auth(withPermission('admin.access')(async (_req, ctx
   const dbUserResult = await getOperatorForSolutionRegen(user.id)
   const dbUser = dbUserResult as NonNullable<typeof dbUserResult>
   if (dbUser.isBanned) throw403('账号不可用')
-  const isAdmin = dbUser.isAdmin === true
+  const isAdmin = dbUser.role === 'SYSTEM_ADMIN'
   const isTeacher = dbUser.role === 'TEACHER'
   if (!isAdmin && !isTeacher) {
     throw403('需要管理员或教师权限')

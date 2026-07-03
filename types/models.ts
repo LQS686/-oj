@@ -11,7 +11,6 @@ export interface User {
   role: string
   solvedCount: number
   acceptedSubmissions: number
-  isAdmin: boolean
   isBanned: boolean
   createdAt: string
   updatedAt: string

@@ -37,7 +37,7 @@ export const GET = withApi.public(async (req) => {
 
 export const POST = withApi.auth(withPermission('problem.create')(async (req, _ctx, { user }) => {
   const currentUser = await getUserFullInfo(user.id)
-  if (!currentUser?.isAdmin) throw403('只有管理员可以创建题目')
+  if (currentUser?.role !== 'SYSTEM_ADMIN') throw403('只有管理员可以创建题目')
 
   const body = await readJson<{
     title?: string

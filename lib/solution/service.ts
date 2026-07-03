@@ -104,7 +104,6 @@ const SOLUTION_LIST_SELECT = {
 export interface SolutionViewUserPayload {
   id: string
   role: string
-  isAdmin: boolean
 }
 
 export async function loadSolutionViewUser(
@@ -115,13 +114,12 @@ export async function loadSolutionViewUser(
   if (!payload) return null
   const dbUser = await prisma.user.findUnique({
     where: { id: payload.userId },
-    select: { id: true, role: true, isAdmin: true },
+    select: { id: true, role: true },
   })
   if (!dbUser) return null
   return {
     id: dbUser.id,
     role: dbUser.role || 'user',
-    isAdmin: dbUser.isAdmin || payload.isAdmin === true,
   }
 }
 

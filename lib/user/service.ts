@@ -23,10 +23,6 @@ export interface UserProfile {
   bio: string | null
   email: string | null
   role: string
-  /** 已废弃：兼容老数据，与 isSuperAdmin 重复 */
-  isAdmin: boolean
-  /** SYSTEM_ADMIN 唯一性硬卡，等同 role === 'SYSTEM_ADMIN' */
-  isSuperAdmin: boolean
   isBanned: boolean
   createdAt: Date
 }
@@ -43,8 +39,6 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
         bio: true,
         email: true,
         role: true,
-        isAdmin: true,
-        isSuperAdmin: true,
         isBanned: true,
         createdAt: true,
       },
@@ -99,7 +93,7 @@ export async function clearUserCache(userId: string) {
   cache.delete(`user:profile:${userId}`)
   cache.delete(`user:stats:${userId}`)
   cache.delete(`auth:user:${userId}`)
-  // 任何用户变更（role / isAdmin / isBanned / rating / solvedCount / 删除）都会影响榜单
+  // 任何用户变更（role / isBanned / rating / solvedCount / 删除）都会影响榜单
   clearRankingCache()
 }
 
@@ -321,7 +315,7 @@ export async function getCurrentUserProfile(userId: string) {
       rating: true,
       rank: true,
       color: true,
-      isAdmin: true,
+      role: true,
       isBanned: true,
       createdAt: true,
       updatedAt: true,
@@ -381,7 +375,7 @@ export async function updateCurrentUserBasic(
       rating: true,
       rank: true,
       color: true,
-      isAdmin: true,
+      role: true,
       updatedAt: true,
     },
   }).then((result: any) => {
@@ -694,11 +688,11 @@ function isBatchUserRole(role: unknown): role is BatchUserRole {
 function getBatchRoleDefaults(role: BatchUserRole) {
   switch (role) {
     case 'SYSTEM_ADMIN':
-      return { isAdmin: true, rank: '管理员', color: '#FF6B6B' }
+      return { rank: '管理员', color: '#FF6B6B' }
     case 'TEACHER':
-      return { isAdmin: false, rank: '教师', color: '#4ECDC4' }
+      return { rank: '教师', color: '#4ECDC4' }
     case 'STUDENT':
-      return { isAdmin: false, rank: '新手', color: '#808080' }
+      return { rank: '新手', color: '#808080' }
   }
 }
 
@@ -855,7 +849,6 @@ export async function batchRegisterUsers(
           rating: 1500,
           rank: roleDefaults.rank,
           color: roleDefaults.color,
-          isAdmin: roleDefaults.isAdmin,
           role: role,
           isBanned: false,
         },
@@ -895,9 +888,7 @@ export async function listAllUsersForAdmin() {
       avatar: true,
       rating: true,
       rank: true,
-      isAdmin: true,
       role: true,
-      isSuperAdmin: true,
       isBanned: true,
       createdAt: true,
       _count: {
@@ -928,10 +919,10 @@ export function assertValidRole(role: string | undefined): asserts role is 'SYST
 export async function assertCanUpdateUser(
   targetUserId: string,
   operatorUserId: string,
-  body: { role?: string; isAdmin?: boolean; isBanned?: boolean }
+  body: { role?: string; isBanned?: boolean }
 ) {
   if (targetUserId === operatorUserId) {
-    if ('isAdmin' in body || 'isBanned' in body || 'role' in body) {
+    if ('isBanned' in body || 'role' in body) {
       const err: any = new Error('不能修改自己的权限或状态')
       err.status = 400
       err.code = 'CANNOT_MODIFY_SELF'
@@ -945,7 +936,7 @@ export async function assertCanUpdateUser(
     err.code = 'NOT_FOUND'
     throw err
   }
-  if (target.isSuperAdmin) {
+  if (target.role === 'SYSTEM_ADMIN') {
     const err: any = new Error('超级管理员不可被修改')
     err.status = 403
     err.code = 'FORBIDDEN'
@@ -971,7 +962,7 @@ export async function assertCanDeleteUser(targetUserId: string, operatorUserId: 
     err.code = 'NOT_FOUND'
     throw err
   }
-  if (target.isSuperAdmin) {
+  if (target.role === 'SYSTEM_ADMIN') {
     const err: any = new Error('超级管理员不可被删除')
     err.status = 403
     err.code = 'FORBIDDEN'
@@ -980,13 +971,12 @@ export async function assertCanDeleteUser(targetUserId: string, operatorUserId: 
 }
 
 /**
- * 管理员更新用户：role / isAdmin / isBanned / password
+ * 管理员更新用户：role / isBanned / password
  */
 export async function adminUpdateUser(
   targetUserId: string,
   body: {
     role?: 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT'
-    isAdmin?: boolean
     isBanned?: boolean
     password?: string
   },
@@ -996,10 +986,6 @@ export async function adminUpdateUser(
   if ('role' in body) {
     assertValidRole(body.role)
     updateData.role = body.role
-    updateData.isAdmin = body.role === 'SYSTEM_ADMIN'
-  }
-  if ('isAdmin' in body) {
-    updateData.isAdmin = Boolean(body.isAdmin)
   }
   if ('isBanned' in body) {
     updateData.isBanned = Boolean(body.isBanned)
@@ -1020,7 +1006,6 @@ export async function adminUpdateUser(
       id: true,
       username: true,
       email: true,
-      isAdmin: true,
       role: true,
       isBanned: true,
     },
@@ -1056,7 +1041,7 @@ export async function filterUserIdsForBatchAction(
   }
   // 跳过超级管理员
   const superAdmins = await prisma.user.findMany({
-    where: { id: { in: filtered }, isSuperAdmin: true },
+    where: { id: { in: filtered }, role: 'SYSTEM_ADMIN' },
     select: { id: true },
   })
   const superAdminIds = new Set(superAdmins.map((u: any) => u.id))
@@ -1078,7 +1063,6 @@ export async function batchUpdateUserRole(finalUserIds: string[], role: 'SYSTEM_
     where: { id: { in: finalUserIds } },
     data: {
       role,
-      isAdmin: role === 'SYSTEM_ADMIN',
     },
   })
   finalUserIds.forEach(clearUserCache)
@@ -1145,15 +1129,15 @@ export async function isEmailTaken(email: string, excludeUserId: string) {
 /** 别名：与 changeCurrentUserEmail 保持一致（getUserService 自带别名也行） */
 export { changeCurrentUserEmail as updateCurrentUserEmail }
 
-/** 读用户角色位（role / isAdmin）— 用于题解鉴权 */
+/** 读用户角色位（role）— 用于题解鉴权 */
 export async function getUserRoleFlags(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true, isAdmin: true },
+    select: { role: true },
   })
 }
 
-/** 读用户完整信息（用于创建训练计划等需要 isAdmin 鉴权） */
+/** 读用户完整信息（用于创建训练计划等需要 role 鉴权） */
 export async function getUserFullInfo(userId: string) {
   return prisma.user.findUnique({ where: { id: userId } })
 }
@@ -1170,9 +1154,7 @@ export interface RegisterResult {
   rating: number
   rank: string
   color: string
-  isAdmin: boolean
   role: string
-  isSuperAdmin: boolean
   createdAt: Date
   isFirstUser: boolean
 }
@@ -1180,7 +1162,7 @@ export interface RegisterResult {
 /** 注册新用户：检查重名/重邮箱 + 创建 + 返回 isFirstUser
  *
  * isFirstUser 由调用方传入（基于 prisma.user.count() === 0 判定），service 内部不读 DB 决定首用户
- *  - isFirstUser=true  → role=SYSTEM_ADMIN, isSuperAdmin=true
+ *  - isFirstUser=true  → role=SYSTEM_ADMIN
  *  - isFirstUser=false → role=STUDENT
  */
 export async function registerNewUser(input: {
@@ -1222,9 +1204,7 @@ export async function registerNewUser(input: {
       rating: 1500,
       rank: isFirstUser ? '管理员' : '新手',
       color: isFirstUser ? '#FF6B6B' : '#808080',
-      isAdmin: isFirstUser, // 兼容字段
       role: isFirstUser ? 'SYSTEM_ADMIN' : 'STUDENT',
-      isSuperAdmin: isFirstUser,
       isBanned: false,
     },
     select: {
@@ -1235,9 +1215,7 @@ export async function registerNewUser(input: {
       rating: true,
       rank: true,
       color: true,
-      isAdmin: true,
       role: true,
-      isSuperAdmin: true,
       createdAt: true,
     },
   })

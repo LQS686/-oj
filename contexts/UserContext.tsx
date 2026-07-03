@@ -13,7 +13,6 @@ interface User {
   rating: number
   rank: string
   color: string
-  isAdmin: boolean
   role: string
   createdAt: string
 }

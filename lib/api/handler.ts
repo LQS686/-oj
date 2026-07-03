@@ -13,6 +13,7 @@ import { getUserFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getClassMembership, type ClassMembership } from '@/lib/class/auth'
 import { fail, forbidden, notFound, serverError, unauthorized } from './response'
+import { isAdmin } from '@/lib/permissions'
 import { logger } from '@/lib/logger'
 
 export interface ApiContext<P = Record<string, string>> {
@@ -143,7 +144,7 @@ export function withAuth(handler: Handler<AuthContext>) {
  */
 export function withAdmin(handler: Handler<AuthContext>) {
   return withAuth(async (req, ctx, { user }) => {
-    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+    if (!isAdmin(user)) {
       return forbidden('需要管理员权限')
     }
     return handler(req, ctx, { user })

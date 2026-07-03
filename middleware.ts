@@ -54,15 +54,9 @@ async function isAdminPayload(token: string): Promise<boolean> {
     const payloadJson = atob(payloadPadded)
     const payload = JSON.parse(payloadJson) as {
       role?: string
-      isSuperAdmin?: boolean
-      isAdmin?: boolean
     }
 
-    if (payload.isSuperAdmin === true) return true
-    if (payload.role === 'SYSTEM_ADMIN') return true
-    // 兼容旧版仅 isAdmin=true 的 token（已废弃字段，仅作降级兜底）
-    if (payload.isAdmin === true) return true
-    return false
+    return payload.role === 'SYSTEM_ADMIN'
   } catch {
     return false
   }

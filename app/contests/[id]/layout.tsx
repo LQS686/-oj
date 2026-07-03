@@ -59,7 +59,7 @@ export default async function ContestLayout({
  user = verifyToken(token)
  }
 
- if (user && user.isAdmin) {
+ if (user && user.role === 'SYSTEM_ADMIN') {
  canViewDetails = true
  } else {
  // 1. Not Started -> False (Already default)

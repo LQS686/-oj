@@ -22,8 +22,8 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
     select: { authorId: true },
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
-  const u = await prisma.user.findUnique({ where: { id: user.id }, select: { isAdmin: true } })
-  if (!u?.isAdmin && found.authorId !== user.id) {
+  const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
+  if (u?.role !== 'SYSTEM_ADMIN' && found.authorId !== user.id) {
     throw403('只有作者或管理员可以修改题目')
   }
 

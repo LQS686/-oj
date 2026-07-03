@@ -29,7 +29,6 @@ export interface UserResponse {
   rating: number;
   rank: string;
   color: string;
-  isAdmin: boolean;
   role: string;
   createdAt: string;
 }
@@ -51,7 +50,6 @@ function mapUserToResponse(user: any): UserResponse {
     rating: user.rating,
     rank: user.rank,
     color: user.color,
-    isAdmin: user.isAdmin,
     role: user.role,
     createdAt: user.createdAt.toISOString(),
   };
@@ -95,9 +93,7 @@ class AuthService {
           rating: true,
           rank: true,
           color: true,
-          isAdmin: true,
           role: true,
-          isSuperAdmin: true,
           isBanned: true,
           createdAt: true,
         },
@@ -124,14 +120,12 @@ class AuthService {
         userId: user.id,
         email: user.email,
         username: user.username,
-        isAdmin: user.isAdmin,
         role: user.role,
-        isSuperAdmin: user.isSuperAdmin,
       });
 
       const userResponse = mapUserToResponse(user);
 
-      logger.info('登录成功', { userId: user.id, username: user.username, isAdmin: user.isAdmin });
+      logger.info('登录成功', { userId: user.id, username: user.username, role: user.role });
       return { user: userResponse, token };
     } catch (error) {
       errorMonitor.trackError(error as Error, { errorType: 'auth', operation: 'login' });
@@ -153,7 +147,6 @@ class AuthService {
           rating: true,
           rank: true,
           color: true,
-          isAdmin: true,
           role: true,
           createdAt: true,
         },

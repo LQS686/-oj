@@ -25,7 +25,6 @@ interface UserInfo {
  id: string
  username: string
  role: string
- isSuperAdmin: boolean
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -275,14 +274,6 @@ export default function AdminUserPermissionsPage() {
  <span className={`tag ${ROLE_COLORS[user.role] || 'tag-info'}`}>
  {ROLE_LABELS[user.role] || user.role}
  </span>
- </div>
- <div>
- <span className="text-sm text-muted-foreground mr-2">超级管理员：</span>
- {user.isSuperAdmin ? (
- <span className="tag tag-error">是</span>
- ) : (
- <span className="tag tag-info">否</span>
- )}
  </div>
  </div>
  </div>

@@ -156,7 +156,7 @@ export default function EditSolutionPage() {
 
  // 权限校验（在 user 与 solution 都就绪后判断）
  const userId = user?.id ?? null
- const isAdmin = !!user?.isAdmin
+ const isAdmin = user?.role === 'SYSTEM_ADMIN'
  const isTeacher = (user?.role ?? '').toUpperCase() === 'TEACHER'
  const isAuthor = !!(userId && solution?.author?.id && userId === solution.author.id)
  const canEdit = isAuthor || isAdmin || isTeacher

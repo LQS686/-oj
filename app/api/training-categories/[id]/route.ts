@@ -8,9 +8,10 @@ import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
 import { updateCategory, deleteCategory } from '@/lib/training/service'
 import { isObjectId } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
+import { isAdmin } from '@/lib/permissions'
 
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+  if (!isAdmin(user)) {
     throw400('FORBIDDEN', '需要管理员权限')
   }
   const { id } = (ctx as any).params
@@ -21,7 +22,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+  if (!isAdmin(user)) {
     throw400('FORBIDDEN', '需要管理员权限')
   }
   const { id } = (ctx as any).params

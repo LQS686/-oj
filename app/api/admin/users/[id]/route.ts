@@ -28,7 +28,6 @@ export const PATCH = withApi.auth(withPermission('admin.access')(async (req, ctx
 
   const body = await readJson<{
     role?: string
-    isAdmin?: boolean
     isBanned?: boolean
     password?: string
   }>(req)
@@ -41,11 +40,9 @@ export const PATCH = withApi.auth(withPermission('admin.access')(async (req, ctx
   type ValidRole = (typeof validRoles)[number]
   const safeBody: {
     role?: ValidRole
-    isAdmin?: boolean
     isBanned?: boolean
     password?: string
   } = {
-    isAdmin: body.isAdmin,
     isBanned: body.isBanned,
     password: body.password,
   }

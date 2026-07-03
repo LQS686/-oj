@@ -24,7 +24,6 @@ export const GET = withApi.auth(withPermission('admin.access')(async (_req, ctx)
       id: true,
       username: true,
       role: true,
-      isSuperAdmin: true,
     },
   })
   if (!user) {
@@ -53,7 +52,6 @@ export const GET = withApi.auth(withPermission('admin.access')(async (_req, ctx)
       id: user.id,
       username: user.username,
       role: user.role,
-      isSuperAdmin: user.isSuperAdmin,
     },
     rolePermissions: rolePermList,
     userPermissions,

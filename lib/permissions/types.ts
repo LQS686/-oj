@@ -19,5 +19,4 @@ export type PermissionCode =
 export interface PermissionUser {
   id: string
   role?: string | null
-  isSuperAdmin?: boolean
 }

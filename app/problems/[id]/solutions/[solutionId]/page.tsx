@@ -195,7 +195,7 @@ export default function SolutionDetailPage() {
  const canEditOrDelete =
  !!user &&
  !!solution &&
- (user.id === solution.authorId || user.isAdmin || user.role === 'TEACHER')
+ (user.id === solution.authorId || user.role === 'SYSTEM_ADMIN' || user.role === 'TEACHER')
 
  if (loading) {
  return (

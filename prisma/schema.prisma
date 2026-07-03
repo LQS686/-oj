@@ -22,9 +22,7 @@ model User {
   solvedCount   Int       @default(0) // 解题数
   rank          String    @default("新手")
   color         String    @default("#808080")
-  isAdmin       Boolean   @default(false) // 已废弃：语义被 role 覆盖，保留用于兼容旧代码，请勿继续读取
-  role          String    @default("USER") // SYSTEM_ADMIN, TEACHER, STUDENT（统一角色：唯一真相源）
-  isSuperAdmin  Boolean   @default(false) // 等同于 role=SYSTEM_ADMIN，唯一性硬卡（业务层校验），不可被降级/删除
+  role          String    @default("STUDENT") // SYSTEM_ADMIN, TEACHER, STUDENT（唯一真相源，详见 docs/ROLE_SYSTEM.md）
   isBanned      Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

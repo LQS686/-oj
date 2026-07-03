@@ -10,6 +10,7 @@
 import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
 import { withPermission } from '@/lib/api/withPermission'
 import { isObjectId } from '@/lib/api/validation'
+import { isAdmin } from '@/lib/permissions'
 import bcrypt from 'bcryptjs'
 import {
   deleteContest,
@@ -35,8 +36,8 @@ export const PUT = withApi.auth(withPermission('contest.edit')(async (req, ctx, 
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
-  const access = await ensureContestManageAccess(id, user.id, isAdmin)
+  const adminFlag = isAdmin(user)
+  const access = await ensureContestManageAccess(id, user.id, adminFlag)
   if (!access.ok) {
     if (access.status === 404) throw404(access.error)
     throw403(access.error)
@@ -84,8 +85,8 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = (ctx as any).params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
-  const access = await ensureContestManageAccess(id, user.id, isAdmin)
+  const adminFlag = isAdmin(user)
+  const access = await ensureContestManageAccess(id, user.id, adminFlag)
   if (!access.ok) {
     if (access.status === 404) throw404(access.error)
     throw403(access.error)

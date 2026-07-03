@@ -27,9 +27,9 @@ export const GET = withApi.public(async (req, ctx) => {
   // 草稿仅作者/admin 可见
   if (training.status === 'draft') {
     if (!userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
-    const u = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } })
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
     const authorId: string | null = training.author?.id ?? null
-    if (!u?.isAdmin && authorId !== userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
+    if (u?.role !== 'SYSTEM_ADMIN' && authorId !== userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
   }
 
   // 异步 viewCount++（不阻塞响应）
@@ -48,8 +48,8 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     select: { authorId: true },
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
-  const u = await prisma.user.findUnique({ where: { id: user.id }, select: { isAdmin: true } })
-  if (!u?.isAdmin && found.authorId !== user.id) {
+  const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
+  if (u?.role !== 'SYSTEM_ADMIN' && found.authorId !== user.id) {
     throw403('只有作者或管理员可以编辑')
   }
 
@@ -67,7 +67,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   }>(req)
 
   // 分类仅 admin 可选；普通用户若传则丢弃
-  if (u?.isAdmin !== true) {
+  if (u?.role !== 'SYSTEM_ADMIN') {
     delete (body as any).categoryType
     delete (body as any).isRecommended
     delete (body as any).status
@@ -87,8 +87,8 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
     select: { authorId: true },
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
-  const u = await prisma.user.findUnique({ where: { id: user.id }, select: { isAdmin: true } })
-  if (!u?.isAdmin && found.authorId !== user.id) {
+  const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
+  if (u?.role !== 'SYSTEM_ADMIN' && found.authorId !== user.id) {
     throw403('只有作者或管理员可以删除')
   }
   await deleteTraining(id)

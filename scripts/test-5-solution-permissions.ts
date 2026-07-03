@@ -59,13 +59,13 @@ interface TestCase {
 }
 
 const cases: TestCase[] = [
-  // 用例 1：管理员（role=ADMIN）→ ADMIN
+  // 用例 1：管理员（role=SYSTEM_ADMIN）→ ADMIN
   {
-    name: '1. 管理员 role=ADMIN → 允许 / ADMIN',
+    name: '1. 管理员 role=SYSTEM_ADMIN → 允许 / ADMIN',
     expected: { allowed: true, reason: 'ADMIN' },
     run: async () => {
       const result = await canViewSolutions(
-        { id: 'u-admin-1', role: 'ADMIN', isAdmin: true },
+        { id: 'u-admin-1', role: 'SYSTEM_ADMIN' },
         'p-1'
       )
       assertResult(result, { allowed: true, reason: 'ADMIN' })
@@ -100,7 +100,7 @@ const cases: TestCase[] = [
       findFirstCallCount = 0
       mockBestScore = 85
       const result = await canViewSolutions(
-        { id: 'u-user-1', role: 'USER' },
+        { id: 'u-user-1', role: 'STUDENT' },
         'p-3'
       )
       assertResult(result, { allowed: true, reason: 'ENOUGH_SCORE', bestScore: 85 })
@@ -118,7 +118,7 @@ const cases: TestCase[] = [
       findFirstCallCount = 0
       mockBestScore = 100 // 即便分数够也隐藏
       const result = await canViewSolutions(
-        { id: 'u-user-2', role: 'USER' },
+        { id: 'u-user-2', role: 'STUDENT' },
         'p-4',
         { isAssignmentContext: true }
       )
@@ -137,7 +137,7 @@ const cases: TestCase[] = [
       findFirstCallCount = 0
       mockBestScore = null // 模拟无提交
       const result = await canViewSolutions(
-        { id: 'u-user-3', role: 'USER' },
+        { id: 'u-user-3', role: 'STUDENT' },
         'p-5'
       )
       assertResult(result, { allowed: false, reason: 'NO_SUBMISSION', bestScore: 0 })
@@ -180,7 +180,7 @@ function runPureFunctionExtraCases() {
   // 6) 普通用户分数 < 60 → LOW_SCORE
   {
     const result = decideSolutionView(
-      { id: 'u-low', role: 'USER' },
+      { id: 'u-low', role: 'STUDENT' },
       30,
       {}
     )
@@ -188,21 +188,21 @@ function runPureFunctionExtraCases() {
     console.log(`✅ 6. (纯函数) 普通用户最高分=30 → 拒绝 / LOW_SCORE`)
   }
 
-  // 7) isAdmin=true 但无 role → ADMIN
+  // 7) role=SYSTEM_ADMIN → ADMIN
   {
     const result = decideSolutionView(
-      { id: 'u-flag', isAdmin: true },
+      { id: 'u-flag', role: 'SYSTEM_ADMIN' },
       0,
       {}
     )
     assertResult(result, { allowed: true, reason: 'ADMIN' })
-    console.log(`✅ 7. (纯函数) isAdmin=true → 允许 / ADMIN`)
+    console.log(`✅ 7. (纯函数) role=SYSTEM_ADMIN → 允许 / ADMIN`)
   }
 
   // 8) 边界：bestScore=60 → ENOUGH_SCORE
   {
     const result = decideSolutionView(
-      { id: 'u-edge', role: 'USER' },
+      { id: 'u-edge', role: 'STUDENT' },
       60,
       {}
     )
@@ -213,7 +213,7 @@ function runPureFunctionExtraCases() {
   // 9) 边界：bestScore=59 → LOW_SCORE
   {
     const result = decideSolutionView(
-      { id: 'u-edge2', role: 'USER' },
+      { id: 'u-edge2', role: 'STUDENT' },
       59,
       {}
     )

@@ -270,18 +270,18 @@ export async function patchClassMember(
     data: update,
   })
 
-  // 角色变更同步到系统 User.role（SYSTEM_ADMIN / 超管不被动降级）
+  // 角色变更同步到系统 User.role（SYSTEM_ADMIN 不被动降级）
   if (data.role !== undefined) {
     const target = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true, isSuperAdmin: true },
+      select: { role: true },
     })
-    if (target && !target.isSuperAdmin && target.role !== 'SYSTEM_ADMIN') {
+    if (target && target.role !== 'SYSTEM_ADMIN') {
       const newSystemRole = classApiRoleToSystemRole(data.role)
       if (target.role !== newSystemRole) {
         await prisma.user.update({
           where: { id: userId },
-          data: { role: newSystemRole, isAdmin: false },
+          data: { role: newSystemRole },
         })
         // 清掉用户 profile / 榜单缓存，避免登录态与后台列表读到旧角色
         const { clearUserCache } = await import('@/lib/user/service')
@@ -599,16 +599,14 @@ export async function findClassAssignment(assignmentId: string, classId: string)
   })
 }
 
-/** 读当前用户是否为站点管理员/教师（与前端 isAdmin/isTeacher 语义对齐） */
+/** 读当前用户是否为站点管理员/教师（SYSTEM_ADMIN 或 TEACHER） */
 export async function getUserIsAdmin(userId: string) {
   const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { isAdmin: true, isSuperAdmin: true, role: true },
+    select: { role: true },
   })
   if (!u) return false
-  if (u.isSuperAdmin === true) return true
-  if (u.role === 'SYSTEM_ADMIN' || u.role === 'ADMIN' || u.role === 'SUPER_ADMIN') return true
-  if (u.isAdmin === true) return true
+  if (u.role === 'SYSTEM_ADMIN') return true
   return u.role === 'TEACHER'
 }
 

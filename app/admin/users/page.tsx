@@ -17,12 +17,10 @@ const ROLE_DISPLAY: Record<string, { label: string; color: string }> = {
  STUDENT: { label: '学生', color: 'tag-info' },
 }
 
-function getRoleDisplay(role?: string, isSuperAdmin?: boolean) {
- if (isSuperAdmin || role === 'SYSTEM_ADMIN') return ROLE_DISPLAY.SYSTEM_ADMIN
+function getRoleDisplay(role?: string) {
+ if (role === 'SYSTEM_ADMIN') return ROLE_DISPLAY.SYSTEM_ADMIN
  if (role === 'TEACHER') return ROLE_DISPLAY.TEACHER
  if (role === 'STUDENT') return ROLE_DISPLAY.STUDENT
- // 旧值（USER/ADMIN）回退到新体系
- if (role === 'ADMIN' || role === 'SUPER_ADMIN') return ROLE_DISPLAY.SYSTEM_ADMIN
  return ROLE_DISPLAY.STUDENT
 }
 
@@ -31,8 +29,6 @@ interface User {
  username: string
  email: string
  role: string
- isAdmin: boolean
- isSuperAdmin: boolean
  createdAt: string
  _count?: {
  submissions: number
@@ -166,11 +162,7 @@ export default function AdminUsersPage() {
  }
 
  const getUserRole = (user: User): string => {
- if (user.isSuperAdmin) return 'SYSTEM_ADMIN'
- if (user.role === 'SYSTEM_ADMIN' || user.role === 'SUPER_ADMIN') return 'SYSTEM_ADMIN'
- if (user.role === 'TEACHER') return 'TEACHER'
- if (user.role === 'STUDENT' || user.role === 'USER') return 'STUDENT'
- return 'STUDENT'
+ return user.role
  }
 
  const filteredUsers = users.filter(user => {
@@ -445,14 +437,9 @@ export default function AdminUsersPage() {
  label: '角色',
  render: (_, user) => (
  <div className="flex items-center gap-2">
- <span className={`tag ${getRoleDisplay(user.role, user.isSuperAdmin).color}`}>
- {getRoleDisplay(user.role, user.isSuperAdmin).label}
+ <span className={`tag ${getRoleDisplay(user.role).color}`}>
+ {getRoleDisplay(user.role).label}
  </span>
- {user.isSuperAdmin && (
- <span className="text-xs text-accent-light bg-amber-400/10 px-2 py-0.5 rounded">
- 超管
- </span>
- )}
  </div>
  ),
  },
@@ -494,13 +481,13 @@ export default function AdminUsersPage() {
  setEditRole(getUserRole(user))
  setShowEditModal(true)
  }}
- disabled={user.isSuperAdmin}
+ disabled={user.role === 'SYSTEM_ADMIN'}
  className={`p-2 rounded-lg transition-colors ${
- user.isSuperAdmin
+ user.role === 'SYSTEM_ADMIN'
  ? 'text-muted-foreground cursor-not-allowed'
  : 'text-primary hover:bg-primary/5'
  }`}
- title={user.isSuperAdmin ? '超级管理员不可修改' : '编辑'}
+ title={user.role === 'SYSTEM_ADMIN' ? '系统管理员不可修改' : '编辑'}
  >
  <Edit className="w-4 h-4" />
  </button>
@@ -509,13 +496,13 @@ export default function AdminUsersPage() {
  setSelectedUser(user)
  setShowDeleteModal(true)
  }}
- disabled={user.isSuperAdmin}
+ disabled={user.role === 'SYSTEM_ADMIN'}
  className={`p-2 rounded-lg transition-colors ${
- user.isSuperAdmin
+ user.role === 'SYSTEM_ADMIN'
  ? 'text-muted-foreground cursor-not-allowed'
  : 'text-error hover:bg-error/10'
  }`}
- title={user.isSuperAdmin ? '超级管理员不可删除' : '删除'}
+ title={user.role === 'SYSTEM_ADMIN' ? '系统管理员不可删除' : '删除'}
  >
  <Trash2 className="w-4 h-4" />
  </button>

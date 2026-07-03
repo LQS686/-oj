@@ -11,7 +11,6 @@ interface LoginResponse {
     rating: number;
     rank: string;
     color: string;
-    isAdmin: boolean;
     role: string;
     createdAt: string;
   };
@@ -35,7 +34,6 @@ interface UserData {
   rating: number;
   rank: string;
   color: string;
-  isAdmin: boolean;
   role: string;
   createdAt: string;
 }

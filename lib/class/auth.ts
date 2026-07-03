@@ -9,7 +9,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
-import { normalizeClassRoleToApi, isClassAdminApiRole } from './roles'
+import { normalizeClassRoleToApi } from './roles'
 
 export type ClassRole = 'teacher' | 'assistant' | 'student'
 
@@ -42,7 +42,6 @@ export interface ClassMembership {
   isOwner: boolean
   isTeacher: boolean
   isAssistant: boolean
-  isAdmin: boolean
   isStudent: boolean
   isMember: boolean
 }
@@ -71,7 +70,6 @@ export async function getClassMembership(
     isOwner: normalizeClassRoleToApi(member.role) === 'owner',
     isTeacher: role === 'teacher',
     isAssistant: role === 'assistant',
-    isAdmin: isClassAdminApiRole(member.role),
     isStudent: role === 'student',
     isMember: true,
   }

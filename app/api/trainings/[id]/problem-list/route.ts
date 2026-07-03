@@ -21,8 +21,8 @@ export const GET = withApi.public(async (req, ctx) => {
     const token = req.cookies.get('token')?.value
     const userId = token ? verifyToken(token)?.userId : null
     if (!userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
-    const u = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } })
-    if (!u?.isAdmin && training.authorId !== userId) {
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+    if (u?.role !== 'SYSTEM_ADMIN' && training.authorId !== userId) {
       throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
     }
   }

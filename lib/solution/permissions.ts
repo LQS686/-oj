@@ -2,7 +2,7 @@
  * 题解查看权限控制工具
  *
  * 规则优先级：
- *   1. 管理员/教师（role=ADMIN / role=TEACHER / isAdmin=true）始终允许
+ *   1. 管理员/教师（SYSTEM_ADMIN / TEACHER）始终允许
  *   2. 作业场景（isAssignmentContext=true）一律隐藏
  *   3. 其他情况下查询该用户在该题的最高分，达到 60 分即可查看
  */
@@ -38,12 +38,11 @@ export interface SolutionViewResult {
 /**
  * 调用方传入的 user 形状：
  *   - 完整 User 对象（含 role）
- *   - JWT 解码后的 payload（含 isAdmin，但 role 需要从 DB 二次查询）
+ *   - JWT 解码后的 payload（role 需要从 DB 二次查询）
  */
 export interface SolutionViewUser {
   id: string
   role?: string
-  isAdmin?: boolean
 }
 
 /**
@@ -79,7 +78,7 @@ export function decideSolutionView(
 ): SolutionViewResult {
   // 1) 管理员 / 教师直接放行
   if (user) {
-    if (user.role === 'ADMIN' || user.isAdmin === true) {
+    if (user.role === 'SYSTEM_ADMIN') {
       return {
         allowed: true,
         reason: 'ADMIN',
@@ -147,7 +146,7 @@ export async function canViewSolutions(
 ): Promise<SolutionViewResult> {
   // 1) 管理员 / 教师短路返回（无需查 DB）
   if (user) {
-    if (user.role === 'ADMIN' || user.isAdmin === true) {
+    if (user.role === 'SYSTEM_ADMIN') {
       return {
         allowed: true,
         reason: 'ADMIN',

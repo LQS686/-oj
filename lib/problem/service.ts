@@ -897,7 +897,7 @@ export async function getProblemForSolutionRegeneration(problemId: string) {
 export async function getOperatorForSolutionRegen(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, isAdmin: true, isBanned: true },
+    select: { id: true, role: true, isBanned: true },
   })
 }
 

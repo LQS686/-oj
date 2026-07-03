@@ -71,9 +71,7 @@ export const POST = withApi.public(async (req) => {
     userId: user.id,
     email: user.email,
     username: user.username,
-    isAdmin: user.isAdmin,
     role: user.role,
-    isSuperAdmin: user.isSuperAdmin,
   })
 
   const response = NextResponse.json(

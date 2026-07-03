@@ -55,7 +55,7 @@ export async function checkContestAccess(
   const now = new Date()
   const isStarted = now >= contest.startTime
   const isEnded = now > contest.endTime
-  const isAdmin = currentUser?.isAdmin || contest.authorId === currentUser?.userId
+  const isAdmin = currentUser?.role === 'SYSTEM_ADMIN' || contest.authorId === currentUser?.userId
 
   if (isAdmin) {
     return { allowed: true, contest }

@@ -24,7 +24,7 @@ export default async function ContestOverviewPage({ params }: { params: Promise<
  if (token) {
  const payload = verifyToken(token)
  if (payload) {
- if (payload.userId === contest.authorId || payload.isAdmin) {
+ if (payload.userId === contest.authorId || payload.role === 'SYSTEM_ADMIN') {
  const now = new Date()
  if (now < contest.startTime) {
  canEdit = true

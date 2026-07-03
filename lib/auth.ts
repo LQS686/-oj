@@ -25,9 +25,7 @@ export interface JWTPayload {
   userId: string
   email: string
   username: string
-  isAdmin: boolean
-  role?: string
-  isSuperAdmin?: boolean
+  role: string
 }
 
 export function signToken(payload: JWTPayload): string {

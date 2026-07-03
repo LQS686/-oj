@@ -8,6 +8,7 @@
  */
 import { withApi, ok, readJson, readQuery, throw400 } from '@/lib/api/withApi'
 import { isObjectId, toInt } from '@/lib/api/validation'
+import { isAdmin } from '@/lib/permissions'
 import { getUserFromRequest } from '@/lib/auth'
 import { checkContestAccess } from '@/lib/contest-auth'
 import {
@@ -21,11 +22,11 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   if (!isObjectId(contestId)) throw400('INVALID_ID', '无效的竞赛ID')
 
   const body = await readJson<{ problemId: string; code: string; language: string }>(req)
-  const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
+  const adminFlag = isAdmin(user)
   const result = await submitContestCode({
     contestId: contestId!,
     userId: user.id,
-    isAdmin,
+    isAdmin: adminFlag,
     problemId: body.problemId,
     code: body.code,
     language: body.language,

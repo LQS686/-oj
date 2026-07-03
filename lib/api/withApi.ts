@@ -35,6 +35,7 @@ import { logger } from '@/lib/logger'
 import { getUserFromRequest } from '@/lib/auth'
 import { getClassMembership, type ClassMembership } from '@/lib/class/auth'
 import { getCachedUser, type AuthUser, type ApiContext } from './handler'
+import { isAdmin } from '@/lib/permissions'
 
 export type { AuthUser, ApiContext }
 
@@ -170,7 +171,7 @@ export const withApi = {
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId)
         if (!user) throw throw401('用户不存在')
-        if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+        if (!isAdmin(user)) {
           throw throw403('需要管理员权限')
         }
         const resolved = await resolveCtxParams(ctx)

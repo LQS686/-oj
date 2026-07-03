@@ -21,7 +21,6 @@ import type { PermissionCode } from '@/lib/permissions/types'
 interface CurrentUser {
   id: string
   role?: string | null
-  isSuperAdmin?: boolean
 }
 
 const STUDENT_ALLOWED: PermissionCode[] = [
@@ -44,7 +43,7 @@ const TEACHER_EXACT: PermissionCode[] = ['user.view', 'user.edit']
 
 function checkLocal(user: CurrentUser | null, code: PermissionCode): boolean {
   if (!user) return false
-  if (user.isSuperAdmin === true || user.role === 'SYSTEM_ADMIN') return true
+  if (user.role === 'SYSTEM_ADMIN') return true
 
   if (user.role === 'TEACHER') {
     if (TEACHER_EXACT.includes(code)) return true
@@ -78,7 +77,6 @@ export function usePermission(code: PermissionCode | PermissionCode[]): boolean 
           setUser({
             id: profile.id,
             role: profile.role ?? null,
-            isSuperAdmin: false, // /api/auth/me 不暴露 isSuperAdmin；SYSTEM_ADMIN role 已足够
           })
         } else {
           setUser(null)
