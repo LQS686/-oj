@@ -1,7 +1,8 @@
 // 评测Worker - 监听队列并执行评测
-import { judgeQueue } from './queue'
+import { judgeQueue, addJudgeJob } from './queue'
 import { prisma } from '@/lib/prisma'
-import type { JudgeResult } from './queue'
+import type { JudgeJob, JudgeResult, QueuedJob } from './queue'
+import type { ComparisonMode } from './types'
 import { emitSubmissionUpdate, broadcastMessage } from '@/lib/websocket/server'
 import { 
   updateSubmissionDirect, 
@@ -13,7 +14,7 @@ import { logger } from '@/lib/logger'
 import { cache } from '@/lib/cache'
 
 // 监听评测完成事件
-judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
+judgeQueue.on('completed', async (job: QueuedJob, result: JudgeResult) => {
   try {
     logger.info(`更新数据库`, { submissionId: result.submissionId, status: result.status })
     
@@ -168,7 +169,7 @@ judgeQueue.on('completed', async (job: any, result: JudgeResult) => {
 })
 
 // 监听评测失败事件
-judgeQueue.on('failed', async (job: any, error: Error) => {
+judgeQueue.on('failed', async (job: QueuedJob, error: Error) => {
   try {
     logger.error(`评测失败`, error, { jobId: job.id })
     
@@ -214,24 +215,84 @@ judgeQueue.on('failed', async (job: any, error: Error) => {
   }
 })
 
-// 定期清理已完成的任务
-setInterval(async () => {
-  const stats = judgeQueue.getStats()
-  logger.info(`队列状态`, { waiting: stats.waiting, active: stats.active, completed: stats.completed })
+// 启动时扫描 DB 中 status='Judging' 的 submission 重新入队（重启恢复）
+async function recoverPendingJobs() {
+  try {
+    const pendingSubmissions = await prisma.submission.findMany({
+      where: { status: 'Judging' },
+      include: { problem: { include: { testCases: true } } },
+    })
+    if (pendingSubmissions.length === 0) {
+      logger.info('无需恢复的任务')
+      return
+    }
+    logger.info(`发现 ${pendingSubmissions.length} 个待恢复任务，重新入队`)
+    for (const sub of pendingSubmissions) {
+      try {
+        if (!sub.problem) {
+          logger.warn(`跳过恢复：题目不存在`, { submissionId: sub.id })
+          continue
+        }
+        const testCases = sub.problem.testCases.map(tc => ({
+          id: tc.id,
+          input: tc.input,
+          output: tc.output,
+          score: tc.score,
+          timeLimit: tc.timeLimit ?? undefined,
+          memoryLimit: tc.memoryLimit ?? undefined,
+        }))
+        const job: JudgeJob = {
+          submissionId: sub.id,
+          problemId: sub.problemId,
+          userId: sub.userId,
+          code: sub.code,
+          language: sub.language,
+          timeLimit: sub.problem.timeLimit,
+          memoryLimit: sub.problem.memoryLimit,
+          comparisonMode: (sub.problem.comparisonMode ?? 'default') as ComparisonMode,
+          realPrecision: sub.problem.realPrecision ?? 3,
+          testCases,
+        }
+        await addJudgeJob(job)
+        logger.info(`已恢复任务`, { submissionId: sub.id })
+      } catch (err) {
+        logger.error(`恢复任务失败`, err, { submissionId: sub.id })
+      }
+    }
+  } catch (err) {
+    logger.error('扫描待恢复任务失败', err)
+  }
+}
+
+// 定期输出队列状态
+const statsInterval = setInterval(async () => {
+  try {
+    const stats = judgeQueue.getStats()
+    logger.info(`队列状态`, { waiting: stats.waiting, active: stats.active, completed: stats.completed })
+  } catch (err) {
+    logger.error('获取队列状态失败', err)
+  }
 }, 30000)
 
-logger.info('评测Worker已启动')
-logger.info('正在监听评测队列...')
+// 在文件末尾启动恢复
+recoverPendingJobs().then(() => {
+  logger.info('评测Worker已启动')
+  logger.info('正在监听评测队列...')
+})
 
 // 优雅退出
 process.on('SIGINT', async () => {
   logger.info('正在关闭Worker...')
+  clearInterval(statsInterval)
+  judgeQueue.dispose()
   await prisma.$disconnect()
   process.exit(0)
 })
 
 process.on('SIGTERM', async () => {
   logger.info('正在关闭Worker...')
+  clearInterval(statsInterval)
+  judgeQueue.dispose()
   await prisma.$disconnect()
   process.exit(0)
 })

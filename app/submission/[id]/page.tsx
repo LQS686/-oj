@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, FileCode, Clock, Database, User, Calendar, Code, CheckCircle, XCircle, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, History, Target, RefreshCw, Loader2, Info } from 'lucide-react'
+import { ArrowLeft, FileCode, Clock, Database, User, Calendar, Code, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, History, Target, RefreshCw, Loader2, Info } from 'lucide-react'
 import { formatTime, formatMemory } from '@/lib/utils'
 import { getStatusText } from '@/lib/status'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -55,7 +55,19 @@ interface SubmissionHistoryItem {
 }
 
 // 终态：评测已结束的状态（不再轮询/订阅）
-const FINAL_STATUSES = new Set(['AC', 'Accepted', 'WA', 'Wrong Answer', 'TLE', 'Time Limit Exceeded', 'MLE', 'Memory Limit Exceeded', 'RE', 'Runtime Error', 'CE', 'Compile Error', 'SE', 'System Error'])
+const FINAL_STATUSES = new Set([
+  'AC', 'Accepted',
+  'WA', 'Wrong Answer',
+  'TLE', 'Time Limit Exceeded',
+  'MLE', 'Memory Limit Exceeded',
+  'RE', 'Runtime Error',
+  'CE', 'Compile Error',
+  'SE', 'System Error',
+  'PE', 'Presentation Error',
+  'OLE', 'Output Limit Exceeded',
+  'CSP',
+  'PC', 'Partly Correct',
+])
 
 function isFinalStatus(status: string | undefined | null): boolean {
  if (!status) return false
@@ -96,21 +108,28 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  if (data.success) {
  setSubmission(data.data)
  } else {
- if (response.status === 404 && !submission) {
- setError('提交记录不存在或已被删除。如果这是作业提交，请从作业页面查看详情。')
- } else if (response.status !== 404) {
+ // 404 分支：仅在首次加载（submission 仍为 null）时显示"不存在"
+ if (response.status === 404) {
+ setSubmission((prev) => {
+ if (!prev) setError('提交记录不存在或已被删除。如果这是作业提交，请从作业页面查看详情。')
+ return prev
+ })
+ } else {
  setError(data.error || '加载失败')
  }
  }
  } catch (err) {
  console.error('获取提交详情失败:', err)
- if (!submission) setError('网络错误，请稍后重试')
+ setSubmission((prev) => {
+ if (!prev) setError('网络错误，请稍后重试')
+ return prev
+ })
  } finally {
  setLoading(false)
  isRefreshingRef.current = false
  if (showRefreshing) setIsRefreshing(false)
  }
- }, [id, submission])
+ }, [id])
 
  // 首次加载 + id 变化时拉取
  useEffect(() => {
@@ -155,15 +174,40 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  },
  })
 
- // 轮询兜底：非终态时每 2s 拉取一次（WebSocket 不可用时仍能更新）
+ // 轮询兜底：非终态时每 3s 拉取一次（WebSocket 不可用时仍能更新）
+ // deps 仅依赖 status 字符串，避免 WS 乐观更新 setSubmission 触发 interval 反复重建。
  useEffect(() => {
  if (!submission) return
  if (isFinalStatus(submission.status)) return
- const timer = setInterval(() => {
+
+ let intervalId: ReturnType<typeof setInterval> | null = null
+ const start = () => {
+ if (intervalId) return
+ intervalId = setInterval(() => fetchSubmission(true), 3000)
+ }
+ const stop = () => {
+ if (intervalId) {
+ clearInterval(intervalId)
+ intervalId = null
+ }
+ }
+ const onVisibilityChange = () => {
+ if (document.visibilityState === 'visible') {
  fetchSubmission(true)
- }, 2000)
- return () => clearInterval(timer)
- }, [submission?.status, submission, fetchSubmission])
+ start()
+ } else {
+ stop()
+ }
+ }
+
+ if (document.visibilityState === 'visible') start()
+ document.addEventListener('visibilitychange', onVisibilityChange)
+ return () => {
+ stop()
+ document.removeEventListener('visibilitychange', onVisibilityChange)
+ }
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [id, submission?.status])
 
  useEffect(() => {
  if (submission) {
@@ -284,6 +328,17 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  case 'CE':
  case 'Compile Error':
  return <Code className="w-5 h-5 text-muted-foreground" />
+ case 'PE':
+ case 'Presentation Error':
+ return <AlertTriangle className="w-5 h-5 text-amber-600" />
+ case 'OLE':
+ case 'Output Limit Exceeded':
+ return <AlertTriangle className="w-5 h-5 text-amber-600" />
+ case 'CSP':
+ return <XCircle className="w-5 h-5 text-[var(--difficulty-hard)]" />
+ case 'PC':
+ case 'Partly Correct':
+ return <CheckCircle2 className="w-5 h-5 text-[var(--difficulty-medium)]" />
  default:
  return <AlertTriangle className="w-5 h-5 text-muted-foreground" />
  }
@@ -319,6 +374,17 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  return <AlertTriangle className="w-4 h-4 text-warning" />
  case 'CE':
  return <Code className="w-4 h-4 text-muted-foreground" />
+ case 'PE':
+ case 'Presentation Error':
+ return <AlertTriangle className="w-4 h-4 text-amber-600" />
+ case 'OLE':
+ case 'Output Limit Exceeded':
+ return <AlertTriangle className="w-4 h-4 text-amber-600" />
+ case 'CSP':
+ return <XCircle className="w-4 h-4 text-[var(--difficulty-hard)]" />
+ case 'PC':
+ case 'Partly Correct':
+ return <CheckCircle2 className="w-4 h-4 text-[var(--difficulty-medium)]" />
  default:
  return <Clock className="w-4 h-4 text-muted-foreground" />
  }

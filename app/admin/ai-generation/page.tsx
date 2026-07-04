@@ -321,6 +321,40 @@ export default function AIGenerationPage() {
  }
  }, [])
 
+ // 页面不可见时暂停所有轮询，可见时恢复（避免后台标签页持续消耗 API 限流配额）
+ useEffect(() => {
+ const onVisibilityChange = () => {
+ const visible = document.visibilityState === 'visible'
+ activeJobsRef.current.forEach((j: JobState) => {
+ if (j.status !== 'PROCESSING') return
+ if (visible) {
+ // 恢复轮询（若已存在 intervalId 不重复启动）
+ if (j.intervalId) return
+ const intervalId = setInterval(() => pollLogStatus(j.logId), 2000)
+ setActiveJobs(prev => {
+ const m = new Map(prev)
+ const existing = m.get(j.logId)
+ if (existing) m.set(j.logId, { ...existing, intervalId })
+ return m
+ })
+ } else {
+ // 暂停轮询
+ if (j.intervalId) {
+ clearInterval(j.intervalId)
+ setActiveJobs(prev => {
+ const m = new Map(prev)
+ const existing = m.get(j.logId)
+ if (existing) m.set(j.logId, { ...existing, intervalId: undefined })
+ return m
+ })
+ }
+ }
+ })
+ }
+ document.addEventListener('visibilitychange', onVisibilityChange)
+ return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+ }, [pollLogStatus])
+
  // 业务决策（2026-06）：恢复 PROCESSING 状态的孤儿日志，自动加入 activeJobs 继续轮询
  // （用户切走页面再切回时，会自动接管仍在运行的后台任务）
  useEffect(() => {

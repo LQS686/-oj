@@ -1,13 +1,9 @@
-import { exec, execSync, spawn, ChildProcess } from 'child_process'
-import { promisify } from 'util'
+import { execSync, spawn } from 'child_process'
 import { writeFile, unlink } from 'fs/promises'
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { getRunCommand } from './compiler'
 import { logger } from '@/lib/logger'
-import pidusage from 'pidusage'
 
-const execPromise = promisify(exec)
 const USE_DOCKER = process.env.USE_DOCKER === 'true' || false
 
 export interface ExecuteOptions {
@@ -17,6 +13,8 @@ export interface ExecuteOptions {
   timeLimit: number
   memoryLimit: number
   compiledPath?: string
+  /** 临界 TLE 容差比例，extraTime = ceil(max(2000, timeLimit*2) * extraTimeRatio) */
+  extraTimeRatio?: number
 }
 
 export interface ExecuteResult {
@@ -29,6 +27,91 @@ export interface ExecuteResult {
   memoryExceeded: boolean
   runtimeError: boolean
   cannotStart: boolean
+  /** CPU 时间（用户态 + 内核态，ms）。Windows 平台回退为墙钟时间 */
+  cpuTime?: number
+  /** 程序正常完成但 CPU 时间 > timeLimit（且未被强制杀死），用于触发重测 */
+  exceedsTimeLimit?: boolean
+}
+
+/**
+ * 自适应超时缓冲：extraTime = ceil(max(2000, timeLimit * 2) * extraTimeRatio)
+ * 强制杀死窗口为 timeLimit + extraTime
+ */
+function computeExtraTime(timeLimit: number, extraTimeRatio: number): number {
+  return Math.ceil(Math.max(2000, timeLimit * 2) * extraTimeRatio)
+}
+
+/**
+ * 解析 /proc/[pid]/stat 获取 utime + stime 累计毫秒
+ * 字段 14 (utime) + 15 (stime)，单位为 clock ticks（CLK_TCK 通常为 100）
+ * comm (字段 2) 可能包含空格或括号，使用 lastIndexOf(')') 切分
+ * 失败返回 -1
+ */
+function readProcCpuTimeMs(pid: number): number {
+  try {
+    const content = readFileSync(`/proc/${pid}/stat`, 'utf-8')
+    const lastParen = content.lastIndexOf(')')
+    if (lastParen < 0) return -1
+    // 切去 "pid (comm)" 后，剩余字段从 field 3 开始
+    const rest = content.slice(lastParen + 2).trim().split(/\s+/)
+    // rest[0] = state (field 3), rest[11] = utime (field 14), rest[12] = stime (field 15)
+    const utime = parseInt(rest[11], 10)
+    const stime = parseInt(rest[12], 10)
+    if (Number.isNaN(utime) || Number.isNaN(stime)) return -1
+    // CLK_TCK 在 Linux 上恒为 100
+    return Math.round((utime + stime) * (1000 / 100))
+  } catch {
+    return -1
+  }
+}
+
+/**
+ * 解析 /proc/[pid]/status 获取 VmHWM（峰值常驻内存，KB）
+ * VmHWM 已是进程生命周期内的峰值，仅需读取一次即可
+ * 失败返回 -1
+ */
+function readProcVmHwmKB(pid: number): number {
+  try {
+    const content = readFileSync(`/proc/${pid}/status`, 'utf-8')
+    const match = content.match(/^VmHWM:\s+(\d+)\s+kB/m)
+    if (match) return parseInt(match[1], 10)
+    return -1
+  } catch {
+    return -1
+  }
+}
+
+/**
+ * Windows: 通过 tasklist 获取指定 PID 的当前工作集内存（KB）
+ * 用于轮询采集峰值。失败返回 -1
+ * 注：tasklist 返回的是当前 WorkingSet，非 PeakWorkingSet；
+ * 通过轮询间隔内取最大值近似峰值。Windows 原生 PeakWorkingSet 需要 GetProcessMemoryInfo API，
+ * 不引入原生依赖时此为最佳折中。
+ */
+function readWindowsProcessMemoryKB(pid: number): number {
+  try {
+    const out = execSync(`tasklist /fi "PID eq ${pid}" /fo csv /nh`, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+      timeout: 2000,
+    })
+    // 输出格式: "name","pid","session","sessionnum","mem"
+    // 例如: "node.exe","1234","Console","1","12,345 K"
+    const line = out.trim().split('\n')[0]
+    if (!line) return -1
+    const cols = line.match(/"[^"]*"/g)
+    if (!cols || cols.length < 5) return -1
+    const memStr = cols[4]
+      .replace(/"/g, '')
+      .replace(/,/g, '')
+      .replace(/\s*K/i, '')
+      .trim()
+    const mem = parseInt(memStr, 10)
+    if (Number.isNaN(mem)) return -1
+    return mem
+  } catch {
+    return -1
+  }
 }
 
 export async function executeCode(options: ExecuteOptions): Promise<ExecuteResult> {
@@ -38,11 +121,15 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     timeLimit,
     memoryLimit,
     compiledPath,
+    extraTimeRatio = 0.1,
   } = options
 
   if (!compiledPath) {
     throw new Error('缺少编译路径')
   }
+
+  const extraTime = computeExtraTime(timeLimit, extraTimeRatio)
+  const hardTimeoutMs = timeLimit + extraTime
 
   const tempDir = join(process.cwd(), 'temp', 'judge')
   const timestamp = Date.now()
@@ -70,15 +157,27 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     let memoryExceeded = false
     let cannotStart = false
     let peakMemoryKB = 0
+    let cpuTimeMs = 0
+    let exceedsTimeLimit = false
     let startTime = 0
     let endTime = 0
 
     if (USE_DOCKER) {
       const containerId = `judge_${timestamp}_${randomId}`
       const baseImage = getDockerImage(language)
-      
+      const statsPath = join(tempDir, `stats_${timestamp}_${randomId}.txt`)
+
+      // 内层命令：选手程序 stdout+stderr → output 文件
+      const innerCmd = `cd /app/temp && ${getDockerRunCommand(language, compiledPath, inputPath)} > output_${timestamp}_${randomId}.txt 2>&1`
+      // /usr/bin/time -v 包裹内层命令，统计信息重定向到独立 stats 文件
+      // 注：/usr/bin/time 在部分基础镜像（如 ubuntu:22.04、openjdk:17 基于 oraclelinux）未安装，
+      // 此时直接执行内层命令，避免选手输出文件不被写入而误判 WA
+      const escapedInner = innerCmd.replace(/'/g, "'\\''")
+      const wrappedCmd = `if command -v /usr/bin/time >/dev/null 2>&1; then /usr/bin/time -v sh -c '${escapedInner}' 2> /tmp/time_stats.txt; else sh -c '${escapedInner}'; fi; exit $?`
+
+      // 移除 --rm，改为手动管理，以便在 exit 后 docker cp 读取 stats 文件
       const dockerRunCommand = [
-        'run', '--rm', '--name', containerId,
+        'run', '--name', containerId,
         '--memory', `${memoryLimit}m`,
         '--memory-swap', `${memoryLimit * 2}m`,
         '--cpus', '1',
@@ -93,37 +192,40 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         '--ulimit', 'nofile=1024:1024',
         baseImage,
         'bash', '-c',
-        `cd /app/temp && ${getDockerRunCommand(language, compiledPath, inputPath)} > output_${timestamp}_${randomId}.txt 2>&1`
+        wrappedCmd
       ]
 
       logger.debug(`执行Docker命令`, { command: dockerRunCommand.join(' ') })
 
       const dockerProcess = spawn('docker', dockerRunCommand, {
-        timeout: timeLimit + 1000,
+        timeout: hardTimeoutMs,
         stdio: 'inherit'
       })
 
       // 仅在进程已 spawn、即将被等待时计时
       startTime = Date.now()
 
-      await new Promise<void>((resolve, reject) => {
-        let timeoutId: NodeJS.Timeout
-
-        timeoutId = setTimeout(() => {
+      await new Promise<void>((resolve) => {
+        const timeoutId = setTimeout(() => {
           logger.debug(`Docker执行超时，强制终止容器`)
           timeout = true
           spawn('docker', ['rm', '-f', containerId], { detached: true, stdio: 'ignore' })
           dockerProcess.kill()
           endTime = Date.now()
           resolve()
-        }, timeLimit + 1000)
+        }, hardTimeoutMs)
 
         dockerProcess.on('exit', (code) => {
           clearTimeout(timeoutId)
           endTime = Date.now()
           exitCode = code || 0
           if (code !== 0 && !timeout) {
-            runtimeError = true
+            // 137 = 容器被 OOM Killer 杀死（SIGKILL by kernel），判定为 MLE
+            if (code === 137) {
+              memoryExceeded = true
+            } else {
+              runtimeError = true
+            }
           }
           resolve()
         })
@@ -138,6 +240,46 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         })
       })
 
+      // 评测后从容器中读取 /usr/bin/time 的统计文件
+      // 容器尚未被删除（已移除 --rm），可 docker cp
+      try {
+        execSync(`docker cp ${containerId}:/tmp/time_stats.txt ${statsPath}`, { timeout: 5000 })
+        const statsContent = readFileSync(statsPath, 'utf-8')
+        // 解析 Maximum resident set size (kbytes): NNN
+        const memMatch = statsContent.match(/Maximum resident set size \(kbytes\): (\d+)/)
+        if (memMatch) peakMemoryKB = parseInt(memMatch[1], 10)
+        // 解析 CPU 时间 = User time + System time（秒 → 毫秒）
+        // 注：Elapsed (wall clock) time 是墙钟时间，包含 I/O 等待，不应作为 cpuTime
+        const userMatch = statsContent.match(/User time \(seconds\): ([\d.]+)/)
+        const sysMatch = statsContent.match(/System time \(seconds\): ([\d.]+)/)
+        if (userMatch && sysMatch) {
+          cpuTimeMs = Math.round((parseFloat(userMatch[1]) + parseFloat(sysMatch[1])) * 1000)
+        } else {
+          // 回退：解析 Elapsed (wall clock) time 作为 cpuTimeMs（不精确但优于 0）
+          const timeMatch = statsContent.match(/Elapsed \(wall clock\) time.*?: (.+)/)
+          if (timeMatch) {
+            const t = timeMatch[1].trim()
+            // 格式如 0:01.23 或 1:23.45
+            const parts = t.split(':')
+            if (parts.length === 2) {
+              const sec = parseFloat(parts[0]) * 60 + parseFloat(parts[1])
+              cpuTimeMs = Math.round(sec * 1000)
+            }
+          }
+        }
+      } catch (err) {
+        logger.debug('Docker 资源统计解析失败，回退为默认值', { error: err instanceof Error ? err.message : String(err) })
+      } finally {
+        // 清理容器
+        spawn('docker', ['rm', '-f', containerId], { detached: true, stdio: 'ignore' })
+        // 清理 stats 文件
+        try {
+          if (existsSync(statsPath)) await unlink(statsPath)
+        } catch {
+          // 忽略清理错误
+        }
+      }
+
       try {
         const fs = await import('fs/promises')
         const outputFile = join(tempDir, `output_${timestamp}_${randomId}.txt`)
@@ -148,13 +290,32 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         logger.error(`读取Docker输出失败`, err)
       }
 
-      peakMemoryKB = await getDockerContainerMemory(containerId)
+      if (peakMemoryKB === 0) {
+        logger.debug(`Docker模式: 资源统计未采集到（/usr/bin/time 可能未安装或容器已被超时清理）`)
+      }
     } else {
-      const runInfo = getRunInfo(language, compiledPath, inputPath, outputPath, errorPath)
-      
-      logger.debug(`执行命令`, { command: runInfo.command, args: runInfo.args })
+      const runInfo = getRunInfo(language, compiledPath)
+      const isLinux = process.platform === 'linux'
+      const isWindows = process.platform === 'win32'
 
-      const childProcess = spawn(runInfo.command, runInfo.args, {
+      // Linux 所有支持语言使用 runner.sh 设置硬资源限制
+      // （RLIMIT_AS / RLIMIT_CPU / RLIMIT_STACK，参考 LemonLime watcher_unix.cpp）
+      let command = runInfo.command
+      let args = runInfo.args
+      const useRunnerWrapper = isLinux && ['cpp', 'c', 'python', 'java', 'javascript'].includes(language)
+      if (useRunnerWrapper) {
+        const runnerPath = join(__dirname, 'runner.sh')
+        const memMb = String(memoryLimit)
+        // CPU 秒数向上取整，确保不与 extraTime 窗口冲突
+        const cpuSec = String(Math.max(1, Math.ceil(hardTimeoutMs / 1000)))
+        const stackMb = String(Math.min(memoryLimit, 64))
+        command = 'bash'
+        args = [runnerPath, memMb, cpuSec, stackMb, runInfo.command, ...runInfo.args]
+      }
+
+      logger.debug(`执行命令`, { command, args, extraTime, hardTimeoutMs })
+
+      const childProcess = spawn(command, args, {
         cwd: tempDir,
         stdio: ['pipe', 'pipe', 'pipe'],
         detached: false
@@ -163,96 +324,173 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       const maxMemoryBytes = memoryLimit * 1024 * 1024
       let monitorInterval: NodeJS.Timeout | null = null
       let processKilled = false
+      let forceKilled = false
 
       if (childProcess.pid) {
-        monitorInterval = setInterval(async () => {
+        // Linux: /proc 文件读取廉价（50ms 间隔）
+        // Windows: tasklist 调用较重（100ms 间隔）
+        // 注：Linux /proc/[pid]/stat 的 utime/stime 为累计值，VmHWM 已是峰值，
+        // 因此仅需保留最新读数即可，无需取 max；为容错仍取 max。
+        const pollIntervalMs = isLinux ? 50 : 100
+        monitorInterval = setInterval(() => {
           if (processKilled || !childProcess.pid) return
-          
-          try {
-            const stats = await pidusage(childProcess.pid)
-            const currentMemoryKB = Math.round(stats.memory / 1024)
-            
-            if (currentMemoryKB > peakMemoryKB) {
-              peakMemoryKB = currentMemoryKB
-            }
-            
-            if (stats.memory > maxMemoryBytes) {
-              logger.debug(`内存超过限制`, { 
-                current: Math.round(stats.memory / 1024 / 1024), 
-                limit: memoryLimit 
+
+          if (isLinux) {
+            const cpuMs = readProcCpuTimeMs(childProcess.pid)
+            if (cpuMs > cpuTimeMs) cpuTimeMs = cpuMs
+            const hwm = readProcVmHwmKB(childProcess.pid)
+            if (hwm > peakMemoryKB) peakMemoryKB = hwm
+            // 软检测：内存超限则杀死（硬限制由 runner.sh 的 ulimit 兜底）
+            if (hwm > 0 && hwm * 1024 > maxMemoryBytes) {
+              logger.debug(`内存超过限制`, {
+                current: Math.round(hwm / 1024),
+                limit: memoryLimit
               })
               memoryExceeded = true
               processKilled = true
+              forceKilled = true
               childProcess.kill('SIGKILL')
               if (monitorInterval) clearInterval(monitorInterval)
             }
-          } catch (err) {
-            // 进程可能已结束
+          } else if (isWindows) {
+            const memKB = readWindowsProcessMemoryKB(childProcess.pid)
+            if (memKB > peakMemoryKB) peakMemoryKB = memKB
+            // Windows 无原生 Job Object 限制（不引入 ffi-napi 依赖），
+            // 依赖轮询检测超限后杀死
+            if (memKB > 0 && memKB * 1024 > maxMemoryBytes) {
+              logger.debug(`内存超过限制`, {
+                current: Math.round(memKB / 1024),
+                limit: memoryLimit
+              })
+              memoryExceeded = true
+              processKilled = true
+              forceKilled = true
+              try {
+                execSync(`taskkill /F /T /PID ${childProcess.pid}`, { stdio: 'ignore' })
+              } catch {
+                // 忽略：进程可能已退出
+              }
+              if (monitorInterval) clearInterval(monitorInterval)
+            }
           }
-        }, 50)
+        }, pollIntervalMs)
       }
 
       const { createReadStream, createWriteStream } = await import('fs')
       const inputStream = createReadStream(inputPath)
+
+      // 给 stdin 与输入流附加 error 处理器，防止选手程序提前退出时 EPIPE crash Worker
+      childProcess.stdin.on('error', (err) => {
+        logger.debug('stdin 写入错误（选手程序可能已退出）', { error: err.message })
+      })
+      inputStream.on('error', (err) => {
+        logger.debug('输入流读取错误', { error: err.message })
+      })
+
       inputStream.pipe(childProcess.stdin)
-      
+
       const outputStream = createWriteStream(outputPath)
       const errorStream = createWriteStream(errorPath)
-      
+
       childProcess.stdout.pipe(outputStream)
       childProcess.stderr.pipe(errorStream)
 
       // 在流管道搭建完毕、进程即将被等待退出时开始计时
       startTime = Date.now()
 
-      await new Promise<void>((resolve, reject) => {
-        let timeoutId: NodeJS.Timeout
+      await new Promise<void>((resolve) => {
+        let resolved = false
+        let exited = false
+        let savedExitCode: number | null = 0
+        let savedForceKilled = false
+        let savedTimeout = false
 
-        timeoutId = setTimeout(() => {
-          logger.debug(`执行超时，强制终止进程`)
+        const timeoutId = setTimeout(() => {
+          logger.debug(`执行超时，强制终止进程`, { hardTimeoutMs })
           timeout = true
-          
+          forceKilled = true
+
           if (!processKilled) {
             processKilled = true
-            
+
             childProcess.kill('SIGINT')
-            
+
             setTimeout(() => {
               childProcess.kill('SIGTERM')
             }, 100)
-            
+
             setTimeout(() => {
               childProcess.kill('SIGKILL')
             }, 200)
-            
-            if (process.platform === 'win32') {
+
+            if (isWindows) {
               try {
                 execSync(`taskkill /F /T /PID ${childProcess.pid}`, { stdio: 'ignore' })
-              } catch (killError: any) {
-                // 忽略
+              } catch {
+                // 忽略：进程可能已退出
               }
             }
           }
-          
-          if (monitorInterval) clearInterval(monitorInterval)
-          if (!endTime) endTime = Date.now()
-          resolve()
-        }, timeLimit + 1000)
+
+          // 不在此处 resolve，等待 close 事件统一收尾
+          // （close 在所有 stdio 流关闭后触发，确保输出已完整刷盘）
+        }, hardTimeoutMs)
 
         childProcess.on('exit', (code) => {
+          if (exited) return
+          exited = true
+          // 仅保存状态，不执行 endTime/resolve，等待 close 事件
+          // （close 在所有 stdio 流关闭后触发，确保 stdout 已刷盘）
+          savedExitCode = code
+          savedForceKilled = forceKilled
+          savedTimeout = timeout
+        })
+
+        childProcess.on('close', () => {
+          if (resolved) return
+          resolved = true
           clearTimeout(timeoutId)
           if (monitorInterval) clearInterval(monitorInterval)
           processKilled = true
-          // 进程退出瞬间立刻记录时间，避免被文件 I/O 计入
+          // close 事件触发时所有 stdio 流已关闭，输出已完整刷盘
           endTime = Date.now()
-          exitCode = code || 0
-          if (code !== 0 && !timeout) {
+          exitCode = savedExitCode || 0
+
+          // Linux: 退出前再读一次 /proc 拿最终 CPU 时间与峰值内存
+          // 注：close 事件触发时 /proc/[pid] 可能已消失，readProc* 失败返回 -1
+          // 此时使用轮询期间采集到的最大值
+          if (isLinux && childProcess.pid && !savedForceKilled) {
+            const finalCpu = readProcCpuTimeMs(childProcess.pid)
+            if (finalCpu > cpuTimeMs) cpuTimeMs = finalCpu
+            const finalHwm = readProcVmHwmKB(childProcess.pid)
+            if (finalHwm > peakMemoryKB) peakMemoryKB = finalHwm
+          }
+
+          // Windows 平台无 CPU 时间采集 API（不引入原生依赖），回退为墙钟时间
+          if (!isLinux || cpuTimeMs <= 0) {
+            cpuTimeMs = Math.max(0, endTime - startTime)
+            if (isWindows) {
+              logger.debug(`Windows平台: 使用墙钟时间作为 CPU 时间`)
+            }
+          }
+
+          if (savedExitCode !== 0 && !savedTimeout) {
             runtimeError = true
           }
+
+          // exceedsTimeLimit: 程序正常完成（未被强制杀死），但 CPU 时间超过 timeLimit
+          // 此时 timeout 保持 false（程序在 timeLimit + extraTime 窗口内完成），
+          // 由 judger 决定是否触发重测
+          if (!savedForceKilled && !savedTimeout && cpuTimeMs > timeLimit) {
+            exceedsTimeLimit = true
+          }
+
           resolve()
         })
 
         childProcess.on('error', (err) => {
+          if (resolved) return
+          resolved = true
           clearTimeout(timeoutId)
           if (monitorInterval) clearInterval(monitorInterval)
           processKilled = true
@@ -283,8 +521,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     const execTime = Math.max(0, endTime - startTime)
     const preciseTime = Math.max(1, Math.round(execTime))
 
-    if (peakMemoryKB === 0) {
-      peakMemoryKB = getEstimatedBaseMemory(language)
+    // 内存采集失败时返回 0（不再使用伪造回退值），并记录警告
+    if (peakMemoryKB === 0 && !USE_DOCKER) {
+      logger.warn(`内存采集失败，记为 0`, { language, platform: process.platform })
     }
 
     try {
@@ -295,17 +534,17 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       logger.warn(`清理临时文件失败`, { error: cleanupError })
     }
 
-    let detailedError = undefined;
-    
+    let detailedError = undefined
+
     if (timeout) {
-      detailedError = `Time Limit Exceeded (>${timeLimit}ms)`;
+      detailedError = `Time Limit Exceeded (>${timeLimit}ms)`
     } else if (memoryExceeded) {
-      detailedError = `Memory Limit Exceeded (>${memoryLimit}MB)`;
+      detailedError = `Memory Limit Exceeded (>${memoryLimit}MB)`
     } else if (runtimeError) {
-      const errLines = error.split('\n');
-      const lastLine = errLines[errLines.length - 1] || errLines[errLines.length - 2] || 'Runtime Error';
-      detailedError = `Runtime Error: ${lastLine}`;
-      if (error) detailedError += `\n${error.substring(0, 500)}`;
+      const errLines = error.split('\n')
+      const lastLine = errLines[errLines.length - 1] || errLines[errLines.length - 2] || 'Runtime Error'
+      detailedError = `Runtime Error: ${lastLine}`
+      if (error) detailedError += `\n${error.substring(0, 500)}`
     }
 
     return {
@@ -318,64 +557,25 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       memoryExceeded,
       runtimeError,
       cannotStart,
+      cpuTime: cpuTimeMs,
+      exceedsTimeLimit,
     }
   } catch (err) {
     try {
       if (existsSync(inputPath)) await unlink(inputPath)
       if (existsSync(outputPath)) await unlink(outputPath)
       if (existsSync(errorPath)) await unlink(errorPath)
-    } catch (cleanupError) {
+    } catch {
+      // 忽略清理错误
     }
-    
+
     throw new Error(`执行错误: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
-function getEstimatedBaseMemory(language: string): number {
-  switch (language) {
-    case 'cpp':
-    case 'c':
-      return 1024
-    case 'java':
-      return 16384
-    case 'python':
-      return 4096
-    case 'javascript':
-      return 8192
-    default:
-      return 1024
-  }
-}
-
-async function getDockerContainerMemory(containerId: string): Promise<number> {
-  try {
-    const { stdout } = await execPromise(
-      `docker stats ${containerId} --no-stream --format "{{.MemUsage}}" 2>/dev/null || echo "0B"`
-    )
-    const memStr = stdout.trim()
-    const match = memStr.match(/([\d.]+)(GiB|MiB|KiB|B)/i)
-    if (match) {
-      const value = parseFloat(match[1])
-      const unit = match[2].toLowerCase()
-      switch (unit) {
-        case 'gib': return Math.round(value * 1024 * 1024)
-        case 'mib': return Math.round(value * 1024)
-        case 'kib': return Math.round(value)
-        case 'b': return Math.round(value / 1024)
-      }
-    }
-  } catch (err) {
-    // 容器可能已删除
-  }
-  return 0
-}
-
-function getRunInfo(language: string, compiledPath: string, inputPath: string, outputPath: string, errorPath: string): { command: string, args: string[] } {
+function getRunInfo(language: string, compiledPath: string): { command: string, args: string[] } {
   const relativeCompiledPath = compiledPath.split('\\').pop() || compiledPath.split('/').pop() || ''
-  const relativeInputPath = inputPath.split('\\').pop() || inputPath.split('/').pop() || ''
-  const relativeOutputPath = outputPath.split('\\').pop() || outputPath.split('/').pop() || ''
-  const relativeErrorPath = errorPath.split('\\').pop() || errorPath.split('/').pop() || ''
-  
+
   const commands: Record<string, { command: string, args: string[] }> = {
     cpp: {
       command: relativeCompiledPath,
@@ -398,34 +598,33 @@ function getRunInfo(language: string, compiledPath: string, inputPath: string, o
       args: [relativeCompiledPath]
     }
   }
-  
+
   const cmdInfo = commands[language] || { command: relativeCompiledPath, args: [] }
-  
+
   if (process.platform === 'win32') {
-    let executablePath = cmdInfo.command;
-    let args = [...cmdInfo.args];
-    
+    let executablePath = cmdInfo.command
+    const args = [...cmdInfo.args]
+
     if (executablePath.startsWith('./')) {
-      executablePath = executablePath.substring(2);
+      executablePath = executablePath.substring(2)
     }
-    
+
     if ((language === 'cpp' || language === 'c') && !executablePath.endsWith('.exe')) {
-      executablePath += '.exe';
+      executablePath += '.exe'
     }
-    
+
     if (language !== 'cpp' && language !== 'c') {
-      args = args.map(arg => {
+      args.forEach((arg, i) => {
         if (arg.startsWith('./')) {
-          return arg.substring(2);
+          args[i] = arg.substring(2)
         }
-        return arg;
-      });
+      })
     }
-    
+
     return {
       command: executablePath,
-      args: args
-    };
+      args
+    }
   } else {
     return {
       command: cmdInfo.command,
@@ -448,10 +647,10 @@ function getDockerImage(language: string): string {
 function getDockerRunCommand(language: string, compiledPath: string, inputPath: string): string {
   const relativeCompiledPath = compiledPath.split('\\').pop() || compiledPath.split('/').pop() || ''
   const relativeInputPath = inputPath.split('\\').pop() || inputPath.split('/').pop() || ''
-  
+
   const safeCompiledPath = relativeCompiledPath.replace(/\\/g, '/')
   const safeInputPath = relativeInputPath.replace(/\\/g, '/')
-  
+
   const commands: Record<string, string> = {
     cpp: `./${safeCompiledPath} < ${safeInputPath}`,
     c: `./${safeCompiledPath} < ${safeInputPath}`,
@@ -459,6 +658,6 @@ function getDockerRunCommand(language: string, compiledPath: string, inputPath: 
     python: `python3 ${safeCompiledPath} < ${safeInputPath}`,
     javascript: `node ${safeCompiledPath} < ${safeInputPath}`,
   }
-  
+
   return commands[language] || safeCompiledPath
 }

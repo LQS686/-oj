@@ -32,8 +32,7 @@ export default function UserMenu() {
  const data = await notificationApi.getNotifications(1, 1)
  setUnreadCount(data.unreadCount)
  } catch (error) {
- logger.error('获取未读通知数量失败', error)
- // 在测试环境中忽略错误
+ // 测试环境忽略；非测试环境仅记录一次（避免控制台刷屏）
  if (process.env.NODE_ENV !== 'test') {
  logger.error('获取未读通知数量失败', error)
  }
@@ -62,10 +61,44 @@ export default function UserMenu() {
  }, [user])
 
  useEffect(() => {
- if (user) {
+ if (!user) return
+
+ // 首次加载立即拉取一次（fetchUnreadCount 是 async，setState 在异步回调中执行，非同步调用）
+ // eslint-disable-next-line react-hooks/set-state-in-effect
  fetchUnreadCount()
- const interval = setInterval(fetchUnreadCount, 30000)
- return () => clearInterval(interval)
+
+ // 30s 轮询：页面不可见时暂停，可见时立即刷新并恢复轮询
+ let intervalId: ReturnType<typeof setInterval> | null = null
+ const start = () => {
+ if (intervalId) return
+ intervalId = setInterval(fetchUnreadCount, 30000)
+ }
+ const stop = () => {
+ if (intervalId) {
+ clearInterval(intervalId)
+ intervalId = null
+ }
+ }
+ const onVisibilityChange = () => {
+ if (document.visibilityState === 'visible') {
+ fetchUnreadCount()
+ start()
+ } else {
+ stop()
+ }
+ }
+
+ // 初始根据当前可见性决定是否启动
+ if (document.visibilityState === 'visible') {
+ start()
+ } else {
+ stop()
+ }
+ document.addEventListener('visibilitychange', onVisibilityChange)
+
+ return () => {
+ stop()
+ document.removeEventListener('visibilitychange', onVisibilityChange)
  }
  }, [user, fetchUnreadCount])
 

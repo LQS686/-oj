@@ -7,6 +7,10 @@ import type { CompareInput, CompareResult } from './types'
 // 128 KiB 缓冲区，对齐 LemonLime BufferedStreamReader::BUFFER_SIZE (1 << 18)
 const BUFFER_SIZE = 128 * 1024
 
+// 浮点数格式正则，对齐 LemonLime compareRealNumbers 中 fscanf("%Lf") 的严格性：
+// 拒绝 "3.14abc" 等带尾部垃圾的 token（parseFloat 会静默忽略尾部非数字字符）
+const FLOAT_REGEX = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/
+
 /**
  * 流式缓冲读取器
  * 参考 LemonLime 的 BufferedStreamReader，包装 Node.js Readable，
@@ -82,9 +86,10 @@ class BufferedStreamReader {
   }
 
   // 读取直到换行符或末尾，处理 \r\n / \n / \r 行尾，每行最多 maxLen 字符
+  // 截断后继续消费剩余字符至行尾（丢弃多余字符），避免下一轮从行中间读取导致误判 AC
   async nextUntilNewLine(maxLen = 1024): Promise<string> {
     let result = ''
-    while (result.length < maxLen) {
+    while (true) {
       await this.ensureData()
       if (this.pos >= this.buffer.length) {
         break
@@ -103,7 +108,10 @@ class BufferedStreamReader {
         this.lineNumber++
         break
       }
-      result += ch
+      // 未达 maxLen 时累积字符；已达 maxLen 时仅前进 pos（丢弃多余字符）
+      if (result.length < maxLen) {
+        result += ch
+      }
       this.pos++
     }
     return result
@@ -238,11 +246,12 @@ async function compareIgnoreSpaces(
       const userEof = await userReader.eof()
       const stdEof = await stdReader.eof()
       if (userEof && stdEof) {
-        // 均到末尾，检查行号是否一致
-        if (userReader.line() !== stdReader.line()) {
-          return { score: 0, status: 'PE', message: `第 ${Math.max(userReader.line(), stdReader.line())} 行格式错误` }
-        }
+        // 均到末尾，全部 token 匹配完成
         return { score: fullScore, status: 'AC', message: '' }
+      }
+      // 每次 token 相等后检查行号（对齐 LemonLime judgingthread.cpp:279-284）
+      if (userReader.line() !== stdReader.line()) {
+        return { score: 0, status: 'PE', message: `第 ${userReader.line()} 行格式错误` }
       }
       continue
     }
@@ -292,6 +301,14 @@ async function compareRealNumbers(
     }
     if (!userEmpty && stdEmpty) {
       return { score: 0, status: 'OLE', message: `第 ${userReader.line()} 行，选手输出内容过多` }
+    }
+
+    // 校验 token 格式：对齐 LemonLime fscanf("%Lf")，拒绝带尾部垃圾的 token
+    if (userToken.length > 0 && !FLOAT_REGEX.test(userToken)) {
+      return { score: 0, status: 'WA', message: `第 ${userReader.line()} 行，无效的数字格式: ${userToken}` }
+    }
+    if (stdToken.length > 0 && !FLOAT_REGEX.test(stdToken)) {
+      return { score: 0, status: 'WA', message: `第 ${stdReader.line()} 行，标准答案含无效数字格式: ${stdToken}` }
     }
 
     const a = parseFloat(userToken)

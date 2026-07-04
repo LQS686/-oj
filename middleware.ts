@@ -20,6 +20,10 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/auth/login': { maxRequests: 10, windowMs: 60000 },
   '/api/auth/register': { maxRequests: 5, windowMs: 60000 },
   '/api/auth/forgot-password': { maxRequests: 3, windowMs: 300000 },
+  // 高频轮询接口：navbar 30s 轮询 + AdminLayout 30s 轮询，放宽至 200/min
+  '/api/notifications': { maxRequests: 200, windowMs: 60000 },
+  // AI 生成日志轮询：2s 间隔，单任务 30 次/min，多任务并发可能更高
+  '/api/admin/ai/generate': { maxRequests: 200, windowMs: 60000 },
 }
 
 export async function middleware(request: NextRequest) {

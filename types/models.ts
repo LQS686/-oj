@@ -74,12 +74,11 @@ export interface Submission {
   totalTests: number
   message: string | null
   testResults: Array<{
-    input: string
-    expectedOutput: string
-    actualOutput: string
+    testId: string
     status: string
     time: number
     memory: number
+    message?: string
   }> | null
   submittedAt: string
   isLate: boolean
@@ -263,12 +262,11 @@ export interface JudgeStatusData {
   passedTests: number
   totalTests: number
   testResults: Array<{
-    input: string
-    expectedOutput: string
-    actualOutput: string
+    testId: string
     status: string
     time: number
     memory: number
+    message?: string
   }>
 }
 

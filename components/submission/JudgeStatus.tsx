@@ -56,7 +56,7 @@ export default function JudgeStatus({
  case 'CSP':
  return <AlertCircle className="w-5 h-5 text-error" />
  case 'PC':
- case 'Partially Correct':
+ case 'Partly Correct':
  return <CheckCircle2 className="w-5 h-5 text-primary-light" />
  case 'Judging':
  case 'Pending':
@@ -91,7 +91,7 @@ export default function JudgeStatus({
  case 'CSP':
  return 'bg-error/10 border-error/30'
  case 'PC':
- case 'Partially Correct':
+ case 'Partly Correct':
  return 'bg-primary/10 border-primary/30'
  case 'Judging':
  case 'Pending':
@@ -121,7 +121,7 @@ export default function JudgeStatus({
  'Output Limit Exceeded': '输出超限',
  CSP: '无法启动',
  PC: '部分正确',
- 'Partially Correct': '部分正确',
+ 'Partly Correct': '部分正确',
  SE: '系统错误',
  'System Error': '系统错误',
  Judging: '评测中',
@@ -152,7 +152,7 @@ export default function JudgeStatus({
  case 'Memory Limit Exceeded':
  return 'text-purple-400'
  case 'PC':
- case 'Partially Correct':
+ case 'Partly Correct':
  return 'text-primary-light'
  case 'Judging':
  case 'Pending':

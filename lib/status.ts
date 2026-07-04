@@ -126,6 +126,55 @@ export function getStatusConfig(status: string): StatusConfig {
       iconBg: 'bg-primary-50',
       text: 'Running',
       color: 'text-primary'
+    },
+    'PE': {
+      icon: 'alert-triangle',
+      className: 'status-pe',
+      iconBg: 'bg-amber-50',
+      text: 'Presentation Error',
+      color: 'text-amber-600'
+    },
+    'Presentation Error': {
+      icon: 'alert-triangle',
+      className: 'status-pe',
+      iconBg: 'bg-amber-50',
+      text: 'Presentation Error',
+      color: 'text-amber-600'
+    },
+    'OLE': {
+      icon: 'alert-triangle',
+      className: 'status-ole',
+      iconBg: 'bg-amber-50',
+      text: 'Output Limit Exceeded',
+      color: 'text-amber-600'
+    },
+    'Output Limit Exceeded': {
+      icon: 'alert-triangle',
+      className: 'status-ole',
+      iconBg: 'bg-amber-50',
+      text: 'Output Limit Exceeded',
+      color: 'text-amber-600'
+    },
+    'CSP': {
+      icon: 'x-circle',
+      className: 'status-csp',
+      iconBg: 'bg-[var(--difficulty-hard-bg)]',
+      text: 'Checker Special Problem',
+      color: 'text-[var(--difficulty-hard)]'
+    },
+    'PC': {
+      icon: 'check-circle-2',
+      className: 'status-pc',
+      iconBg: 'bg-[var(--difficulty-medium-bg)]',
+      text: 'Partly Correct',
+      color: 'text-[var(--difficulty-medium)]'
+    },
+    'Partly Correct': {
+      icon: 'check-circle-2',
+      className: 'status-pc',
+      iconBg: 'bg-[var(--difficulty-medium-bg)]',
+      text: 'Partly Correct',
+      color: 'text-[var(--difficulty-medium)]'
     }
   }
 

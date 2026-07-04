@@ -124,7 +124,40 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   useEffect(() => {
+    // fetchNotifications 是 async，setState 在异步回调中执行，非同步调用
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotifications()
+
+    // 30s 轮询：页面不可见时暂停，可见时立即刷新并恢复轮询
+    let intervalId: ReturnType<typeof setInterval> | null = null
+    const start = () => {
+      if (intervalId) return
+      intervalId = setInterval(fetchNotifications, 30000)
+    }
+    const stop = () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications()
+        start()
+      } else {
+        stop()
+      }
+    }
+
+    if (document.visibilityState === 'visible') {
+      start()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [])
 
   const handleLogout = async () => {

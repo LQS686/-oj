@@ -230,20 +230,65 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     }
   }, [activeTab, problemId, user, fromAssignment, classId])
 
-  // 轮询兜底：只要在"提交记录" tab 且有非终态提交，就每 3s 拉一次。
+  // 轮询兜底：只要在"提交记录" tab 且有非终态提交，就每 5s 拉一次。
   // 解决 WebSocket 断连 / 漏推 / 跨标签页 等场景下前端永远不刷新的问题。
+  // 用 ref 跟踪 hasNonFinal，避免 submissions 变化导致 interval 反复重建（曾经的 bug：
+  // 每次 WS 乐观更新 setSubmissions → effect 重建 setInterval → 3s 后 fetchSubmissions →
+  // 再次 setSubmissions → 再次重建 → 形成高频刷新循环）。
+  const hasNonFinalRef = useRef(false)
   useEffect(() => {
-    if (activeTab !== 'submissions') return
-    const hasNonFinal = submissions.some(
+    hasNonFinalRef.current = submissions.some(
       (s) => s?.status === 'Pending' || s?.status === 'Judging' || s?.status === 'Running'
     )
-    if (!hasNonFinal) return
-    const timer = setInterval(() => {
-      fetchSubmissions()
-    }, 3000)
-    return () => clearInterval(timer)
+  }, [submissions])
+
+  useEffect(() => {
+    if (activeTab !== 'submissions') return
+
+    let intervalId: ReturnType<typeof setInterval> | null = null
+    const start = () => {
+      if (intervalId) return
+      intervalId = setInterval(() => {
+        // 每次轮询前检查 ref，若已全部终态则停止（避免无意义请求）
+        if (!hasNonFinalRef.current) {
+          stop()
+          return
+        }
+        fetchSubmissions()
+      }, 5000)
+    }
+    const stop = () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // 切回页面时立即刷新一次（若仍有非终态），再启动轮询
+        if (hasNonFinalRef.current) {
+          fetchSubmissions()
+          start()
+        } else {
+          stop()
+        }
+      } else {
+        stop()
+      }
+    }
+
+    // 初始：若有非终态提交且页面可见，启动轮询
+    if (hasNonFinalRef.current && document.visibilityState === 'visible') {
+      start()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, submissions])
+  }, [activeTab])
 
   // 兜底：只要列表里最新一条已经是终态，就把"评测中..."按钮重置回"提交"。
   // 解决 ref 跟 data.id 没对上、tab 切换、refetch 时机错位 等场景下
@@ -272,13 +317,32 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     onSubmissionUpdate: (data) => {
       // 1) 乐观更新提交列表：让"提交记录" tab 立即反映出最新状态，
       //    无需等待服务器再次回包 / 不依赖 currentSubmissionId 是否对得上。
+      //    不再额外触发 fetchSubmissions() —— 乐观更新已更新列表，
+      //    轮询 effect 会在有非终态提交时定期兜底刷新，避免每个 WS 事件都打一次 API。
       if (data?.id) {
         setSubmissions((prev) => {
           if (!Array.isArray(prev)) return prev
           const idx = prev.findIndex((s) => s?.id === data.id)
           if (idx === -1) {
-            // 列表里还没这条记录（极少见：刚提交但还没拉过列表），不强行插入，
-            // 后续轮询 / 下次切 tab 会自动同步
+            // 列表里还没这条记录：可能是刚提交但还没拉过列表。
+            // 若是终态事件，插入到列表头部；若是中间态，也插入以便轮询跟踪。
+            if (data.status && data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running') {
+              return [
+                {
+                  id: data.id,
+                  status: data.status,
+                  score: data.score,
+                  time: data.time,
+                  memory: data.memory,
+                  passedTests: data.passedTests,
+                  totalTests: data.totalTests,
+                  message: data.message,
+                  language: language,
+                  submittedAt: new Date().toISOString(),
+                },
+                ...prev,
+              ]
+            }
             return prev
           }
           const next = prev.slice()
@@ -294,11 +358,6 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           }
           return next
         })
-
-        // 兜底：服务端为准的完整刷新，确保列表与评分等字段绝对一致
-        if (activeTab === 'submissions') {
-          fetchSubmissions()
-        }
       }
 
       // 2) 收到任何"终态"事件都重置"评测中..."按钮，

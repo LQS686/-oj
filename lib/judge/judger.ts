@@ -18,7 +18,7 @@ async function runOnce(
   compiledPath: string,
   tcTimeLimit: number,
   tcMemoryLimit: number
-): Promise<{ status: ResultState; score: number; time: number; memory: number; message: string; outputCorrect: boolean }> {
+): Promise<{ status: ResultState; score: number; time: number; memory: number; message: string; outputCorrect: boolean; exceedsTimeLimit: boolean }> {
   const executeResult = await executeCode({
     code: job.code,
     language: job.language,
@@ -26,20 +26,21 @@ async function runOnce(
     timeLimit: tcTimeLimit,
     memoryLimit: tcMemoryLimit,
     compiledPath,
+    extraTimeRatio: job.extraTimeRatio ?? 0.1,
   })
 
   // 细粒度状态判定
   if (executeResult.cannotStart) {
-    return { status: 'CSP', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '无法启动程序', outputCorrect: false }
+    return { status: 'CSP', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '无法启动程序', outputCorrect: false, exceedsTimeLimit: false }
   }
   if (executeResult.timeout) {
-    return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出时间限制', outputCorrect: false }
+    return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出时间限制', outputCorrect: false, exceedsTimeLimit: false }
   }
   if (executeResult.memoryExceeded) {
-    return { status: 'MLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出内存限制', outputCorrect: false }
+    return { status: 'MLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出内存限制', outputCorrect: false, exceedsTimeLimit: false }
   }
   if (executeResult.runtimeError) {
-    return { status: 'RE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '运行时错误', outputCorrect: false }
+    return { status: 'RE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '运行时错误', outputCorrect: false, exceedsTimeLimit: false }
   }
 
   // 程序正常完成，比较输出
@@ -53,9 +54,9 @@ async function runOnce(
 
   const outputCorrect = compareResult.score > 0
 
-  // 临界 TLE：程序完成但用时超过严格限制
-  if (executeResult.time > tcTimeLimit) {
-    return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出时间限制', outputCorrect }
+  // 临界 TLE：executor 判定程序完成但 CPU 时间超限
+  if (executeResult.exceedsTimeLimit) {
+    return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出时间限制', outputCorrect, exceedsTimeLimit: true }
   }
 
   return {
@@ -65,6 +66,7 @@ async function runOnce(
     memory: executeResult.memory,
     message: compareResult.message,
     outputCorrect,
+    exceedsTimeLimit: false,
   }
 }
 
@@ -85,6 +87,8 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
     testResults: [],
   }
 
+  let compileResult: Awaited<ReturnType<typeof compileCode>> | undefined
+
   try {
     // 第一步: 代码安全分析
     logger.debug(`分析代码安全性`)
@@ -102,7 +106,7 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
 
     // 第二步: 编译
     logger.debug(`编译代码`)
-    const compileResult = await compileCode(job.code, job.language)
+    compileResult = await compileCode(job.code, job.language)
 
     if (!compileResult.success) {
       logger.warn(`编译失败`, { compileState: compileResult.compileState })
@@ -120,29 +124,7 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
 
     logger.debug(`编译成功`)
 
-    // 第三步: 预热执行器
-    // 预热：执行一次用户的程序（带空输入、短超时），
-    // 让 OS 文件缓存、子进程创建路径（Windows 冷启动）热起来，
-    // 避免首测点继承数百毫秒的冷启动开销。
-    // 空输入下用户程序可能立即退出或被超时杀死，都不影响后续评测。
-    if (job.testCases.length > 0) {
-      try {
-        logger.debug(`预热执行器`, { language: job.language })
-        await executeCode({
-          code: job.code,
-          language: job.language,
-          input: '',
-          timeLimit: 500, // 预热超时短，避免用户程序挂起
-          memoryLimit: job.memoryLimit || 256,
-          compiledPath: compileResult.compiledPath,
-        })
-      } catch (warmupError) {
-        // 预热失败不影响后续评测
-        logger.debug(`预热执行失败（忽略）`, { error: (warmupError as Error).message })
-      }
-    }
-
-    // 第四步: 运行测试用例
+    // 第三步: 运行测试用例
     let maxTime = 0
     let maxMemory = 0
 
@@ -168,11 +150,13 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
 
         // 临界 TLE 重测：输出正确但时间略微超限，重跑以排除抖动
         const maxRejudge = job.rejudgeTimes ?? 0
-        const extraRatio = job.extraTimeRatio ?? 0
         for (let r = 0; r < maxRejudge; r++) {
-          if (verdict.status !== 'TLE' || !verdict.outputCorrect) break
-          if (verdict.time > tcTimeLimit * (1 + extraRatio)) break
+          // 仅当"临界 TLE"时重测：程序在 extraTime 窗口内完成（未被强制杀死）、输出正确、但 CPU 时间超限
+          if (verdict.status !== 'TLE' || !verdict.exceedsTimeLimit || !verdict.outputCorrect) break
+          // 重测：取首次通过的结果
           verdict = await runOnce(testCase, job, compileResult.compiledPath!, tcTimeLimit, tcMemoryLimit)
+          // 重测通过则停止
+          if (verdict.status === 'AC') break
         }
 
         // 更新最大时间和内存（符合NOI标准，确保非负）
@@ -237,6 +221,15 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
     logger.error(`评测系统错误`, error)
     result.status = 'SE'
     result.message = error instanceof Error ? error.message : '系统错误'
+  } finally {
+    // 仅当编译成功时清理编译产物
+    if (compileResult?.success && compileResult.compiledPath) {
+      try {
+        await cleanup(compileResult.compiledPath)
+      } catch (err) {
+        logger.warn('清理编译产物失败', { error: err instanceof Error ? err.message : String(err) })
+      }
+    }
   }
 
   const endTime = Date.now()
@@ -248,13 +241,27 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
 
 // 清理临时文件
 export async function cleanup(compiledPath?: string) {
-  if (compiledPath) {
+  if (!compiledPath) return
+  const fs = await import('fs/promises')
+  const path = await import('path')
+
+  const tryUnlink = async (p: string) => {
     try {
-      const fs = await import('fs/promises')
-      await fs.unlink(compiledPath)
-      logger.debug(`已清理临时文件`, { path: compiledPath })
+      await fs.unlink(p)
+      logger.debug(`已清理临时文件`, { path: p })
     } catch {
+      // 文件不存在或无权限，忽略
     }
+  }
+
+  await tryUnlink(compiledPath)
+
+  // Java 情况：compiledPath 无扩展名，实际产物是 {className}.class 与源文件 {className}.java
+  // 不清理会导致高并发下两个 Java 提交（均 public class Main）互相覆盖
+  const ext = path.extname(compiledPath)
+  if (!ext) {
+    await tryUnlink(`${compiledPath}.class`)
+    await tryUnlink(`${compiledPath}.java`)
   }
 }
 

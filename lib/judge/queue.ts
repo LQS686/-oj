@@ -5,6 +5,12 @@ import { EventEmitter } from 'events'
 import { logger } from '@/lib/logger'
 import type { ResultState, ComparisonMode } from './types'
 
+// 评测机默认配置（可通过环境变量覆盖）
+const DEFAULT_EXTRA_TIME_RATIO = parseFloat(process.env.JUDGE_EXTRA_TIME_RATIO || '0.1')
+const DEFAULT_REJUDGE_TIMES = parseInt(process.env.JUDGE_REJUDGE_TIMES || '1', 10)
+const DEFAULT_MAX_CONCURRENT = parseInt(process.env.JUDGE_MAX_CONCURRENT || '1', 10)
+const DEFAULT_JOB_TIMEOUT = parseInt(process.env.JUDGE_JOB_TIMEOUT || '300', 10) * 1000
+
 // 评测任务数据类型
 export interface JudgeJob {
   submissionId: string
@@ -51,7 +57,7 @@ export interface JudgeResult {
 // 任务状态
 type JobStatus = 'waiting' | 'active' | 'completed' | 'failed'
 
-interface QueuedJob {
+export interface QueuedJob {
   id: string
   data: JudgeJob
   status: JobStatus
@@ -68,10 +74,45 @@ class JudgeQueue extends EventEmitter {
   private completed: Map<string, QueuedJob> = new Map()
   private maxConcurrent: number = 3
   private isProcessing: boolean = false
+  private deadJobChecker: NodeJS.Timeout | null = null
 
   constructor(maxConcurrent: number = 3) {
     super()
     this.maxConcurrent = maxConcurrent
+    this.deadJobChecker = setInterval(() => this.checkDeadJobs(), 30000)
+  }
+
+  // 死任务检测：扫描 processing，对超时未完成的 job 强制标记失败
+  private checkDeadJobs() {
+    const now = Date.now()
+    // 先收集要清理的 job，避免遍历时 delete 导致迭代异常
+    const deadJobs: Array<[string, QueuedJob]> = []
+    for (const [jobId, job] of this.processing) {
+      if (job.startedAt && now - job.startedAt.getTime() > DEFAULT_JOB_TIMEOUT) {
+        deadJobs.push([jobId, job])
+      }
+    }
+    for (const [jobId, job] of deadJobs) {
+      logger.warn(`检测到死任务，强制标记失败`, { jobId, startedAt: job.startedAt })
+      try {
+        job.status = 'failed'
+        job.error = `评测超时（超过 ${DEFAULT_JOB_TIMEOUT / 1000}s）`
+        job.completedAt = new Date()
+        this.processing.delete(jobId)
+        this.completed.set(jobId, job)
+        this.emit('failed', job, new Error('评测超时'))
+      } catch (e) {
+        logger.error(`清理死任务时出错`, e, { jobId })
+      }
+    }
+  }
+
+  // 清理资源（关闭死任务检测定时器），供 Worker 退出时调用
+  dispose() {
+    if (this.deadJobChecker) {
+      clearInterval(this.deadJobChecker)
+      this.deadJobChecker = null
+    }
   }
 
   // 添加任务到队列
@@ -115,6 +156,17 @@ class JudgeQueue extends EventEmitter {
         // 异步执行评测（不等待）
         this.executeJob(job).catch((error: Error) => {
           logger.error(`评测执行错误`, error, { jobId: job.id })
+          // 补全：确保 job 不永久占槽位
+          try {
+            job.status = 'failed'
+            job.error = error instanceof Error ? error.message : String(error)
+            job.completedAt = new Date()
+            this.processing.delete(job.id)
+            this.completed.set(job.id, job)
+            this.emit('failed', job, error)
+          } catch (e) {
+            logger.error(`补全失败状态时出错`, e, { jobId: job.id })
+          }
         })
       }
 
@@ -219,7 +271,7 @@ declare global {
   var __judgeQueue: JudgeQueue | undefined
 }
 
-export const judgeQueue = global.__judgeQueue ?? new JudgeQueue(3)
+export const judgeQueue = global.__judgeQueue ?? new JudgeQueue(DEFAULT_MAX_CONCURRENT)
 
 if (!global.__judgeQueue) {
   global.__judgeQueue = judgeQueue
@@ -227,7 +279,13 @@ if (!global.__judgeQueue) {
 
 // 辅助函数
 export async function addJudgeJob(data: JudgeJob): Promise<string> {
-  return judgeQueue.add(data)
+  // 注入环境变量默认值（未显式指定时使用）
+  const enrichedData: JudgeJob = {
+    ...data,
+    extraTimeRatio: data.extraTimeRatio ?? DEFAULT_EXTRA_TIME_RATIO,
+    rejudgeTimes: data.rejudgeTimes ?? DEFAULT_REJUDGE_TIMES,
+  }
+  return judgeQueue.add(enrichedData)
 }
 
 export async function getJobStatus(jobId: string) {
