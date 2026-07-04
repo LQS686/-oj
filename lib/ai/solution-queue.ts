@@ -5,7 +5,7 @@
  * - 入队：创建 AiGenerationLog (PENDING)，然后入队
  * - 处理：调用 generateSolutionForProblem，成功后写入 Solution 记录
  *   （isAiGenerated=true / isOfficial=true / sourceType=AI_OFFICIAL）
- * - 任意并发（不限制 maxConcurrent）
+ * - 并发受限（maxConcurrent 默认 2，可通过 AI_SOLUTION_MAX_CONCURRENT 环境变量覆盖）
  *
  * 注意：本队列不复用 aiQueue，因为题解生成是不同业务，写入目标是 Solution 而非 Problem。
  *       AiGenerationLog 是两个队列共享的状态表，但 result 字段结构不同。
@@ -15,6 +15,9 @@ import { EventEmitter } from 'events'
 import { logger } from '../logger'
 import { prisma } from '../prisma'
 import { generateSolutionForProblem, SolutionGenerationParams } from './solution-generator'
+
+/** 题解生成任务超时时间（默认 5 分钟，可通过 AI_SOLUTION_TIMEOUT_MS 环境变量覆盖） */
+const AI_SOLUTION_TIMEOUT_MS = parseInt(process.env.AI_SOLUTION_TIMEOUT_MS || '300000', 10)
 
 /**
  * 入队参数
@@ -50,7 +53,8 @@ interface QueuedJob {
 class SolutionQueue extends EventEmitter {
   private queue: QueuedJob[] = []
   private processing: Map<string, QueuedJob> = new Map()
-  private isProcessing: boolean = false
+  /** 最大并发数（默认 2，可通过 AI_SOLUTION_MAX_CONCURRENT 环境变量覆盖） */
+  private maxConcurrent = parseInt(process.env.AI_SOLUTION_MAX_CONCURRENT || '2', 10)
 
   async add(data: SolutionJob): Promise<string> {
     const job: QueuedJob = {
@@ -61,35 +65,68 @@ class SolutionQueue extends EventEmitter {
     }
     this.queue.push(job)
     this.emit('waiting', job.id)
-    if (!this.isProcessing) {
-      this.processQueue()
-    }
+    this.processQueue()
     return job.id
   }
 
   /**
-   * 任意并发：每有一个等待中的 job 就立刻起一个 executeJob，
-   * 不再像 aiQueue 那样限制 maxConcurrent=2。
+   * 并发受限：最多同时运行 maxConcurrent 个 executeJob。
+   * 每完成一个 job 后通过 finally 继续推进队列，无需轮询。
    */
   private async processQueue() {
-    if (this.isProcessing) return
-    this.isProcessing = true
-    while (this.queue.length > 0 || this.processing.size > 0) {
-      while (this.queue.length > 0) {
-        const job = this.queue.shift()!
-        job.status = 'active'
-        job.startedAt = new Date()
-        this.processing.set(job.id, job)
-        this.executeJob(job).catch((error) => {
-          logger.error(`Solution Job Error: ${job.id}`, error)
-        })
-      }
-      await new Promise(resolve => setTimeout(resolve, 100))
+    while (this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
+      const job = this.queue.shift()!
+      job.status = 'active'
+      job.startedAt = new Date()
+      this.processing.set(job.id, job)
+      this.executeJob(job).catch((error) => {
+        logger.error(`Solution Job Error: ${job.id}`, error)
+      }).finally(() => {
+        // 处理完一个后继续推进队列
+        this.processQueue()
+      })
     }
-    this.isProcessing = false
   }
 
+  /**
+   * executeJob 包装器：在 _executeJobInner 外层加超时保护（默认 5 分钟）。
+   * 超时后 Promise.race reject，进入 catch 标记 FAILED（覆盖 Task 11.3 stuck 检测）；
+   * processing 在 finally 中统一清理。
+   */
   private async executeJob(job: QueuedJob) {
+    try {
+      await Promise.race([
+        this._executeJobInner(job),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('题解生成任务执行超时')),
+            AI_SOLUTION_TIMEOUT_MS
+          )
+        )
+      ])
+    } catch (error: unknown) {
+      // 超时或 _executeJobInner 未捕获异常：标记 FAILED
+      // _executeJobInner 内部已 try/catch 并写 FAILED 日志，此处主要兜底超时场景
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      job.status = 'failed'
+      job.error = errorMessage
+      logger.error('[solution-queue] 题解生成任务超时或异常', {
+        logId: job.id,
+        problemId: job.data.params.problemId,
+        message: errorMessage
+      })
+      await prisma.aiGenerationLog.update({
+        where: { id: job.id },
+        data: { status: 'FAILED', error: errorMessage }
+      }).catch(() => {
+        // 忽略：可能 _executeJobInner 已更新过日志
+      })
+    } finally {
+      this.processing.delete(job.id)
+    }
+  }
+
+  private async _executeJobInner(job: QueuedJob) {
     try {
       await prisma.aiGenerationLog.update({
         where: { id: job.id },
@@ -122,26 +159,28 @@ class SolutionQueue extends EventEmitter {
       // 同题同源的旧 AI 标程题解先删除（保持「同一题目只有一份 AI_OFFICIAL 标程题解」）
       // 注：sourceType / codeLanguage 为 schema 新增字段，当前 Prisma client 可能尚未重新生成，
       //     用 as any 兜底，运行时已支持。
-      await prisma.solution.deleteMany({
-        where: {
-          problemId: problem.id,
-          sourceType: 'AI_OFFICIAL'
-        } as any
-      })
-
-      const solution = await prisma.solution.create({
-        data: {
-          problemId: problem.id,
-          authorId: job.data.authorId,
-          title: `AI 标程题解 - ${problem.title}`,
-          content: result.content,
-          code: job.data.params.stdCode || null,
-          codeLanguage: job.data.params.stdLang || result.language || null,
-          language: job.data.params.stdLang || result.language || null,
-          isOfficial: true,
-          isAiGenerated: true,
-          sourceType: 'AI_OFFICIAL'
-        } as any
+      // 使用 $transaction 保证 deleteMany + create 原子性，避免中途失败导致题解丢失
+      const solution = await prisma.$transaction(async (tx) => {
+        await tx.solution.deleteMany({
+          where: {
+            problemId: problem.id,
+            sourceType: 'AI_OFFICIAL'
+          } as any
+        })
+        return tx.solution.create({
+          data: {
+            problemId: problem.id,
+            authorId: job.data.authorId,
+            title: `AI 标程题解 - ${problem.title}`,
+            content: result.content,
+            code: job.data.params.stdCode || null,
+            codeLanguage: job.data.params.stdLang || result.language || null,
+            language: job.data.params.stdLang || result.language || null,
+            isOfficial: true,
+            isAiGenerated: true,
+            sourceType: 'AI_OFFICIAL'
+          } as any
+        })
       })
 
       await prisma.aiGenerationLog.update({
@@ -169,7 +208,6 @@ class SolutionQueue extends EventEmitter {
 
       job.status = 'completed'
       job.completedAt = new Date()
-      this.processing.delete(job.id)
     } catch (error: any) {
       job.status = 'failed'
       job.error = error.message
@@ -200,8 +238,6 @@ class SolutionQueue extends EventEmitter {
             : undefined
         }
       })
-
-      this.processing.delete(job.id)
     }
   }
 }

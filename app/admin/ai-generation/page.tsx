@@ -529,12 +529,9 @@ export default function AIGenerationPage() {
  }
 
  const getDifficultyColor = (diff: string) => {
+ // DIFFICULTY_COLORS 的值是单个类名（如 'difficulty-easy'），直接拼接返回
  const color = DIFFICULTY_COLORS[diff]
- if (color) {
- const [textColor, bgColor] = color.split(' ')
- return `tag ${bgColor.replace('/10', '/20')} ${textColor}`
- }
- return 'tag'
+ return color ? `tag ${color}` : 'tag'
  }
 
  const selectedModel = models.find(m => m.id === selectedModelId)
@@ -1077,10 +1074,10 @@ export default function AIGenerationPage() {
  </div>
  {/* 难度 + 标签 */}
  <div className="flex items-center gap-2 flex-wrap">
- <span className={`tag ${getDifficultyColor(job.result.difficulty)}`}>
- {job.result.difficulty}
+ <span className={`tag ${getDifficultyColor(job.result.difficulty || '')}`}>
+ {job.result.difficulty || '未设置'}
  </span>
- {job.result.tags.map((tag, idx) => (
+ {(job.result.tags || []).map((tag: string, idx: number) => (
  <span key={idx} className="tag">{tag}</span>
  ))}
  </div>

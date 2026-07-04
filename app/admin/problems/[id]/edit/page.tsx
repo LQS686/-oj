@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
@@ -82,6 +82,9 @@ export default function EditProblemPage() {
  const [deletingSolutionId, setDeletingSolutionId] = useState<string | null>(null)
  const [regenerating, setRegenerating] = useState(false)
  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+ // 题解生成轮询（使用 ref 避免 setInterval 闭包内拿到过期 state）
+ const pollingRef = useRef<{ logId: string; intervalId: ReturnType<typeof setInterval> | null }>({ logId: '', intervalId: null })
 
  const fetchProblemData = useCallback(async () => {
  try {
@@ -202,6 +205,87 @@ export default function EditProblemPage() {
  }
  }
 
+ const stopSolutionPolling = useCallback(() => {
+ if (pollingRef.current.intervalId) {
+ clearInterval(pollingRef.current.intervalId)
+ }
+ pollingRef.current = { logId: '', intervalId: null }
+ }, [])
+
+ const startSolutionPolling = useCallback((logId: string) => {
+ // 清理旧轮询，避免重复轮询
+ if (pollingRef.current.intervalId) {
+ clearInterval(pollingRef.current.intervalId)
+ }
+
+ const poll = async () => {
+ // 页面不可见时跳过本轮，等切回时由 visibilitychange 触发
+ if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+ try {
+ const res = await fetchWithAuth(`/api/admin/ai/solution/status?logId=${logId}`)
+ const data = await res.json()
+ if (!data.success) return
+
+ const { status, error } = data.data || {}
+ if (status === 'COMPLETED') {
+ stopSolutionPolling()
+ fetchSolutions() // 刷新题解列表
+ setActionMessage({ type: 'success', text: '题解生成完成' })
+ setTimeout(() => setActionMessage(null), 4000)
+ } else if (status === 'FAILED') {
+ stopSolutionPolling()
+ setActionMessage({ type: 'error', text: error || '题解生成失败' })
+ setTimeout(() => setActionMessage(null), 4000)
+ }
+ // PENDING/PROCESSING 继续轮询
+ } catch (e) {
+ console.error('轮询题解状态失败', e)
+ }
+ }
+
+ // 立即轮询一次，然后每 2s 轮询
+ poll()
+ const intervalId = setInterval(poll, 2000)
+ pollingRef.current = { logId, intervalId }
+ }, [fetchSolutions, stopSolutionPolling])
+
+ // 可见性感知：切回页面时立即轮询一次
+ useEffect(() => {
+ const onVisibilityChange = () => {
+ if (document.visibilityState === 'visible' && pollingRef.current.logId) {
+ const currentLogId = pollingRef.current.logId
+ fetchWithAuth(`/api/admin/ai/solution/status?logId=${currentLogId}`)
+ .then((r) => r.json())
+ .then((data) => {
+ if (!data.success) return
+ const { status, error } = data.data || {}
+ if (status === 'COMPLETED') {
+ stopSolutionPolling()
+ fetchSolutions()
+ setActionMessage({ type: 'success', text: '题解生成完成' })
+ setTimeout(() => setActionMessage(null), 4000)
+ } else if (status === 'FAILED') {
+ stopSolutionPolling()
+ setActionMessage({ type: 'error', text: error || '题解生成失败' })
+ setTimeout(() => setActionMessage(null), 4000)
+ }
+ })
+ .catch(() => {})
+ }
+ }
+ document.addEventListener('visibilitychange', onVisibilityChange)
+ return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+ }, [fetchSolutions, stopSolutionPolling])
+
+ // 组件卸载时清理轮询
+ useEffect(() => {
+ return () => {
+ if (pollingRef.current.intervalId) {
+ clearInterval(pollingRef.current.intervalId)
+ }
+ }
+ }, [])
+
  const handleRegenerateSolution = async () => {
  const ok = window.confirm(
  '将删除原 AI 官方题解并重新生成。确定继续吗？'
@@ -216,8 +300,15 @@ export default function EditProblemPage() {
  )
  const data = await response.json().catch(() => null)
  if (response.ok && data?.success) {
+ const logId = data.data?.logId
  setActionMessage({ type: 'success', text: 'AI 题解已重新入队生成' })
+ if (logId) {
+ // 启动轮询，等待生成完成后自动刷新
+ startSolutionPolling(logId)
+ } else {
+ // 兼容无 logId 的旧接口：直接刷新
  await fetchSolutions()
+ }
  } else {
  setActionMessage({
  type: 'error',

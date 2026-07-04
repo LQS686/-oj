@@ -216,10 +216,12 @@ async function runThinkingStep(config: AiConfig, context: PromptContext): Promis
 
     // 合并 config.params（DeepSeek v4 thinking 参数、topP 等透传）
     // 使用 buildChatParams 统一处理（自动注入 thinking / reasoning_effort）
+    // thinking 模式下思维链会消耗大量 tokens，需给足预算（32768）
     const baseParams = {
       model,
       messages: [{ role: 'user' as const, content: prompt }],
-      temperature
+      temperature,
+      max_tokens: (config as any).maxTokens ? (config as any).maxTokens * 2 : 32768
     }
     const merged = buildChatParams(config, baseParams, true)
 
@@ -234,7 +236,9 @@ async function runThinkingStep(config: AiConfig, context: PromptContext): Promis
     // DeepSeek v4 thinking 模式：思维链在 reasoning_content，主输出在 content
     // 优先读取 reasoning_content（如有），否则回退到 content
     const msg = response.choices[0].message as any
-    const content = msg?.reasoning_content || msg?.content || ''
+    // 与生成步骤保持一致：优先读 content（最终输出），仅当 content 为空时回退到 reasoning_content（原始思维链）
+    // thinking prompt 要求结构化设计分析，该分析在 content 中
+    const content = msg?.content || msg?.reasoning_content || ''
 
     return {
         content: typeof content === 'string' ? content : '',
@@ -262,7 +266,9 @@ export async function generateProblems(params: GenerationParams, userId?: string
   }
 
   // Use Loader to get isolated generation prompt
-  const { systemPrompt, userPrompt, temperature } = promptLoader.getPrompt(context);
+  const { systemPrompt, userPrompt, temperature: promptTemperature } = promptLoader.getPrompt(context);
+  // 优先使用 config.temperature（模型级配置），未配置时回退到 prompt generator 的默认温度
+  const temperature = (config as any).temperature ?? promptTemperature
 
   const client = createAiClient(config, false)
   const model = getModelName(config, false)
@@ -289,13 +295,16 @@ export async function generateProblems(params: GenerationParams, userId?: string
     temperature: effectiveBaseTemperature,
     response_format: { type: 'json_object' as const },
     // 出 1 道完整题（15 组测试数据 + 双解法）通常 4000-9000 tokens；
-    // 出 2-3 道时叠加。给到 16384 防止长响应被截断。
-    max_tokens: 16384
+    // 出 2-3 道时叠加。thinking 模式下思维链会额外消耗大量 tokens，
+    // 给到 32768 防止长响应被截断（buildChatParams 已保护此字段不被 config.params 覆盖）。
+    // thinking 模式下思维链会额外消耗大量 tokens，放大 2 倍预算
+    max_tokens: (config as any).maxTokens ? (config as any).maxTokens * 2 : 32768
   }
 
   // 尝试 1：标准调用，使用 callWithRetry 包装
   // 内部重试机制：解析失败时会用更低的温度 + 强提示再调一次
-  const tryGenerate = async (userPromptOverride?: string, overrideTemp?: number): Promise<any> => {
+  // 重试时通过 disableThinking=true 关闭 thinking 模式，避免思维链再次消耗 tokens 导致截断
+  const tryGenerate = async (userPromptOverride?: string, overrideTemp?: number, disableThinking = false): Promise<any> => {
     const params: any = userPromptOverride
       ? { ...baseParams, messages: [baseParams.messages[0], { role: 'user' as const, content: userPromptOverride }] }
       : baseParams
@@ -303,7 +312,15 @@ export async function generateProblems(params: GenerationParams, userId?: string
     if (userPromptOverride) {
       params.temperature = overrideTemp !== undefined ? overrideTemp : 0.2
     }
-    const merged = buildChatParams(config, params, false)
+    // 重试时禁用 thinking：构建临时 config 副本，清空 params.thinking
+    const effectiveConfig = disableThinking
+      ? (() => {
+          const paramsCopy = { ...(config.params || {}) }
+          delete paramsCopy.thinking
+          return { ...config, params: { ...paramsCopy, reasoning_effort: 'low' } }
+        })()
+      : config
+    const merged = buildChatParams(effectiveConfig, params, false)
     // 注：buildChatParams 返回 Record<string, any> 以支持 DeepSeek 扩展字段（thinking 等），
     //     此处用 as any 兼容 OpenAI SDK 严格类型
     const response = await callWithRetry(
@@ -359,10 +376,12 @@ export async function generateProblems(params: GenerationParams, userId?: string
           code: e?.code,
           parseError: e?.info?.parseError,
           strippedThinkBlock: e?.info?.strippedThinkBlock,
+          hint: e?.info?.hint,
           preview: e?.info?.originalContent
         })
         const regenPrompt = `${finalUserPrompt}\n\n【重要】你上一次的响应无法被解析为合法 JSON（${e?.info?.parseError || 'parse error'}）。请重新输出**严格合法闭合的 JSON 对象**，不要添加任何 markdown 标记（\`\`\`json 等）、不要添加 \`<think>\` 思考块、不要在 JSON 外添加任何解释文字。`
-        content = await tryGenerate(regenPrompt, regenTemp)
+        // 重试时禁用 thinking 模式：截断通常是 thinking 消耗 tokens 所致，关闭 thinking 让全部预算用于 JSON 输出
+        content = await tryGenerate(regenPrompt, regenTemp, true)
         try {
           parsed = safeJsonParse(content)
           logger.info(`[generateProblems] 第 ${regenAttempts + 1} 次内层重试成功`)

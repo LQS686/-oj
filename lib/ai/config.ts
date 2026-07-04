@@ -12,6 +12,12 @@ export interface AiConfig {
   thinkingApiKey?: string
   thinkingBaseUrl?: string
   thinkingLevel: number
+  /** 模型最大输出 tokens（thinking 模式下会自动放大） */
+  maxTokens?: number
+  /** 基础温度（generator 会根据场景调整） */
+  temperature?: number
+  /** 请求超时（毫秒） */
+  timeout?: number
   /** 高级参数（topP / frequencyPenalty / presencePenalty / responseFormat / stop / thinking / reasoning_effort） */
   params?: Record<string, any>
 }
@@ -59,6 +65,9 @@ export async function getAiConfig(userId?: string, requestedModelId?: string): P
               thinkingApiKey: globalConfig?.thinkingApiKey ? decrypt(globalConfig.thinkingApiKey as string) : undefined,
               thinkingBaseUrl: globalConfig?.thinkingBaseUrl || undefined,
               thinkingLevel: globalConfig?.thinkingLevel || 3,
+              maxTokens: (aiModel as any).maxTokens || undefined,
+              temperature: (aiModel as any).temperature || undefined,
+              timeout: (aiModel as any).timeout || undefined,
               // 透传模型高级参数（DeepSeek v4 thinking、topP 等）
               params: ((aiModel as any).params as Record<string, any>) || undefined
           }
@@ -85,6 +94,9 @@ export async function getAiConfig(userId?: string, requestedModelId?: string): P
     // 修复：同上 — 当 thinkingProvider 不一致时不允许回退到主 apiKey
     thinkingApiKey: config.thinkingApiKey ? decrypt(config.thinkingApiKey) : undefined,
     thinkingBaseUrl: config.thinkingBaseUrl || undefined,
-    thinkingLevel: config.thinkingLevel
+    thinkingLevel: config.thinkingLevel,
+    maxTokens: (config as any).maxTokens || undefined,
+    temperature: (config as any).temperature || undefined,
+    timeout: (config as any).timeout || undefined,
   }
 }

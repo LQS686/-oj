@@ -118,7 +118,7 @@ export async function retryAiGeneration(
       params: {
         ...retryParams,
         _retryFrom: retryFromLogId,
-        _reduceTemperature: reduceTemperature || true,
+        _reduceTemperature: reduceTemperature ?? true,
       },
     },
   })
@@ -636,9 +636,22 @@ export async function testAiConnection(input: TestConnectionInput) {
       if (savedConfig.provider === provider) {
         decryptedKey = decrypt(savedConfig.apiKey)
       } else if (savedConfig.thinkingProvider === provider) {
-        decryptedKey = savedConfig.thinkingApiKey
-          ? decrypt(savedConfig.thinkingApiKey)
-          : decrypt(savedConfig.apiKey)
+        // 安全约束：当 thinkingProvider 与主 provider 不一致时，必须使用 thinkingApiKey
+        // （遵循 config.ts 的安全约束：绝不允许回退到主 apiKey）
+        if (savedConfig.thinkingProvider && savedConfig.thinkingProvider !== savedConfig.provider) {
+          if (!savedConfig.thinkingApiKey) {
+            throw new ApiError(
+              'MISSING_API_KEY',
+              `thinkingProvider(${savedConfig.thinkingProvider}) 与主 provider(${savedConfig.provider}) 不一致，但未配置 thinkingApiKey`,
+              400
+            )
+          }
+          decryptedKey = decrypt(savedConfig.thinkingApiKey)
+        } else {
+          decryptedKey = savedConfig.thinkingApiKey
+            ? decrypt(savedConfig.thinkingApiKey)
+            : decrypt(savedConfig.apiKey)
+        }
       }
       if (decryptedKey) apiKey = decryptedKey
     }

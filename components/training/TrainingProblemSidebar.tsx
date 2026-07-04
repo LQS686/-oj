@@ -11,7 +11,6 @@ import {
 import { useUser } from '@/contexts/UserContext'
 import { useTrainingProblemWorkspace } from '@/contexts/TrainingProblemWorkspaceContext'
 import { formatProblemDocumentTitle } from '@/lib/document-title'
-import JudgeStatus from '@/components/submission/JudgeStatus'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -39,9 +38,6 @@ export default function TrainingProblemSidebar() {
     setLanguage,
     submitting,
     submitResult,
-    showJudgeStatus,
-    judgeStatus,
-    setShowJudgeStatus,
     submitCode,
   } = ws
 
@@ -89,19 +85,6 @@ export default function TrainingProblemSidebar() {
           <CodeIcon className="w-4 h-4 text-primary-light" />
           <h3 className="font-medium text-foreground">提交代码</h3>
         </div>
-
-        {showJudgeStatus && judgeStatus && (
-          <div className="px-4 pt-4">
-            <JudgeStatus
-              submissionId={judgeStatus.submissionId}
-              status={judgeStatus.status}
-              passedTests={judgeStatus.passedTests}
-              totalTests={judgeStatus.totalTests}
-              testResults={judgeStatus.testResults}
-              onClose={() => setShowJudgeStatus(false)}
-            />
-          </div>
-        )}
 
         {submitResult && (
           <div

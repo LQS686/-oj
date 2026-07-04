@@ -5,20 +5,17 @@ import { useRouter } from 'next/navigation'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import {
   AlertCircle,
-  CheckCircle2,
-  XCircle,
   BookOpen,
   ListChecks,
   MessageSquare,
-  X,
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { logger } from '@/lib/logger'
-import { getStatusColor } from '@/lib/status'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
+import SubmissionResultModal, { type SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 import { useTrainingProblemWorkspace } from '@/contexts/TrainingProblemWorkspaceContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import type { Problem } from '@/types/models'
@@ -45,7 +42,6 @@ export default function TrainingProblemDetailPage({
     refreshTrainingProblems,
     submitting,
     setSubmitting,
-    submitResult,
     setSubmitResult,
     judgeStatus,
     setJudgeStatus,
@@ -71,6 +67,11 @@ export default function TrainingProblemDetailPage({
   useEffect(() => {
     currentSubmissionIdRef.current = currentSubmissionId
   }, [currentSubmissionId])
+
+  const submittingRef = useRef(false)
+  useEffect(() => {
+    submittingRef.current = submitting
+  }, [submitting])
 
   const safeIndex = trainingProblems.findIndex((p) => p.id === problemId)
   const currentMeta = safeIndex >= 0 ? trainingProblems[safeIndex] : undefined
@@ -128,6 +129,7 @@ export default function TrainingProblemDetailPage({
     fetchProblem()
     setSubmitResult(null)
     setLastResult(null)
+    setShowResultModal(false)
     setShowJudgeStatus(false)
     setJudgeStatus(null)
   }, [problemId])
@@ -141,19 +143,25 @@ export default function TrainingProblemDetailPage({
   useEffect(() => {
     if (!submitting) return
     if (!Array.isArray(submissions) || submissions.length === 0) return
-    const latest = submissions[0]
-    const status = latest?.status
+    const currentId = currentSubmissionIdRef.current
+    if (!currentId) return
+    const current = submissions.find((s) => s?.id === currentId)
+    if (!current) return
+    const status = current?.status
     if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
       setSubmitting(false)
       setJudgeProgress(null)
-      setSubmitResult({
-        type: status === 'AC' || status === 'Accepted' ? 'success' : 'error',
-        text: `评测完成：${status}`,
-        id: latest.id,
-      })
+      setSubmitResult(null)
       setLastResult({
+        submissionId: current.id,
         status,
-        score: typeof latest.score === 'number' ? latest.score : 0,
+        score: typeof current.score === 'number' ? current.score : 0,
+        time: typeof current.time === 'number' ? current.time : 0,
+        memory: typeof current.memory === 'number' ? current.memory : 0,
+        passedTests: typeof current.passedTests === 'number' ? current.passedTests : 0,
+        totalTests: typeof current.totalTests === 'number' ? current.totalTests : 0,
+        message: current.message ?? null,
+        testResults: current.testResults ?? undefined,
       })
       refreshTrainingProblems()
     }
@@ -177,25 +185,34 @@ export default function TrainingProblemDetailPage({
         })
       }
 
+      // 用 submitting 状态作为门控，不依赖 currentSubmissionIdRef
+      const isCurrentSubmission = submittingRef.current
       const isFinal =
         data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+
       if (isFinal) {
         setSubmitting(false)
         setJudgeProgress(null)
-        setSubmitResult({
-          type: data.status === 'AC' || data.status === 'Accepted' ? 'success' : 'error',
-          text: `评测完成：${data.status}`,
-          id: data.id,
-        })
-        setLastResult({
-          status: data.status,
-          score: typeof data.score === 'number' ? data.score : 0,
-        })
+        setSubmitResult(null)
         fetchSubmissions()
         refreshTrainingProblems()
       }
 
-      if (data.id === currentSubmissionIdRef.current) {
+      // 只在是当前提交时，才设置弹窗状态（避免其他提交事件触发弹窗）
+      if (isCurrentSubmission) {
+        if (isFinal) {
+          setLastResult({
+            submissionId: data.id,
+            status: data.status,
+            score: typeof data.score === 'number' ? data.score : 0,
+            time: typeof data.time === 'number' ? data.time : 0,
+            memory: typeof data.memory === 'number' ? data.memory : 0,
+            passedTests: typeof data.passedTests === 'number' ? data.passedTests : 0,
+            totalTests: typeof data.totalTests === 'number' ? data.totalTests : 0,
+            message: data.message ?? null,
+            testResults: data.testResults ?? undefined,
+          })
+        }
         setJudgeStatus({
           submissionId: data.id,
           status: data.status,
@@ -241,6 +258,7 @@ export default function TrainingProblemDetailPage({
         setSubmitResult(null)
         setLastResult(null)
         setShowJudgeStatus(false)
+        setShowResultModal(true)
 
         const res = await fetchWithAuth('/api/submissions', {
           method: 'POST',
@@ -255,6 +273,7 @@ export default function TrainingProblemDetailPage({
             text: '提交成功，正在评测...',
             id: data.submissionId,
           })
+          currentSubmissionIdRef.current = data.submissionId
           setCurrentSubmissionId(data.submissionId)
           setActiveTab('submissions')
           fetchSubmissions()
@@ -313,56 +332,6 @@ export default function TrainingProblemDetailPage({
 
   return (
     <div>
-      {submitting && judgeStatus && (
-        <div className="mb-4 p-4 rounded-xl bg-muted border border-border animate-fadeIn">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              <span className="text-foreground">正在评测...</span>
-              {judgeProgress && (
-                <span className="text-muted-foreground text-sm">
-                  ({judgeProgress.currentTest}/{judgeProgress.totalTests})
-                </span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => setJudgeStatus(null)}
-              className="p-1 hover:bg-muted rounded"
-            >
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {lastResult && !submitting && (
-        <div
-          className={`mb-4 p-4 rounded-xl border animate-fadeIn ${
-            lastResult.status === 'AC' || lastResult.status === 'Accepted'
-              ? 'bg-secondary/10 border-green-500/20'
-              : 'bg-error/10 border-red-500/20'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {lastResult.status === 'AC' || lastResult.status === 'Accepted' ? (
-                <CheckCircle2 className="w-5 h-5 text-green-400" />
-              ) : (
-                <XCircle className="w-5 h-5 text-red-400" />
-              )}
-              <span className={`font-medium ${getStatusColor(lastResult.status)}`}>
-                {lastResult.status}
-              </span>
-              <span className="text-muted-foreground">得分: {lastResult.score}</span>
-            </div>
-            <button type="button" onClick={() => setLastResult(null)} className="p-1 hover:bg-muted rounded">
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="card-static rounded-lg overflow-hidden">
         <div className="flex border-b border-border overflow-x-auto">
           {[
@@ -408,6 +377,31 @@ export default function TrainingProblemDetailPage({
           )}
         </div>
       </div>
+
+      <SubmissionResultModal
+        isOpen={showResultModal}
+        onClose={() => {
+          setShowResultModal(false)
+          setJudgeStatus(null)
+          setLastResult(null)
+        }}
+        isJudging={submitting}
+        judgeProgress={judgeProgress}
+        result={lastResult as SubmissionResultData | null}
+        onContinueSubmit={() => {
+          const textarea = document.querySelector('textarea')
+          textarea?.focus()
+          setShowResultModal(false)
+          setJudgeStatus(null)
+          setLastResult(null)
+        }}
+        onViewDetail={(submissionId) => {
+          setShowResultModal(false)
+          setJudgeStatus(null)
+          setLastResult(null)
+          router.push(`/submission/${submissionId}`)
+        }}
+      />
     </div>
   )
 }

@@ -5,27 +5,27 @@ import {
   BookOpen,
   Send,
   AlertCircle,
+  AlertTriangle,
   Wifi,
-  WifiOff,
   XCircle,
   Code as CodeIcon,
   CheckCircle2,
   Timer,
   MemoryStick,
   FileCode,
+  FileText,
   MessageSquare,
   ListChecks,
-  X,
   Edit3
 } from 'lucide-react'
 import { getStatusColor } from '@/lib/status'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
-import JudgeStatus from '@/components/submission/JudgeStatus'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
+import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canManageContent } from '@/lib/permissions'
@@ -79,7 +79,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
   const [judgeStatus, setJudgeStatus] = useState<any>(null)
   const [judgeProgress, setJudgeProgress] = useState<{ currentTest: number; totalTests: number } | null>(null)
-  const [lastResult, setLastResult] = useState<{ status: string; score: number } | null>(null)
+  const [lastResult, setLastResult] = useState<SubmissionResultData | null>(null)
+  const [showResultModal, setShowResultModal] = useState(false)
   
   const [problem, setProblem] = useState<any>(null)
   const [problemLoading, setProblemLoading] = useState(true)
@@ -187,6 +188,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     currentSubmissionIdRef.current = currentSubmissionId
   }, [currentSubmissionId])
 
+  // 用 ref 跟踪 submitting 状态，避免回调闭包拿到陈旧值
+  const submittingRef = useRef(false)
+  useEffect(() => {
+    submittingRef.current = submitting
+  }, [submitting])
+
   const fetchSubmissions = async () => {
     try {
       setSubmissionsLoading(true)
@@ -290,21 +297,31 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
-  // 兜底：只要列表里最新一条已经是终态，就把"评测中..."按钮重置回"提交"。
+  // 兜底：只要当前提交已经是终态，就把"评测中..."按钮重置回"提交"。
   // 解决 ref 跟 data.id 没对上、tab 切换、refetch 时机错位 等场景下
   // submitting 卡在 true 不下来的问题。
   useEffect(() => {
     if (!submitting) return
     if (!Array.isArray(submissions) || submissions.length === 0) return
-    const latest = submissions[0] // 列表按 submittedAt desc 排序
-    const status = latest?.status
+    const currentId = currentSubmissionIdRef.current
+    if (!currentId) return
+    const current = submissions.find((s) => s?.id === currentId)
+    if (!current) return
+    const status = current.status
     if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
       setSubmitting(false)
       setJudgeProgress(null)
       if (!lastResult || lastResult.status !== status) {
         setLastResult({
+          submissionId: current.id,
           status,
-          score: typeof latest.score === 'number' ? latest.score : 0
+          score: typeof current.score === 'number' ? current.score : 0,
+          time: typeof current.time === 'number' ? current.time : 0,
+          memory: typeof current.memory === 'number' ? current.memory : 0,
+          passedTests: typeof current.passedTests === 'number' ? current.passedTests : 0,
+          totalTests: typeof current.totalTests === 'number' ? current.totalTests : 0,
+          message: current.message ?? null,
+          testResults: Array.isArray(current.testResults) ? current.testResults : undefined,
         })
       }
     }
@@ -360,22 +377,34 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         })
       }
 
-      // 2) 收到任何"终态"事件都重置"评测中..."按钮，
-      //    不要再被 currentSubmissionId 门控拦截 — 按钮只是表达"我正在等结果"，
-      //    任意一条提交落地（哪怕是更早的）都意味着本轮等待可以结束了。
+      // 2) 判断是否是终态
       const isFinal = data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+
+      // 3) 用 submitting 状态作为门控：提交后到收到终态之间，submitting 为 true。
+      //    不依赖 currentSubmissionIdRef（它通过 useEffect 异步同步，可能有时序问题）。
+      const isCurrentSubmission = submittingRef.current
+
+      // 4) 收到任何"终态"事件都重置"评测中..."按钮
       if (isFinal) {
         setSubmitting(false)
         setJudgeProgress(null)
-        setLastResult({
-          status: data.status,
-          score: typeof data.score === 'number' ? data.score : 0
-        })
       }
 
-      // 3) 仅当是"当前提交"时，单独驱动中间的进度条状态
-      const isCurrentSubmission = data.id === currentSubmissionIdRef.current
+      // 5) 只在是当前提交时，才设置弹窗状态（避免其他提交事件触发弹窗）
       if (isCurrentSubmission) {
+        if (isFinal) {
+          setLastResult({
+            submissionId: data.id,
+            status: data.status,
+            score: typeof data.score === 'number' ? data.score : 0,
+            time: typeof data.time === 'number' ? data.time : 0,
+            memory: typeof data.memory === 'number' ? data.memory : 0,
+            passedTests: typeof data.passedTests === 'number' ? data.passedTests : 0,
+            totalTests: typeof data.totalTests === 'number' ? data.totalTests : 0,
+            message: data.message ?? null,
+            testResults: Array.isArray(data.testResults) ? data.testResults : undefined,
+          })
+        }
         setJudgeStatus({
           submissionId: data.id,
           status: data.status,
@@ -418,6 +447,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     setJudgeStatus(null)
     setJudgeProgress(null)
     setLastResult(null)
+    setShowResultModal(true)
 
     try {
       let submitUrl: string
@@ -442,6 +472,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       const data = await response.json()
 
       if (data.success) {
+        currentSubmissionIdRef.current = data.submissionId
         setCurrentSubmissionId(data.submissionId)
         setActiveTab('submissions')
       } else {
@@ -546,58 +577,6 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             </div>
           )}
         </div>
-
-        {submitting && judgeStatus && (
-          <div className="mb-4 p-4 rounded-xl bg-muted border border-border animate-fadeIn">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                <span className="text-foreground">正在评测...</span>
-                {judgeProgress && (
-                  <span className="text-muted-foreground text-sm">
-                    ({judgeProgress.currentTest}/{judgeProgress.totalTests})
-                  </span>
-                )}
-              </div>
-              <button 
-                onClick={() => setJudgeStatus(null)}
-                className="p-1 hover:bg-muted rounded cursor-pointer transition-colors duration-300 group"
-              >
-                <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors duration-300" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {lastResult && !submitting && (
-          <div className={`mb-4 p-4 rounded-xl border transition-all duration-300 animate-fadeIn ${
-            lastResult.status === 'AC' 
-              ? 'bg-secondary/100/10 border-green-500/20 hover:bg-secondary/100/15 hover:border-green-500/30'
-              : 'bg-error/100/10 border-red-500/20 hover:bg-error/100/15 hover:border-red-500/30'
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {lastResult.status === 'AC' ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-400" />
-                ) : (
-                  <XCircle className="w-5 h-5 text-red-400" />
-                )}
-                <span className={`font-medium ${getStatusColor(lastResult.status)}`}>
-                  {lastResult.status}
-                </span>
-                <span className="text-muted-foreground">
-                  得分: {lastResult.score}
-                </span>
-              </div>
-              <button 
-                onClick={() => setLastResult(null)}
-                className="p-1 hover:bg-muted rounded cursor-pointer transition-colors duration-300 group"
-              >
-                <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors duration-300" />
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
           {/* 左栏：题面 / 题解 / 提交记录（原 tab + 内容） */}
@@ -729,16 +708,19 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {selectedSubmission && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fadeIn"
           onClick={() => setSelectedSubmission(null)}
         >
-          <div 
+          <div
             className="card-static rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl transition-all duration-300"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted">
-              <h3 className="font-semibold text-foreground">提交详情</h3>
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold text-foreground">提交详情</h3>
+              </div>
               <button
                 onClick={() => setSelectedSubmission(null)}
                 className="p-2 rounded-lg hover:bg-muted/50 transition-colors duration-300 group"
@@ -748,17 +730,17 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card-static p-4">
                   <p className="text-xs text-muted-foreground mb-1">语言</p>
                   <p className="font-semibold text-foreground">{selectedSubmission.language}</p>
                 </div>
-                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card-static p-4">
                   <p className="text-xs text-muted-foreground mb-1">状态</p>
                   <span className={`font-medium ${getStatusColor(selectedSubmission.status)}`}>
                     {selectedSubmission.status}
                   </span>
                 </div>
-                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card-static p-4">
                   <p className="text-xs text-muted-foreground mb-1">得分</p>
                   <p className="font-semibold text-foreground">
                     {selectedSubmission.score}
@@ -769,19 +751,19 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     )}
                   </p>
                 </div>
-                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card-static p-4">
                   <p className="text-xs text-muted-foreground mb-1">耗时</p>
                   <p className="font-semibold text-foreground">{selectedSubmission.time}ms</p>
                 </div>
-                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card-static p-4">
                   <p className="text-xs text-muted-foreground mb-1">内存</p>
                   <p className="font-semibold text-foreground">
-                    {selectedSubmission.memory > 0 
-                      ? `${(selectedSubmission.memory / 1024).toFixed(2)}MB` 
+                    {selectedSubmission.memory > 0
+                      ? `${(selectedSubmission.memory / 1024).toFixed(2)}MB`
                       : '0MB'}
                   </p>
                 </div>
-                <div className="card rounded-xl p-4 hover:border-primary/30 transition-all duration-300">
+                <div className="card-static p-4">
                   <p className="text-xs text-muted-foreground mb-1">提交时间</p>
                   <p className="font-semibold text-foreground text-sm">
                     {new Date(selectedSubmission.submittedAt).toLocaleString('zh-CN')}
@@ -795,16 +777,24 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     <CodeIcon className="w-4 h-4 text-primary-light" />
                     <h4 className="font-semibold text-foreground">代码</h4>
                   </div>
-                  <pre className="bg-muted rounded-xl p-4 overflow-x-auto text-sm font-mono text-foreground border border-border hover:border-primary/30 transition-all duration-300">
-                    <code>{selectedSubmission.code}</code>
-                  </pre>
+                  <div className="rounded-xl overflow-hidden border border-border">
+                    <div className="px-4 py-2 bg-muted text-muted-foreground text-sm border-b border-border">
+                      <span className="font-medium">{selectedSubmission.language}</span>
+                    </div>
+                    <pre className="bg-muted p-4 overflow-x-auto text-sm font-mono text-foreground">
+                      <code>{selectedSubmission.code}</code>
+                    </pre>
+                  </div>
                 </div>
               )}
 
               {selectedSubmission.message && (
                 <div>
-                  <h4 className="font-semibold text-foreground mb-2">错误信息</h4>
-                  <div className="bg-error/10 border border-error/20 rounded-xl p-4 hover:border-error/30 transition-all duration-300">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-error" />
+                    <h4 className="font-semibold text-foreground">错误信息</h4>
+                  </div>
+                  <div className="bg-error/10 border border-error/20 rounded-xl p-4">
                     <pre className="text-sm text-error whitespace-pre-wrap">
                       {selectedSubmission.message}
                     </pre>
@@ -815,6 +805,27 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           </div>
         </div>
       )}
+
+      <SubmissionResultModal
+        isOpen={showResultModal}
+        onClose={() => { setShowResultModal(false); setJudgeStatus(null); setLastResult(null); }}
+        isJudging={submitting}
+        judgeProgress={judgeProgress}
+        result={lastResult as SubmissionResultData | null}
+        onContinueSubmit={() => {
+          const textarea = document.querySelector('textarea');
+          textarea?.focus();
+          setShowResultModal(false);
+          setJudgeStatus(null);
+          setLastResult(null);
+        }}
+        onViewDetail={(submissionId) => {
+          setShowResultModal(false);
+          setJudgeStatus(null);
+          setLastResult(null);
+          router.push(`/submission/${submissionId}`);
+        }}
+      />
     </div>
   )
 }

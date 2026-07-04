@@ -74,6 +74,122 @@ function isFinalStatus(status: string | undefined | null): boolean {
  return FINAL_STATUSES.has(status)
 }
 
+const STATUS_TEXT_ZH: Record<string, string> = {
+  AC: '通过', Accepted: '通过',
+  WA: '答案错误', 'Wrong Answer': '答案错误',
+  TLE: '超时', 'Time Limit Exceeded': '超时',
+  MLE: '超内存', 'Memory Limit Exceeded': '超内存',
+  RE: '运行错误', 'Runtime Error': '运行错误',
+  CE: '编译错误', 'Compile Error': '编译错误',
+  PE: '格式错误', 'Presentation Error': '格式错误',
+  OLE: '输出超限', 'Output Limit Exceeded': '输出超限',
+  CSP: '无法启动',
+  PC: '部分正确', 'Partly Correct': '部分正确',
+  SE: '系统错误', 'System Error': '系统错误',
+  Pending: '等待评测', Judging: '评测中', Running: '运行中',
+}
+
+function getTestStatusIcon(status: string) {
+  switch (status) {
+    case 'AC':
+    case 'Accepted':
+      return <CheckCircle className="w-5 h-5 text-secondary" />
+    case 'WA':
+    case 'Wrong Answer':
+      return <XCircle className="w-5 h-5 text-error" />
+    case 'TLE':
+    case 'Time Limit Exceeded':
+      return <Clock className="w-5 h-5 text-accent" />
+    case 'MLE':
+    case 'Memory Limit Exceeded':
+      return <Database className="w-5 h-5 text-info" />
+    case 'RE':
+    case 'Runtime Error':
+      return <AlertTriangle className="w-5 h-5 text-warning" />
+    case 'CE':
+    case 'Compile Error':
+      return <Code className="w-5 h-5 text-muted-foreground" />
+    case 'PE':
+    case 'Presentation Error':
+      return <AlertTriangle className="w-5 h-5 text-amber-600" />
+    case 'OLE':
+    case 'Output Limit Exceeded':
+      return <AlertTriangle className="w-5 h-5 text-amber-600" />
+    case 'CSP':
+      return <XCircle className="w-5 h-5 text-[var(--difficulty-hard)]" />
+    case 'PC':
+    case 'Partly Correct':
+      return <CheckCircle2 className="w-5 h-5 text-[var(--difficulty-medium)]" />
+    default:
+      return <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+  }
+}
+
+function TestPointRow({ result, index }: { result: TestResult; index: number }) {
+  const isPass = result.status === 'AC' || result.status === 'Accepted'
+  const isJudgingTest = result.status === 'Judging' || result.status === 'Pending' || result.status === 'Running'
+  const [expanded, setExpanded] = useState(!isPass)
+  const hasMessage = !!result.message
+
+  return (
+    <div
+      className={`p-4 rounded-lg border transition-all ${
+        isPass
+          ? 'bg-secondary/5 border-secondary/20 hover:border-secondary/40'
+          : isJudgingTest
+          ? 'bg-muted border-border'
+          : 'bg-error/5 border-error/20 hover:border-error/40'
+      }`}
+    >
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => hasMessage && setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-3">
+          {isJudgingTest
+            ? <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+            : getTestStatusIcon(result.status)}
+          <div>
+            <div className="font-semibold text-foreground">
+              测试点 #{index + 1}
+            </div>
+            <div className="text-sm text-muted-foreground">{getStatusText(result.status)}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-6 text-sm">
+          <div className="text-center">
+            <div className="text-muted-foreground">时间</div>
+            <div className="font-mono font-semibold text-foreground">
+              {isJudgingTest ? '-' : formatTime(result.time)}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-muted-foreground">内存</div>
+            <div className="font-mono font-semibold text-foreground">
+              {isJudgingTest ? '-' : formatMemory(result.memory)}
+            </div>
+          </div>
+          {hasMessage && (
+            <div className="text-muted-foreground">
+              {expanded ? (
+                <ChevronDown className="w-5 h-5" />
+              ) : (
+                <ChevronRight className="w-5 h-5" />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      {expanded && result.message && (
+        <div className="mt-3 text-sm text-foreground bg-muted p-3 rounded border border-border">
+          <div className="font-medium text-foreground mb-1">错误信息:</div>
+          <pre className="whitespace-pre-wrap text-muted-foreground">{result.message}</pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SubmissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
  const { id } = use(params)
  const router = useRouter()
@@ -83,7 +199,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  const [error, setError] = useState('')
  const [submissionHistory, setSubmissionHistory] = useState<SubmissionHistoryItem[]>([])
  const [historyLoading, setHistoryLoading] = useState(false)
- const [expandedTestResults, setExpandedTestResults] = useState<Set<string>>(new Set())
  const [copied, setCopied] = useState(false)
  // 实时刷新状态：用于展示"刷新中"小图标
  const [isRefreshing, setIsRefreshing] = useState(false)
@@ -308,52 +423,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  )
  }
 
- const getTestStatusIcon = (status: string) => {
- switch (status) {
- case 'AC':
- case 'Accepted':
- return <CheckCircle className="w-5 h-5 text-secondary" />
- case 'WA':
- case 'Wrong Answer':
- return <XCircle className="w-5 h-5 text-error" />
- case 'TLE':
- case 'Time Limit Exceeded':
- return <Clock className="w-5 h-5 text-accent" />
- case 'MLE':
- case 'Memory Limit Exceeded':
- return <Database className="w-5 h-5 text-info" />
- case 'RE':
- case 'Runtime Error':
- return <AlertTriangle className="w-5 h-5 text-warning" />
- case 'CE':
- case 'Compile Error':
- return <Code className="w-5 h-5 text-muted-foreground" />
- case 'PE':
- case 'Presentation Error':
- return <AlertTriangle className="w-5 h-5 text-amber-600" />
- case 'OLE':
- case 'Output Limit Exceeded':
- return <AlertTriangle className="w-5 h-5 text-amber-600" />
- case 'CSP':
- return <XCircle className="w-5 h-5 text-[var(--difficulty-hard)]" />
- case 'PC':
- case 'Partly Correct':
- return <CheckCircle2 className="w-5 h-5 text-[var(--difficulty-medium)]" />
- default:
- return <AlertTriangle className="w-5 h-5 text-muted-foreground" />
- }
- }
-
- const toggleTestResult = (testId: string) => {
- const newExpanded = new Set(expandedTestResults)
- if (newExpanded.has(testId)) {
- newExpanded.delete(testId)
- } else {
- newExpanded.add(testId)
- }
- setExpandedTestResults(newExpanded)
- }
-
  const handleCopyCode = async () => {
  await navigator.clipboard.writeText(submission.code)
  setCopied(true)
@@ -406,6 +475,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  }
  }
 
+ const isAc = submission.status === 'AC' || submission.status === 'Accepted'
+ const statusCardBorder = isAc ? 'border-secondary/40 bg-secondary/5' : 'border-border'
+
  return (
  <div className="min-h-screen bg-background">
  <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -446,18 +518,21 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
  <div className="card-static p-6 mb-6">
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
- <div>
+ <div className={`rounded-xl border p-4 ${statusCardBorder}`}>
  <div className="text-sm text-muted-foreground mb-2">状态</div>
+ <div className="flex items-center gap-2 flex-wrap">
  {getStatusBadge(submission.status)}
+ <span className="text-sm text-muted-foreground">{STATUS_TEXT_ZH[submission.status] || submission.status}</span>
  </div>
- <div>
+ </div>
+ <div className={`rounded-xl border p-4 ${statusCardBorder}`}>
  <div className="text-sm text-muted-foreground mb-2">分数</div>
  <div className="text-3xl font-bold text-foreground">{submission.score}</div>
  <div className="text-sm text-muted-foreground mt-1">
  ({submission.passedTests}/{submission.totalTests} 测试点)
  </div>
  </div>
- <div>
+ <div className={`rounded-xl border p-4 ${statusCardBorder}`}>
  <div className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
  用时
  <span
@@ -475,7 +550,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  ></div>
  </div>
  </div>
- <div>
+ <div className={`rounded-xl border p-4 ${statusCardBorder}`}>
  <div className="text-sm text-muted-foreground mb-2">内存</div>
  <div className="text-2xl font-mono text-foreground">{formatMemory(submission.memory)}</div>
  <div className="w-full bg-muted rounded-full h-2 mt-2">
@@ -675,66 +750,13 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  </div>
  <div className="space-y-3">
  {submission.testResults && submission.testResults.length > 0 ? (
- submission.testResults.map((result, index) => {
- const isSuccess = result.status === 'AC' || result.status === 'Accepted'
- const isJudgingTest = result.status === 'Judging' || result.status === 'Pending' || result.status === 'Running'
- return (
- <div
+ submission.testResults.map((result, index) => (
+ <TestPointRow
  key={result.testId || `test-${index}`}
- className={`p-4 rounded-lg border transition-all ${
- isSuccess
- ? 'bg-secondary/5 border-secondary/20 hover:border-secondary/40'
- : isJudgingTest
- ? 'bg-muted border-border'
- : 'bg-error/5 border-error/20 hover:border-error/40'
- }`}
- >
- <div
- className="flex items-center justify-between cursor-pointer"
- onClick={() => toggleTestResult(result.testId)}
- >
- <div className="flex items-center gap-3">
- {isJudgingTest
- ? <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
- : getTestStatusIcon(result.status)}
- <div>
- <div className="font-semibold text-foreground">
- 测试点 #{index + 1}
- </div>
- <div className="text-sm text-muted-foreground">{getStatusText(result.status)}</div>
- </div>
- </div>
- <div className="flex items-center gap-6 text-sm">
- <div className="text-center">
- <div className="text-muted-foreground">时间</div>
- <div className="font-mono font-semibold text-foreground">
- {isJudgingTest ? '-' : formatTime(result.time)}
- </div>
- </div>
- <div className="text-center">
- <div className="text-muted-foreground">内存</div>
- <div className="font-mono font-semibold text-foreground">
- {isJudgingTest ? '-' : formatMemory(result.memory)}
- </div>
- </div>
- <div className="text-muted-foreground">
- {expandedTestResults.has(result.testId) ? (
- <ChevronDown className="w-5 h-5" />
- ) : (
- <ChevronRight className="w-5 h-5" />
- )}
- </div>
- </div>
- </div>
- {expandedTestResults.has(result.testId) && result.message && (
- <div className="mt-3 text-sm text-foreground bg-muted p-3 rounded border border-border">
- <div className="font-medium text-foreground mb-1">错误信息:</div>
- <pre className="whitespace-pre-wrap text-muted-foreground">{result.message}</pre>
- </div>
- )}
- </div>
- )
- })
+ result={result}
+ index={index}
+ />
+ ))
  ) : (
  !isFinalStatus(submission.status) && (
  <div className="text-center py-8 text-muted-foreground">
@@ -770,20 +792,23 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  )}
  </button>
  </div>
- <div className="bg-background-secondary rounded-lg overflow-hidden border border-border">
- <div className="px-4 py-3 bg-muted text-muted-foreground text-sm flex justify-between items-center border-b border-border">
+ <div className="rounded-xl overflow-hidden border border-border">
+ <div className="px-4 py-2 bg-muted text-muted-foreground text-sm border-b border-border flex items-center justify-between">
  <span className="font-medium">{submission.language}</span>
- <div className="flex items-center gap-2">
- <span className="text-xs">
- {submission.code.split('\n').length} 行
- </span>
+ <span className="text-xs">{submission.code.split('\n').length} 行</span>
  </div>
+ <div className="overflow-x-auto custom-scrollbar max-h-96 overflow-y-auto">
+ <pre className="flex text-sm font-mono">
+ <div className="bg-muted/50 text-muted-foreground text-right py-4 px-3 select-none border-r border-border sticky left-0">
+ {submission.code.split('\n').map((_, i) => (
+ <div key={i}>{i + 1}</div>
+ ))}
  </div>
- <pre className="p-4 overflow-x-auto max-h-96 custom-scrollbar">
- <code className="text-foreground text-sm font-mono">
+ <code className="text-foreground py-4 px-4 block whitespace-pre">
  {submission.code}
  </code>
  </pre>
+ </div>
  </div>
  </div>
 

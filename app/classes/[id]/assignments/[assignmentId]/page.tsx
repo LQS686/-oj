@@ -8,7 +8,6 @@ import { fetchWithAuth } from '@/lib/api/base'
 import {
  Clock,
  CheckCircle2,
- XCircle,
  Edit,
  Trash2,
  MoreHorizontal,
@@ -17,7 +16,6 @@ import {
  Send,
  AlertCircle,
  FileCode,
- X,
 } from 'lucide-react'
 import StudentCompletionTable from '@/components/StudentCompletionTable'
 import ProblemDescription from '@/components/problem/ProblemDescription'
@@ -29,6 +27,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
 import { canManageContent } from '@/lib/permissions'
 import { isClassAdminApiRole, isClassStudentApiRole, normalizeClassRoleToApi } from '@/lib/class/roles'
+import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -104,7 +103,8 @@ export default function AssignmentDetailPage() {
  const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
  const [judgeStatus, setJudgeStatus] = useState<any>(null)
  const [judgeProgress, setJudgeProgress] = useState<{ currentTest: number; totalTests: number } | null>(null)
- const [lastResult, setLastResult] = useState<{ status: string; score: number } | null>(null)
+ const [lastResult, setLastResult] = useState<SubmissionResultData | null>(null)
+ const [showResultModal, setShowResultModal] = useState(false)
  const [submitCooldown, setSubmitCooldown] = useState(false)
 
  // ref 跟踪 currentSubmissionId，避免回调闭包拿到陈旧值
@@ -112,6 +112,12 @@ export default function AssignmentDetailPage() {
  useEffect(() => {
  currentSubmissionIdRef.current = currentSubmissionId
  }, [currentSubmissionId])
+
+ // ref 跟踪 submitting 状态，避免回调闭包拿到陈旧值
+ const submittingRef = useRef(false)
+ useEffect(() => {
+ submittingRef.current = submitting
+ }, [submitting])
 
  useEffect(() => {
  fetchAssignment()
@@ -203,23 +209,29 @@ export default function AssignmentDetailPage() {
  }
  }, [params.id, params.assignmentId])
 
- // 兜底：作业内部"我的提交状态"列表里只要有一条终态，就把按钮重置。
+ // 兜底：作业内部"我的提交状态"列表里只要当前提交是终态，就把按钮重置。
  // 解决 ref 没追上 / tab 切换 / 多提交 等场景下 submitting 卡在 true 的问题。
  useEffect(() => {
  if (!submitting) return
  if (!Array.isArray(submissions) || submissions.length === 0) return
- const mySubs = submissions.filter((s) => !s.userId || s.userId === user?.id)
- const latestMine = mySubs[0]
- if (!latestMine) return
- const status = latestMine.status
+ const currentId = currentSubmissionIdRef.current
+ if (!currentId) return
+ const current = submissions.find((s) => s?.id === currentId)
+ if (!current) return
+ const status = current.status
  if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
  setSubmitting(false)
  setSubmitCooldown(false)
  setJudgeProgress(null)
  if (!lastResult || lastResult.status !== status) {
  setLastResult({
+ submissionId: current.id,
  status,
- score: typeof latestMine.score === 'number' ? latestMine.score : 0
+ score: typeof current.score === 'number' ? current.score : 0,
+ time: 0,
+ memory: 0,
+ passedTests: 0,
+ totalTests: 0,
  })
  }
  }
@@ -230,22 +242,45 @@ export default function AssignmentDetailPage() {
  userId: user?.id || '',
  enabled: !!user,
  onSubmissionUpdate: (data) => {
- // 1) 收到任何"终态"事件都直接重置 submitting / cooldown，
- // 不要再被 currentSubmissionId 门控拦截（同样的 bug 在
- // /problem/[id] 出现过，导致按钮永远卡在"评测中"）。
+ // 1) 判断是否是终态
  const isFinal = data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+
+ // 2) 用 submitting 状态作为门控，不依赖 currentSubmissionIdRef
+ const isCurrentSubmission = submittingRef.current
+
+ // 3) 收到任何"终态"事件都直接重置 submitting / cooldown
  if (isFinal) {
  setSubmitting(false)
  setSubmitCooldown(false)
  setJudgeProgress(null)
- setLastResult({
- status: data.status,
- score: typeof data.score === 'number' ? data.score : (data.passedTests || 0) * 10
- })
+ if (isCurrentSubmission) {
  setCode('')
  }
+ }
 
- // 2) 乐观合并到本作业的"我的提交"列表（无论是否 currentSubmissionId）
+ // 4) 只在是当前提交时，才设置弹窗状态（避免其他提交事件触发弹窗）
+ if (isCurrentSubmission && isFinal) {
+ setLastResult({
+ submissionId: data.id,
+ status: data.status,
+ score: typeof data.score === 'number' ? data.score : (data.passedTests || 0) * 10,
+ time: data.time,
+ memory: data.memory,
+ passedTests: data.passedTests || 0,
+ totalTests: data.totalTests || 0,
+ message: data.message,
+ testResults: data.testResults,
+ })
+ setJudgeStatus({
+ submissionId: data.id,
+ status: data.status,
+ passedTests: data.passedTests || 0,
+ totalTests: data.totalTests || 0,
+ testResults: data.testResults || [],
+ })
+ }
+
+ // 4) 乐观合并到本作业的"我的提交"列表（无论是否 currentSubmissionId）
  if (data?.id && isFinal) {
  const currentProblemId = assignment?.problems?.[selectedProblemIndex]?.id || ''
  setSubmissions((prev) => {
@@ -267,9 +302,8 @@ export default function AssignmentDetailPage() {
  })
  }
 
- // 3) 仅当是"当前提交"时，单独驱动中间进度条状态
- const isCurrentSubmission = data.id === currentSubmissionIdRef.current
- if (isCurrentSubmission) {
+ // 5) 当前提交的中间态（非终态）也驱动进度条状态
+ if (isCurrentSubmission && !isFinal) {
  setJudgeStatus({
  submissionId: data.id,
  status: data.status,
@@ -312,6 +346,7 @@ export default function AssignmentDetailPage() {
  setJudgeStatus(null)
  setJudgeProgress(null)
  setLastResult(null)
+ setShowResultModal(true)
 
  try {
  const submitUrl = `/api/classes/${params.id}/assignments/${params.assignmentId}/submit`
@@ -326,6 +361,7 @@ export default function AssignmentDetailPage() {
  })
  const data = await response.json()
  if (data.success) {
+ currentSubmissionIdRef.current = data.submissionId
  setCurrentSubmissionId(data.submissionId)
  } else {
  setSubmitting(false)
@@ -598,51 +634,8 @@ export default function AssignmentDetailPage() {
  placeholder="在此粘贴或输入代码..."
  />
 
- <div className="min-h-[44px]">
- {submitting && judgeStatus && (
- <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 animate-fadeIn">
- <div className="flex items-center gap-3">
- <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
- <span className="text-sm text-foreground">正在评测...</span>
- {judgeProgress && (
- <span className="text-xs text-muted-foreground">
- ({judgeProgress.currentTest}/{judgeProgress.totalTests})
- </span>
- )}
- </div>
- </div>
- )}
+ <div className="min-h-[44px]" />
 
- {lastResult && !submitting && (
- <div className={`p-3 rounded-lg border transition-all ${
- lastResult.status === 'AC'
- ? 'bg-secondary/5 border-secondary/20'
- : 'bg-error/5 border-error/20'
- }`}>
- <div className="flex items-center justify-between">
- <div className="flex items-center gap-3">
- {lastResult.status === 'AC' ? (
- <CheckCircle2 className="w-5 h-5 text-secondary" />
- ) : (
- <XCircle className="w-5 h-5 text-error" />
- )}
- <span className={`text-sm font-medium ${lastResult.status === 'AC' ? 'text-secondary' : 'text-error'}`}>
- {lastResult.status}
- </span>
- <span className="text-sm text-muted-foreground">
- 得分: {lastResult.score}
- </span>
- </div>
- <button
- onClick={() => setLastResult(null)}
- className="p-1 rounded hover:bg-muted transition-colors"
- >
- <X className="w-4 h-4 text-muted-foreground" />
- </button>
- </div>
- </div>
- )}
- </div>
 
  <div className="flex items-center gap-3 pt-1">
  <button
@@ -759,6 +752,26 @@ export default function AssignmentDetailPage() {
  }}
  onDeleted={() => {
  router.push(`/classes/${classId}`)
+ }}
+ />
+ <SubmissionResultModal
+ isOpen={showResultModal}
+ onClose={() => { setShowResultModal(false); setJudgeStatus(null); setLastResult(null); }}
+ isJudging={submitting}
+ judgeProgress={judgeProgress}
+ result={lastResult as SubmissionResultData | null}
+ onContinueSubmit={() => {
+ const textarea = document.querySelector('textarea');
+ textarea?.focus();
+ setShowResultModal(false);
+ setJudgeStatus(null);
+ setLastResult(null);
+ }}
+ onViewDetail={(submissionId) => {
+ setShowResultModal(false);
+ setJudgeStatus(null);
+ setLastResult(null);
+ router.push(`/submission/${submissionId}`);
  }}
  />
  </div>

@@ -176,13 +176,12 @@ export async function generateSolutionForProblem(
       { role: 'system' as const, content: SYSTEM_PROMPT },
       { role: 'user' as const, content: userPrompt }
     ],
-    // 题解写作需要一定创造性，温度 0.7；不用 JSON 强约束结构（已经在 system prompt 中明示）
-    temperature: 0.7,
+    // 题解写作需要一定创造性；优先使用 config 配置，默认 0.7
+    temperature: config.temperature ?? 0.7,
     response_format: { type: 'json_object' as const },
-    // 题解 5 段 markdown 通常 1500-4000 tokens，给 8192 留足余量
-    max_tokens: 8192
+    // 题解 5 段 markdown 通常 1500-4000 tokens，给 8192 留足余量；优先使用 config 配置
+    max_tokens: config.maxTokens || 8192
   }
-  const merged = buildChatParams(config, baseParams, false)
 
   logger.info('[solution-generator] 开始生成题解', {
     problemId: params.problemId,
@@ -192,31 +191,84 @@ export async function generateSolutionForProblem(
     model
   })
 
-  const response = await callWithRetry(
-    () => client.chat.completions.create(merged as any),
-    { maxRetries: 2, backoffMs: 800, opName: 'solution-generate' }
-  )
+  // 累计 tokens（含重试）
+  let totalTokens = 0
 
-  const msg = response.choices[0].message as any
-  const raw = msg?.content || msg?.reasoning_content || ''
-  const tokensUsed = response.usage?.total_tokens || 0
-
-  if (!raw) {
-    throw new Error('solution-generator: AI 响应为空')
+  // 包装一次 AI 调用 + 内容提取；overrideTemp/overridePrompt 用于解析失败后的梯度重试
+  // 保留原有 system prompt 不变，仅修改 user prompt 与温度
+  const tryGenerate = async (overrideTemp?: number, overridePrompt?: string): Promise<string> => {
+    const genParams = overridePrompt
+      ? {
+          ...baseParams,
+          messages: [
+            { role: 'system' as const, content: SYSTEM_PROMPT },
+            { role: 'user' as const, content: overridePrompt }
+          ]
+        }
+      : { ...baseParams }
+    if (overrideTemp !== undefined) {
+      genParams.temperature = overrideTemp
+    }
+    const mergedRegen = buildChatParams(config, genParams, false)
+    const response = await callWithRetry(
+      () => client.chat.completions.create(mergedRegen as any),
+      { maxRetries: 2, backoffMs: 800, opName: overridePrompt ? 'solution-regen' : 'solution-generate' }
+    )
+    const msg = response.choices[0].message as any
+    const content = msg?.content || msg?.reasoning_content || ''
+    if (!content) {
+      throw new Error('solution-generator: AI 响应为空')
+    }
+    totalTokens += response.usage?.total_tokens || 0
+    return content
   }
 
+  // 主调用 + 解析失败时的梯度重试（0.2 → 0.0），仿照 generator.ts 的 regenTemperatures 策略
+  let raw: string
   let parsed: any
-  try {
-    parsed = safeJsonParse(raw)
-  } catch (e: any) {
-    // 解析失败时透传 AI_PARSE_FAILED 元信息
-    logger.error('[solution-generator] JSON 解析失败', {
-      problemId: params.problemId,
-      parseError: e?.info?.parseError,
-      preview: e?.info?.originalContent
-    })
-    throw e
+  const regenTemperatures = [0.2, 0.0]
+  let regenAttempts = 0
+
+  raw = await tryGenerate()
+  while (true) {
+    try {
+      parsed = safeJsonParse(raw)
+      break
+    } catch (e: any) {
+      const isJsonError =
+        e?.code === 'AI_PARSE_FAILED' ||
+        (e instanceof Error &&
+          (e.message.startsWith('Failed to parse JSON') || e.message.includes('JSON.parse')))
+      if (!isJsonError) {
+        // 非解析错误（如 AI 响应为空），直接透传
+        throw e
+      }
+      if (regenAttempts >= regenTemperatures.length) {
+        // 已用尽所有内层重试，透传 AI_PARSE_FAILED 元信息
+        logger.error('[solution-generator] JSON 解析失败，已用尽内层重试', {
+          problemId: params.problemId,
+          attempts: regenAttempts,
+          parseError: e?.info?.parseError,
+          preview: e?.info?.originalContent
+        })
+        throw e
+      }
+      const regenTemp = regenTemperatures[regenAttempts]
+      logger.warn(`[solution-generator] JSON 解析失败，触发第 ${regenAttempts + 1} 次内层重试`, {
+        problemId: params.problemId,
+        temperature: regenTemp,
+        code: e?.code,
+        parseError: e?.info?.parseError,
+        preview: e?.info?.originalContent
+      })
+      const regenPrompt = `${userPrompt}\n\n【重要】你上一次的响应无法被解析为合法 JSON。请重新输出**严格合法闭合的 JSON 对象**，不要添加任何 markdown 标记、不要添加 <think> 思考块。`
+      regenAttempts++
+      raw = await tryGenerate(regenTemp, regenPrompt)
+      // 继续 while 循环尝试解析新响应
+    }
   }
+
+  const tokensUsed = totalTokens
 
   const content: string = (parsed?.content || '').toString().trim()
   if (!content) {

@@ -8,6 +8,37 @@ import { executeCode } from '@/lib/judge/executor'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
 import { validateCodeSafety } from '@/lib/judge/codeAnalyzer'
 
+// problemNumber 竞态修复：unique 冲突时重试
+async function createProblemWithRetry(data: any, maxRetries = 3): Promise<any> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await prisma.problem.create({ data })
+    } catch (e: any) {
+      if (e?.code === 'P2002' && attempt < maxRetries - 1) {
+        // unique 冲突，重新查询最大 problemNumber
+        const latest = await prisma.problem.findFirst({
+          where: { problemNumber: { startsWith: 'P' } },
+          orderBy: { createdAt: 'desc' },
+          select: { problemNumber: true },
+        })
+        let nextNum = 1001
+        if (latest?.problemNumber) {
+          const match = latest.problemNumber.match(/^P(\d+)$/)
+          if (match) {
+            nextNum = parseInt(match[1], 10) + 1
+          }
+        }
+        data.problemNumber = `P${nextNum}`
+        logger.warn(`[problemNumber] unique 冲突，重试 ${attempt + 1}/${maxRetries}`, { nextNum: data.problemNumber })
+        continue
+      }
+      throw e
+    }
+  }
+  // 理论上不可达（循环要么 return 要么 throw）
+  throw new Error('createProblemWithRetry: exhausted retries')
+}
+
 interface AiJob {
   logId: string
   userId: string
@@ -77,7 +108,47 @@ class AiQueue extends EventEmitter {
   }
 
   private async executeJob(job: QueuedJob) {
+    const AI_JOB_TIMEOUT_MS = parseInt(process.env.AI_JOB_TIMEOUT_MS || '300000', 10) // 默认 5 分钟
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
     try {
+      // 主逻辑包装为 Promise.race + 超时，避免 AI 任务长时间挂起阻塞队列
+      await Promise.race([
+        this._executeJobInner(job),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('AI 任务执行超时')), AI_JOB_TIMEOUT_MS)
+        })
+      ])
+    } catch (error: any) {
+      job.status = 'failed'
+      job.error = error.message
+
+      // 透传 AI_PARSE_FAILED 错误代码到日志，让前端能识别并友好提示
+      const isParseError = error?.code === 'AI_PARSE_FAILED'
+      const errorMessage = isParseError
+        ? `AI 返回格式异常：${error.message}。建议：重试 / 切换模型 / 降低 temperature`
+        : error.message
+
+      // Update DB with error
+      await prisma.aiGenerationLog.update({
+        where: { id: job.id },
+        data: {
+          status: 'FAILED',
+          error: errorMessage,
+          result: isParseError ? {
+            parseFailed: true,
+            parseInfo: error?.info || null,
+            originalContent: error?.info?.originalContent
+          } as any : undefined
+        }
+      })
+    } finally {
+      // 确保 processing Map 总是被清理（即使超时或异常）
+      if (timeoutId) clearTimeout(timeoutId)
+      this.processing.delete(job.id)
+    }
+  }
+
+  private async _executeJobInner(job: QueuedJob) {
       // Update DB status to PROCESSING
       await prisma.aiGenerationLog.update({
         where: { id: job.id },
@@ -85,7 +156,7 @@ class AiQueue extends EventEmitter {
       })
 
       // Call AI
-      let { problems, testCases, thought, tokensUsed } = await generateProblems(job.data.params, job.data.userId)
+      let { problems, testCases, thought, tokensUsed, qualityIssues } = await generateProblems(job.data.params, job.data.userId)
 
       // ---------------------------------------------------------
       // 🚀 SHARED: Solution Execution for Correct Outputs
@@ -284,7 +355,6 @@ class AiQueue extends EventEmitter {
             })
 
             job.status = 'completed'
-            this.processing.delete(job.id)
             return
 
         } catch (error: any) {
@@ -498,7 +568,7 @@ class AiQueue extends EventEmitter {
               // END 标程修正 output
               // ---------------------------------------------------------
 
-              const newProblem = await prisma.problem.create({
+              const newProblem = await createProblemWithRetry({
                 data: {
                   problemNumber,
                   title: problem.title || 'Untitled AI Problem',
@@ -512,12 +582,16 @@ class AiQueue extends EventEmitter {
                   timeLimit: problem.time_limit || 1000,
                   memoryLimit: problem.memory_limit || 128,
                   // 业务决策（2026-06）：AI 生成的题目不需要人工验证，直接加入公开题库
-                  isPublic: true,
-                  visibility: 'public',
+                  // 质量门禁（2026-07）：存在 qualityIssues 时降级为 private，需人工复核
+                  isPublic: !qualityIssues?.length,
+                  visibility: qualityIssues?.length ? 'private' : 'public',
                   authorId: job.data.userId,
                   isAiGenerated: true,
                   aiStatus: 'AI_GENERATED',
                   aiPrompt: JSON.stringify(job.data.params),
+                  // 保存标程，便于后续测试数据生成 / output 修正复用
+                  stdCode,
+                  stdLang,
                   testCases: {
                     create: validTestCases
                   }
@@ -547,14 +621,6 @@ class AiQueue extends EventEmitter {
                     problemNumber: newProblem.problemNumber
                   })
                 } else {
-                  // 清理同题同源的旧 AI 标程题解（保持"同题只有一份 AI_OFFICIAL"）
-                  await prisma.solution.deleteMany({
-                    where: {
-                      problemId: newProblem.id,
-                      sourceType: 'AI_OFFICIAL'
-                    } as any
-                  })
-
                   // 决定 code / codeLanguage（与之前 enqueueSolutionJob 的策略一致）
                   const code: string | null = problem.solution_cpp
                     ? String(problem.solution_cpp)
@@ -567,19 +633,31 @@ class AiQueue extends EventEmitter {
                       ? 'python'
                       : null
 
-                  const solution = await prisma.solution.create({
-                    data: {
-                      problemId: newProblem.id,
-                      authorId: job.data.userId,
-                      title: `AI 标程题解 - ${newProblem.title}`,
-                      content: article,
-                      code: code || null,
-                      codeLanguage: codeLanguage || null,
-                      language: codeLanguage || null,
-                      isOfficial: true,
-                      isAiGenerated: true,
-                      sourceType: 'AI_OFFICIAL'
-                    } as any
+                  // 事务保证：清理旧 AI 标程题解 + 创建新题解原子完成
+                  // （避免 deleteMany 后 create 失败导致题解丢失）
+                  const solution = await prisma.$transaction(async (tx: any) => {
+                    // 清理同题同源的旧 AI 标程题解（保持"同题只有一份 AI_OFFICIAL"）
+                    await tx.solution.deleteMany({
+                      where: {
+                        problemId: newProblem.id,
+                        sourceType: 'AI_OFFICIAL'
+                      } as any
+                    })
+
+                    return await tx.solution.create({
+                      data: {
+                        problemId: newProblem.id,
+                        authorId: job.data.userId,
+                        title: `AI 标程题解 - ${newProblem.title}`,
+                        content: article,
+                        code: code || null,
+                        codeLanguage: codeLanguage || null,
+                        language: codeLanguage || null,
+                        isOfficial: true,
+                        isAiGenerated: true,
+                        sourceType: 'AI_OFFICIAL'
+                      } as any
+                    })
                   })
 
                   solutionResult = {
@@ -657,7 +735,6 @@ class AiQueue extends EventEmitter {
           }
 
           job.status = 'completed'
-          this.processing.delete(job.id)
           return
       }
       
@@ -679,34 +756,6 @@ class AiQueue extends EventEmitter {
       })
       
       job.status = 'completed'
-      this.processing.delete(job.id)
-
-    } catch (error: any) {
-      job.status = 'failed'
-      job.error = error.message
-
-      // 透传 AI_PARSE_FAILED 错误代码到日志，让前端能识别并友好提示
-      const isParseError = error?.code === 'AI_PARSE_FAILED'
-      const errorMessage = isParseError
-        ? `AI 返回格式异常：${error.message}。建议：重试 / 切换模型 / 降低 temperature`
-        : error.message
-
-      // Update DB with error
-      await prisma.aiGenerationLog.update({
-        where: { id: job.id },
-        data: {
-          status: 'FAILED',
-          error: errorMessage,
-          result: isParseError ? {
-            parseFailed: true,
-            parseInfo: error?.info || null,
-            originalContent: error?.info?.originalContent
-          } as any : undefined
-        }
-      })
-
-      this.processing.delete(job.id)
-    }
   }
 }
 

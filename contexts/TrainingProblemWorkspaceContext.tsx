@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Submission, JudgeStatusData } from '@/types/models'
+import type { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 
 export interface TrainingProblemItem {
   id: string
@@ -46,8 +47,10 @@ interface TrainingProblemWorkspaceValue {
   setShowJudgeStatus: (v: boolean) => void
   judgeProgress: { currentTest: number; totalTests: number } | null
   setJudgeProgress: (v: TrainingProblemWorkspaceValue['judgeProgress']) => void
-  lastResult: { status: string; score: number } | null
+  lastResult: SubmissionResultData | null
   setLastResult: (v: TrainingProblemWorkspaceValue['lastResult']) => void
+  showResultModal: boolean
+  setShowResultModal: (v: boolean) => void
   currentSubmissionId: string | null
   setCurrentSubmissionId: (v: string | null) => void
   activeTab: 'description' | 'solutions' | 'submissions'
@@ -82,6 +85,7 @@ export function TrainingProblemWorkspaceProvider({
   const [showJudgeStatus, setShowJudgeStatus] = useState(false)
   const [judgeProgress, setJudgeProgress] = useState<TrainingProblemWorkspaceValue['judgeProgress']>(null)
   const [lastResult, setLastResult] = useState<TrainingProblemWorkspaceValue['lastResult']>(null)
+  const [showResultModal, setShowResultModal] = useState(false)
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions'>('description')
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -134,6 +138,8 @@ export function TrainingProblemWorkspaceProvider({
       setJudgeProgress,
       lastResult,
       setLastResult,
+      showResultModal,
+      setShowResultModal,
       currentSubmissionId,
       setCurrentSubmissionId,
       activeTab,
@@ -159,6 +165,7 @@ export function TrainingProblemWorkspaceProvider({
       showJudgeStatus,
       judgeProgress,
       lastResult,
+      showResultModal,
       currentSubmissionId,
       activeTab,
       submissions,

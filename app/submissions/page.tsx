@@ -33,6 +33,21 @@ interface Submission {
  isLate?: boolean
 }
 
+const STATUS_TEXT_ZH: Record<string, string> = {
+  AC: '通过', Accepted: '通过',
+  WA: '答案错误', 'Wrong Answer': '答案错误',
+  TLE: '超时', 'Time Limit Exceeded': '超时',
+  MLE: '超内存', 'Memory Limit Exceeded': '超内存',
+  RE: '运行错误', 'Runtime Error': '运行错误',
+  CE: '编译错误', 'Compile Error': '编译错误',
+  PE: '格式错误', 'Presentation Error': '格式错误',
+  OLE: '输出超限', 'Output Limit Exceeded': '输出超限',
+  CSP: '无法启动',
+  PC: '部分正确', 'Partly Correct': '部分正确',
+  SE: '系统错误', 'System Error': '系统错误',
+  Pending: '等待评测', Judging: '评测中', Running: '运行中',
+}
+
 function SubmissionsContent() {
  const searchParams = useSearchParams()
  const router = useRouter()
@@ -220,8 +235,7 @@ function SubmissionsContent() {
  <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">状态</th>
  <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">分数</th>
  <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">语言</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">时间</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">内存</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">用时·内存</th>
  <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">提交时间</th>
  <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">操作</th>
  </tr>
@@ -229,7 +243,7 @@ function SubmissionsContent() {
  <tbody className="divide-y divide-border">
  {submissions.length === 0 ? (
  <tr>
- <td colSpan={10} className="px-6 py-16 text-center">
+ <td colSpan={9} className="px-6 py-16 text-center">
  <div className="text-center">
  <FileText className="w-16 h-16 mx-auto mb-4 text-muted-foreground/20" />
  <p className="text-lg font-medium text-foreground mb-2">没有找到提交记录</p>
@@ -264,7 +278,7 @@ function SubmissionsContent() {
  {submission.user.nickname || submission.user.username}
  </Link>
  </td>
- <td className="px-6 py-4">
+ <td className="px-6 py-4" title={STATUS_TEXT_ZH[submission.status] || submission.status}>
  {getStatusBadge(submission.status)}
  </td>
  <td className="px-6 py-4">
@@ -276,15 +290,8 @@ function SubmissionsContent() {
  </span>
  </td>
  <td className="px-6 py-4">
- <span className="font-mono text-sm text-foreground flex items-center gap-1">
- <Clock className="w-3 h-3 text-muted-foreground" />
- {formatTime(submission.time)}
- </span>
- </td>
- <td className="px-6 py-4">
- <span className="font-mono text-sm text-foreground flex items-center gap-1">
- <Database className="w-3 h-3 text-muted-foreground" />
- {formatMemory(submission.memory)}
+ <span className="font-mono text-sm text-foreground">
+ {formatTime(submission.time)} · {formatMemory(submission.memory)}
  </span>
  </td>
  <td className="px-6 py-4">
@@ -297,18 +304,20 @@ function SubmissionsContent() {
  {assignmentId ? (
  <button
  onClick={() => setSelectedSubmission(submission)}
- className="text-primary-light hover:text-primary transition-colors text-sm flex items-center gap-1"
+ className="p-1.5 rounded-lg text-muted-foreground hover:text-primary-light hover:bg-muted transition-colors cursor-pointer"
+ title="查看详情"
+ aria-label="查看详情"
  >
  <Eye className="w-4 h-4" />
- 查看详情
  </button>
  ) : (
  <Link
  href={`/submission/${submission.id}`}
- className="text-primary-light hover:text-primary transition-colors text-sm flex items-center gap-1"
+ className="p-1.5 rounded-lg text-muted-foreground hover:text-primary-light hover:bg-muted transition-colors inline-flex"
+ title="查看详情"
+ aria-label="查看详情"
  >
  <Eye className="w-4 h-4" />
- 查看详情
  </Link>
  )}
  </td>
@@ -343,9 +352,15 @@ function SubmissionsContent() {
  </div>
 
  {selectedSubmission && assignmentId && (
- <div className="fixed inset-0 bg-background/80 flex items-center justify-center p-4 z-50">
- <div className="card-static max-w-4xl w-full max-h-[90vh] overflow-hidden">
- <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+ <div
+ className="fixed inset-0 bg-background/80 flex items-center justify-center p-4 z-50"
+ onClick={() => setSelectedSubmission(null)}
+ >
+ <div
+ className="card-static rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
+ onClick={(e) => e.stopPropagation()}
+ >
+ <div className="px-6 py-4 border-b border-border bg-muted flex items-center justify-between">
  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
  <FileText className="w-5 h-5 text-primary" />
  提交详情
@@ -359,26 +374,26 @@ function SubmissionsContent() {
  </div>
  <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] custom-scrollbar">
  <div className="grid grid-cols-2 gap-6 mb-6">
- <div className="card-static p-4">
+ <div className="card-static p-4 rounded-xl">
  <p className="text-sm text-muted-foreground mb-1">提交用户</p>
  <p className="font-medium text-foreground flex items-center gap-2">
  <User className="w-4 h-4 text-primary" />
  {selectedSubmission.user.nickname || selectedSubmission.user.username}
  </p>
  </div>
- <div className="card-static p-4">
+ <div className="card-static p-4 rounded-xl">
  <p className="text-sm text-muted-foreground mb-1">题目</p>
  <p className="font-medium text-foreground">{selectedSubmission.problem.title}</p>
  </div>
- <div className="card-static p-4">
+ <div className="card-static p-4 rounded-xl">
  <p className="text-sm text-muted-foreground mb-1">语言</p>
  <span className="tag">{selectedSubmission.language}</span>
  </div>
- <div className="card-static p-4">
+ <div className="card-static p-4 rounded-xl">
  <p className="text-sm text-muted-foreground mb-1">状态</p>
  {getStatusBadge(selectedSubmission.status)}
  </div>
- <div className="card-static p-4">
+ <div className="card-static p-4 rounded-xl">
  <p className="text-sm text-muted-foreground mb-1">得分</p>
  <p className="font-medium text-foreground">
  <span className="text-2xl font-bold">{selectedSubmission.score}</span>
@@ -389,7 +404,7 @@ function SubmissionsContent() {
  )}
  </p>
  </div>
- <div className="card-static p-4">
+ <div className="card-static p-4 rounded-xl">
  <p className="text-sm text-muted-foreground mb-1">提交时间</p>
  <p className="font-medium text-foreground flex items-center gap-2">
  <Calendar className="w-4 h-4 text-muted-foreground" />
