@@ -14,7 +14,8 @@
 import { EventEmitter } from 'events'
 import { logger } from '../logger'
 import { prisma } from '../prisma'
-import { generateSolutionForProblem, SolutionGenerationParams } from './solution-generator'
+import type { SolutionGenerationParams } from './solution-generator';
+import { generateSolutionForProblem } from './solution-generator'
 
 /** 题解生成任务超时时间（默认 5 分钟，可通过 AI_SOLUTION_TIMEOUT_MS 环境变量覆盖） */
 const AI_SOLUTION_TIMEOUT_MS = parseInt(process.env.AI_SOLUTION_TIMEOUT_MS || '300000', 10)
@@ -48,6 +49,13 @@ interface QueuedJob {
   createdAt: Date
   startedAt?: Date
   completedAt?: Date
+  /**
+   * 超时标志：executeJob 用 Promise.race 实现超时，但 _executeJobInner 的 Promise
+   * 无法真正取消。超时后 catch 设置 aborted=true，_executeJobInner 在写库点
+   * （写 Solution / status='COMPLETED' 之前）检查此标志并 return，避免覆盖已被
+   * catch 标为 FAILED 的日志状态。
+   */
+  aborted: boolean
 }
 
 class SolutionQueue extends EventEmitter {
@@ -61,7 +69,8 @@ class SolutionQueue extends EventEmitter {
       id: data.logId,
       data,
       status: 'waiting',
-      createdAt: new Date()
+      createdAt: new Date(),
+      aborted: false
     }
     this.queue.push(job)
     this.emit('waiting', job.id)
@@ -107,7 +116,9 @@ class SolutionQueue extends EventEmitter {
     } catch (error: unknown) {
       // 超时或 _executeJobInner 未捕获异常：标记 FAILED
       // _executeJobInner 内部已 try/catch 并写 FAILED 日志，此处主要兜底超时场景
+      // 标记 aborted，让 _executeJobInner 在后续写库点跳过 COMPLETED 覆盖
       const errorMessage = error instanceof Error ? error.message : String(error)
+      job.aborted = true
       job.status = 'failed'
       job.error = errorMessage
       logger.error('[solution-queue] 题解生成任务超时或异常', {
@@ -160,6 +171,10 @@ class SolutionQueue extends EventEmitter {
       // 注：sourceType / codeLanguage 为 schema 新增字段，当前 Prisma client 可能尚未重新生成，
       //     用 as any 兜底，运行时已支持。
       // 使用 $transaction 保证 deleteMany + create 原子性，避免中途失败导致题解丢失
+      //
+      // 超时保护：若 executeJob 已因超时把日志标 FAILED，则跳过写 Solution + COMPLETED 日志，
+      // 避免覆盖已被 catch 标记的 FAILED 状态（检查与写库之间无 await，避免竞态）
+      if (job.aborted) return
       const solution = await prisma.$transaction(async (tx) => {
         await tx.solution.deleteMany({
           where: {
@@ -182,6 +197,10 @@ class SolutionQueue extends EventEmitter {
           } as any
         })
       })
+
+      // 超时保护：事务执行期间若超时触发，跳过 COMPLETED 写库避免覆盖 FAILED
+      // （检查与写库之间无 await，避免竞态）
+      if (job.aborted) return
 
       await prisma.aiGenerationLog.update({
         where: { id: job.id },
@@ -244,7 +263,7 @@ class SolutionQueue extends EventEmitter {
 
 // Global singleton — 与 aiQueue 同款模式，避免 dev server 热重载时多实例
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __solutionQueue: SolutionQueue | undefined
 }
 

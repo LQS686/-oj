@@ -41,8 +41,25 @@ export default function ContestRankPage() {
 
  useEffect(() => {
  fetchRank()
- const timer = setInterval(fetchRank, 30000)
- return () => clearInterval(timer)
+ let intervalId: ReturnType<typeof setInterval> | null = setInterval(fetchRank, 30000)
+ const onVisibilityChange = () => {
+ if (document.visibilityState === 'visible') {
+ // 恢复前台时立即刷新一次并重启轮询
+ fetchRank()
+ if (!intervalId) intervalId = setInterval(fetchRank, 30000)
+ } else {
+ // 页面隐藏时暂停轮询，避免后台无意义请求
+ if (intervalId) {
+ clearInterval(intervalId)
+ intervalId = null
+ }
+ }
+ }
+ document.addEventListener('visibilitychange', onVisibilityChange)
+ return () => {
+ if (intervalId) clearInterval(intervalId)
+ document.removeEventListener('visibilitychange', onVisibilityChange)
+ }
  }, [])
 
  const fetchRank = async () => {

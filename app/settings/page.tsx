@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { User, Mail, Lock, Bell, Globe, Check, X, Settings, Shield, ChevronRight } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import AvatarUploader from '@/components/AvatarUploader'
@@ -61,6 +61,24 @@ export default function SettingsPage() {
  }
  })
 
+ // 邮箱验证码倒计时定时器、消息提示定时器的引用，用于卸载时清理
+ const emailCountdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+ const messageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+ // 组件卸载时清理所有定时器，避免 setState 操作已卸载组件
+ useEffect(() => {
+ return () => {
+ if (emailCountdownTimerRef.current) {
+ clearInterval(emailCountdownTimerRef.current)
+ emailCountdownTimerRef.current = null
+ }
+ if (messageTimerRef.current) {
+ clearTimeout(messageTimerRef.current)
+ messageTimerRef.current = null
+ }
+ }
+ }, [])
+
  useEffect(() => {
  if (contextUser) {
  setUserLocal(contextUser)
@@ -95,7 +113,11 @@ export default function SettingsPage() {
 
  const showMessage = (type: 'success' | 'error', text: string) => {
  setMessage({ type, text })
- setTimeout(() => setMessage(null), 3000)
+ if (messageTimerRef.current) clearTimeout(messageTimerRef.current)
+ messageTimerRef.current = setTimeout(() => {
+ setMessage(null)
+ messageTimerRef.current = null
+ }, 3000)
  }
 
  const handleProfileSubmit = async () => {
@@ -259,11 +281,15 @@ export default function SettingsPage() {
  if (data.success) {
  showMessage('success', '验证码已发送至新邮箱')
  setEmailChange(prev => ({ ...prev, step: 'verify', loading: false, countdown: 60 }))
- 
- const timer = setInterval(() => {
+
+ if (emailCountdownTimerRef.current) clearInterval(emailCountdownTimerRef.current)
+ emailCountdownTimerRef.current = setInterval(() => {
  setEmailChange(prev => {
  if (prev.countdown <= 1) {
- clearInterval(timer)
+ if (emailCountdownTimerRef.current) {
+ clearInterval(emailCountdownTimerRef.current)
+ emailCountdownTimerRef.current = null
+ }
  return { ...prev, countdown: 0 }
  }
  return { ...prev, countdown: prev.countdown - 1 }

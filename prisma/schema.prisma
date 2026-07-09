@@ -152,6 +152,8 @@ model TestCase {
   memoryLimit Int?     // 单测点内存限制覆盖（null=使用题目默认）
   orderIndex  Int
   createdAt   DateTime @default(now())
+
+  @@index([problemId])
 }
 
 // 提交记录
@@ -222,6 +224,8 @@ model ContestProblem {
   problem    Problem  @relation(fields: [problemId], references: [id])
   orderIndex Int
   score      Int      @default(100)
+
+  @@index([contestId])
 }
 
 // 竞赛参与者
@@ -294,6 +298,8 @@ model ClassAssignment {
   createdAt   DateTime                  @default(now())
 
   submissions ClassAssignmentSubmission[]
+
+  @@index([classId])
 }
 
 // 班级作业提交记录
@@ -342,6 +348,9 @@ model ClassNote {
   likes       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([classId])
+  @@index([classId, createdAt])
 }
 
 // 班级邀请码
@@ -416,6 +425,9 @@ model Comment {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([solutionId])
+  @@index([authorId])
 }
 
 // 题解
@@ -488,6 +500,9 @@ model Blog {
   isPublic  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([isPublic, createdAt])
 }
 
 // 训练计划 / 题单
@@ -583,6 +598,8 @@ model UserAchievement {
   achievementId String      @db.ObjectId
   achievement   Achievement @relation(fields: [achievementId], references: [id])
   earnedAt      DateTime    @default(now())
+
+  @@index([userId])
 }
 
 // 收藏
@@ -593,6 +610,8 @@ model Favorite {
   problemId String   @db.ObjectId
   problem   Problem  @relation(fields: [problemId], references: [id])
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // 通知
@@ -606,6 +625,9 @@ model Notification {
   link      String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
 }
 
 // 笔记阅读历史
@@ -629,6 +651,9 @@ model AuditLog {
   ip          String?
   userAgent   String?
   createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }
 
 // AI出题记录

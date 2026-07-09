@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events'
 import { logger } from '@/lib/logger'
-import { generateProblems, GenerationParams } from './generator'
+import type { GenerationParams } from './generator';
+import { generateProblems } from './generator'
 import { prisma } from '@/lib/prisma'
 import { createNotification } from '@/lib/notifications'
 import { compileCode, cleanup } from '@/lib/judge/compiler'
@@ -55,6 +56,13 @@ interface QueuedJob {
   createdAt: Date
   startedAt?: Date
   completedAt?: Date
+  /**
+   * 超时标志：executeJob 用 Promise.race 实现超时，但 _executeJobInner 的 Promise
+   * 无法真正取消。超时后 catch 设置 aborted=true，_executeJobInner 在关键写库点
+   * （status='COMPLETED' 之前）检查此标志并 return，避免把已被 catch 标为 FAILED
+   * 的日志状态覆盖回 COMPLETED。
+   */
+  aborted: boolean
 }
 
 class AiQueue extends EventEmitter {
@@ -73,6 +81,7 @@ class AiQueue extends EventEmitter {
       data,
       status: 'waiting',
       createdAt: new Date(),
+      aborted: false,
     }
 
     this.queue.push(job)
@@ -119,6 +128,8 @@ class AiQueue extends EventEmitter {
         })
       ])
     } catch (error: any) {
+      // 标记 aborted，让 _executeJobInner 在后续写库点跳过 COMPLETED 覆盖
+      job.aborted = true
       job.status = 'failed'
       job.error = error.message
 
@@ -161,8 +172,8 @@ class AiQueue extends EventEmitter {
       // ---------------------------------------------------------
       // 🚀 SHARED: Solution Execution for Correct Outputs
       // ---------------------------------------------------------
-      let validTestCasesWithStats: any[] = []
-      let stats = {
+      const validTestCasesWithStats: any[] = []
+      const stats = {
           total: 0,
           passed: 0,
           failed: 0,
@@ -302,6 +313,9 @@ class AiQueue extends EventEmitter {
                 orderIndex: idx
             }))
 
+            // 超时保护：若 executeJob 已因超时把日志标 FAILED，则跳过后续写库，避免覆盖状态
+            if (job.aborted) return
+
             // Transactional update
             await prisma.$transaction(async (tx: any) => {
                 // Delete old cases
@@ -325,12 +339,15 @@ class AiQueue extends EventEmitter {
                     } as any
                 })
 
+                // 超时保护：事务执行期间若超时触发，跳过 COMPLETED 写库避免覆盖 FAILED
+                if (job.aborted) return
+
                 // Update Log
                 await tx.aiGenerationLog.update({
                     where: { id: job.id },
-                    data: { 
+                    data: {
                         status: 'COMPLETED',
-                        result: { 
+                        result: {
                             testCases: newCasesFormatted, // Return only new cases in result for log visibility
                             thought,
                             stats: stats.total > 0 ? stats : undefined
@@ -705,6 +722,9 @@ class AiQueue extends EventEmitter {
             finalError = `Partial success. Errors: ${errors.join('; ')}`
           }
 
+          // 超时保护：跳过 COMPLETED 写库，避免覆盖已被 catch 标记的 FAILED 状态
+          if (job.aborted) return
+
           // Update DB with results
           await prisma.aiGenerationLog.update({
             where: { id: job.id },
@@ -746,6 +766,8 @@ class AiQueue extends EventEmitter {
         input: input !== undefined ? String(input) : '',
         output: output !== undefined ? String(output) : ''
       }))
+      // 超时保护：跳过 COMPLETED 写库，避免覆盖已被 catch 标记的 FAILED 状态
+      if (job.aborted) return
       await prisma.aiGenerationLog.update({
         where: { id: job.id },
         data: {

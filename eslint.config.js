@@ -97,6 +97,8 @@ export default [
       'dist/**',
       'build/**',
       'coverage/**',
+      // 参考资源为外部 Qt 项目翻译文件（.ts 实为 XML），非本项目源码
+      '参考资源/**',
       '**/*.config.js',
       '**/*.config.ts',
       'server.ts',

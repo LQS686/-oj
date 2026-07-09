@@ -28,7 +28,7 @@ interface AiConfigBody {
  * GET /api/admin/ai/config
  */
 export const GET = withApi.admin(async () => {
-  const { data, config, totalTokens } = await getGlobalAiConfig()
+  const { data, totalTokens } = await getGlobalAiConfig()
   if (data) return ok(data)
 
   // 数据库无配置时回退到 SystemSettings

@@ -9,6 +9,9 @@ import { verifyToken, JWTPayload } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 let io: SocketIOServer | null = null
+// 定时器引用：优雅关闭时 clearInterval，避免资源泄漏
+let rateLimitCleanupTimer: ReturnType<typeof setInterval> | null = null
+let staleConnectionCleanupTimer: ReturnType<typeof setInterval> | null = null
 
 const MAX_MESSAGE_SIZE = 1 * 1024 * 1024
 const RATE_LIMIT_WINDOW = 60 * 1000
@@ -45,7 +48,7 @@ function cleanupRateLimit(): void {
   }
 }
 
-setInterval(cleanupRateLimit, 60 * 1000)
+rateLimitCleanupTimer = setInterval(cleanupRateLimit, 60 * 1000)
 
 async function authenticateSocket(socket: Socket): Promise<string | null> {
   try {
@@ -64,7 +67,7 @@ async function authenticateSocket(socket: Socket): Promise<string | null> {
 
     return payload.userId
   } catch (error) {
-    console.error('❌ Socket 认证失败:', error)
+    logger.error('❌ Socket 认证失败:', error)
     return null
   }
 }
@@ -102,11 +105,11 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
  */
 export function initWebSocketServer(httpServer: HTTPServer) {
   if (io) {
-    console.log('⚠️  WebSocket 服务器已存在')
+    logger.info('⚠️  WebSocket 服务器已存在')
     return io
   }
 
-  console.log('🔧 正在初始化 WebSocket 服务器...')
+  logger.info('🔧 正在初始化 WebSocket 服务器...')
   
   io = new SocketIOServer(httpServer, {
     cors: {
@@ -143,7 +146,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     const userId = await authenticateSocket(socket)
     const isAuthenticated = userId !== null
 
-    console.log(`✅ 客户端连接: ${socket.id}, IP=${clientIP}, 认证=${isAuthenticated}, 剩余配额=${rateCheck.remaining}`)
+    logger.info(`✅ 客户端连接: ${socket.id}, IP=${clientIP}, 认证=${isAuthenticated}, 剩余配额=${rateCheck.remaining}`)
     
     connectedClients.set(socket.id, {
       socketId: socket.id,
@@ -159,19 +162,19 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       const client = connectedClients.get(socket.id)
       
       if (!ALLOWED_EVENT_TYPES.includes(eventName as any)) {
-        console.warn(`⚠️  未知消息类型: ${eventName}, Socket=${socket.id}`)
+        logger.warn(`⚠️  未知消息类型: ${eventName}, Socket=${socket.id}`)
         return next()
       }
       
       const messageSize = JSON.stringify(args).length
       if (messageSize > MAX_MESSAGE_SIZE) {
-        console.warn(`⚠️  消息大小超限: ${messageSize} bytes, Socket=${socket.id}, 事件=${eventName}`)
+        logger.warn(`⚠️  消息大小超限: ${messageSize} bytes, Socket=${socket.id}, 事件=${eventName}`)
         return next(new Error('消息大小超过限制'))
       }
       
       if (eventName === 'join' || eventName === 'leave') {
         if (!client?.isAuthenticated) {
-          console.warn(`🚫 未认证用户尝试访问私有房间: Socket=${socket.id}, 事件=${eventName}`)
+          logger.warn(`🚫 未认证用户尝试访问私有房间: Socket=${socket.id}, 事件=${eventName}`)
           socket.emit('error', { event: eventName, message: '请先认证后再访问私有房间' })
           return next(new Error('未认证'))
         }
@@ -184,7 +187,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       try {
         const client = connectedClients.get(socket.id)
         if (!client?.isAuthenticated) {
-          console.warn(`🚫 未认证用户尝试加入私有房间: Socket=${socket.id}`)
+          logger.warn(`🚫 未认证用户尝试加入私有房间: Socket=${socket.id}`)
           socket.emit('error', { event: 'join', message: '请先认证后再加入私有房间' })
           return
         }
@@ -217,7 +220,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
         
         socket.emit('joined', { userId, room: roomName })
       } catch (error) {
-        console.error('❌ 处理 join 事件错误:', error)
+        logger.error('❌ 处理 join 事件错误:', error)
         socket.emit('error', { event: 'join', message: '处理加入房间失败' })
       }
     })
@@ -237,22 +240,22 @@ export function initWebSocketServer(httpServer: HTTPServer) {
         
         const roomName = `user:${userId}`
         socket.leave(roomName)
-        console.log(`👋 用户 ${userId} 离开房间: ${roomName}`)
+        logger.info(`👋 用户 ${userId} 离开房间: ${roomName}`)
         socket.emit('left', { userId, room: roomName })
       } catch (error) {
-        console.error('❌ 处理 leave 事件错误:', error)
+        logger.error('❌ 处理 leave 事件错误:', error)
         socket.emit('error', { event: 'leave', message: '处理离开房间失败' })
       }
     })
 
     socket.on('disconnect', (reason) => {
-      console.log(`❌ 客户端断开: ${socket.id}, 原因: ${reason}`)
+      logger.info(`❌ 客户端断开: ${socket.id}, 原因: ${reason}`)
 
       connectedClients.delete(socket.id)
     })
 
     socket.on('error', (error) => {
-      console.error('❌ Socket 错误:', error)
+      logger.error('❌ Socket 错误:', error)
       socket.emit('error', { event: 'unknown', message: '发生未知错误' })
     })
 
@@ -280,19 +283,19 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     })
 
     socket.conn.on('heartbeat_timeout', () => {
-      console.warn(`⚠️  心跳超时: ${socket.id}`)
+      logger.warn(`⚠️  心跳超时: ${socket.id}`)
       socket.disconnect(true)
     })
   })
 
   // 定期清理无效连接
-  setInterval(() => {
+  staleConnectionCleanupTimer = setInterval(() => {
     const now = Date.now()
     const timeoutThreshold = 5 * 60 * 1000 // 5分钟超时
     
     for (const [socketId, clientInfo] of connectedClients.entries()) {
       if (now - clientInfo.connectedAt > timeoutThreshold) {
-        console.warn(`⚠️  清理超时连接: ${socketId}`)
+        logger.warn(`⚠️  清理超时连接: ${socketId}`)
         connectedClients.delete(socketId)
       }
     }
@@ -304,11 +307,34 @@ export function initWebSocketServer(httpServer: HTTPServer) {
 }
 
 /**
+ * 关闭 WebSocket 服务器并清理定时器
+ * 供 server.ts 优雅关闭时调用：clearInterval 两个定时器 + io.close()
+ */
+export function closeWebSocket(): void {
+  if (rateLimitCleanupTimer) {
+    clearInterval(rateLimitCleanupTimer)
+    rateLimitCleanupTimer = null
+  }
+  if (staleConnectionCleanupTimer) {
+    clearInterval(staleConnectionCleanupTimer)
+    staleConnectionCleanupTimer = null
+  }
+  if (io) {
+    try {
+      io.close()
+    } catch (e) {
+      logger.error('关闭 WebSocket 服务器失败', e)
+    }
+    io = null
+  }
+}
+
+/**
  * 获取 WebSocket 服务器实例
  */
 export function getIO(): SocketIOServer | null {
   if (!io) {
-    console.warn('⚠️  WebSocket 服务器尚未初始化')
+    logger.warn('⚠️  WebSocket 服务器尚未初始化')
     return null
   }
   return io
@@ -320,13 +346,13 @@ export function getIO(): SocketIOServer | null {
 export function emitSubmissionUpdate(userId: string, data: { id: string; status: string; score: number; time?: number; memory?: number; passedTests?: number; totalTests?: number; problemId?: string; message?: string; testResults?: any[] }) {
   const ioInstance = getIO()
   if (!ioInstance) {
-    console.warn('⚠️  WebSocket 服务器未初始化，跳过推送')
+    logger.warn('⚠️  WebSocket 服务器未初始化，跳过推送')
     return
   }
 
   const roomName = `user:${userId}`
   ioInstance.to(roomName).emit('submission:update', data)
-  console.log(`📤 推送提交更新到用户 ${userId}:`, {
+  logger.info(`📤 推送提交更新到用户 ${userId}:`, {
     id: data.id,
     status: data.status,
     score: data.score,
@@ -349,7 +375,7 @@ export function emitJudgeProgress(userId: string, data: {
 
   const roomName = `user:${userId}`
   ioInstance.to(roomName).emit('judge:progress', data)
-  console.log(`📊 推送评测进度到用户 ${userId}: ${data.currentTest}/${data.totalTests}`)
+  logger.info(`📊 推送评测进度到用户 ${userId}: ${data.currentTest}/${data.totalTests}`)
 }
 
 /**
@@ -365,7 +391,7 @@ export function emitNotification(userId: string, notification: {
 
   const roomName = `user:${userId}`
   ioInstance.to(roomName).emit('notification', notification)
-  console.log(`🔔 发送通知到用户 ${userId}:`, notification.title)
+  logger.info(`🔔 发送通知到用户 ${userId}:`, notification.title)
 }
 
 /**

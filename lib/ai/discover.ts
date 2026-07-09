@@ -5,6 +5,7 @@
 import { prisma } from '@/lib/prisma'
 import { getProviderMeta, inferModelType, type ProviderMeta } from './providers'
 import { ApiError } from '@/lib/api/withApi'
+import { decrypt } from '@/lib/crypto'
 
 export interface DiscoveredModel {
   name: string
@@ -44,6 +45,7 @@ async function fetchOpenAICompatibleModels(
   const res = await fetch(url, {
     method: 'GET',
     headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(10000),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
@@ -81,6 +83,22 @@ export async function discoverProviderModels(
     throw new ApiError('NO_API_KEY', '服务商未配置 API Key', 400)
   }
 
+  // 数据库存储的是 AES-256-CBC 密文，必须先解密再作为 Bearer token 传给服务商
+  // （参考 lib/ai/config.ts L56/L89 的 decrypt 调用）
+  let apiKey: string
+  try {
+    apiKey = decrypt(provider.apiKey)
+  } catch {
+    throw new ApiError(
+      'DECRYPT_FAILED',
+      'AI 配置加密密钥未设置或解密失败',
+      500
+    )
+  }
+  if (!apiKey) {
+    throw new ApiError('NO_API_KEY', '服务商 API Key 解密后为空', 400)
+  }
+
   const { meta, format, openaiBase } = resolveProvider({
     slug: provider.slug,
     name: provider.name,
@@ -92,7 +110,7 @@ export async function discoverProviderModels(
     if (!openaiBase) {
       throw new ApiError('NO_BASE_URL', '未配置 OpenAI 兼容 baseUrl', 400)
     }
-    return fetchOpenAICompatibleModels(openaiBase, provider.apiKey)
+    return fetchOpenAICompatibleModels(openaiBase, apiKey)
   }
 
   if (format === 'anthropic') {

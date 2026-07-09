@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { logger } from '@/lib/logger'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
 import { ApiError } from '@/lib/api/withApi'
 import {
@@ -572,7 +573,7 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
         memoryLimit: tc.memoryLimit ?? undefined,
       })),
     })
-    console.log(`✅ 竞赛提交 ${submission.id} 已加入评测队列`)
+    logger.info(`✅ 竞赛提交 ${submission.id} 已加入评测队列`)
   } catch (queueError) {
     console.error('加入队列失败:', queueError)
     // 依然返回成功，但标记为系统错误
@@ -780,8 +781,17 @@ export async function listContestProblemsWithStatus(
  * ========================================================================== */
 
 /** 管理员列出所有竞赛（带作者 + 题目/参赛者计数） */
-export async function listAdminContests() {
+export async function listAdminContests(opts?: { page?: number; pageSize?: number }) {
+  const page = opts?.page
+  const pageSize = opts?.pageSize
+  const usePaging =
+    typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
+  // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
+  const take = usePaging ? (pageSize as number) : 500
+  const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
   return prisma.contest.findMany({
+    skip,
+    take,
     orderBy: { startTime: 'desc' },
     include: {
       author: { select: { username: true } },

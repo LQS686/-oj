@@ -335,34 +335,38 @@ export async function listAdminSubmissions(filter: {
       },
     }),
   ])
-  // 手动查询用户和题目信息，优雅处理已删除的数据
-  const submissions = await Promise.all(
-    submissionsRaw.map(async (sub: any) => {
-      const [user, problem] = await Promise.all([
-        prisma.user.findUnique({
-          where: { id: sub.userId },
+  // 批量查询用户和题目信息，避免 N+1（原每条提交 2 次查询，pageSize=50 时 100 次往返）
+  const userIds = [...new Set(submissionsRaw.map((s: any) => s.userId).filter(Boolean))]
+  const problemIds = [...new Set(submissionsRaw.map((s: any) => s.problemId).filter(Boolean))]
+  const [users, problems] = await Promise.all([
+    userIds.length
+      ? prisma.user.findMany({
+          where: { id: { in: userIds } },
           select: { id: true, username: true, nickname: true },
-        }),
-        prisma.problem.findUnique({
-          where: { id: sub.problemId },
+        })
+      : [],
+    problemIds.length
+      ? prisma.problem.findMany({
+          where: { id: { in: problemIds } },
           select: { id: true, problemNumber: true, title: true },
-        }),
-      ])
-      return {
-        ...sub,
-        user: user || {
-          id: sub.userId,
-          username: '未知用户',
-          nickname: '未知用户',
-        },
-        problem: problem || {
-          id: sub.problemId,
-          problemNumber: '',
-          title: '题目已删除',
-        },
-      }
-    })
-  )
+        })
+      : [],
+  ])
+  const userMap = new Map(users.map((u: any) => [u.id, u]))
+  const problemMap = new Map(problems.map((p: any) => [p.id, p]))
+  const submissions = submissionsRaw.map((sub: any) => ({
+    ...sub,
+    user: userMap.get(sub.userId) || {
+      id: sub.userId,
+      username: '未知用户',
+      nickname: '未知用户',
+    },
+    problem: problemMap.get(sub.problemId) || {
+      id: sub.problemId,
+      problemNumber: '',
+      title: '题目已删除',
+    },
+  }))
   return {
     submissions,
     total,

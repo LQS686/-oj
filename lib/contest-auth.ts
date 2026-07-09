@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { JWTPayload } from '@/lib/auth'
 import { canManageContent } from '@/lib/permissions'
 import { NextRequest } from 'next/server'
@@ -14,7 +15,7 @@ async function logAccess(
   const ip = req?.headers.get('x-forwarded-for') || (req as any)?.ip || 'unknown'
   const userAgent = req?.headers.get('user-agent') || 'unknown'
   
-  console.log(`[Audit] ${action} | User: ${userId || 'Guest'} | Resource: ${resource} | IP: ${ip}`)
+  logger.info(`[Audit] ${action} | User: ${userId || 'Guest'} | Resource: ${resource} | IP: ${ip}`)
 
   try {
     await prisma.auditLog.create({

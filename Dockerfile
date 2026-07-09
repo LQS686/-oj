@@ -36,7 +36,10 @@ WORKDIR /app
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 # 安装必要的系统依赖（用于编译器）
+# bash: runner.sh 依赖；coreutils: 提供 /usr/bin/time 用于资源统计回退
 RUN apk add --no-cache \
+    bash \
+    coreutils \
     python3 \
     py3-pip \
     make \
@@ -49,7 +52,9 @@ RUN apk add --no-cache \
 # 设置环境变量
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV USE_DOCKER=true
+# USE_DOCKER=false: 在容器内直接执行评测更简单可靠（容器内已装 g++/gcc/openjdk）。
+# sibling 容器卷挂载复杂（评测容器看不到宿主文件），如需 Docker 沙箱需另配 docker.sock + 卷挂载。
+ENV USE_DOCKER=false
 
 # 创建非root用户
 RUN addgroup --system --gid 1001 nodejs

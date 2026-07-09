@@ -2,6 +2,39 @@
 // 创建数据库用户和初始数据
 // 密码通过环境变量传入，无默认值
 
+// ---------------------------------------------------------
+// 副本集初始化（幂等）
+// mongo 以 --replSet rs0 启动，但首次启动若不 initiate 会拒绝写入；
+// 且项目多处依赖 prisma.$transaction，事务必须在副本集上运行。
+// 重复执行不报错：已 initiate 时 rs.status() 直接成功。
+// ---------------------------------------------------------
+try {
+  rs.status()
+  print('[INFO] 副本集 rs0 已初始化')
+} catch (e) {
+  // 未初始化时 rs.status() 抛错（如 "not yet initialized" / "no replset config"）
+  print('[INFO] 副本集尚未初始化，开始 rs.initiate...')
+  rs.initiate({
+    _id: 'rs0',
+    members: [{ _id: 0, host: 'mongo:27017' }]
+  })
+  print('[INFO] rs.initiate 已发起，等待 PRIMARY...')
+}
+
+// 等待节点成为 PRIMARY（可写），否则后续 createUser/createCollection 会失败
+let waited = 0
+while (!db.hello().isWritablePrimary) {
+  if (waited === 0) {
+    print('[INFO] 等待节点升级为 PRIMARY...')
+  }
+  sleep(1000)
+  waited++
+  if (waited > 60) {
+    throw new Error('等待副本集 PRIMARY 超时（60s），init-mongo.js 终止')
+  }
+}
+print('[SUCCESS] 副本集已就绪，当前节点为 PRIMARY')
+
 const dbName = 'oj_platform'
 
 const db = db.getSiblingDB(dbName)

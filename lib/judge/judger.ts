@@ -225,7 +225,7 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
     // 仅当编译成功时清理编译产物
     if (compileResult?.success && compileResult.compiledPath) {
       try {
-        await cleanup(compileResult.compiledPath)
+        await cleanup(compileResult.compiledPath, job.language)
       } catch (err) {
         logger.warn('清理编译产物失败', { error: err instanceof Error ? err.message : String(err) })
       }
@@ -240,7 +240,7 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
 }
 
 // 清理临时文件
-export async function cleanup(compiledPath?: string) {
+export async function cleanup(compiledPath?: string, language?: string) {
   if (!compiledPath) return
   const fs = await import('fs/promises')
   const path = await import('path')
@@ -256,10 +256,18 @@ export async function cleanup(compiledPath?: string) {
 
   await tryUnlink(compiledPath)
 
+  // cpp/c：compiledPath 是可执行文件，需额外清理源文件 solution_*.cpp/.c
+  if (language === 'cpp' || language === 'c') {
+    const dir = path.dirname(compiledPath)
+    const stem = path.basename(compiledPath, path.extname(compiledPath))
+    const sourceExt = language === 'cpp' ? '.cpp' : '.c'
+    await tryUnlink(path.join(dir, stem + sourceExt))
+  }
+
   // Java 情况：compiledPath 无扩展名，实际产物是 {className}.class 与源文件 {className}.java
   // 不清理会导致高并发下两个 Java 提交（均 public class Main）互相覆盖
   const ext = path.extname(compiledPath)
-  if (!ext) {
+  if (language === 'java' || (!language && !ext)) {
     await tryUnlink(`${compiledPath}.class`)
     await tryUnlink(`${compiledPath}.java`)
   }

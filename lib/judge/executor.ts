@@ -323,6 +323,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
       const maxMemoryBytes = memoryLimit * 1024 * 1024
       let monitorInterval: NodeJS.Timeout | null = null
+      // timeoutId 提升至外层作用域，便于内存轮询杀进程后清除墙超时定时器
+      let timeoutId: NodeJS.Timeout | null = null
       let processKilled = false
       let forceKilled = false
 
@@ -349,6 +351,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
               memoryExceeded = true
               processKilled = true
               forceKilled = true
+              // 内存超限杀进程后清除墙超时定时器，避免后续误设 timeout 标志覆盖 MLE
+              if (timeoutId) clearTimeout(timeoutId)
               childProcess.kill('SIGKILL')
               if (monitorInterval) clearInterval(monitorInterval)
             }
@@ -365,6 +369,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
               memoryExceeded = true
               processKilled = true
               forceKilled = true
+              // 内存超限杀进程后清除墙超时定时器，避免后续误设 timeout 标志覆盖 MLE
+              if (timeoutId) clearTimeout(timeoutId)
               try {
                 execSync(`taskkill /F /T /PID ${childProcess.pid}`, { stdio: 'ignore' })
               } catch {
@@ -404,8 +410,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         let savedExitCode: number | null = 0
         let savedForceKilled = false
         let savedTimeout = false
+        let fallbackTimer: NodeJS.Timeout | null = null
 
-        const timeoutId = setTimeout(() => {
+        timeoutId = setTimeout(() => {
           logger.debug(`执行超时，强制终止进程`, { hardTimeoutMs })
           timeout = true
           forceKilled = true
@@ -436,20 +443,12 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           // （close 在所有 stdio 流关闭后触发，确保输出已完整刷盘）
         }, hardTimeoutMs)
 
-        childProcess.on('exit', (code) => {
-          if (exited) return
-          exited = true
-          // 仅保存状态，不执行 endTime/resolve，等待 close 事件
-          // （close 在所有 stdio 流关闭后触发，确保 stdout 已刷盘）
-          savedExitCode = code
-          savedForceKilled = forceKilled
-          savedTimeout = timeout
-        })
-
-        childProcess.on('close', () => {
+        // 统一收尾函数：close/error/兜底定时器共用
+        const finishResolve = () => {
           if (resolved) return
           resolved = true
-          clearTimeout(timeoutId)
+          if (timeoutId) clearTimeout(timeoutId)
+          if (fallbackTimer) clearTimeout(fallbackTimer)
           if (monitorInterval) clearInterval(monitorInterval)
           processKilled = true
           // close 事件触发时所有 stdio 流已关闭，输出已完整刷盘
@@ -474,6 +473,12 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             }
           }
 
+          // P1-3: runner.sh 的 ulimit -t CPU 超限会发 SIGXCPU(退出码 152)
+          // 或 SIGKILL(137)，非 Docker 路径应视为 TLE 而非 RE
+          if (savedExitCode === 137 || savedExitCode === 152) {
+            savedTimeout = true
+          }
+
           if (savedExitCode !== 0 && !savedTimeout) {
             runtimeError = true
           }
@@ -486,12 +491,35 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           }
 
           resolve()
+        }
+
+        childProcess.on('exit', (code) => {
+          if (exited) return
+          exited = true
+          // 仅保存状态，不执行 endTime/resolve，等待 close 事件
+          // （close 在所有 stdio 流关闭后触发，确保 stdout 已刷盘）
+          savedExitCode = code
+          savedForceKilled = forceKilled
+          savedTimeout = timeout
+          // P1-5: exit 比 close 更早触发；启动兜底定时器，
+          // 若 close 因孙进程继承 stdout fd 而永不触发，则在 2s 后强制 resolve
+          fallbackTimer = setTimeout(() => {
+            if (!resolved) {
+              logger.debug(`close 事件超时未触发，强制 resolve（孙进程可能持有 fd）`)
+              finishResolve()
+            }
+          }, 2000)
+        })
+
+        childProcess.on('close', () => {
+          finishResolve()
         })
 
         childProcess.on('error', (err) => {
           if (resolved) return
           resolved = true
-          clearTimeout(timeoutId)
+          if (timeoutId) clearTimeout(timeoutId)
+          if (fallbackTimer) clearTimeout(fallbackTimer)
           if (monitorInterval) clearInterval(monitorInterval)
           processKilled = true
           endTime = Date.now()

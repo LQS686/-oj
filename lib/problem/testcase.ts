@@ -183,22 +183,36 @@ export async function parseTestCaseZip(zipBuffer: Buffer): Promise<ValidationRes
     const hasFolder = zipEntries.some((e) => e.isDirectory)
     if (hasFolder) return { success: false, error: '压缩包内不得包含文件夹' }
 
+    // 先按 entry 数量做早期校验，防止 zip bomb（解压前）
+    const fileEntries = zipEntries.filter((e) => !e.isDirectory)
+    if (fileEntries.length > TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES * 2) {
+      return { success: false, error: `测试点数量超过限制（最多${TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES}对）` }
+    }
+
     const testCaseMap = new Map<number, { in?: Buffer; out?: Buffer; inName?: string; outName?: string }>()
     let totalUnzipSize = 0
 
-    for (const entry of zipEntries) {
-      if (entry.isDirectory) continue
+    // 逐个解压，累计实际字节数（不依赖 zip 头声明的可伪造大小），超过上限立即中止
+    for (const entry of fileEntries) {
       const fileName = entry.entryName
-      const fileSize = entry.header.size
-      totalUnzipSize += fileSize
       const validation = validateFileName(fileName)
       if (!validation.valid) {
         return { success: false, error: `文件名不符合规范: ${fileName}` }
       }
+      // 解压单个 entry 并以实际字节数做二次校验
+      const fileContent = entry.getData()
+      const actualSize = fileContent.length
+      if (actualSize > TESTCASE_UPLOAD_CONFIG.MAX_UNZIP_SIZE) {
+        return { success: false, error: '单个文件解压后大小超过限制' }
+      }
+      totalUnzipSize += actualSize
+      if (totalUnzipSize > TESTCASE_UPLOAD_CONFIG.MAX_UNZIP_SIZE) {
+        return { success: false, error: `解压后文件总大小超过限制` }
+      }
+
       const { number, type } = validation
       if (!testCaseMap.has(number!)) testCaseMap.set(number!, {})
       const tc = testCaseMap.get(number!)!
-      const fileContent = entry.getData()
       if (type === 'in') {
         if (tc.in) return { success: false, error: `测试点 ${number} 的输入文件重复` }
         tc.in = fileContent
@@ -208,10 +222,6 @@ export async function parseTestCaseZip(zipBuffer: Buffer): Promise<ValidationRes
         tc.out = fileContent
         tc.outName = fileName
       }
-    }
-
-    if (totalUnzipSize > TESTCASE_UPLOAD_CONFIG.MAX_UNZIP_SIZE) {
-      return { success: false, error: `解压后文件总大小超过限制` }
     }
 
     const testCases: TestCaseFile[] = []
@@ -246,7 +256,7 @@ export async function parseTestCaseZip(zipBuffer: Buffer): Promise<ValidationRes
     return { success: true, testCases, totalSize: totalUnzipSize }
   } catch (error) {
     logger.error('解析测试点压缩包失败', error)
-    return { success: false, error: error instanceof Error ? error.message : '解析压缩包失败' }
+    return { success: false, error: '解析压缩包失败' }
   }
 }
 

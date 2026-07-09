@@ -185,15 +185,22 @@ class JudgeQueue extends EventEmitter {
       
       // 执行评测
       const result = await executeJudge(job.data)
-      
+
+      // 竞态保护：若 job 已被 checkDeadJobs 标记为 failed/completed，
+      // 则不再覆盖状态、不从 processing 删除、不重复 emit，直接返回结果。
+      if (job.status === 'failed' || job.status === 'completed') {
+        logger.warn(`任务已被标记为 ${job.status}（可能被死任务检测器处理），跳过完成回调`, { jobId: job.id })
+        return
+      }
+
       // 标记完成
       job.status = 'completed'
       job.result = result
       job.completedAt = new Date()
-      
+
       this.processing.delete(job.id)
       this.completed.set(job.id, job)
-      
+
       this.emit('completed', job, result)
       logger.info(`评测完成`, { jobId: job.id, status: result.status })
       
@@ -205,14 +212,20 @@ class JudgeQueue extends EventEmitter {
         }
       }
     } catch (error) {
+      // 竞态保护：若 job 已被 checkDeadJobs 标记为 failed/completed，
+      // 则不覆盖状态、不重复 emit（避免数据库被多次更新）
+      if (job.status === 'failed' || job.status === 'completed') {
+        logger.warn(`任务已被标记为 ${job.status}（可能被死任务检测器处理），跳过失败回调`, { jobId: job.id })
+        return
+      }
       // 标记失败
       job.status = 'failed'
       job.error = error instanceof Error ? error.message : String(error)
       job.completedAt = new Date()
-      
+
       this.processing.delete(job.id)
       this.completed.set(job.id, job)
-      
+
       this.emit('failed', job, error)
       logger.error(`评测失败`, error, { jobId: job.id })
     }

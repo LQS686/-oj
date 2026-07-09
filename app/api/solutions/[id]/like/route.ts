@@ -4,6 +4,7 @@
 import { withApi, ok, readQuery, throw400, throw404 } from '@/lib/api/withApi'
 import { toggleSolutionLike, loadSolutionViewUser } from '@/lib/solution/service'
 import { isObjectId } from '@/lib/api/validation'
+import { logger } from '@/lib/logger'
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id } = (ctx as any).params
@@ -21,16 +22,17 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
       message: result.liked ? '点赞成功' : '已取消点赞',
     })
   } catch (err: any) {
+    logger.error('切换题解点赞失败', err)
     if (err?.status === 403) {
       return Response.json(
-        { ok: false, success: false, error: err.message, permission: err.permission, code: 'FORBIDDEN' },
+        { ok: false, success: false, error: '无权操作', permission: err.permission, code: 'FORBIDDEN' },
         { status: 403 }
       )
     }
-    if (err?.status === 404) throw404(err.message)
+    if (err?.status === 404) throw404('资源不存在')
     if (err?.status === 503) {
       return Response.json(
-        { ok: false, success: false, error: err.message, code: 'SERVICE_UNAVAILABLE' },
+        { ok: false, success: false, error: '服务暂时不可用', code: 'SERVICE_UNAVAILABLE' },
         { status: 503 }
       )
     }

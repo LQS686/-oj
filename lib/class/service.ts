@@ -9,6 +9,7 @@ import { addJudgeJob } from '@/lib/judge/queue'
 import {
   createClassAssignmentSubmissionDirect,
   createSubmissionDirect,
+  deleteClassAssignmentSubmissionDirect,
   incrementProblemSubmitCount,
   updateClassAssignmentSubmissionDirect,
   updateSubmissionDirect,
@@ -984,15 +985,23 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
     isLate,
   })
 
-  const submission = await createSubmissionDirect({
-    problemId: input.problemId,
-    userId: input.userId,
-    code: input.code,
-    language: input.language,
-    status: 'Pending',
-    totalTests: problem.testCases.length,
-    assignmentSubmissionId: assignmentSubmission.id,
-  })
+  // 两次写入使用原生驱动（非 Prisma），用补偿逻辑保证一致性：
+  // 第二步 createSubmissionDirect 失败时回滚第一步，避免孤立作业提交记录
+  let submission
+  try {
+    submission = await createSubmissionDirect({
+      problemId: input.problemId,
+      userId: input.userId,
+      code: input.code,
+      language: input.language,
+      status: 'Pending',
+      totalTests: problem.testCases.length,
+      assignmentSubmissionId: assignmentSubmission.id,
+    })
+  } catch (err) {
+    await deleteClassAssignmentSubmissionDirect(assignmentSubmission.id).catch(() => {})
+    throw err
+  }
 
   await incrementProblemSubmitCount(input.problemId)
 
@@ -1487,46 +1496,57 @@ export async function joinClassByCode(
     return { ok: false, code: 400, reason: '班级人数已达上限' }
   }
 
-  // 乐观更新 usedCount
+  // 乐观更新 usedCount + 建成员：放入事务保证原子性，任一步失败回滚 usedCount
   const now = new Date()
   const maxUsesCondition =
     invite.maxUses === -1 ? { usedCount: { lt: 999999 } } : { usedCount: { lt: invite.maxUses } }
-  const updatedInvite = await prisma.classInvite.updateMany({
-    where: {
-      id: invite.id,
-      ...maxUsesCondition,
-      ...(invite.expiresAt ? { expiresAt: { gt: now } } : {}),
-    },
-    data: { usedCount: { increment: 1 } },
-  })
-  if (updatedInvite.count === 0) {
-    return { ok: false, code: 400, reason: '邀请码已失效或使用次数已达上限' }
-  }
-
   try {
-    await prisma.classMember.create({
-      data: {
-        classId,
-        userId,
-        role: apiRoleToDb('student'),
-        permissions: {
-          canViewProblems: true,
-          canSubmit: true,
-          canViewNotes: true,
-          canCreateNotes: false,
-          canManageAssignments: false,
-          canInviteMembers: false,
+    await prisma.$transaction(async (tx) => {
+      const updatedInvite = await tx.classInvite.updateMany({
+        where: {
+          id: invite.id,
+          ...maxUsesCondition,
+          ...(invite.expiresAt ? { expiresAt: { gt: now } } : {}),
         },
-        joinedAt: new Date(),
-        lastActiveAt: new Date(),
-      },
+        data: { usedCount: { increment: 1 } },
+      })
+      if (updatedInvite.count === 0) {
+        const err: any = new Error('邀请码已失效或使用次数已达上限')
+        err.code = 'INVITE_EXHAUSTED'
+        throw err
+      }
+      try {
+        await tx.classMember.create({
+          data: {
+            classId,
+            userId,
+            role: apiRoleToDb('student'),
+            permissions: {
+              canViewProblems: true,
+              canSubmit: true,
+              canViewNotes: true,
+              canCreateNotes: false,
+              canManageAssignments: false,
+              canInviteMembers: false,
+            },
+            joinedAt: new Date(),
+            lastActiveAt: new Date(),
+          },
+        })
+      } catch (err: any) {
+        if (err?.code === 'P2002') {
+          const e: any = new Error('您已经是班级成员')
+          e.code = 'ALREADY_MEMBER'
+          throw e
+        }
+        throw err
+      }
     })
   } catch (err: any) {
-    if (err?.code === 'P2002') {
-      await prisma.classInvite.update({
-        where: { id: invite.id },
-        data: { usedCount: { decrement: 1 } },
-      })
+    if (err?.code === 'INVITE_EXHAUSTED') {
+      return { ok: false, code: 400, reason: '邀请码已失效或使用次数已达上限' }
+    }
+    if (err?.code === 'ALREADY_MEMBER') {
       return { ok: false, code: 400, reason: '您已经是班级成员' }
     }
     throw err
@@ -1640,38 +1660,47 @@ export async function respondDirectInvite(
   }
 
   const newStatus = action === 'accept' ? 'accepted' : 'rejected'
-  await prisma.classDirectInvite.update({
-    where: { id: inviteId },
-    data: { status: newStatus, respondedAt: new Date() },
-  })
 
+  // 接受邀请时：更新邀请状态 + 建成员需事务保证，避免"已接受但未入班"且 unique 约束阻断重试
   if (action === 'accept') {
-    const existingMember = await prisma.classMember.findUnique({
-      where: {
-        classId_userId: { classId: invite.classId, userId: currentUserId },
-      },
-    })
-    if (!existingMember) {
-      await prisma.classMember.create({
-        data: {
-          classId: invite.classId,
-          userId: currentUserId,
-          role: apiRoleToDb('student'),
-          permissions: {
-            canViewProblems: true,
-            canSubmit: true,
-            canViewNotes: true,
-            canCreateNotes: false,
-            canManageAssignments: false,
-            canInviteMembers: false,
-            canManageMembers: false,
-            canViewStats: false,
-          },
-          joinedAt: new Date(),
-          lastActiveAt: new Date(),
+    await prisma.$transaction(async (tx) => {
+      await tx.classDirectInvite.update({
+        where: { id: inviteId },
+        data: { status: newStatus, respondedAt: new Date() },
+      })
+      const existingMember = await tx.classMember.findUnique({
+        where: {
+          classId_userId: { classId: invite.classId, userId: currentUserId },
         },
       })
-    }
+      if (!existingMember) {
+        await tx.classMember.create({
+          data: {
+            classId: invite.classId,
+            userId: currentUserId,
+            role: apiRoleToDb('student'),
+            permissions: {
+              canViewProblems: true,
+              canSubmit: true,
+              canViewNotes: true,
+              canCreateNotes: false,
+              canManageAssignments: false,
+              canInviteMembers: false,
+              canManageMembers: false,
+              canViewStats: false,
+            },
+            joinedAt: new Date(),
+            lastActiveAt: new Date(),
+          },
+        })
+      }
+    })
+  } else {
+    // 拒绝：仅需更新邀请状态，单次写无需事务
+    await prisma.classDirectInvite.update({
+      where: { id: inviteId },
+      data: { status: newStatus, respondedAt: new Date() },
+    })
   }
 
   return { ok: true, status: newStatus, classId: invite.classId }
@@ -2318,8 +2347,17 @@ export async function cancelClassJoinRequest(
  * ========================================================================== */
 
 /** 管理员列出所有班级（带成员/作业/笔记计数 + owner 用户名） */
-export async function listAllClassesForAdmin() {
+export async function listAllClassesForAdmin(opts?: { page?: number; pageSize?: number }) {
+  const page = opts?.page
+  const pageSize = opts?.pageSize
+  const usePaging =
+    typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
+  // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
+  const take = usePaging ? (pageSize as number) : 500
+  const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
   const classes = await prisma.class.findMany({
+    skip,
+    take,
     orderBy: { createdAt: 'desc' },
     include: {
       _count: { select: { members: true, assignments: true, notes: true } },

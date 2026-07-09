@@ -98,12 +98,13 @@ async function safeCall(
     if (err?.code === 'P2025') {
       return fail('NOT_FOUND', '资源不存在', 404)
     }
+    // 兜底：仅记录详细错误到日志，不向客户端透传 err.message（避免泄露内部结构）
     logger.error(`[${errorCode}] ${err?.message || err}`, {
       url: req.url,
       method: req.method,
       stack: err?.stack,
     })
-    return serverError(err?.message || '服务器错误')
+    return serverError('服务器错误')
   }
 }
 

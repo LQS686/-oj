@@ -6,7 +6,7 @@
 import { createServer } from 'http'
 import { parse } from 'url'
 import next from 'next'
-import { initWebSocketServer } from './lib/websocket/server'
+import { initWebSocketServer, closeWebSocket } from './lib/websocket/server'
 import dotenv from 'dotenv'
 import { logger } from './lib/logger'
 
@@ -83,4 +83,96 @@ app.prepare().then(() => {
     logger.info(`服务器运行在 http://${hostname}:${port}`)
     logger.info(`WebSocket 服务在 ws://${hostname}:${port}/socket.io`)
   })
+
+  // ----------------------------------------------------------------
+  // 优雅关闭：收到 SIGTERM/SIGINT 时停止接收新请求、关闭各连接与队列
+  // 各步骤用 try/catch 包裹，任一失败不阻塞后续；并行关闭以加速；带 10s 兜底超时
+  // ----------------------------------------------------------------
+  let isShuttingDown = false
+
+  function gracefulShutdown(signal: string): void {
+    if (isShuttingDown) {
+      logger.warn(`再次收到 ${signal} 信号，强制退出`)
+      process.exit(1)
+      return
+    }
+    isShuttingDown = true
+    logger.info(`收到关闭信号（${signal}），开始优雅关闭...`)
+
+    // 10 秒兜底超时：防止 in-flight 请求或 keep-alive 连接导致进程长时间挂起
+    const forceExitTimer = setTimeout(() => {
+      logger.error('优雅关闭超时（10s），强制退出')
+      process.exit(1)
+    }, 10000)
+
+    // 动态导入避免在 dotenv 加载前初始化 prisma/redis（这些模块在加载时读取环境变量）
+    Promise.all([
+      import('./lib/judge/queue'),
+      import('./lib/redis'),
+      import('./lib/prisma'),
+    ]).then(([{ judgeQueue }, { getRedisClient }, { prisma }]) => {
+      const tasks: Promise<void>[] = [
+        // 1. 停止接收新请求，等待 in-flight 请求结束
+        new Promise<void>((resolve) => {
+          httpServer.close((err) => {
+            if (err) logger.error('停止 HTTP 服务器失败', err)
+            else logger.info('HTTP 服务器已停止接收新请求')
+            resolve()
+          })
+        }),
+        // 2. 关闭 Socket.IO + 清理 WebSocket 定时器
+        Promise.resolve().then(() => {
+          try {
+            closeWebSocket()
+            logger.info('WebSocket 服务器已关闭')
+          } catch (e) {
+            logger.error('关闭 WebSocket 失败', e)
+          }
+        }),
+        // 3. 释放评测队列资源（停止死任务检测定时器）
+        Promise.resolve().then(() => {
+          try {
+            judgeQueue.dispose()
+            logger.info('评测队列资源已释放')
+          } catch (e) {
+            logger.error('释放评测队列失败', e)
+          }
+        }),
+        // 4. 关闭 Redis 连接
+        Promise.resolve().then(async () => {
+          try {
+            await getRedisClient().quit()
+            logger.info('Redis 连接已关闭')
+          } catch (e) {
+            logger.error('关闭 Redis 失败', e)
+          }
+        }),
+        // 5. 断开 Prisma 数据库连接
+        Promise.resolve().then(async () => {
+          try {
+            await prisma.$disconnect()
+            logger.info('Prisma 已断开连接')
+          } catch (e) {
+            logger.error('Prisma 断开失败', e)
+          }
+        }),
+      ]
+
+      // AI 队列（aiQueue / solutionQueue）无 dispose/drain 方法，跳过清理
+      logger.info('AI 队列无 dispose 方法，跳过 aiQueue/solutionQueue 清理')
+
+      return Promise.allSettled(tasks)
+    }).then(() => {
+      clearTimeout(forceExitTimer)
+      logger.info('优雅关闭完成，退出进程')
+      process.exit(0)
+    }).catch((e) => {
+      logger.error('优雅关闭过程中发生未预期错误', e)
+      clearTimeout(forceExitTimer)
+      process.exit(1)
+    })
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 })

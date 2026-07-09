@@ -1,9 +1,11 @@
 
 import { logger } from '../logger';
 import { createAiClient, getModelName, buildChatParams } from './factory'
-import { getAiConfig, AiConfig } from './config'
+import type { AiConfig } from './config';
+import { getAiConfig } from './config'
 import { promptLoader } from './prompts/loader'
-import { GenerationMode, PromptContext, GeneratedProblem } from './prompts/core/types'
+import type { PromptContext, GeneratedProblem } from './prompts/core/types';
+import { GenerationMode } from './prompts/core/types'
 import { checkGeneratedProblem, checkTestDataQuality } from './quality-check'
 import { safeJsonParse as _safeJsonParse } from './response-parser'
 

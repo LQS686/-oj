@@ -118,15 +118,19 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  fetchSubmissions()
  }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus, isFromLeaderboard])
 
- // 轮询兜底：列表里有非终态记录时每 3s 拉一次，
- // 解决 WebSocket 漏推 / 断连时提交记录永远不刷新的问题
+ // 用 ref 跟踪是否有非终态提交，避免 submissions 变化导致 interval 反复重建
+ const hasNonFinalRef = useRef(false)
  useEffect(() => {
- if (!Array.isArray(submissions) || submissions.length === 0) return
- const hasNonFinal = submissions.some(
+ hasNonFinalRef.current = Array.isArray(submissions) && submissions.some(
  (s) => s?.status === 'Pending' || s?.status === 'Judging' || s?.status === 'Running'
  )
- if (!hasNonFinal) return
- const timer = setInterval(async () => {
+ }, [submissions])
+
+ // 轮询兜底：列表里有非终态记录时每 3s 拉一次，
+ // 解决 WebSocket 漏推 / 断连时提交记录永远不刷新的问题。
+ // 页面隐藏时暂停轮询，恢复前台时若仍有非终态则重启。
+ useEffect(() => {
+ const fetchSubmissionsPolling = async () => {
  try {
  const params = new URLSearchParams()
  if (filterUserId) params.append('userId', filterUserId)
@@ -134,7 +138,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  if (filterStatus) params.append('status', filterStatus)
  params.append('page', '1')
  params.append('pageSize', '50')
- 
+
  const response = await fetchWithAuth(
  `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
  { cache: 'no-store' }
@@ -146,9 +150,51 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  } catch (error) {
  logger.error('轮询提交记录失败', error)
  }
+ }
+
+ let intervalId: ReturnType<typeof setInterval> | null = null
+ const start = () => {
+ if (intervalId) return
+ intervalId = setInterval(() => {
+ // 每次轮询前检查 ref，若已全部终态则停止（避免无意义请求）
+ if (!hasNonFinalRef.current) {
+ stop()
+ return
+ }
+ fetchSubmissionsPolling()
  }, 3000)
- return () => clearInterval(timer)
- }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus, submissions])
+ }
+ const stop = () => {
+ if (intervalId) {
+ clearInterval(intervalId)
+ intervalId = null
+ }
+ }
+ const onVisibilityChange = () => {
+ if (document.visibilityState === 'visible') {
+ // 切回页面时若仍有非终态提交，立即刷新一次并启动轮询
+ if (hasNonFinalRef.current) {
+ fetchSubmissionsPolling()
+ start()
+ } else {
+ stop()
+ }
+ } else {
+ stop()
+ }
+ }
+
+ // 初始：若有非终态提交且页面可见，启动轮询
+ if (hasNonFinalRef.current && document.visibilityState === 'visible') {
+ start()
+ }
+ document.addEventListener('visibilitychange', onVisibilityChange)
+
+ return () => {
+ stop()
+ document.removeEventListener('visibilitychange', onVisibilityChange)
+ }
+ }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus])
 
  // WebSocket 实时推送：本地有用户提交时收到推送，
  // 立即合并到列表（乐观更新），再后台拉一次拿权威数据
@@ -172,6 +218,10 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  totalTests: typeof data.totalTests === 'number' ? data.totalTests : next[idx].totalTests,
  message: data.message ?? next[idx].message,
  }
+ // 同步更新 hasNonFinalRef，让轮询 effect 立即感知状态变化
+ hasNonFinalRef.current = next.some(
+ (s) => s?.status === 'Pending' || s?.status === 'Judging' || s?.status === 'Running'
+ )
  return next
  })
  },

@@ -53,6 +53,19 @@ export default function ProblemTestCasesPage() {
  const [logs, setLogs] = useState<any[]>([])
  const [logsLoading, setLogsLoading] = useState(false)
 
+ // 成功提示 setTimeout 引用，用于卸载时清理
+ const successMsgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+ // 组件卸载时清理定时器，避免 setState 操作已卸载组件
+ useEffect(() => {
+ return () => {
+ if (successMsgTimerRef.current) {
+ clearTimeout(successMsgTimerRef.current)
+ successMsgTimerRef.current = null
+ }
+ }
+ }, [])
+
  useEffect(() => {
  if (showLogsModal) {
  fetchLogs()
@@ -75,22 +88,21 @@ export default function ProblemTestCasesPage() {
  }
 
  useEffect(() => {
- if (pollingLogId) {
- const interval = setInterval(async () => {
+ if (!pollingLogId) return
+
+ const pollAiStatus = async () => {
  try {
  const res = await fetchWithAuth(`/api/admin/ai/generate?logId=${pollingLogId}`)
  const data = await res.json()
- 
+
  if (data.success && data.data) {
  const status = data.data.status
  if (status === 'COMPLETED') {
- clearInterval(interval)
  setPollingLogId(null)
  setAiGenerating(false)
  setSuccessMsg('AI 生成完成，正在刷新数据...')
  await fetchProblemData()
  } else if (status === 'FAILED') {
- clearInterval(interval)
  setPollingLogId(null)
  setAiGenerating(false)
  setError('AI 生成失败: ' + (data.data.error || '未知错误'))
@@ -99,8 +111,38 @@ export default function ProblemTestCasesPage() {
  } catch (err) {
  logger.error('轮询生成状态失败', err)
  }
- }, 2000)
- return () => clearInterval(interval)
+ }
+
+ let intervalId: ReturnType<typeof setInterval> | null = null
+ const start = () => {
+ if (intervalId) return
+ intervalId = setInterval(pollAiStatus, 2000)
+ }
+ const stop = () => {
+ if (intervalId) {
+ clearInterval(intervalId)
+ intervalId = null
+ }
+ }
+ const onVisibilityChange = () => {
+ if (document.visibilityState === 'visible') {
+ // 恢复前台时立即查一次并重启轮询
+ pollAiStatus()
+ start()
+ } else {
+ // 页面隐藏时暂停轮询，避免后台无意义请求
+ stop()
+ }
+ }
+
+ if (document.visibilityState === 'visible') {
+ start()
+ }
+ document.addEventListener('visibilitychange', onVisibilityChange)
+
+ return () => {
+ stop()
+ document.removeEventListener('visibilitychange', onVisibilityChange)
  }
  }, [pollingLogId])
 
@@ -350,7 +392,11 @@ export default function ProblemTestCasesPage() {
 
  if (data.success) {
  setSuccessMsg('测试用例保存成功！')
- setTimeout(() => setSuccessMsg(''), 3000)
+ if (successMsgTimerRef.current) clearTimeout(successMsgTimerRef.current)
+ successMsgTimerRef.current = setTimeout(() => {
+ setSuccessMsg('')
+ successMsgTimerRef.current = null
+ }, 3000)
  } else {
  setError(data.error || '保存失败')
  }

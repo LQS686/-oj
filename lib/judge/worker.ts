@@ -1,5 +1,6 @@
 // 评测Worker - 监听队列并执行评测
 import { judgeQueue, addJudgeJob } from './queue'
+import { cleanupOldTempFiles } from './judger'
 import { prisma } from '@/lib/prisma'
 import type { JudgeJob, JudgeResult, QueuedJob } from './queue'
 import type { ComparisonMode } from './types'
@@ -13,8 +14,8 @@ import {
 import { logger } from '@/lib/logger'
 import { cache } from '@/lib/cache'
 
-// 监听评测完成事件
-judgeQueue.on('completed', async (job: QueuedJob, result: JudgeResult) => {
+// 监听评测完成事件（热重载守卫：避免 Next.js dev 模式重复注册监听器）
+if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', async (job: QueuedJob, result: JudgeResult) => {
   try {
     logger.info(`更新数据库`, { submissionId: result.submissionId, status: result.status })
     
@@ -168,8 +169,8 @@ judgeQueue.on('completed', async (job: QueuedJob, result: JudgeResult) => {
   }
 })
 
-// 监听评测失败事件
-judgeQueue.on('failed', async (job: QueuedJob, error: Error) => {
+// 监听评测失败事件（热重载守卫：避免 Next.js dev 模式重复注册监听器）
+if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job: QueuedJob, error: Error) => {
   try {
     logger.error(`评测失败`, error, { jobId: job.id })
     
@@ -264,35 +265,57 @@ async function recoverPendingJobs() {
   }
 }
 
-// 定期输出队列状态
-const statsInterval = setInterval(async () => {
-  try {
-    const stats = judgeQueue.getStats()
-    logger.info(`队列状态`, { waiting: stats.waiting, active: stats.active, completed: stats.completed })
-  } catch (err) {
-    logger.error('获取队列状态失败', err)
+// 定时器引用（保存以便统一优雅关闭时清理，关闭逻辑由 server.ts 调用 disposeWorker 处理）
+let statsInterval: NodeJS.Timeout | null = null
+let cleanupInterval: NodeJS.Timeout | null = null
+
+// 守卫：Next.js dev 模式热重载时避免重复注册定时器/恢复任务
+declare global {
+  var __judgeWorkerInitialized: boolean | undefined
+}
+
+if (!global.__judgeWorkerInitialized) {
+  global.__judgeWorkerInitialized = true
+
+  // P0 Security: 生产环境未启用 Docker 评测沙箱告警（不阻塞启动）
+  if (process.env.NODE_ENV === 'production' && process.env.USE_DOCKER !== 'true') {
+    logger.warn('生产环境未启用 Docker 评测沙箱，选手代码可能访问进程资源，建议设置 USE_DOCKER=true')
   }
-}, 30000)
 
-// 在文件末尾启动恢复
-recoverPendingJobs().then(() => {
-  logger.info('评测Worker已启动')
-  logger.info('正在监听评测队列...')
-})
+  // 定期输出队列状态
+  statsInterval = setInterval(async () => {
+    try {
+      const stats = judgeQueue.getStats()
+      logger.info(`队列状态`, { waiting: stats.waiting, active: stats.active, completed: stats.completed })
+    } catch (err) {
+      logger.error('获取队列状态失败', err)
+    }
+  }, 30000)
 
-// 优雅退出
-process.on('SIGINT', async () => {
-  logger.info('正在关闭Worker...')
-  clearInterval(statsInterval)
-  judgeQueue.dispose()
-  await prisma.$disconnect()
-  process.exit(0)
-})
+  // P1-2: 定期清理过期临时文件（10分钟），防止编译源文件堆积
+  cleanupInterval = setInterval(() => {
+    try {
+      cleanupOldTempFiles()
+    } catch (e) {
+      logger.error('清理过期临时文件失败', e)
+    }
+  }, 600000)
 
-process.on('SIGTERM', async () => {
-  logger.info('正在关闭Worker...')
-  clearInterval(statsInterval)
-  judgeQueue.dispose()
-  await prisma.$disconnect()
-  process.exit(0)
-})
+  // 在文件末尾启动恢复
+  recoverPendingJobs().then(() => {
+    logger.info('评测Worker已启动')
+    logger.info('正在监听评测队列...')
+  })
+}
+
+// 清理 Worker 定时器（供 server.ts 统一优雅关闭调用；judgeQueue.dispose 由其另行调用）
+export function disposeWorker() {
+  if (statsInterval) {
+    clearInterval(statsInterval)
+    statsInterval = null
+  }
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval)
+    cleanupInterval = null
+  }
+}

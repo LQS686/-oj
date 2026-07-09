@@ -11,6 +11,7 @@ import {
   loadSolutionViewUser,
 } from '@/lib/solution/service'
 import { toInt } from '@/lib/api/validation'
+import { logger } from '@/lib/logger'
 
 export const GET = withApi.public(async (req) => {
   const q = readQuery<{
@@ -58,8 +59,9 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     const solution = await createUserSolution(body, user.id)
     return ok(solution, { status: 201 })
   } catch (err: any) {
-    if (err?.status === 400) throw400('VALIDATION', err.message)
-    if (err?.status === 404) throw404(err.message)
+    logger.error('创建题解失败', err)
+    if (err?.status === 400) throw400('VALIDATION', '请求参数不合法')
+    if (err?.status === 404) throw404('资源不存在')
     throw err
   }
 })

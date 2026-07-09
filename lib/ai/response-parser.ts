@@ -177,6 +177,13 @@ export function safeJsonParse(text: string): any {
   try {
     return JSON.parse(stripped)
   } catch (e: any) {
+    // 二次尝试：剥离 markdown 代码块包裹（```json ... ``` 或 ``` ... ```）后解析
+    // 国产模型偶发仍用 markdown 包裹 JSON，tryRemoveMarkdown 内部完成剥离 + JSON.parse
+    try {
+      return tryRemoveMarkdown(stripped)
+    } catch {
+      // 两次解析均失败，继续抛 AI_PARSE_FAILED
+    }
     // 启发式检测响应是否被 max_tokens 截断：
     // 截断的标志 = 字符串里所有括号/引号都是奇数个未闭合
     // 简化判定：如果内容最后 50 字包含未闭合的 " 或 { 或 [，大概率是截断

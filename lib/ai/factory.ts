@@ -1,5 +1,5 @@
 import { OpenAI } from 'openai'
-import { AiConfig } from './config'
+import type { AiConfig } from './config'
 import { resolveBaseUrl, getProviderMeta, inferModelType } from './providers'
 
 export function createAiClient(config: AiConfig, isThinking = false) {

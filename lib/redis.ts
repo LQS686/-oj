@@ -14,7 +14,7 @@ function createRedisClient(): Redis {
   })
 
   client.on('error', (error) => {
-    console.error('Redis connection error:', error)
+    logger.error('Redis connection error:', error)
   })
 
   client.on('connect', () => {
@@ -22,11 +22,11 @@ function createRedisClient(): Redis {
   })
 
   client.on('reconnecting', () => {
-    console.log('Redis reconnecting...')
+    logger.info('Redis reconnecting...')
   })
 
   client.on('end', () => {
-    console.log('Redis connection closed')
+    logger.info('Redis connection closed')
   })
 
   return client
@@ -60,7 +60,7 @@ class RedisCache {
       }
       return null
     } catch (error) {
-      console.error('Redis get error:', error)
+      logger.error('Redis get error:', error)
       return null
     }
   }
@@ -72,7 +72,7 @@ class RedisCache {
       await this.client.set(fullKey, JSON.stringify(value), 'EX', ttl)
       return true
     } catch (error) {
-      console.error('Redis set error:', error)
+      logger.error('Redis set error:', error)
       return false
     }
   }
@@ -83,7 +83,7 @@ class RedisCache {
       await this.client.del(fullKey)
       return true
     } catch (error) {
-      console.error('Redis delete error:', error)
+      logger.error('Redis delete error:', error)
       return false
     }
   }
@@ -104,7 +104,7 @@ class RedisCache {
     try {
       return await this.client.incr(fullKey)
     } catch (error) {
-      console.error('Redis increment error:', error)
+      logger.error('Redis increment error:', error)
       return null
     }
   }
@@ -114,7 +114,7 @@ class RedisCache {
     try {
       return await this.client.decr(fullKey)
     } catch (error) {
-      console.error('Redis decrement error:', error)
+      logger.error('Redis decrement error:', error)
       return null
     }
   }
@@ -124,7 +124,7 @@ class RedisCache {
     try {
       return await this.client.keys(fullPattern)
     } catch (error) {
-      console.error('Redis keys error:', error)
+      logger.error('Redis keys error:', error)
       return []
     }
   }

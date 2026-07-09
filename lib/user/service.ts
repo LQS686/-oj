@@ -925,8 +925,17 @@ export function assertAssignableRole(
 /**
  * 列出所有用户（管理员）
  */
-export async function listAllUsersForAdmin() {
+export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: number }) {
+  const page = opts?.page
+  const pageSize = opts?.pageSize
+  const usePaging =
+    typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
+  // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
+  const take = usePaging ? (pageSize as number) : 500
+  const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
   return prisma.user.findMany({
+    skip,
+    take,
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
@@ -1297,5 +1306,21 @@ export async function registerNewUser(input: {
       createdAt: true,
     },
   })
-  return { ...user, isFirstUser }
+
+  // TOCTOU 防护：并发注册时，多个请求可能同时通过 count===0 判定。
+  // 创建后二次校验 SYSTEM_ADMIN 数量，若 >1 说明已有更早的超管，将当前用户降级为 STUDENT。
+  let actualRole = user.role
+  let actualIsFirstUser = isFirstUser
+  if (isFirstUser) {
+    const adminCount = await prisma.user.count({ where: { role: 'SYSTEM_ADMIN' } })
+    if (adminCount > 1) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { role: 'STUDENT', rank: '新手', color: '#808080' },
+      })
+      actualRole = 'STUDENT'
+      actualIsFirstUser = false
+    }
+  }
+  return { ...user, role: actualRole, isFirstUser: actualIsFirstUser }
 }

@@ -12,7 +12,7 @@ import {
 } from '@/lib/category/service'
 import { logger } from '@/lib/logger'
 
-export const POST = withApi.public(async () => {
+export const POST = withApi.admin(async () => {
   const data = await seedDefaultCategories()
   return ok({ message: '分类初始化完成', data })
 })

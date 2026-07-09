@@ -134,22 +134,58 @@ export default function TrainingDetailPage() {
  },
  })
 
- // 兜底轮询：有评测中题目时每 3s 拉一次
- useEffect(() => {
- if (judgeStatus !== null) {
- if (pollingRef.current) clearInterval(pollingRef.current)
+ // 用 ref 跟踪 judgeStatus，避免每个中间态都重启计时器
+ const judgeStatusRef = useRef<{ problemId: string; status: string } | null>(null)
+
+ const startPolling = useCallback(() => {
+ // 幂等：已在运行则不重启，避免中间态反复重置 3s 倒计时
+ if (pollingRef.current) return
  pollingRef.current = setInterval(() => {
  fetchDetail(false)
  }, 3000)
- } else if (pollingRef.current) {
+ }, [fetchDetail])
+
+ const stopPolling = useCallback(() => {
+ if (pollingRef.current) {
  clearInterval(pollingRef.current)
  pollingRef.current = null
  }
- return () => {
- if (pollingRef.current) clearInterval(pollingRef.current)
- pollingRef.current = null
+ }, [])
+
+ // judgeStatus 变化时同步 ref 并启动/停止轮询（仅页面可见时启动）
+ useEffect(() => {
+ judgeStatusRef.current = judgeStatus
+ if (judgeStatus && document.visibilityState === 'visible') {
+ startPolling()
+ } else if (!judgeStatus) {
+ stopPolling()
  }
- }, [judgeStatus, fetchDetail])
+ }, [judgeStatus, startPolling, stopPolling])
+
+ // 兜底轮询：有评测中题目时每 3s 拉一次。
+ // 页面隐藏时暂停轮询，恢复前台时若仍处于评测中则重启。
+ useEffect(() => {
+ const onVisibilityChange = () => {
+ if (document.visibilityState === 'visible') {
+ // 恢复前台时若仍处于评测中，立即刷新一次并重启轮询
+ if (judgeStatusRef.current) {
+ fetchDetail(false)
+ startPolling()
+ } else {
+ stopPolling()
+ }
+ } else {
+ // 页面隐藏时暂停轮询，避免后台无意义请求
+ stopPolling()
+ }
+ }
+ document.addEventListener('visibilitychange', onVisibilityChange)
+ return () => {
+ stopPolling()
+ document.removeEventListener('visibilitychange', onVisibilityChange)
+ }
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [trainingId])
 
  if (loading) {
  return (

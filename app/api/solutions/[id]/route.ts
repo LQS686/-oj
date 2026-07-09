@@ -16,6 +16,7 @@ import {
 } from '@/lib/solution/service'
 import { getUserRoleFlags } from '@/lib/user/service'
 import { isObjectId } from '@/lib/api/validation'
+import { logger } from '@/lib/logger'
 
 function getClientIp(req: Request): string {
   const fwd = req.headers.get('x-forwarded-for')
@@ -75,9 +76,10 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
     const updated = await updateUserSolution(id, user.id, adminFlag, canManage, body)
     return ok(updated)
   } catch (err: any) {
-    if (err?.status === 400) throw400('VALIDATION', err.message)
-    if (err?.status === 403) throw403(err.message)
-    if (err?.status === 404) throw404(err.message)
+    logger.error('更新题解失败', err)
+    if (err?.status === 400) throw400('VALIDATION', '请求参数不合法')
+    if (err?.status === 403) throw403('无权操作')
+    if (err?.status === 404) throw404('资源不存在')
     throw err
   }
 })
@@ -94,8 +96,9 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
     await deleteUserSolution(id, user.id, adminFlag, canManage)
     return ok({ message: '题解已删除' })
   } catch (err: any) {
-    if (err?.status === 403) throw403(err.message)
-    if (err?.status === 404) throw404(err.message)
+    logger.error('删除题解失败', err)
+    if (err?.status === 403) throw403('无权操作')
+    if (err?.status === 404) throw404('资源不存在')
     throw err
   }
 })

@@ -540,9 +540,10 @@ export async function getGlobalAiConfig() {
         totalTokens: tokenStats._sum.tokensUsed || 0,
         hasApiKey: !!config.apiKey,
       },
+      totalTokens: tokenStats._sum.tokensUsed || 0,
     }
   }
-  return { config: null, totalTokens: tokenStats._sum.tokensUsed || 0 }
+  return { data: null, totalTokens: tokenStats._sum.tokensUsed || 0 }
 }
 
 /** 写入管理员 AI 全局配置（敏感字段加密） */

@@ -338,16 +338,22 @@ export async function listProblemSubmissionsMerged(
  * 管理员视角：列出全部题目（含隐藏字段）/ 创建题目（含自动编号）
  * ========================================================================== */
 
-export async function listAllProblemsForAdmin() {
+export async function listAllProblemsForAdmin(opts?: { page?: number; pageSize?: number }) {
+  const page = opts?.page
+  const pageSize = opts?.pageSize
+  const usePaging =
+    typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
+  // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
+  const take = usePaging ? (pageSize as number) : 500
+  const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
   return prisma.problem.findMany({
+    skip,
+    take,
     orderBy: [{ problemNumber: 'asc' }, { createdAt: 'desc' }],
     select: {
       id: true,
       problemNumber: true,
       title: true,
-      description: true,
-      input: true,
-      output: true,
       samples: true,
       hint: true,
       source: true,

@@ -305,6 +305,7 @@ export async function updateClassAssignmentSubmissionDirect(
 
 /**
  * 直接创建竞赛及关联题目（绕过 Prisma 事务）
+ * insertOne + insertMany 放入 MongoDB session 事务，保证原子性
  */
 export async function createContestDirect(data: {
   title: string
@@ -340,20 +341,26 @@ export async function createContestDirect(data: {
       updatedAt: new Date()
     }
 
-    await db.collection('Contest').insertOne(contest)
+    const contestProblems =
+      data.problemIds && data.problemIds.length > 0
+        ? data.problemIds.map((pid, index) => ({
+            _id: new ObjectId(),
+            contestId: contest._id,
+            problemId: new ObjectId(pid),
+            orderIndex: index,
+            score: 100, // 默认分数
+          }))
+        : []
 
-    // 2. 创建竞赛题目关联
-    if (data.problemIds && data.problemIds.length > 0) {
-      const contestProblems = data.problemIds.map((pid, index) => ({
-        _id: new ObjectId(),
-        contestId: contest._id,
-        problemId: new ObjectId(pid),
-        orderIndex: index,
-        score: 100 // 默认分数
-      }))
-
-      await db.collection('ContestProblem').insertMany(contestProblems)
-    }
+    // insertOne + insertMany 放入事务，任一步失败则整体回滚
+    await client.withSession(async (session) => {
+      await session.withTransaction(async () => {
+        await db.collection('Contest').insertOne(contest, { session })
+        if (contestProblems.length > 0) {
+          await db.collection('ContestProblem').insertMany(contestProblems, { session })
+        }
+      })
+    })
 
     return {
       id: contest._id.toString(),
@@ -439,20 +446,39 @@ export async function updateClassAssignmentDirect(
 
 /**
  * 直接删除班级作业（绕过 Prisma 事务）
+ * deleteMany + deleteOne 放入 MongoDB session 事务，保证原子性
  */
 export async function deleteClassAssignmentDirect(assignmentId: string) {
   return withRetry(async () => {
     const client = await getMongoClient()
     const db = client.db()
 
-    // 1. 删除相关提交记录
-    await db.collection('ClassAssignmentSubmission').deleteMany({
-      assignmentId: new ObjectId(assignmentId)
-    })
+    await client.withSession(async (session) => {
+      await session.withTransaction(async () => {
+        // 1. 删除相关提交记录
+        await db
+          .collection('ClassAssignmentSubmission')
+          .deleteMany({ assignmentId: new ObjectId(assignmentId) }, { session })
 
-    // 2. 删除作业本身
-    await db.collection('ClassAssignment').deleteOne({
-      _id: new ObjectId(assignmentId)
+        // 2. 删除作业本身
+        await db
+          .collection('ClassAssignment')
+          .deleteOne({ _id: new ObjectId(assignmentId) }, { session })
+      })
+    })
+  })
+}
+
+/**
+ * 直接删除班级作业提交记录（用于 submitAssignmentCode 失败时的补偿回滚）
+ */
+export async function deleteClassAssignmentSubmissionDirect(submissionId: string) {
+  return withRetry(async () => {
+    const client = await getMongoClient()
+    const db = client.db()
+
+    await db.collection('ClassAssignmentSubmission').deleteOne({
+      _id: new ObjectId(submissionId)
     })
   })
 }

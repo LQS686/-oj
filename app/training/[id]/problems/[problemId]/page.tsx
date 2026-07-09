@@ -35,6 +35,8 @@ export default function TrainingProblemDetailPage({
   const [problem, setProblem] = useState<Problem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // 提交结果弹窗状态（与 problem/[id]、classes/assignments 页一致）
+  const [showResultModal, setShowResultModal] = useState(false)
 
   const {
     trainingProblems,

@@ -166,6 +166,12 @@ export interface Class {
     members: number
     assignments: number
   }
+  stats?: {
+    memberCount: number
+    problemCount: number
+    assignmentCount: number
+    noteCount: number
+  }
 }
 
 export interface ClassMember {

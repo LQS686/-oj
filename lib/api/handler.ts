@@ -115,12 +115,17 @@ function wrapWithErrorBoundary(handler: Handler, errorCode = 'HANDLER'): Handler
       if (err?.message === 'INVALID_JSON') {
         return fail('INVALID_JSON', '请求体不是合法 JSON', 400)
       }
+      // ApiError（已知业务异常）透传其 message/code/status
+      if (err?.name === 'ApiError' && err?.code && typeof err?.status === 'number') {
+        return fail(err.code, err.message, err.status)
+      }
+      // 兜底：仅记录详细错误到日志，不向客户端透传 err.message（避免泄露内部结构）
       logger.error(`[${errorCode}] ${err?.message || err}`, {
         url: req.url,
         method: req.method,
         stack: err?.stack,
       })
-      return serverError(err?.message || '服务器错误')
+      return serverError('服务器错误')
     }
   }
 }
