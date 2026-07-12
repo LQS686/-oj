@@ -52,32 +52,9 @@ export function trimAll(obj: Record<string, unknown>): Record<string, unknown> {
   return result
 }
 
-export function sanitizeObject(obj: Record<string, unknown>, fields: string[]): Record<string, unknown> {
-  if (!obj || typeof obj !== 'object') {
-    return {}
-  }
-
-  const result: Record<string, unknown> = { ...obj }
-
-  for (const field of fields) {
-    if (typeof result[field] === 'string') {
-      result[field] = escapeHtml(result[field] as string)
-    }
-  }
-
-  return result
-}
-
 export function removeNullBytes(str: string): string {
   if (!str || typeof str !== 'string') {
     return ''
   }
   return str.replace(/\x00/g, '')
-}
-
-export function normalizeWhitespace(str: string): string {
-  if (!str || typeof str !== 'string') {
-    return ''
-  }
-  return str.replace(/\s+/g, ' ').trim()
 }

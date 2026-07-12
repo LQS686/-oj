@@ -25,9 +25,12 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
   if (!body.title?.trim()) throw400('MISSING_TITLE', '请填写公告标题')
   if (!body.content?.trim()) throw400('MISSING_CONTENT', '请填写公告内容')
 
+  const title = body.title!
+  const content = body.content!
+
   const created = await createAnnouncement({
-    title: body.title,
-    content: body.content,
+    title,
+    content,
     isPinned: body.isPinned,
     isPublished: body.isPublished,
     publishedAt: body.publishedAt ? new Date(body.publishedAt) : null,

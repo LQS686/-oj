@@ -69,6 +69,12 @@ export default function ContestProblemDetailPage({
     currentSubmissionIdRef.current = currentSubmissionId
   }, [currentSubmissionId])
 
+  // 防重复提交：用 ref 同步守卫，避免 React state 异步更新间隙双击绕过 disabled
+  const submittingRef = useRef(false)
+  useEffect(() => {
+    submittingRef.current = submitting
+  }, [submitting])
+
   const safeIndex = contestProblems.findIndex((p) => p.id === problemId)
   const currentMeta = safeIndex >= 0 ? contestProblems[safeIndex] : undefined
 
@@ -233,6 +239,9 @@ export default function ContestProblemDetailPage({
         setSubmitResult({ type: 'error', text: '代码不能为空' })
         return
       }
+      // 防重复提交：用 ref 同步守卫
+      if (submittingRef.current) return
+      submittingRef.current = true
       try {
         setSubmitting(true)
         setSubmitResult(null)
@@ -257,10 +266,12 @@ export default function ContestProblemDetailPage({
           fetchSubmissions()
         } else {
           setSubmitResult({ type: 'error', text: data.error || '提交失败' })
+          submittingRef.current = false
           setSubmitting(false)
         }
       } catch {
         setSubmitResult({ type: 'error', text: '网络错误' })
+        submittingRef.current = false
         setSubmitting(false)
       }
     })

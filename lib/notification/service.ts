@@ -1,14 +1,24 @@
 /**
  * lib/notification/service.ts
- * 通知 CRUD、已读标记
+ * 通知 CRUD、已读标记、推送
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { emitNotification } from '@/lib/websocket/server'
+import { logger } from '@/lib/logger'
 import { DEFAULT_PAGE_SIZE } from '@/lib/types/common'
 
 export interface NotificationFilter {
   userId: string
   unreadOnly?: boolean
+}
+
+export interface NotificationData {
+  userId: string
+  type: string
+  title: string
+  content: string
+  link?: string | null
 }
 
 export async function listNotifications(
@@ -32,16 +42,48 @@ export async function listNotifications(
   return { items, total, unreadCount, page, pageSize }
 }
 
-export async function createNotification(data: {
-  userId: string
-  type: string
-  title: string
-  content: string
-  link?: string
-}) {
-  const result = await prisma.notification.create({ data })
+export async function createNotification(data: NotificationData) {
+  const result = await prisma.notification.create({
+    data: {
+      userId: data.userId,
+      type: data.type,
+      title: data.title,
+      content: data.content,
+      link: data.link || null,
+      isRead: false,
+    },
+  })
   clearNotificationCache(data.userId)
+  emitNotification(data.userId, {
+    type: 'info',
+    title: data.title,
+    message: data.content,
+  })
+  logger.info(`通知已创建并推送: ${data.title} -> 用户 ${data.userId}`)
   return result
+}
+
+export async function createNotifications(notifications: NotificationData[]) {
+  if (notifications.length === 0) return
+  await prisma.notification.createMany({
+    data: notifications.map((data) => ({
+      userId: data.userId,
+      type: data.type,
+      title: data.title,
+      content: data.content,
+      link: data.link || null,
+      isRead: false,
+    })),
+  })
+  notifications.forEach((data) => {
+    clearNotificationCache(data.userId)
+    emitNotification(data.userId, {
+      type: 'info',
+      title: data.title,
+      message: data.content,
+    })
+  })
+  logger.info(`批量通知已创建并推送: ${notifications.length} 条`)
 }
 
 export async function clearNotificationCache(userId: string) {

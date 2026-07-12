@@ -443,6 +443,10 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       return
     }
 
+    // 防重复提交：用 ref 同步守卫，避免 React state 异步更新间隙双击绕过 disabled
+    if (submittingRef.current) return
+    submittingRef.current = true
+
     setSubmitting(true)
     setJudgeStatus(null)
     setJudgeProgress(null)
@@ -476,9 +480,11 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         setCurrentSubmissionId(data.submissionId)
         setActiveTab('submissions')
       } else {
+        submittingRef.current = false
         setSubmitting(false)
       }
     } catch (error) {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }

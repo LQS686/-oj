@@ -88,7 +88,7 @@ export function TrainingCard({ training, variant = 'default' }: TrainingCardProp
  <div className={LIST_GRID_CARD_MIDDLE}>
  <div className="flex items-start gap-1 mb-1.5">
  {training.isRecommended && (
- <Sparkles className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" title="推荐" />
+ <Sparkles className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" aria-label="推荐" />
  )}
  <h3 className={LIST_GRID_CARD_TITLE}>
  {training.title}

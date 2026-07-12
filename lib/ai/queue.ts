@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger'
 import type { GenerationParams } from './generator';
 import { generateProblems } from './generator'
 import { prisma } from '@/lib/prisma'
-import { createNotification } from '@/lib/notifications'
+import { createNotification } from '@/lib/notification/service'
 import { compileCode, cleanup } from '@/lib/judge/compiler'
 import { executeCode } from '@/lib/judge/executor'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'

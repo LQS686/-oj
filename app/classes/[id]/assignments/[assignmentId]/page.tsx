@@ -339,7 +339,9 @@ export default function AssignmentDetailPage() {
  }
  if (!code.trim() || code.trim().length < 10) return
  if (!assignment?.problems?.[selectedProblemIndex]) return
- if (submitting || submitCooldown) return
+ // 防重复提交：用 ref 同步守卫，避免 React state 异步更新间隙双击绕过 disabled
+ if (submittingRef.current || submitCooldown) return
+ submittingRef.current = true
 
  setSubmitting(true)
  setSubmitCooldown(true)
@@ -364,10 +366,12 @@ export default function AssignmentDetailPage() {
  currentSubmissionIdRef.current = data.submissionId
  setCurrentSubmissionId(data.submissionId)
  } else {
+ submittingRef.current = false
  setSubmitting(false)
  setTimeout(() => setSubmitCooldown(false), 3000)
  }
  } catch (error) {
+ submittingRef.current = false
  setSubmitting(false)
  setTimeout(() => setSubmitCooldown(false), 3000)
  }

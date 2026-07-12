@@ -29,20 +29,7 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
       return
     }
     
-    // 更新提交记录
-    // await prisma.submission.update({
-    //   where: { id: result.submissionId },
-    //   data: {
-    //     status: result.status,
-    //     score: result.score,
-    //     time: result.time,
-    //     memory: result.memory,
-    //     passedTests: result.passedTests,
-    //     message: result.message,
-    //   }
-    // })
-
-    // 使用 direct MongoDB 驱动绕过 Prisma 事务
+    // 更新提交记录（使用 direct MongoDB 驱动绕过 Prisma 事务）
     await updateSubmissionDirect(result.submissionId, {
       status: result.status,
       score: result.score,
@@ -65,10 +52,6 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
 
       // 只有第一次AC才增加题目的totalAccepted
       if (isFirst) {
-        // await prisma.problem.update({
-        //   where: { id: submission.problemId },
-        //   data: { totalAccepted: { increment: 1 } }
-        // })
         await incrementProblemAcceptedCount(submission.problemId)
         
         // ✅ 增加用户解题数
@@ -114,19 +97,6 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
         }
         
         // ✅ 精确更新对应的作业提交记录
-        // await prisma.classAssignmentSubmission.update({
-        //   where: { id: submission.assignmentSubmissionId },
-        //   data: {
-        //     status: result.status,
-        //     score: finalScore,
-        //     time: result.time,
-        //     memory: result.memory,
-        //     passedTests: result.passedTests,
-        //     totalTests: result.totalTests || 0,
-        //     message: result.message
-        //   }
-        // })
-
         await updateClassAssignmentSubmissionDirect(submission.assignmentSubmissionId, {
             status: result.status,
             score: finalScore,
@@ -181,14 +151,6 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
     })
     
     // 更新为系统错误
-    // await prisma.submission.update({
-    //   where: { id: job.id },
-    //   data: {
-    //     status: 'SE',
-    //     message: `系统错误: ${error.message}`,
-    //   }
-    // })
-
     await updateSubmissionDirect(job.id, {
       status: 'SE',
       message: `系统错误: ${error.message}`

@@ -22,6 +22,7 @@ export const GET = withApi.admin(async (req, _ctx, _auth) => {
 
   if (!logId) {
     throw400('BAD_REQUEST', 'logId 必填')
+    return
   }
 
   // getSolutionJobStatus 在 log 不存在时会抛 Error；这里捕获并映射为 404，

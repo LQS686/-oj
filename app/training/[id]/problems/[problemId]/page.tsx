@@ -255,6 +255,9 @@ export default function TrainingProblemDetailPage({
         setSubmitResult({ type: 'error', text: '代码不能为空' })
         return
       }
+      // 防重复提交：用 ref 同步守卫
+      if (submittingRef.current) return
+      submittingRef.current = true
       try {
         setSubmitting(true)
         setSubmitResult(null)
@@ -281,10 +284,12 @@ export default function TrainingProblemDetailPage({
           fetchSubmissions()
         } else {
           setSubmitResult({ type: 'error', text: data.error || '提交失败' })
+          submittingRef.current = false
           setSubmitting(false)
         }
       } catch {
         setSubmitResult({ type: 'error', text: '网络错误' })
+        submittingRef.current = false
         setSubmitting(false)
       }
     })

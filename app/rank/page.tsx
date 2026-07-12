@@ -185,7 +185,7 @@ export default function RankPage() {
  toolbar={
  <div className="flex items-center gap-1 card-static p-1 rounded-lg w-fit border border-border">
  {[
- { key: 'rating', label: 'Rating 积分榜' },
+ { key: 'rating', label: 'Rating 排行榜' },
  { key: 'solved', label: 'AC 刷题榜' },
  ].map((tab) => (
  <button

@@ -572,9 +572,9 @@ function ClassCard({
           </div>
         )}
         {classData.isPublic ? (
-          <Globe className="w-4 h-4 text-secondary shrink-0" title="公开" />
+          <Globe className="w-4 h-4 text-secondary shrink-0" aria-label="公开" />
         ) : (
-          <Lock className="w-4 h-4 text-accent shrink-0" title="私密" />
+          <Lock className="w-4 h-4 text-accent shrink-0" aria-label="私密" />
         )}
       </div>
       <div className={LIST_GRID_CARD_MIDDLE}>

@@ -10,7 +10,3 @@ export const DIFFICULTY_COLORS: Record<string, string> = {
   '省选': 'difficulty-hard',
   'NOI': 'difficulty-expert',
 }
-
-export const DIFFICULTY_ORDER = DIFFICULTIES
-
-export type Difficulty = typeof DIFFICULTIES[number]

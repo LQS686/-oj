@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Settings, Save, Mail, Shield, Globe } from 'lucide-react'
+import { Settings, Save, Mail, Shield, Globe, Send } from 'lucide-react'
 
 interface SystemSettings {
  siteName: string
@@ -17,6 +17,8 @@ interface SystemSettings {
  smtpPort: number
  smtpUser: string
  smtpFrom: string
+ smtpPassword: string
+ smtpSecure: boolean
 }
 
 export default function AdminSettingsPage() {
@@ -33,10 +35,15 @@ export default function AdminSettingsPage() {
  defaultLanguage: 'cpp',
  maxSubmissionSize: 65536,
  smtpHost: '',
- smtpPort: 587,
+ smtpPort: 465,
  smtpUser: '',
- smtpFrom: ''
+ smtpFrom: '',
+ smtpPassword: '',
+ smtpSecure: true
  })
+ const [testEmail, setTestEmail] = useState('')
+ const [testingEmail, setTestingEmail] = useState(false)
+ const [testResult, setTestResult] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
  useEffect(() => {
  fetchSettings()
@@ -87,6 +94,42 @@ export default function AdminSettingsPage() {
  } finally {
  setSaving(false)
  }
+ }
+
+ const handleTestEmail = async () => {
+ if (!testEmail) {
+ setTestResult({ type: 'error', msg: '请输入收件邮箱' })
+ return
+ }
+ setTestingEmail(true)
+ setTestResult(null)
+ try {
+ const response = await fetchWithAuth('/api/admin/settings/test-email', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ email: testEmail })
+ })
+ const data = await response.json()
+ if (data.success) {
+ setTestResult({ type: 'success', msg: '测试邮件已发送，请查收' })
+ } else {
+ setTestResult({ type: 'error', msg: data.error || '发送失败' })
+ }
+ } catch (err) {
+ setTestResult({ type: 'error', msg: '网络错误' })
+ } finally {
+ setTestingEmail(false)
+ }
+ }
+
+ // QQ 邮箱一键填充：smtp.qq.com + SSL + 465
+ const fillQqMail = () => {
+ setSettings(prev => ({
+ ...prev,
+ smtpHost: 'smtp.qq.com',
+ smtpPort: 465,
+ smtpSecure: true
+ }))
  }
 
  if (loading) {
@@ -241,12 +284,28 @@ export default function AdminSettingsPage() {
  </div>
 
  <div className="card p-6 lg:col-span-2">
- <div className="flex items-center gap-3 mb-6">
+ <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+ <div className="flex items-center gap-3">
  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-accent/10">
  <Mail className="w-4 h-4 text-accent" />
  </div>
  <h2 className="text-lg font-bold text-foreground">邮件设置</h2>
  </div>
+ <button
+ onClick={fillQqMail}
+ className="btn btn-secondary text-sm flex items-center gap-2"
+ title="一键填充 QQ 邮箱 SMTP 参数（smtp.qq.com / 465 / SSL）"
+ >
+ <Mail className="w-4 h-4" />
+ QQ 邮箱一键填充
+ </button>
+ </div>
+
+ <p className="text-xs text-muted-foreground mb-4">
+ 以 QQ 邮箱为例：用户名填完整邮箱地址，密码填
+ <span className="text-foreground font-medium">授权码</span>
+ （非 QQ 密码，在 QQ邮箱「设置 → 帐户 → POP3/SMTP 服务」中开启并生成）。
+ </p>
 
  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
  <div>
@@ -255,7 +314,7 @@ export default function AdminSettingsPage() {
  type="text"
  value={settings.smtpHost}
  onChange={(e) => setSettings({ ...settings, smtpHost: e.target.value })}
- placeholder="smtp.example.com"
+ placeholder="smtp.qq.com"
  className="input"
  />
  </div>
@@ -266,16 +325,29 @@ export default function AdminSettingsPage() {
  type="number"
  value={settings.smtpPort}
  onChange={(e) => setSettings({ ...settings, smtpPort: parseInt(e.target.value) })}
+ placeholder="465"
  className="input"
  />
  </div>
 
  <div>
- <label className="block text-sm font-medium text-muted-foreground mb-2">SMTP 用户名</label>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">SMTP 用户名（完整邮箱地址）</label>
  <input
  type="text"
  value={settings.smtpUser}
  onChange={(e) => setSettings({ ...settings, smtpUser: e.target.value })}
+ placeholder="123456@qq.com"
+ className="input"
+ />
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">授权码</label>
+ <input
+ type="password"
+ value={settings.smtpPassword}
+ onChange={(e) => setSettings({ ...settings, smtpPassword: e.target.value })}
+ placeholder="留空表示不修改已有授权码"
  className="input"
  />
  </div>
@@ -286,10 +358,69 @@ export default function AdminSettingsPage() {
  type="email"
  value={settings.smtpFrom}
  onChange={(e) => setSettings({ ...settings, smtpFrom: e.target.value })}
- placeholder="noreply@example.com"
+ placeholder="与用户名一致的完整邮箱地址"
  className="input"
  />
  </div>
+
+ <div className="flex items-center justify-between p-4 rounded-lg bg-white/5">
+ <div>
+ <p className="text-foreground font-medium">启用 SSL</p>
+ <p className="text-sm text-muted-foreground">QQ 邮箱端口 465 需开启，端口 587 通常关闭</p>
+ </div>
+ <label className="relative inline-flex items-center cursor-pointer">
+ <input
+ type="checkbox"
+ checked={settings.smtpSecure}
+ onChange={(e) => setSettings({ ...settings, smtpSecure: e.target.checked })}
+ className="sr-only peer"
+ />
+ <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+ </label>
+ </div>
+ </div>
+
+ {/* 测试发信 */}
+ <div className="mt-6 pt-6 border-t border-border">
+ <h3 className="text-sm font-bold text-foreground mb-3">测试发信</h3>
+ <p className="text-xs text-muted-foreground mb-3">
+ 保存设置后，可填入收件邮箱发送测试邮件，验证 SMTP 配置是否正确。
+ </p>
+ <div className="flex gap-3 flex-wrap">
+ <input
+ type="email"
+ value={testEmail}
+ onChange={(e) => setTestEmail(e.target.value)}
+ placeholder="收件邮箱地址"
+ className="input flex-1 min-w-[200px]"
+ />
+ <button
+ onClick={handleTestEmail}
+ disabled={testingEmail}
+ className="btn btn-primary flex items-center gap-2"
+ >
+ {testingEmail ? (
+ <>
+ <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+ 发送中...
+ </>
+ ) : (
+ <>
+ <Send className="w-4 h-4" />
+ 发送测试邮件
+ </>
+ )}
+ </button>
+ </div>
+ {testResult && (
+ <div className={`mt-3 px-4 py-3 rounded-lg text-sm ${
+ testResult.type === 'success'
+ ? 'bg-success/10 border border-success/30 text-success'
+ : 'bg-error/10 border border-error/30 text-error'
+ }`}>
+ {testResult.msg}
+ </div>
+ )}
  </div>
  </div>
  </div>

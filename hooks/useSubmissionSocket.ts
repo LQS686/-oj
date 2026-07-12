@@ -180,6 +180,5 @@ export function useSubmissionSocket({
   return {
     isConnected,
     lastUpdate,
-    socket: socketRef.current,
   }
 }

@@ -16,7 +16,7 @@ import { logger } from '../lib/logger'
 import { generateProblems, GenerationParams } from '../lib/ai/generator'
 
 // 通过 .env 或环境变量直接读取 DEEPSEEK_API_KEY；缺则退出
-require('dotenv').config()
+import 'dotenv/config'
 
 const HAS_API_KEY = !!process.env.DEEPSEEK_API_KEY
 

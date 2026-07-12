@@ -217,7 +217,3 @@ export function getDifficultyColor(difficulty: string): string {
   }
   return classMap[difficulty] || 'difficulty-easy'
 }
-
-export function getDifficultyClass(difficulty: string): string {
-  return getDifficultyColor(difficulty)
-}

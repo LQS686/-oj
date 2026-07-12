@@ -14,7 +14,7 @@ import {
   updateClassAssignmentSubmissionDirect,
   updateSubmissionDirect,
 } from '@/lib/mongodb-direct'
-import { createNotification, createNotifications } from '@/lib/notifications'
+import { createNotification, createNotifications } from '@/lib/notification/service'
 import { normalizeClassRoleToApi, apiRoleToDb, isClassAdminApiRole } from '@/lib/class/roles'
 
 /* ============================================================================
