@@ -13,7 +13,9 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
-    dangerouslyAllowSVG: true,
+    // 禁用 SVG 加载：SVG 可内嵌 <script>，存在 XSS 风险。
+    // 项目头像上传已限定 JPG/PNG/GIF/WebP（见 lib/user/service.ts），无需 SVG。
+    dangerouslyAllowSVG: false,
     // 为了更好的兼容性，我们设置 unoptimized 为 true
     // 这将禁用 Next.js 的图片优化，直接使用原文件
     unoptimized: true,

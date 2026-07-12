@@ -27,6 +27,7 @@ export interface AuthUser {
   avatar: string | null
   role: string
   email: string | null
+  tokenVersion: number
 }
 
 export interface AuthContext {
@@ -68,24 +69,42 @@ export function parseQuery(req: NextRequest): Record<string, string> {
 }
 
 /**
- * 进程级用户缓存（TTL 60s）
+ * 进程级用户缓存（TTL 60s，LRU 上限 10000 条）
  */
 type CachedUser = { value: AuthUser; expiry: number }
+const MAX_USER_CACHE_SIZE = 10000
 const userCache: Map<string, CachedUser> = (() => {
   const g = globalThis as any
   if (!g.__userCache) g.__userCache = new Map<string, CachedUser>()
   return g.__userCache as Map<string, CachedUser>
 })()
 
-export async function getCachedUser(userId: string): Promise<AuthUser | null> {
+export async function getCachedUser(
+  userId: string,
+  expectedTokenVersion?: number
+): Promise<AuthUser | null> {
   const hit = userCache.get(userId)
-  if (hit && hit.expiry > Date.now()) return hit.value
+  if (hit && hit.expiry > Date.now()) {
+    // tokenVersion 校验：与 JWT 中的版本号不一致则视为已吊销
+    if (expectedTokenVersion !== undefined && hit.value.tokenVersion !== expectedTokenVersion) {
+      return null
+    }
+    // LRU：重新写入以标记为最近使用
+    userCache.delete(userId)
+    userCache.set(userId, hit)
+    return hit.value
+  }
 
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, username: true, nickname: true, avatar: true, role: true, email: true },
+    select: { id: true, username: true, nickname: true, avatar: true, role: true, email: true, tokenVersion: true },
   })
   if (!dbUser) return null
+
+  // tokenVersion 校验：数据库中的版本号大于 JWT 中的版本号，说明 Token 已被吊销
+  if (expectedTokenVersion !== undefined && dbUser.tokenVersion !== expectedTokenVersion) {
+    return null
+  }
 
   const value: AuthUser = {
     id: dbUser.id,
@@ -94,6 +113,13 @@ export async function getCachedUser(userId: string): Promise<AuthUser | null> {
     avatar: dbUser.avatar,
     role: dbUser.role || 'user',
     email: dbUser.email,
+    tokenVersion: dbUser.tokenVersion,
+  }
+  // LRU 淘汰：容量超限时移除最旧条目
+  while (userCache.size >= MAX_USER_CACHE_SIZE) {
+    const oldestKey = userCache.keys().next().value
+    if (oldestKey === undefined) break
+    userCache.delete(oldestKey)
   }
   userCache.set(userId, { value, expiry: Date.now() + 60_000 })
   return value
@@ -137,8 +163,8 @@ export function withAuth(handler: Handler<AuthContext>) {
   const wrapped: Handler = async (req, ctx) => {
     const session = getUserFromRequest(req)
     if (!session?.userId) return unauthorized()
-    const user = await getCachedUser(session.userId)
-    if (!user) return unauthorized('用户不存在')
+    const user = await getCachedUser(session.userId, session.tokenVersion)
+    if (!user) return unauthorized('用户不存在或登录已失效')
     return handler(req, ctx, { user })
   }
   return wrapWithErrorBoundary(wrapped, 'AUTH')

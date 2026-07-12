@@ -97,8 +97,8 @@ export function validatePassword(password: string): { valid: boolean; errors: st
     return { valid: false, errors: ['密码不能为空'] }
   }
 
-  if (password.length < 6) {
-    errors.push('密码长度至少为6位')
+  if (password.length < 8) {
+    errors.push('密码长度至少为8位')
   }
 
   if (password.length > 128) {
@@ -114,8 +114,8 @@ export function validatePassword(password: string): { valid: boolean; errors: st
   }
 
   const commonPasswords = [
-    '123456', 'password', '123456789', '12345678', '12345',
-    '1234567', '1234567890', 'qwerty', 'abc123', '111111'
+    '12345678', 'password', '123456789', '1234567890', 'qwerty',
+    'abc123', '111111', '1234567', '12345', '123456', 'password1', 'qwerty123'
   ]
   if (commonPasswords.includes(password.toLowerCase())) {
     errors.push('密码过于简单，请使用更强的密码')

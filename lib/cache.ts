@@ -3,6 +3,8 @@ export interface CacheOptions {
   key?: string // 自定义缓存键
 }
 
+const MAX_CACHE_SIZE = 10000
+
 class Cache {
   private storage: Map<string, { value: any; expiry: number }> = new Map()
   private cleanupInterval: NodeJS.Timeout
@@ -18,6 +20,18 @@ class Cache {
       if (expiry < now) {
         this.storage.delete(key)
       }
+    }
+  }
+
+  /**
+   * LRU 淘汰：容量超限时移除最久未使用的条目。
+   * Map 按插入顺序遍历，首项即最旧。get/set 时重新写入以更新顺序。
+   */
+  private evictIfNeeded() {
+    while (this.storage.size >= MAX_CACHE_SIZE) {
+      const oldestKey = this.storage.keys().next().value
+      if (oldestKey === undefined) break
+      this.storage.delete(oldestKey)
     }
   }
 
@@ -38,6 +52,9 @@ class Cache {
     // 检查缓存是否存在且未过期
     const cached = this.storage.get(key)
     if (cached && cached.expiry > now) {
+      // LRU：重新写入以标记为最近使用
+      this.storage.delete(key)
+      this.storage.set(key, cached)
       return cached.value
     }
 
@@ -46,6 +63,7 @@ class Cache {
 
     // 设置缓存
     const ttl = options.ttl || 5 * 60 * 1000 // 默认5分钟
+    this.evictIfNeeded()
     this.storage.set(key, {
       value,
       expiry: now + ttl
@@ -55,6 +73,7 @@ class Cache {
   }
 
   set(key: string, value: any, ttl: number = 5 * 60 * 1000) {
+    this.evictIfNeeded()
     this.storage.set(key, {
       value,
       expiry: Date.now() + ttl

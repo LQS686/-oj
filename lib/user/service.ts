@@ -398,8 +398,8 @@ export async function changeCurrentUserPassword(
     err.status = 400
     throw err
   }
-  if (newPassword.length < 6) {
-    const err: any = new Error('新密码长度至少为6位')
+  if (newPassword.length < 8) {
+    const err: any = new Error('新密码长度至少为8位')
     err.status = 400
     throw err
   }
@@ -422,9 +422,13 @@ export async function changeCurrentUserPassword(
   const hashedPassword = await bcryptModule.hash(newPassword, 10)
   const client = await getMongoClient()
   const db = client.db()
+  // 修改密码时递增 tokenVersion，使所有旧 Token 失效（强制重新登录）
   await db.collection('User').updateOne(
     { _id: new ObjectId(userId) },
-    { $set: { password: hashedPassword, updatedAt: new Date() } }
+    {
+      $set: { password: hashedPassword, updatedAt: new Date() },
+      $inc: { tokenVersion: 1 },
+    }
   )
   clearUserCache(userId)
 }
@@ -1065,21 +1069,31 @@ export async function adminUpdateUser(
   bcryptModule: typeof import('bcryptjs')
 ) {
   const updateData: any = {}
+  // 修改密码或封禁时需递增 tokenVersion，使旧 Token 失效
+  let shouldInvalidateTokens = false
+
   if ('role' in body) {
     assertValidRole(body.role)
     updateData.role = body.role
   }
   if ('isBanned' in body) {
     updateData.isBanned = Boolean(body.isBanned)
+    if (updateData.isBanned) {
+      shouldInvalidateTokens = true
+    }
   }
   if (body.password) {
-    if (body.password.length < 6) {
-      const err: any = new Error('密码长度至少为6位')
+    if (body.password.length < 8) {
+      const err: any = new Error('密码长度至少为8位')
       err.status = 400
       err.code = 'PASSWORD_TOO_SHORT'
       throw err
     }
     updateData.password = await bcryptModule.hash(body.password, 10)
+    shouldInvalidateTokens = true
+  }
+  if (shouldInvalidateTokens) {
+    updateData.tokenVersion = { increment: 1 }
   }
   const result = await prisma.user.update({
     where: { id: targetUserId },

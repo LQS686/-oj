@@ -105,9 +105,10 @@ export async function saveSystemSettings(settings: Partial<SystemSettings>): Pro
     memorySettings = newSettings as unknown as Record<string, unknown>
     return true
   } catch (error) {
+    // 写入失败时返回 false，调用方可感知失败并重试或提示用户
+    // 不更新 memorySettings：避免将未持久化的脏数据写入缓存导致后续读取不一致
     logger.error('保存系统设置失败', error)
-    memorySettings = { ...(await getRawSystemSettings()), ...settings } as Record<string, unknown>
-    return true
+    return false
   }
 }
 

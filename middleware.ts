@@ -1,20 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { getUserFromRequest } from '@/lib/auth'
 import { canAccessAdmin } from '@/lib/permissions'
 
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for')
-  const realIP = request.headers.get('x-real-ip')
-  if (forwarded) {
-    return forwarded.split(',')[0].trim()
-  }
-  if (realIP) {
-    return realIP
-  }
-  return 'unknown'
-}
+// 写操作方法集合：需进行 CSRF Origin/Referer 校验
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }> = {
   '/api/auth/login': { maxRequests: 10, windowMs: 60000 },
@@ -24,6 +15,48 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/notifications': { maxRequests: 200, windowMs: 60000 },
   // AI 生成日志轮询：2s 间隔，单任务 30 次/min，多任务并发可能更高
   '/api/admin/ai/generate': { maxRequests: 200, windowMs: 60000 },
+}
+
+/**
+ * CSRF 防护：对写操作校验 Origin / Referer，防止跨站请求伪造。
+ * 同源判定：Origin 或 Referer 的 host 必须与当前请求 Host 一致。
+ */
+function isAllowedOrigin(request: NextRequest): boolean {
+  if (!WRITE_METHODS.has(request.method.toUpperCase())) {
+    return true
+  }
+
+  const host = request.headers.get('host')
+  if (!host) {
+    return true // 无 Host 头时放行（异常环境由上游处理）
+  }
+
+  const origin = request.headers.get('origin')
+  const referer = request.headers.get('referer')
+
+  // 优先校验 Origin
+  if (origin) {
+    try {
+      const originHost = new URL(origin).host
+      return originHost === host
+    } catch {
+      return false
+    }
+  }
+
+  // Origin 缺失时回退到 Referer
+  if (referer) {
+    try {
+      const refererHost = new URL(referer).host
+      return refererHost === host
+    } catch {
+      return false
+    }
+  }
+
+  // 同源 POST 且无 Origin/Referer：浏览器同源请求至少会携带 Referer
+  // 缺失两者可能是非浏览器客户端（curl / 服务端调用），放行由鉴权层处理
+  return true
 }
 
 export async function middleware(request: NextRequest) {
@@ -41,12 +74,26 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/api/')) {
-    const rateLimitConfig = API_RATE_LIMITS[pathname] || { maxRequests: 100, windowMs: 60000 }
+    // CSRF 校验：写操作必须同源
+    if (!isAllowedOrigin(request)) {
+      return new NextResponse(
+        JSON.stringify({ success: false, error: '跨站请求被拒绝' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const baseConfig = API_RATE_LIMITS[pathname] || { maxRequests: 100, windowMs: 60000 }
 
     const ip = getClientIP(request)
+    // unknown IP 施加更严格限流（默认值的 50%），防止无代理头请求共用桶被滥用
+    const isUnknown = ip === 'unknown'
+    const maxRequests = isUnknown
+      ? Math.max(1, Math.floor(baseConfig.maxRequests * 0.5))
+      : baseConfig.maxRequests
+
     const result = await checkRateLimit(`mw:${ip}:${pathname}`, {
-      maxRequests: rateLimitConfig.maxRequests,
-      windowMs: rateLimitConfig.windowMs,
+      maxRequests,
+      windowMs: baseConfig.windowMs,
       keyPrefix: 'middleware'
     })
 

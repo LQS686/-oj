@@ -29,8 +29,8 @@ async function logAccess(
       }
     })
   } catch (err) {
-    // Fail silently for audit log DB errors to not block main flow
-    console.error('Failed to write audit log:', err)
+    // 审计日志写入失败不应阻断主流程，仅记录告警
+    logger.warn('[contest-auth] 审计日志写入失败', err instanceof Error ? { message: err.message } : { error: err })
   }
 }
 

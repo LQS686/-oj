@@ -152,8 +152,8 @@ export const withApi = {
       return safeCall(async () => {
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
-        const user = await getCachedUser(session.userId)
-        if (!user) throw throw401('用户不存在')
+        const user = await getCachedUser(session.userId, session.tokenVersion)
+        if (!user) throw throw401('用户不存在或登录已失效')
         const resolved = await resolveCtxParams(ctx)
         return handler(req, resolved, { user })
       }, 'AUTH', req)
@@ -170,8 +170,8 @@ export const withApi = {
       return safeCall(async () => {
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
-        const user = await getCachedUser(session.userId)
-        if (!user) throw throw401('用户不存在')
+        const user = await getCachedUser(session.userId, session.tokenVersion)
+        if (!user) throw throw401('用户不存在或登录已失效')
         if (!canAccessAdmin(user)) {
           throw throw403('需要管理员权限')
         }
@@ -191,8 +191,8 @@ export const withApi = {
       return safeCall(async () => {
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
-        const user = await getCachedUser(session.userId)
-        if (!user) throw throw401('用户不存在')
+        const user = await getCachedUser(session.userId, session.tokenVersion)
+        if (!user) throw throw401('用户不存在或登录已失效')
         if (!isSystemAdmin(user)) {
           throw throw403('需要系统管理员权限')
         }
@@ -213,8 +213,8 @@ export const withApi = {
       return safeCall(async () => {
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
-        const user = await getCachedUser(session.userId)
-        if (!user) throw throw401('用户不存在')
+        const user = await getCachedUser(session.userId, session.tokenVersion)
+        if (!user) throw throw401('用户不存在或登录已失效')
         // 兼容 Promise<params> 与 params 两种 Next.js 形态
         const rawParams: any = ctx?.params
         const resolvedParams = rawParams && typeof rawParams.then === 'function' ? await rawParams : rawParams

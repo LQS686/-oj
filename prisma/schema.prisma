@@ -24,6 +24,7 @@ model User {
   color         String    @default("#808080")
   role          String    @default("STUDENT") // SYSTEM_ADMIN, TEACHER, STUDENT（唯一真相源，详见 docs/ROLE_SYSTEM.md）
   isBanned      Boolean   @default(false)
+  tokenVersion  Int       @default(0) // JWT 吊销版本号：修改密码/封禁时递增，使旧 Token 失效
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

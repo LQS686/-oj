@@ -82,7 +82,8 @@ class RedisStore implements RateLimitStore {
       await this.redis.ping();
       this.useRedis = true;
     } catch (error) {
-      console.warn('Redis not available, using memory store');
+      // fail-open：Redis 不可用时降级到内存存储，不影响限流功能本身
+      console.warn('[rate-limit] Redis 不可用，降级为内存存储:', error instanceof Error ? error.message : error);
       this.useRedis = false;
     }
   }
@@ -108,7 +109,8 @@ class RedisStore implements RateLimitStore {
         return undefined;
       }
       return entry;
-    } catch {
+    } catch (error) {
+      console.warn('[rate-limit] Redis get 失败:', error instanceof Error ? error.message : error);
       return undefined;
     }
   }
@@ -120,7 +122,8 @@ class RedisStore implements RateLimitStore {
     try {
       const ttl = Math.ceil((entry.resetTime - Date.now()) / 1000);
       await this.redis.setex(`ratelimit:${key}`, ttl, JSON.stringify(entry));
-    } catch {
+    } catch (error) {
+      console.warn('[rate-limit] Redis set 失败:', error instanceof Error ? error.message : error);
     }
   }
 
@@ -130,7 +133,8 @@ class RedisStore implements RateLimitStore {
 
     try {
       await this.redis.del(`ratelimit:${key}`);
-    } catch {
+    } catch (error) {
+      console.warn('[rate-limit] Redis delete 失败:', error instanceof Error ? error.message : error);
     }
   }
 
@@ -167,7 +171,8 @@ async function checkRateLimit(
 
   try {
     entry = await redisStore.get(key);
-  } catch {
+  } catch (error) {
+    console.warn('[rate-limit] 读取 Redis 计数失败，回退内存:', error instanceof Error ? error.message : error);
   }
 
   if (!entry) {
@@ -187,7 +192,8 @@ async function checkRateLimit(
   memoryStore.set(key, newEntry);
   try {
     await redisStore.set(key, newEntry);
-  } catch {
+  } catch (error) {
+    console.warn('[rate-limit] 写入 Redis 计数失败:', error instanceof Error ? error.message : error);
   }
 
   const result: RateLimitResult = {
@@ -275,6 +281,12 @@ function getClientIP(request: NextRequest): string {
 
   if (realIP) {
     return realIP;
+  }
+
+  // Next.js / Node.js 运行时提供的连接远端地址
+  const socketIP = (request as any).ip;
+  if (socketIP && typeof socketIP === 'string') {
+    return socketIP;
   }
 
   return 'unknown';

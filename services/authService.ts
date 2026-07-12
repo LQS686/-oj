@@ -95,6 +95,7 @@ class AuthService {
           color: true,
           role: true,
           isBanned: true,
+          tokenVersion: true,
           createdAt: true,
         },
       });
@@ -121,6 +122,7 @@ class AuthService {
         email: user.email,
         username: user.username,
         role: user.role,
+        tokenVersion: user.tokenVersion,
       });
 
       const userResponse = mapUserToResponse(user);
