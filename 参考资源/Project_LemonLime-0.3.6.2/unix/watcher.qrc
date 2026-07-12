@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/watcher">
-        <file>watcher_unix</file>
-    </qresource>
-</RCC>
