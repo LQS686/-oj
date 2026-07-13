@@ -101,10 +101,7 @@ export function useSubmissionSocket({
       reconnectionDelayMax: 5000,
       timeout: 20000,
       auth: {
-        token: typeof window !== 'undefined' ? (() => {
-          const t = localStorage.getItem('token')
-          return (t && t !== 'null' && t !== 'undefined') ? t : undefined
-        })() : undefined,
+        // Token 通过 httpOnly cookie 自动携带（socket.handshake.headers.cookie），无需显式传递
       },
     })
 

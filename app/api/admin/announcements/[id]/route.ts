@@ -7,7 +7,7 @@ import { deleteAnnouncement, updateAnnouncement } from '@/lib/announcement/servi
 import { prisma } from '@/lib/prisma'
 
 export const PATCH = withApi.admin(async (req, ctx) => {
-  const { id: resolved } = await (ctx as any).params
+  const { id: resolved } = ctx.params
   if (!isObjectId(resolved)) throw400('INVALID_ID', '无效的公告 ID')
 
   const existing = await prisma.systemAnnouncement.findUnique({ where: { id: resolved } })
@@ -41,7 +41,7 @@ export const PATCH = withApi.admin(async (req, ctx) => {
 })
 
 export const DELETE = withApi.admin(async (_req, ctx) => {
-  const { id: resolved } = await (ctx as any).params
+  const { id: resolved } = ctx.params
   if (!isObjectId(resolved)) throw400('INVALID_ID', '无效的公告 ID')
 
   const existing = await prisma.systemAnnouncement.findUnique({ where: { id: resolved } })

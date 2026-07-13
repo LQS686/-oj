@@ -30,7 +30,7 @@ import { getUserFromRequest } from '@/lib/auth'
  * 公开班级任何人都可访问；私有班级需要是成员
  */
 export const GET = withApi.public(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const q = readQuery<{ sortBy?: string; sortOrder?: string; role?: string; active?: string; search?: string }>(req)
@@ -99,7 +99,7 @@ export const GET = withApi.public(async (req, ctx) => {
  * 教师/助教可更新班级信息
  */
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   await assertClassAdmin(id, user.id, '需要管理员权限')
@@ -122,7 +122,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
  * 仅班级创建人可解散
  */
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const classDataResult = await getClassById(id)

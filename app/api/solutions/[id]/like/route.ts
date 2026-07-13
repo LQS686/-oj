@@ -7,7 +7,7 @@ import { isObjectId } from '@/lib/api/validation'
 import { logger } from '@/lib/logger'
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题解ID')
 
   const q = readQuery<{ isAssignmentContext?: string }>(req)

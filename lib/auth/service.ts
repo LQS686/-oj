@@ -36,7 +36,7 @@ export async function findUserById(userId: string): Promise<AuthUserInfo | null>
       username: u.username,
       nickname: u.nickname,
       avatar: u.avatar,
-      role: u.role || 'user',
+      role: u.role || 'STUDENT',
       email: u.email,
     } satisfies AuthUserInfo
   }, { ttl: 60_000 })

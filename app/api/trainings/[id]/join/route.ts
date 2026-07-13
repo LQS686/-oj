@@ -10,14 +10,14 @@ import { isObjectId } from '@/lib/api/validation'
 import { throw400 } from '@/lib/api/withApi'
 
 export const POST = withApi.auth(async (_req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
   const result = await enrollTraining(id, user.id)
   return ok({ joined: true, id: result.id, joinedAt: result.joinedAt })
 })
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
   const result = await unenrollTraining(id, user.id)
   return ok({ joined: false, removed: !!result })

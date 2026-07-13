@@ -32,12 +32,6 @@ export default function NotificationsPage() {
  const fetchNotifications = async () => {
  setLoading(true)
  try {
- const token = localStorage.getItem('token')
- if (!token) {
- router.push('/login')
- return
- }
-
  const params = new URLSearchParams({
  page: page.toString(),
  pageSize: '20'
@@ -48,6 +42,11 @@ export default function NotificationsPage() {
  }
 
  const response = await fetchWithAuth(`/api/notifications?${params}`)
+
+ if (response.status === 401) {
+ router.push('/login')
+ return
+ }
 
  const data = await response.json()
 

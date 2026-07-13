@@ -50,7 +50,6 @@ export async function listProblems(
   if (filter.keyword) {
     where.OR = [
       { title: { contains: filter.keyword, mode: 'insensitive' } },
-      { id: { contains: filter.keyword } },
     ]
   }
   if (filter.difficulty) where.difficulty = filter.difficulty

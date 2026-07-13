@@ -22,7 +22,7 @@ model User {
   solvedCount   Int       @default(0) // 解题数
   rank          String    @default("新手")
   color         String    @default("#808080")
-  role          String    @default("STUDENT") // SYSTEM_ADMIN, TEACHER, STUDENT（唯一真相源，详见 docs/ROLE_SYSTEM.md）
+  role          String    @default("STUDENT") // SYSTEM_ADMIN, ADMIN, TEACHER, STUDENT（唯一真相源，详见 docs/ROLE_SYSTEM.md）
   isBanned      Boolean   @default(false)
   tokenVersion  Int       @default(0) // JWT 吊销版本号：修改密码/封禁时递增，使旧 Token 失效
   createdAt     DateTime  @default(now())
@@ -270,7 +270,7 @@ model ClassMember {
   class     Class    @relation(fields: [classId], references: [id])
   userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  role      String   // teacher(班主任), assistant(助教), student(学生)
+  role      String   // DB 实际存储：owner | admin | member（API 层通过 lib/class/roles.ts 双映射暴露为 owner | assistant | student）
   remark    String?  // 成员备注
 
   // 细粒度权限控制
@@ -354,20 +354,6 @@ model ClassNote {
   @@index([classId, createdAt])
 }
 
-// 班级邀请码
-model ClassInvite {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  classId     String   @db.ObjectId
-  code        String   @unique  // 邀请码（唯一）
-  createdBy   String   @db.ObjectId  // 创建者
-  maxUses     Int      @default(1)  // 最大使用次数（-1表示无限）
-  usedCount   Int      @default(0)  // 已使用次数
-  expiresAt   DateTime?  // 过期时间（可选）
-  createdAt   DateTime @default(now())
-
-  @@index([classId])
-}
-
 // 班级直接邀请（通过用户名邀请）
 model ClassDirectInvite {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -440,9 +426,9 @@ model Solution {
   author        User      @relation(fields: [authorId], references: [id])
   title         String
   content       String
-  language      String?   // 兼容旧字段：题解配套代码语言
-  code          String?   // 兼容旧字段：题解配套代码
-  codeLanguage  String?   // 新字段：与 code 配对的语言（语义更清晰）
+  language      String?   // [已废弃] 兼容旧字段：题解配套代码语言，新代码应使用 codeLanguage。迁移完成后可删除
+  code          String?   // [已废弃] 兼容旧字段：题解配套代码
+  codeLanguage  String?   // 推荐字段：与 code 配对的语言（语义更清晰）
   views         Int       @default(0)
   likes         Int       @default(0)
   isOfficial    Boolean   @default(false)            // 是否标程题解（置顶展示）

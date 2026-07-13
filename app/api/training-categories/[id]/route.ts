@@ -8,13 +8,13 @@ import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
 import { updateCategory, deleteCategory } from '@/lib/training/service'
 import { isObjectId } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
-import { isAdmin } from '@/lib/permissions'
+import { canAccessAdmin } from '@/lib/permissions'
 
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
-  if (!isAdmin(user)) {
+  if (!canAccessAdmin(user)) {
     throw400('FORBIDDEN', '需要管理员权限')
   }
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的分类ID')
   const body = await readJson<{ name?: string; description?: string; orderIndex?: number }>(req)
   const updated = await updateCategory(id, body)
@@ -22,10 +22,10 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  if (!isAdmin(user)) {
+  if (!canAccessAdmin(user)) {
     throw400('FORBIDDEN', '需要管理员权限')
   }
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的分类ID')
 
   // 防御性：若有题单引用则禁止删除

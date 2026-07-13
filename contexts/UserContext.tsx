@@ -66,9 +66,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const login = (userData: User, token?: string) => {
     if (typeof window === 'undefined') return
-    if (token) {
-      localStorage.setItem('token', token)
-    }
+    // Token 由后端通过 httpOnly cookie 设置，前端不再存储到 localStorage（避免 XSS 窃取）
     // 乐观更新：先用登录返回的用户信息渲染，再拉取完整资料
     setUser(userData)
     refreshUser()
@@ -82,7 +80,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('退出登录失败:', error)
     } finally {
-      localStorage.removeItem('token')
+      // Token cookie 由后端 /api/auth/logout 清除，前端无需处理
       setUser(null)
     }
   }

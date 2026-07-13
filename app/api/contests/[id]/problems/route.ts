@@ -10,7 +10,7 @@ import { checkContestAccess } from '@/lib/contest-auth'
 import { listContestProblemsWithStatus } from '@/lib/contest/service'
 
 export const GET = withApi.public(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
   const currentUser = getUserFromRequest(req)

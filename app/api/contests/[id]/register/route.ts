@@ -11,7 +11,7 @@ import {
 } from '@/lib/contest/service'
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
   const contestResult = await getContestForRegistration(id)

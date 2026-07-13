@@ -8,7 +8,7 @@
  * 迁移到 withApi 中间件模式
  */
 import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
-import { canManageContent, isAdmin } from '@/lib/permissions'
+import { canManageContent, canAccessAdmin } from '@/lib/permissions'
 import { isObjectId } from '@/lib/api/validation'
 import bcrypt from 'bcryptjs'
 import {
@@ -21,7 +21,7 @@ import { getUserFromRequest } from '@/lib/auth'
 
 // GET /api/contests/[id] - 获取竞赛详情
 export const GET = withApi.public(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
   const session = getUserFromRequest(req)
@@ -34,10 +34,10 @@ export const GET = withApi.public(async (req, ctx) => {
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
   if (!canManageContent(user)) throw throw403('无权限编辑竞赛')
 
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const adminFlag = isAdmin(user)
+  const adminFlag = canAccessAdmin(user)
   const access = await ensureContestManageAccess(id, user.id, adminFlag)
   if (!access.ok) {
     if (access.status === 404) throw404(access.error)
@@ -85,10 +85,10 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   if (!canManageContent(user)) throw throw403('无权限删除竞赛')
 
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const adminFlag = isAdmin(user)
+  const adminFlag = canAccessAdmin(user)
   const access = await ensureContestManageAccess(id, user.id, adminFlag)
   if (!access.ok) {
     if (access.status === 404) throw404(access.error)

@@ -2,7 +2,7 @@
  * lib/class/validation.ts
  * 班级参数校验
  */
-import { required, optional, toInt, toBool } from '@/lib/api/validation'
+import { required, optional, toBool } from '@/lib/api/validation'
 import { validateObjectId } from '@/lib/api/validation'
 
 export function parseClassCreate(body: any) {
@@ -18,14 +18,6 @@ export function parseClassUpdate(body: any) {
     name: optional(body?.name),
     description: optional(body?.description),
     isPublic: body?.isPublic !== undefined ? toBool(body.isPublic) : undefined,
-  }
-}
-
-export function parseInviteCreate(body: any) {
-  return {
-    maxUses: toInt(body?.maxUses, 'maxUses', 1),
-    expiresAt: body?.expiresAt ? new Date(body.expiresAt) : undefined,
-    role: optional(body?.role) ?? 'student',
   }
 }
 

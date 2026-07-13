@@ -35,7 +35,7 @@ const permissionDescriptions: Record<keyof Permissions, { title: string; descrip
   },
   canInviteMembers: {
     title: '邀请成员',
-    description: '允许成员创建邀请码并邀请新成员',
+    description: '允许成员通过用户名邀请新成员',
   },
   canManageMembers: {
     title: '管理成员',
@@ -80,14 +80,13 @@ export default function MemberPermissionsPage() {
   }, [classId, memberId])
 
   const fetchMemberInfo = async () => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-
     try {
       const response = await fetchWithAuth(`/api/classes/${classId}`)
+
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
 
       if (response.ok) {
         const data = await response.json()
@@ -125,12 +124,6 @@ export default function MemberPermissionsPage() {
   }
 
   const handleSavePermissions = async () => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-
     if (!confirm('确定要修改该成员的权限吗？')) {
       return
     }
@@ -146,6 +139,11 @@ export default function MemberPermissionsPage() {
           body: JSON.stringify({ permissions }),
         }
       )
+
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
 
       if (response.ok) {
         alert('权限更新成功！')

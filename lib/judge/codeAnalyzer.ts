@@ -201,12 +201,13 @@ function analyzeCode(code: string, language: string): CodeAnalysisResult {
   const langKey = getLanguageKey(language);
   
   if (langKey && DANGEROUS_PATTERNS[langKey as keyof typeof DANGEROUS_PATTERNS]) {
+    // 安全说明：以下正则仅做静态告警，真正的安全边界是评测沙箱（seccomp/cgroups/命名空间隔离）。
+    // 静态正则存在大量绕过手段（字符串拼接、宏、编码），不能作为安全防线，因此降级为 warnings。
     const patterns = DANGEROUS_PATTERNS[langKey as keyof typeof DANGEROUS_PATTERNS];
     patterns.forEach(({ pattern, name }) => {
       const regex = new RegExp(pattern.source, pattern.flags);
       if (regex.test(code)) {
-        result.safe = false;
-        result.errors.push(`检测到危险模式: ${name}`);
+        result.warnings.push(`检测到可能受限的模式: ${name}（最终是否放行由沙箱决定）`);
         result.detectedPatterns.push(name);
       }
     });

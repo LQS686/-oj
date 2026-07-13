@@ -8,7 +8,7 @@ import { getSubmissionDetailOrClassAssignment } from '@/lib/submission/service'
 import { isObjectId } from '@/lib/api/validation'
 
 export const GET = withApi.public(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的提交ID')
   const data = await getSubmissionDetailOrClassAssignment(id)
   if (!data) throw404('提交记录不存在')

@@ -71,17 +71,17 @@ export default function MemberActivityPage() {
   }
 
   const fetchActivityStats = async () => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      router.push('/login')
-      return
-    }
-
     try {
       setLoading(true)
       setError(null)
 
       const response = await fetchWithAuth(`/api/classes/${classId}/members/${memberId}/activity`)
+
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
+
       const data = await response.json()
 
       if (response.ok && data.success) {

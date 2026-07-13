@@ -24,7 +24,7 @@ import {
 } from '@/lib/class/service'
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  const { id, problemId } = (ctx as any).params
+  const { id, problemId } = ctx.params
   if (!isObjectId(id) || !isObjectId(problemId)) {
     throw400('INVALID_ID', '无效的ID')
   }
@@ -71,7 +71,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
 })
 
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
-  const { id, problemId } = (ctx as any).params
+  const { id, problemId } = ctx.params
   if (!isObjectId(id) || !isObjectId(problemId)) {
     throw400('INVALID_ID', '无效的ID')
   }
@@ -103,7 +103,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  const { id, problemId } = (ctx as any).params
+  const { id, problemId } = ctx.params
   if (!isObjectId(id) || !isObjectId(problemId)) {
     throw400('INVALID_ID', '无效的ID')
   }

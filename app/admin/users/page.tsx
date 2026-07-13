@@ -382,10 +382,7 @@ export default function AdminUsersPage() {
  }
 
  xhr.open('POST', '/api/admin/users/batch-register')
- const token = localStorage.getItem('token')
- if (token && token !== 'null' && token !== 'undefined') {
- xhr.setRequestHeader('Authorization', `Bearer ${token}`)
- }
+ // Token 通过 httpOnly cookie 自动携带（xhr.withCredentials = true）
  xhr.withCredentials = true
  xhr.send(formData)
  } catch (err) {

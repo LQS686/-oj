@@ -23,7 +23,7 @@ import {
 import { createClassAssignment } from '@/lib/class/assignment'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const member = await getCurrentClassMember(id, user.id)
@@ -42,7 +42,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   await assertClassAdmin(id, user.id, '只有管理员可以创建作业')

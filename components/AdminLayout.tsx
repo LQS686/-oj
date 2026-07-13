@@ -166,12 +166,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         method: 'POST',
         credentials: 'include',
       })
-      localStorage.removeItem('token')
       logout()
       router.push('/login')
     } catch (error) {
       logger.error('登出失败', error)
-      localStorage.removeItem('token')
       router.push('/login')
     }
   }

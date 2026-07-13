@@ -40,3 +40,9 @@ temp/
 
 # generated
 /generated/
+
+# runtime logs
+/logs/
+
+# TRAE IDE local skills & configs
+/.trae/

@@ -6,7 +6,7 @@ import { isObjectId } from '@/lib/api/validation'
 import { discoverProviderModels } from '@/lib/ai/discover'
 
 export const POST = withApi.admin(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的ID')
   const models = await discoverProviderModels(id)
   return ok(models)

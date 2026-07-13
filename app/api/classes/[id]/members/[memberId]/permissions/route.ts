@@ -16,7 +16,7 @@ import {
 } from '@/lib/class/service'
 
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
-  const { id, memberId } = (ctx as any).params
+  const { id, memberId } = ctx.params
   if (!isObjectId(id) || !isObjectId(memberId)) {
     throw400('INVALID_ID', '无效的ID')
   }

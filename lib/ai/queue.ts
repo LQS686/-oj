@@ -339,9 +339,6 @@ class AiQueue extends EventEmitter {
                     } as any
                 })
 
-                // 超时保护：事务执行期间若超时触发，跳过 COMPLETED 写库避免覆盖 FAILED
-                if (job.aborted) return
-
                 // Update Log
                 await tx.aiGenerationLog.update({
                     where: { id: job.id },

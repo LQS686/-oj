@@ -17,7 +17,7 @@ import {
 
 /** 获取邀请详情 */
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  const { inviteId } = (ctx as any).params
+  const { inviteId } = ctx.params
   if (!isObjectId(inviteId)) throw400('INVALID_ID', '无效的邀请ID')
 
   const result = await getDirectInviteDetail(inviteId, user.id)
@@ -29,7 +29,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
 
 /** 响应邀请 */
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
-  const { inviteId } = (ctx as any).params
+  const { inviteId } = ctx.params
   if (!isObjectId(inviteId)) throw400('INVALID_ID', '无效的邀请ID')
 
   const body = await readJson<{ action: string }>(req)

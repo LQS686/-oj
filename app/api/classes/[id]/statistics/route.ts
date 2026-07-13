@@ -11,7 +11,7 @@ import {
 } from '@/lib/class/service'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
-  const { id: classId } = (ctx as any).params
+  const { id: classId } = ctx.params
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
   const access = await ensureClassAccessible(classId!, user.id)

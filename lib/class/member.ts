@@ -51,14 +51,46 @@ export async function listClassMembers(
     }
   }
 
+  // 搜索下推 DB：在 user 关联表（username/nickname）和 ClassMember.remark 上做 contains 模糊匹配
+  if (search) {
+    const searchOr = [
+      { user: { username: { contains: search, mode: 'insensitive' } } },
+      { user: { nickname: { contains: search, mode: 'insensitive' } } },
+      { remark: { contains: search, mode: 'insensitive' } },
+    ]
+    // active 过滤也可能使用 where.OR，两者需用 AND 组合避免覆盖
+    if (where.OR) {
+      where.AND = [{ OR: where.OR }, { OR: searchOr }]
+      delete where.OR
+    } else {
+      where.OR = searchOr
+    }
+  }
+
+  // 排序下推 DB（role 排序需自定义权重，DB 不支持 case 表达式，保留内存排序）
+  let orderBy: any
+  switch (sortBy) {
+    case 'lastActiveAt':
+      orderBy = { lastActiveAt: sortOrder }
+      break
+    case 'username':
+      orderBy = { user: { username: sortOrder } }
+      break
+    case 'joinedAt':
+    default:
+      orderBy = { joinedAt: sortOrder }
+      break
+  }
+
   const members = await prisma.classMember.findMany({
     where,
     include: {
       user: { select: { username: true, nickname: true, avatar: true } },
     },
+    orderBy,
   })
 
-  let details = members.map((m: any) => ({
+  const details = members.map((m: any) => ({
     id: m.id,
     userId: m.userId,
     username: m.user.username,
@@ -72,42 +104,15 @@ export async function listClassMembers(
     remark: m.remark,
   }))
 
-  if (search) {
-    const q = search.toLowerCase()
-    details = details.filter(
-      (m: any) =>
-        m.username?.toLowerCase().includes(q) ||
-        (m.nickname && m.nickname.toLowerCase().includes(q)) ||
-        (m.remark && m.remark.toLowerCase().includes(q))
-    )
+  // role 排序在内存中完成（owner > assistant > student 的自定义权重 DB 无法表达）
+  if (sortBy === 'role') {
+    const order: Record<string, number> = { owner: 3, assistant: 2, student: 1 }
+    details.sort((a: any, b: any) => {
+      const av = order[a.role] ?? 0
+      const bv = order[b.role] ?? 0
+      return sortOrder === 'asc' ? (av > bv ? 1 : -1) : av < bv ? 1 : -1
+    })
   }
-
-  details.sort((a: any, b: any) => {
-    let av: any
-    let bv: any
-    switch (sortBy) {
-      case 'role': {
-        const order: Record<string, number> = { owner: 3, assistant: 2, student: 1 }
-        av = order[a.role] ?? 0
-        bv = order[b.role] ?? 0
-        break
-      }
-      case 'lastActiveAt':
-        av = a.lastActiveAt ? new Date(a.lastActiveAt).getTime() : 0
-        bv = b.lastActiveAt ? new Date(b.lastActiveAt).getTime() : 0
-        break
-      case 'username':
-        av = a.username || ''
-        bv = b.username || ''
-        break
-      case 'joinedAt':
-      default:
-        av = new Date(a.joinedAt).getTime()
-        bv = new Date(b.joinedAt).getTime()
-        break
-    }
-    return sortOrder === 'asc' ? (av > bv ? 1 : -1) : av < bv ? 1 : -1
-  })
 
   return details
 }

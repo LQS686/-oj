@@ -18,7 +18,7 @@ import {
 
 /** 创建加入申请 */
 export const POST = withApi.auth(async (req, ctx, { user }) => {
-  const { id: classId } = (ctx as any).params
+  const { id: classId } = ctx.params
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
   const body = await readJson<{ message?: string }>(req)
@@ -43,7 +43,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
 
 /** 获取加入申请列表 */
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  const { id: classId } = (ctx as any).params
+  const { id: classId } = ctx.params
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
   // 验证当前用户是否是班级管理员

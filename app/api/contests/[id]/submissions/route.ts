@@ -8,7 +8,7 @@
  */
 import { withApi, ok, readJson, readQuery, throw400 } from '@/lib/api/withApi'
 import { isObjectId, toInt } from '@/lib/api/validation'
-import { isAdmin } from '@/lib/permissions'
+import { canAccessAdmin } from '@/lib/permissions'
 import { getUserFromRequest } from '@/lib/auth'
 import { checkContestAccess } from '@/lib/contest-auth'
 import {
@@ -18,11 +18,11 @@ import {
 
 // POST /api/contests/[id]/submissions - 提交竞赛代码
 export const POST = withApi.auth(async (req, ctx, { user }) => {
-  const { id: contestId } = (ctx as any).params
+  const { id: contestId } = ctx.params
   if (!isObjectId(contestId)) throw400('INVALID_ID', '无效的竞赛ID')
 
   const body = await readJson<{ problemId: string; code: string; language: string }>(req)
-  const adminFlag = isAdmin(user)
+  const adminFlag = canAccessAdmin(user)
   const result = await submitContestCode({
     contestId: contestId!,
     userId: user.id,
@@ -36,7 +36,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
 
 // GET /api/contests/[id]/submissions - 获取竞赛提交列表
 export const GET = withApi.public(async (req, ctx) => {
-  const { id: contestId } = (ctx as any).params
+  const { id: contestId } = ctx.params
   if (!isObjectId(contestId)) throw400('INVALID_ID', '无效的竞赛ID')
 
   // 验证访问权限

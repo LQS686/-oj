@@ -12,7 +12,7 @@ import { deleteAiModel, updateAiModel } from '@/lib/ai/service'
  * PUT /api/admin/ai/models/[id]
  */
 export const PUT = withApi.admin(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   const body = await readJson<{
@@ -44,7 +44,7 @@ export const PUT = withApi.admin(async (req, ctx) => {
  * DELETE /api/admin/ai/models/[id]
  */
 export const DELETE = withApi.admin(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   await deleteAiModel(id)

@@ -6,6 +6,12 @@ import { logger } from '@/lib/logger'
 
 const USE_DOCKER = process.env.USE_DOCKER === 'true' || false
 
+// VULN-04 修复：Windows 本地评测无沙箱隔离，仅允许在显式确认的开发环境使用。
+// 生产环境必须启用 USE_DOCKER=true。模块加载时一次性告警，避免每次评测刷日志。
+if (!USE_DOCKER && process.platform === 'win32' && process.env.NODE_ENV !== 'production') {
+  logger.warn('⚠️ [安全] Windows 开发环境使用本地进程评测，无 Docker 沙箱隔离。生产环境必须设置 USE_DOCKER=true。设置 ALLOW_LOCAL_JUDGE_ON_WINDOWS=1 可显式确认此风险。')
+}
+
 export interface ExecuteOptions {
   code: string
   language: string
@@ -90,7 +96,10 @@ function readProcVmHwmKB(pid: number): number {
  */
 function readWindowsProcessMemoryKB(pid: number): number {
   try {
-    const out = execSync(`tasklist /fi "PID eq ${pid}" /fo csv /nh`, {
+    // pid 来自 process.pid，始终为正整数；显式校验防止命令注入
+    const safePid = Math.floor(pid)
+    if (!Number.isFinite(safePid) || safePid <= 0) return -1
+    const out = execSync(`tasklist /fi "PID eq ${safePid}" /fo csv /nh`, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'ignore'],
       timeout: 2000,
@@ -372,7 +381,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
               // 内存超限杀进程后清除墙超时定时器，避免后续误设 timeout 标志覆盖 MLE
               if (timeoutId) clearTimeout(timeoutId)
               try {
-                execSync(`taskkill /F /T /PID ${childProcess.pid}`, { stdio: 'ignore' })
+                if (childProcess.pid && childProcess.pid > 0) {
+                  execSync(`taskkill /F /T /PID ${childProcess.pid}`, { stdio: 'ignore' })
+                }
               } catch {
                 // 忽略：进程可能已退出
               }
@@ -432,7 +443,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
             if (isWindows) {
               try {
-                execSync(`taskkill /F /T /PID ${childProcess.pid}`, { stdio: 'ignore' })
+                if (childProcess.pid && childProcess.pid > 0) {
+                  execSync(`taskkill /F /T /PID ${childProcess.pid}`, { stdio: 'ignore' })
+                }
               } catch {
                 // 忽略：进程可能已退出
               }

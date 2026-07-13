@@ -14,6 +14,7 @@ import {
   validatePassword,
 } from '@/lib/validation'
 import { escapeHtml } from '@/lib/sanitize'
+import { clearAuthUserCache } from '@/lib/api/handler'
 
 export interface UserProfile {
   id: string
@@ -93,6 +94,8 @@ export async function clearUserCache(userId: string) {
   cache.delete(`user:profile:${userId}`)
   cache.delete(`user:stats:${userId}`)
   cache.delete(`auth:user:${userId}`)
+  // 清除鉴权层用户缓存（role/tokenVersion），避免角色变更后 60s 内仍以旧角色通过鉴权
+  clearAuthUserCache(userId)
   // 任何用户变更（role / isBanned / rating / solvedCount / 删除）都会影响榜单
   clearRankingCache()
 }

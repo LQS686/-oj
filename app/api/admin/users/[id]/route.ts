@@ -23,7 +23,7 @@ import * as bcrypt from 'bcryptjs'
  * - password：仅 SYSTEM_ADMIN 可重置他人密码
  */
 export const PATCH = withApi.admin(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的ID')
 
   const body = await readJson<{
@@ -67,7 +67,7 @@ export const PATCH = withApi.admin(async (req, ctx, { user }) => {
  * DELETE /api/admin/users/[id] - 删除用户（管理员）
  */
 export const DELETE = withApi.admin(async (_req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的ID')
 
   // 校验：不能删除自己 / 超级管理员不能删除 / 管理员不能删除其他管理员

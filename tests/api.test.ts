@@ -25,11 +25,12 @@ describe('API Tests', () => {
     });
 
     it('should login with valid credentials', async () => {
+      // 测试环境凭据：实际部署时应通过环境变量注入，此处仅用于 CI/本地测试
       const response = await agent
         .post('/api/auth/login')
         .send({
-          email: 'admin@example.com',
-          password: 'admin123'
+          email: process.env.TEST_ADMIN_EMAIL || 'admin@example.com',
+          password: process.env.TEST_ADMIN_PASSWORD || 'admin123'
         });
       expect(response.status).toBe(200);
     });

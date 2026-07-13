@@ -3,6 +3,7 @@
  * 班级业务层（CRUD / 成员 / 邀请 / 笔记 / 作业 / 邀请 / 商品）
  */
 
+import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { canManageContent } from '@/lib/permissions'
 import { addJudgeJob } from '@/lib/judge/queue'
@@ -265,6 +266,18 @@ export async function patchClassMember(
   return updated
 }
 
+/** 合法权限位白名单 */
+const ALLOWED_PERMISSION_KEYS = [
+  'canViewProblems',
+  'canSubmit',
+  'canViewNotes',
+  'canCreateNotes',
+  'canManageAssignments',
+  'canInviteMembers',
+  'canManageMembers',
+  'canViewStats',
+] as const
+
 /** 合并成员权限位 */
 export async function mergeClassMemberPermissions(
   classId: string,
@@ -275,7 +288,14 @@ export async function mergeClassMemberPermissions(
     where: { classId_userId: { classId, userId } },
   })
   if (!current) return null
-  const merged = { ...((current.permissions as any) || {}), ...permissions }
+  // 仅允许白名单内的权限位写入，防止注入未知字段
+  const filtered: Record<string, any> = {}
+  for (const key of ALLOWED_PERMISSION_KEYS) {
+    if (key in permissions) {
+      filtered[key] = permissions[key]
+    }
+  }
+  const merged = { ...((current.permissions as any) || {}), ...filtered }
   return prisma.classMember.update({
     where: { classId_userId: { classId, userId } },
     data: { permissions: merged },
@@ -1159,6 +1179,12 @@ export async function deleteClassProblem(problemId: string) {
   return prisma.problem.delete({ where: { id: problemId } })
 }
 
+/** 生成班级题目编号：T + 6 位时间戳 + 4 位随机 hex（避免 Math.random 可预测性） */
+function generateClassProblemNumber(): string {
+  const suffix = crypto.randomBytes(2).toString('hex')
+  return `T${Date.now().toString().slice(-6)}${suffix}`
+}
+
 /** 复制一道公共题到班级题库 */
 export async function cloneProblemToClass(
   sourceProblemId: string,
@@ -1170,9 +1196,7 @@ export async function cloneProblemToClass(
     include: { testCases: true },
   })
   if (!source) return null
-  const problemNumber = `T${Date.now().toString().slice(-6)}${Math.floor(
-    Math.random() * 100
-  )}`
+  const problemNumber = generateClassProblemNumber()
   return prisma.problem.create({
     data: {
       problemNumber,
@@ -1216,9 +1240,7 @@ export async function createNewClassProblem(
     memoryLimit?: number
   }
 ) {
-  const problemNumber = `T${Date.now().toString().slice(-6)}${Math.floor(
-    Math.random() * 100
-  )}`
+  const problemNumber = generateClassProblemNumber()
   return prisma.problem.create({
     data: {
       problemNumber,
@@ -1342,83 +1364,8 @@ export async function deleteClassNoteSimple(noteId: string) {
 }
 
 /* ============================================================================
- * 班级邀请码 / 直接邀请
+ * 班级直接邀请（按用户名）
  * ========================================================================== */
-
-export async function listClassInvitesWithCreators(classId: string) {
-  const invites = await prisma.classInvite.findMany({
-    where: { classId },
-    orderBy: { createdAt: 'desc' },
-  })
-  const userIds = Array.from(new Set(invites.map((i: any) => i.createdBy)))
-  const users = userIds.length
-    ? await prisma.user.findMany({
-        where: { id: { in: userIds } },
-        select: { id: true, username: true, nickname: true },
-      })
-    : []
-  const userMap = new Map<any, any>(users.map((u: any) => [u.id, u]))
-
-  return invites.map((invite: any) => {
-    const creator = userMap.get(invite.createdBy)
-    const isExpired = invite.expiresAt && new Date(invite.expiresAt) < new Date()
-    const isExhausted = invite.maxUses !== -1 && invite.usedCount >= invite.maxUses
-    return {
-      id: invite.id,
-      code: invite.code,
-      maxUses: invite.maxUses,
-      usedCount: invite.usedCount,
-      expiresAt: invite.expiresAt,
-      createdAt: invite.createdAt,
-      creator: {
-        id: creator?.id,
-        username: creator?.username,
-        nickname: creator?.nickname,
-      },
-      status: isExpired ? 'expired' : isExhausted ? 'exhausted' : 'active',
-      inviteLink: `${
-        process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-      }/classes/join?code=${invite.code}`,
-    }
-  })
-}
-
-export async function getClassInviteSimple(classId: string, inviteId: string) {
-  return prisma.classInvite.findUnique({ where: { id: inviteId, classId } })
-}
-
-export async function deleteClassInviteSimple(inviteId: string) {
-  return prisma.classInvite.delete({ where: { id: inviteId } })
-}
-
-export async function createClassInviteCodeUnique(
-  classId: string,
-  createdBy: string,
-  maxUses: number,
-  expiresAt: Date | null
-) {
-  // 生成唯一的 8 位邀请码
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let code = ''
-  for (let attempt = 0; attempt < 20; attempt++) {
-    code = ''
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    const exists = await prisma.classInvite.findUnique({ where: { code } })
-    if (!exists) break
-  }
-  return prisma.classInvite.create({
-    data: {
-      classId,
-      code,
-      createdBy,
-      maxUses,
-      usedCount: 0,
-      expiresAt,
-    },
-  })
-}
 
 export async function listClassDirectInvitesDetailed(classId: string) {
   return prisma.classDirectInvite.findMany({
@@ -1454,105 +1401,6 @@ export async function sendClassDirectInviteNotification(
     content: `${inviter?.nickname || inviter?.username} 邀请您加入班级 "${className}"`,
     link: `/classes/invites/direct/${inviteId}`,
   })
-}
-
-/* ============================================================================
- * 加入班级（通过邀请码）
- * ========================================================================== */
-export interface JoinClassResult {
-  ok: boolean
-  code?: number
-  reason?: string
-  classId?: string
-  className?: string
-}
-
-export async function joinClassByCode(
-  code: string,
-  userId: string
-): Promise<JoinClassResult> {
-  const invite = await prisma.classInvite.findUnique({ where: { code } })
-  if (!invite) return { ok: false, code: 404, reason: '邀请码不存在或已失效' }
-
-  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-    return { ok: false, code: 400, reason: '邀请码已过期' }
-  }
-  if (invite.maxUses !== -1 && invite.usedCount >= invite.maxUses) {
-    return { ok: false, code: 400, reason: '邀请码使用次数已达上限' }
-  }
-
-  const classId = invite.classId
-
-  const existingMember = await prisma.classMember.findUnique({
-    where: { classId_userId: { classId, userId } },
-  })
-  if (existingMember) return { ok: false, code: 400, reason: '您已经是班级成员' }
-
-  const classData = await prisma.class.findUnique({ where: { id: classId } })
-  if (!classData) return { ok: false, code: 404, reason: '班级不存在' }
-
-  const memberCount = await prisma.classMember.count({ where: { classId } })
-  if (memberCount >= classData.maxMembers) {
-    return { ok: false, code: 400, reason: '班级人数已达上限' }
-  }
-
-  // 乐观更新 usedCount + 建成员：放入事务保证原子性，任一步失败回滚 usedCount
-  const now = new Date()
-  const maxUsesCondition =
-    invite.maxUses === -1 ? { usedCount: { lt: 999999 } } : { usedCount: { lt: invite.maxUses } }
-  try {
-    await prisma.$transaction(async (tx) => {
-      const updatedInvite = await tx.classInvite.updateMany({
-        where: {
-          id: invite.id,
-          ...maxUsesCondition,
-          ...(invite.expiresAt ? { expiresAt: { gt: now } } : {}),
-        },
-        data: { usedCount: { increment: 1 } },
-      })
-      if (updatedInvite.count === 0) {
-        const err: any = new Error('邀请码已失效或使用次数已达上限')
-        err.code = 'INVITE_EXHAUSTED'
-        throw err
-      }
-      try {
-        await tx.classMember.create({
-          data: {
-            classId,
-            userId,
-            role: apiRoleToDb('student'),
-            permissions: {
-              canViewProblems: true,
-              canSubmit: true,
-              canViewNotes: true,
-              canCreateNotes: false,
-              canManageAssignments: false,
-              canInviteMembers: false,
-            },
-            joinedAt: new Date(),
-            lastActiveAt: new Date(),
-          },
-        })
-      } catch (err: any) {
-        if (err?.code === 'P2002') {
-          const e: any = new Error('您已经是班级成员')
-          e.code = 'ALREADY_MEMBER'
-          throw e
-        }
-        throw err
-      }
-    })
-  } catch (err: any) {
-    if (err?.code === 'INVITE_EXHAUSTED') {
-      return { ok: false, code: 400, reason: '邀请码已失效或使用次数已达上限' }
-    }
-    if (err?.code === 'ALREADY_MEMBER') {
-      return { ok: false, code: 400, reason: '您已经是班级成员' }
-    }
-    throw err
-  }
-
-  return { ok: true, classId, className: classData.name }
 }
 
 /* ============================================================================

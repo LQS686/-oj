@@ -6,7 +6,7 @@
  * DELETE 鉴权：删除（作者 / 管理员 / 教师，级联删评论）
  */
 import { withApi, ok, readJson, readQuery, throw400, throw403, throw404 } from '@/lib/api/withApi'
-import { isAdmin, canManageContent } from '@/lib/permissions'
+import { canAccessAdmin, canManageContent } from '@/lib/permissions'
 import { verifyToken } from '@/lib/auth'
 import {
   getSolutionDetailWithPermission,
@@ -25,7 +25,7 @@ function getClientIp(req: Request): string {
 }
 
 export const GET = withApi.public(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题解ID')
 
   const q = readQuery<{ isAssignmentContext?: string }>(req)
@@ -57,7 +57,7 @@ export const GET = withApi.public(async (req, ctx) => {
 })
 
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题解ID')
 
   const body = await readJson<{
@@ -69,7 +69,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
 
   // 鉴权：作者本人 或 管理员/教师
   const dbUser = await getUserRoleFlags(user.id)
-  const adminFlag = isAdmin(user)
+  const adminFlag = canAccessAdmin(user)
   const canManage = canManageContent(dbUser)
 
   try {
@@ -85,11 +85,11 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题解ID')
 
   const dbUser = await getUserRoleFlags(user.id)
-  const adminFlag = isAdmin(user)
+  const adminFlag = canAccessAdmin(user)
   const canManage = canManageContent(dbUser)
 
   try {

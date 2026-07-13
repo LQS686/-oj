@@ -291,7 +291,7 @@ export async function upsertUserAiPreference(input: {
 }
 
 import { encrypt, decrypt, maskApiKey } from '@/lib/crypto'
-import { resolveBaseUrl, getProviderMeta } from '@/lib/ai/providers'
+import { resolveBaseUrl, getProviderMeta, validateAiBaseUrl } from '@/lib/ai/providers'
 import { OpenAI } from 'openai'
 
 /* ---------- Provider ---------- */
@@ -668,6 +668,14 @@ export async function testAiConnection(input: TestConnectionInput) {
 
   // Determine Base URL via provider dictionary
   const finalBaseUrl = baseUrl || resolveBaseUrl(provider, 'openai', null) || ''
+  // SSRF 防护：校验 baseUrl 不指向内网/元数据端点
+  if (finalBaseUrl) {
+    try {
+      validateAiBaseUrl(finalBaseUrl)
+    } catch (e: any) {
+      throw new ApiError('INVALID_BASE_URL', e?.message || 'baseUrl 校验失败', 400)
+    }
+  }
   const client = new OpenAI({ apiKey, baseURL: finalBaseUrl })
 
   // Determine Model — 优先使用入参 model，否则用 default

@@ -77,7 +77,6 @@ try {
   db.createCollection('Comment')
   db.createCollection('Class')
   db.createCollection('ClassMember')
-  db.createCollection('ClassInvite')
   db.createCollection('ClassAssignment')
   db.createCollection('ClassAssignmentSubmission')
   db.createCollection('SystemSettings')

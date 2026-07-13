@@ -18,7 +18,7 @@ import {
 import { removeClassMember as removeClassMemberDirect } from '@/lib/class/member'
 
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
-  const { id, memberId } = (ctx as any).params
+  const { id, memberId } = ctx.params
   if (!isObjectId(id) || !isObjectId(memberId)) {
     throw400('INVALID_ID', '无效的ID')
   }
@@ -41,7 +41,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  const { id, memberId } = (ctx as any).params
+  const { id, memberId } = ctx.params
   if (!isObjectId(id) || !isObjectId(memberId)) {
     throw400('INVALID_ID', '无效的ID')
   }

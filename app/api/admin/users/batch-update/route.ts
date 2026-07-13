@@ -1,7 +1,7 @@
 /**
  * /api/admin/users/batch-update - 批量更新用户角色（管理员）
  *
- * POST { userIds: string[], role: 'SYSTEM_ADMIN' | 'TEACHER' | 'STUDENT' }
+ * POST { userIds: string[], role: 'ADMIN' | 'TEACHER' | 'STUDENT' }
  * - 跳过自己
  * - 跳过超级管理员
  */

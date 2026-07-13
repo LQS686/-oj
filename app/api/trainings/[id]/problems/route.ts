@@ -11,12 +11,12 @@ import {
 import type { TrainingProblemPatchInput } from '@/lib/training/types'
 import { isObjectId } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
-import { canManageContent, isAdmin } from '@/lib/permissions'
+import { canManageContent, canAccessAdmin } from '@/lib/permissions'
 
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   if (!canManageContent(user)) throw throw403('无权限修改训练题目')
 
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
   // 权限：作者或管理员
@@ -26,7 +26,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
-  if (!isAdmin(u) && found.authorId !== user.id) {
+  if (!canAccessAdmin(u) && found.authorId !== user.id) {
     throw403('只有作者或管理员可以修改题目')
   }
 

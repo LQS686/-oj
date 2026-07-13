@@ -3,7 +3,7 @@
  * AI Provider 模型发现：调用服务商的 /v1/models 接口或根据 apiFormat 分支
  */
 import { prisma } from '@/lib/prisma'
-import { getProviderMeta, inferModelType, type ProviderMeta } from './providers'
+import { getProviderMeta, inferModelType, validateAiBaseUrl, type ProviderMeta } from './providers'
 import { ApiError } from '@/lib/api/withApi'
 import { decrypt } from '@/lib/crypto'
 
@@ -41,6 +41,8 @@ async function fetchOpenAICompatibleModels(
   baseUrl: string,
   apiKey: string
 ): Promise<DiscoveredModel[]> {
+  // SSRF 防护：校验 baseUrl 不指向内网/元数据端点
+  validateAiBaseUrl(baseUrl)
   const url = `${baseUrl.replace(/\/+$/, '')}/models`
   const res = await fetch(url, {
     method: 'GET',

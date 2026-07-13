@@ -199,3 +199,57 @@ export function inferModelType(modelId: string): ModelType {
   }
   return 'generation'
 }
+
+/**
+ * SSRF 防护：校验 AI 服务商 baseUrl 不指向内网/元数据端点。
+ * 阻止管理员误配或恶意配置导致服务端请求伪造（SSRF）。
+ */
+export function validateAiBaseUrl(baseUrl: string): void {
+  let parsed: URL
+  try {
+    parsed = new URL(baseUrl)
+  } catch {
+    throw new Error('baseUrl 格式无效')
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`不允许的协议: ${parsed.protocol}（仅允许 http/https）`)
+  }
+
+  const host = parsed.hostname.toLowerCase()
+
+  // 禁止 localhost 主机名
+  if (host === 'localhost') {
+    throw new Error('baseUrl 不允许指向 localhost')
+  }
+
+  // IPv4 检查
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (ipv4Match) {
+    const octets = ipv4Match.slice(1).map(Number)
+    if (octets.some((o) => o > 255)) {
+      throw new Error(`无效的 IPv4 地址: ${host}`)
+    }
+    const [a, b] = octets
+    if (
+      a === 0 ||                          // 0.0.0.0/8
+      a === 10 ||                         // 10.0.0.0/8
+      a === 127 ||                        // 127.0.0.0/8 (loopback)
+      (a === 169 && b === 254) ||         // 169.254.0.0/16 (link-local / cloud metadata)
+      (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
+      (a === 192 && b === 168) ||         // 192.168.0.0/16
+      (a === 100 && b >= 64 && b <= 127)  // 100.64.0.0/10 (CGNAT)
+    ) {
+      throw new Error(`baseUrl 不允许指向内网/保留地址: ${host}`)
+    }
+  }
+
+  // IPv6 检查
+  if (host === '::1' || host === '::' || host === '[::1]' || host === '[::]') {
+    throw new Error(`baseUrl 不允许指向内网地址: ${host}`)
+  }
+  if (host.startsWith('fe80') || host.startsWith('fc') || host.startsWith('fd')) {
+    throw new Error(`baseUrl 不允许指向内网地址: ${host}`)
+  }
+}
+

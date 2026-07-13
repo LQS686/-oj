@@ -20,7 +20,7 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { formatRelativeTime } from '@/lib/utils'
 import { canManageContent } from '@/lib/permissions'
-import MarkdownRenderer from '@/components/solution/MarkdownRenderer'
+import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 
 interface SolutionDetail {
  id: string
@@ -420,7 +420,7 @@ export default function SolutionDetailPage() {
  <Sparkles className="w-5 h-5 text-primary-light" />
  <h2 className="text-lg font-semibold text-foreground">题解内容</h2>
  </div>
- <MarkdownRenderer content={solution.content || ''} />
+ <MarkdownRenderer content={solution.content || ''} preprocessContent={false} />
  </div>
 
  {/* 配套代码区域 */}

@@ -8,7 +8,7 @@ import { getClassNoteBasic } from '@/lib/class/service'
 import { markClassNoteRead } from '@/lib/class/note'
 
 export const POST = withApi.auth(async (_req, ctx, { user }) => {
-  const { id: classId, noteId } = (ctx as any).params
+  const { id: classId, noteId } = ctx.params
   if (!isObjectId(classId) || !isObjectId(noteId)) {
     throw400('INVALID_ID', '无效的ID')
   }

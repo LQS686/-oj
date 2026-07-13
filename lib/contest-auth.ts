@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { JWTPayload } from '@/lib/auth'
-import { canManageContent } from '@/lib/permissions'
+import { canAccessAdmin } from '@/lib/permissions'
 import { NextRequest } from 'next/server'
 
 // 审计日志记录函数
@@ -23,7 +23,7 @@ async function logAccess(
         userId,
         action,
         resource,
-        details: details ? JSON.stringify(details) : undefined,
+        details: details || undefined,
         ip,
         userAgent
       }
@@ -57,7 +57,7 @@ export async function checkContestAccess(
   const now = new Date()
   const isStarted = now >= contest.startTime
   const isEnded = now > contest.endTime
-  const isAdmin = canManageContent(currentUser ? { id: currentUser.userId, role: currentUser.role } : null) || contest.authorId === currentUser?.userId
+  const isAdmin = canAccessAdmin(currentUser ? { id: currentUser.userId, role: currentUser.role } : null) || contest.authorId === currentUser?.userId
 
   if (isAdmin) {
     return { allowed: true, contest }

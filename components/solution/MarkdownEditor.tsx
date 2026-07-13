@@ -19,7 +19,7 @@ import {
  Eraser,
  type LucideIcon,
 } from 'lucide-react'
-import MarkdownRenderer from './MarkdownRenderer'
+import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { cn } from '@/lib/utils'
 
 export interface MarkdownEditorProps {
@@ -455,7 +455,7 @@ export default function MarkdownEditor({
  style={{ minHeight }}
  >
  {debouncedValue.trim() ? (
- <MarkdownRenderer content={debouncedValue} />
+ <MarkdownRenderer content={debouncedValue} preprocessContent={false} />
  ) : (
  <p className="text-sm text-muted-foreground italic">实时预览将显示在这里…</p>
  )}

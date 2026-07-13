@@ -7,7 +7,7 @@ import { isSystemAdmin } from '@/lib/permissions'
 import { applyProblemVerification } from '@/lib/problem/service'
 
 export const POST = withApi.admin(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目ID')
 
   const body = await readJson<{

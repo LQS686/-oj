@@ -15,7 +15,7 @@ import {
  * PATCH /api/admin/classes/[id] - 更新班级可见性（管理员）
  */
 export const PATCH = withApi.admin(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   const body = await readJson<{ isPublic?: boolean }>(req)
@@ -29,7 +29,7 @@ export const PATCH = withApi.admin(async (req, ctx) => {
  * DELETE /api/admin/classes/[id] - 删除班级（管理员）
  */
 export const DELETE = withApi.admin(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   const message = await adminDeleteClass(id)

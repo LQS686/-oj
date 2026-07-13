@@ -18,7 +18,7 @@ import {
  * GET /api/admin/contests/[id] - 获取单个竞赛详情（管理员）
  */
 export const GET = withApi.admin(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   const contest = await adminGetContestWithProblems(id)
@@ -30,7 +30,7 @@ export const GET = withApi.admin(async (_req, ctx) => {
  * PATCH /api/admin/contests/[id] - 更新竞赛（管理员）
  */
 export const PATCH = withApi.admin(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   const body = await readJson<AdminUpdateContestInput>(req)
@@ -41,7 +41,7 @@ export const PATCH = withApi.admin(async (req, ctx) => {
  * DELETE /api/admin/contests/[id] - 删除竞赛（管理员）
  */
 export const DELETE = withApi.admin(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   // 删除竞赛（级联删除会处理关联数据，如 ContestProblem）

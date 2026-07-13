@@ -8,7 +8,7 @@ import { getUserFromRequest } from '@/lib/auth'
 import { getClassById, getCurrentClassMember } from '@/lib/class/service'
 
 export const GET = withApi.public(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const q = readQuery<{ sortBy?: string; sortOrder?: string; role?: string; active?: string; search?: string }>(req)

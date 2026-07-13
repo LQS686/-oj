@@ -10,7 +10,7 @@ import { checkContestAccess } from '@/lib/contest-auth'
 import { computeContestRankings } from '@/lib/contest/service'
 
 export const GET = withApi.public(async (req, ctx) => {
-  const { id: contestId } = (ctx as any).params
+  const { id: contestId } = ctx.params
   if (!isObjectId(contestId)) throw400('INVALID_ID', '无效的竞赛ID')
 
   // 验证访问权限

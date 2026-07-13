@@ -15,7 +15,7 @@ import {
  * PUT /api/admin/ai/providers/[id]
  */
 export const PUT = withApi.admin(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   const body = await readJson<{
@@ -34,7 +34,7 @@ export const PUT = withApi.admin(async (req, ctx) => {
  * DELETE /api/admin/ai/providers/[id]
  */
 export const DELETE = withApi.admin(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
   // 级联删除：先删除该服务商下的所有模型，再删除服务商本身

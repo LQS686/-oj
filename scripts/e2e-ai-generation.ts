@@ -146,7 +146,7 @@ async function main() {
   }
 
   console.log('🚀 开始端到端测试...')
-  console.log(`   API Key: ${process.env.DEEPSEEK_API_KEY?.slice(0, 8)}...`)
+  console.log(`   API Key: ${process.env.DEEPSEEK_API_KEY?.slice(0, 4)}****`)
   console.log(`   Base URL: ${process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1'}`)
   console.log('')
 

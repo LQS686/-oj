@@ -10,7 +10,8 @@ interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
-  error?: ApiError;
+  error?: string;
+  code?: string;
 }
 
 const REQUEST_TIMEOUT_MS = 30000
@@ -82,11 +83,11 @@ class ApiClient {
 
         try {
           const data = await response.json();
-          if (data.error?.message) {
-            errorMessage = data.error.message;
+          if (typeof data.error === 'string' && data.error) {
+            errorMessage = data.error;
           }
-          if (data.error?.code) {
-            errorCode = data.error.code;
+          if (data.code) {
+            errorCode = data.code;
           }
         } catch (e) {
           // 无法解析JSON，使用默认错误信息
@@ -113,11 +114,10 @@ class ApiClient {
       }
 
       if (!data.success) {
-        const errorMessage = data.error?.message || data.message || '请求失败';
+        const errorMessage = typeof data.error === 'string' ? data.error : (data.message || '请求失败');
         const error: ApiError = {
           message: errorMessage,
-          code: data.error?.code,
-          details: data.error?.details,
+          code: data.code,
         };
         throw error;
       }
@@ -235,11 +235,11 @@ class ApiClient {
 
         try {
           const data = await response.json();
-          if (data.error?.message) {
-            errorMessage = data.error.message;
+          if (typeof data.error === 'string' && data.error) {
+            errorMessage = data.error;
           }
-          if (data.error?.code) {
-            errorCode = data.error.code;
+          if (data.code) {
+            errorCode = data.code;
           }
         } catch (e) {
           // 无法解析JSON，使用默认错误信息
@@ -266,11 +266,10 @@ class ApiClient {
       }
 
       if (!data.success) {
-        const errorMessage = data.error?.message || data.message || '上传失败';
+        const errorMessage = typeof data.error === 'string' ? data.error : (data.message || '上传失败');
         const error: ApiError = {
           message: errorMessage,
-          code: data.error?.code,
-          details: data.error?.details,
+          code: data.code,
         };
         throw error;
       }
@@ -311,11 +310,8 @@ class ApiClient {
 export const apiClient = new ApiClient();
 
 export function getAuthHeaders(): Record<string, string> {
-  if (typeof window === 'undefined') return {}
-  const token = localStorage.getItem('token')
-  if (token && token !== 'null' && token !== 'undefined') {
-    return { 'Authorization': `Bearer ${token}` }
-  }
+  // Token 由后端通过 httpOnly cookie 设置，fetch 使用 credentials: 'include' 自动携带。
+  // 不再从 localStorage 读取 token（避免 XSS 窃取）。
   return {}
 }
 

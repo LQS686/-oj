@@ -6,7 +6,7 @@ import { withApi, ok, readQuery, throw400, throw404 } from '@/lib/api/withApi'
 import { listProblemSubmissionsMerged } from '@/lib/problem/service'
 
 export const GET = withApi.public(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!id) throw400('INVALID_ID', '无效的题目ID')
 
   const q = readQuery<{ page?: string; pageSize?: string; userId?: string }>(req)

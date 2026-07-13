@@ -14,7 +14,7 @@ import {
 import { isClassAdminApiRole } from '@/lib/class/roles'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
-  const { id, assignmentId } = (ctx as any).params
+  const { id, assignmentId } = ctx.params
   if (!isObjectId(id) || !isObjectId(assignmentId)) {
     throw400('INVALID_ID', '无效的ID')
   }

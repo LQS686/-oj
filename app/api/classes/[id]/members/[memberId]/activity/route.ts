@@ -7,7 +7,7 @@ import { isObjectId } from '@/lib/api/validation'
 import { getClassMemberActivity, isClassAdminRole, getCurrentClassMember } from '@/lib/class/service'
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  const { id, memberId } = (ctx as any).params
+  const { id, memberId } = ctx.params
   if (!isObjectId(id) || !isObjectId(memberId)) {
     throw400('INVALID_ID', '无效的ID')
   }

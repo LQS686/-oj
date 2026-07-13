@@ -7,7 +7,7 @@ import { isObjectId } from '@/lib/api/validation'
 import { getCurrentClassMember, getMyAssignmentProgress } from '@/lib/class/service'
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  const { id, assignmentId } = (ctx as any).params
+  const { id, assignmentId } = ctx.params
   if (!isObjectId(id) || !isObjectId(assignmentId)) {
     throw400('INVALID_ID', '无效的ID')
   }

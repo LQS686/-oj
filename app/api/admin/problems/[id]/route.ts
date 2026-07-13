@@ -18,7 +18,7 @@ import {
  * GET /api/admin/problems/[id] - 获取题目详情（管理员）
  */
 export const GET = withApi.admin(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const problem = await getAdminProblemById(id)
   if (!problem) throw404('题目不存在')
@@ -29,7 +29,7 @@ export const GET = withApi.admin(async (_req, ctx) => {
  * PATCH /api/admin/problems/[id] - 更新题目（管理员）
  */
 export const PATCH = withApi.admin(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
   return ok(await updateAdminProblem(id, body))
@@ -39,7 +39,7 @@ export const PATCH = withApi.admin(async (req, ctx) => {
  * PUT /api/admin/problems/[id] - 更新题目（管理员）
  */
 export const PUT = withApi.admin(async (req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
   return ok(await updateAdminProblem(id, body))
@@ -49,7 +49,7 @@ export const PUT = withApi.admin(async (req, ctx) => {
  * DELETE /api/admin/problems/[id] - 删除题目（管理员）
  */
 export const DELETE = withApi.admin(async (_req, ctx) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   return ok(await deleteAdminProblem(id))
 })

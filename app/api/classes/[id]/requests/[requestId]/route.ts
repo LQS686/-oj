@@ -17,7 +17,7 @@ import {
  * body: { action: 'approve' | 'reject' }
  */
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
-  const { id, requestId } = (ctx as any).params
+  const { id, requestId } = ctx.params
   if (!isObjectId(id) || !isObjectId(requestId)) {
     throw400('INVALID_ID', '无效的ID')
   }
@@ -44,7 +44,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
  * DELETE /api/classes/[id]/requests/[requestId] - 撤销自己提交的申请
  */
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  const { id, requestId } = (ctx as any).params
+  const { id, requestId } = ctx.params
   if (!isObjectId(id) || !isObjectId(requestId)) {
     throw400('INVALID_ID', '无效的ID')
   }

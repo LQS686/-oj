@@ -23,7 +23,7 @@ import {
 } from '@/lib/class/service'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const classDataResult = await getClassById(id)
@@ -48,7 +48,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   await assertClassAdmin(id, user.id, '只有管理员可以添加题目')

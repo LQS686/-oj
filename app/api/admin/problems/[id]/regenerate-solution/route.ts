@@ -19,7 +19,7 @@ import { logger } from '@/lib/logger'
 import { enqueueSolutionJob } from '@/lib/ai/solution-queue'
 
 export const POST = withApi.admin(async (_req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
 
   // 管理员权限已由 withApi.admin 校验，这里仅校验账号可用性

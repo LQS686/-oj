@@ -12,7 +12,7 @@ import {
 import { toInt } from '@/lib/api/validation'
 import type { TrainingCategoryType } from '@/lib/training/types'
 import { verifyToken } from '@/lib/auth'
-import { isAdmin } from '@/lib/permissions'
+import { canAccessAdmin } from '@/lib/permissions'
 
 export const GET = withApi.public(async (req) => {
   const q = readQuery<{
@@ -70,7 +70,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   }
 
   // 普通用户（admin=false）创建时强制为私有草稿，isRecommended=false
-  const adminFlag = isAdmin(user)
+  const adminFlag = canAccessAdmin(user)
   const isPublic = adminFlag ? (body.isPublic ?? true) : false
   const status = adminFlag ? (body.status ?? 'published') : 'draft'
   const isRecommended = adminFlag ? (body.isRecommended ?? false) : false

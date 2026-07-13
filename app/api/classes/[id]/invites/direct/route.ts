@@ -17,7 +17,7 @@ import {
 } from '@/lib/class/service'
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
-  const { id: classId } = (ctx as any).params
+  const { id: classId } = ctx.params
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
   const body = await readJson<{ username?: string; message?: string }>(req)
@@ -31,7 +31,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const currentMemberRole = currentMember!.role
   const currentMemberPerms = (currentMember!.permissions as any) || {}
 
-  const isAdmin = currentMemberRole === 'owner' || currentMemberRole === 'assistant'
+  const isAdmin = currentMemberRole === 'owner' || currentMemberRole === 'admin'
   const hasInvitePermission = !!currentMemberPerms.canInviteMembers
   if (!isAdmin && !hasInvitePermission) throw403('您没有邀请权限')
 
@@ -72,14 +72,14 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
-  const { id: classId } = (ctx as any).params
+  const { id: classId } = ctx.params
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
 
   // 只有管理员可以查看邀请列表
   const currentMember = await getCurrentClassMember(classId, user.id)
   if (!currentMember) throw403('您不是班级成员')
   const currentMemberRole = currentMember!.role
-  if (currentMemberRole !== 'owner' && currentMemberRole !== 'assistant') {
+  if (currentMemberRole !== 'owner' && currentMemberRole !== 'admin') {
     throw403('只有管理员可以查看邀请列表')
   }
 

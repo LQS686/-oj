@@ -22,7 +22,7 @@ import {
 } from '@/lib/class/service'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const classDataResult = await getClassById(id)
@@ -47,7 +47,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
-  const { id } = (ctx as any).params
+  const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const body = await readJson<{
