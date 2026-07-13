@@ -2,15 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { settingsApi } from '@/lib/api'
-
-interface SystemSettings {
-  siteName: string
-  siteDescription: string
-  allowRegistration: boolean
-  allowGuestSubmission: boolean
-  defaultLanguage: string
-  maxSubmissionSize: number
-}
+import type { SystemSettings } from '@/lib/settings'
 
 const defaultSettings: SystemSettings = {
   siteName: 'OJ Platform',
@@ -18,7 +10,13 @@ const defaultSettings: SystemSettings = {
   allowRegistration: true,
   allowGuestSubmission: false,
   defaultLanguage: 'cpp',
-  maxSubmissionSize: 65536
+  maxSubmissionSize: 65536,
+  smtpHost: '',
+  smtpPort: 465,
+  smtpUser: '',
+  smtpFrom: '',
+  smtpPassword: '',
+  smtpSecure: true
 }
 
 interface SettingsContextType {

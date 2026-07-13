@@ -1,6 +1,6 @@
 import { apiClient } from './base';
 
-interface LoginResponse {
+export interface LoginResponse {
   user: {
     id: string;
     username: string;
@@ -24,7 +24,7 @@ interface RegisterData {
   nickname?: string;
 }
 
-interface UserData {
+export interface UserData {
   id: string;
   username: string;
   email: string;

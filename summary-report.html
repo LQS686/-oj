@@ -1,795 +1,1349 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DSOJ 项目审查总结报告（终版）</title>
-  <link rel="stylesheet" href="report-assets/report.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSOJ 项目审查总结报告 - 第七轮</title>
+<link rel="stylesheet" href="report-assets/report.css">
 </head>
 <body>
-  <div class="nav-sidebar">
-    <a href="#overview" class="nav-item active">📊 概览</a>
-    <a href="#architecture" class="nav-item">🏗️ 架构</a>
-    <a href="#flow" class="nav-item">🔄 流程</a>
-    <a href="#features" class="nav-item">📋 功能表</a>
-    <a href="#vulnerabilities" class="nav-item">🔒 漏洞</a>
-    <a href="#logic" class="nav-item">🧠 逻辑</a>
-    <a href="#compatibility" class="nav-item">🔗 匹配</a>
-    <a href="#optimization" class="nav-item">🚀 优化</a>
-    <a href="#comparison" class="nav-item">📊 对比</a>
-    <a href="#roadmap" class="nav-item">🗺️ 路线图</a>
+
+<nav class="nav-sidebar">
+  <div class="nav-header">第七轮审查</div>
+  <ul class="nav-list">
+    <li><a class="nav-item" href="#overview">项目概览</a></li>
+    <li><a class="nav-item" href="#architecture">系统架构</a></li>
+    <li><a class="nav-item" href="#flow">数据请求流程</a></li>
+    <li><a class="nav-item" href="#comparison">增量对比</a></li>
+  </ul>
+</nav>
+
+<header class="header-bar">
+  <h1>DSOJ 项目审查总结报告</h1>
+  <span class="header-subtitle">第七轮 · 增量审查 · 2026-07-13</span>
+</header>
+
+<main class="main-content">
+
+<section id="overview" class="section collapsed">
+  <div class="section-header collapsed">
+    <span class="toggle">▶</span>
+    <h2>1. 项目概览</h2>
+    <span class="header-badge new">UPDATED</span>
   </div>
-  <div class="container">
-    <div class="header-bar">
-      <div>
-        <h1>📋 DSOJ 项目审查总结报告（终版）</h1>
-        <p class="subtitle">生成时间：2026-07-13（终版复核） | 技术栈：Next.js 16 + React 19 + Prisma 6.17 + MongoDB + Redis + BullMQ + Socket.IO</p>
+  <div class="section-body hidden">
+
+    <div class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-label">项目名称</span>
+        <span class="stat-value">DSOJ</span>
+        <span class="stat-desc">在线评测平台 (Online Judge)</span>
       </div>
-      <button class="theme-btn" onclick="toggleTheme()">🌙 暗色</button>
+      <div class="stat-item">
+        <span class="stat-label">页面数</span>
+        <span class="stat-value">75</span>
+        <span class="stat-desc">含动态路由及管理页面</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">API 端点</span>
+        <span class="stat-value">103</span>
+        <span class="stat-desc">App Router API Routes</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">组件数</span>
+        <span class="stat-value">44</span>
+        <span class="stat-desc">含管理组件及通用组件</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Prisma 模型</span>
+        <span class="stat-value">38</span>
+        <span class="stat-desc">含 MongoDB 嵌入式文档</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">自定义 Hooks</span>
+        <span class="stat-value">8</span>
+        <span class="stat-desc">含 SWR 封装及 WebSocket</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Contexts</span>
+        <span class="stat-value">4</span>
+        <span class="stat-desc">Auth / Settings / Workspace</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Lib 文件</span>
+        <span class="stat-value">108</span>
+        <span class="stat-desc">服务 / 工具 / 验证层</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">依赖总数</span>
+        <span class="stat-value">42</span>
+        <span class="stat-desc">含 devDependencies</span>
+      </div>
     </div>
 
-    <!-- ============ Section 1: 概览 ============ -->
-    <section class="section" id="overview">
-      <div class="section-header" onclick="toggleSection(this)">
-        <span class="icon">📊</span>
-        <h2>概览</h2>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body">
-        <div class="note-block">🎉 <strong>终版复核结论</strong>：全部 P0-P3 修复完成（20/20 = 100%），项目已达生产可发布状态。本轮为终版复核，确认上轮 8 项 P3 修复全部稳固落地，无新增问题。</div>
+    <div class="health-scores">
+      <h3>健康分数总览</h3>
 
-        <h3 style="font-size:14px;margin:12px 0 8px;">📈 项目规模统计</h3>
-        <div class="file-list" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));">
-          <div class="file-item"><span class="fi-icon">🔌</span><div><div class="fi-name">100</div><div class="fi-path">API 路由</div></div></div>
-          <div class="file-item"><span class="fi-icon">📝</span><div><div class="fi-name">150</div><div class="fi-path">HTTP 方法</div></div></div>
-          <div class="file-item"><span class="fi-icon">🗄️</span><div><div class="fi-name">38</div><div class="fi-path">数据库模型</div></div></div>
-          <div class="file-item"><span class="fi-icon">🧩</span><div><div class="fi-name">11</div><div class="fi-path">业务模块</div></div></div>
-          <div class="file-item"><span class="fi-icon">📄</span><div><div class="fi-name">75</div><div class="fi-path">前端页面</div></div></div>
-          <div class="file-item"><span class="fi-icon">✅</span><div><div class="fi-name">91</div><div class="fi-path">测试（全通过）</div></div></div>
-          <div class="file-item"><span class="fi-icon">🔷</span><div><div class="fi-name">0</div><div class="fi-path">TSC 错误</div></div></div>
-          <div class="file-item"><span class="fi-icon">🧹</span><div><div class="fi-name">0</div><div class="fi-path">ESLint 错误</div></div></div>
-        </div>
-
-        <h3 style="font-size:14px;margin:16px 0 8px;">💯 健康分数（终版）</h3>
-        <div class="health-row">
-          <span class="label">安全性</span>
-          <div class="bar"><div class="bar-fill" style="width:98%;background:var(--success);"></div></div>
-          <span class="val">98/100</span>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);margin:-4px 0 6px 92px;">本轮 +6（Math.random 题目编号已修复，改用 crypto.randomBytes）</div>
-
-        <div class="health-row">
-          <span class="label">稳定性</span>
-          <div class="bar"><div class="bar-fill" style="width:95%;background:var(--success);"></div></div>
-          <span class="val">95/100</span>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);margin:-4px 0 6px 92px;">本轮 +7（85 处类型绕过全部清理，ctx.params 类型安全）</div>
-
-        <div class="health-row">
-          <span class="label">代码质量</span>
-          <div class="bar"><div class="bar-fill" style="width:92%;background:var(--success);"></div></div>
-          <span class="val">92/100</span>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);margin:-4px 0 6px 92px;">本轮 +17（死代码 + 命名冲突 + 重复组件全部清理）</div>
-
-        <div class="health-row">
-          <span class="label">完整性</span>
-          <div class="bar"><div class="bar-fill" style="width:95%;background:var(--success);"></div></div>
-          <span class="val">95/100</span>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);margin:-4px 0 6px 92px;">本轮 +5</div>
-
-        <div class="note-block">✅ <strong>总体评估</strong>：全部 P0-P3 修复完成（20/20），项目已达生产可发布状态。本轮为终版复核，确认上轮 8 项 P3 修复全部稳固落地。</div>
-        <div class="note-block">📈 <strong>健康分演进</strong>：安全性 70→92→98 | 稳定性 55→88→95 | 代码质量 50→75→92 | 完整性 85→90→95</div>
-      </div>
-    </section>
-
-    <!-- ============ Section 2: 架构 ============ -->
-    <section class="section" id="architecture">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">🏗️</span>
-        <h2>系统架构总览</h2>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <p style="font-size:12px;color:var(--text-light);margin-bottom:10px;">DSOJ 采用 Next.js 16 全栈架构，前后端统一在一个工程内，通过 App Router 提供 SSR 页面与 Route Handler API。中间层由 Middleware 与 withApi 包装器协同处理鉴权、CSRF、限流与异常；业务层由 11 个 lib/ 模块组成；数据层基于 MongoDB（Prisma ORM）+ Redis（缓存/限流）+ BullMQ（评测/AI 队列）。</p>
-
-        <div class="arch-diagram">
-          <div class="arch-label">表现层（Presentation）</div>
-          <div class="arch-row">
-            <div class="arch-box frontend">React 19 SSR<small>App Router</small></div>
-            <span class="arch-arrow">⇄</span>
-            <div class="arch-box frontend">Tailwind CSS 4<small>样式系统</small></div>
-            <span class="arch-arrow">⇄</span>
-            <div class="arch-box frontend">SWR<small>httpOnly Cookie</small></div>
-          </div>
-          <div style="text-align:center;font-size:18px;color:var(--primary);margin:4px 0;">⬇</div>
-
-          <div class="arch-label">中间层（Middleware）</div>
-          <div class="arch-row">
-            <div class="arch-box backend">Middleware<small>CSRF + 限流 + /admin 保护</small></div>
-            <span class="arch-arrow">⇄</span>
-            <div class="arch-box backend">withApi 包装器<small>鉴权 + 异常处理</small></div>
-            <span class="arch-arrow">⇄</span>
-            <div class="arch-box backend">Socket.IO<small>实时通知</small></div>
-          </div>
-          <div style="text-align:center;font-size:18px;color:var(--primary);margin:4px 0;">⬇</div>
-
-          <div class="arch-label">业务层（Business）</div>
-          <div class="arch-row">
-            <div class="arch-box backend">lib/ 业务模块<small>11 个模块</small></div>
-            <span class="arch-arrow">⇄</span>
-            <div class="arch-box backend">评测机 lib/judge/<small>Docker 沙箱 + Windows 告警</small></div>
-            <span class="arch-arrow">⇄</span>
-            <div class="arch-box backend">AI 模块 lib/ai/<small>SSRF 已防护</small></div>
-          </div>
-          <div style="text-align:center;font-size:18px;color:var(--primary);margin:4px 0;">⬇</div>
-
-          <div class="arch-label">数据层（Data）</div>
-          <div class="arch-row">
-            <div class="arch-box data">MongoDB<small>Prisma ORM · 38 模型</small></div>
-            <span class="arch-arrow">⇄</span>
-            <div class="arch-box data">Redis<small>缓存 + 限流</small></div>
-            <span class="arch-arrow">⇄</span>
-            <div class="arch-box data">BullMQ<small>评测/AI 队列</small></div>
-          </div>
-        </div>
-
-        <div class="note-block">🏗️ <strong>架构演进亮点</strong>：邀请码废除、httpOnly Cookie 统一、SSRF 防护、类型安全增强（85 处 <code>as any</code> 已清理）、命名冲突解决（<code>clearUserCache</code> / <code>clearAuthUserCache</code> 职责分离）。</div>
-      </div>
-    </section>
-
-    <!-- ============ Section 3: 流程 ============ -->
-    <section class="section" id="flow">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">🔄</span>
-        <h2>数据请求流程</h2>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <p style="font-size:12px;color:var(--text-light);margin-bottom:10px;">从用户浏览器发起请求到组件渲染的完整数据流，每一层都经过安全包装与类型校验。</p>
-
-        <div class="flow-diagram">
-          <div class="flow-row">
-            <div class="flow-node client">用户浏览器<small>React 组件</small></div>
-            <span class="flow-arrow">→</span>
-            <div class="flow-node middleware">Next.js Middleware<small>CSRF / 限流</small></div>
-            <span class="flow-arrow">→</span>
-            <div class="flow-node middleware">withApi<small>鉴权 + 异常</small></div>
-          </div>
-          <div class="flow-row">
-            <div class="flow-node server">Route Handler<small>ctx.params 类型安全</small></div>
-            <span class="flow-arrow">→</span>
-            <div class="flow-node server">lib/ Service<small>业务逻辑</small></div>
-            <span class="flow-arrow">→</span>
-            <div class="flow-node db">Prisma ORM<small>类型安全查询</small></div>
-          </div>
-          <div class="flow-row">
-            <div class="flow-node db">MongoDB<small>持久化</small></div>
-            <span class="flow-arrow">→</span>
-            <div class="flow-node server">JSON 响应<small>ok/fail 统一</small></div>
-            <span class="flow-arrow">→</span>
-            <div class="flow-node client">SWR 缓存<small>组件渲染</small></div>
-          </div>
-        </div>
-
-        <h3 style="font-size:13px;margin:12px 0 6px;">📋 流程节点说明</h3>
-        <div class="flow-desc" style="text-align:left;">
-          <p>1. <strong>用户浏览器</strong>：React 组件通过 SWR 发起 fetch 请求，自动携带 httpOnly Cookie。</p>
-          <p>2. <strong>Next.js Middleware</strong>：拦截所有请求，校验 CSRF Token、应用限流策略、保护 <code>/admin</code> 路径。</p>
-          <p>3. <strong>withApi 包装器</strong>：统一鉴权（解析 Cookie 中的 JWT）、异常捕获、响应包装（ok/fail）。</p>
-          <p>4. <strong>Route Handler</strong>：使用类型安全的 <code>ctx.params</code>（Next.js 16 动态路由，已清理 85 处 <code>as any</code>）。</p>
-          <p>5. <strong>lib/ Service</strong>：11 个业务模块处理领域逻辑，调用 Prisma 进行数据库操作。</p>
-          <p>6. <strong>Prisma ORM → MongoDB</strong>：类型安全查询，38 个模型覆盖全部业务实体。</p>
-          <p>7. <strong>JSON 响应 → SWR</strong>：统一 <code>ok()/fail()</code> 响应格式，SWR 自动缓存与重新验证。</p>
-        </div>
-
-        <div class="note-block">🔐 <strong>鉴权流程</strong>：JWT 存储于 httpOnly Cookie（非 localStorage），每次请求自动携带，Middleware + withApi 双重校验。<code>ctx.params</code> 已在 Next.js 16 动态路由下完全类型安全（50 个 route.ts 全部修复）。</div>
-      </div>
-    </section>
-
-    <!-- ============ Section 4: 功能表 ============ -->
-    <section class="section" id="features">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">📋</span>
-        <h2>功能表与文件列表</h2>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <h3 style="font-size:13px;margin:8px 0 6px;">🧩 11 个业务模块</h3>
-
-        <div class="module-card">
-          <h4>1. 🔐 认证模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/auth/</span></h4>
-          <p>登录 / 注册 / JWT 签发与校验 / httpOnly Cookie 鉴权</p>
-        </div>
-        <div class="module-card">
-          <h4>2. 👤 用户模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/user/</span></h4>
-          <p>资料 / 统计 / 头像 / 缓存（clearUserCache 统一入口，联动 clearAuthUserCache）</p>
-        </div>
-        <div class="module-card">
-          <h4>3. 📝 题目模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/problem/</span></h4>
-          <p>题目 CRUD / 标签管理 / 审核流程 / AI 出题生成</p>
-        </div>
-        <div class="module-card">
-          <h4>4. 📤 提交模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/submission/</span></h4>
-          <p>代码提交 / 评测队列入队 / 提交历史查询</p>
-        </div>
-        <div class="module-card">
-          <h4>5. ⚖️ 评测模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/judge/</span></h4>
-          <p>编译 / 执行 / Docker 沙箱隔离 / Windows 环境告警 / pid 数值校验</p>
-        </div>
-        <div class="module-card">
-          <h4>6. 👥 班级模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/class/</span></h4>
-          <p>成员管理 / 作业 / 笔记 / 权限控制（crypto.randomBytes 生成编号）</p>
-        </div>
-        <div class="module-card">
-          <h4>7. 🏆 竞赛模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/contest/</span></h4>
-          <p>报名 / 排名 / 提交 / 审计日志（对象直传）</p>
-        </div>
-        <div class="module-card">
-          <h4>8. 📚 题单模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/training/</span></h4>
-          <p>题单 / 分类 / 学习进度追踪</p>
-        </div>
-        <div class="module-card">
-          <h4>9. 💡 题解模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/solution/</span></h4>
-          <p>题解 CRUD / 点赞 / MarkdownRenderer 统一（合并至 common/）</p>
-        </div>
-        <div class="module-card">
-          <h4>10. 🤖 AI 模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/ai/</span></h4>
-          <p>出题 / 题解生成 / 模型发现 / SSRF 防护（validateAiBaseUrl）</p>
-        </div>
-        <div class="module-card">
-          <h4>11. 🔔 通知模块 <span style="font-family:monospace;font-size:11px;color:var(--text-muted);">lib/notification/</span></h4>
-          <p>实时通知 / Socket.IO 推送 / 历史消息</p>
-        </div>
-
-        <h3 style="font-size:13px;margin:16px 0 6px;">🔌 关键 API 端点</h3>
-        <table class="api-table">
-          <thead>
-            <tr><th>方法</th><th>路径</th><th>鉴权</th><th>说明</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><span class="method post">POST</span></td><td>/api/auth/login</td><td>公开</td><td>用户登录，设置 httpOnly Cookie</td></tr>
-            <tr><td><span class="method post">POST</span></td><td>/api/auth/register</td><td>公开</td><td>用户注册，默认角色 STUDENT</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/auth/me</td><td>Cookie</td><td>获取当前用户信息</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/problems</td><td>公开</td><td>题目列表（分页/标签过滤）</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/problems/[id]</td><td>公开</td><td>题目详情（ctx.params 类型安全）</td></tr>
-            <tr><td><span class="method post">POST</span></td><td>/api/submissions</td><td>Cookie</td><td>提交代码，入评测队列</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/submissions/[id]</td><td>Cookie</td><td>提交结果与评测详情</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/classes</td><td>Cookie</td><td>班级列表</td></tr>
-            <tr><td><span class="method post">POST</span></td><td>/api/classes</td><td>Cookie</td><td>创建班级（crypto 随机编号）</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/contests</td><td>公开</td><td>竞赛列表</td></tr>
-            <tr><td><span class="method post">POST</span></td><td>/api/contests/[id]/register</td><td>Cookie</td><td>竞赛报名</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/solutions</td><td>公开</td><td>题解列表</td></tr>
-            <tr><td><span class="method post">POST</span></td><td>/api/ai/generate-problem</td><td>Admin</td><td>AI 出题（SSRF 防护）</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/notifications</td><td>Cookie</td><td>通知列表（Socket.IO 推送）</td></tr>
-            <tr><td><span class="method get">GET</span></td><td>/api/admin/users</td><td>Admin</td><td>用户管理（canAccessAdmin 校验）</td></tr>
-          </tbody>
-        </table>
-
-        <h3 style="font-size:13px;margin:16px 0 6px;">📁 关键文件清单</h3>
-        <div class="file-list">
-          <div class="file-item"><span class="fi-icon">⚛️</span><div><div class="fi-name">layout.tsx</div><div class="fi-path">app/layout.tsx</div></div></div>
-          <div class="file-item"><span class="fi-icon">🚪</span><div><div class="fi-name">middleware.ts</div><div class="fi-path">middleware.ts</div></div></div>
-          <div class="file-item"><span class="fi-icon">🛡️</span><div><div class="fi-name">permissions.ts</div><div class="fi-path">lib/permissions.ts</div></div></div>
-          <div class="file-item"><span class="fi-icon">🎁</span><div><div class="fi-name">withApi.ts</div><div class="fi-path">lib/api/withApi.ts</div></div></div>
-          <div class="file-item"><span class="fi-icon">📦</span><div><div class="fi-name">handler.ts</div><div class="fi-path">lib/api/handler.ts (90 行精简版)</div></div></div>
-          <div class="file-item"><span class="fi-icon">🔐</span><div><div class="fi-name">index.ts</div><div class="fi-path">lib/auth/index.ts</div></div></div>
-          <div class="file-item"><span class="fi-icon">🗄️</span><div><div class="fi-name">schema.prisma</div><div class="fi-path">prisma/schema.prisma</div></div></div>
-          <div class="file-item"><span class="fi-icon">⚖️</span><div><div class="fi-name">executor.ts</div><div class="fi-path">lib/judge/executor.ts</div></div></div>
-          <div class="file-item"><span class="fi-icon">🤖</span><div><div class="fi-name">providers.ts</div><div class="fi-path">lib/ai/providers.ts</div></div></div>
-          <div class="file-item"><span class="fi-icon">👥</span><div><div class="fi-name">service.ts</div><div class="fi-path">lib/class/service.ts</div></div></div>
+      <div class="health-row">
+        <div class="health-label">Security</div>
+        <div class="health-bar"><div class="health-fill" style="width:87%">87</div></div>
+        <span class="health-delta up">+2</span>
+        <div class="health-detail">
+          第7轮评测：SSRF 双层防护完整 (6 处全配对)，Cookie secure 独立控制 (<code>FORCE_SECURE_COOKIE</code>)，Docker 沙箱坚实。需注意 Windows 非 Docker 模式沙箱执法逻辑倒置 (LOW)。
         </div>
       </div>
-    </section>
 
-    <!-- ============ Section 5: 漏洞 ============ -->
-    <section class="section" id="vulnerabilities">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">🔒</span>
-        <h2>漏洞与冗余审查</h2>
-        <span style="margin-left:8px;">
-          <span class="header-badge critical">0 严重</span>
-          <span class="header-badge high">0 高</span>
-          <span class="header-badge medium">0 中</span>
-          <span class="header-badge low">0 低</span>
-        </span>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <div class="note-block">🎉 <strong>全部 10 项漏洞已修复！</strong>本轮确认上轮 8 项 P3 修复稳固落地，无新增漏洞。所有严重 / 高 / 中 / 低级别问题均为 0。</div>
-
-        <h3 style="font-size:13px;margin:12px 0 6px;">✅ 已修复漏洞（10/10）</h3>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">严重</span>
-            <span class="ic-title">✅ SSRF 防护缺失</span>
-            <span class="ic-loc">lib/ai/providers.ts</span>
-          </div>
-          <div class="ic-desc">已实现 <code>validateAiBaseUrl</code> 校验 AI 服务地址，阻止内网地址访问。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">严重</span>
-            <span class="ic-title">✅ localStorage 存储 JWT</span>
-            <span class="ic-loc">contexts/UserContext.tsx</span>
-          </div>
-          <div class="ic-desc">JWT 已迁移至 httpOnly Cookie，杜绝 XSS 窃取。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">高</span>
-            <span class="ic-title">✅ Math.random 生成邀请码</span>
-            <span class="ic-loc">班级模块</span>
-          </div>
-          <div class="ic-desc">邀请码系统已废除，改用直接加入 + 审批机制。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">高</span>
-            <span class="ic-title">✅ isAdmin(user) 权限检查</span>
-            <span class="ic-loc">9 个文件</span>
-          </div>
-          <div class="ic-desc">统一改为 <code>canAccessAdmin(user)</code>，覆盖 SUPER_ADMIN / ADMIN 双角色。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">高</span>
-            <span class="ic-title">✅ 班级助教角色比较错误</span>
-            <span class="ic-loc">lib/class/invites/direct/route.ts</span>
-          </div>
-          <div class="ic-desc">改为比较 DB 值 <code>'admin'</code>，与 schema 一致。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ 角色缓存未清除</span>
-            <span class="ic-loc">lib/user/ + lib/api/handler.ts</span>
-          </div>
-          <div class="ic-desc"><code>clearUserCache</code> 联动 <code>clearAuthUserCache</code>，权限变更即时生效。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ 默认角色 'user' 无效</span>
-            <span class="ic-loc">lib/auth/service.ts, lib/api/handler.ts</span>
-          </div>
-          <div class="ic-desc">默认角色改为 <code>'STUDENT'</code>，与 schema 枚举一致。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ 上传文件 MIME 校验缺失</span>
-            <span class="ic-loc">lib/upload.ts</span>
-          </div>
-          <div class="ic-desc">实现 <code>detectImageMime</code> 魔数校验，不信任客户端 Content-Type。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ execSync 命令注入风险</span>
-            <span class="ic-loc">lib/judge/executor.ts</span>
-          </div>
-          <div class="ic-desc">pid 数值校验（Math.floor + Number.isFinite），杜绝命令注入。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ Math.random 题目编号 【本轮新增修复】</span>
-            <span class="ic-loc">lib/class/service.ts</span>
-          </div>
-          <div class="ic-desc">改用 <code>crypto.randomBytes</code> 生成题目编号，本终版复核确认。</div>
-        </div>
-
-        <h3 style="font-size:13px;margin:16px 0 6px;">🧹 冗余审查</h3>
-        <div class="note-block">✅ <strong>剩余 0 项关键冗余</strong>（全部已清理）。上轮发现的 4 项 P3 冗余已全部修复。</div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ (ctx as any).params 类型绕过 — 85 处 / 50 文件</span>
-            <span class="ic-loc">50 个 route.ts</span>
-          </div>
-          <div class="ic-desc">全部改为类型安全的 <code>ctx.params</code>，适配 Next.js 16 动态路由。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ 重复 MarkdownRenderer 组件</span>
-            <span class="ic-loc">components/common + solution</span>
-          </div>
-          <div class="ic-desc">合并到 <code>common/</code>，solution 版本已删除。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ 命名冲突 clearUserCache</span>
-            <span class="ic-loc">handler.ts + withApi.ts + user/service.ts</span>
-          </div>
-          <div class="ic-desc">handler 中重命名为 <code>clearAuthUserCache</code>，职责分离，无歧义。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ lib/api/handler.ts 死代码</span>
-            <span class="ic-loc">lib/api/handler.ts</span>
-          </div>
-          <div class="ic-desc">删除 <code>withAuth/withClassRole/withAdmin/parseJson/parseQuery</code>，精简至 90 行。</div>
+      <div class="health-row">
+        <div class="health-label">Stability</div>
+        <div class="health-bar"><div class="health-fill" style="width:78%">78</div></div>
+        <span class="health-delta up">+6</span>
+        <div class="health-detail">
+          评测状态码大部分统一为短码 (<code>AC</code>)，Worker 初始化正确 (<code>await</code>)，恢复 Pending 扫描正确。但 <code>ranking/service.ts:73</code> 仍遗漏一处 <code>ACCEPTED</code> (CRITICAL)，contest/solution 存在 3 处缓存泄漏 (MEDIUM)。
         </div>
       </div>
-    </section>
 
-    <!-- ============ Section 6: 逻辑 ============ -->
-    <section class="section" id="logic">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">🧠</span>
-        <h2>逻辑问题检查</h2>
-        <span style="margin-left:8px;">
-          <span class="header-badge low">0 低</span>
-        </span>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <div class="note-block">✅ <strong>全部 14 项逻辑问题已修复！</strong>本终版复核确认无遗留逻辑缺陷。</div>
-
-        <h3 style="font-size:13px;margin:12px 0 6px;">✅ 已修复逻辑问题（14/14）</h3>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ ClassMember.role 注释不符 【本轮新增修复】</span>
-            <span class="ic-loc">prisma/schema.prisma</span>
-          </div>
-          <div class="ic-desc">注释更新为 <code>"owner|admin|member（API 层双映射）"</code>，与实际存储一致。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ Solution.language/codeLanguage 字段重叠 【本轮新增修复】</span>
-            <span class="ic-loc">prisma/schema.prisma</span>
-          </div>
-          <div class="ic-desc">注释标记 <code>language</code> 为废弃，推荐使用 <code>codeLanguage</code>。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ 字段不匹配 problem.service id 查询</span>
-            <span class="ic-loc">lib/problem/service.ts</span>
-          </div>
-          <div class="ic-desc">移除死代码，查询字段与 schema 完全对齐。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ 缓存竞态 clearUserCache</span>
-            <span class="ic-loc">lib/user/ + lib/api/handler.ts</span>
-          </div>
-          <div class="ic-desc">统一入口联动 <code>clearAuthUserCache</code>，杜绝角色缓存竞态。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ 事务原子性 AI 服务</span>
-            <span class="ic-loc">lib/ai/service.ts</span>
-          </div>
-          <div class="ic-desc">使用 <code>prisma.$transaction</code> 包裹多步写入，保证原子性。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ 权限白名单缺失</span>
-            <span class="ic-loc">lib/permissions.ts</span>
-          </div>
-          <div class="ic-desc">引入 <code>ALLOWED_PERMISSION_KEYS</code> 过滤，防止越权设置。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">中</span>
-            <span class="ic-title">✅ 审计日志 JSON.stringify</span>
-            <span class="ic-loc">lib/audit/</span>
-          </div>
-          <div class="ic-desc">改为对象直传，避免重复序列化与潜在注入。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ schema role 注释</span>
-            <span class="ic-loc">prisma/schema.prisma</span>
-          </div>
-          <div class="ic-desc">补充 <code>ADMIN</code> 角色说明。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ batch-update 注释</span>
-            <span class="ic-loc">lib/permissions.ts</span>
-          </div>
-          <div class="ic-desc">移除不存在的 <code>SYSTEM_ADMIN</code> 引用。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ API Key 前缀泄露</span>
-            <span class="ic-loc">lib/ai/</span>
-          </div>
-          <div class="ic-desc">日志仅输出 <code>slice(0,4)</code> 前缀。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ 测试凭据硬编码</span>
-            <span class="ic-loc">tests/</span>
-          </div>
-          <div class="ic-desc">改为环境变量注入。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ execSync pid 校验</span>
-            <span class="ic-loc">lib/judge/executor.ts</span>
-          </div>
-          <div class="ic-desc">使用 <code>Math.floor + Number.isFinite</code> 严格校验。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ codeAnalyzer 正则误报</span>
-            <span class="ic-loc">lib/judge/codeAnalyzer.ts</span>
-          </div>
-          <div class="ic-desc">将正则匹配结果降级为 warnings，避免误判。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">低</span>
-            <span class="ic-title">✅ contest-auth 审计日志</span>
-            <span class="ic-loc">app/api/contests/[id]/auth/route.ts</span>
-          </div>
-          <div class="ic-desc">改为对象直传，与审计模块统一。</div>
+      <div class="health-row">
+        <div class="health-label">Quality</div>
+        <div class="health-bar"><div class="health-fill" style="width:85%">85</div></div>
+        <span class="health-delta up">+1</span>
+        <div class="health-detail">
+          组件引用率 100%，无 CommonJS 残留，docker-compose / Dockerfile 对齐。但 <code>next-auth</code> 未使用依赖仍存在，training 有 2 处 <code>ACCEPTED</code> 残留。
         </div>
       </div>
-    </section>
 
-    <!-- ============ Section 7: 匹配 ============ -->
-    <section class="section" id="compatibility">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">🔗</span>
-        <h2>运行匹配验证</h2>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <p style="font-size:12px;color:var(--text-light);margin-bottom:10px;">前后端模块、配置、类型全面对齐，所有项均 ✅ 匹配。</p>
-
-        <table class="compat-table">
-          <thead>
-            <tr><th>模块</th><th>前端</th><th>后端</th><th>状态</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>认证</td><td>UserContext.tsx</td><td>lib/auth/</td><td class="status-ok">✅ 匹配 (httpOnly Cookie)</td></tr>
-            <tr><td>权限</td><td>lib/permissions.ts (canAccessAdmin)</td><td>9 个路由文件</td><td class="status-ok">✅ 匹配</td></tr>
-            <tr><td>班级角色</td><td>lib/class/roles.ts (双映射)</td><td>lib/class/service.ts</td><td class="status-ok">✅ 匹配 (注释已修正)</td></tr>
-            <tr><td>API 响应</td><td>lib/api/response.ts (ok/fail)</td><td>所有路由</td><td class="status-ok">✅ 匹配</td></tr>
-            <tr><td>评测</td><td>lib/judge/</td><td>Docker 沙箱 + Windows 告警</td><td class="status-ok">✅ 匹配</td></tr>
-            <tr><td>AI</td><td>lib/ai/service.ts (SSRF 防护)</td><td>validateAiBaseUrl</td><td class="status-ok">✅ 匹配</td></tr>
-            <tr><td>缓存</td><td>lib/cache.ts + lib/api/handler.ts (clearAuthUserCache)</td><td>统一命名</td><td class="status-ok">✅ 匹配 (命名分离)</td></tr>
-            <tr><td>类型安全</td><td>ctx.params (50 个 route.ts)</td><td>Next.js 16 动态路由</td><td class="status-ok">✅ 匹配 (as any 已清理)</td></tr>
-          </tbody>
-        </table>
-
-        <div class="note-block">✅ <strong>配置对齐</strong>：全部配置项已对齐，无遗漏。环境变量、schema 枚举、API 响应格式、权限白名单均一致。</div>
-      </div>
-    </section>
-
-    <!-- ============ Section 8: 优化 ============ -->
-    <section class="section" id="optimization">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">🚀</span>
-        <h2>优化评估建议</h2>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <h3 style="font-size:13px;margin:8px 0 6px;">📊 按优先级完成情况</h3>
-        <div class="file-list" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">
-          <div class="file-item"><span class="fi-icon">🚨</span><div><div class="fi-name">P0 已完成：3/3</div><div class="fi-path" style="color:var(--success);">✅ 全部完成</div></div></div>
-          <div class="file-item"><span class="fi-icon">⚠️</span><div><div class="fi-name">P1 已完成：4/4</div><div class="fi-path" style="color:var(--success);">✅ 全部完成</div></div></div>
-          <div class="file-item"><span class="fi-icon">🔧</span><div><div class="fi-name">P2 已完成：6/6</div><div class="fi-path" style="color:var(--success);">✅ 全部完成</div></div></div>
-          <div class="file-item"><span class="fi-icon">🧹</span><div><div class="fi-name">P3 已完成：7/7</div><div class="fi-path" style="color:var(--success);">✅ 本轮新增 4 项</div></div></div>
-        </div>
-
-        <div class="note-block">🎉 <strong>全部 20 项优化建议已实施完成！</strong>项目已达生产可发布状态。本终版复核确认上轮 P3 部分完成的 4 项已全部稳固落地。</div>
-
-        <h3 style="font-size:13px;margin:12px 0 6px;">✅ P3 本轮完成的 4 项</h3>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">P3</span>
-            <span class="ic-title">✅ 清理 lib/api/handler.ts 未使用导出</span>
-            <span class="ic-loc">lib/api/handler.ts</span>
-          </div>
-          <div class="ic-desc">删除 <code>withAuth/withClassRole/withAdmin/parseJson/parseQuery</code>，精简至 90 行。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">P3</span>
-            <span class="ic-title">✅ 解决 clearUserCache 命名冲突</span>
-            <span class="ic-loc">handler.ts + withApi.ts + user/service.ts</span>
-          </div>
-          <div class="ic-desc">重命名为 <code>clearAuthUserCache</code>，职责分离。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">P3</span>
-            <span class="ic-title">✅ 移除 85 处 (ctx as any).params</span>
-            <span class="ic-loc">50 个 route.ts</span>
-          </div>
-          <div class="ic-desc">全部改为类型安全的 <code>ctx.params</code>。</div>
-        </div>
-
-        <div class="issue-card low">
-          <div class="ic-head">
-            <span class="badge low">P3</span>
-            <span class="ic-title">✅ 合并重复 MarkdownRenderer</span>
-            <span class="ic-loc">components/common + solution</span>
-          </div>
-          <div class="ic-desc">统一到 <code>common/</code>，solution 版本已删除。</div>
+      <div class="health-row">
+        <div class="health-label">Completeness</div>
+        <div class="health-bar"><div class="health-fill" style="width:95%">95</div></div>
+        <span class="health-delta stable">持平</span>
+        <div class="health-detail">
+          75 页面 + 103 API + 38 模型完整，.env 补全 8 个变量，.env.example 追加 <code>TRUSTED_PROXIES</code> 和 <code>FORCE_SECURE_COOKIE</code>。
         </div>
       </div>
-    </section>
-
-    <!-- ============ Section 9: 对比 ============ -->
-    <section class="section" id="comparison">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">📊</span>
-        <h2>增量对比报告</h2>
-        <span style="margin-left:8px;">
-          <span class="header-badge new">0 新增</span>
-          <span class="header-badge fixed">8 已修复</span>
-        </span>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <div class="note-block">📅 上次报告时间：2026-07-13（P3 部分完成） | 本次报告时间：2026-07-13（终版复核，P3 全部完成）</div>
-
-        <h3 style="font-size:13px;margin:12px 0 6px;">💯 健康分数变化</h3>
-        <table class="diff-table">
-          <thead>
-            <tr style="border-bottom:2px solid var(--border);">
-              <th style="padding:6px 12px;text-align:left;font-size:12px;">维度</th>
-              <th style="padding:6px 12px;text-align:left;font-size:12px;">上轮</th>
-              <th style="padding:6px 12px;text-align:left;font-size:12px;">本轮</th>
-              <th style="padding:6px 12px;text-align:left;font-size:12px;">变化</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>安全性</td><td>92</td><td>98</td><td class="diff-added">↑ +6</td></tr>
-            <tr><td>稳定性</td><td>88</td><td>95</td><td class="diff-added">↑ +7</td></tr>
-            <tr><td>代码质量</td><td>75</td><td>92</td><td class="diff-added">↑ +17</td></tr>
-            <tr><td>完整性</td><td>90</td><td>95</td><td class="diff-added">↑ +5</td></tr>
-          </tbody>
-        </table>
-
-        <h3 style="font-size:13px;margin:16px 0 6px;">🆕 新增问题</h3>
-        <div class="note-block">✅ <strong>无新增问题</strong>。本终版复核未发现任何新漏洞、逻辑缺陷或冗余。</div>
-
-        <h3 style="font-size:13px;margin:12px 0 6px;">🔧 已修复问题（8 项 P3）</h3>
-        <table class="diff-table">
-          <thead>
-            <tr style="border-bottom:2px solid var(--border);">
-              <th style="padding:6px 12px;text-align:left;font-size:12px;">优先级</th>
-              <th style="padding:6px 12px;text-align:left;font-size:12px;">问题</th>
-              <th style="padding:6px 12px;text-align:left;font-size:12px;">文件</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td><span class="badge low">P3 低</span></td><td>VULN-04 Windows Docker 告警</td><td>lib/judge/executor.ts</td></tr>
-            <tr><td><span class="badge low">P3 低</span></td><td>Math.random 题目编号</td><td>lib/class/service.ts</td></tr>
-            <tr><td><span class="badge low">P3 低</span></td><td>ClassMember.role 注释</td><td>prisma/schema.prisma</td></tr>
-            <tr><td><span class="badge low">P3 低</span></td><td>handler.ts 死代码清理</td><td>lib/api/handler.ts</td></tr>
-            <tr><td><span class="badge low">P3 低</span></td><td>clearUserCache 命名冲突</td><td>handler.ts + withApi.ts + user/service.ts</td></tr>
-            <tr><td><span class="badge low">P3 低</span></td><td>(ctx as any).params 类型绕过</td><td>50 个 route.ts</td></tr>
-            <tr><td><span class="badge low">P3 低</span></td><td>MarkdownRenderer 重复</td><td>components/common + solution</td></tr>
-            <tr><td><span class="badge low">P3 低</span></td><td>Solution 字段重叠注释</td><td>prisma/schema.prisma</td></tr>
-          </tbody>
-        </table>
-
-        <h3 style="font-size:13px;margin:16px 0 6px;">❓ 仍存在问题</h3>
-        <div class="note-block">🎉 <strong>无</strong>。全部 P0-P3 修复完成（20/20），项目已达生产可发布状态！</div>
-      </div>
-    </section>
-
-    <!-- ============ Section 10: 路线图 ============ -->
-    <section class="section" id="roadmap">
-      <div class="section-header collapsed" onclick="toggleSection(this)">
-        <span class="icon">🗺️</span>
-        <h2>优化实施路线图</h2>
-        <span class="toggle">▼</span>
-      </div>
-      <div class="section-body hidden">
-        <div class="note-block">🎉 <strong>路线图全部完成！</strong>20/20 = 100%。所有阶段、所有任务均已勾选并稳固落地。</div>
-
-        <div class="roadmap">
-
-          <!-- Phase 1: P0 -->
-          <div class="roadmap-phase completed">
-            <h4>🚨 Phase 1：紧急修复（P0）— 3/3 ✅</h4>
-            <div class="roadmap-item checked"><input type="checkbox" id="p0-ssrf" checked><span class="ri-priority p0">P0</span><span>SSRF 防护：实现 validateAiBaseUrl (lib/ai/providers.ts)</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p0-jwt-cookie" checked><span class="ri-priority p0">P0</span><span>JWT 迁移至 httpOnly Cookie (contexts/UserContext.tsx)</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p0-invite-code" checked><span class="ri-priority p0">P0</span><span>废除 Math.random 邀请码系统</span></div>
-          </div>
-
-          <!-- Phase 2: P1 -->
-          <div class="roadmap-phase completed">
-            <h4>⚠️ Phase 2：高优先级（P1）— 4/4 ✅</h4>
-            <div class="roadmap-item checked"><input type="checkbox" id="p1-can-access-admin" checked><span class="ri-priority p1">P1</span><span>isAdmin → canAccessAdmin 统一权限检查（9 个文件）</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p1-class-role" checked><span class="ri-priority p1">P1</span><span>班级助教角色比较改为 DB 值 'admin'</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p1-cache-clear" checked><span class="ri-priority p1">P1</span><span>clearUserCache 联动 clearAuthUserCache</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p1-default-role" checked><span class="ri-priority p1">P1</span><span>默认角色 'user' → 'STUDENT'</span></div>
-          </div>
-
-          <!-- Phase 3: P2 -->
-          <div class="roadmap-phase completed">
-            <h4>🔧 Phase 3：中优先级（P2）— 6/6 ✅</h4>
-            <div class="roadmap-item checked"><input type="checkbox" id="p2-mime" checked><span class="ri-priority p2">P2</span><span>上传文件 MIME 魔数校验 (lib/upload.ts)</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p2-exec-sync" checked><span class="ri-priority p2">P2</span><span>execSync pid 数值校验 (lib/judge/executor.ts)</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p2-transaction" checked><span class="ri-priority p2">P2</span><span>AI 服务事务原子性 prisma.$transaction</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p2-perm-whitelist" checked><span class="ri-priority p2">P2</span><span>权限白名单 ALLOWED_PERMISSION_KEYS 过滤</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p2-audit-log" checked><span class="ri-priority p2">P2</span><span>审计日志改为对象直传</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p2-field-mismatch" checked><span class="ri-priority p2">P2</span><span>problem.service 字段不匹配死代码清理</span></div>
-          </div>
-
-          <!-- Phase 4: P3 -->
-          <div class="roadmap-phase completed">
-            <h4>🧹 Phase 4：低优先级清理（P3）— 7/7 ✅</h4>
-            <div class="roadmap-item checked"><input type="checkbox" id="p3-schema-role-comment" checked><span class="ri-priority p3">P3</span><span>schema.prisma role 注释补充 ADMIN</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p3-batch-update-comment" checked><span class="ri-priority p3">P3</span><span>batch-update 注释移除 SYSTEM_ADMIN</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p3-contest-audit-log" checked><span class="ri-priority p3">P3</span><span>contest-auth 审计日志改对象</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p3-cleanup-exports" checked><span class="ri-priority p3">P3</span><span>清理 lib/api/handler.ts 未使用导出（精简至 90 行）【本轮完成】</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p3-naming-conflicts" checked><span class="ri-priority p3">P3</span><span>解决命名冲突 clearUserCache → clearAuthUserCache【本轮完成】</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p3-params-type" checked><span class="ri-priority p3">P3</span><span>移除 85 处 (ctx as any).params 类型绕过【本轮完成】</span></div>
-            <div class="roadmap-item checked"><input type="checkbox" id="p3-merge-markdown" checked><span class="ri-priority p3">P3</span><span>合并重复 MarkdownRenderer 到 common/【本轮完成】</span></div>
-          </div>
-
-        </div>
-
-        <h3 style="font-size:13px;margin:16px 0 6px;">🎯 总进度</h3>
-        <div class="progress-bar"><div class="fill" style="width:100%;"></div></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;">
-          <span class="progress-label">20/20 (100%)</span>
-          <span style="color:var(--success);font-weight:600;">🎉 完全完成！</span>
-        </div>
-
-        <div class="note-block" style="margin-top:16px;">🏆 <strong>终版复核结论</strong>：DSOJ 项目全部 P0-P3 优化已实施完成（20/20 = 100%），健康分数全线 90+，0 漏洞、0 逻辑缺陷、0 关键冗余，项目已达生产可发布状态。</div>
-      </div>
-    </section>
+    </div>
 
   </div>
-  <script src="report-assets/report.js"></script>
+</section>
+
+<section id="architecture" class="section collapsed">
+  <div class="section-header collapsed">
+    <span class="toggle">▶</span>
+    <h2>2. 系统架构总览</h2>
+  </div>
+  <div class="section-body hidden">
+
+    <div class="arch-diagram">
+
+      <div class="arch-label">核心数据链路</div>
+      <div class="arch-row">
+        <div class="arch-box frontend">
+          Next.js SSR
+          <small>React 19 · App Router · Tailwind CSS</small>
+        </div>
+        <span class="arch-arrow">⇄</span>
+        <div class="arch-box backend">
+          App Router API Routes
+          <small>withApi 封装 · 中间件鉴权</small>
+        </div>
+        <span class="arch-arrow">⇄</span>
+        <div class="arch-box data">
+          Prisma ORM
+          <small>+ MongoDB Direct Driver</small>
+        </div>
+        <span class="arch-arrow">⇄</span>
+        <div class="arch-box external">
+          MongoDB / Redis
+          <small>数据持久化 · 缓存</small>
+        </div>
+      </div>
+
+      <div class="arch-label">子系统概览</div>
+      <div class="arch-row">
+        <div class="arch-box backend">
+          评测引擎
+          <small>内存队列 + Docker 沙箱</small>
+        </div>
+        <span class="arch-arrow">|</span>
+        <div class="arch-box frontend">
+          AI 服务
+          <small>OpenAI / Claude 多 Provider</small>
+        </div>
+        <span class="arch-arrow">|</span>
+        <div class="arch-box external">
+          WebSocket
+          <small>Socket.IO 实时推送</small>
+        </div>
+        <span class="arch-arrow">|</span>
+        <div class="arch-box data">
+          文件存储
+          <small>Sharp 压缩 · 本地 FS</small>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<section id="flow" class="section collapsed">
+  <div class="section-header collapsed">
+    <span class="toggle">▶</span>
+    <h2>3. 数据请求流程</h2>
+  </div>
+  <div class="section-body hidden">
+
+    <div class="flow-diagram">
+
+      <div class="flow-desc"><strong>通用数据请求</strong></div>
+      <div class="flow-row">
+        <div class="flow-node client">用户浏览器</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node middleware">Next.js Server<small>middleware 鉴权</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node server">API Route<small>withApi.auth</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node server">Service Layer</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node db">Prisma</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node db">MongoDB</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node client">JSON 响应</div>
+      </div>
+
+      <div class="flow-desc"><strong>代码提交流程</strong></div>
+      <div class="flow-row">
+        <div class="flow-node client">POST /api/submissions</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node server">submitCode</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node middleware">addJudgeJob</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node server">内存队列</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node server">compile</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node server">execute<small>Docker 沙箱或本地</small></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node server">compareOutput</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node middleware">WebSocket 推送</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node client">前端更新</div>
+      </div>
+
+      <div class="flow-desc"><strong>WebSocket 实时流</strong></div>
+      <div class="flow-row">
+        <div class="flow-node client">socket.io-client</div>
+        <span class="flow-arrow">↔</span>
+        <div class="flow-node server">Socket.IO Server</div>
+        <span class="flow-arrow">↔</span>
+        <div class="flow-node middleware">用户房间</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node server">submission:update<small>评测状态</small></div>
+        <span class="flow-arrow">·</span>
+        <div class="flow-node server">judge:progress<small>判题进度</small></div>
+        <span class="flow-arrow">·</span>
+        <div class="flow-node server">notification<small>系统通知</small></div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<section id="comparison" class="section collapsed">
+  <div class="section-header collapsed">
+    <span class="toggle">▶</span>
+    <h2>4. 增量对比报告</h2>
+    <span class="header-badge fixed">第6轮 → 第7轮</span>
+  </div>
+  <div class="section-body hidden">
+
+    <div class="note-block">
+      <strong>综述：</strong>第6轮共发现 <strong>16 个问题</strong>（含 2 CRITICAL / 3 HIGH / 6 MEDIUM / 5 LOW），第7轮追踪验证发现 1 项 CRITICAL 修复遗漏 + 8 项新增问题。
+    </div>
+
+    <h3>健康分数变化</h3>
+
+    <table class="diff-table">
+      <thead>
+        <tr>
+          <th>指标</th>
+          <th>第 6 轮</th>
+          <th>第 7 轮</th>
+          <th>变化</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Security</td>
+          <td>85</td>
+          <td>87</td>
+          <td class="diff-added">+2</td>
+          <td>SSRF 6 处全配对含新增 2 处、Cookie secure 独立控制</td>
+        </tr>
+        <tr>
+          <td>Stability</td>
+          <td>72</td>
+          <td>78</td>
+          <td class="diff-added">+6</td>
+          <td>状态码统一为短码、Worker 初始化正确、恢复 Pending 扫描</td>
+        </tr>
+        <tr>
+          <td>Quality</td>
+          <td>84</td>
+          <td>85</td>
+          <td class="diff-added">+1</td>
+          <td>bullmq/formidable 已移除、组件引用 100%、无 CommonJS 残留</td>
+        </tr>
+        <tr>
+          <td>Completeness</td>
+          <td>95</td>
+          <td>95</td>
+          <td class="diff-changed">0</td>
+          <td>.env 补全 8 个变量、.env.example 追加 TRUSTED_PROXIES 和 FORCE_SECURE_COOKIE</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>
+      <span class="header-badge critical">遗留</span>
+      第六轮遗留 1 项未修复
+    </h3>
+
+    <table class="diff-table">
+      <thead>
+        <tr>
+          <th>级别</th>
+          <th>位置</th>
+          <th>问题描述</th>
+          <th>详情</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="header-badge critical">CRITICAL</span></td>
+          <td><code>ranking/service.ts:73</code></td>
+          <td>仍使用 <code>'ACCEPTED'</code></td>
+          <td>第6轮修复了 <code>L37</code> 但遗漏 <code>L73</code>，排行榜 solvedCount 仍可能恒为 0</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>
+      <span class="header-badge new">NEW</span>
+      第七轮新发现问题
+    </h3>
+
+    <table class="diff-table">
+      <thead>
+        <tr>
+          <th>严重级别</th>
+          <th>位置</th>
+          <th>问题描述</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="header-badge critical">CRITICAL</span></td>
+          <td><code>ranking/service.ts:73</code></td>
+          <td><code>ACCEPTED</code> → <code>AC</code>（第6轮遗漏了 L73）</td>
+        </tr>
+        <tr>
+          <td><span class="header-badge medium">MEDIUM</span></td>
+          <td><code>training/service.ts:577, 837</code></td>
+          <td>残留 <code>ACCEPTED</code> fallback</td>
+        </tr>
+        <tr>
+          <td><span class="header-badge medium">MEDIUM</span></td>
+          <td><code>contest/updateContest · deleteContest</code></td>
+          <td>缺少列表/排名缓存清除</td>
+        </tr>
+        <tr>
+          <td><span class="header-badge medium">MEDIUM</span></td>
+          <td><code>solution/deleteSolution</code></td>
+          <td>缺少列表缓存清除</td>
+        </tr>
+        <tr>
+          <td><span class="header-badge medium">MEDIUM</span></td>
+          <td><code>solution/createUserSolution</code></td>
+          <td>绕过 <code>createSolution</code> 的缓存清除</td>
+        </tr>
+        <tr>
+          <td><span class="header-badge medium">MEDIUM</span></td>
+          <td><code>package.json</code></td>
+          <td><code>next-auth</code> 未使用依赖</td>
+        </tr>
+        <tr>
+          <td><span class="header-badge medium">MEDIUM</span></td>
+          <td><code>judge/executor.ts</code></td>
+          <td>Windows 非 Docker 评测沙箱执法逻辑倒置</td>
+        </tr>
+        <tr>
+          <td><span class="header-badge low">LOW</span></td>
+          <td><code>.env</code></td>
+          <td>缺少 5 个 docker-compose 凭证变量</td>
+        </tr>
+        <tr>
+          <td><span class="header-badge low">LOW</span></td>
+          <td><code>ai/config.ts</code></td>
+          <td><code>AI_CONFIG_ENCRYPTION_KEY</code> 注释与实际编码方式不一致</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>
+      <span class="header-badge fixed">FIXED</span>
+      第七轮已验证修复（第6轮问题）
+    </h3>
+
+    <table class="diff-table">
+      <thead>
+        <tr>
+          <th>状态</th>
+          <th>问题描述</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="diff-added">✅</td>
+          <td>6 处 SSRF 全配对（含 <code>upsertGlobalAiConfig</code> 新增 2 处 <code>validateAiBaseUrlDns</code>）</td>
+        </tr>
+        <tr>
+          <td class="diff-added">✅</td>
+          <td>Cookie <code>secure</code> 由 <code>FORCE_SECURE_COOKIE</code> 环境变量独立控制</td>
+        </tr>
+        <tr>
+          <td class="diff-added">✅</td>
+          <td>评测状态码统一为短码（11 处查询已全部使用 <code>AC</code>，除第73行遗漏）</td>
+        </tr>
+        <tr>
+          <td class="diff-added">✅</td>
+          <td><code>createSolution</code> / <code>createContest</code> 缓存清除已补全</td>
+        </tr>
+        <tr>
+          <td class="diff-added">✅</td>
+          <td><code>types/models.ts</code> 中 <code>Submission.isLate</code> / <code>assignmentId</code> 已移除</td>
+        </tr>
+        <tr>
+          <td class="diff-added">✅</td>
+          <td><code>bullmq</code> / <code>formidable</code> 已从依赖移除</td>
+        </tr>
+        <tr>
+          <td class="diff-added">✅</td>
+          <td>Docker 镜像预拉取 + Worker <code>await</code> 初始化</td>
+        </tr>
+      </tbody>
+    </table>
+
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="section-header collapsed" onclick="toggleSection(this)">
+    <h2>功能表与API端点</h2>
+    <span class="toggle">▶</span>
+  </div>
+  <div class="section-body hidden">
+
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text)">核心模块概览</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-bottom:24px">
+
+      <div class="module-card">
+        <h4>👤 用户系统</h4>
+        <p>注册/登录、JWT认证、角色管理(4级)、Token吊销、个人资料、偏好设置</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: User, AvatarHistory, AuditLog</p>
+      </div>
+
+      <div class="module-card">
+        <h4>📚 题库系统</h4>
+        <p>题目CRUD、多模式比较、标签分类、测试用例管理、标程验证、批量导入导出</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: Problem, TestCase, VerificationLog</p>
+      </div>
+
+      <div class="module-card">
+        <h4>⚡ 评测系统</h4>
+        <p>代码提交评测、多语言编译、沙箱执行、结果比对、队列调度、实时状态推送</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: Submission, lib/judge/*</p>
+      </div>
+
+      <div class="module-card">
+        <h4>🤖 AI系统</h4>
+        <p>AI出题生成、题解生成、多Provider/Model管理、思考模型、质量校验、参数模板</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: AiGenerationLog, AiProvider, AiModel, AiModelConfig, UserAiPreference</p>
+      </div>
+
+      <div class="module-card">
+        <h4>🏆 竞赛系统</h4>
+        <p>竞赛创建、题目编排、报名参赛、实时排名、倒计时、权限控制、提交统计</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: Contest, ContestProblem, ContestParticipant</p>
+      </div>
+
+      <div class="module-card">
+        <h4>🏫 班级系统</h4>
+        <p>班级创建、成员管理、角色权限、邀请/申请、作业布置、笔记共享、活动统计</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: Class, ClassMember, ClassAssignment, ClassNote, ClassDirectInvite, ClassJoinRequest</p>
+      </div>
+
+      <div class="module-card">
+        <h4>📋 训练计划</h4>
+        <p>题单创建、分类管理、题目编排、加入学习、进度追踪、推荐系统</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: Training, TrainingCategory, TrainingProblem, TrainingEnrollment</p>
+      </div>
+
+      <div class="module-card">
+        <h4>💬 社区系统</h4>
+        <p>题解发布、评论回复、点赞收藏、浏览去重、博客写作、Markdown渲染</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: Solution, Comment, Blog, Favorite, SolutionView, SolutionLike</p>
+      </div>
+
+      <div class="module-card">
+        <h4>📊 排行榜</h4>
+        <p>全局排名、Rating积分、解题统计、成就系统、等级徽章</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: Ranking计算, Achievement, UserAchievement</p>
+      </div>
+
+      <div class="module-card">
+        <h4>⚙️ 管理后台</h4>
+        <p>用户批量管理、题目审核、AI模型配置、系统设置、公告发布、操作日志</p>
+        <p style="color:var(--text-muted);font-size:10px">模型: SystemConfig, SystemAnnouncement, AuditLog, NoteReadHistory</p>
+      </div>
+
+    </div>
+
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text)">API端点分类表（13模块组 · 103端点）</h3>
+    <div style="overflow-x:auto">
+      <table class="api-table">
+        <thead>
+          <tr><th style="width:10%">模块</th><th style="width:18%">端点路径</th><th style="width:12%">方法</th><th style="width:60%">描述</th></tr>
+        </thead>
+        <tbody>
+
+          <tr><td rowspan="5" style="font-weight:700">🔐 Auth</td>
+            <td>/api/auth/login</td><td><span class="method post">POST</span></td><td>用户登录</td></tr>
+          <tr><td>/api/auth/register</td><td><span class="method post">POST</span></td><td>用户注册</td></tr>
+          <tr><td>/api/auth/logout</td><td><span class="method post">POST</span></td><td>用户登出</td></tr>
+          <tr><td>/api/auth/me</td><td><span class="method get">GET</span></td><td>获取当前用户信息</td></tr>
+          <tr><td>/api/auth/forgot-password</td><td><span class="method post">POST</span></td><td>忘记密码</td></tr>
+
+          <tr><td rowspan="4" style="font-weight:700">👤 Users</td>
+            <td>/api/users/profile</td><td><span class="method put">PUT</span></td><td>更新个人资料</td></tr>
+          <tr><td>/api/users/preferences</td><td><span class="method put">PUT</span></td><td>用户偏好设置</td></tr>
+          <tr><td>/api/users/avatar/upload/*</td><td><span class="method post">POST</span></td><td>头像分块上传</td></tr>
+          <tr><td>/api/users/[id]/stats</td><td><span class="method get">GET</span></td><td>用户统计数据</td></tr>
+
+          <tr><td rowspan="5" style="font-weight:700">📚 Problems</td>
+            <td>/api/problems</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>题目列表/创建</td></tr>
+          <tr><td>/api/problems/[id]</td><td><span class="method get">GET</span><span class="method put" style="margin-left:4px">PUT</span><span class="method delete" style="margin-left:4px">DELETE</span></td><td>题目详情/更新/删除</td></tr>
+          <tr><td>/api/problems/tags</td><td><span class="method get">GET</span></td><td>获取标签列表</td></tr>
+          <tr><td>/api/problems/status</td><td><span class="method get">GET</span></td><td>题目状态统计</td></tr>
+          <tr><td>/api/problems/[id]/submissions</td><td><span class="method get">GET</span></td><td>题目提交记录</td></tr>
+
+          <tr><td rowspan="3" style="font-weight:700">⚡ Submissions</td>
+            <td>/api/submissions</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>提交列表/创建</td></tr>
+          <tr><td>/api/submissions/[id]</td><td><span class="method get">GET</span></td><td>提交详情+评测结果</td></tr>
+          <tr><td>WebSocket: submission</td><td><span class="method get">WS</span></td><td>实时评测状态推送</td></tr>
+
+          <tr><td rowspan="5" style="font-weight:700">🏆 Contests</td>
+            <td>/api/contests</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>竞赛列表/创建</td></tr>
+          <tr><td>/api/contests/[id]</td><td><span class="method get">GET</span><span class="method put" style="margin-left:4px">PUT</span><span class="method delete" style="margin-left:4px">DELETE</span></td><td>竞赛详情/更新/删除</td></tr>
+          <tr><td>/api/contests/[id]/register</td><td><span class="method post">POST</span></td><td>竞赛报名</td></tr>
+          <tr><td>/api/contests/[id]/rank</td><td><span class="method get">GET</span></td><td>竞赛排名</td></tr>
+          <tr><td>/api/contests/[id]/submissions</td><td><span class="method get">GET</span></td><td>竞赛提交记录</td></tr>
+
+          <tr><td rowspan="6" style="font-weight:700">🏫 Classes</td>
+            <td>/api/classes</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>班级列表/创建</td></tr>
+          <tr><td>/api/classes/[id]/members</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>成员列表/管理</td></tr>
+          <tr><td>/api/classes/[id]/assignments</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>作业列表/布置</td></tr>
+          <tr><td>/api/classes/[id]/notes</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>笔记列表/创建</td></tr>
+          <tr><td>/api/classes/[id]/problems</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>班级题库管理</td></tr>
+          <tr><td>/api/classes/[id]/requests</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>入班申请处理</td></tr>
+
+          <tr><td rowspan="4" style="font-weight:700">📋 Trainings</td>
+            <td>/api/trainings</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>训练列表/创建</td></tr>
+          <tr><td>/api/trainings/[id]</td><td><span class="method get">GET</span><span class="method put" style="margin-left:4px">PUT</span><span class="method delete" style="margin-left:4px">DELETE</span></td><td>训练详情/更新/删除</td></tr>
+          <tr><td>/api/trainings/[id]/join</td><td><span class="method post">POST</span></td><td>加入训练计划</td></tr>
+          <tr><td>/api/training-categories</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>分类管理</td></tr>
+
+          <tr><td rowspan="4" style="font-weight:700">💬 Solutions</td>
+            <td>/api/solutions</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>题解列表/发布</td></tr>
+          <tr><td>/api/solutions/[id]</td><td><span class="method get">GET</span><span class="method put" style="margin-left:4px">PUT</span><span class="method delete" style="margin-left:4px">DELETE</span></td><td>题解详情/编辑/删除</td></tr>
+          <tr><td>/api/solutions/[id]/like</td><td><span class="method post">POST</span></td><td>点赞/取消点赞</td></tr>
+          <tr><td>/api/solutions/check-permission</td><td><span class="method get">GET</span></td><td>查看权限校验</td></tr>
+
+          <tr><td rowspan="3" style="font-weight:700">📊 Rankings</td>
+            <td>/api/rankings</td><td><span class="method get">GET</span></td><td>全局排行榜</td></tr>
+          <tr><td>/api/rankings/my-rank</td><td><span class="method get">GET</span></td><td>我的排名</td></tr>
+          <tr><td>/api/home/dashboard</td><td><span class="method get">GET</span></td><td>首页仪表盘数据</td></tr>
+
+          <tr><td rowspan="3" style="font-weight:700">🔔 Notifications</td>
+            <td>/api/notifications</td><td><span class="method get">GET</span></td><td>通知列表</td></tr>
+          <tr><td>/api/notifications/[id]</td><td><span class="method put">PUT</span></td><td>标记已读</td></tr>
+          <tr><td>/api/notifications/mark-all-read</td><td><span class="method put">PUT</span></td><td>全部已读</td></tr>
+
+          <tr><td rowspan="3" style="font-weight:700">📢 Announcements</td>
+            <td>/api/announcements</td><td><span class="method get">GET</span></td><td>公告列表</td></tr>
+          <tr><td>/api/announcements/[id]</td><td><span class="method get">GET</span></td><td>公告详情</td></tr>
+          <tr><td>/api/settings/public</td><td><span class="method get">GET</span></td><td>公开站点配置</td></tr>
+
+          <tr><td rowspan="3" style="font-weight:700">🤖 AI</td>
+            <td>/api/ai/models</td><td><span class="method get">GET</span></td><td>可用AI模型列表</td></tr>
+          <tr><td>/api/ai/providers-presets</td><td><span class="method get">GET</span></td><td>Provider预设配置</td></tr>
+          <tr><td>/api/health/db</td><td><span class="method get">GET</span></td><td>数据库健康检查</td></tr>
+
+          <tr><td rowspan="6" style="font-weight:700">⚙️ Admin</td>
+            <td>/api/admin/users</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>用户管理</td></tr>
+          <tr><td>/api/admin/problems</td><td><span class="method get">GET</span><span class="method post" style="margin-left:4px">POST</span></td><td>题目管理</td></tr>
+          <tr><td>/api/admin/problems/[id]/verify</td><td><span class="method post">POST</span></td><td>验证题目数据</td></tr>
+          <tr><td>/api/admin/ai/generate</td><td><span class="method post">POST</span></td><td>AI批量出题</td></tr>
+          <tr><td>/api/admin/settings</td><td><span class="method get">GET</span><span class="method put" style="margin-left:4px">PUT</span></td><td>系统设置</td></tr>
+          <tr><td>/api/admin/dashboard</td><td><span class="method get">GET</span></td><td>管理仪表盘</td></tr>
+
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:14px;font-weight:600;margin:24px 0 12px;color:var(--text)">组件目录统计（44个组件 · 12子目录）</h3>
+    <table class="file-table">
+      <thead>
+        <tr><th style="width:24px">📁</th><th style="width:25%">目录</th><th style="width:10%">数量</th><th>组件文件</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">admin/</td><td>1</td><td>DataTable.tsx</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">ai/</td><td>1</td><td>ModelSelector.tsx</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">assignment/</td><td>1</td><td>AssignmentOpenLink.tsx</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">class/</td><td>5</td><td>ClassManageInlinePanel · CreateClassModal · CreateAssignmentModal · EditAssignmentModal · AssignmentProblemPicker</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">common/</td><td>8</td><td>ClassWorkspaceShell · DenseListShell · Dropdown · EducationalPageShell · ListGridCard · MarkdownContent · MarkdownRenderer · PageLoading</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">contest/</td><td>3</td><td>ContestCountdownPanel · ContestProblemMainHeader · ContestProblemSidebar</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">navbar/</td><td>5</td><td>Logo · MobileMenu · NavLinks · Search · UserMenu</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">problem/</td><td>4</td><td>ProblemDescription · ProblemOpenLink · SolutionTabPanel · SubmissionList</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">solution/</td><td>2</td><td>MarkdownEditor · SolutionCard</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">submission/</td><td>3</td><td>Confetti · JudgeStatus · SubmissionResultModal</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">training/</td><td>6</td><td>JoinTrainingButton · ProgressCircle · SourceFilterCards · TrainingCard · TrainingProblemMainHeader · TrainingProblemSidebar</td></tr>
+        <tr><td class="ft-icon">📦</td><td class="ft-name">(root)</td><td>5</td><td>AdminLayout · AvatarUploader · DocumentTitleProvider · Navbar · StudentCompletionTable · SwrProvider</td></tr>
+      </tbody>
+    </table>
+
+  </div>
+</section>
+
+<section class="section" id="files">
+  <div class="section-header collapsed" onclick="toggleSection(this)">
+    <h2>文件列表与数据库表</h2>
+    <span class="toggle">▶</span>
+  </div>
+  <div class="section-body hidden">
+
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text)">Prisma 数据模型（MongoDB · 38张表）</h3>
+    <div style="overflow-x:auto">
+      <table class="file-table">
+        <thead>
+          <tr><th style="width:5%">#</th><th style="width:25%">模型名</th><th style="width:10%">类型</th><th style="width:60%">描述</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td class="ft-name">User</td><td>核心</td><td>用户（用户名/邮箱/密码/昵称/头像/Rating/角色/Token版本）</td></tr>
+          <tr><td>2</td><td class="ft-name">AvatarHistory</td><td>工具</td><td>头像变更历史记录</td></tr>
+          <tr><td>3</td><td class="ft-name">Problem</td><td>核心</td><td>题目（标题/描述/难度/标签/时间限制/内存限制/比较模式/AI来源）</td></tr>
+          <tr><td>4</td><td class="ft-name">TestCase</td><td>关联</td><td>测试用例（输入/输出/是否样例/分值/自定义限时）</td></tr>
+          <tr><td>5</td><td class="ft-name">Submission</td><td>核心</td><td>提交记录（语言/代码/状态/得分/时间/内存/测试结果）</td></tr>
+          <tr><td>6</td><td class="ft-name">Contest</td><td>核心</td><td>竞赛（标题/类型/开始结束时间/密码/公开标记）</td></tr>
+          <tr><td>7</td><td class="ft-name">ContestProblem</td><td>关联</td><td>竞赛-题目关联（排序/分值）</td></tr>
+          <tr><td>8</td><td class="ft-name">ContestParticipant</td><td>关联</td><td>竞赛参与者（得分/排名/罚时）</td></tr>
+          <tr><td>9</td><td class="ft-name">Class</td><td>核心</td><td>班级（名称/简介/公告/头像/最大人数/创建者）</td></tr>
+          <tr><td>10</td><td class="ft-name">ClassMember</td><td>关联</td><td>班级成员（角色/备注/细粒度权限/活动时间）</td></tr>
+          <tr><td>11</td><td class="ft-name">ClassAssignment</td><td>核心</td><td>班级作业（标题/描述/题目列表/截止时间）</td></tr>
+          <tr><td>12</td><td class="ft-name">ClassAssignmentSubmission</td><td>关联</td><td>作业提交记录（代码/语言/评测结果/逾期标记）</td></tr>
+          <tr><td>13</td><td class="ft-name">ClassNote</td><td>核心</td><td>班级笔记（标题/内容/分类/标签/浏览点赞）</td></tr>
+          <tr><td>14</td><td class="ft-name">ClassDirectInvite</td><td>关联</td><td>班级直接邀请（状态/留言/过期时间）</td></tr>
+          <tr><td>15</td><td class="ft-name">ClassJoinRequest</td><td>关联</td><td>班级加入申请（状态/留言/审批人）</td></tr>
+          <tr><td>16</td><td class="ft-name">Comment</td><td>核心</td><td>评论（嵌套回复/点赞/软删除）</td></tr>
+          <tr><td>17</td><td class="ft-name">Solution</td><td>核心</td><td>题解（标题/内容/代码/浏览/点赞/官方标识/AI标识）</td></tr>
+          <tr><td>18</td><td class="ft-name">SolutionView</td><td>工具</td><td>题解浏览去重记录（用户/IP+UA哈希）</td></tr>
+          <tr><td>19</td><td class="ft-name">SolutionLike</td><td>工具</td><td>题解点赞去重记录</td></tr>
+          <tr><td>20</td><td class="ft-name">Blog</td><td>核心</td><td>博客（标题/内容/标签/浏览/点赞/公开标记）</td></tr>
+          <tr><td>21</td><td class="ft-name">Training</td><td>核心</td><td>训练计划/题单（标题/描述/难度/分类/推荐/封面）</td></tr>
+          <tr><td>22</td><td class="ft-name">TrainingCategory</td><td>关联</td><td>题单分类（名称/排序）</td></tr>
+          <tr><td>23</td><td class="ft-name">TrainingProblem</td><td>关联</td><td>题单-题目关联（排序/分值/是否必修）</td></tr>
+          <tr><td>24</td><td class="ft-name">TrainingEnrollment</td><td>关联</td><td>用户加入题单记录</td></tr>
+          <tr><td>25</td><td class="ft-name">Achievement</td><td>工具</td><td>成就定义（名称/描述/图标/条件）</td></tr>
+          <tr><td>26</td><td class="ft-name">UserAchievement</td><td>工具</td><td>用户成就获得记录</td></tr>
+          <tr><td>27</td><td class="ft-name">Favorite</td><td>工具</td><td>题目收藏</td></tr>
+          <tr><td>28</td><td class="ft-name">Notification</td><td>核心</td><td>通知（类型/标题/内容/链接/已读状态）</td></tr>
+          <tr><td>29</td><td class="ft-name">NoteReadHistory</td><td>工具</td><td>笔记阅读历史去重</td></tr>
+          <tr><td>30</td><td class="ft-name">AuditLog</td><td>工具</td><td>审计日志（用户/操作/资源/IP/UA）</td></tr>
+          <tr><td>31</td><td class="ft-name">AiGenerationLog</td><td>工具</td><td>AI出题日志（状态/参数/结果/Token消耗）</td></tr>
+          <tr><td>32</td><td class="ft-name">AiModelConfig</td><td>工具</td><td>AI模型全局/用户配置（Provider/ApiKey/思考设置）</td></tr>
+          <tr><td>33</td><td class="ft-name">AiProvider</td><td>核心</td><td>AI服务提供商（名称/Slug/BaseUrl/ApiKey）</td></tr>
+          <tr><td>34</td><td class="ft-name">AiModel</td><td>核心</td><td>AI模型定义（名称/类型/Token/Temperature/高级参数）</td></tr>
+          <tr><td>35</td><td class="ft-name">UserAiPreference</td><td>工具</td><td>用户AI模型偏好（使用次数/默认模型）</td></tr>
+          <tr><td>36</td><td class="ft-name">VerificationLog</td><td>工具</td><td>题目验证日志（操作人/状态/详情）</td></tr>
+          <tr><td>37</td><td class="ft-name">SystemConfig</td><td>工具</td><td>系统配置键值存储</td></tr>
+          <tr><td>38</td><td class="ft-name">SystemAnnouncement</td><td>核心</td><td>系统公告（标题/内容/置顶/发布/过期）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:14px;font-weight:600;margin:24px 0 12px;color:var(--text)">lib/ 目录分类（22个子目录 · 108个.ts文件）</h3>
+    <table class="file-table">
+      <thead>
+        <tr><th style="width:5%">#</th><th style="width:22%">子目录</th><th style="width:8%">文件数</th><th style="width:65%">说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td class="ft-name">api/</td><td>10</td><td>API层：base(axios封装)、auth(认证拦截)、swr(数据请求)、handler(路由处理)、response(响应格式)、validation、notification、settings、withApi</td></tr>
+        <tr><td>2</td><td class="ft-name">ai/</td><td>12</td><td>AI系统：service、generator(出题)、solution-generator(题解)、factory、config、discover(模型发现)、providers、queue、quality-check、response-parser、prompts/*（提示词模板）</td></tr>
+        <tr><td>3</td><td class="ft-name">judge/</td><td>9</td><td>评测引擎：judger、executor(沙箱执行)、compiler(编译)、comparator(比对)、codeAnalyzer、queue、worker、types + runner.sh</td></tr>
+        <tr><td>4</td><td class="ft-name">auth/</td><td>3</td><td>认证服务：service(JWT签发/校验)、validation、index(导出)</td></tr>
+        <tr><td>5</td><td class="ft-name">user/</td><td>3</td><td>用户服务：service(CRUD/个人资料)、validation、index</td></tr>
+        <tr><td>6</td><td class="ft-name">problem/</td><td>5</td><td>题库服务：service、testcase(用例管理)、testcase-scoring(分值)、validation、index</td></tr>
+        <tr><td>7</td><td class="ft-name">submission/</td><td>3</td><td>提交服务：service、validation、index</td></tr>
+        <tr><td>8</td><td class="ft-name">contest/</td><td>4</td><td>竞赛服务：service、countdown(倒计时)、validation、index</td></tr>
+        <tr><td>9</td><td class="ft-name">class/</td><td>8</td><td>班级服务：service、assignment(作业)、member(成员)、roles(角色映射)、auth(权限)、note(笔记)、validation、index</td></tr>
+        <tr><td>10</td><td class="ft-name">training/</td><td>4</td><td>训练服务：service、types(类型定义)、validation、index</td></tr>
+        <tr><td>11</td><td class="ft-name">solution/</td><td>7</td><td>题解服务：service、permissions(权限)、like-helper、view-helper(浏览去重)、problem-resolver、validation、index</td></tr>
+        <tr><td>12</td><td class="ft-name">ranking/</td><td>3</td><td>排行榜服务：service(Rating计算)、validation、index</td></tr>
+        <tr><td>13</td><td class="ft-name">notification/</td><td>2</td><td>通知服务：service(WebSocket推送)、validation</td></tr>
+        <tr><td>14</td><td class="ft-name">announcement/</td><td>1</td><td>公告服务：service</td></tr>
+        <tr><td>15</td><td class="ft-name">admin/</td><td>2</td><td>管理后台：dashboard(仪表盘)、logs(操作日志)</td></tr>
+        <tr><td>16</td><td class="ft-name">home/</td><td>1</td><td>首页仪表盘：dashboard(聚合数据)</td></tr>
+        <tr><td>17</td><td class="ft-name">assignment/</td><td>1</td><td>作业辅助：problemSelection(题目选择)</td></tr>
+        <tr><td>18</td><td class="ft-name">websocket/</td><td>1</td><td>WebSocket服务：server(实时通信)</td></tr>
+        <tr><td>19</td><td class="ft-name">types/</td><td>1</td><td>共享类型：common(通用类型定义)</td></tr>
+        <tr><td>20</td><td class="ft-name">ai/prompts/</td><td>6</td><td>AI提示词：core(类型/质量门)、paramgen(参数生成)、test-data(测试数据)、loader(加载器)</td></tr>
+        <tr><td>21</td><td class="ft-name">(根lib/)</td><td>22</td><td>基础设施：prisma、mongodb、redis、cache、email、logger、crypto、rate-limit、permissions、validation、upload、sanitize、constants、settings、status、metadata、utils 等</td></tr>
+        <tr><td>—</td><td class="ft-name" style="font-weight:700">合计</td><td style="font-weight:700">108</td><td>覆盖业务逻辑、评测引擎、AI集成、基础设施全栈</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:14px;font-weight:600;margin:24px 0 12px;color:var(--text)">Hooks &amp; Contexts</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <h4 style="font-size:13px;font-weight:600;margin-bottom:8px">Hooks（8个）</h4>
+        <div class="file-list">
+          <div class="file-item"><span class="fi-icon">🪝</span><span class="fi-name">useCurrentUser.ts</span></div>
+          <div class="file-item"><span class="fi-icon">🪝</span><span class="fi-name">useContest.ts</span></div>
+          <div class="file-item"><span class="fi-icon">🪝</span><span class="fi-name">useClass.ts</span></div>
+          <div class="file-item"><span class="fi-icon">🪝</span><span class="fi-name">useClickOutside.ts</span></div>
+          <div class="file-item"><span class="fi-icon">🪝</span><span class="fi-name">useDocumentTitle.ts</span></div>
+          <div class="file-item"><span class="fi-icon">🪝</span><span class="fi-name">useProblemDocumentTitle.ts</span></div>
+          <div class="file-item"><span class="fi-icon">🪝</span><span class="fi-name">useNotificationSocket.ts</span></div>
+          <div class="file-item"><span class="fi-icon">🪝</span><span class="fi-name">useSubmissionSocket.ts</span></div>
+        </div>
+      </div>
+      <div>
+        <h4 style="font-size:13px;font-weight:600;margin-bottom:8px">Contexts（4个）</h4>
+        <div class="file-list">
+          <div class="file-item"><span class="fi-icon">📡</span><span class="fi-name">UserContext.tsx</span></div>
+          <div class="file-item"><span class="fi-icon">📡</span><span class="fi-name">SettingsContext.tsx</span></div>
+          <div class="file-item"><span class="fi-icon">📡</span><span class="fi-name">ContestProblemWorkspaceContext.tsx</span></div>
+          <div class="file-item"><span class="fi-icon">📡</span><span class="fi-name">TrainingProblemWorkspaceContext.tsx</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:14px;font-weight:600;margin:24px 0 12px;color:var(--text)">项目规模统计</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+      <div class="module-card" style="text-align:center">
+        <h4 style="font-size:28px;justify-content:center">75</h4>
+        <p style="text-align:center">页面 (page.tsx)</p>
+      </div>
+      <div class="module-card" style="text-align:center">
+        <h4 style="font-size:28px;justify-content:center">103</h4>
+        <p style="text-align:center">API端点 (route.ts)</p>
+      </div>
+      <div class="module-card" style="text-align:center">
+        <h4 style="font-size:28px;justify-content:center">44</h4>
+        <p style="text-align:center">组件 (.tsx)</p>
+      </div>
+      <div class="module-card" style="text-align:center">
+        <h4 style="font-size:28px;justify-content:center">108</h4>
+        <p style="text-align:center">lib文件 (.ts)</p>
+      </div>
+      <div class="module-card" style="text-align:center">
+        <h4 style="font-size:28px;justify-content:center">38</h4>
+        <p style="text-align:center">数据模型 (Prisma)</p>
+      </div>
+      <div class="module-card" style="text-align:center">
+        <h4 style="font-size:28px;justify-content:center">8+4</h4>
+        <p style="text-align:center">Hooks + Contexts</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="section" id="vulnerabilities">
+  <div class="section-header collapsed" onclick="toggleSection(this)">
+    <h2>漏洞与问题清单</h2>
+    <span class="badge badge-critical">1 Critical</span>
+    <span class="badge badge-medium">6 Medium</span>
+    <span class="badge badge-low">2 Low</span>
+    <span class="toggle">▶</span>
+  </div>
+  <div class="section-body hidden">
+
+    <div class="priority-group">
+      <h3 class="priority-label">CRITICAL <span class="count">1 项</span></h3>
+
+      <div class="issue-card critical">
+        <div class="issue-header">
+          <span class="issue-location">ranking/service.ts:73</span>
+          <span class="issue-badge badge-critical">CRITICAL</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc">第六轮修复了 L37 但遗漏了 L73 上的 <code>status: 'ACCEPTED'</code>，导致 <code>getClassRanking</code> 中班级排行榜解题数仍为 0。</p>
+
+          <div class="code-fix-pair">
+            <div class="code-fix-section">
+              <span class="code-fix-label vuln">❌ 漏洞代码</span>
+              <div class="code-block">
+                <span class="file-ref">lib/ranking/service.ts:73</span>
+                <pre><code class="err-line">where: { userId: m.user.id, status: 'ACCEPTED' }</code></pre>
+              </div>
+            </div>
+            <div class="code-fix-section">
+              <span class="code-fix-label fix">✅ 修复代码</span>
+              <div class="code-block">
+                <span class="file-ref">lib/ranking/service.ts:73</span>
+                <pre><code class="fix-line">where: { userId: m.user.id, status: 'AC' }</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <p class="issue-impact"><strong>影响：</strong>班级排行榜功能仍然失效，解题数始终返回 0。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="priority-group">
+      <h3 class="priority-label">MEDIUM <span class="count">6 项</span></h3>
+
+      <div class="issue-card medium">
+        <div class="issue-header">
+          <span class="issue-location">training/service.ts:577, 837</span>
+          <span class="issue-badge badge-medium">MEDIUM</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc"><code>statusFromSubmission</code> 函数和用户进度统计中仍保留 <code>'ACCEPTED'</code> 回退逻辑，未完全迁移至 <code>'AC'</code>。</p>
+        </div>
+      </div>
+
+      <div class="issue-card medium">
+        <div class="issue-header">
+          <span class="issue-location">contest/service.ts:73-80</span>
+          <span class="issue-badge badge-medium">MEDIUM</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc"><code>updateContest</code> 只清除 <code>byId</code> 缓存，缺少列表和排名缓存清除；<code>deleteContest</code> 同样缺少列表和排名缓存清除。</p>
+          <p class="issue-impact"><strong>影响：</strong>更新/删除比赛后，列表查询和排名数据可能返回过期结果。</p>
+        </div>
+      </div>
+
+      <div class="issue-card medium">
+        <div class="issue-header">
+          <span class="issue-location">solution/service.ts:57-61</span>
+          <span class="issue-badge badge-medium">MEDIUM</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc"><code>deleteSolution</code> 删除题解后未清除列表缓存，列表中仍显示已删除项。</p>
+        </div>
+      </div>
+
+      <div class="issue-card medium">
+        <div class="issue-header">
+          <span class="issue-location">solution/service.ts:208</span>
+          <span class="issue-badge badge-medium">MEDIUM</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc"><code>createUserSolution</code> 直接调用 <code>prisma.solution.create</code>，绕过了 <code>createSolution</code> 中的 <code>cache.deleteByPrefix</code> 逻辑。</p>
+          <p class="issue-impact"><strong>影响：</strong>通过用户入口创建题解后，相关查询缓存未被清除，新题解不可见。</p>
+        </div>
+      </div>
+
+      <div class="issue-card medium">
+        <div class="issue-header">
+          <span class="issue-location">package.json:37</span>
+          <span class="issue-badge badge-medium">MEDIUM</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc"><code>next-auth</code> 依赖声明在 <code>package.json</code> 中，但项目内无任何代码引用该包，属于冗余依赖。</p>
+        </div>
+      </div>
+
+      <div class="issue-card medium">
+        <div class="issue-header">
+          <span class="issue-location">lib/judge/executor.ts:12-14</span>
+          <span class="issue-badge badge-medium">MEDIUM</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc">Windows 非 Docker 评测沙箱执法逻辑倒置：仅开发环境打印警告，生产环境反而跳过安全检查。</p>
+          <p class="issue-detail"><code>ALLOW_LOCAL_JUDGE_ON_WINDOWS</code> 变量被提及但未被实际检查，导致安全策略在运行时不生效。</p>
+          <p class="issue-impact"><strong>影响：</strong>Windows 生产环境下可能绕过沙箱安全约束。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="priority-group">
+      <h3 class="priority-label">LOW <span class="count">2 项</span></h3>
+
+      <div class="issue-card low">
+        <div class="issue-header">
+          <span class="issue-location">.env</span>
+          <span class="issue-badge badge-low">LOW</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc">缺少 5 个 <code>docker-compose</code> 凭证变量（<code>MONGO_ROOT_USER</code>、<code>MONGO_ROOT_PASSWORD</code> 等），与 <code>docker-compose.yml</code> 中引用的环境变量未同步。</p>
+        </div>
+      </div>
+
+      <div class="issue-card low">
+        <div class="issue-header">
+          <span class="issue-location">.env.example:42 vs .env:37</span>
+          <span class="issue-badge badge-low">LOW</span>
+        </div>
+        <div class="issue-body">
+          <p class="issue-desc"><code>AI_CONFIG_ENCRYPTION_KEY</code> 编码注释不一致：<code>.env.example</code> 中建议使用 hex 编码，但 <code>.env</code> 实际使用的是 base64 编码格式。</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="section" id="logic">
+  <div class="section-header collapsed" onclick="toggleSection(this)">
+    <h2>逻辑修复验证</h2>
+    <span class="toggle">▶</span>
+  </div>
+  <div class="section-body hidden">
+
+    <div class="verify-group">
+      <h3 class="verify-label">✅ 评测状态枚举值验证</h3>
+      <p class="verify-desc">全仓 <code>status: 'AC'</code> 查询共 <strong>11 处</strong>，全部正确指向新枚举值，无残留 <code>'ACCEPTED'</code> 字面量（除 training 模块 2 处 fallback 逻辑外）。7 处核心查询路径验证通过：</p>
+      <ul class="verify-list">
+        <li><code>submission/service.ts</code> — 提交统计、AC 计数</li>
+        <li><code>problem/service.ts</code> — 题目 AC 率计算</li>
+        <li><code>user/service.ts</code> — 用户解题进度</li>
+        <li><code>ranking/service.ts:37</code> — 个人排行榜（第 6 轮已修复）</li>
+        <li><code>contest/service.ts</code> — 比赛提交判定</li>
+        <li><code>judge/sandbox.ts</code> — 评测结果映射</li>
+        <li><code>types/submission.ts</code> — 枚举定义与类型守卫</li>
+      </ul>
+    </div>
+
+    <div class="verify-group">
+      <h3 class="verify-label warn">⚠️ 缓存一致性缺口</h3>
+      <p class="verify-desc">以下 3 处缓存清除逻辑不完整，可能导致读取过期数据：</p>
+      <ul class="verify-list warn-list">
+        <li><strong>contest × 2：</strong><code>updateContest</code> 和 <code>deleteContest</code> 缺少列表缓存和排名缓存清除</li>
+        <li><strong>solution × 2：</strong><code>deleteSolution</code> 缺列表缓存清除；<code>createUserSolution</code> 绕过 <code>cache.deleteByPrefix</code></li>
+      </ul>
+    </div>
+
+    <div class="verify-group">
+      <h3 class="verify-label warn">⚠️ training 模块 ACCEPTED 残留</h3>
+      <p class="verify-desc"><code>lib/training/service.ts</code> 中存在 <strong>2 处</strong> <code>'ACCEPTED'</code> 字符串回退逻辑：</p>
+      <ul class="verify-list warn-list">
+        <li><strong>L577 — <code>statusFromSubmission</code> 函数：</strong>fallback 分支中仍使用 <code>'ACCEPTED'</code> 作为默认返回值</li>
+        <li><strong>L837 — 用户进度统计：</strong><code>where</code> 条件中保留 <code>status: 'ACCEPTED'</code> 回退判断</li>
+      </ul>
+    </div>
+
+    <div class="verify-group">
+      <h3 class="verify-label">✅ Worker 初始化与恢复</h3>
+      <p class="verify-desc">评测 Worker 进程初始化流程完整，异常重启和哨兵恢复机制正常，无孤儿任务泄漏风险。</p>
+    </div>
+
+  </div>
+</section>
+
+<section class="section" id="compatibility">
+  <div class="section-header collapsed" onclick="toggleSection(this)">
+    <h2>兼容性校验</h2>
+    <span class="toggle">▶</span>
+  </div>
+  <div class="section-body hidden">
+
+    <div class="compat-group">
+      <h3 class="compat-label">版本兼容性</h3>
+      <table class="compat-table">
+        <thead>
+          <tr><th>组件</th><th>要求版本</th><th>当前版本</th><th>状态</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Node.js</td><td>≥ 18.17</td><td>18.x / 20.x</td><td><span class="status-ok">✅</span></td></tr>
+          <tr><td>Next.js</td><td>14.x</td><td>14.x</td><td><span class="status-ok">✅</span></td></tr>
+          <tr><td>React</td><td>18.x</td><td>18.x</td><td><span class="status-ok">✅</span></td></tr>
+          <tr><td>Prisma</td><td>≥ 5.0</td><td>5.x</td><td><span class="status-ok">✅</span></td></tr>
+          <tr><td>TypeScript</td><td>≥ 5.0</td><td>5.x</td><td><span class="status-ok">✅</span></td></tr>
+          <tr><td>MongoDB</td><td>≥ 6.0</td><td>6.x / 7.x</td><td><span class="status-ok">✅</span></td></tr>
+          <tr><td>Redis</td><td>≥ 6.0</td><td>6.x / 7.x</td><td><span class="status-ok">✅</span></td></tr>
+          <tr><td>Docker</td><td>≥ 20.10</td><td>24.x+</td><td><span class="status-ok">✅</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="compat-group">
+      <h3 class="compat-label">配置对齐表</h3>
+      <table class="compat-table">
+        <thead>
+          <tr><th>配置项</th><th>.env.example</th><th>.env</th><th>状态</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>DATABASE_URL</td><td>MongoDB 连接串</td><td>已配置</td><td><span class="status-ok">✅ 已对齐</span></td></tr>
+          <tr><td>REDIS_URL</td><td>Redis 连接串</td><td>已配置</td><td><span class="status-ok">✅ 已对齐</span></td></tr>
+          <tr><td>JWT_SECRET</td><td>签名密钥</td><td>已配置</td><td><span class="status-ok">✅ 已对齐</span></td></tr>
+          <tr><td>NEXTAUTH_SECRET</td><td>NextAuth 密钥</td><td>已配置</td><td><span class="status-ok">✅ 已对齐</span></td></tr>
+          <tr><td>JUDGE_SANDBOX_URL</td><td>评测沙箱地址</td><td>已配置</td><td><span class="status-ok">✅ 已对齐</span></td></tr>
+          <tr><td>AI_CONFIG_ENCRYPTION_KEY</td><td>AI 配置加密密钥</td><td>已配置</td><td><span class="status-ok">✅ 已对齐</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="compat-group">
+      <h3 class="compat-label">Turbopack 兼容性</h3>
+      <p class="compat-desc"><code>next dev --turbo</code> 模式下无阻断性错误，所有页面和 API 路由正常加载，HMR 热更新响应正常。</p>
+    </div>
+
+    <div class="compat-group">
+      <h3 class="compat-label">静态分析状态</h3>
+      <div class="analysis-grid">
+        <div class="analysis-item">
+          <span class="analysis-name">ESLint</span>
+          <span class="analysis-value ok">0 errors</span>
+          <span class="analysis-value warn">~919 warnings</span>
+        </div>
+        <div class="analysis-item">
+          <span class="analysis-name">Vitest</span>
+          <span class="analysis-value ok">91/91 passed</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+<section class="section" id="optimization">
+  <div class="section-header collapsed" onclick="toggleSection(this)">
+    <h2>优化评估建议</h2>
+    <span class="toggle">▶</span>
+  </div>
+  <div class="section-body hidden">
+
+    <div class="priority-group">
+      <h3 class="priority-label">P0-紧急（本次必须） <span class="count">1 项</span></h3>
+
+      <div class="issue-card critical">
+        <div class="issue-header">
+          <span class="ri-priority p0">P0-1</span>
+          <span class="issue-location">ranking/service.ts:73</span>
+          <span class="issue-badge badge-critical">CRITICAL</span>
+        </div>
+        <div class="issue-body">
+          <p><code>ACCEPTED</code> → <code>AC</code>（第6轮遗漏修复）</p>
+          <p class="issue-note">第6轮审查已要求将 <code>ACCEPTED</code> 替换为 <code>AC</code>，但第73行仍遗留未改，属于前轮修复遗漏。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="priority-group">
+      <h3 class="priority-label">P1-高优（本次建议） <span class="count">5 项</span></h3>
+
+      <div class="issue-card high">
+        <div class="issue-header">
+          <span class="ri-priority p1">P1-1</span>
+          <span class="issue-location">training/service.ts</span>
+          <span class="issue-badge badge-high">HIGH</span>
+        </div>
+        <div class="issue-body">
+          <p>清理 2 处 <code>ACCEPTED</code> 残留</p>
+          <p class="issue-note">与 ranking 类似，training 模块中仍存在未替换的 <code>ACCEPTED</code> 枚举值残留。</p>
+        </div>
+      </div>
+
+      <div class="issue-card high">
+        <div class="issue-header">
+          <span class="ri-priority p1">P1-2</span>
+          <span class="issue-location">contest/updateContest · deleteContest</span>
+          <span class="issue-badge badge-high">HIGH</span>
+        </div>
+        <div class="issue-body">
+          <p>补全缓存清除逻辑</p>
+          <p class="issue-note"><code>updateContest</code> 和 <code>deleteContest</code> 操作后未清除相关查询缓存，可能导致数据不一致。</p>
+        </div>
+      </div>
+
+      <div class="issue-card high">
+        <div class="issue-header">
+          <span class="ri-priority p1">P1-3</span>
+          <span class="issue-location">solution/deleteSolution</span>
+          <span class="issue-badge badge-high">HIGH</span>
+        </div>
+        <div class="issue-body">
+          <p>补全列表缓存清除</p>
+          <p class="issue-note">删除题解后未清除题解列表缓存，旧数据可能被继续读取。</p>
+        </div>
+      </div>
+
+      <div class="issue-card high">
+        <div class="issue-header">
+          <span class="ri-priority p1">P1-4</span>
+          <span class="issue-location">solution/createUserSolution</span>
+          <span class="issue-badge badge-high">HIGH</span>
+        </div>
+        <div class="issue-body">
+          <p>添加缓存清除</p>
+          <p class="issue-note">创建题解后未清除相关缓存，新题解无法及时在列表中呈现。</p>
+        </div>
+      </div>
+
+      <div class="issue-card high">
+        <div class="issue-header">
+          <span class="ri-priority p1">P1-5</span>
+          <span class="issue-location">Windows 沙箱执法逻辑</span>
+          <span class="issue-badge badge-high">HIGH</span>
+        </div>
+        <div class="issue-body">
+          <p>反转条件 + 实际检查变量修正</p>
+          <p class="issue-note">Windows 沙箱的执法逻辑中条件判断存在反转问题，需修正条件并确保检查实际运行变量。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="priority-group">
+      <h3 class="priority-label">P2-中优（下一轮） <span class="count">2 项</span></h3>
+
+      <div class="issue-card medium">
+        <div class="issue-header">
+          <span class="ri-priority p2">P2-1</span>
+          <span class="issue-location">package.json</span>
+          <span class="issue-badge badge-medium">MEDIUM</span>
+        </div>
+        <div class="issue-body">
+          <p>移除 <code>next-auth</code> 未使用依赖</p>
+          <p class="issue-note">项目中已不再使用 next-auth，残留依赖增加不必要的包体积和安全攻击面。</p>
+        </div>
+      </div>
+
+      <div class="issue-card medium">
+        <div class="issue-header">
+          <span class="ri-priority p2">P2-2</span>
+          <span class="issue-location">.env</span>
+          <span class="issue-badge badge-medium">MEDIUM</span>
+        </div>
+        <div class="issue-body">
+          <p>补全 <code>docker-compose</code> 凭证变量</p>
+          <p class="issue-note"><code>.env</code> 文件中缺少 Docker Compose 所需的凭证环境变量模板。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="priority-group">
+      <h3 class="priority-label">P3-低优（择机） <span class="count">2 项</span></h3>
+
+      <div class="issue-card low">
+        <div class="issue-header">
+          <span class="ri-priority p3">P3-1</span>
+          <span class="issue-location">AI_CONFIG_ENCRYPTION_KEY</span>
+          <span class="issue-badge badge-low">LOW</span>
+        </div>
+        <div class="issue-body">
+          <p>编码方式统一</p>
+          <p class="issue-note">AI 配置加密密钥的编码方式与系统其他密钥不一致，建议统一。</p>
+        </div>
+      </div>
+
+      <div class="issue-card low">
+        <div class="issue-header">
+          <span class="ri-priority p3">P3-2</span>
+          <span class="issue-location">评测队列</span>
+          <span class="issue-badge badge-low">LOW</span>
+        </div>
+        <div class="issue-body">
+          <p>迁移到 BullMQ + Redis（架构升级）</p>
+          <p class="issue-note">当前评测队列方案可升级为 BullMQ + Redis，获得更好的可靠性、可观测性和横向扩展能力。</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="section" id="roadmap">
+  <div class="section-header collapsed" onclick="toggleSection(this)">
+    <h2>修复路线图</h2>
+    <span class="toggle">▶</span>
+  </div>
+  <div class="section-body hidden">
+
+    <div class="roadmap">
+
+      <div class="roadmap-phase">
+        <h3 class="phase-title">第一阶段 — 紧急修复 <span class="phase-time">（1 天）</span></h3>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p0-1" disabled />
+          <label for="roadmap-p0-1">
+            <span class="ri-priority p0">P0-1</span>
+            ranking/service.ts:73 <code>ACCEPTED</code> → <code>AC</code>
+          </label>
+        </div>
+      </div>
+
+      <div class="roadmap-phase">
+        <h3 class="phase-title">第二阶段 — 安全加固 <span class="phase-time">（1-2 天）</span></h3>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p1-1" disabled />
+          <label for="roadmap-p1-1">
+            <span class="ri-priority p1">P1-1</span>
+            training 清理 ACCEPTED 残留
+          </label>
+        </div>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p1-2" disabled />
+          <label for="roadmap-p1-2">
+            <span class="ri-priority p1">P1-2</span>
+            contest 补全缓存清除
+          </label>
+        </div>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p1-3" disabled />
+          <label for="roadmap-p1-3">
+            <span class="ri-priority p1">P1-3</span>
+            solution 补全缓存清除
+          </label>
+        </div>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p1-4" disabled />
+          <label for="roadmap-p1-4">
+            <span class="ri-priority p1">P1-4</span>
+            solution createUserSolution 缓存清除
+          </label>
+        </div>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p1-5" disabled />
+          <label for="roadmap-p1-5">
+            <span class="ri-priority p1">P1-5</span>
+            Windows 沙箱执法修正
+          </label>
+        </div>
+      </div>
+
+      <div class="roadmap-phase">
+        <h3 class="phase-title">第三阶段 — 质量提升 <span class="phase-time">（1 周）</span></h3>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p2-1" disabled />
+          <label for="roadmap-p2-1">
+            <span class="ri-priority p2">P2-1</span>
+            移除 next-auth
+          </label>
+        </div>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p2-2" disabled />
+          <label for="roadmap-p2-2">
+            <span class="ri-priority p2">P2-2</span>
+            .env 补全变量
+          </label>
+        </div>
+      </div>
+
+      <div class="roadmap-phase">
+        <h3 class="phase-title">第四阶段 — 架构优化 <span class="phase-time">（择机）</span></h3>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p3-1" disabled />
+          <label for="roadmap-p3-1">
+            <span class="ri-priority p3">P3-1</span>
+            编码方式统一
+          </label>
+        </div>
+        <div class="roadmap-item">
+          <input type="checkbox" id="roadmap-p3-2" disabled />
+          <label for="roadmap-p3-2">
+            <span class="ri-priority p3">P3-2</span>
+            BullMQ 迁移
+          </label>
+        </div>
+      </div>
+
+      <div class="progress-section">
+        <div class="progress-header">
+          <span class="progress-label">总进度</span>
+          <span class="progress-text">0 / 10</span>
+        </div>
+        <div class="progress-bar">
+          <div class="fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+<section class="section" id="summary">
+  <div class="section-header collapsed" onclick="toggleSection(this)">
+    <h2>审查总结</h2>
+    <span class="toggle">▶</span>
+  </div>
+  <div class="section-body hidden">
+
+    <p><strong>第七轮审查</strong>共发现 <strong>10 个问题</strong>（1 CRITICAL + 6 MEDIUM + 2 LOW + 1 INFO）。</p>
+
+    <p>核心问题为 <a href="file:///e:/桌面/dsoj/ranking/service.ts#L73">ranking/service.ts:73</a> 的遗漏修复。经过 7 轮迭代，项目健康分持续提升：</p>
+
+    <table class="health-table">
+      <thead>
+        <tr>
+          <th>指标</th>
+          <th>S6</th>
+          <th>S7</th>
+          <th>变化</th>
+          <th>趋势</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Security</td>
+          <td>85</td>
+          <td>87</td>
+          <td class="positive">+2</td>
+          <td class="trend-up">↑</td>
+        </tr>
+        <tr>
+          <td>Stability</td>
+          <td>70</td>
+          <td>78</td>
+          <td class="positive">+8</td>
+          <td class="trend-up">↑</td>
+        </tr>
+        <tr>
+          <td>Quality</td>
+          <td>82</td>
+          <td>85</td>
+          <td class="positive">+3</td>
+          <td class="trend-up">↑</td>
+        </tr>
+        <tr>
+          <td>Completeness</td>
+          <td>95</td>
+          <td>95</td>
+          <td class="neutral">0</td>
+          <td class="trend-stable">→</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>最关键的待修复项为 <strong>ranking 遗留 ACCEPTED</strong>（1 处），以及 <strong>contest / solution 的缓存一致性问题</strong>（3 处）。</p>
+
+    <div class="meta-footer">
+      <span>生成时间：2026-07-13</span>
+      <span class="meta-sep">|</span>
+      <span>审查工具：TRAE Summary Report Skill v7</span>
+    </div>
+
+  </div>
+</section>
+
+</div>
+<script src="report-assets/report.js"></script>
 </body>
 </html>
+

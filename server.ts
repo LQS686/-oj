@@ -58,7 +58,7 @@ validateEnvironment()
 const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
   const httpServer = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url!, true)
@@ -75,8 +75,11 @@ app.prepare().then(() => {
   logger.info('WebSocket 服务器初始化完成')
 
   // WebSocket 初始化后，再启动评测 Worker
+  // 必须 await 确保 Worker 事件监听器在服务器开始接收请求前注册完毕，
+  // 否则首次提交若评测很快完成（如编译错误），completed 事件会因无监听器而丢失，
+  // 导致提交永远停留在 Pending 状态，表现为"评测超时"。
   logger.info('启动评测 Worker')
-  import('./lib/judge/init')
+  await import('./lib/judge/init')
   logger.info('评测 Worker 启动完成')
 
   httpServer.listen(port, () => {

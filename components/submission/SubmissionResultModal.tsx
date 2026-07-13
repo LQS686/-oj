@@ -15,7 +15,7 @@ import {
   Database,
 } from 'lucide-react'
 import Confetti from './Confetti'
-import { formatTime } from '@/lib/utils'
+import { formatTime, formatMemory } from '@/lib/utils'
 
 export interface TestResultItem {
   testId?: string
@@ -250,12 +250,6 @@ function MetricCard({
       </div>
     </div>
   )
-}
-
-function formatMemory(kb: number): string {
-  if (kb <= 0) return '0MB'
-  if (kb < 1024) return `${kb}KB`
-  return `${(kb / 1024).toFixed(1)}MB`
 }
 
 export default function SubmissionResultModal({

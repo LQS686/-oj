@@ -5,21 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Settings, Save, Mail, Shield, Globe, Send } from 'lucide-react'
-
-interface SystemSettings {
- siteName: string
- siteDescription: string
- allowRegistration: boolean
- allowGuestSubmission: boolean
- defaultLanguage: string
- maxSubmissionSize: number
- smtpHost: string
- smtpPort: number
- smtpUser: string
- smtpFrom: string
- smtpPassword: string
- smtpSecure: boolean
-}
+import type { SystemSettings } from '@/lib/settings'
 
 export default function AdminSettingsPage() {
  const router = useRouter()

@@ -10,6 +10,7 @@ export interface User {
   rank: string | null
   role: string
   solvedCount: number
+  /** 计算字段：由 user/service.ts 统计后追加，非 Prisma schema 字段 */
   acceptedSubmissions: number
   isBanned: boolean
   createdAt: string
@@ -27,11 +28,8 @@ export interface Problem {
   description: string
   input: string
   output: string
-  inputFormat: string | null
-  outputFormat: string | null
   samples: Array<{ input: string; output: string }>
   hint: string | null
-  hints: string | null
   source: string | null
   difficulty: string
   tags: string[]
@@ -62,7 +60,6 @@ export interface Submission {
   problemId: string
   userId: string
   contestId: string | null
-  assignmentId: string | null
   assignmentSubmissionId: string | null
   language: string
   code: string
@@ -81,7 +78,6 @@ export interface Submission {
     message?: string
   }> | null
   submittedAt: string
-  isLate: boolean
   problem?: {
     id: string
     title: string
@@ -153,7 +149,10 @@ export interface Class {
   id: string
   name: string
   description: string | null
+  announcement: string | null
   avatar: string | null
+  isPublic: boolean
+  maxMembers: number
   ownerId: string
   createdAt: string
   updatedAt: string
@@ -174,6 +173,11 @@ export interface Class {
   }
 }
 
+/**
+ * 班级成员（API 响应类型）
+ * 注意：role 为 API 值（owner|assistant|student），DB 存储值为 owner|admin|member
+ * DB 操作请使用 lib/class/auth.ts 的 ClassMembership 接口（含 dbRole 字段）
+ */
 export interface ClassMember {
   id: string
   classId: string

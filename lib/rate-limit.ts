@@ -270,15 +270,29 @@ export function rateLimit(options: RateLimitOptions = {}) {
   };
 }
 
+/**
+ * 受信任的反向代理层数。
+ * 部署在 Nginx 后面时设为 1，Nginx+CDN 时设为 2，依此类推。
+ * 取 X-Forwarded-For 中倒数第 N 个 IP（最接近应用层的代理写入的客户端 IP）。
+ * 环境变量 TRUSTED_PROXIES 未设置时默认 1。
+ */
+const TRUSTED_PROXIES = Math.max(0, parseInt(process.env.TRUSTED_PROXIES || '1', 10) || 0)
+
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
   const realIP = request.headers.get('x-real-ip');
 
   if (forwarded) {
-    const ips = forwarded.split(',').map(ip => ip.trim());
-    return ips[0] || 'unknown';
+    const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
+    if (ips.length > 0) {
+      // 取倒数第 N 个 IP（N=受信任代理层数），这是最近一个受信任代理写入的客户端 IP
+      // 攻击者伪造的 IP 在首段，会被受信任代理追加的真实 IP 覆盖
+      const idx = Math.max(0, ips.length - TRUSTED_PROXIES)
+      return ips[idx] || 'unknown';
+    }
   }
 
+  // X-Real-IP 通常由最近的反向代理写入，已覆盖客户端伪造值
   if (realIP) {
     return realIP;
   }

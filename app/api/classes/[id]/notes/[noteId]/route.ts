@@ -21,6 +21,7 @@ import {
   updateClassNoteFields,
   deleteClassNoteSimple,
 } from '@/lib/class/service'
+import { isClassAdminRole } from '@/lib/class/roles'
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const { id, noteId } = ctx.params
@@ -75,7 +76,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 
   const isAuthor = safeNote.authorId === user.id
   const member = await getCurrentClassMember(id, user.id)
-  const isAdmin = !!(member && (member.role === 'owner' || member.role === 'admin'))
+  const isAdmin = !!(member && isClassAdminRole(member.role))
   if (!isAuthor && !isAdmin) throw403('只有作者或管理员可以编辑笔记')
 
   const updateData: { title?: string; content?: string; category?: string; tags?: string[] } = {}
@@ -100,7 +101,7 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
 
   const isAuthor = safeNote.authorId === user.id
   const member = await getCurrentClassMember(id, user.id)
-  const isAdmin = !!(member && (member.role === 'owner' || member.role === 'admin'))
+  const isAdmin = !!(member && isClassAdminRole(member.role))
   if (!isAuthor && !isAdmin) throw403('只有作者或管理员可以删除笔记')
 
   await deleteClassNoteSimple(noteId)

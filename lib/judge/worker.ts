@@ -178,11 +178,14 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
   }
 })
 
-// 启动时扫描 DB 中 status='Judging' 的 submission 重新入队（重启恢复）
+// 启动时扫描 DB 中 status='Judging' 或 'Pending' 的 submission 重新入队（重启恢复）
+// 注：submitCode 创建提交时 status='Pending'，评测中仅在内存 JudgeResult 中为 'Judging'（不写 DB），
+// 评测完成后直接写最终状态（AC/WA/TLE...）。因此 Worker 崩溃后，DB 中残留的是 'Pending'（未开始）
+// 或 'Judging'（历史兼容）。两者都需恢复。
 async function recoverPendingJobs() {
   try {
     const pendingSubmissions = await prisma.submission.findMany({
-      where: { status: 'Judging' },
+      where: { status: { in: ['Judging', 'Pending'] } },
       include: { problem: { include: { testCases: true } } },
     })
     if (pendingSubmissions.length === 0) {

@@ -1,12 +1,12 @@
 import { logger } from '../logger';
 
-interface ApiError {
+interface ClientApiError {
   message: string;
   code?: string;
   details?: any;
 }
 
-interface ApiResponse<T> {
+interface ClientApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
@@ -93,7 +93,7 @@ class ApiClient {
           // 无法解析JSON，使用默认错误信息
         }
 
-        const error: ApiError = {
+        const error: ClientApiError = {
           message: errorMessage,
           code: errorCode,
         };
@@ -102,11 +102,11 @@ class ApiClient {
 
       const text = await response.text()
 
-      let data: ApiResponse<T>
+      let data: ClientApiResponse<T>
       try {
         data = JSON.parse(text)
       } catch {
-        const parseError: ApiError = {
+        const parseError: ClientApiError = {
           message: `服务器响应解析失败 (${response.status})`,
           code: 'PARSE_ERROR',
         }
@@ -115,7 +115,7 @@ class ApiClient {
 
       if (!data.success) {
         const errorMessage = typeof data.error === 'string' ? data.error : (data.message || '请求失败');
-        const error: ApiError = {
+        const error: ClientApiError = {
           message: errorMessage,
           code: data.code,
         };
@@ -127,7 +127,7 @@ class ApiClient {
       clearTimeout(timeoutId)
 
       if (error instanceof DOMException && error.name === 'AbortError') {
-        const timeoutError: ApiError = {
+        const timeoutError: ClientApiError = {
           message: '请求超时，请稍后重试',
           code: 'TIMEOUT',
         };
@@ -135,7 +135,7 @@ class ApiClient {
       }
 
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        const networkError: ApiError = {
+        const networkError: ClientApiError = {
           message: '网络连接失败，请检查网络设置',
           code: 'NETWORK_ERROR',
         };
@@ -245,7 +245,7 @@ class ApiClient {
           // 无法解析JSON，使用默认错误信息
         }
 
-        const error: ApiError = {
+        const error: ClientApiError = {
           message: errorMessage,
           code: errorCode,
         };
@@ -254,11 +254,11 @@ class ApiClient {
 
       const text = await response.text()
 
-      let data: ApiResponse<T>
+      let data: ClientApiResponse<T>
       try {
         data = JSON.parse(text)
       } catch {
-        const parseError: ApiError = {
+        const parseError: ClientApiError = {
           message: `服务器响应解析失败 (${response.status})`,
           code: 'PARSE_ERROR',
         }
@@ -267,7 +267,7 @@ class ApiClient {
 
       if (!data.success) {
         const errorMessage = typeof data.error === 'string' ? data.error : (data.message || '上传失败');
-        const error: ApiError = {
+        const error: ClientApiError = {
           message: errorMessage,
           code: data.code,
         };
@@ -279,7 +279,7 @@ class ApiClient {
       clearTimeout(timeoutId)
 
       if (error instanceof DOMException && error.name === 'AbortError') {
-        const timeoutError: ApiError = {
+        const timeoutError: ClientApiError = {
           message: '上传超时，请稍后重试',
           code: 'TIMEOUT',
         };
@@ -287,7 +287,7 @@ class ApiClient {
       }
 
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        const networkError: ApiError = {
+        const networkError: ClientApiError = {
           message: '网络连接失败，请检查网络设置',
           code: 'NETWORK_ERROR',
         };
@@ -309,19 +309,12 @@ class ApiClient {
 
 export const apiClient = new ApiClient();
 
-export function getAuthHeaders(): Record<string, string> {
-  // Token 由后端通过 httpOnly cookie 设置，fetch 使用 credentials: 'include' 自动携带。
-  // 不再从 localStorage 读取 token（避免 XSS 窃取）。
-  return {}
-}
-
-export async function fetchWithAuth(
+export async function fetchWithCookie(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
-    ...getAuthHeaders(),
   }
   return fetch(url, {
     ...options,
@@ -330,4 +323,7 @@ export async function fetchWithAuth(
   })
 }
 
-export type { ApiError, ApiResponse };
+/**
+ * @deprecated 请使用 fetchWithCookie 替代（cookie 模式不再需要 Authorization 头，命名更准确）
+ */
+export const fetchWithAuth = fetchWithCookie

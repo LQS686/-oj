@@ -9,14 +9,6 @@
 /** 系统支持的 4 个固定角色 */
 export type RoleCode = 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT'
 
-export interface User {
-  id: string
-  username: string
-  email: string
-  role?: string
-  [key: string]: any
-}
-
 /** 角色判定的最小入参类型（仅需 role 字段） */
 export interface RoleUser {
   id?: string
@@ -35,12 +27,14 @@ export function isAdmin(user: RoleUser | null): boolean {
   return user.role === 'ADMIN'
 }
 
+/** @internal 仅供测试使用 */
 /** 是否为教师（TEACHER） */
 export function isTeacher(user: RoleUser | null): boolean {
   if (!user) return false
   return user.role === 'TEACHER'
 }
 
+/** @internal 仅供测试使用 */
 /** 是否为学生（STUDENT） */
 export function isStudent(user: RoleUser | null): boolean {
   if (!user) return false
@@ -52,6 +46,7 @@ export function canAccessAdmin(user: RoleUser | null): boolean {
   return isSystemAdmin(user) || isAdmin(user)
 }
 
+/** @internal 仅供测试使用 */
 /** 是否可管理系统设置（仅 SYSTEM_ADMIN） */
 export function canManageSystemSettings(user: RoleUser | null): boolean {
   return isSystemAdmin(user)
@@ -81,6 +76,7 @@ export function getRoleLabel(role?: string): string {
   return '用户'
 }
 
+/** @internal 仅供测试使用 */
 /** 角色 Tag 颜色类名 */
 export function getRoleColor(role?: string): string {
   if (role === 'SYSTEM_ADMIN') return 'tag-error'

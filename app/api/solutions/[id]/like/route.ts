@@ -17,10 +17,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
 
   try {
     const result = await toggleSolutionLike(id, isAssignmentContext, user.id, viewer)
-    return ok({
-      data: result,
-      message: result.liked ? '点赞成功' : '已取消点赞',
-    })
+    return ok(result)
   } catch (err: any) {
     logger.error('切换题解点赞失败', err)
     if (err?.status === 403) {

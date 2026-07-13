@@ -22,7 +22,7 @@ export interface ClassMember {
   id: string
   userId: string
   classId: string
-  role: 'teacher' | 'assistant' | 'student'
+  role: 'owner' | 'assistant' | 'student'
   joinedAt: string
   user?: {
     id: string

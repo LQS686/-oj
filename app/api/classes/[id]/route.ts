@@ -69,7 +69,7 @@ export const GET = withApi.public(async (req, ctx) => {
     let av: any, bv: any
     switch (q.sortBy) {
       case 'role': {
-        const order: any = { owner: 3, admin: 2, member: 1 }
+        const order: any = { owner: 3, assistant: 2, student: 1 }
         av = order[a.role] || 0
         bv = order[b.role] || 0
         break

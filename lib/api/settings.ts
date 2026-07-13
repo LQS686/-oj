@@ -1,13 +1,5 @@
 import { apiClient } from './base';
-
-interface SystemSettings {
-  siteName: string;
-  siteDescription: string;
-  allowRegistration: boolean;
-  allowGuestSubmission: boolean;
-  defaultLanguage: string;
-  maxSubmissionSize: number;
-}
+import type { SystemSettings } from '@/lib/settings';
 
 export const settingsApi = {
   async getPublicSettings(): Promise<SystemSettings> {

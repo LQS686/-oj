@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { getProviderMeta, inferModelType, validateAiBaseUrl, type ProviderMeta } from './providers'
+import { validateAiBaseUrlDns } from './providers-dns'
 import { ApiError } from '@/lib/api/withApi'
 import { decrypt } from '@/lib/crypto'
 
@@ -43,6 +44,7 @@ async function fetchOpenAICompatibleModels(
 ): Promise<DiscoveredModel[]> {
   // SSRF 防护：校验 baseUrl 不指向内网/元数据端点
   validateAiBaseUrl(baseUrl)
+  await validateAiBaseUrlDns(baseUrl)
   const url = `${baseUrl.replace(/\/+$/, '')}/models`
   const res = await fetch(url, {
     method: 'GET',

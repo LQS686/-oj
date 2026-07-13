@@ -206,7 +206,7 @@ export const withApi = {
    * 班级角色鉴权
    */
   classRole(
-    allowedRoles: Array<'teacher' | 'assistant' | 'student'>,
+    allowedRoles: Array<'owner' | 'assistant' | 'student'>,
     handler: (req: NextRequest, ctx: ApiContext, context: ClassContext) => Promise<Response | unknown> | Response | unknown
   ) {
     return async (req: NextRequest, ctx: ApiContext) => {

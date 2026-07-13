@@ -38,6 +38,14 @@ $mirrors = @(
     @{ Name = "Nginx"; Image = "docker.1ms.run/library/nginx:1.25-alpine" }
 )
 
+# 评测镜像（USE_DOCKER=true 时需要，首次评测前预拉取避免超时）
+$judgeImages = @(
+    @{ Name = "GCC (C/C++)"; Image = "gcc:12" },
+    @{ Name = "OpenJDK (Java)"; Image = "openjdk:17" },
+    @{ Name = "Python"; Image = "python:3.11" },
+    @{ Name = "Node (JavaScript)"; Image = "node:18" }
+)
+
 foreach ($item in $mirrors) {
     Write-Host "  拉取 $($item.Name)..." -NoNewline
     try {
@@ -49,6 +57,22 @@ foreach ($item in $mirrors) {
         }
     } catch {
         Write-Host " ⚠️" -ForegroundColor Yellow
+    }
+}
+
+Write-Host ""
+Write-Host "  拉取评测镜像（首次评测前预拉取，避免超时）..." -ForegroundColor Cyan
+foreach ($item in $judgeImages) {
+    Write-Host "  拉取 $($item.Name)..." -NoNewline
+    try {
+        docker pull $item.Image 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host " ✅" -ForegroundColor Green
+        } else {
+            Write-Host " ⚠️ (USE_DOCKER=true 时必需)" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host " ⚠️ (USE_DOCKER=true 时必需)" -ForegroundColor Yellow
     }
 }
 

@@ -2,14 +2,18 @@ import { execSync, spawn } from 'child_process'
 import { writeFile, unlink } from 'fs/promises'
 import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { join } from 'path'
+import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 
 const USE_DOCKER = process.env.USE_DOCKER === 'true' || false
 
 // VULN-04 修复：Windows 本地评测无沙箱隔离，仅允许在显式确认的开发环境使用。
 // 生产环境必须启用 USE_DOCKER=true。模块加载时一次性告警，避免每次评测刷日志。
-if (!USE_DOCKER && process.platform === 'win32' && process.env.NODE_ENV !== 'production') {
-  logger.warn('⚠️ [安全] Windows 开发环境使用本地进程评测，无 Docker 沙箱隔离。生产环境必须设置 USE_DOCKER=true。设置 ALLOW_LOCAL_JUDGE_ON_WINDOWS=1 可显式确认此风险。')
+if (!USE_DOCKER && process.platform === 'win32') {
+  if (process.env.ALLOW_LOCAL_JUDGE_ON_WINDOWS !== '1') {
+    throw new Error('Windows 本地评测需要在 .env 中设置 ALLOW_LOCAL_JUDGE_ON_WINDOWS=1 以显式确认风险。生产环境请设置 USE_DOCKER=true')
+  }
+  logger.warn('⚠️ [安全] Windows 本地进程评测已显式确认 (ALLOW_LOCAL_JUDGE_ON_WINDOWS=1)，无 Docker 沙箱隔离。生产环境必须设置 USE_DOCKER=true。')
 }
 
 export interface ExecuteOptions {
@@ -142,7 +146,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
   const tempDir = join(process.cwd(), 'temp', 'judge')
   const timestamp = Date.now()
-  const randomId = Math.random().toString(36).substring(7)
+  const randomId = crypto.randomBytes(8).toString('hex')
   const inputPath = join(tempDir, `input_${timestamp}_${randomId}.txt`)
   const outputPath = join(tempDir, `output_${timestamp}_${randomId}.txt`)
   const errorPath = join(tempDir, `error_${timestamp}_${randomId}.txt`)
@@ -175,6 +179,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       const containerId = `judge_${timestamp}_${randomId}`
       const baseImage = getDockerImage(language)
       const statsPath = join(tempDir, `stats_${timestamp}_${randomId}.txt`)
+
+      // 首次评测前确保镜像已拉取，避免 docker run 隐式拉取被 hardTimeoutMs 杀死
+      await ensureDockerImage(baseImage)
 
       // 内层命令：选手程序 stdout+stderr → output 文件
       const innerCmd = `cd /app/temp && ${getDockerRunCommand(language, compiledPath, inputPath)} > output_${timestamp}_${randomId}.txt 2>&1`
@@ -683,6 +690,44 @@ function getDockerImage(language: string): string {
     javascript: 'node:18',
   }
   return images[language] || 'ubuntu:22.04'
+}
+
+/**
+ * 已拉取的 Docker 镜像缓存（避免每次评测都执行 docker image inspect）
+ * 首次评测时镜像不存在 → 触发 docker pull（允许长达 5 分钟）
+ * 后续评测直接跳过检查，无额外开销
+ */
+const pulledImages = new Set<string>()
+
+/**
+ * 确保 Docker 评测镜像已存在本地，不存在则拉取。
+ * 首次评测超时的主要根因：docker run 触发隐式拉取，但 spawn 超时仅 hardTimeoutMs（~1.2s），
+ * 远不足以拉取数百 MB 镜像。本函数将"拉取"与"执行"分离，拉取使用独立的长超时。
+ */
+async function ensureDockerImage(image: string): Promise<void> {
+  if (pulledImages.has(image)) return
+
+  // 检查镜像是否已存在
+  try {
+    execSync(`docker image inspect ${image}`, { stdio: 'ignore', timeout: 5000 })
+    pulledImages.add(image)
+    logger.info(`Docker 镜像已存在`, { image })
+    return
+  } catch {
+    // 镜像不存在，继续拉取
+  }
+
+  logger.info(`Docker 镜像不存在，开始拉取`, { image })
+  try {
+    execSync(`docker pull ${image}`, {
+      stdio: 'inherit',
+      timeout: 300_000, // 5 分钟，足以拉取 ~1.2GB 镜像
+    })
+    pulledImages.add(image)
+    logger.info(`Docker 镜像拉取完成`, { image })
+  } catch (err) {
+    throw new Error(`Docker 镜像拉取失败: ${image} - ${err instanceof Error ? err.message : String(err)}`)
+  }
 }
 
 function getDockerRunCommand(language: string, compiledPath: string, inputPath: string): string {

@@ -34,7 +34,7 @@ export async function getGlobalRanking(limit = 100): Promise<RankingItem[]> {
       },
     })
     return Promise.all(users.map(async (u: any, idx: any) => {
-      const solved = await prisma.submission.count({ where: { userId: u.id, status: 'ACCEPTED' } })
+      const solved = await prisma.submission.count({ where: { userId: u.id, status: 'AC' } })
       return {
         rank: idx + 1,
         userId: u.id,
@@ -70,7 +70,7 @@ export async function getClassRanking(classId: string, limit = 100): Promise<Ran
     members.sort((a: any, b: any) => (b.user.rating || 0) - (a.user.rating || 0))
     return Promise.all(members.map(async (m: any, idx: any) => {
       const solved = await prisma.submission.count({
-        where: { userId: m.user.id, status: 'ACCEPTED' },
+        where: { userId: m.user.id, status: 'AC' },
       })
       return {
         rank: idx + 1,

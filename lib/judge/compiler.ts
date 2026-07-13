@@ -4,6 +4,7 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 import { CompileState } from './types'
 
@@ -92,7 +93,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
   }
 
   const timestamp = Date.now()
-  const randomId = Math.random().toString(36).substring(7)
+  const randomId = crypto.randomBytes(8).toString('hex')
   const filename = `solution_${timestamp}_${randomId}`
 
   // Java: 解析主类名作为源文件名，javac 据此产出 {className}.class

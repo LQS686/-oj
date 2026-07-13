@@ -190,7 +190,6 @@ class SolutionQueue extends EventEmitter {
             content: result.content,
             code: job.data.params.stdCode || null,
             codeLanguage: job.data.params.stdLang || result.language || null,
-            language: job.data.params.stdLang || result.language || null,
             isOfficial: true,
             isAiGenerated: true,
             sourceType: 'AI_OFFICIAL'

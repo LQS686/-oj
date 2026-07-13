@@ -5,16 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { fetchWithAuth } from '@/lib/api/base'
 import { EducationalPageShell, PageLoading } from '@/components/common'
-
-interface Notification {
- id: string
- type: string
- title: string
- content: string
- link: string | null
- isRead: boolean
- createdAt: string
-}
+import type { Notification } from '@/types/models'
 
 export default function NotificationsPage() {
  const router = useRouter()

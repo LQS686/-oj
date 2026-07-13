@@ -203,6 +203,9 @@ export function inferModelType(modelId: string): ModelType {
 /**
  * SSRF 防护：校验 AI 服务商 baseUrl 不指向内网/元数据端点。
  * 阻止管理员误配或恶意配置导致服务端请求伪造（SSRF）。
+ *
+ * 注意：此函数为同步校验，拦截字符串形式的内网地址和非标准 IP 编码。
+ * 对于 DNS Rebinding 攻击（域名解析到内网），请额外调用 validateAiBaseUrlDns（位于 ./providers-dns）。
  */
 export function validateAiBaseUrl(baseUrl: string): void {
   let parsed: URL
@@ -223,12 +226,26 @@ export function validateAiBaseUrl(baseUrl: string): void {
     throw new Error('baseUrl 不允许指向 localhost')
   }
 
+  // 拒绝非标准 IP 编码（十进制/十六进制/八进制），防止绕过 IPv4 检查
+  // 例如：2130706433(=127.0.0.1)、0x7f000001(=127.0.0.1)、0177.0.0.1(=127.0.0.1)
+  if (/^\d+$/.test(host) && !host.includes('.')) {
+    throw new Error(`baseUrl 不允许使用十进制 IP 编码: ${host}`)
+  }
+  if (host.startsWith('0x') || host.includes('0x')) {
+    throw new Error(`baseUrl 不允许使用十六进制 IP 编码: ${host}`)
+  }
+
   // IPv4 检查
   const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
   if (ipv4Match) {
     const octets = ipv4Match.slice(1).map(Number)
     if (octets.some((o) => o > 255)) {
       throw new Error(`无效的 IPv4 地址: ${host}`)
+    }
+    // 拒绝八进制编码：以 0 开头且长度 > 1 的八位组（如 0177 = 127）
+    const octetStrings = ipv4Match.slice(1)
+    if (octetStrings.some((s) => s.length > 1 && s.startsWith('0'))) {
+      throw new Error(`baseUrl 不允许使用八进制 IP 编码: ${host}`)
     }
     const [a, b] = octets
     if (
@@ -252,4 +269,5 @@ export function validateAiBaseUrl(baseUrl: string): void {
     throw new Error(`baseUrl 不允许指向内网地址: ${host}`)
   }
 }
+
 

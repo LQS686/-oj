@@ -1,21 +1,9 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { authApi } from '@/lib/api'
+import { authApi, type UserData } from '@/lib/api'
 
-interface User {
-  id: string
-  username: string
-  email: string
-  nickname?: string
-  avatar?: string
-  bio?: string
-  rating: number
-  rank: string
-  color: string
-  role: string
-  createdAt: string
-}
+type User = UserData
 
 interface UserContextType {
   user: User | null
@@ -37,7 +25,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setIsInitialized(true)
       return
     }
-    
+
     const verifyUser = async () => {
       try {
         const userData = await authApi.getCurrentUser()
@@ -48,7 +36,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setIsInitialized(true)
       }
     }
-    
+
     verifyUser()
   }, [])
 

@@ -4,7 +4,7 @@ FROM docker.1ms.run/library/node:20-alpine AS builder
 WORKDIR /app
 
 # 设置构建时环境变量（仅构建时使用，不写入镜像层）
-ARG JWT_SECRET=build-time-secret-key
+ARG JWT_SECRET
 ARG DATABASE_URL=mongodb://localhost:27017/oj_platform
 ENV NEXT_PHASE=phase-production-build
 ENV JWT_SECRET=${JWT_SECRET}

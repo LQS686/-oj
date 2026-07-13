@@ -1,13 +1,5 @@
 import { apiClient } from './base';
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
-  type: string;
-}
+import type { Notification } from '@/types/models';
 
 interface NotificationResponse {
   notifications: Notification[];

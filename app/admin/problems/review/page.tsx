@@ -10,10 +10,7 @@ import {
  Loader2, Eye, EyeOff, Send, RefreshCw
 } from 'lucide-react'
 import Link from 'next/link'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import MarkdownContent from '@/components/common/MarkdownContent'
 import { DIFFICULTIES, DIFFICULTY_COLORS } from '@/lib/constants'
 
 interface TestCase {
@@ -456,23 +453,7 @@ export default function ProblemReviewPage() {
  </div>
 
  <div className="prose prose-invert prose-slate max-w-none">
- <ReactMarkdown
- remarkPlugins={[remarkGfm]}
- components={{
- code({ node, inline, className, children, ...props }: any) {
- const match = /language-(\w+)/.exec(className || '')
- return !inline && match ? (
- <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
- {String(children).replace(/\n$/, '')}
- </SyntaxHighlighter>
- ) : (
- <code className="bg-muted px-1.5 py-0.5 rounded text-pink-400" {...props}>{children}</code>
- )
- }
- }}
- >
- {currentProblem.description}
- </ReactMarkdown>
+ <MarkdownContent content={currentProblem.description} />
  </div>
 
  <div className="grid grid-cols-2 gap-4">

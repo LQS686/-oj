@@ -270,7 +270,7 @@ model ClassMember {
   class     Class    @relation(fields: [classId], references: [id])
   userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  role      String   // DB 实际存储：owner | admin | member（API 层通过 lib/class/roles.ts 双映射暴露为 owner | assistant | student）
+  role      String   // owner | assistant | student
   remark    String?  // 成员备注
 
   // 细粒度权限控制
@@ -426,9 +426,9 @@ model Solution {
   author        User      @relation(fields: [authorId], references: [id])
   title         String
   content       String
-  language      String?   // [已废弃] 兼容旧字段：题解配套代码语言，新代码应使用 codeLanguage。迁移完成后可删除
-  code          String?   // [已废弃] 兼容旧字段：题解配套代码
-  codeLanguage  String?   // 推荐字段：与 code 配对的语言（语义更清晰）
+  language      String?   // 冗余字段，新代码不再写入，保留兼容旧数据
+  code          String?   // 题解配套代码
+  codeLanguage  String?   // 题解配套代码语言（语义更清晰的别名，与 language 保持同步）
   views         Int       @default(0)
   likes         Int       @default(0)
   isOfficial    Boolean   @default(false)            // 是否标程题解（置顶展示）
@@ -497,7 +497,7 @@ model Training {
   id            String            @id @default(auto()) @map("_id") @db.ObjectId
   title         String
   description   String
-  difficulty    String?           // 已废弃，保留为可选（兼容老数据）
+  difficulty    String?           // 题单难度（可选，用于筛选和展示）
   categoryType  String?           // 'official' 官方 | 'contest' 竞赛/考级
   isPublic      Boolean           @default(true)
   status        String            @default("published") // draft / published / archived
@@ -660,7 +660,8 @@ model AiGenerationLog {
   @@index([createdAt])
 }
 
-// AI模型配置 (Deprecated: Use AiProvider and AiModel instead)
+// AI模型配置（全局思考模型设置存储，被 AiProvider/AiModel 的混合配置方案使用）
+// 新模型选择走 AiProvider+AiModel，但 thinking 相关设置仍依赖此表存储
 model AiModelConfig {
   id                String   @id @default(auto()) @map("_id") @db.ObjectId
   userId            String?  @db.ObjectId // 关联用户，为空则为全局配置

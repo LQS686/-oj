@@ -15,6 +15,7 @@ import {
 } from '@/lib/validation'
 import { escapeHtml } from '@/lib/sanitize'
 import { clearAuthUserCache } from '@/lib/api/handler'
+import { isSystemAdmin, isAdmin } from '@/lib/permissions'
 
 export interface UserProfile {
   id: string
@@ -50,7 +51,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 export async function getUserStats(userId: string) {
   return cache.get('user:stats', [userId], async () => {
     const [solved, submissions, contests] = await Promise.all([
-      prisma.submission.count({ where: { userId, status: 'ACCEPTED' } }),
+      prisma.submission.count({ where: { userId, status: 'AC' } }),
       prisma.submission.count({ where: { userId } }),
       prisma.contestParticipant.count({ where: { userId } }),
     ])
@@ -188,7 +189,7 @@ export async function getUserFullStats(userId: string) {
 
   // AC 提交
   const acSubmissions = submissions.filter(
-    (sub: any) => sub.status === 'AC' || sub.status === 'Accepted'
+    (sub: any) => sub.status === 'AC'
   )
 
   // 难度分布（AC 唯一题）
@@ -220,7 +221,7 @@ export async function getUserFullStats(userId: string) {
   // AC 题目去重
   const acProblems = new Set(
     submissions
-      .filter((sub: SubmissionData) => sub.status === 'AC' || sub.status === 'Accepted')
+      .filter((sub: SubmissionData) => sub.status === 'AC')
       .map((sub: SubmissionData) => sub.problemId)
   )
 
@@ -275,12 +276,12 @@ export async function getUserFullStats(userId: string) {
     user,
     submissions: {
       total: submissions.length,
-      accepted: statusCount['AC'] || statusCount['Accepted'] || 0,
-      wrongAnswer: statusCount['WA'] || statusCount['Wrong Answer'] || 0,
-      timeLimitExceeded: statusCount['TLE'] || statusCount['Time Limit Exceeded'] || 0,
-      memoryLimitExceeded: statusCount['MLE'] || statusCount['Memory Limit Exceeded'] || 0,
-      runtimeError: statusCount['RE'] || statusCount['Runtime Error'] || 0,
-      compileError: statusCount['CE'] || statusCount['Compile Error'] || 0,
+      accepted: statusCount['AC'] || 0,
+      wrongAnswer: statusCount['WA'] || 0,
+      timeLimitExceeded: statusCount['TLE'] || 0,
+      memoryLimitExceeded: statusCount['MLE'] || 0,
+      runtimeError: statusCount['RE'] || 0,
+      compileError: statusCount['CE'] || 0,
       pending: statusCount['Pending'] || 0,
       statusCount,
     },
@@ -908,8 +909,8 @@ const ASSIGNABLE_ROLES = ['ADMIN', 'TEACHER', 'STUDENT']
  * - ADMIN 只能赋予 TEACHER / STUDENT（不能管理其他管理员）
  */
 export function getAssignableRoles(operatorRole: string | undefined | null): string[] {
-  if (operatorRole === 'SYSTEM_ADMIN') return ASSIGNABLE_ROLES
-  if (operatorRole === 'ADMIN') return ['TEACHER', 'STUDENT']
+  if (isSystemAdmin({ role: operatorRole })) return ASSIGNABLE_ROLES
+  if (isAdmin({ role: operatorRole })) return ['TEACHER', 'STUDENT']
   return []
 }
 
@@ -1004,14 +1005,14 @@ export async function assertCanUpdateUser(
     err.code = 'NOT_FOUND'
     throw err
   }
-  if (target.role === 'SYSTEM_ADMIN') {
+  if (isSystemAdmin(target)) {
     const err: any = new Error('超级管理员不可被修改')
     err.status = 403
     err.code = 'FORBIDDEN'
     throw err
   }
   // 管理员不能管理其他管理员
-  if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
+  if (isAdmin({ role: operatorRole }) && isAdmin(target)) {
     const err: any = new Error('管理员不能管理其他管理员')
     err.status = 403
     err.code = 'FORBIDDEN'
@@ -1044,14 +1045,14 @@ export async function assertCanDeleteUser(
     err.code = 'NOT_FOUND'
     throw err
   }
-  if (target.role === 'SYSTEM_ADMIN') {
+  if (isSystemAdmin(target)) {
     const err: any = new Error('超级管理员不可被删除')
     err.status = 403
     err.code = 'FORBIDDEN'
     throw err
   }
   // 管理员不能管理其他管理员
-  if (operatorRole === 'ADMIN' && target.role === 'ADMIN') {
+  if (isAdmin({ role: operatorRole }) && isAdmin(target)) {
     const err: any = new Error('管理员不能管理其他管理员')
     err.status = 403
     err.code = 'FORBIDDEN'
@@ -1143,7 +1144,7 @@ export async function filterUserIdsForBatchAction(
     throw err
   }
   // 跳过超级管理员；ADMIN 操作时还要跳过其他管理员
-  const protectedRoles = operatorRole === 'ADMIN' ? ['SYSTEM_ADMIN', 'ADMIN'] : ['SYSTEM_ADMIN']
+  const protectedRoles = isAdmin({ role: operatorRole }) ? ['SYSTEM_ADMIN', 'ADMIN'] : ['SYSTEM_ADMIN']
   const protectedUsers = await prisma.user.findMany({
     where: { id: { in: filtered }, role: { in: protectedRoles } },
     select: { id: true },

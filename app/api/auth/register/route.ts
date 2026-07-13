@@ -86,7 +86,7 @@ export const POST = withApi.public(async (req) => {
 
   response.cookies.set('token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.FORCE_SECURE_COOKIE === 'true' || process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60,
   })

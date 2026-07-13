@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        JWT_SECRET: ${JWT_SECRET:-build-placeholder-not-used-at-runtime}
     image: oj-platform:app
     ports:
       - "3000:3000"
@@ -13,7 +15,7 @@ services:
       - DATABASE_URL=mongodb://${MONGO_APP_USER:-ojuser}:${MONGO_APP_PASSWORD:?err}@mongo:27017/oj_platform?authSource=oj_platform&replicaSet=rs0
       - JWT_SECRET=${JWT_SECRET:?err}
       - AI_CONFIG_ENCRYPTION_KEY=${AI_CONFIG_ENCRYPTION_KEY:?err}
-      - USE_DOCKER=true
+      - USE_DOCKER=false
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - PORT=3000
       - REDIS_URL=redis://:${REDIS_PASSWORD:?err}@redis:6379

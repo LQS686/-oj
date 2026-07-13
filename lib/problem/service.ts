@@ -55,7 +55,7 @@ export async function listProblems(
   if (filter.difficulty) where.difficulty = filter.difficulty
   if (filter.isPublic !== undefined) where.isPublic = filter.isPublic
   if (filter.categoryId) where.categoryId = filter.categoryId
-  if (filter.tagIds?.length) where.tags = { some: { tagId: { in: filter.tagIds } } }
+  if (filter.tagIds?.length) where.tags = { hasSome: filter.tagIds }
 
   const [items, total] = await Promise.all([
     prisma.problem.findMany({

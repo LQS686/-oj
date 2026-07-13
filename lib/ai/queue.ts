@@ -666,7 +666,6 @@ class AiQueue extends EventEmitter {
                         content: article,
                         code: code || null,
                         codeLanguage: codeLanguage || null,
-                        language: codeLanguage || null,
                         isOfficial: true,
                         isAiGenerated: true,
                         sourceType: 'AI_OFFICIAL'

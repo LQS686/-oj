@@ -292,6 +292,7 @@ export async function upsertUserAiPreference(input: {
 
 import { encrypt, decrypt, maskApiKey } from '@/lib/crypto'
 import { resolveBaseUrl, getProviderMeta, validateAiBaseUrl } from '@/lib/ai/providers'
+import { validateAiBaseUrlDns } from '@/lib/ai/providers-dns'
 import { OpenAI } from 'openai'
 
 /* ---------- Provider ---------- */
@@ -329,6 +330,11 @@ export async function createAiProvider(input: {
   }
   const meta = getProviderMeta(input.slug)
   const finalBaseUrl = input.baseUrl || (meta ? meta.baseUrl : null)
+
+  if (finalBaseUrl) {
+    validateAiBaseUrl(finalBaseUrl)
+    await validateAiBaseUrlDns(finalBaseUrl)
+  }
 
   let encryptedKey: string | null = null
   if (input.apiKey) {
@@ -382,6 +388,10 @@ export async function updateAiProvider(
     data.apiKey = encrypt(input.apiKey)
   } else if (input.apiKey === '') {
     data.apiKey = null
+  }
+  if (input.baseUrl) {
+    validateAiBaseUrl(input.baseUrl)
+    await validateAiBaseUrlDns(input.baseUrl)
   }
   const provider = await prisma.aiProvider.update({ where: { id }, data })
 
@@ -546,7 +556,7 @@ export async function getGlobalAiConfig() {
   return { data: null, totalTokens: tokenStats._sum.tokensUsed || 0 }
 }
 
-/** 写入管理员 AI 全局配置（敏感字段加密） */
+/** 写入管理员 AI 全局配置（敏感字段加密，事务保证原子性） */
 export async function upsertGlobalAiConfig(input: {
   provider: string
   model: string
@@ -559,55 +569,55 @@ export async function upsertGlobalAiConfig(input: {
   thinkingBaseUrl?: string
   thinkingLevel?: number
 }) {
-  const existingConfig = await prisma.aiModelConfig.findFirst({ where: { scope: 'GLOBAL' } })
-
-  let finalApiKey = existingConfig?.apiKey || ''
-  if (input.apiKey && !/^\*{3,}$/.test(input.apiKey)) {
-    finalApiKey = encrypt(input.apiKey)
-  } else if (input.apiKey === '') {
-    finalApiKey = ''
+  if (input.baseUrl) {
+    validateAiBaseUrl(input.baseUrl)
+    await validateAiBaseUrlDns(input.baseUrl)
   }
-
-  let finalThinkingApiKey = existingConfig?.thinkingApiKey || ''
-  if (input.thinkingApiKey && !/^\*{3,}$/.test(input.thinkingApiKey)) {
-    finalThinkingApiKey = encrypt(input.thinkingApiKey)
-  } else if (input.thinkingApiKey === '') {
-    finalThinkingApiKey = ''
+  if (input.thinkingBaseUrl) {
+    validateAiBaseUrl(input.thinkingBaseUrl)
+    await validateAiBaseUrlDns(input.thinkingBaseUrl)
   }
+  await prisma.$transaction(async (tx) => {
+    const existingConfig = await tx.aiModelConfig.findFirst({ where: { scope: 'GLOBAL' } })
 
-  if (existingConfig) {
-    await prisma.aiModelConfig.update({
-      where: { id: existingConfig.id },
-      data: {
-        provider: input.provider,
-        model: input.model,
-        apiKey: finalApiKey,
-        baseUrl: input.baseUrl,
-        enableThinking: input.enableThinking || false,
-        thinkingProvider: input.thinkingProvider,
-        thinkingModel: input.thinkingModel,
-        thinkingApiKey: finalThinkingApiKey,
-        thinkingBaseUrl: input.thinkingBaseUrl,
-        thinkingLevel: input.thinkingLevel || 3,
-      },
-    })
-  } else {
-    await prisma.aiModelConfig.create({
-      data: {
-        scope: 'GLOBAL',
-        provider: input.provider,
-        model: input.model,
-        apiKey: finalApiKey,
-        baseUrl: input.baseUrl,
-        enableThinking: input.enableThinking || false,
-        thinkingProvider: input.thinkingProvider,
-        thinkingModel: input.thinkingModel,
-        thinkingApiKey: finalThinkingApiKey,
-        thinkingBaseUrl: input.thinkingBaseUrl,
-        thinkingLevel: input.thinkingLevel || 3,
-      },
-    })
-  }
+    let finalApiKey = existingConfig?.apiKey || ''
+    if (input.apiKey && !/^\*{3,}$/.test(input.apiKey)) {
+      finalApiKey = encrypt(input.apiKey)
+    } else if (input.apiKey === '') {
+      finalApiKey = ''
+    }
+
+    let finalThinkingApiKey = existingConfig?.thinkingApiKey || ''
+    if (input.thinkingApiKey && !/^\*{3,}$/.test(input.thinkingApiKey)) {
+      finalThinkingApiKey = encrypt(input.thinkingApiKey)
+    } else if (input.thinkingApiKey === '') {
+      finalThinkingApiKey = ''
+    }
+
+    const data = {
+      provider: input.provider,
+      model: input.model,
+      apiKey: finalApiKey,
+      baseUrl: input.baseUrl,
+      enableThinking: input.enableThinking || false,
+      thinkingProvider: input.thinkingProvider,
+      thinkingModel: input.thinkingModel,
+      thinkingApiKey: finalThinkingApiKey,
+      thinkingBaseUrl: input.thinkingBaseUrl,
+      thinkingLevel: input.thinkingLevel || 3,
+    }
+
+    if (existingConfig) {
+      await tx.aiModelConfig.update({
+        where: { id: existingConfig.id },
+        data,
+      })
+    } else {
+      await tx.aiModelConfig.create({
+        data: { scope: 'GLOBAL', ...data },
+      })
+    }
+  })
 }
 
 /* ---------- 连通性测试 ---------- */
@@ -672,6 +682,7 @@ export async function testAiConnection(input: TestConnectionInput) {
   if (finalBaseUrl) {
     try {
       validateAiBaseUrl(finalBaseUrl)
+      await validateAiBaseUrlDns(finalBaseUrl)
     } catch (e: any) {
       throw new ApiError('INVALID_BASE_URL', e?.message || 'baseUrl 校验失败', 400)
     }

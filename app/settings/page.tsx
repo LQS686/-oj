@@ -141,7 +141,7 @@ export default function SettingsPage() {
  const updatedUser = { ...user, ...data.data }
  setUserLocal(updatedUser)
  setUser(updatedUser)
- localStorage.setItem('user', JSON.stringify(updatedUser))
+ localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar, role: updatedUser.role }))
  } else {
  showMessage('error', data.error || '更新失败')
  }
@@ -330,7 +330,7 @@ export default function SettingsPage() {
  const updatedUser = { ...user, email: data.newEmail }
  setUserLocal(updatedUser)
  setUser(updatedUser)
- localStorage.setItem('user', JSON.stringify(updatedUser))
+ localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar, role: updatedUser.role }))
  setEmailChange({
  newEmail: '',
  currentPassword: '',
@@ -446,7 +446,7 @@ export default function SettingsPage() {
  const updatedUser = { ...user, avatar: newUrl }
  setUserLocal(updatedUser)
  setUser(updatedUser)
- localStorage.setItem('user', JSON.stringify(updatedUser))
+ localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar, role: updatedUser.role }))
  showMessage('success', '头像更新成功')
  }}
  />

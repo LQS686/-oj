@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { trimAll, escapeHtml, removeNullBytes } from '@/lib/sanitize';
 import { validateRequired } from '@/lib/validation';
 import { errorMonitor } from '@/lib/error-monitor';
+import type { LoginResponse } from '@/lib/api/auth';
 
 // 类型定义
 export interface LoginInput {
@@ -31,11 +32,6 @@ export interface UserResponse {
   color: string;
   role: string;
   createdAt: string;
-}
-
-export interface LoginResponse {
-  user: UserResponse;
-  token: string;
 }
 
 // 辅助函数
@@ -131,37 +127,6 @@ class AuthService {
       return { user: userResponse, token };
     } catch (error) {
       errorMonitor.trackError(error as Error, { errorType: 'auth', operation: 'login' });
-      throw error;
-    }
-  }
-
-  async getCurrentUser(userId: string): Promise<UserResponse> {
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          nickname: true,
-          avatar: true,
-          bio: true,
-          rating: true,
-          rank: true,
-          color: true,
-          role: true,
-          createdAt: true,
-        },
-      });
-
-      if (!user) {
-        logger.warn('获取用户信息失败: 用户不存在', { userId });
-        throw new Error('用户不存在');
-      }
-
-      return mapUserToResponse(user);
-    } catch (error) {
-      errorMonitor.trackError(error as Error, { errorType: 'auth', operation: 'getCurrentUser' });
       throw error;
     }
   }

@@ -3,12 +3,6 @@
  * 跨业务模块的通用类型
  */
 
-export interface Pagination {
-  page: number
-  pageSize: number
-  total: number
-}
-
 export interface ListOptions {
   page?: number
   pageSize?: number

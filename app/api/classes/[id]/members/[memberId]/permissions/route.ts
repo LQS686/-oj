@@ -14,6 +14,7 @@ import {
   requireClassAdminRole,
   requireManageableTarget,
 } from '@/lib/class/service'
+import { isClassAdminRole, isClassOwnerRole } from '@/lib/class/roles'
 
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   const { id, memberId } = ctx.params
@@ -30,7 +31,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   const target = await requireManageableTarget(id, memberId, operator.role)
 
   // 额外的业务规则：管理员不能修改班级创建人（owner）
-  if (operator.role === 'admin' && target.role === 'owner') {
+  if (isClassAdminRole(operator.role) && !isClassOwnerRole(operator.role) && isClassOwnerRole(target.role)) {
     throw400('FORBIDDEN', '管理员无法修改班级创建人')
   }
 

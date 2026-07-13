@@ -7,7 +7,7 @@ import { isObjectId } from '@/lib/api/validation'
 import {
   findClassAssignment,
   getCurrentClassMember,
-  getUserIsAdmin,
+  getUserCanManageContent,
   hasFullScoreOnProblem,
   listAssignmentSubmissions,
 } from '@/lib/class/service'
@@ -34,7 +34,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
 
   // 权限校验：查看其他用户的提交需要满足以下条件之一
   if (q.userId && q.userId !== user.id) {
-    const isSystemAdmin = await getUserIsAdmin(user.id)
+    const canManageContent = await getUserCanManageContent(user.id)
     const isClassStaff = isClassAdminApiRole(memberRole)
 
     let hasFullScore = false
@@ -42,7 +42,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
       hasFullScore = await hasFullScoreOnProblem(user.id, assignmentId, q.problemId)
     }
 
-    if (!isSystemAdmin && !isClassStaff && !hasFullScore) {
+    if (!canManageContent && !isClassStaff && !hasFullScore) {
       throw403(
         '只有系统管理员、班级创建人、班级管理员或完成该题目并获得满分的用户可以查看他人的提交记录'
       )

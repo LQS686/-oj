@@ -2,7 +2,7 @@
  * WebSocket Hook - 实时接收提交状态更新
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import io, { Socket } from 'socket.io-client'
 import { logger } from '@/lib/logger'
 
@@ -49,15 +49,14 @@ export function useSubmissionSocket({
 }: UseSubmissionSocketOptions) {
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
-  const [lastUpdate, setLastUpdate] = useState<SubmissionUpdate | null>(null)
-  
+
   // 使用 useRef 保存回调函数，避免因回调更新导致重新连接
   const callbacksRef = useRef({
     onSubmissionUpdate,
     onJudgeProgress,
     onNotification,
   })
-  
+
   // 更新回调引用
   useEffect(() => {
     callbacksRef.current = {
@@ -88,8 +87,8 @@ export function useSubmissionSocket({
 
     logger.debug('开始连接 WebSocket...')
 
-    const socketUrl = typeof window !== 'undefined' 
-      ? window.location.origin 
+    const socketUrl = typeof window !== 'undefined'
+      ? window.location.origin
       : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000')
 
     const socket = io(socketUrl, {
@@ -137,7 +136,6 @@ export function useSubmissionSocket({
     // 提交状态更新
     socket.on('submission:update', (data: SubmissionUpdate) => {
       logger.debug('收到提交更新', data)
-      setLastUpdate(data)
       callbacksRef.current.onSubmissionUpdate?.(data)
     })
 
@@ -176,6 +174,5 @@ export function useSubmissionSocket({
 
   return {
     isConnected,
-    lastUpdate,
   }
 }

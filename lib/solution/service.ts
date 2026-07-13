@@ -46,6 +46,7 @@ export async function getSolutionById(id: string) {
 }
 
 export async function createSolution(data: any, authorId: string) {
+  cache.deleteByPrefix('solution:list:')
   return prisma.solution.create({ data: { ...data, authorId } })
 }
 
@@ -56,6 +57,7 @@ export async function updateSolution(id: string, data: any) {
 
 export async function deleteSolution(id: string) {
   cache.delete(`solution:byId:${id}`)
+  cache.deleteByPrefix('solution:list:')
   return prisma.solution.delete({ where: { id } })
 }
 
@@ -119,7 +121,7 @@ export async function loadSolutionViewUser(
   if (!dbUser) return null
   return {
     id: dbUser.id,
-    role: dbUser.role || 'user',
+    role: dbUser.role || 'STUDENT',
   }
 }
 
@@ -204,7 +206,7 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
     err.status = 404
     throw err
   }
-  return prisma.solution.create({
+  const result = await prisma.solution.create({
     data: {
       problemId: realProblemId,
       authorId,
@@ -222,6 +224,8 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
       },
     },
   })
+  cache.deleteByPrefix('solution:list:')
+  return result
 }
 
 /**

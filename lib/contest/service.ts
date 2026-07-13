@@ -66,16 +66,21 @@ export async function getContestById(id: string) {
 }
 
 export async function createContest(data: any, authorId: string) {
+  cache.deleteByPrefix('contest:list:')
   return prisma.contest.create({ data: { ...data, authorId } })
 }
 
 export async function updateContest(id: string, data: any) {
   cache.delete(`contest:byId:${id}`)
+  cache.deleteByPrefix('contest:list:')
+  cache.deleteByPrefix('contest:rank')
   return prisma.contest.update({ where: { id }, data })
 }
 
 export async function deleteContest(id: string) {
   cache.delete(`contest:byId:${id}`)
+  cache.deleteByPrefix('contest:list:')
+  cache.deleteByPrefix('contest:rank')
   return prisma.contest.delete({ where: { id } })
 }
 
@@ -384,7 +389,7 @@ export async function computeContestRankings(contestId: string) {
     // ACM 逻辑
     if (contest.type === 'ACM') {
       if (problemStats.status === 'AC') return
-      if (sub.status === 'AC' || sub.status === 'Accepted') {
+      if (sub.status === 'AC') {
         // 兼容不同状态写法
         problemStats.status = 'AC'
         problemStats.time = relativeTime
@@ -744,7 +749,7 @@ export async function listContestProblemsWithStatus(
     }),
     prisma.submission.groupBy({
       by: ['problemId'],
-      where: { contestId, problemId: { in: problemIds }, status: 'Accepted' },
+      where: { contestId, problemId: { in: problemIds }, status: 'AC' },
       _count: { _all: true },
     }),
   ])

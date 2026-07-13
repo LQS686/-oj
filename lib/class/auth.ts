@@ -2,35 +2,22 @@
  * lib/class/auth.ts
  * 班级鉴权 / 角色判断 helper
  *
- * 角色语义：
- * - teacher（班主任，对应数据库 owner）—— 班级创建人，拥有一切权限
- * - assistant（助教，对应数据库 admin）—— 协助管理
- * - student（学生，对应数据库 member）—— 普通成员
+ * 角色语义（统一使用 lib/class/roles.ts 的体系）：
+ * - owner（班主任/班级创建人）—— 拥有一切权限
+ * - assistant（助教）—— 协助管理
+ * - student（学生）—— 普通成员
+ *
+ * DB 与 API 已统一为 owner | assistant | student。
+ * normalizeClassRoleToApi 自动处理历史数据中的 admin/member 值。
  */
 
 import { prisma } from '@/lib/prisma'
 import { normalizeClassRoleToApi } from './roles'
 
-export type ClassRole = 'teacher' | 'assistant' | 'student'
-
-/**
- * 数据库存储值（保持向后兼容）→ 业务角色
- */
+export type ClassRole = 'owner' | 'assistant' | 'student'
 
 export function mapClassRole(dbRole: string): ClassRole {
-  const api = normalizeClassRoleToApi(dbRole)
-  if (api === 'owner') return 'teacher'
-  if (api === 'assistant') return 'assistant'
-  return 'student'
-}
-
-/**
- * 业务角色 → 数据库存储值
- */
-export function toDbRole(role: ClassRole): string {
-  if (role === 'teacher') return 'owner'
-  if (role === 'assistant') return 'admin'
-  return 'member'
+  return normalizeClassRoleToApi(dbRole)
 }
 
 export interface ClassMembership {
@@ -67,8 +54,8 @@ export async function getClassMembership(
     dbRole: member.role,
     role,
     permissions: (member.permissions as Record<string, any>) || null,
-    isOwner: normalizeClassRoleToApi(member.role) === 'owner',
-    isTeacher: role === 'teacher',
+    isOwner: role === 'owner',
+    isTeacher: role === 'owner',
     isAssistant: role === 'assistant',
     isStudent: role === 'student',
     isMember: true,
@@ -95,19 +82,18 @@ export function hasClassPermission(
   key: string
 ): boolean {
   if (!membership) return false
-  if (membership.isTeacher) return true // 班主任拥有所有权限
+  if (membership.isTeacher) return true
   if (!membership.permissions) return false
   return !!membership.permissions[key]
 }
 
 /**
  * 便捷鉴权：要求当前用户为班主任/助教
- * 失败时返回 null，路由层可继续后续逻辑
  */
 export async function requireClassRole(
   classId: string,
   userId: string | undefined | null,
-  allowedRoles: ClassRole[] = ['teacher', 'assistant']
+  allowedRoles: ClassRole[] = ['owner', 'assistant']
 ): Promise<{ ok: true; membership: ClassMembership } | { ok: false; reason: string }> {
   if (!userId) return { ok: false, reason: '未登录' }
 

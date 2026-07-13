@@ -16,7 +16,7 @@ import {
   updateSubmissionDirect,
 } from '@/lib/mongodb-direct'
 import { createNotification, createNotifications } from '@/lib/notification/service'
-import { normalizeClassRoleToApi, apiRoleToDb, isClassAdminApiRole } from '@/lib/class/roles'
+import { normalizeClassRoleToApi, isClassAdminApiRole, isClassAdminRole } from '@/lib/class/roles'
 
 /* ============================================================================
  * 班级 CRUD
@@ -255,7 +255,7 @@ export async function patchClassMember(
 ) {
   const update: { remark?: string; role?: string } = {}
   if (data.remark !== undefined) update.remark = data.remark
-  if (data.role !== undefined) update.role = apiRoleToDb(data.role)
+  if (data.role !== undefined) update.role = data.role
 
   const updated = await prisma.classMember.update({
     where: { classId_userId: { classId, userId } },
@@ -591,8 +591,8 @@ export async function findClassAssignment(assignmentId: string, classId: string)
   })
 }
 
-/** 读当前用户是否为站点管理员/教师（SYSTEM_ADMIN 或 TEACHER） */
-export async function getUserIsAdmin(userId: string) {
+/** 读当前用户是否有内容管理权限（SYSTEM_ADMIN / ADMIN / TEACHER） */
+export async function getUserCanManageContent(userId: string) {
   const u = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, role: true },
@@ -1526,7 +1526,7 @@ export async function respondDirectInvite(
           data: {
             classId: invite.classId,
             userId: currentUserId,
-            role: apiRoleToDb('student'),
+            role: 'student',
             permissions: {
               canViewProblems: true,
               canSubmit: true,
@@ -1896,11 +1896,6 @@ export async function ensureClassAccessible(
  * 权限检查 helper（业务层使用）
  * ========================================================================== */
 
-/** 检查用户是否班级管理员（兼容 DB / API 角色值） */
-export function isClassAdminRole(dbRole: string | undefined | null) {
-  return isClassAdminApiRole(dbRole)
-}
-
 /** 检查当前用户是否可管理目标成员（owner 可管所有；assistant 不能管 owner 和 assistant） */
 export function canManageMember(
   operatorRole: string | null | undefined,
@@ -1974,8 +1969,8 @@ export async function buildClassAssignmentDetail(
 
   const userSubmissions = submissions.filter((s: any) => s.userId === viewerUserId)
   const viewerIsClassAdmin = isClassAdminApiRole(viewerRole)
-  const viewerIsSiteAdmin = await getUserIsAdmin(viewerUserId)
-  const canViewAllSubmissions = viewerIsClassAdmin || viewerIsSiteAdmin
+  const viewerCanManageContent = await getUserCanManageContent(viewerUserId)
+  const canViewAllSubmissions = viewerIsClassAdmin || viewerCanManageContent
   const allSubmissions = canViewAllSubmissions
     ? submissions.map((s: any) => ({
         id: s.id,
@@ -2112,7 +2107,7 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
   const classRecord = await prisma.class.findUnique({ where: { id: input.classId } })
   if (!classRecord) throw new ApiError('NOT_FOUND', '班级不存在', 404)
 
-  if (input.operatorRole !== 'owner' && input.operatorRole !== 'assistant') {
+  if (!isClassAdminRole(input.operatorRole)) {
     throw new ApiError('FORBIDDEN', '无权处理加入申请', 403)
   }
 
@@ -2149,7 +2144,7 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
     // 创建成员 + 更新申请
     await prisma.$transaction([
       prisma.classMember.create({
-        data: { classId: input.classId, userId: request.userId, role: apiRoleToDb('student') },
+        data: { classId: input.classId, userId: request.userId, role: 'student' },
       }),
       prisma.classJoinRequest.update({
         where: { id: input.requestId },
@@ -2240,3 +2235,5 @@ export async function adminDeleteClass(classId: string) {
   await prisma.class.delete({ where: { id: classId } })
   return '班级已删除'
 }
+
+export { isClassAdminRole, isClassOwnerRole } from './roles'

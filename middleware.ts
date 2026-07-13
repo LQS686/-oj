@@ -77,7 +77,7 @@ export async function middleware(request: NextRequest) {
     // CSRF 校验：写操作必须同源
     if (!isAllowedOrigin(request)) {
       return new NextResponse(
-        JSON.stringify({ success: false, error: '跨站请求被拒绝' }),
+        JSON.stringify({ ok: false, success: false, error: '跨站请求被拒绝', code: 'CSRF_REJECTED' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
       )
     }
@@ -100,9 +100,11 @@ export async function middleware(request: NextRequest) {
     if (!result.success) {
       return new NextResponse(
         JSON.stringify({
+          ok: false,
           success: false,
           error: '请求过于频繁，请稍后再试',
-          retryAfter: result.retryAfter
+          retryAfter: result.retryAfter,
+          code: 'RATE_LIMITED'
         }),
         {
           status: 429,

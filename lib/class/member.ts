@@ -9,11 +9,9 @@ import {
   isClassOwner,
   isClassTeacher,
   isClassAssistant,
-  mapClassRole,
-  toDbRole,
   type ClassMembership,
 } from './auth'
-import { normalizeClassRoleToApi, dbRolesMatchingApiFilter } from './roles'
+import { normalizeClassRoleToApi, dbRolesMatchingApiFilter, isClassOwnerRole } from './roles'
 
 export interface MemberListFilter {
   role?: string
@@ -51,14 +49,12 @@ export async function listClassMembers(
     }
   }
 
-  // 搜索下推 DB：在 user 关联表（username/nickname）和 ClassMember.remark 上做 contains 模糊匹配
   if (search) {
     const searchOr = [
       { user: { username: { contains: search, mode: 'insensitive' } } },
       { user: { nickname: { contains: search, mode: 'insensitive' } } },
       { remark: { contains: search, mode: 'insensitive' } },
     ]
-    // active 过滤也可能使用 where.OR，两者需用 AND 组合避免覆盖
     if (where.OR) {
       where.AND = [{ OR: where.OR }, { OR: searchOr }]
       delete where.OR
@@ -67,7 +63,6 @@ export async function listClassMembers(
     }
   }
 
-  // 排序下推 DB（role 排序需自定义权重，DB 不支持 case 表达式，保留内存排序）
   let orderBy: any
   switch (sortBy) {
     case 'lastActiveAt':
@@ -104,7 +99,6 @@ export async function listClassMembers(
     remark: m.remark,
   }))
 
-  // role 排序在内存中完成（owner > assistant > student 的自定义权重 DB 无法表达）
   if (sortBy === 'role') {
     const order: Record<string, number> = { owner: 3, assistant: 2, student: 1 }
     details.sort((a: any, b: any) => {
@@ -123,13 +117,13 @@ export async function listClassMembers(
 export async function addClassMember(
   classId: string,
   userId: string,
-  role: 'teacher' | 'assistant' | 'student' = 'student'
+  role: 'owner' | 'assistant' | 'student' = 'student'
 ) {
   return prisma.classMember.create({
     data: {
       classId,
       userId,
-      role: toDbRole(role),
+      role,
       joinedAt: new Date(),
     },
   })
@@ -143,7 +137,7 @@ export async function removeClassMember(classId: string, userId: string) {
     where: { classId_userId: { classId, userId } },
   })
   if (!target) return { ok: false, reason: '该用户不是班级成员' } as const
-  if (target.role === 'owner')
+  if (isClassOwnerRole(target.role))
     return { ok: false, reason: '不能移除班级创建人' } as const
   await prisma.classMember.delete({
     where: { classId_userId: { classId, userId } },
@@ -161,7 +155,7 @@ export async function updateClassMemberRole(
 ) {
   return prisma.classMember.update({
     where: { classId_userId: { classId, userId } },
-    data: { role: toDbRole(newRole) },
+    data: { role: newRole },
   })
 }
 

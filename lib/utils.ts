@@ -11,6 +11,7 @@ export function formatTime(ms: number): string {
 }
 
 export function formatMemory(kb: number): string {
+  if (kb <= 0) return '0KB'
   if (kb < 1024) return `${kb}KB`
   return `${(kb / 1024).toFixed(2)}MB`
 }

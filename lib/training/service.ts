@@ -345,7 +345,7 @@ export async function createTrainingWithProblems(input: TrainingCreateInput) {
     data: {
       title: rest.title,
       description: rest.description,
-      // difficulty 字段已废弃，仅在显式传入时设置（兼容老数据）
+      // difficulty 可选字段，仅在显式传入时设置
       ...(rest.difficulty != null ? { difficulty: rest.difficulty } : {}),
       categoryType: rest.categoryType ?? null,
       isPublic: rest.isPublic ?? true,
@@ -574,7 +574,7 @@ export async function incrementViewCount(trainingId: string) {
  * ========================================================================== */
 
 function statusFromSubmission(status: string): TrainingProblemStatus {
-  if (status === 'AC' || status === 'ACCEPTED') return 'AC'
+  if (status === 'AC') return 'AC'
   return 'ATTEMPTED'
 }
 
@@ -834,7 +834,7 @@ export async function getUserTrainingProgressDetail(
     const statusData = problemStatusMap.get(problemId)
     if (statusData) {
       attemptedCount++
-      if (statusData.status === 'AC' || statusData.status === 'ACCEPTED') {
+      if (statusData.status === 'AC') {
         solvedCount++
         problemProgress.push({ problemId, status: 'AC', submittedAt: statusData.submittedAt })
       } else {
@@ -871,28 +871,3 @@ export async function getUserTrainingProgressDetail(
   }
 }
 
-/* ============================================================================
- * 兼容旧 API（带 fallback）
- * ========================================================================== */
-
-export async function getUserTrainingProgress(trainingId: string, userId: string) {
-  return (prisma as any).trainingProgress
-    ? await (prisma as any).trainingProgress.findUnique({
-        where: { trainingId_userId: { trainingId, userId } },
-      })
-    : null
-}
-
-export async function updateTrainingProgress(
-  trainingId: string,
-  userId: string,
-  data: { completedProblems?: number; totalScore?: number }
-) {
-  const model = (prisma as any).trainingProgress
-  if (!model) return null
-  return model.upsert({
-    where: { trainingId_userId: { trainingId, userId } },
-    update: data,
-    create: { trainingId, userId, ...data },
-  })
-}
