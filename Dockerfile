@@ -1,5 +1,5 @@
 # 构建阶段 - 使用国内镜像源
-FROM docker.1ms.run/library/node:20-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ COPY . .
 RUN npm run build
 
 # 生产阶段 - 使用国内镜像源
-FROM docker.1ms.run/library/node:20-alpine AS runner
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 

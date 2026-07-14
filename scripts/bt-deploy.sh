@@ -25,6 +25,31 @@ if ! command -v docker &>/dev/null; then
 fi
 info "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 
+# ========================================================
+# 配置 Docker 镜像加速（国内服务器必需）
+# ========================================================
+step "配置 Docker 镜像加速"
+if [ ! -f /etc/docker/daemon.json ] || ! grep -q "registry-mirrors" /etc/docker/daemon.json 2>/dev/null; then
+  mkdir -p /etc/docker
+  cat > /etc/docker/daemon.json <<'DOCKERCONF'
+{
+  "registry-mirrors": [
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me"
+  ],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+DOCKERCONF
+  systemctl restart docker
+  info "Docker 镜像加速已配置（docker.1ms.run + docker.xuanyuan.me）"
+else
+  info "Docker 镜像加速已存在"
+fi
+
 cd "$PROJECT_DIR"
 
 # ============================================================
