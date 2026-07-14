@@ -43,7 +43,7 @@ export default function RootLayout({
             <UserProvider>
               <DocumentTitleProvider />
               <Navbar />
-              <main className="relative">
+              <main className="relative min-h-screen">
                 <PageTransition>{children}</PageTransition>
               </main>
               <Toaster
