@@ -83,7 +83,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@tailwindcss ./node_
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_modules/tailwindcss
 
 # 安装生产依赖
-RUN npm config set registry https://registry.npmmirror.com && npm install --only=production
+RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts
 
 # 创建必要的目录
 RUN mkdir -p /app/temp /app/logs && \
