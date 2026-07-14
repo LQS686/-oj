@@ -161,9 +161,17 @@ export default function TrainingListPage() {
 
         {/* 列表 */}
         {loading ? (
-          <PageLoading label="加载题单中..." />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="card rounded-lg p-5 border border-border animate-pulse">
+                <div className="h-4 w-3/4 rounded bg-muted mb-3" />
+                <div className="h-3 w-1/2 rounded bg-muted mb-2" />
+                <div className="h-3 w-1/3 rounded bg-muted" />
+              </div>
+            ))}
+          </div>
         ) : error ? (
-          <div className="card-static rounded-lg p-12 text-center max-w-md mx-auto">
+          <div className="card-static rounded-lg p-12 text-center max-w-md mx-auto animate-fadeIn">
             <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
               <AlertCircle className="w-8 h-8 text-error" />
             </div>
@@ -175,8 +183,8 @@ export default function TrainingListPage() {
             </button>
           </div>
         ) : trainings.length === 0 ? (
-          <div className="card-static rounded-lg p-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+          <div className="card-static rounded-lg p-16 text-center animate-fadeIn">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6 animate-float">
               {source === 'mine' ? <UserCheck className="w-8 h-8 text-muted-foreground" /> : <BookOpen className="w-8 h-8 text-muted-foreground" />}
             </div>
             <div className="text-foreground text-xl font-semibold mb-2">
@@ -195,7 +203,7 @@ export default function TrainingListPage() {
             )}
           </div>
         ) : (
-          <div className={LIST_GRID_CLASS}>
+          <div className={`${LIST_GRID_CLASS} animate-fadeIn`}>
             {trainings.map((t) => (
               <TrainingCard key={t.id} training={t} variant="grid" />
             ))}

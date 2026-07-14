@@ -28,10 +28,6 @@ export default function AnnouncementsListPage() {
     }
   }, [])
 
-  if (loading) {
-    return <PageLoading label="加载公告…" />
-  }
-
   return (
     <EducationalPageShell
       width="default"
@@ -39,10 +35,24 @@ export default function AnnouncementsListPage() {
       description="平台通知与重要说明"
       icon={Megaphone}
     >
-      {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-12 text-center">暂无系统公告</p>
-      ) : (
+      {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="card-static rounded-xl p-5 animate-pulse">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-3.5 h-3.5 rounded bg-muted" />
+                <div className="w-16 h-3 rounded bg-muted" />
+              </div>
+              <div className="h-4 w-3/4 rounded bg-muted mb-2" />
+              <div className="h-3 w-full rounded bg-muted mb-1" />
+              <div className="h-3 w-2/3 rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-12 text-center animate-fadeIn">暂无系统公告</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 animate-fadeIn">
           {items.map((item) => (
             <Link
               key={item.id}

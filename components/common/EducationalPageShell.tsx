@@ -54,7 +54,7 @@ export function EducationalPageShell({
         {backHref && (
           <Link
             href={backHref}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary mb-4 transition-colors"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary mb-4 transition-all duration-200 hover:translate-x-[-2px]"
           >
             {backLabel}
           </Link>
@@ -64,7 +64,7 @@ export function EducationalPageShell({
           <div className="flex items-center gap-3 min-w-0">
             {Icon && (
               <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${iconClassName}`}
+                className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-110 hover:rotate-3 ${iconClassName}`}
               >
                 <Icon className="w-5 h-5" />
               </div>
@@ -81,7 +81,9 @@ export function EducationalPageShell({
 
         {toolbar && <div className="mb-6">{toolbar}</div>}
 
-        {children}
+        <div>
+          {children}
+        </div>
       </div>
     </div>
   )

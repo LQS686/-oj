@@ -75,11 +75,11 @@ export default function SearchBar() {
  className="btn-ghost btn p-2.5 group"
  aria-label="搜索"
  >
- <Search className="w-5 h-5 transition-transform duration-300 group-hover:rotate-12" />
+ <Search className="w-5 h-5 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
  </button>
  
  {isSearchOpen && (
- <div className="dropdown-menu w-96 p-3 animate-dropdownIn">
+ <div className="dropdown-menu w-96 p-3">
  <div className="relative">
  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
  <input

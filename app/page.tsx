@@ -168,10 +168,10 @@ function DashboardView() {
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card-static rounded-xl p-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-stagger-in">
+        <div className="card-static rounded-xl p-5 group cursor-default">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-110">
               <CheckCircle2 className="w-5 h-5 text-primary" />
             </div>
             <span className="text-sm text-muted-foreground font-medium">今日解题</span>
@@ -180,9 +180,9 @@ function DashboardView() {
           <div className="text-xs text-muted-foreground mt-1">累计 {stats.totalSolved} 题</div>
         </div>
 
-        <div className="card-static rounded-xl p-5">
+        <div className="card-static rounded-xl p-5 group cursor-default">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center transition-all duration-300 group-hover:bg-orange-200 dark:group-hover:bg-orange-900/30 group-hover:scale-110">
               <Flame className="w-5 h-5 text-orange-500" />
             </div>
             <span className="text-sm text-muted-foreground font-medium">连续打卡</span>
@@ -193,9 +193,9 @@ function DashboardView() {
           <div className="text-xs text-muted-foreground mt-1">{stats.streak > 0 ? '继续加油' : '今日开始打卡'}</div>
         </div>
 
-        <div className="card-static rounded-xl p-5">
+        <div className="card-static rounded-xl p-5 group cursor-default">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center transition-all duration-300 group-hover:bg-green-200 dark:group-hover:bg-green-900/30 group-hover:scale-110">
               <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
             <span className="text-sm text-muted-foreground font-medium">本周通过率</span>
@@ -218,9 +218,9 @@ function DashboardView() {
           )}
         </div>
 
-        <div className="card-static rounded-xl p-5">
+        <div className="card-static rounded-xl p-5 group cursor-default">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center transition-all duration-300 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/30 group-hover:scale-110">
               <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <span className="text-sm text-muted-foreground font-medium">Rating</span>
@@ -242,7 +242,7 @@ function DashboardView() {
         {recentAssignments.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">暂无班级作业，加入班级后可在此查看</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 animate-stagger-in">
             {recentAssignments.map((item) => (
               <Link
                 key={item.id}
@@ -279,7 +279,7 @@ function DashboardView() {
         {upcomingContests.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">暂无即将开始的公开竞赛</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 animate-stagger-in">
             {upcomingContests.map((item) => (
               <Link
                 key={item.id}
@@ -338,7 +338,7 @@ function GuestView() {
 
   return (
     <div className="space-y-16">
-      <section className="pt-6">
+      <section className="pt-6 animate-fadeIn">
         <div className="container mx-auto px-4">
           <AnnouncementsGrid items={announcements} />
         </div>
@@ -347,14 +347,14 @@ function GuestView() {
       {/* Hero */}
       <section className="py-20 md:py-28">
         <div className="container mx-auto px-4 text-center max-w-3xl mx-auto">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-foreground mb-6 leading-tight">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-foreground mb-6 leading-tight animate-fadeIn">
             在线编程学习平台
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed">
+          <p className="text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed animate-fadeIn" style={{ animationDelay: '100ms' }}>
             海量精选题库、实时评测系统、专业竞赛平台，<br className="hidden sm:block" />
             助你从入门到精通，成为编程高手
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fadeIn" style={{ animationDelay: '200ms' }}>
             <Link href="/register" className="btn btn-primary text-base px-8 py-3">
               开始学习
               <ArrowRight className="w-5 h-5" />
@@ -370,12 +370,12 @@ function GuestView() {
       {/* Feature Cards */}
       <section className="pb-16 md:pb-24">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 animate-stagger-in">
             {guestFeatures.map((feature, index) => {
               const Icon = feature.icon
               return (
-                <div key={index} className="card-static rounded-xl p-6">
-                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4">
+                <div key={index} className="card-static rounded-xl p-6 group cursor-default">
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-primary/25 group-hover:rotate-3">
                     <Icon className="w-6 h-6 text-white" />
                   </div>
                   <h3 className="text-base font-bold text-foreground mb-2">{feature.title}</h3>
@@ -390,8 +390,8 @@ function GuestView() {
       {/* Login / Register CTA */}
       <section className="pb-16 md:pb-24">
         <div className="container mx-auto px-4">
-          <div className="card-static rounded-2xl p-10 md:p-14 text-center max-w-2xl mx-auto">
-            <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-6">
+          <div className="card-static rounded-2xl p-10 md:p-14 text-center max-w-2xl mx-auto hover-scale">
+            <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-6 animate-float">
               <Star className="w-7 h-7 text-white" />
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">准备好开始了吗？</h2>
@@ -430,7 +430,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
+              <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center transition-transform duration-300 hover:rotate-12 hover:scale-110">
                 <Code2 className="w-4.5 h-4.5 text-white" />
               </div>
               <div>
@@ -440,10 +440,10 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link href="/problems" className="hover:text-primary transition-colors font-medium">题库</Link>
-              <Link href="/contests" className="hover:text-primary transition-colors font-medium">竞赛</Link>
-              <Link href="/training" className="hover:text-primary transition-colors font-medium">训练</Link>
-              <Link href="/rank" className="hover:text-primary transition-colors font-medium">排行榜</Link>
+              <Link href="/problems" className="hover:text-primary transition-all duration-200 font-medium hover:scale-105">题库</Link>
+              <Link href="/contests" className="hover:text-primary transition-all duration-200 font-medium hover:scale-105">竞赛</Link>
+              <Link href="/training" className="hover:text-primary transition-all duration-200 font-medium hover:scale-105">训练</Link>
+              <Link href="/rank" className="hover:text-primary transition-all duration-200 font-medium hover:scale-105">排行榜</Link>
             </div>
 
             <div className="text-sm text-muted-foreground">

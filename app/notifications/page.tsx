@@ -143,16 +143,14 @@ export default function NotificationsPage() {
  return date.toLocaleDateString('zh-CN')
  }
 
- if (loading && notifications.length === 0) {
- return <PageLoading label="加载通知中..." />
- }
+ const showSkeleton = loading && notifications.length === 0
 
- return (
- <EducationalPageShell
- width="narrow"
- title="通知中心"
- description={unreadCount > 0 ? `您有 ${unreadCount} 条未读通知` : '所有通知已读'}
- icon={Bell}
+  return (
+  <EducationalPageShell
+  width="narrow"
+  title="通知中心"
+  description={unreadCount > 0 ? `您有 ${unreadCount} 条未读通知` : '所有通知已读'}
+  icon={Bell}
  actions={
  unreadCount > 0 ? (
  <button onClick={markAllAsRead} className="btn btn-primary">
@@ -194,7 +192,19 @@ export default function NotificationsPage() {
  </div>
  }
  >
- {notifications.length === 0 ? (
+ {showSkeleton ? (
+ <div className="space-y-3">
+ {Array.from({ length: 5 }).map((_, i) => (
+ <div key={i} className="card-static rounded-lg px-4 py-3 animate-pulse">
+ <div className="grid grid-cols-12 gap-4">
+ <div className="col-span-1 flex items-center justify-center"><div className="w-8 h-8 rounded-lg bg-muted" /></div>
+ <div className="col-span-8"><div className="h-4 w-3/4 rounded bg-muted mb-2" /><div className="h-3 w-full rounded bg-muted" /></div>
+ <div className="col-span-3 flex justify-end"><div className="h-3 w-20 rounded bg-muted" /></div>
+ </div>
+ </div>
+ ))}
+ </div>
+ ) : notifications.length === 0 ? (
  <div className="card-static rounded-lg p-16 text-center">
  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
  <Bell className="w-8 h-8 text-muted-foreground" />
@@ -207,7 +217,7 @@ export default function NotificationsPage() {
  </div>
  </div>
  ) : (
- <>
+ <div className="animate-fadeIn">
  <div className="card-static rounded-t-lg overflow-hidden">
  <div className="bg-muted px-4 py-3 text-sm font-semibold text-muted-foreground border-b border-border">
  <div className="grid grid-cols-12 gap-4">
@@ -277,8 +287,8 @@ export default function NotificationsPage() {
  </div>
  ))}
  </div>
- </>
-)}
+ </div>
+ )}
 
  {totalPages > 1 && (
  <div className="mt-8 flex justify-center">

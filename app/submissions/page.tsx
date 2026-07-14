@@ -100,10 +100,6 @@ function SubmissionsContent() {
  }
  }
 
- if (loading) {
- return <PageLoading label="加载提交记录..." />
- }
-
  const getStatusIcon = (status: string) => {
  switch (status) {
  case 'AC':
@@ -204,7 +200,43 @@ function SubmissionsContent() {
  ) : undefined
  }
  >
+ {loading ? (
  <div className="card-static overflow-hidden rounded-lg border border-border">
+ <div className="overflow-x-auto">
+ <table className="w-full">
+ <thead className="bg-muted border-b border-border">
+ <tr>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">提交ID</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">题目</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">用户</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">状态</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">分数</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">语言</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">用时·内存</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">提交时间</th>
+ <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">操作</th>
+ </tr>
+ </thead>
+ <tbody className="divide-y divide-border">
+ {Array.from({ length: 5 }).map((_, i) => (
+ <tr key={i} className="animate-pulse">
+ <td className="px-6 py-4"><div className="h-4 w-16 rounded bg-muted" /></td>
+ <td className="px-6 py-4"><div className="h-4 w-32 rounded bg-muted" /></td>
+ <td className="px-6 py-4"><div className="h-4 w-20 rounded bg-muted" /></td>
+ <td className="px-6 py-4"><div className="h-5 w-14 rounded-full bg-muted" /></td>
+ <td className="px-6 py-4"><div className="h-4 w-8 rounded bg-muted" /></td>
+ <td className="px-6 py-4"><div className="h-4 w-12 rounded bg-muted" /></td>
+ <td className="px-6 py-4"><div className="h-4 w-20 rounded bg-muted" /></td>
+ <td className="px-6 py-4"><div className="h-4 w-24 rounded bg-muted" /></td>
+ <td className="px-6 py-4"><div className="h-4 w-10 rounded bg-muted" /></td>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ </div>
+ </div>
+ ) : (
+ <div className="card-static overflow-hidden rounded-lg border border-border animate-fadeIn">
  <div className="overflow-x-auto">
  <table className="w-full">
  <thead className="bg-muted border-b border-border">
@@ -330,6 +362,7 @@ function SubmissionsContent() {
  </div>
  )}
  </div>
+ )}
 
  {selectedSubmission && assignmentId && (
  <div

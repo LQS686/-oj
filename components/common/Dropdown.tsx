@@ -57,7 +57,7 @@ export default function Dropdown({
  
  {isOpen && (
  <div 
- className={`dropdown-menu animate-dropdownIn ${className} ${align === 'right' ? 'right-0' : 'left-0'}`}
+ className={`dropdown-menu ${className} ${align === 'right' ? 'right-0' : 'left-0'}`}
  role="menu"
  >
  {children}

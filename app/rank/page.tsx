@@ -159,55 +159,77 @@ export default function RankPage() {
  )
  }
 
- if (loading && rankings.length === 0) {
- return <PageLoading label="加载排行榜中..." />
- }
+ const showSkeleton = loading && rankings.length === 0
 
- return (
- <EducationalPageShell
- title="全站排行榜"
- description="每 30 秒更新一次"
- icon={Trophy}
- iconClassName="bg-accent text-white"
- actions={
- <button
- type="button"
- onClick={() => {
- setIsRefreshing(true)
- fetchRankings(1, activeTab, true)
- }}
- disabled={isRefreshing}
- className="btn btn-ghost"
- >
- <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
- 刷新
- </button>
- }
- toolbar={
- <div className="flex items-center gap-1 card-static p-1 rounded-lg w-fit border border-border">
- {[
- { key: 'rating', label: 'Rating 排行榜' },
- { key: 'solved', label: 'AC 刷题榜' },
- ].map((tab) => (
- <button
- key={tab.key}
- type="button"
- onClick={() => setActiveTab(tab.key as typeof activeTab)}
- className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
- activeTab === tab.key
- ? 'bg-primary text-white'
- : 'text-muted-foreground hover:bg-muted'
- }`}
- >
- {tab.label}
- </button>
- ))}
- </div>
- }
- className="flex flex-col"
- >
- <div className="flex-1 flex flex-col min-h-0">
- {error && (
+  return (
+  <EducationalPageShell
+  title="全站排行榜"
+  description="每 30 秒更新一次"
+  icon={Trophy}
+  iconClassName="bg-accent text-white"
+  actions={
+  <button
+  type="button"
+  onClick={() => {
+  setIsRefreshing(true)
+  fetchRankings(1, activeTab, true)
+  }}
+  disabled={isRefreshing}
+  className="btn btn-ghost"
+  >
+  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+  刷新
+  </button>
+  }
+  toolbar={
+  <div className="flex items-center gap-1 card-static p-1 rounded-lg w-fit border border-border">
+  {[
+  { key: 'rating', label: 'Rating 排行榜' },
+  { key: 'solved', label: 'AC 刷题榜' },
+  ].map((tab) => (
+  <button
+  key={tab.key}
+  type="button"
+  onClick={() => setActiveTab(tab.key as typeof activeTab)}
+  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+  activeTab === tab.key
+  ? 'bg-primary text-white shadow-sm'
+  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+  }`}
+  >
+  {tab.label}
+  </button>
+  ))}
+  </div>
+  }
+  className="flex flex-col"
+  >
+  <div className="flex-1 flex flex-col min-h-0">
+  {showSkeleton ? (
+  <div className="card-static rounded-xl overflow-hidden">
+  <div className="flex px-4 py-3 text-sm font-semibold text-muted-foreground border-b border-border/50">
+  <div className="w-16 text-center">排名</div>
+  <div className="flex-1">选手</div>
+  <div className="w-24 text-right">Rating</div>
+  <div className="w-24 text-right">解题数</div>
+  <div className="w-16 text-right">趋势</div>
+  </div>
+  {Array.from({ length: 8 }).map((_, i) => (
+  <div key={i} className="flex items-center border-b border-border/50 px-4 py-3 animate-pulse">
+  <div className="w-16 flex justify-center"><div className="w-8 h-8 rounded bg-muted" /></div>
+  <div className="flex-1 flex items-center gap-3">
+  <div className="w-10 h-10 rounded-full bg-muted" />
+  <div className="h-4 w-24 rounded bg-muted" />
+  </div>
+  <div className="w-24 text-right"><div className="h-5 w-12 rounded bg-muted ml-auto" /></div>
+  <div className="w-24 text-right"><div className="h-4 w-10 rounded bg-muted ml-auto" /></div>
+  <div className="w-16 flex justify-end"><div className="w-4 h-4 rounded bg-muted" /></div>
+  </div>
+  ))}
+  </div>
+   ) : (
+   <div className="animate-fadeIn">
+   {error && (
  <div className="card-static rounded-xl p-4 mb-6 border border-error/30 bg-error/5">
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-3">
@@ -245,7 +267,7 @@ export default function RankPage() {
  return (
  <div
  key={user.id}
- className={`flex items-center border-b border-border/50 hover:bg-primary/5 transition-colors px-4 py-3 ${
+ className={`flex items-center border-b border-border/50 hover:bg-primary/5 transition-all duration-200 px-4 py-3 ${
  isCurrentUser ? 'bg-primary/10' : ''
  }`}
  >
@@ -255,23 +277,23 @@ export default function RankPage() {
  
  <div className="flex-1 flex items-center gap-3 min-w-0">
  <Link href={`/profile/${user.id}`} className="flex items-center gap-3 flex-1 min-w-0 group">
- <div className="relative">
+ <div className="relative transition-transform duration-200 group-hover:scale-110">
  {user.avatar ? (
  <img
  src={user.avatar}
  alt={user.username}
- className="w-10 h-10 rounded-full object-cover border-2 border-transparent group-hover:border-primary-light transition-all"
+ className="w-10 h-10 rounded-full object-cover border-2 border-transparent group-hover:border-primary-light transition-all duration-200"
  />
  ) : (
  <div
- className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg"
+ className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg transition-all duration-200 group-hover:shadow-xl"
  style={{ backgroundColor: user.color }}
  >
  {user.username?.charAt(0).toUpperCase() || '?'}
  </div>
  )}
  {isTop3 && (
- <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
+ <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent flex items-center justify-center animate-pulse-glow">
  <Trophy className="w-2.5 h-2.5 text-white" />
  </div>
  )}
@@ -317,15 +339,17 @@ export default function RankPage() {
  </div>
 
  {rankings.length === 0 && !loading && (
- <div className="card-static rounded-xl p-16 text-center mt-6">
- <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
- <Trophy className="w-8 h-8 text-accent" />
- </div>
- <div className="text-foreground text-xl font-semibold mb-2">暂无排名数据</div>
- <div className="text-muted-foreground">还没有用户上榜</div>
- </div>
- )}
- </div>
+  <div className="card-static rounded-xl p-16 text-center mt-6 animate-fadeIn">
+  <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6 animate-float">
+  <Trophy className="w-8 h-8 text-accent" />
+  </div>
+  <div className="text-foreground text-xl font-semibold mb-2">暂无排名数据</div>
+  <div className="text-muted-foreground">还没有用户上榜</div>
+  </div>
+   )}
+   </div>
+   )}
+  </div>
 
  <AnimatePresence>
  {myRank && myRank.rank > 100 && (

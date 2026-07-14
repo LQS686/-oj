@@ -2,13 +2,10 @@
 
 export function PageLoading({ label = '加载中...' }: { label?: string }) {
   return (
-    <div className="min-h-[50vh] flex items-center justify-center">
-      <div className="text-center">
-        <div className="relative w-12 h-12 mx-auto mb-4">
-          <div className="absolute inset-0 rounded-full border-2 border-border" />
-          <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        </div>
-        <p className="text-muted-foreground text-sm">{label}</p>
+    <div className="min-h-[30vh] flex items-center justify-center">
+      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+        <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-icon-spin" />
+        <span>{label}</span>
       </div>
     </div>
   )

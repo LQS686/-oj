@@ -36,7 +36,7 @@ export default function NavLinks() {
             href={link.href}
             className={`nav-link ${isActive ? 'active' : ''}`}
           >
-            <Icon className="w-4 h-4" />
+            <Icon className={`w-4 h-4 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
             <span>{link.label}</span>
           </Link>
         )

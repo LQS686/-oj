@@ -23,7 +23,6 @@ import { canCreateContest } from '@/lib/permissions'
 import { fetchWithCookie } from '@/lib/api/base'
 import {
   EducationalPageShell,
-  PageLoading,
   LIST_GRID_CLASS,
   LIST_GRID_CARD_META_ROW,
   LIST_GRID_CARD_TITLE,
@@ -188,218 +187,186 @@ export default function ContestsPage() {
  router.push('/contests/create')
  }
 
- if (loading) {
- return <PageLoading label="加载竞赛中..." />
- }
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="card rounded-lg p-5 border border-border animate-pulse">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-4 h-4 rounded bg-muted" />
+                <div className="w-16 h-5 rounded-full bg-muted" />
+              </div>
+              <div className="h-5 w-3/4 rounded bg-muted mb-3" />
+              <div className="space-y-2">
+                <div className="h-4 w-1/2 rounded bg-muted" />
+                <div className="h-4 w-1/3 rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
 
- if (error) {
- return (
- <EducationalPageShell title="竞赛" description="参加竞赛，挑战自我" icon={Trophy} iconClassName="bg-accent text-white">
- <div className="card-static rounded-lg p-12 text-center max-w-md mx-auto border border-border">
- <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
- <AlertCircle className="w-8 h-8 text-error" />
- </div>
- <p className="text-error mb-6">{error}</p>
- <button onClick={fetchContests} className="btn-primary btn">
- 重试
- </button>
- </div>
- </EducationalPageShell>
- )
- }
+    if (error) {
+      return (
+        <div className="card-static rounded-lg p-12 text-center max-w-md mx-auto border border-border">
+          <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-error" />
+          </div>
+          <p className="text-error mb-6">{error}</p>
+          <button onClick={fetchContests} className="btn-primary btn">
+            重试
+          </button>
+        </div>
+      )
+    }
 
- return (
- <EducationalPageShell
- title="竞赛"
- description="参加竞赛，挑战自我"
- icon={Trophy}
- iconClassName="bg-accent text-white"
- actions={
- canCreate ? (
- <button onClick={handleCreateContest} className="btn-primary btn">
- <Plus className="w-5 h-5" />
- 创建竞赛
- </button>
- ) : undefined
- }
- toolbar={
- <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
- <div className="flex items-center gap-2 card-static p-1 rounded-lg overflow-x-auto border border-border">
- {[
- { key: 'all', label: '全部' },
- { key: 'ongoing', label: '进行中' },
- { key: 'upcoming', label: '即将开始' },
- { key: 'ended', label: '已结束' }
- ].map((tab) => (
- <button 
- key={tab.key}
- className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
- activeTab === tab.key
- ? 'bg-primary text-white'
- : 'text-muted-foreground hover:bg-muted'
- }`}
- onClick={() => setActiveTab(tab.key as typeof activeTab)}
- >
- {tab.label}
- </button>
- ))}
- </div>
+    if (contests.length === 0) {
+      return (
+        <div className="card-static rounded-lg p-16 text-center border border-border animate-fadeIn">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6 animate-float">
+            <Trophy className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <div className="text-foreground text-xl font-semibold mb-2">暂无竞赛</div>
+          <div className="text-muted-foreground mb-6">当前筛选条件下没有竞赛</div>
+          {activeTab === 'all' && (
+            <button 
+              onClick={handleCreateContest}
+              className="btn-primary btn px-8 py-4 rounded-lg"
+            >
+              <Plus className="w-5 h-5" />
+              创建第一个竞赛
+            </button>
+          )}
+        </div>
+      )
+    }
 
- <form onSubmit={handleSearch} className="flex gap-4">
- <div className="relative flex-1 lg:w-72">
- <Search className="absolute left-4.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4.5 h-4.5" />
- <input
- type="text"
- placeholder="搜索竞赛..."
- value={keyword}
- onChange={(e) => setKeyword(e.target.value)}
- className="input pl-13 py-3.5 rounded-lg"
- />
- </div>
- <button 
- type="submit"
- className="btn-ghost btn px-5 py-3 rounded-lg"
- >
- 搜索
- </button>
- </form>
- </div>
- }
- >
- {contests.length === 0 ? (
- <div className="card-static rounded-lg p-16 text-center border border-border">
- <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
- <Trophy className="w-8 h-8 text-muted-foreground" />
- </div>
- <div className="text-foreground text-xl font-semibold mb-2">暂无竞赛</div>
- <div className="text-muted-foreground mb-6">当前筛选条件下没有竞赛</div>
- {activeTab === 'all' && (
- <button 
- onClick={handleCreateContest}
- className="btn-primary btn px-8 py-4 rounded-lg"
- >
- <Plus className="w-5 h-5" />
- 创建第一个竞赛
- </button>
- )}
- </div>
- ) : (
- <div className={LIST_GRID_CLASS}>
- {contests.map((contest) => {
- const status = getContestStatus(contest.startTime, contest.endTime)
- const statusConfig = getStatusConfig(status)
- const StatusIcon = statusConfig.icon
- const rowHref = status === '已结束' ? `/contests/${contest.id}/rank` : `/contests/${contest.id}`
+    return (
+      <div className={`${LIST_GRID_CLASS} animate-fadeIn`}>
+        {contests.map((contest) => {
+          const status = getContestStatus(contest.startTime, contest.endTime)
+          const statusConfig = getStatusConfig(status)
+          const StatusIcon = statusConfig.icon
+          const rowHref = status === '已结束' ? `/contests/${contest.id}/rank` : `/contests/${contest.id}`
 
- return (
- <Link
- key={contest.id}
- href={rowHref}
- className={listGridCardLinkClass()}
- >
- <div className={LIST_GRID_CARD_META_ROW}>
- <StatusIcon className={`w-4 h-4 ${statusConfig.iconClass} shrink-0`} />
- <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">
- {contest.type}
- </span>
- </div>
- <div className={LIST_GRID_CARD_MIDDLE}>
- <div className="flex items-center gap-1.5 min-w-0">
- {!contest.isPublic && (
- <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
- )}
- <h3 className={`${LIST_GRID_CARD_TITLE} flex-1 min-w-0 !line-clamp-1`}>
- {contest.title}
- </h3>
- <span
- className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusConfig.tag}`}
- >
- {status}
- </span>
- </div>
- {status === '即将开始' && contest.isRegistered && (
- <span className="text-xs text-secondary-light font-semibold mt-1 block">已报名</span>
- )}
- </div>
- <div className={`space-y-1 overflow-hidden ${LIST_GRID_CARD_FOOTER}`}>
- <span className="flex items-center gap-1.5">
- <Calendar className="w-3.5 h-3.5 shrink-0" />
- <span className="truncate">{formatTime(contest.startTime)}</span>
- </span>
- <span className="flex items-center gap-1.5">
- <Clock className="w-3.5 h-3.5 shrink-0" />
- <span>{contest.duration} 分钟</span>
- </span>
- {status === '即将开始' && (
- <span className="flex items-center gap-1 text-primary-light font-medium line-clamp-1">
- <Timer className="w-3.5 h-3.5 shrink-0" />
- {getTimeRemaining(contest.startTime)}
- </span>
- )}
- <span className="flex items-center gap-1.5">
- <Users className="w-3.5 h-3.5 shrink-0" />
- {contest._count.participants} 人
- </span>
- </div>
- </Link>
- )
- })}
- </div>
- )}
+          return (
+            <Link
+              key={contest.id}
+              href={rowHref}
+              className={listGridCardLinkClass()}
+            >
+              <div className={LIST_GRID_CARD_META_ROW}>
+                <StatusIcon className={`w-4 h-4 ${statusConfig.iconClass} shrink-0`} />
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">
+                  {contest.type}
+                </span>
+              </div>
+              <div className={LIST_GRID_CARD_MIDDLE}>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {!contest.isPublic && (
+                    <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  )}
+                  <h3 className={`${LIST_GRID_CARD_TITLE} flex-1 min-w-0 !line-clamp-1`}>
+                    {contest.title}
+                  </h3>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusConfig.tag}`}
+                  >
+                    {status}
+                  </span>
+                </div>
+                {status === '即将开始' && contest.isRegistered && (
+                  <span className="text-xs text-secondary-light font-semibold mt-1 block">已报名</span>
+                )}
+              </div>
+              <div className={`space-y-1 overflow-hidden ${LIST_GRID_CARD_FOOTER}`}>
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{formatTime(contest.startTime)}</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  <span>{contest.duration} 分钟</span>
+                </span>
+                {status === '即将开始' && (
+                  <span className="flex items-center gap-1 text-primary-light font-medium line-clamp-1">
+                    <Timer className="w-3.5 h-3.5 shrink-0" />
+                    {getTimeRemaining(contest.startTime)}
+                  </span>
+                )}
+                <span className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 shrink-0" />
+                  {contest._count.participants} 人
+                </span>
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+    )
+  }
 
- {totalPages > 1 && (
- <div className="mt-12 flex justify-center">
- <div className="flex items-center gap-2.5 card-static rounded-lg p-2.5 border border-primary/5">
- <button 
- onClick={() => setPage(page - 1)}
- disabled={page === 1}
- className="btn-ghost btn px-4 py-3 rounded-xl"
- >
- <ChevronLeft className="w-5.5 h-5.5" />
- </button>
- <div className="flex items-center gap-1.5">
- {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
- const pageNum = i + 1
- return (
- <button 
- key={pageNum}
- onClick={() => setPage(pageNum)}
- className={`w-11 h-11 rounded-xl font-semibold transition-all ${
- page === pageNum
- ? 'bg-primary text-white shadow-lg'
- : 'text-muted-foreground hover:bg-primary/8 hover:text-primary-light'
- }`}
- >
- {pageNum}
- </button>
- )
- })}
- {totalPages > 5 && (
- <>
- <span className="px-3 text-muted-foreground">...</span>
- <button 
- onClick={() => setPage(totalPages)}
- className={`w-11 h-11 rounded-xl font-semibold transition-all ${
- page === totalPages
- ? 'bg-primary text-white shadow-lg'
- : 'text-muted-foreground hover:bg-primary/8 hover:text-primary-light'
- }`}
- >
- {totalPages}
- </button>
- </>
- )}
- </div>
- <button 
- onClick={() => setPage(page + 1)}
- disabled={page === totalPages}
- className="btn-ghost btn px-4 py-3 rounded-xl"
- >
- <ChevronRight className="w-5.5 h-5.5" />
- </button>
- </div>
- </div>
- )}
- </EducationalPageShell>
- )
+  return (
+    <EducationalPageShell
+      title="竞赛"
+      description="参加竞赛，挑战自我"
+      icon={Trophy}
+      iconClassName="bg-accent text-white"
+      actions={
+        canCreate ? (
+          <button onClick={handleCreateContest} className="btn-primary btn">
+            <Plus className="w-5 h-5" />
+            创建竞赛
+          </button>
+        ) : undefined
+      }
+      toolbar={
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 card-static p-1 rounded-lg overflow-x-auto border border-border">
+            {[
+              { key: 'all', label: '全部' },
+              { key: 'ongoing', label: '进行中' },
+              { key: 'upcoming', label: '即将开始' },
+              { key: 'ended', label: '已结束' }
+            ].map((tab) => (
+              <button 
+                key={tab.key}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                  activeTab === tab.key
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+                onClick={() => setActiveTab(tab.key as typeof activeTab)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSearch} className="flex gap-4">
+            <div className="relative flex-1 lg:w-72">
+              <Search className="absolute left-4.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4.5 h-4.5" />
+              <input
+                type="text"
+                placeholder="搜索竞赛..."
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                className="input pl-13 py-3.5 rounded-lg"
+              />
+            </div>
+            <button 
+              type="submit"
+              className="btn-ghost btn px-5 py-3 rounded-lg"
+            >
+              搜索
+            </button>
+          </form>
+        </div>
+      }
+    >
+      {renderContent()}
+    </EducationalPageShell>
+  )
 }
