@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { useRef, useEffect, useState } from 'react'
 import {
   BookOpen,
   Trophy,
@@ -17,19 +17,46 @@ interface NavLink {
   icon: React.ElementType
 }
 
+const navLinks: NavLink[] = [
+  { href: '/problems', label: '题库', icon: BookOpen },
+  { href: '/contests', label: '竞赛', icon: Trophy },
+  { href: '/training', label: '训练', icon: Dumbbell },
+  { href: '/classes', label: '班级', icon: GraduationCap },
+  { href: '/rank', label: '排行榜', icon: BarChart3 },
+]
+
 export default function NavLinks() {
   const pathname = usePathname()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
 
-  const navLinks: NavLink[] = [
-    { href: '/problems', label: '题库', icon: BookOpen },
-    { href: '/contests', label: '竞赛', icon: Trophy },
-    { href: '/training', label: '训练', icon: Dumbbell },
-    { href: '/classes', label: '班级', icon: GraduationCap },
-    { href: '/rank', label: '排行榜', icon: BarChart3 },
-  ]
+  useEffect(() => {
+    if (!containerRef.current) return
+    const activeEl = containerRef.current.querySelector('.active') as HTMLElement | null
+    if (activeEl) {
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const activeRect = activeEl.getBoundingClientRect()
+      setIndicator({
+        left: activeRect.left - containerRect.left,
+        width: activeRect.width,
+      })
+    } else {
+      setIndicator(null)
+    }
+  }, [pathname])
 
   return (
-    <div className="hidden lg:flex items-center gap-0.5">
+    <div ref={containerRef} className="hidden lg:flex items-center gap-0.5 relative">
+      {indicator && (
+        <div
+          className="absolute top-0 bottom-0 bg-primary/10 rounded-lg pointer-events-none"
+          style={{
+            left: indicator.left,
+            width: indicator.width,
+            transition: 'left 200ms ease, width 200ms ease',
+          }}
+        />
+      )}
       {navLinks.map((link) => {
         const Icon = link.icon
         const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
@@ -39,13 +66,6 @@ export default function NavLinks() {
             href={link.href}
             className={`nav-link group relative ${isActive ? 'active' : ''}`}
           >
-            {isActive && (
-              <motion.div
-                layoutId="nav-indicator"
-                className="absolute inset-0 bg-primary/10 rounded-lg"
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-              />
-            )}
             <span className="relative z-10 flex items-center gap-1.5">
               <Icon className={`w-4 h-4 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
               {link.label}

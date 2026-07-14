@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="zh-CN" data-scroll-behavior="smooth">
+    <html lang="zh-CN">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -43,9 +43,7 @@ export default function RootLayout({
             <UserProvider>
               <DocumentTitleProvider />
               <Navbar />
-              <main className="relative min-h-screen">
-                <PageTransition>{children}</PageTransition>
-              </main>
+              <PageTransition>{children}</PageTransition>
               <Toaster
                 position="top-right"
                 toastOptions={{

@@ -201,6 +201,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 code, pre {
@@ -299,7 +301,7 @@ code, pre {
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
-    transition: all 200ms var(--ease-out);
+    transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out);
     position: relative;
     overflow: hidden;
   }
@@ -315,7 +317,7 @@ code, pre {
     color: var(--card-foreground);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    transition: all 200ms var(--ease-out);
+    transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out);
   }
 
   .card-static:hover {
@@ -334,7 +336,7 @@ code, pre {
     line-height: 1.25rem;
     padding: 0.5rem 1rem;
     border-radius: var(--radius-sm);
-    transition: all 150ms var(--ease-out);
+    transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out), background 150ms var(--ease-out);
     cursor: pointer;
     outline: none;
     border: 1px solid transparent;
@@ -444,7 +446,7 @@ code, pre {
     color: var(--foreground);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    transition: all 200ms var(--ease-out);
+    transition: border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out);
     outline: none;
   }
 
@@ -476,7 +478,7 @@ code, pre {
     font-weight: 500;
     color: var(--muted-foreground);
     border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
+    transition: color 150ms var(--ease-out), background 150ms var(--ease-out), border-color 150ms var(--ease-out);
     cursor: pointer;
     border-bottom: 2px solid transparent;
   }
@@ -500,7 +502,7 @@ code, pre {
     font-size: 0.75rem;
     font-weight: 600;
     border-radius: var(--radius-sm);
-    transition: all 150ms var(--ease-out);
+    transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out), background 150ms var(--ease-out);
     background: var(--muted);
     color: var(--muted-foreground);
   }
@@ -616,7 +618,7 @@ code, pre {
     color: var(--foreground);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all 150ms var(--ease-out);
+    transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
     text-align: left;
     background: transparent;
     border: none;
@@ -746,7 +748,7 @@ code, pre {
   .custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
-    scroll-behavior: smooth;
+  scroll-behavior: auto;
   }
 
   .custom-scrollbar::-webkit-scrollbar {
@@ -811,6 +813,7 @@ code, pre {
 
   .animate-fadeIn {
     animation: fadeIn 0.2s ease-out forwards;
+    will-change: transform, opacity;
   }
 
   @keyframes fadeIn {
@@ -826,6 +829,7 @@ code, pre {
 
   .animate-slideInRight {
     animation: slideInRight 0.2s ease-out forwards;
+    will-change: transform, opacity;
   }
 
   @keyframes slideInRight {
@@ -841,6 +845,7 @@ code, pre {
 
   .animate-fade-in {
     animation: fade-in 0.2s ease-out;
+    will-change: transform, opacity;
   }
 
   @keyframes fade-in {
@@ -858,6 +863,7 @@ code, pre {
   .animate-stagger-in > * {
     opacity: 0;
     animation: stagger-item 0.3s var(--ease-out) forwards;
+    will-change: transform, opacity;
   }
   .animate-stagger-in > *:nth-child(1) { animation-delay: 0ms; }
   .animate-stagger-in > *:nth-child(2) { animation-delay: 50ms; }
@@ -884,6 +890,7 @@ code, pre {
   /* Modal/overlay enter animation */
   .animate-modal-in {
     animation: modal-enter 250ms var(--ease-spring);
+    will-change: transform, opacity;
   }
 
   @keyframes modal-enter {
