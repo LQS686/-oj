@@ -11,7 +11,7 @@
  * 4. 防御性：API 字段错位时降级为空
  * 5. fetch：cache: 'no-store'
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
 import Link from 'next/link'
 import { BookOpen, AlertCircle, RefreshCw, Plus, UserCheck } from 'lucide-react'
@@ -19,7 +19,7 @@ import TrainingCard from '@/components/training/TrainingCard'
 import SourceFilterCards, { type TrainingSource } from '@/components/training/SourceFilterCards'
 import type { TrainingListItem } from '@/lib/training/types'
 import { canManageContent } from '@/lib/permissions'
-import { EducationalPageShell, PageLoading, LIST_GRID_CLASS } from '@/components/common'
+import { EducationalPageShell, LIST_GRID_CLASS } from '@/components/common'
 
 const SOURCE_LABELS: Record<TrainingSource, string> = {
   all: '全部题单',
@@ -37,18 +37,21 @@ export default function TrainingListPage() {
   const [total, setTotal] = useState(0)
   const [source, setSource] = useState<TrainingSource>('official')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
+  const currentUserIdRef = useRef<string | null>(null)
+  const isFirstLoad = useRef(true)
 
   const fetchTrainings = useCallback(async (signal?: AbortSignal) => {
     try {
-      setLoading(true)
+      if (isFirstLoad.current) {
+        setLoading(true)
+      }
+      // stale-while-revalidate: keep old data visible during re-fetch
       setError(null)
       const params = new URLSearchParams({
         page: String(page),
         limit: '24',
       })
-      // 后端 DB 层过滤（不再做后置 filter）
       if (source === 'official') {
         params.set('categoryType', 'official')
       } else if (source === 'contest') {
@@ -70,10 +73,9 @@ export default function TrainingListPage() {
       }
       let items: TrainingListItem[] = Array.isArray(data.data?.items) ? data.data.items : []
 
-      // "我的题单"：客户端再过滤（基于当前用户加入/创建）
       if (source === 'mine') {
         items = items.filter(t =>
-          t.userProgress?.isJoined || t.author?.id === currentUserId
+          t.userProgress?.isJoined || t.author?.id === currentUserIdRef.current
         )
       }
 
@@ -86,9 +88,10 @@ export default function TrainingListPage() {
       setError('网络错误')
       setTrainings([])
     } finally {
+      isFirstLoad.current = false
       setLoading(false)
     }
-  }, [page, source, currentUserId])
+  }, [page, source])
 
   // 拉取当前用户
   useEffect(() => {
@@ -97,17 +100,17 @@ export default function TrainingListPage() {
       .then(data => {
         if (data?.success && data.data) {
           setIsLoggedIn(true)
-          setCurrentUserId(data.data.id)
+          currentUserIdRef.current = data.data.id
           setCurrentUserRole(data.data.role ?? null)
         } else {
           setIsLoggedIn(false)
-          setCurrentUserId(null)
+          currentUserIdRef.current = null
           setCurrentUserRole(null)
         }
       })
       .catch(() => {
         setIsLoggedIn(false)
-        setCurrentUserId(null)
+        currentUserIdRef.current = null
         setCurrentUserRole(null)
       })
   }, [])
