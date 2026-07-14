@@ -177,6 +177,6 @@ docker compose up -d
 |------|---------|
 | 80/443 端口冲突 | 检查是否有其他进程占用：`lsof -i :80` |
 | Docker 镜像拉取失败 | 脚本会自动配置 Docker 镜像加速器（docker.1ms.run + docker.xuanyuan.me），如仍失败可在 `/etc/docker/daemon.json` 中更换加速地址后执行 `systemctl restart docker` |
-| MongoDB 副本集未初始化 | `docker compose logs mongo` 查看日志，确认 keyfile 权限为 400 |
+| MongoDB 副本集未初始化 | `docker compose logs mongo` 查看日志，keyfile 由容器自动生成无需手动管理 |
 | 构建超过 10 分钟 | 首次构建较慢，后续升级仅增量构建 |
 | API 返回 502 | 等待 40 秒健康检查通过后刷新 |

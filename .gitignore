@@ -44,8 +44,5 @@ temp/
 # runtime logs
 /logs/
 
-# MongoDB 副本集密钥（自动生成，勿提交）
-/mongo-keyfile
-
 # TRAE IDE local skills & configs
 /.trae/
