@@ -2,7 +2,6 @@
 
 import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { Trophy, ArrowLeft, Save, X } from 'lucide-react'
@@ -131,7 +130,6 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
 
  if (loading) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center min-h-screen">
  <div className="text-center">
  <div className="relative w-16 h-16 mx-auto mb-6">
@@ -141,12 +139,10 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
  <p className="text-muted-foreground text-lg">加载中...</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
  return (
- <AdminLayout>
  <div className="max-w-4xl mx-auto space-y-6">
  <div className="flex items-center gap-4">
  <button
@@ -356,6 +352,5 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
  </div>
  </form>
  </div>
- </AdminLayout>
  )
 }

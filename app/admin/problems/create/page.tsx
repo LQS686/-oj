@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ArrowLeft, Plus, X, Save, Loader2, FileText, Sparkles } from 'lucide-react'
@@ -147,7 +146,6 @@ export default function CreateProblemPage() {
  }
 
  return (
- <AdminLayout>
  <div className="max-w-5xl mx-auto space-y-6">
  <div className="flex items-center gap-4">
  <button
@@ -519,6 +517,5 @@ export default function CreateProblemPage() {
  </div>
  </form>
  </div>
- </AdminLayout>
  )
 }

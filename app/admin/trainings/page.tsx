@@ -7,7 +7,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { DataTable, type Column } from '@/components/admin'
 import {
   Plus, Search, Edit, Trash2, Eye, Filter, BookOpen, AlertCircle, RefreshCw
@@ -198,7 +197,6 @@ export default function AdminTrainingsPage() {
  ]
 
  return (
- <AdminLayout>
  <div className="space-y-6">
  <div className="flex items-center justify-between">
  <div>
@@ -272,6 +270,5 @@ export default function AdminTrainingsPage() {
  />
  )}
  </div>
- </AdminLayout>
  )
 }

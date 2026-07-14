@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { Trophy, ArrowLeft, Save, X, Search, Plus, AlertCircle } from 'lucide-react'
@@ -141,7 +140,6 @@ export default function CreateContestPage() {
  }
 
  return (
- <AdminLayout>
  <div className="max-w-4xl mx-auto space-y-6">
  <div className="flex items-center gap-4">
  <button
@@ -410,6 +408,5 @@ export default function CreateContestPage() {
  </div>
  </form>
  </div>
- </AdminLayout>
  )
 }

@@ -7,7 +7,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import AdminLayout from '@/components/AdminLayout'
 import { ArrowLeft, Save, X, Plus, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -130,7 +129,6 @@ export default function CreateTrainingPage() {
  }, [problems])
 
  return (
- <AdminLayout>
  <div className="max-w-5xl mx-auto space-y-5">
  {/* 顶部导航 */}
  <div className="flex items-center gap-3">
@@ -388,6 +386,5 @@ export default function CreateTrainingPage() {
  </button>
  </div>
  </div>
- </AdminLayout>
  )
 }

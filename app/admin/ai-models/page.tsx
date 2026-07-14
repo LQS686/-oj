@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import {
  Plus, Trash2, Edit, Check, X, Key, Server,
@@ -487,14 +486,12 @@ export default function AIModelsPage() {
 
  if (loading) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center min-h-screen">
  <div className="text-center">
  <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
  <p className="text-muted-foreground">加载中...</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
@@ -502,7 +499,6 @@ export default function AIModelsPage() {
  const effectiveModels = providers.length === 0 ? [] : models
 
  return (
- <AdminLayout>
  <div className="space-y-6">
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-3">
@@ -1098,6 +1094,5 @@ export default function AIModelsPage() {
  </div>
  )}
  </div>
- </AdminLayout>
  )
 }

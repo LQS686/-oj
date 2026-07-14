@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { FileText, Plus, Edit, Trash2, Eye, EyeOff, Search, Trophy, Database, X, Filter, ChevronDown, Users, Clock, BarChart2 } from 'lucide-react'
@@ -354,33 +353,29 @@ export default function AdminProblemsPage() {
 
  if (initialLoading) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center min-h-screen">
  <div className="text-center">
  <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
  <p className="text-muted-foreground">加载中...</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
  if (error) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center min-h-screen">
  <div className="text-center">
  <p className="text-error text-lg mb-2">{error}</p>
  {error.includes('权限') && <p className="text-muted-foreground">正在跳转...</p>}
  </div>
  </div>
- </AdminLayout>
  )
  }
 
  return (
- <AdminLayout>
- <div className="space-y-6">
+  <>
+   <div className="space-y-6">
  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
  <div className="flex items-center gap-3">
  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -812,9 +807,9 @@ export default function AdminProblemsPage() {
  确认删除
  </button>
  </div>
- </div>
- </div>
- )}
- </AdminLayout>
- )
+	  </div>
+	</div>
+  )}
+  </>
+  )
 }

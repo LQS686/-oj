@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import {
@@ -70,20 +69,17 @@ export default function AdminDashboard() {
 
  if (loading) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center h-96">
  <div className="text-center">
  <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
  <p className="text-muted-foreground">加载中...</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
  if (error) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center h-96">
  <div className="text-center">
  <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
@@ -93,7 +89,6 @@ export default function AdminDashboard() {
  <p className="text-muted-foreground">{error}</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
@@ -161,7 +156,6 @@ export default function AdminDashboard() {
  ]
 
  return (
- <AdminLayout>
  <div className="space-y-6">
  <div className="flex items-center gap-3 mb-2">
  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -254,6 +248,5 @@ export default function AdminDashboard() {
  />
  </div>
  </div>
- </AdminLayout>
  )
 }

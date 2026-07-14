@@ -7,7 +7,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import AdminLayout from '@/components/AdminLayout'
 import {
  ArrowLeft, Save, X, Plus, Trash2, Check, AlertCircle, RefreshCw,
  Search, ExternalLink, ChevronUp, ChevronDown
@@ -293,14 +292,11 @@ export default function EditTrainingPage() {
 
  if (loading) {
  return (
- <AdminLayout>
  <div className="py-20 text-center text-muted-foreground">加载中...</div>
- </AdminLayout>
  )
  }
  if (error) {
  return (
- <AdminLayout>
  <div className="py-12 text-center">
  <AlertCircle className="w-10 h-10 mx-auto mb-3 text-error" />
  <p className="text-foreground mb-4">{error}</p>
@@ -311,13 +307,11 @@ export default function EditTrainingPage() {
  <RefreshCw className="w-4 h-4" /> 重试
  </button>
  </div>
- </AdminLayout>
  )
  }
  if (!training) return null
 
  return (
- <AdminLayout>
  <div className="max-w-5xl mx-auto space-y-5">
  {/* 顶部导航 */}
  <div className="flex items-center justify-between gap-3">
@@ -658,6 +652,5 @@ export default function EditTrainingPage() {
  )}
  </div>
  </div>
- </AdminLayout>
  )
 }

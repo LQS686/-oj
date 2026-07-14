@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { ArrowLeft, Download, Database, Edit, Clock, History, Loader2 } from 'lucide-react'
@@ -222,19 +221,16 @@ export default function SourceManagementPage() {
 
  if (loading) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center min-h-screen">
  <div className="text-center">
  <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
  <p className="text-muted-foreground">加载中...</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
  return (
- <AdminLayout>
  <div className="space-y-6">
  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
  <div className="flex items-center gap-4">
@@ -374,6 +370,5 @@ export default function SourceManagementPage() {
  </div>
  )}
  </div>
- </AdminLayout>
  )
 }

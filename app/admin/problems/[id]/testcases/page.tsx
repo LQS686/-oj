@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ArrowLeft, Upload, X, Plus, Sparkles, Loader2, Save, FileText, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
@@ -413,19 +412,16 @@ export default function ProblemTestCasesPage() {
 
  if (loading) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center min-h-screen">
  <div className="text-center">
  <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
  <p className="text-muted-foreground">加载题目数据...</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
  return (
- <AdminLayout>
  <div className="max-w-6xl mx-auto space-y-6">
  <div className="card p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
  <div className="flex items-center gap-4">
@@ -903,6 +899,5 @@ export default function ProblemTestCasesPage() {
  </div>
  )}
  </div>
- </AdminLayout>
  )
 }

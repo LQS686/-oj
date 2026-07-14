@@ -6,7 +6,6 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import AdminLayout from '@/components/AdminLayout'
 import { DataTable, type Column } from '@/components/admin'
 import {
   ArrowLeft, Plus, Edit, Trash2, X, Save, AlertCircle, RefreshCw
@@ -216,7 +215,6 @@ export default function TrainingCategoriesPage() {
  ]
 
  return (
- <AdminLayout>
  <div className="space-y-6 max-w-3xl">
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-3">
@@ -288,6 +286,5 @@ export default function TrainingCategoriesPage() {
  />
  )}
  </div>
- </AdminLayout>
  )
 }

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import {
  Clock, CheckCircle, XCircle, Play, Edit, Save,
@@ -235,20 +234,17 @@ export default function ProblemReviewPage() {
 
  if (loading) {
  return (
- <AdminLayout>
  <div className="flex items-center justify-center min-h-screen">
  <div className="text-center">
  <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
  <p className="text-muted-foreground">加载中...</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
  if (problems.length === 0) {
  return (
- <AdminLayout>
  <div className="space-y-6">
  <div className="flex items-center gap-3">
  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/20">
@@ -266,12 +262,10 @@ export default function ProblemReviewPage() {
  <p className="text-sm text-muted-foreground mt-2">所有手动提交的题目都已审核完成</p>
  </div>
  </div>
- </AdminLayout>
  )
  }
 
  return (
- <AdminLayout>
  <div className="space-y-6">
  {error && (
  <div className="bg-error/5 border border-error/15 text-error px-4 py-3 rounded-lg">
@@ -631,6 +625,5 @@ export default function ProblemReviewPage() {
  </div>
  </div>
  </div>
- </AdminLayout>
  )
 }

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminLayout from '@/components/AdminLayout'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Megaphone, Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
 
@@ -145,7 +144,6 @@ export default function AdminAnnouncementsPage() {
   }
 
   return (
-    <AdminLayout>
       <div className="p-6 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -308,6 +306,5 @@ export default function AdminAnnouncementsPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
   )
 }
