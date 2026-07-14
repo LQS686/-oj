@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { authApi, type UserData } from '@/lib/api'
 
 type User = UserData
@@ -40,7 +40,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     verifyUser()
   }, [])
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (typeof window === 'undefined') return
 
     try {
@@ -50,17 +50,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
       console.error('刷新用户信息失败:', error)
       setUser(null)
     }
-  }
+  }, [])
 
-  const login = (userData: User, token?: string) => {
+  const login = useCallback((userData: User, token?: string) => {
     if (typeof window === 'undefined') return
-    // Token 由后端通过 httpOnly cookie 设置，前端不再存储到 localStorage（避免 XSS 窃取）
-    // 乐观更新：先用登录返回的用户信息渲染，再拉取完整资料
     setUser(userData)
     refreshUser()
-  }
+  }, [refreshUser])
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     if (typeof window === 'undefined') return
 
     try {
@@ -68,13 +66,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('退出登录失败:', error)
     } finally {
-      // Token cookie 由后端 /api/auth/logout 清除，前端无需处理
       setUser(null)
     }
-  }
+  }, [])
+
+  const value = useMemo(() => ({
+    user,
+    isLoading: !isInitialized,
+    setUser,
+    login,
+    logout,
+    refreshUser,
+  }), [user, isInitialized, login, logout, refreshUser])
 
   return (
-    <UserContext.Provider value={{ user, isLoading: !isInitialized, setUser, login, logout, refreshUser }}>
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   )

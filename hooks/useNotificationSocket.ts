@@ -81,11 +81,6 @@ export function useNotificationSocket({
       setIsConnected(false)
     })
 
-    socket.on('reconnect', () => {
-      setIsConnected(true)
-      socket.emit('join', userId)
-    })
-
     socket.on('connect_error', () => {
       setIsConnected(false)
     })

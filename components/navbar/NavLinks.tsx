@@ -1,5 +1,8 @@
+'use client'
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { motion } from 'framer-motion'
 import {
   BookOpen,
   Trophy,
@@ -29,15 +32,24 @@ export default function NavLinks() {
     <div className="hidden lg:flex items-center gap-0.5">
       {navLinks.map((link) => {
         const Icon = link.icon
-        const isActive = pathname === link.href
+        const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
         return (
           <Link
             key={link.href}
             href={link.href}
-            className={`nav-link ${isActive ? 'active' : ''}`}
+            className={`nav-link group relative ${isActive ? 'active' : ''}`}
           >
-            <Icon className={`w-4 h-4 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
-            <span>{link.label}</span>
+            {isActive && (
+              <motion.div
+                layoutId="nav-indicator"
+                className="absolute inset-0 bg-primary/10 rounded-lg"
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10 flex items-center gap-1.5">
+              <Icon className={`w-4 h-4 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
+              {link.label}
+            </span>
           </Link>
         )
       })}

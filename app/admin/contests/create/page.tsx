@@ -43,7 +43,8 @@ export default function CreateContestPage() {
  const response = await fetchWithAuth('/api/admin/problems')
  const data = await response.json()
  if (data.success) {
- setAllProblems(Array.isArray(data.data) ? data.data : [])
+   const payload = data.data
+   setAllProblems(Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [])
  } else {
  setAllProblems([])
  }

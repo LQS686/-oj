@@ -116,7 +116,8 @@ export default function AdminUsersPage() {
 
  const data = await response.json()
  if (data.success) {
- setUsers(Array.isArray(data.data) ? data.data : [])
+   const payload = data.data
+   setUsers(Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [])
  } else {
  setError(data.error || '获取用户列表失败')
  setUsers([])

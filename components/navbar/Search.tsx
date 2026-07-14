@@ -35,10 +35,28 @@ export default function SearchBar() {
  const [searchResults, setSearchResults] = useState<SearchResult | null>(null)
  const [searchLoading, setSearchLoading] = useState(false)
  const searchRef = useRef<HTMLDivElement>(null)
+ const inputRef = useRef<HTMLInputElement>(null)
 
  useClickOutside(searchRef, () => {
  if (isSearchOpen) setIsSearchOpen(false)
  })
+
+ useEffect(() => {
+ const handleKeyDown = (e: KeyboardEvent) => {
+ if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+ e.preventDefault()
+ setIsSearchOpen(prev => !prev)
+ }
+ }
+ window.addEventListener('keydown', handleKeyDown)
+ return () => window.removeEventListener('keydown', handleKeyDown)
+ }, [])
+
+ useEffect(() => {
+ if (isSearchOpen && inputRef.current) {
+ inputRef.current.focus()
+ }
+ }, [isSearchOpen])
 
  const handleSearch = useCallback(async (query: string) => {
  if (!query.trim()) {
@@ -83,10 +101,10 @@ export default function SearchBar() {
  <div className="relative">
  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
  <input
+ ref={inputRef}
  type="text"
  placeholder="搜索题目、用户、竞赛..."
  className="input pl-10 py-2.5 text-sm focus:ring-2 focus:ring-primary/50"
- autoFocus
  value={searchQuery}
  onChange={(e) => setSearchQuery(e.target.value)}
  onKeyDown={(e) => {

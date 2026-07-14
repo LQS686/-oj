@@ -187,6 +187,7 @@ model Submission {
   @@index([problemId, userId])
   @@index([problemId, status])
   @@index([userId, submittedAt])
+  @@index([userId, status])
 }
 
 // 竞赛模型
@@ -415,6 +416,7 @@ model Comment {
 
   @@index([solutionId])
   @@index([authorId])
+  @@index([solutionId, isDeleted])
 }
 
 // 题解
@@ -599,6 +601,8 @@ model Favorite {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@unique([userId, problemId])
+  @@index([problemId])
 }
 
 // 通知

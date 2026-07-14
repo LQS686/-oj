@@ -39,8 +39,8 @@ export interface UserData {
 }
 
 export const authApi = {
-  async login(username: string, password: string): Promise<LoginResponse> {
-    return apiClient.post<LoginResponse>('/auth/login', { username, password });
+  async login(username: string, password: string, rememberMe?: boolean): Promise<LoginResponse> {
+    return apiClient.post<LoginResponse>('/auth/login', { username, password, rememberMe });
   },
 
   async register(data: RegisterData): Promise<LoginResponse> {

@@ -6,17 +6,16 @@
  *   throw new AppError('INVALID_ROLE', '无效的角色类型', 400)
  *   throw AppError.badRequest('CODE', '消息')
  *   throw AppError.notFound('资源不存在')
+ *
+ * AppError 继承 ApiError，确保 withApi.safeCall 能正确捕获并返回对应状态码。
  */
 
-export class AppError extends Error {
-  public readonly code: string
-  public readonly status: number
+import { ApiError } from '@/lib/api/withApi'
 
+export class AppError extends ApiError {
   constructor(code: string, message: string, status: number = 400) {
-    super(message)
+    super(code, message, status)
     this.name = 'AppError'
-    this.code = code
-    this.status = status
   }
 
   static badRequest(code: string, message: string): AppError {

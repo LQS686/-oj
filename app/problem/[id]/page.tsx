@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, use, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen,
   Send,
@@ -31,6 +32,7 @@ import { logger } from '@/lib/logger'
 import { canManageContent } from '@/lib/permissions'
 import Link from 'next/link'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
+import toast from 'react-hot-toast'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -156,10 +158,20 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     if (typeof window === 'undefined') return
 
     const codeKey = getStorageKey(problemId, classId, fromAssignment)
-    localStorage.removeItem(codeKey)
+    const savedCode = localStorage.getItem(codeKey)
+    if (savedCode) {
+      setCode(savedCode)
+    } else {
+      setCode('')
+    }
 
     const langKey = getLanguageStorageKey(problemId, classId, fromAssignment)
-    localStorage.removeItem(langKey)
+    const savedLang = localStorage.getItem(langKey)
+    if (savedLang && languageOptions.some(l => l.value === savedLang)) {
+      setLanguage(savedLang)
+    } else {
+      setLanguage('cpp')
+    }
   }, [problemId, classId, fromAssignment])
 
   useEffect(() => {
@@ -170,14 +182,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     if (typeof window === 'undefined' || !code) return
-    
+
     const codeKey = getStorageKey(problemId, classId, fromAssignment)
     localStorage.setItem(codeKey, code)
   }, [code, problemId, classId, fromAssignment])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    
+
     const langKey = getLanguageStorageKey(problemId, classId, fromAssignment)
     localStorage.setItem(langKey, language)
   }, [language, problemId, classId, fromAssignment])
@@ -440,6 +452,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     }
 
     if (!code.trim() || code.trim().length < 10) {
+      toast.error('代码不能为空或少于10个字符')
       return
     }
 
@@ -482,10 +495,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       } else {
         submittingRef.current = false
         setSubmitting(false)
+        setShowResultModal(false)
+        toast.error(data.error || '提交失败')
       }
     } catch (error) {
       submittingRef.current = false
       setSubmitting(false)
+      setShowResultModal(false)
+      toast.error('网络错误，请稍后重试')
     }
   }
 
@@ -496,6 +513,19 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const handleClearCode = () => {
     setCode('')
   }
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        if (!submittingRef.current && user && code.trim().length >= 10) {
+          handleSubmit()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [user, code])
 
 
 
@@ -596,49 +626,80 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                 .filter((tab) => !(isAssignmentContext && tab.key === 'solutions'))
                 .map((tab) => {
                   const Icon = tab.icon
+                  const isActive = activeTab === tab.key
                   return (
                     <button
                       key={tab.key}
                       onClick={() => setActiveTab(tab.key as typeof activeTab)}
                       className={`flex items-center gap-2 px-5 py-3.5 font-medium transition-all duration-300 relative cursor-pointer group whitespace-nowrap ${
-                        activeTab === tab.key
+                        isActive
                           ? 'text-primary-light'
                           : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 transition-transform duration-300 ${activeTab === tab.key ? 'rotate-3' : ''}`} />
-                      {tab.label}
-                      {activeTab === tab.key && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                      {isActive && (
+                        <motion.div
+                          layoutId="problem-tab-indicator"
+                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        />
                       )}
+                      <Icon className={`w-4 h-4 transition-transform duration-300 ${isActive ? 'rotate-3' : ''}`} />
+                      {tab.label}
                     </button>
                   )
                 })}
             </div>
 
             <div className="p-6">
-              {activeTab === 'description' && (
-                <ProblemDescription problem={problem} />
-              )}
+              <AnimatePresence mode="wait">
+                {activeTab === 'description' && (
+                  <motion.div
+                    key="description"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ProblemDescription problem={problem} />
+                  </motion.div>
+                )}
 
-              {activeTab === 'solutions' && (
-                <SolutionTabPanel
-                  problemId={problemId}
-                  isAssignmentContext={isAssignmentContext}
-                />
-              )}
+                {activeTab === 'solutions' && (
+                  <motion.div
+                    key="solutions"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <SolutionTabPanel
+                      problemId={problemId}
+                      isAssignmentContext={isAssignmentContext}
+                    />
+                  </motion.div>
+                )}
 
-              {activeTab === 'submissions' && (
-                <SubmissionList
-                  submissions={submissions}
-                  loading={submissionsLoading}
-                  error={null}
-                  user={user}
-                  fromAssignment={fromAssignment}
-                  classId={classId}
-                  onSelect={(sub) => setSelectedSubmission(sub)}
-                />
-              )}
+                {activeTab === 'submissions' && (
+                  <motion.div
+                    key="submissions"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <SubmissionList
+                      submissions={submissions}
+                      loading={submissionsLoading}
+                      error={null}
+                      user={user}
+                      fromAssignment={fromAssignment}
+                      classId={classId}
+                      onSelect={(sub) => setSelectedSubmission(sub)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
@@ -660,8 +721,9 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                 )}
 
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-sm font-medium text-foreground">语言</label>
+                  <label htmlFor="language-select" className="text-sm font-medium text-foreground">语言</label>
                   <select
+                    id="language-select"
                     value={language}
                     onChange={(e) => handleLanguageChange(e.target.value)}
                     className="input w-auto min-w-[140px] py-1.5 text-sm hover:border-primary/30 transition-colors duration-300"
@@ -675,11 +737,13 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                 </div>
 
                 <textarea
+                  id="code-editor"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   className="w-full h-[360px] rounded-xl bg-muted text-foreground font-mono text-sm p-3 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
                   spellCheck={false}
-                  placeholder="在此粘贴或输入代码..."
+                  placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
+                  aria-label="代码编辑器"
                 />
 
                 <div className="flex flex-wrap items-center gap-2">

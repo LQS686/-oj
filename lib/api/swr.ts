@@ -22,10 +22,14 @@ class SwrError extends Error {
  * - 401 时抛出 SwrError('UNAUTHORIZED')，调用方可决定是否跳转登录
  */
 export async function swrFetcher<T = unknown>(url: string): Promise<T> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15_000)
   const res = await fetch(url, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
   })
+  clearTimeout(timeoutId)
   let body: ApiResponse<T> | null = null
   try {
     body = (await res.json()) as ApiResponse<T>

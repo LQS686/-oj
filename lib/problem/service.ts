@@ -244,11 +244,14 @@ export async function listProblemSubmissionsMerged(
   const submissionWhere: any = { problemId: problem.id }
   if (filter.userId) submissionWhere.userId = filter.userId
 
+  // Fetch at most page*limit from each table to bound memory (no full table scan)
+  const fetchLimit = page * limit
   const [submissions, classSubmissions, totalSubmissions, totalClassSubmissions] =
     await Promise.all([
       prisma.submission.findMany({
         where: submissionWhere,
         orderBy: { submittedAt: 'desc' },
+        take: fetchLimit,
         select: {
           id: true,
           status: true,
@@ -268,6 +271,7 @@ export async function listProblemSubmissionsMerged(
           ...(filter.userId ? { userId: filter.userId } : {}),
         },
         orderBy: { submittedAt: 'desc' },
+        take: fetchLimit,
         select: {
           id: true,
           status: true,
@@ -290,16 +294,16 @@ export async function listProblemSubmissionsMerged(
       }),
     ])
 
-  const classUserIds = Array.from(new Set(classSubmissions.map((s: any) => s.userId)))
+  const classUserIds = Array.from(new Set(classSubmissions.map((s) => s.userId)))
   const users = classUserIds.length
     ? await prisma.user.findMany({
         where: { id: { in: classUserIds } },
         select: { id: true, username: true, nickname: true },
       })
     : []
-  const userMap = new Map(users.map((u: any) => [u.id, u]))
+  const userMap = new Map(users.map((u) => [u.id, u]))
 
-  const formattedClass = classSubmissions.map((s: any) => ({
+  const formattedClass = classSubmissions.map((s) => ({
     id: s.id,
     status: s.status,
     language: s.language,
@@ -318,7 +322,7 @@ export async function listProblemSubmissionsMerged(
 
   const all = [...submissions, ...formattedClass]
     .sort(
-      (a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
     )
     .slice((page - 1) * limit, page * limit)
 
@@ -345,31 +349,43 @@ export async function listAllProblemsForAdmin(opts?: { page?: number; pageSize?:
   // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
   const take = usePaging ? (pageSize as number) : 500
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
-  return prisma.problem.findMany({
-    skip,
-    take,
-    orderBy: [{ problemNumber: 'asc' }, { createdAt: 'desc' }],
-    select: {
-      id: true,
-      problemNumber: true,
-      title: true,
-      samples: true,
-      hint: true,
-      source: true,
-      difficulty: true,
-      tags: true,
-      isPublic: true,
-      visibility: true,
-      timeLimit: true,
-      memoryLimit: true,
-      totalSubmit: true,
-      totalAccepted: true,
-      createdAt: true,
-      updatedAt: true,
-      isAiGenerated: true,
-      aiStatus: true,
+  const [data, total] = await Promise.all([
+    prisma.problem.findMany({
+      skip,
+      take,
+      orderBy: [{ problemNumber: 'asc' }, { createdAt: 'desc' }],
+      select: {
+        id: true,
+        problemNumber: true,
+        title: true,
+        samples: true,
+        hint: true,
+        source: true,
+        difficulty: true,
+        tags: true,
+        isPublic: true,
+        visibility: true,
+        timeLimit: true,
+        memoryLimit: true,
+        totalSubmit: true,
+        totalAccepted: true,
+        createdAt: true,
+        updatedAt: true,
+        isAiGenerated: true,
+        aiStatus: true,
+      },
+    }),
+    prisma.problem.count(),
+  ])
+  return {
+    data,
+    pagination: {
+      page: usePaging ? (page as number) : 1,
+      limit: take,
+      total,
+      totalPages: Math.ceil(total / take),
     },
-  })
+  }
 }
 
 /** 校验创建/更新题目时的核心字段（抛出 ApiError 由路由 withApi 捕获） */

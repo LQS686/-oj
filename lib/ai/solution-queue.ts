@@ -14,6 +14,7 @@
 import { EventEmitter } from 'events'
 import { logger } from '../logger'
 import { prisma } from '../prisma'
+import type { Prisma } from '@prisma/client'
 import type { SolutionGenerationParams } from './solution-generator';
 import { generateSolutionForProblem } from './solution-generator'
 
@@ -168,8 +169,7 @@ class SolutionQueue extends EventEmitter {
 
       // 写入 Solution 记录
       // 同题同源的旧 AI 标程题解先删除（保持「同一题目只有一份 AI_OFFICIAL 标程题解」）
-      // 注：sourceType / codeLanguage 为 schema 新增字段，当前 Prisma client 可能尚未重新生成，
-      //     用 as any 兜底，运行时已支持。
+      // 注：sourceType / codeLanguage 为 schema 新增字段
       // 使用 $transaction 保证 deleteMany + create 原子性，避免中途失败导致题解丢失
       //
       // 超时保护：若 executeJob 已因超时把日志标 FAILED，则跳过写 Solution + COMPLETED 日志，
@@ -180,7 +180,7 @@ class SolutionQueue extends EventEmitter {
           where: {
             problemId: problem.id,
             sourceType: 'AI_OFFICIAL'
-          } as any
+          }
         })
         return tx.solution.create({
           data: {
@@ -193,7 +193,7 @@ class SolutionQueue extends EventEmitter {
             isOfficial: true,
             isAiGenerated: true,
             sourceType: 'AI_OFFICIAL'
-          } as any
+          }
         })
       })
 
@@ -211,7 +211,7 @@ class SolutionQueue extends EventEmitter {
             content: result.content,
             language: result.language || job.data.params.stdLang || null,
             tokensUsed: result.tokensUsed
-          } as any,
+          } as Prisma.InputJsonValue,
           tokensUsed: result.tokensUsed
         }
       })
@@ -226,19 +226,23 @@ class SolutionQueue extends EventEmitter {
 
       job.status = 'completed'
       job.completedAt = new Date()
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error)
+      const errObj = (error || {}) as Record<string, unknown>
+      const errCode = errObj.code
+      const errInfo = errObj.info as Record<string, unknown> | undefined
       job.status = 'failed'
-      job.error = error.message
+      job.error = errMsg
 
-      const isParseError = error?.code === 'AI_PARSE_FAILED'
+      const isParseError = errCode === 'AI_PARSE_FAILED'
       const errorMessage = isParseError
-        ? `AI 返回格式异常：${error.message}。建议：重试 / 切换模型 / 降低 temperature`
-        : error.message
+        ? `AI 返回格式异常：${errMsg}。建议：重试 / 切换模型 / 降低 temperature`
+        : errMsg
 
       logger.error('[solution-queue] AI 题解生成失败', {
         logId: job.id,
         problemId: job.data.params.problemId,
-        code: error?.code,
+        code: errCode,
         message: errorMessage
       })
 
@@ -250,9 +254,9 @@ class SolutionQueue extends EventEmitter {
           result: isParseError
             ? ({
                 parseFailed: true,
-                parseInfo: error?.info || null,
-                originalContent: error?.info?.originalContent
-              } as any)
+                parseInfo: errInfo || null,
+                originalContent: errInfo?.originalContent || null
+              } as Prisma.InputJsonValue)
             : undefined
         }
       })
@@ -296,8 +300,6 @@ export async function enqueueSolutionJob(
     data: {
       userId: triggeredBy,
       status: 'PENDING',
-      // 用 params 字段记录题解生成上下文（与题目出题共用 AiGenerationLog 表，
-      // 通过 _kind='solution' 区分；不依赖 schema 扩展以保持向后兼容）
       params: {
         _kind: 'solution',
         problemId: params.problemId,
@@ -306,7 +308,7 @@ export async function enqueueSolutionJob(
         hasStdCode: !!params.stdCode,
         stdLang: params.stdLang || null,
         modelId: params.modelId || null
-      } as any
+      } as Prisma.InputJsonValue
     }
   })
 
@@ -354,14 +356,15 @@ export async function getSolutionJobStatus(
     throw new Error(`AiGenerationLog 不存在：${logId}`)
   }
 
-  const result = (log.result as any) || {}
+      const result = (log.result as Record<string, unknown>) || {}
 
   if (log.status === 'COMPLETED') {
     // 优先用 result.content；若空，再回查最新 AI_OFFICIAL Solution
-    let content: string | undefined = result.content
-    if (!content && result.solutionId) {
+    let content: string | undefined = result.content as string | undefined
+    const solutionId = result.solutionId as string | undefined
+    if (!content && solutionId) {
       const sol = await prisma.solution.findUnique({
-        where: { id: result.solutionId },
+        where: { id: solutionId },
         select: { content: true }
       })
       content = sol?.content
@@ -369,7 +372,7 @@ export async function getSolutionJobStatus(
     return {
       status: log.status,
       content,
-      solutionId: result.solutionId
+      solutionId
     }
   }
 

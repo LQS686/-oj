@@ -149,25 +149,132 @@ export async function getUserFullStats(userId: string) {
   })
   if (!user) return null
 
-  const submissions = await prisma.submission.findMany({
-    where: { userId },
-    select: {
-      id: true,
-      status: true,
-      language: true,
-      problemId: true,
-      submittedAt: true,
-      problem: {
-        select: { title: true, difficulty: true, problemNumber: true },
+  const [
+    totalSubmissions,
+    statusGroups,
+    languageGroups,
+    acProblemIds,
+    attemptedProblemIds,
+    recentSubmissions,
+    difficultyGroups,
+    createdProblems,
+    solutionsCount,
+    commentsCount,
+    contestsCount,
+  ] = await Promise.all([
+    prisma.submission.count({ where: { userId } }),
+    prisma.submission.groupBy({
+      by: ['status'],
+      where: { userId },
+      _count: { id: true },
+    }),
+    prisma.submission.groupBy({
+      by: ['language'],
+      where: { userId },
+      _count: { id: true },
+    }),
+    prisma.submission.findMany({
+      where: { userId, status: 'AC' },
+      select: { problemId: true, submittedAt: true },
+    }),
+    prisma.submission.findMany({
+      where: { userId },
+      select: { problemId: true },
+      distinct: ['problemId'],
+    }),
+    prisma.submission.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        status: true,
+        language: true,
+        problemId: true,
+        submittedAt: true,
+        problem: {
+          select: { title: true, difficulty: true, problemNumber: true },
+        },
       },
-    },
-    orderBy: { submittedAt: 'desc' },
+      orderBy: { submittedAt: 'desc' },
+      take: 10,
+    }),
+    prisma.submission.findMany({
+      where: {
+        userId,
+        status: 'AC',
+      },
+      select: {
+        problemId: true,
+        submittedAt: true,
+        problem: { select: { difficulty: true } },
+      },
+    }),
+    prisma.problem.count({ where: { authorId: userId } }),
+    prisma.solution.count({ where: { authorId: userId } }),
+    prisma.comment.count({ where: { authorId: userId } }),
+    prisma.contestParticipant.count({ where: { userId } }),
+  ])
+
+  // Build status counts from groupBy
+  const statusCount: Record<string, number> = {}
+  statusGroups.forEach((g) => { statusCount[g.status] = g._count.id })
+
+  // Build language counts from groupBy
+  const languageCount: Record<string, number> = {}
+  languageGroups.forEach((g) => { languageCount[g.language] = g._count.id })
+
+  // AC unique problems (deduplicated)
+  const acProblemsMap = new Map<string, boolean>()
+  acProblemIds.forEach((s) => { acProblemsMap.set(s.problemId, true) })
+
+  // Difficulty distribution from AC submissions
+  const solvedDifficultyMap = new Map<string, string | null>()
+  difficultyGroups.forEach((sub) => {
+    if (!solvedDifficultyMap.has(sub.problemId)) {
+      solvedDifficultyMap.set(sub.problemId, sub.problem?.difficulty || null)
+    }
+  })
+  const difficultyCount: Record<string, number> = {}
+  solvedDifficultyMap.forEach((difficulty) => {
+    if (difficulty) {
+      difficultyCount[difficulty] = (difficultyCount[difficulty] || 0) + 1
+    }
+  })
+  const difficultyDistribution = Object.entries(difficultyCount)
+    .map(([difficulty, count]) => ({ difficulty, count }))
+    .sort((a, b) => b.count - a.count)
+
+  // Heatmap from AC submissions
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  const oneYearAgo = new Date()
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+
+  const uniqueAcByProblem = new Map<string, Date>()
+  acProblemIds.forEach((sub) => {
+    if (!uniqueAcByProblem.has(sub.problemId)) {
+      uniqueAcByProblem.set(sub.problemId, sub.submittedAt)
+    }
   })
 
-  type SubmissionData = (typeof submissions)[number]
+  const buildHeatmap = (entries: Map<string, Date>) =>
+    Array.from(entries.values()).reduce((acc: Record<string, number>, date: Date) => {
+      const d = new Date(date).toISOString().split('T')[0]
+      acc[d] = (acc[d] || 0) + 1
+      return acc
+    }, {})
 
-  // 最近10条提交
-  const recentSubmissions = submissions.slice(0, 10).map((sub) => ({
+  const lastWeekEntries = new Map<string, Date>()
+  const yearEntries = new Map<string, Date>()
+  uniqueAcByProblem.forEach((date, problemId) => {
+    if (new Date(date) >= sevenDaysAgo) lastWeekEntries.set(problemId, date)
+    if (new Date(date) >= oneYearAgo) yearEntries.set(problemId, date)
+  })
+
+  const heatmapData = buildHeatmap(lastWeekEntries)
+  const yearHeatmap = buildHeatmap(yearEntries)
+
+  // Recent submissions
+  const formattedRecent = recentSubmissions.map((sub) => ({
     id: sub.id,
     problemId: sub.problem?.problemNumber || sub.problemId,
     realProblemId: sub.problemId,
@@ -178,95 +285,10 @@ export async function getUserFullStats(userId: string) {
     submittedAt: sub.submittedAt,
   }))
 
-  // AC 提交
-  const acSubmissions = submissions.filter(
-    (sub) => sub.status === 'AC'
-  )
-
-  // 难度分布（AC 唯一题）
-  const solvedProblemsMap = new Map<string, string | null>()
-  acSubmissions.forEach((sub) => {
-    if (sub.problem && !solvedProblemsMap.has(sub.problemId)) {
-      solvedProblemsMap.set(sub.problemId, sub.problem.difficulty)
-    }
-  })
-  const difficultyCount: Record<string, number> = {}
-  solvedProblemsMap.forEach((difficulty) => {
-    if (difficulty) {
-      difficultyCount[difficulty] = (difficultyCount[difficulty] || 0) + 1
-    }
-  })
-  const difficultyDistribution = Object.entries(difficultyCount)
-    .map(([difficulty, count]: [string, number]) => ({ difficulty, count }))
-    .sort((a, b) => b.count - a.count)
-
-  // 各状态提交数
-  const statusCount: Record<string, number> = submissions.reduce(
-    (acc: Record<string, number>, sub: SubmissionData) => {
-      acc[sub.status] = (acc[sub.status] || 0) + 1
-      return acc
-    },
-    {}
-  )
-
-  // AC 题目去重
-  const acProblems = new Set(
-    submissions
-      .filter((sub: SubmissionData) => sub.status === 'AC')
-      .map((sub: SubmissionData) => sub.problemId)
-  )
-
-  // 语言统计
-  const languageCount: Record<string, number> = submissions.reduce(
-    (acc: Record<string, number>, sub: SubmissionData) => {
-      acc[sub.language] = (acc[sub.language] || 0) + 1
-      return acc
-    },
-    {}
-  )
-
-  // 最近 7 天 / 365 天热力图
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-  const oneYearAgo = new Date()
-  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-
-  // 唯一 AC 集合（按时间倒序遍历，第一次出现即保留）
-  const uniqueAcSubmissionsMap = new Map<string, SubmissionData>()
-  for (const sub of acSubmissions) {
-    if (!uniqueAcSubmissionsMap.has(sub.problemId)) {
-      uniqueAcSubmissionsMap.set(sub.problemId, sub)
-    }
-  }
-  const uniqueAcSubmissions = Array.from(uniqueAcSubmissionsMap.values())
-
-  const buildHeatmap = (subs: SubmissionData[]) =>
-    subs.reduce((acc: Record<string, number>, sub: SubmissionData) => {
-      const date = new Date(sub.submittedAt).toISOString().split('T')[0]
-      acc[date] = (acc[date] || 0) + 1
-      return acc
-    }, {})
-
-  const lastWeekSubmissions = uniqueAcSubmissions.filter(
-    (sub: SubmissionData) => new Date(sub.submittedAt) >= sevenDaysAgo
-  )
-  const yearSubmissions = uniqueAcSubmissions.filter(
-    (sub: SubmissionData) => new Date(sub.submittedAt) >= oneYearAgo
-  )
-  const heatmapData = buildHeatmap(lastWeekSubmissions)
-  const yearHeatmap = buildHeatmap(yearSubmissions)
-
-  const [createdProblems, solutionsCount, commentsCount, contestsCount] = await Promise.all([
-    prisma.problem.count({ where: { authorId: userId } }),
-    prisma.solution.count({ where: { authorId: userId } }),
-    prisma.comment.count({ where: { authorId: userId } }),
-    prisma.contestParticipant.count({ where: { userId } }),
-  ])
-
   return {
     user,
     submissions: {
-      total: submissions.length,
+      total: totalSubmissions,
       accepted: statusCount['AC'] || 0,
       wrongAnswer: statusCount['WA'] || 0,
       timeLimitExceeded: statusCount['TLE'] || 0,
@@ -277,8 +299,8 @@ export async function getUserFullStats(userId: string) {
       statusCount,
     },
     problems: {
-      solved: acProblems.size,
-      attempted: new Set(submissions.map((s: SubmissionData) => s.problemId)).size,
+      solved: acProblemsMap.size,
+      attempted: attemptedProblemIds.length,
       created: createdProblems,
     },
     languages: languageCount,
@@ -289,7 +311,7 @@ export async function getUserFullStats(userId: string) {
       lastYear: yearHeatmap,
       totalDays: Object.keys(yearHeatmap).length,
     },
-    recentSubmissions,
+    recentSubmissions: formattedRecent,
     difficultyDistribution,
   }
 }
@@ -903,29 +925,41 @@ export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: nu
   // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
   const take = usePaging ? (pageSize as number) : 500
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
-  return prisma.user.findMany({
-    skip,
-    take,
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      nickname: true,
-      avatar: true,
-      rating: true,
-      rank: true,
-      role: true,
-      isBanned: true,
-      createdAt: true,
-      _count: {
-        select: {
-          submissions: true,
-          problems: true,
+  const [data, total] = await Promise.all([
+    prisma.user.findMany({
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        nickname: true,
+        avatar: true,
+        rating: true,
+        rank: true,
+        role: true,
+        isBanned: true,
+        createdAt: true,
+        _count: {
+          select: {
+            submissions: true,
+            problems: true,
+          },
         },
       },
+    }),
+    prisma.user.count(),
+  ])
+  return {
+    data,
+    pagination: {
+      page: usePaging ? (page as number) : 1,
+      limit: take,
+      total,
+      totalPages: Math.ceil(total / take),
     },
-  })
+  }
 }
 
 /**

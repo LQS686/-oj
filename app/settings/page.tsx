@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { User, Mail, Lock, Bell, Globe, Check, X, Settings, Shield, ChevronRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { User, Mail, Lock, Bell, Globe, Check, X, Settings, Shield, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import AvatarUploader from '@/components/AvatarUploader'
 import { fetchWithAuth } from '@/lib/api/base'
@@ -46,6 +47,13 @@ export default function SettingsPage() {
  step: 'input' as 'input' | 'verify',
  loading: false,
  countdown: 0
+ })
+
+ const [showPasswords, setShowPasswords] = useState({
+ current: false,
+ new: false,
+ confirm: false,
+ emailPassword: false,
  })
 
  const [preferences, setPreferences] = useState<Preferences>({
@@ -399,42 +407,58 @@ export default function SettingsPage() {
  )}
 
  <div className="grid lg:grid-cols-4 gap-6">
- <div className="lg:col-span-1">
- <div className="card-static p-3">
- <nav className="space-y-1">
- {tabs.map((tab) => {
- const Icon = tab.icon
- const isActive = activeTab === tab.id
- return (
- <button
- key={tab.id}
- onClick={() => setActiveTab(tab.id)}
- className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${
- isActive
- ? 'bg-primary/15 text-primary-light border border-primary/25'
- : 'text-muted-foreground hover:bg-primary/8 hover:text-foreground'
- }`}
- >
- <Icon className={`w-5 h-5 ${isActive ? 'text-primary-light' : 'group-hover:text-primary-light'}`} />
- <div className="text-left flex-1">
- <div className="font-medium text-sm">{tab.label}</div>
- </div>
- <ChevronRight className={`w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity ${isActive ? 'opacity-100' : ''}`} />
- </button>
- )
- })}
- </nav>
- </div>
+<div className="lg:col-span-1">
+  <div className="card-static p-3">
+   <nav className="space-y-1">
+    {tabs.map((tab) => {
+     const Icon = tab.icon
+     const isActive = activeTab === tab.id
+     return (
+      <button
+       key={tab.id}
+       onClick={() => setActiveTab(tab.id)}
+       className={`relative w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${
+        isActive
+         ? 'text-primary-light'
+         : 'text-muted-foreground hover:bg-primary/8 hover:text-foreground'
+       }`}
+      >
+       {isActive && (
+        <motion.div
+         layoutId="settings-tab-indicator"
+         className="absolute inset-0 bg-primary/15 border border-primary/25 rounded-lg"
+         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        />
+       )}
+       <span className="relative z-10 flex items-center gap-3">
+        <Icon className={`w-5 h-5 ${isActive ? 'text-primary-light' : 'group-hover:text-primary-light'}`} />
+        <div className="text-left flex-1">
+         <div className="font-medium text-sm">{tab.label}</div>
+        </div>
+        <ChevronRight className={`w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity ${isActive ? 'opacity-100' : ''}`} />
+       </span>
+      </button>
+     )
+    })}
+   </nav>
+  </div>
  </div>
 
- <div className="lg:col-span-3">
- <div className="card-static p-6">
- {activeTab === 'profile' && (
- <div>
- <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
- <User className="w-5 h-5 text-primary-light" />
- <h2 className="text-xl font-bold text-foreground">个人资料</h2>
- </div>
+<div className="lg:col-span-3">
+  <div className="card-static p-6">
+   <AnimatePresence mode="wait">
+    {activeTab === 'profile' && (
+     <motion.div
+      key="profile"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
+     >
+      <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
+       <User className="w-5 h-5 text-primary-light" />
+       <h2 className="text-xl font-bold text-foreground">个人资料</h2>
+      </div>
  
  <div className="mb-8 pb-8 border-b border-border">
  <label className="block text-sm font-medium text-muted-foreground mb-4">
@@ -494,30 +518,36 @@ export default function SettingsPage() {
  <p className="mt-2 text-xs text-muted-foreground">{formData.bio.length}/500</p>
  </div>
 
- <div className="pt-4">
- <button
- onClick={handleProfileSubmit}
- disabled={loading}
- className="btn btn-primary min-w-[140px]"
- >
- {loading ? (
- <span className="flex items-center gap-2">
- <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
- 保存中...
- </span>
- ) : '保存修改'}
- </button>
+<div className="pt-4">
+   <button
+    onClick={handleProfileSubmit}
+    disabled={loading}
+    className="btn btn-primary min-w-[140px]"
+   >
+    {loading ? (
+     <span className="flex items-center gap-2">
+      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      保存中...
+     </span>
+    ) : '保存修改'}
+   </button>
+  </div>
  </div>
- </div>
- </div>
+ </motion.div>
  )}
 
  {activeTab === 'account' && (
- <div>
- <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
- <Shield className="w-5 h-5 text-primary-light" />
- <h2 className="text-xl font-bold text-foreground">账号安全</h2>
- </div>
+ <motion.div
+  key="account"
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -10 }}
+  transition={{ duration: 0.2 }}
+ >
+  <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
+   <Shield className="w-5 h-5 text-primary-light" />
+   <h2 className="text-xl font-bold text-foreground">账号安全</h2>
+  </div>
  
  <div className="space-y-8">
  <div>
@@ -553,12 +583,20 @@ export default function SettingsPage() {
  <div className="relative">
  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
  <input
- type="password"
+ type={showPasswords.emailPassword ? 'text' : 'password'}
  placeholder="当前密码"
  value={emailChange.currentPassword}
  onChange={(e) => setEmailChange({ ...emailChange, currentPassword: e.target.value })}
- className="input pl-12"
+ className="input pl-12 pr-12"
  />
+ <button
+ type="button"
+ onClick={() => setShowPasswords(prev => ({ ...prev, emailPassword: !prev.emailPassword }))}
+ aria-label={showPasswords.emailPassword ? '隐藏密码' : '显示密码'}
+ className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+ >
+ {showPasswords.emailPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+ </button>
  </div>
  <div className="pt-2">
  <button
@@ -632,59 +670,89 @@ export default function SettingsPage() {
  <div className="relative">
  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
  <input
- type="password"
+ type={showPasswords.current ? 'text' : 'password'}
  placeholder="当前密码"
  value={formData.currentPassword}
  onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
- className="input pl-12"
+ className="input pl-12 pr-12"
  />
+ <button
+ type="button"
+ onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+ aria-label={showPasswords.current ? '隐藏密码' : '显示密码'}
+ className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+ >
+ {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+ </button>
  </div>
  <div className="relative">
  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
  <input
- type="password"
+ type={showPasswords.new ? 'text' : 'password'}
  placeholder="新密码（至少6位）"
  value={formData.newPassword}
  onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
- className="input pl-12"
+ className="input pl-12 pr-12"
  />
+ <button
+ type="button"
+ onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+ aria-label={showPasswords.new ? '隐藏密码' : '显示密码'}
+ className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+ >
+ {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+ </button>
  </div>
  <div className="relative">
  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
  <input
- type="password"
+ type={showPasswords.confirm ? 'text' : 'password'}
  placeholder="确认新密码"
  value={formData.confirmPassword}
  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
- className="input pl-12"
+ className="input pl-12 pr-12"
  />
- </div>
- <div className="pt-2">
  <button
- onClick={handlePasswordChange}
- disabled={loading}
- className="btn btn-primary min-w-[140px]"
+ type="button"
+ onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+ aria-label={showPasswords.confirm ? '隐藏密码' : '显示密码'}
+ className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
  >
- {loading ? (
- <span className="flex items-center gap-2">
- <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
- 修改中...
- </span>
- ) : '修改密码'}
+ {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
  </button>
  </div>
+<div className="pt-2">
+   <button
+    onClick={handlePasswordChange}
+    disabled={loading}
+    className="btn btn-primary min-w-[140px]"
+   >
+    {loading ? (
+     <span className="flex items-center gap-2">
+      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      修改中...
+     </span>
+    ) : '修改密码'}
+   </button>
+  </div>
  </div>
  </div>
  </div>
- </div>
+ </motion.div>
  )}
 
  {activeTab === 'notifications' && (
- <div>
- <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
- <Bell className="w-5 h-5 text-primary-light" />
- <h2 className="text-xl font-bold text-foreground">通知设置</h2>
- </div>
+ <motion.div
+  key="notifications"
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -10 }}
+  transition={{ duration: 0.2 }}
+ >
+  <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
+   <Bell className="w-5 h-5 text-primary-light" />
+   <h2 className="text-xl font-bold text-foreground">通知设置</h2>
+  </div>
  
  <div className="space-y-1">
  {[
@@ -711,29 +779,35 @@ export default function SettingsPage() {
  ))}
  </div>
 
- <div className="pt-6">
- <button
- onClick={handleSavePreferences}
- disabled={preferencesLoading}
- className="btn btn-primary min-w-[140px]"
- >
- {preferencesLoading ? (
- <span className="flex items-center gap-2">
- <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
- 保存中...
- </span>
- ) : '保存设置'}
- </button>
- </div>
- </div>
+<div className="pt-6">
+   <button
+    onClick={handleSavePreferences}
+    disabled={preferencesLoading}
+    className="btn btn-primary min-w-[140px]"
+   >
+    {preferencesLoading ? (
+     <span className="flex items-center gap-2">
+      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      保存中...
+     </span>
+    ) : '保存设置'}
+   </button>
+  </div>
+ </motion.div>
  )}
 
  {activeTab === 'preferences' && (
- <div>
- <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
- <Globe className="w-5 h-5 text-primary-light" />
- <h2 className="text-xl font-bold text-foreground">偏好设置</h2>
- </div>
+ <motion.div
+  key="preferences"
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -10 }}
+  transition={{ duration: 0.2 }}
+ >
+  <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
+   <Globe className="w-5 h-5 text-primary-light" />
+   <h2 className="text-xl font-bold text-foreground">偏好设置</h2>
+  </div>
  
  <div className="space-y-5">
  <div>
@@ -773,18 +847,19 @@ export default function SettingsPage() {
  onClick={handleSavePreferences}
  disabled={preferencesLoading}
  className="btn btn-primary min-w-[140px]"
- >
- {preferencesLoading ? (
- <span className="flex items-center gap-2">
- <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
- 保存中...
- </span>
- ) : '保存设置'}
- </button>
+>
+   {preferencesLoading ? (
+    <span className="flex items-center gap-2">
+     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+     保存中...
+    </span>
+   ) : '保存设置'}
+  </button>
  </div>
  </div>
- </div>
+ </motion.div>
  )}
+ </AnimatePresence>
  </div>
  </div>
  </div>

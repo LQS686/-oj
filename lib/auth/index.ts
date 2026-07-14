@@ -73,4 +73,3 @@ export function getUserFromRequest(request: NextRequest): JWTPayload | null {
 }
 
 export * from './service'
-export * from './validation'

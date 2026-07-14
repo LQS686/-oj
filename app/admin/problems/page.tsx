@@ -79,7 +79,8 @@ export default function AdminProblemsPage() {
 
  const data = await response.json()
  if (data.success) {
- setProblems(Array.isArray(data.data) ? data.data : [])
+   const payload = data.data
+   setProblems(Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [])
  } else {
  setError(data.error || '获取题目列表失败')
  setProblems([])

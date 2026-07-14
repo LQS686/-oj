@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { settingsApi } from '@/lib/api'
 import type { SystemSettings } from '@/lib/settings'
 
@@ -25,17 +25,13 @@ interface SettingsContextType {
   refreshSettings: () => Promise<void>
 }
 
-const SettingsContext = createContext<SettingsContextType>({
-  settings: defaultSettings,
-  loading: true,
-  refreshSettings: async () => {}
-})
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SystemSettings>(defaultSettings)
   const [loading, setLoading] = useState(true)
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       const settingsData = await settingsApi.getPublicSettings()
       setSettings({ ...defaultSettings, ...settingsData })
@@ -44,14 +40,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchSettings()
-  }, [])
+  }, [fetchSettings])
+
+  const value = useMemo(() => ({
+    settings,
+    loading,
+    refreshSettings: fetchSettings,
+  }), [settings, loading, fetchSettings])
 
   return (
-    <SettingsContext.Provider value={{ settings, loading, refreshSettings: fetchSettings }}>
+    <SettingsContext.Provider value={value}>
       {children}
     </SettingsContext.Provider>
   )
@@ -59,7 +61,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
 export function useSettings() {
   const context = useContext(SettingsContext)
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useSettings must be used within a SettingsProvider')
   }
   return context

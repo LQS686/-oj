@@ -4,7 +4,6 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
-import type { Prisma } from '@prisma/client'
 
 export type RankingType = 'global' | 'class' | 'contest' | 'weekly'
 
@@ -33,18 +32,24 @@ export async function getGlobalRanking(limit = 100): Promise<RankingItem[]> {
         _count: { select: { submissions: true } },
       },
     })
-    return Promise.all(users.map(async (u: any, idx: any) => {
-      const solved = await prisma.submission.count({ where: { userId: u.id, status: 'AC' } })
-      return {
-        rank: idx + 1,
-        userId: u.id,
-        username: u.username,
-        nickname: u.nickname,
-        avatar: u.avatar,
-        score: u.rating,
-        solvedCount: solved,
-        submissionCount: u._count.submissions,
-      }
+
+    const userIds = users.map(u => u.id)
+    const acCounts = await prisma.submission.groupBy({
+      by: ['userId'],
+      where: { userId: { in: userIds }, status: 'AC' },
+      _count: { id: true },
+    })
+    const acMap = new Map(acCounts.map(r => [r.userId, r._count.id]))
+
+    return users.map((u, idx) => ({
+      rank: idx + 1,
+      userId: u.id,
+      username: u.username,
+      nickname: u.nickname,
+      avatar: u.avatar,
+      score: u.rating,
+      solvedCount: acMap.get(u.id) || 0,
+      submissionCount: u._count.submissions,
     }))
   }, { ttl: 60_000 })
 }
@@ -67,21 +72,25 @@ export async function getClassRanking(classId: string, limit = 100): Promise<Ran
         },
       },
     })
-    members.sort((a: any, b: any) => (b.user.rating || 0) - (a.user.rating || 0))
-    return Promise.all(members.map(async (m: any, idx: any) => {
-      const solved = await prisma.submission.count({
-        where: { userId: m.user.id, status: 'AC' },
-      })
-      return {
-        rank: idx + 1,
-        userId: m.user.id,
-        username: m.user.username,
-        nickname: m.user.nickname,
-        avatar: m.user.avatar,
-        score: m.user.rating,
-        solvedCount: solved,
-        submissionCount: m.user._count.submissions,
-      }
+    members.sort((a, b) => (b.user.rating || 0) - (a.user.rating || 0))
+
+    const userIds = members.map(m => m.user.id)
+    const acCounts = await prisma.submission.groupBy({
+      by: ['userId'],
+      where: { userId: { in: userIds }, status: 'AC' },
+      _count: { id: true },
+    })
+    const acMap = new Map(acCounts.map(r => [r.userId, r._count.id]))
+
+    return members.map((m, idx) => ({
+      rank: idx + 1,
+      userId: m.user.id,
+      username: m.user.username,
+      nickname: m.user.nickname,
+      avatar: m.user.avatar,
+      score: m.user.rating,
+      solvedCount: acMap.get(m.user.id) || 0,
+      submissionCount: m.user._count.submissions,
     }))
   }, { ttl: 60_000 })
 }
@@ -125,7 +134,7 @@ export interface RankingPage {
  */
 export async function listRankingByType(type: 'rating' | 'solved', page: number, limit: number): Promise<RankingPage> {
   return cache.get('ranking:list', [type, page, limit], async () => {
-    const orderBy: any[] = type === 'solved'
+    const orderBy: Record<string, string>[] = type === 'solved'
       ? [{ solvedCount: 'desc' }, { rating: 'desc' }]
       : [{ rating: 'desc' }, { solvedCount: 'desc' }]
 
@@ -149,7 +158,7 @@ export async function listRankingByType(type: 'rating' | 'solved', page: number,
       prisma.user.count({ where: { isBanned: false } }),
     ])
 
-    const rankedUsers: RankingUser[] = users.map((user: any, index: any) => ({
+    const rankedUsers: RankingUser[] = users.map((user, index) => ({
       ...user,
       position: (page - 1) * limit + index + 1,
       solvedProblems: user.solvedCount,

@@ -7,6 +7,7 @@ import { SwrProvider } from "@/components/SwrProvider"
 import { Toaster } from "react-hot-toast"
 import DocumentTitleProvider from "@/components/DocumentTitleProvider"
 import { SITE_TITLE_SUFFIX } from "@/lib/document-title"
+import PageTransition from "@/components/common/PageTransition"
 
 export const metadata: Metadata = {
   title: `首页 - ${SITE_TITLE_SUFFIX}`,
@@ -43,7 +44,7 @@ export default function RootLayout({
               <DocumentTitleProvider />
               <Navbar />
               <main className="relative">
-                {children}
+                <PageTransition>{children}</PageTransition>
               </main>
               <Toaster
                 position="top-right"

@@ -13,6 +13,7 @@ export default function LoginPage() {
  const { login } = useUser()
  const { settings } = useSettings()
  const [showPassword, setShowPassword] = useState(false)
+ const [rememberMe, setRememberMe] = useState(false)
  const [formData, setFormData] = useState({
  username: '',
  password: '',
@@ -26,9 +27,10 @@ export default function LoginPage() {
  setLoading(true)
 
  try {
- const result = await authApi.login(formData.username, formData.password)
+ const result = await authApi.login(formData.username, formData.password, rememberMe)
  login(result.user, result.token)
- router.push('/')
+ const returnUrl = new URLSearchParams(window.location.search).get('returnUrl')
+ router.replace(returnUrl || '/')
  } catch (err: any) {
  setError(err.message || '登录失败')
  } finally {
@@ -80,12 +82,13 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-3">
+              <label htmlFor="login-username" className="block text-sm font-semibold text-foreground mb-3">
                 用户名或邮箱
               </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200 peer-focus:text-primary" />
                 <input
+                  id="login-username"
                   type="text"
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -97,12 +100,13 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-3">
+              <label htmlFor="login-password" className="block text-sm font-semibold text-foreground mb-3">
                 密码
               </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -113,6 +117,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-110"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -124,6 +129,8 @@ export default function LoginPage() {
               <label className="flex items-center gap-2.5 cursor-pointer group">
                 <input
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 text-primary border-border rounded focus:ring-primary bg-muted accent-primary"
                 />
                 <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors duration-200">记住我</span>

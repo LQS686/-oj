@@ -115,8 +115,8 @@ export default function UserMenu() {
  <span className="group-hover:text-primary-light transition-colors duration-300">登录</span>
  </Link>
  <Link href="/register" className="btn-primary btn group">
- <span className="hidden sm:inline group- transition-transform duration-300">免费注册</span>
- <span className="sm:hidden group- transition-transform duration-300">注册</span>
+ <span className="hidden sm:inline transition-transform duration-300">免费注册</span>
+ <span className="sm:hidden transition-transform duration-300">注册</span>
  </Link>
  </>
  )
@@ -128,7 +128,7 @@ export default function UserMenu() {
  href="/notifications"
  className="btn-ghost btn p-2.5 relative group"
  >
- <Bell className="w-5 h-5 transition-transform duration-300 group-" />
+ <Bell className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
  {unreadCount > 0 && (
  <span className="absolute -top-0.5 -right-0.5 badge-primary badge min-w-[18px] h-[18px] text-[10px]">
  {unreadCount > 99 ? '99+' : unreadCount}
@@ -143,7 +143,7 @@ export default function UserMenu() {
  aria-label="用户菜单"
  >
  {user.avatar ? (
- <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary group- transition-all duration-300">
+ <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
  <Image 
  src={user.avatar} 
  alt="Avatar" 
@@ -154,7 +154,7 @@ export default function UserMenu() {
  />
  </div>
  ) : (
- <div className="avatar avatar-md group- transition-transform duration-300">
+ <div className="avatar avatar-md group-hover:scale-105 transition-transform duration-300">
  <div className="avatar-fallback text-sm">
  {user.username?.charAt(0).toUpperCase()}
  </div>

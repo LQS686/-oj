@@ -3,6 +3,7 @@
  * AI 出题 / 题解 / 模型发现 — 业务层封装
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { addAiJob } from './queue'
 import { logger } from '@/lib/logger'
 import { ApiError } from '@/lib/api/withApi'
@@ -108,7 +109,7 @@ export async function retryAiGeneration(
     throw new ApiError('IN_PROGRESS', '该日志正在处理中，请等待完成后再试', 400)
   }
 
-  const retryParams = (oldLog.params as any) || {}
+  const retryParams = (oldLog.params as Record<string, string | undefined>) || {}
   logger.info('[ai-generate] Retry from log', { retryFromLogId, userId, reduceTemperature })
 
   const retryLog = await prisma.aiGenerationLog.create({
@@ -119,7 +120,7 @@ export async function retryAiGeneration(
         ...retryParams,
         _retryFrom: retryFromLogId,
         _reduceTemperature: reduceTemperature ?? true,
-      },
+      } as Prisma.InputJsonValue,
     },
   })
 
@@ -127,10 +128,10 @@ export async function retryAiGeneration(
     logId: retryLog.id,
     userId,
     params: {
-      mode: retryParams.mode || 'parametric',
+      mode: (retryParams.mode as 'parametric' | 'test_data') || 'parametric',
       type: retryParams.type,
       difficulty: retryParams.difficulty,
-      topic: retryParams.topic,
+      topic: retryParams.topic ? (Array.isArray(retryParams.topic) ? retryParams.topic : [retryParams.topic]) : undefined,
       count: AI_GENERATION_COUNT,
       additionalInfo: retryParams.additionalInfo,
       title: retryParams.title,
@@ -177,7 +178,7 @@ export async function enqueueAiGeneration(userId: string, body: AiGenerateBody) 
     data: {
       userId,
       status: 'PENDING',
-      params: body as any,
+      params: body as unknown as Prisma.InputJsonValue,
     },
   })
 
@@ -185,11 +186,11 @@ export async function enqueueAiGeneration(userId: string, body: AiGenerateBody) 
     logId: log.id,
     userId,
     params: {
-      mode: (body.mode as any) || 'parametric',
+      mode: (body.mode as 'parametric' | 'test_data') || 'parametric',
       // Parametric
       type: body.type,
       difficulty: body.difficulty,
-      topic: body.topic as any,
+      topic: body.topic as string[] | undefined,
       count: AI_GENERATION_COUNT,
       additionalInfo: body.additionalInfo,
       // Test Data Gen
@@ -218,7 +219,7 @@ export async function listActiveAiModelsForUser() {
     where: { isActive: true },
     orderBy: { name: 'asc' },
   })
-  const providerIds = Array.from(new Set(allModels.map((m: any) => m.providerId)))
+  const providerIds = Array.from(new Set(allModels.map(m => m.providerId)))
   const providers =
     providerIds.length === 0
       ? []
@@ -226,10 +227,10 @@ export async function listActiveAiModelsForUser() {
           where: { id: { in: providerIds }, isActive: true },
           select: { id: true, name: true, slug: true },
         })
-  const providerMap = new Map<any, any>(providers.map((p: any) => [p.id, p]))
+  const providerMap = new Map(providers.map(p => [p.id, p]))
   const models = allModels
-    .filter((m: any) => providerMap.has(m.providerId))
-    .map((m: any) => ({
+    .filter(m => providerMap.has(m.providerId))
+    .map(m => ({
       id: m.id,
       name: m.name,
       model: m.model,
@@ -311,7 +312,7 @@ export type ProviderWithMaskedKey = {
 /** 列出所有 AI 服务商（apiKey 脱敏） */
 export async function listAiProvidersForAdmin() {
   const providers = await prisma.aiProvider.findMany({ orderBy: { createdAt: 'desc' } })
-  return providers.map((p: any) => ({
+  return providers.map(p => ({
     ...p,
     apiKey: p.apiKey ? maskApiKey(p.apiKey) : null,
   })) as ProviderWithMaskedKey[]
@@ -340,8 +341,8 @@ export async function createAiProvider(input: {
   if (input.apiKey) {
     try {
       encryptedKey = encrypt(input.apiKey)
-    } catch (err: any) {
-      if (err?.message?.includes('AI_CONFIG_ENCRYPTION_KEY')) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message?.includes('AI_CONFIG_ENCRYPTION_KEY')) {
         throw new ApiError(
           'MISSING_ENCRYPTION_KEY',
           'AI_CONFIG_ENCRYPTION_KEY 环境变量未设置，请先在 .env 配置 32 字节密钥再添加服务商',
@@ -378,7 +379,7 @@ export async function updateAiProvider(
   input: { name?: string; baseUrl?: string; apiKey?: string; isActive?: boolean }
 ) {
   const existing = await getAiProviderForUpdate(id)
-  const data: any = {
+  const data: { name?: string; baseUrl?: string | null; apiKey?: string | null; isActive?: boolean } = {
     name: input.name,
     baseUrl: input.baseUrl || null,
     isActive: input.isActive !== undefined ? input.isActive : existing.isActive,
@@ -430,16 +431,16 @@ export async function listActiveAiModelsEnriched() {
   })
   if (allModels.length === 0) return { data: [], orphanCount: 0 }
 
-  const providerIds = Array.from(new Set(allModels.map((m: any) => m.providerId)))
+  const providerIds = Array.from(new Set(allModels.map(m => m.providerId)))
   const providers = await prisma.aiProvider.findMany({
     where: { id: { in: providerIds }, isActive: true },
     select: { id: true, name: true, slug: true },
   })
-  const providerMap = new Map<any, any>(providers.map((p: any) => [p.id, p]))
+  const providerMap = new Map(providers.map(p => [p.id, p]))
 
   const validModels = allModels
-    .filter((m: any) => providerMap.has(m.providerId))
-    .map((m: any) => ({ ...m, provider: providerMap.get(m.providerId) }))
+    .filter(m => providerMap.has(m.providerId))
+    .map(m => ({ ...m, provider: providerMap.get(m.providerId) }))
 
   const orphanCount = allModels.length - validModels.length
   if (orphanCount > 0) {
@@ -469,7 +470,7 @@ export async function createAiModel(input: {
       temperature: input.temperature !== undefined ? input.temperature : 0.7,
       timeout: input.timeout || 60000,
       // 高级参数（DeepSeek v4 thinking / topP 等），默认空对象
-      params: (input.params && typeof input.params === 'object' ? input.params : {}) as any,
+      params: (input.params && typeof input.params === 'object' ? input.params : {}) as Prisma.InputJsonValue,
       isActive: true,
     },
   })
@@ -511,7 +512,7 @@ export async function updateAiModel(
       temperature: input.temperature,
       timeout: input.timeout,
       // 高级参数（DeepSeek v4 thinking / topP 等），允许为空对象
-      params: (input.params && typeof input.params === 'object' ? input.params : {}) as any,
+      params: (input.params && typeof input.params === 'object' ? input.params : {}) as Prisma.InputJsonValue,
       isActive: input.isActive !== undefined ? input.isActive : existing.isActive,
     },
   })
@@ -636,8 +637,8 @@ export interface TestConnectionInput {
  *  - INTERNAL_ERROR: 其他内部错误
  */
 export async function testAiConnection(input: TestConnectionInput) {
-  const { provider, model } = input
-  let { apiKey, baseUrl } = input
+  const { provider, model, baseUrl: initialBaseUrl } = input
+  let { apiKey } = input
 
   // 1. Try to use saved key if apiKey is masked or empty
   if (!apiKey || apiKey.includes('****')) {
@@ -677,14 +678,14 @@ export async function testAiConnection(input: TestConnectionInput) {
   }
 
   // Determine Base URL via provider dictionary
-  const finalBaseUrl = baseUrl || resolveBaseUrl(provider, 'openai', null) || ''
+  const finalBaseUrl = initialBaseUrl || resolveBaseUrl(provider, 'openai', null) || ''
   // SSRF 防护：校验 baseUrl 不指向内网/元数据端点
   if (finalBaseUrl) {
     try {
       validateAiBaseUrl(finalBaseUrl)
       await validateAiBaseUrlDns(finalBaseUrl)
-    } catch (e: any) {
-      throw new ApiError('INVALID_BASE_URL', e?.message || 'baseUrl 校验失败', 400)
+    } catch (e: unknown) {
+      throw new ApiError('INVALID_BASE_URL', e instanceof Error ? e.message : 'baseUrl 校验失败', 400)
     }
   }
   const client = new OpenAI({ apiKey, baseURL: finalBaseUrl })
@@ -699,31 +700,32 @@ export async function testAiConnection(input: TestConnectionInput) {
       max_tokens: 5,
     })
     return { message: 'Connection successful', data: response }
-  } catch (error: any) {
-    logger.error('Test Connection Error', { error: error?.message, stack: error?.stack })
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error))
+    const status = Number((error as Record<string, unknown>)?.status || (error as Record<string, Record<string, unknown>>)?.response?.status) || 0
+    logger.error('Test Connection Error', { error: err.message, stack: err.stack })
 
-    const status = error?.status || error?.response?.status
     if (status === 401 || status === 403) {
       throw new ApiError(
         'PROVIDER_REJECTED',
-        `服务商拒绝（${status}）：${error.message || 'API Key 无效或无权限'}`,
+        `服务商拒绝（${status}）：${err.message || 'API Key 无效或无权限'}`,
         502
       )
     }
     if (status && status >= 400 && status < 500) {
       throw new ApiError(
         'PROVIDER_REJECTED',
-        `服务商返回 ${status}：${error.message || '请求参数有误'}`,
+        `服务商返回 ${status}：${err.message || '请求参数有误'}`,
         502
       )
     }
     if (status && status >= 500) {
       throw new ApiError(
         'PROVIDER_REJECTED',
-        `服务商内部错误（${status}）：${error.message || '请稍后重试'}`,
+        `服务商内部错误（${status}）：${err.message || '请稍后重试'}`,
         502
       )
     }
-    throw new ApiError('INTERNAL', error?.message || 'Connection failed', 500)
+    throw new ApiError('INTERNAL', err.message || 'Connection failed', 500)
   }
 }

@@ -62,7 +62,8 @@ export default function SourceManagementPage() {
  const response = await fetchWithAuth('/api/admin/problems')
  const data = await response.json()
  if (data.success) {
- setProblems(data.data)
+   const payload = data.data
+   setProblems(Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [])
  } else {
  setError(data.error)
  }
