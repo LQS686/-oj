@@ -101,11 +101,11 @@ fi
 # 2. 生成 MongoDB KeyFile（仅首次）
 # ============================================================
 if [ ! -f "mongo-keyfile" ]; then
-  openssl rand -base64 756 > mongo-keyfile
-  chmod 400 mongo-keyfile
+  openssl rand 512 | base64 > mongo-keyfile
+  chmod 600 mongo-keyfile
   info "MongoDB KeyFile 已生成"
 else
-  chmod 400 mongo-keyfile
+  chmod 600 mongo-keyfile
 fi
 
 # ============================================================
