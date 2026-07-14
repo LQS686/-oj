@@ -171,7 +171,7 @@ setup_mongo_keyfile() {
   local KEYFILE="mongo-keyfile"
 
   if [ ! -f "$KEYFILE" ]; then
-    openssl rand 512 | base64 > "$KEYFILE"
+    openssl rand -base64 512 | tr -d '\n' > "$KEYFILE"
     chmod 600 "$KEYFILE"
     info "MongoDB 副本集 KeyFile 已生成"
   else
