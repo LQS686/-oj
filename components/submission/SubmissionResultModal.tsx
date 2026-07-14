@@ -398,7 +398,7 @@ export default function SubmissionResultModal({
                     <div className="mt-4 w-full max-w-xs mx-auto">
                       <div className="relative w-full h-2 bg-muted rounded-full overflow-hidden">
                         <motion.div
-                          className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-primary-light rounded-full"
+                          className="absolute top-0 left-0 h-full bg-primary rounded-full"
                           initial={{ width: 0 }}
                           animate={{
                             width: `${Math.min((judgeProgress.currentTest / judgeProgress.totalTests) * 100, 100)}%`,
@@ -444,10 +444,10 @@ export default function SubmissionResultModal({
                     <motion.div
                       className={`absolute top-0 left-0 h-full rounded-full ${
                         progressPercent === 100
-                          ? 'bg-gradient-to-r from-secondary to-secondary-light'
+                          ? 'bg-secondary'
                           : progressPercent > 0
-                          ? 'bg-gradient-to-r from-accent to-accent-light'
-                          : 'bg-gradient-to-r from-error to-red-400'
+                          ? 'bg-accent'
+                          : 'bg-error'
                       }`}
                       initial={{ width: 0 }}
                       animate={{ width: `${progressPercent}%` }}

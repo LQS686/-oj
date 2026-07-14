@@ -88,7 +88,7 @@ export default function MobileMenu() {
  className="lg:hidden btn-ghost btn p-2.5 group"
  aria-label="打开菜单"
  >
- <Menu className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
+ <Menu className="w-5 h-5" />
  </button>
 
  <AnimatePresence>

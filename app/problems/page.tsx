@@ -215,7 +215,7 @@ export default function ProblemsPage() {
     if (filteredProblems.length === 0) {
       return (
         <div className="card-static rounded-lg p-12 text-center animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6 animate-float">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
             <Search className="w-8 h-8 text-muted-foreground" />
           </div>
           <div className="text-foreground text-xl font-semibold mb-2">没有找到符合条件的题目</div>

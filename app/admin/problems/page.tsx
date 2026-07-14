@@ -374,8 +374,8 @@ export default function AdminProblemsPage() {
  }
 
  return (
-  <>
-   <div className="space-y-6">
+ <>
+ <div className="space-y-6">
  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
  <div className="flex items-center gap-3">
  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -807,9 +807,9 @@ export default function AdminProblemsPage() {
  确认删除
  </button>
  </div>
-	  </div>
-	</div>
-  )}
-  </>
-  )
+ </div>
+ </div>
+ )}
+ </>
+ )
 }

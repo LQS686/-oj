@@ -187,7 +187,7 @@ export default function TrainingListPage() {
           </div>
         ) : trainings.length === 0 ? (
           <div className="card-static rounded-lg p-16 text-center animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6 animate-float">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
               {source === 'mine' ? <UserCheck className="w-8 h-8 text-muted-foreground" /> : <BookOpen className="w-8 h-8 text-muted-foreground" />}
             </div>
             <div className="text-foreground text-xl font-semibold mb-2">

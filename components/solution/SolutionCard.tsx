@@ -25,19 +25,19 @@ interface SolutionCardProps {
 }
 
 const LANGUAGE_COLOR_MAP: Record<string, string> = {
- cpp: 'from-blue-500 to-indigo-500',
- c: 'from-slate-500 to-slate-700',
- java: 'from-orange-500 to-red-500',
- python: 'from-yellow-400 to-blue-500',
- javascript: 'from-yellow-300 to-amber-500',
- typescript: 'from-blue-400 to-blue-600',
- go: 'from-cyan-400 to-teal-500',
- rust: 'from-orange-600 to-amber-700',
+  cpp: 'bg-blue-500',
+  c: 'bg-slate-600',
+  java: 'bg-orange-500',
+  python: 'bg-blue-600',
+  javascript: 'bg-amber-500',
+  typescript: 'bg-blue-500',
+  go: 'bg-cyan-500',
+  rust: 'bg-orange-700',
 }
 
-function getLanguageGradient(language: string): string {
- const key = language?.toLowerCase() || ''
- return LANGUAGE_COLOR_MAP[key] || 'from-slate-400 to-slate-600'
+function getLanguageClass(language: string): string {
+  const key = language?.toLowerCase() || ''
+  return LANGUAGE_COLOR_MAP[key] || 'bg-slate-500'
 }
 
 function getAuthorInitial(nickname: string): string {
@@ -96,7 +96,7 @@ export default function SolutionCard({ solution, onClick }: SolutionCardProps) {
  {/* 标题/摘要列：徽标 + 标题 + 语言 */}
  <div className="col-span-5 flex items-center gap-2 min-w-0">
  {isAiGenerated && (
- <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-purple-500 to-purple-700 text-white flex-shrink-0">
+ <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-600 text-white flex-shrink-0">
  <span aria-hidden="true">🤖</span>
  <span>AI</span>
  </span>
@@ -105,15 +105,15 @@ export default function SolutionCard({ solution, onClick }: SolutionCardProps) {
  {title}
  </h3>
  {isOfficial && (
- <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-amber-400 to-yellow-500 text-amber-950 flex-shrink-0">
+ <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500 text-amber-950 flex-shrink-0">
  <span aria-hidden="true">⭐</span>
  <span>标程</span>
  </span>
  )}
  <span
- className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-white bg-gradient-to-r ${getLanguageGradient(
- codeLanguage
- )} flex-shrink-0`}
+ className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-white ${getLanguageClass(
+  codeLanguage
+)} flex-shrink-0`}
  >
  <Code2 className="w-3 h-3" />
  {codeLanguage || 'text'}

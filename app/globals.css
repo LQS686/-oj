@@ -941,49 +941,15 @@ code, pre {
     100% { background-position: -200% 0; }
   }
 
-  /* Float animation for decorative elements */
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
-  }
-
-  /* Scale bounce for interactive elements */
-  .hover-scale {
-    transition: transform 200ms var(--ease-spring);
-  }
-
-  .hover-scale:hover {
-    transform: scale(1.03);
-  }
-
-  .hover-scale:active {
-    transform: scale(0.98);
-    transition-duration: 75ms;
-  }
-
-  /* Link underline animation */
-  .link-underline {
-    position: relative;
-    text-decoration: none;
-  }
-
-  .link-underline::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background: var(--primary);
-    transition: width 200ms var(--ease-out);
-  }
-
-  .link-underline:hover::after {
-    width: 100%;
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+    background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      var(--border) 50%,
+      var(--muted) 100%
+    );
+    background-size: 200% 100%;
   }
 
   /* Icon spin for loading states */

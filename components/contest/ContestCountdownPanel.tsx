@@ -31,9 +31,9 @@ export default function ContestCountdownPanel({
 
   const barClass =
     state.phase === 'running'
-      ? 'bg-gradient-to-r from-secondary to-secondary-light'
+      ? 'bg-secondary'
       : state.phase === 'upcoming'
-        ? 'bg-gradient-to-r from-primary to-primary-light'
+        ? 'bg-primary'
         : 'bg-muted-foreground/50'
 
   return (

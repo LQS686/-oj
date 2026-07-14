@@ -7,7 +7,7 @@ export default function Logo() {
 
   return (
     <Link href="/" className="flex items-center gap-2.5 group">
-      <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center transition-all duration-300 group-hover:shadow-lg group-hover:shadow-primary/25 group-hover:scale-110 group-hover:rotate-3">
+      <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center transition-colors duration-150 group-hover:bg-primary-dark">
         <Code2 className="w-4 h-4 text-white" />
       </div>
       <div className="hidden sm:flex flex-col">

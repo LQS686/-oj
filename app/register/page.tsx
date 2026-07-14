@@ -90,32 +90,24 @@ export default function RegisterPage() {
  const strengthColor = getStrengthColor()
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 py-8 relative overflow-hidden">
-      <div className="absolute inset-0">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-secondary/10 rounded-full animate-float"></div>
-        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full animate-float" style={{ animationDelay: '2s' }}></div>
-      </div>
-      
-      <div className="w-full max-w-md relative z-10">
+    <div className="min-h-screen flex items-center justify-center p-4 py-8">
+      <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary blur-xl opacity-40 group-hover:opacity-60 transition-opacity rounded-lg"></div>
-              <div className="relative w-14 h-14 bg-primary rounded-lg flex items-center justify-center shadow-xl transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
-                <Code2 className="w-7 h-7 text-white" />
-              </div>
+            <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center">
+              <Code2 className="w-7 h-7 text-white" />
             </div>
             <div className="text-left">
-              <span className="text-2xl font-extrabold text-foreground transition-all duration-300">{settings.siteName}</span>
-              <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors duration-300">{settings.siteDescription}</p>
+              <span className="text-2xl font-extrabold text-foreground">{settings.siteName}</span>
+              <p className="text-xs text-muted-foreground">{settings.siteDescription}</p>
             </div>
           </Link>
-          <p className="text-muted-foreground mt-6 text-lg animate-fadeIn">加入我们，开启编程之旅</p>
+          <p className="text-muted-foreground mt-6 text-lg">加入我们，开启编程之旅</p>
         </div>
 
         <div className="card-static rounded-lg p-6 md:p-10 shadow-2xl transition-all duration-300 animate-modal-in">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110 hover:rotate-6">
+            <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>

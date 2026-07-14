@@ -9,12 +9,16 @@ export default function PageTransition({ children }: { children: React.ReactNode
   const [transitionStage, setTransitionStage] = useState<'visible' | 'fading'>('visible')
   const prevPathname = useRef(pathname)
 
+  const isAdminRoute = pathname.startsWith('/admin')
+
   useEffect(() => {
     if (pathname !== prevPathname.current) {
       prevPathname.current = pathname
-      setTransitionStage('fading')
+      if (!isAdminRoute) {
+        setTransitionStage('fading')
+      }
     }
-  }, [pathname])
+  }, [pathname, isAdminRoute])
 
   useEffect(() => {
     if (transitionStage === 'fading') {
@@ -25,6 +29,10 @@ export default function PageTransition({ children }: { children: React.ReactNode
       return () => clearTimeout(t)
     }
   }, [transitionStage, children])
+
+  if (isAdminRoute) {
+    return <>{children}</>
+  }
 
   return (
     <div

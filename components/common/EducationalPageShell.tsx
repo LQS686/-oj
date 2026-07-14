@@ -64,7 +64,7 @@ export function EducationalPageShell({
           <div className="flex items-center gap-3 min-w-0">
             {Icon && (
               <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-110 hover:rotate-3 ${iconClassName}`}
+                className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${iconClassName}`}
               >
                 <Icon className="w-5 h-5" />
               </div>

@@ -348,36 +348,28 @@ export default function UserProfilePage() {
  
  let bgClass = 'bg-muted';
  let textClass = 'text-muted-foreground';
- let glowColor = 'rgba(148, 163, 184, 0.3)';
- 
+
  if (item.difficulty === '入门') {
  bgClass = 'bg-muted';
  textClass = 'text-muted-foreground';
- glowColor = 'rgba(148, 163, 184, 0.3)';
  } else if (item.difficulty === '普及-') {
  bgClass = 'bg-secondary';
  textClass = 'text-secondary-light';
- glowColor = 'rgba(34, 197, 94, 0.3)';
  } else if (item.difficulty === '普及') {
  bgClass = 'bg-primary';
  textClass = 'text-primary-light';
- glowColor = 'rgba(99, 102, 241, 0.3)';
  } else if (item.difficulty === '普及+') {
  bgClass = 'bg-accent';
  textClass = 'text-accent-light';
- glowColor = 'rgba(245, 158, 11, 0.3)';
  } else if (item.difficulty === '提高') {
  bgClass = 'bg-accent';
  textClass = 'text-accent-light';
- glowColor = 'rgba(245, 158, 11, 0.3)';
  } else if (item.difficulty === '提高+') {
  bgClass = 'bg-error';
  textClass = 'text-error';
- glowColor = 'rgba(239, 68, 68, 0.3)';
  } else {
  bgClass = 'bg-primary';
  textClass = 'text-primary-light';
- glowColor = 'rgba(99, 102, 241, 0.3)';
  }
 
  return (
@@ -391,7 +383,6 @@ export default function UserProfilePage() {
  className={`${bgClass} h-3 rounded-full transition-all duration-700`}
  style={{ 
  width: `${percentage}%`,
- boxShadow: `0 0 15px ${glowColor}`
  }}
  ></div>
  </div>

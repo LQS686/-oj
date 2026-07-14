@@ -225,7 +225,7 @@ export default function ContestsPage() {
     if (contests.length === 0) {
       return (
         <div className="card-static rounded-lg p-16 text-center border border-border animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6 animate-float">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
             <Trophy className="w-8 h-8 text-muted-foreground" />
           </div>
           <div className="text-foreground text-xl font-semibold mb-2">暂无竞赛</div>

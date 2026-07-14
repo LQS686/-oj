@@ -205,14 +205,14 @@ export default function JudgeStatus({
  <div className="relative w-full h-2.5 bg-muted rounded-full overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`评测进度: ${Math.round(progress)}%`}>
  <div
  className={`absolute top-0 left-0 h-full transition-all duration-500 ease-out rounded-full ${
- status === 'AC' || status === 'Accepted'
- ? 'bg-gradient-to-r from-secondary to-secondary-light'
- : status === 'Judging' || status === 'Pending'
- ? 'bg-gradient-to-r from-primary to-primary-light'
- : passedTests > 0
- ? 'bg-gradient-to-r from-accent to-accent-light'
- : 'bg-gradient-to-r from-error to-red-400'
- }`}
+            status === 'AC' || status === 'Accepted'
+              ? 'bg-secondary'
+              : status === 'Judging' || status === 'Pending'
+                ? 'bg-primary'
+                : passedTests > 0
+                  ? 'bg-accent'
+                  : 'bg-error'
+          }`}
  style={{ width: `${progress}%` }}
  ></div>
  

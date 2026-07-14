@@ -203,9 +203,8 @@ export default function AdminClassesPage() {
  )
  }
 
- return (
-  <>
-   <div className="space-y-6">
+return (<>
+ <div className="space-y-6">
  <div className="flex items-center gap-3">
  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
  style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
@@ -287,9 +286,8 @@ export default function AdminClassesPage() {
  确认删除
  </button>
  </div>
-	  </div>
-	</div>
-  )}
-  </>
-  )
+ </div>
+ </div>
+ )}
+ </>)
 }

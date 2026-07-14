@@ -93,7 +93,7 @@ export default function SearchBar() {
  className="btn-ghost btn p-2.5 group"
  aria-label="搜索"
  >
- <Search className="w-5 h-5 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
+ <Search className="w-5 h-5" />
  </button>
  
  {isSearchOpen && (

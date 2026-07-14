@@ -340,7 +340,7 @@ export default function RankPage() {
 
  {rankings.length === 0 && !loading && (
   <div className="card-static rounded-xl p-16 text-center mt-6 animate-fadeIn">
-  <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6 animate-float">
+  <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
   <Trophy className="w-8 h-8 text-accent" />
   </div>
   <div className="text-foreground text-xl font-semibold mb-2">暂无排名数据</div>

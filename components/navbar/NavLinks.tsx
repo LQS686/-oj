@@ -67,7 +67,7 @@ export default function NavLinks() {
             className={`nav-link group relative ${isActive ? 'active' : ''}`}
           >
             <span className="relative z-10 flex items-center gap-1.5">
-              <Icon className={`w-4 h-4 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? '' : 'group-hover:text-primary'}`} />
               {link.label}
             </span>
           </Link>

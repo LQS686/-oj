@@ -6,13 +6,13 @@ export default function NotFound() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="text-center animate-fadeIn">
         <div className="relative mb-8">
-          <div className="absolute inset-0 bg-primary/10 rounded-full blur-3xl scale-150 animate-pulse-glow" />
+          <div className="absolute inset-0 bg-primary/10 rounded-full blur-3xl scale-150" />
           <span className="text-[180px] md:text-[220px] font-extrabold text-foreground opacity-30 select-none">
             404
           </span>
         </div>
 
-        <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-amber-500/30 animate-float">
+        <div className="w-20 h-20 rounded-lg bg-amber-500 flex items-center justify-center mx-auto mb-6">
           <AlertTriangle className="w-10 h-10 text-white" />
         </div>
 
