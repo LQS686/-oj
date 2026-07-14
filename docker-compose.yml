@@ -59,7 +59,7 @@ services:
       - mongo_data:/data/db
       - mongo_config:/data/configdb
       - ./scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
-      - ./mongo-keyfile:/etc/mongo/keyfile:ro
+      - ./mongo-keyfile:/etc/mongo/keyfile:ro,Z
     logging:
       driver: "json-file"
       options:
