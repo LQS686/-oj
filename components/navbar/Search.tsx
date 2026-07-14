@@ -1,14 +1,38 @@
 'use client'
 
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, Command } from 'lucide-react'
 import { useClickOutside } from '@/hooks/useClickOutside'
+import { fetchWithCookie } from '@/lib/api/base'
+
+interface SearchResult {
+ problems: Array<{
+ id: string
+ problemNumber: string | null
+ title: string
+ difficulty: string
+ totalAccepted: number
+ totalSubmit: number
+ }>
+ users: Array<{
+ id: string
+ username: string
+ nickname: string | null
+ avatar: string | null
+ rating: number
+ }>
+ contests: Array<{
+ id: string
+ title: string
+ startTime: string
+ }>
+}
 
 export default function SearchBar() {
  const [isSearchOpen, setIsSearchOpen] = useState(false)
  const [searchQuery, setSearchQuery] = useState('')
- const [searchResults, setSearchResults] = useState<any>(null)
+ const [searchResults, setSearchResults] = useState<SearchResult | null>(null)
  const [searchLoading, setSearchLoading] = useState(false)
  const searchRef = useRef<HTMLDivElement>(null)
 
@@ -24,7 +48,7 @@ export default function SearchBar() {
 
  setSearchLoading(true)
  try {
- const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=10`)
+  const response = await fetchWithCookie(`/api/search?q=${encodeURIComponent(query)}&limit=10`)
  const data = await response.json()
  if (data.success) {
  setSearchResults(data.data)
@@ -85,7 +109,7 @@ export default function SearchBar() {
  <div>
  <h4 className="text-xs font-medium text-muted-foreground mb-2">题目</h4>
  <div className="space-y-1">
- {searchResults.problems.slice(0, 3).map((problem: any) => (
+ {searchResults.problems.slice(0, 3).map((problem) => (
  <Link
  key={problem.id}
  href={`/problem/${problem.id}`}
@@ -121,7 +145,7 @@ export default function SearchBar() {
  <div>
  <h4 className="text-xs font-medium text-muted-foreground mb-2">用户</h4>
  <div className="space-y-1">
- {searchResults.users.slice(0, 3).map((user: any) => (
+ {searchResults.users.slice(0, 3).map((user) => (
  <Link
  key={user.id}
  href={`/user/${user.id}`}
@@ -159,7 +183,7 @@ export default function SearchBar() {
  <div>
  <h4 className="text-xs font-medium text-muted-foreground mb-2">竞赛</h4>
  <div className="space-y-1">
- {searchResults.contests.slice(0, 3).map((contest: any) => (
+ {searchResults.contests.slice(0, 3).map((contest) => (
  <Link
  key={contest.id}
  href={`/contest/${contest.id}`}

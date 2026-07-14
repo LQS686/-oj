@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { CheckCircle2, XCircle, Clock, Loader2, AlertCircle, X } from 'lucide-react'
 
 interface TestResult {

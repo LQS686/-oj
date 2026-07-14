@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, ReactNode } from 'react'
+import { useState, useMemo, ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 
 export interface Column<T> {

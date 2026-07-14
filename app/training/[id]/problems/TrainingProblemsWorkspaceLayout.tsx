@@ -9,6 +9,7 @@ import {
 } from '@/contexts/TrainingProblemWorkspaceContext'
 import TrainingProblemSidebar from '@/components/training/TrainingProblemSidebar'
 import TrainingProblemMainHeader from '@/components/training/TrainingProblemMainHeader'
+import { fetchWithCookie } from '@/lib/api/base'
 
 export default function TrainingProblemsWorkspaceLayout({
   children,
@@ -27,7 +28,7 @@ export default function TrainingProblemsWorkspaceLayout({
     let cancelled = false
     async function load() {
       try {
-        const res = await fetch(`/api/trainings/${trainingId}/problem-list`, { cache: 'no-store' })
+        const res = await fetchWithCookie(`/api/trainings/${trainingId}/problem-list`, { cache: 'no-store' })
         const data = await res.json()
         if (cancelled) return
         if (!data.success || !data.data?.training) {

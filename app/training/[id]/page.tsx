@@ -13,6 +13,7 @@
  * 6. 草稿 404 友好处理
  */
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { fetchWithCookie } from '@/lib/api/base'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
@@ -82,7 +83,7 @@ export default function TrainingDetailPage() {
  if (!trainingId) return
  try {
  if (showLoading) setLoading(true)
- const res = await fetch(`/api/trainings/${trainingId}`, {
+ const res = await fetchWithCookie(`/api/trainings/${trainingId}`, {
  cache: 'no-store',
  headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' },
  })
@@ -107,7 +108,7 @@ export default function TrainingDetailPage() {
  }, [trainingId])
 
  useEffect(() => {
- fetch('/api/auth/me', { cache: 'no-store' })
+ fetchWithCookie('/api/auth/me', { cache: 'no-store' })
  .then(r => r.ok ? r.json() : null)
  .then(data => {
  if (data?.success && data.data) setUser(data.data as User)

@@ -16,7 +16,7 @@ import {
 import { getDifficultyColor } from '@/lib/status'
 import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { EducationalPageShell, PageLoading, DenseListShell, denseListRowClass } from '@/components/common'
 
@@ -64,7 +64,7 @@ export default function ProblemsPage() {
 
   const fetchTags = async () => {
     try {
-      const response = await fetch('/api/problems/tags')
+      const response = await fetchWithCookie('/api/problems/tags')
       const data = await response.json()
       if (data.success) {
         setAvailableTags(data.data)
@@ -102,7 +102,7 @@ export default function ProblemsPage() {
   const fetchProblems = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/problems?page=${page}&limit=30`)
+      const response = await fetchWithCookie(`/api/problems?page=${page}&limit=30`)
       const data = await response.json()
 
       if (data.success) {

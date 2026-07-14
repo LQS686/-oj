@@ -17,7 +17,7 @@ import {
  XCircle
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { formatRelativeTime } from '@/lib/utils'
 import { canManageContent } from '@/lib/permissions'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
@@ -111,7 +111,7 @@ export default function SolutionDetailPage() {
  setLoading(true)
  setError(null)
  setNotFound(false)
- const response = await fetch(`/api/solutions/${sid}`)
+ const response = await fetchWithCookie(`/api/solutions/${sid}`)
  const data = await response.json().catch(() => null)
 
  if (response.status === 404) {
@@ -134,7 +134,7 @@ export default function SolutionDetailPage() {
 
  const fetchProblem = async () => {
  try {
- const response = await fetch(`/api/problems/${pid}`)
+ const response = await fetchWithCookie(`/api/problems/${pid}`)
  const data = await response.json().catch(() => null)
  if (data?.success && data.data) {
  setProblem({

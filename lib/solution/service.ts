@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { AppError } from '@/lib/errors'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
 
 export interface SolutionFilter {
@@ -185,26 +186,18 @@ export interface CreateSolutionInput {
 
 export async function createUserSolution(input: CreateSolutionInput, authorId: string) {
   if (!input.problemId || typeof input.problemId !== 'string') {
-    const err: any = new Error('problemId 不能为空')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('VALIDATION', 'problemId 不能为空')
   }
   if (typeof input.title !== 'string' || input.title.length < 1 || input.title.length > 100) {
-    const err: any = new Error('标题长度需在 1-100 字符之间')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('VALIDATION', '标题长度需在 1-100 字符之间')
   }
   if (typeof input.content !== 'string' || input.content.length < 10 || input.content.length > 50000) {
-    const err: any = new Error('内容长度需在 10-50000 字符之间')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('VALIDATION', '内容长度需在 10-50000 字符之间')
   }
   const { resolveProblemId } = await import('./problem-resolver')
   const realProblemId = await resolveProblemId(input.problemId)
   if (!realProblemId) {
-    const err: any = new Error('题目不存在')
-    err.status = 404
-    throw err
+    throw AppError.notFound('题目不存在')
   }
   const result = await prisma.solution.create({
     data: {
@@ -304,30 +297,22 @@ export async function updateUserSolution(
     select: { id: true, authorId: true },
   })
   if (!solution) {
-    const err: any = new Error('题解不存在')
-    err.status = 404
-    throw err
+    throw AppError.notFound('题解不存在')
   }
   const isAuthor = solution.authorId === requesterId
   if (!isAuthor && !isAdmin && !isTeacher) {
-    const err: any = new Error('无权修改此题解')
-    err.status = 403
-    throw err
+    throw AppError.forbidden('无权修改此题解')
   }
   const data: any = {}
   if (input.title !== undefined) {
     if (typeof input.title !== 'string' || input.title.length < 1 || input.title.length > 100) {
-      const err: any = new Error('标题长度需在 1-100 字符之间')
-      err.status = 400
-      throw err
+      throw AppError.badRequest('VALIDATION', '标题长度需在 1-100 字符之间')
     }
     data.title = input.title
   }
   if (input.content !== undefined) {
     if (typeof input.content !== 'string' || input.content.length < 10 || input.content.length > 50000) {
-      const err: any = new Error('内容长度需在 10-50000 字符之间')
-      err.status = 400
-      throw err
+      throw AppError.badRequest('VALIDATION', '内容长度需在 10-50000 字符之间')
     }
     data.content = input.content
   }
@@ -364,15 +349,11 @@ export async function deleteUserSolution(
     select: { id: true, authorId: true },
   })
   if (!solution) {
-    const err: any = new Error('题解不存在')
-    err.status = 404
-    throw err
+    throw AppError.notFound('题解不存在')
   }
   const isAuthor = solution.authorId === requesterId
   if (!isAuthor && !isAdmin && !isTeacher) {
-    const err: any = new Error('无权删除此题解')
-    err.status = 403
-    throw err
+    throw AppError.forbidden('无权删除此题解')
   }
   // 先删除关联评论，再删除题解
   await prisma.comment.deleteMany({ where: { solutionId: id } })
@@ -398,24 +379,17 @@ export async function toggleSolutionLike(
     select: { id: true, problemId: true },
   })
   if (!solution) {
-    const err: any = new Error('题解不存在')
-    err.status = 404
-    throw err
+    throw AppError.notFound('题解不存在')
   }
   const permission = await canViewSolutions(viewer, solution.problemId, { isAssignmentContext })
   if (!permission.allowed) {
-    const err: any = new Error('无权操作此题解')
-    err.status = 403
-    err.permission = permission
-    throw err
+    throw Object.assign(AppError.forbidden('无权操作此题解'), { permission })
   }
 
   const solutionLikeModel = getSolutionLikeModel()
   if (!solutionLikeModel) {
     logger.error('prisma.solutionLike 模型不可用，请执行 `npx prisma generate` + `npx prisma db push`')
-    const err: any = new Error('点赞功能暂不可用，请联系管理员执行 prisma generate')
-    err.status = 503
-    throw err
+    throw new AppError('SERVICE_UNAVAILABLE', '点赞功能暂不可用，请联系管理员执行 prisma generate', 503)
   }
 
   const existing = await solutionLikeModel.findUnique({
@@ -456,9 +430,7 @@ export async function checkSolutionPermission(
   const { resolveProblemId } = await import('./problem-resolver')
   const realProblemId = await resolveProblemId(problemId)
   if (!realProblemId) {
-    const err: any = new Error('题目不存在')
-    err.status = 404
-    throw err
+    throw AppError.notFound('题目不存在')
   }
   const result = await canViewSolutions(viewer, realProblemId, { isAssignmentContext })
   return {

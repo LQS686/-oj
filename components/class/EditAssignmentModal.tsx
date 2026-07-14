@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Pencil, AlertCircle, X, Trash2 } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
 
@@ -27,7 +27,7 @@ async function fetchAllPublicProblems(): Promise<ProblemPickItem[]> {
   let page = 1
   const pageSize = 50
   for (;;) {
-    const response = await fetch(`/api/problems?page=${page}&pageSize=${pageSize}`)
+    const response = await fetchWithCookie(`/api/problems?page=${page}&pageSize=${pageSize}`)
     const data = await response.json()
     if (!data.success) throw new Error(data.error || '获取题目列表失败')
     const batch = data.data?.problems || []

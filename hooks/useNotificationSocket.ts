@@ -46,8 +46,6 @@ export function useNotificationSocket({
       return
     }
 
-    console.log('🔌 连接 WebSocket 通知服务...')
-
     const socket = io({
       path: '/socket.io/',
       transports: ['websocket', 'polling'],
@@ -63,18 +61,15 @@ export function useNotificationSocket({
     socketRef.current = socket
 
     socket.on('connect', () => {
-      console.log('✅ WebSocket 已连接:', socket.id)
       setIsConnected(true)
-
       socket.emit('join', userId)
     })
 
-    socket.on('joined', (data: { userId: string; room: string }) => {
-      console.log(`✅ 已加入通知房间: ${data.room}`)
+    socket.on('joined', () => {
+      // Successfully joined notification room
     })
 
     socket.on('notification', (notification: NotificationData) => {
-      console.log('🔔 收到通知:', notification)
       setLastNotification(notification)
 
       if (callbackRef.current) {
@@ -82,24 +77,20 @@ export function useNotificationSocket({
       }
     })
 
-    socket.on('disconnect', (reason) => {
-      console.log('❌ WebSocket 断开:', reason)
+    socket.on('disconnect', () => {
       setIsConnected(false)
     })
 
-    socket.on('reconnect', (attemptNumber) => {
-      console.log('🔄 WebSocket 重新连接成功:', attemptNumber)
+    socket.on('reconnect', () => {
       setIsConnected(true)
       socket.emit('join', userId)
     })
 
-    socket.on('connect_error', (error) => {
-      console.error('❌ WebSocket 连接错误:', error)
+    socket.on('connect_error', () => {
       setIsConnected(false)
     })
 
     return () => {
-      console.log('🧹 清理 WebSocket 连接')
       if (socket.connected) {
         socket.emit('leave', userId)
       }

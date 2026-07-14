@@ -13,6 +13,7 @@ import {
   Plus, Search, Edit, Trash2, Eye, Filter, BookOpen, AlertCircle, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface AdminTraining {
  id: string
@@ -50,7 +51,7 @@ export default function AdminTrainingsPage() {
  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
  if (keyword) params.set('keyword', keyword)
  if (statusFilter) params.set('status', statusFilter)
- const res = await fetch(`/api/admin/trainings?${params}`, {
+ const res = await fetchWithCookie(`/api/admin/trainings?${params}`, {
  cache: 'no-store',
  })
  const data = await res.json()
@@ -73,7 +74,7 @@ export default function AdminTrainingsPage() {
  const handleDelete = async (id: string, title: string) => {
  if (!confirm(`确定删除题单「${title}」？此操作不可恢复。`)) return
  try {
- const res = await fetch(`/api/trainings/${id}`, {
+ const res = await fetchWithCookie(`/api/trainings/${id}`, {
  method: 'DELETE',
  cache: 'no-store',
  })

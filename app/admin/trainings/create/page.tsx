@@ -10,6 +10,7 @@ import Link from 'next/link'
 import AdminLayout from '@/components/AdminLayout'
 import { ArrowLeft, Save, X, Plus, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface Problem {
  id: string
@@ -46,7 +47,7 @@ export default function CreateTrainingPage() {
  const [submitting, setSubmitting] = useState(false)
 
  useEffect(() => {
- fetch('/api/problems?pageSize=50', { cache: 'no-store' })
+ fetchWithCookie('/api/problems?pageSize=50', { cache: 'no-store' })
  .then(r => r.json())
  .then(data => {
  const items = Array.isArray(data?.data?.problems) ? data.data.problems : []
@@ -83,7 +84,7 @@ export default function CreateTrainingPage() {
  }
  setSubmitting(true)
  try {
- const res = await fetch('/api/trainings', {
+ const res = await fetchWithCookie('/api/trainings', {
  method: 'POST',
  cache: 'no-store',
  headers: { 'Content-Type': 'application/json' },

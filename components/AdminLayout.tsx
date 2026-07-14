@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
 import {
@@ -26,9 +26,10 @@ import {
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
+import type { Notification } from '@/types/models'
 
 interface AdminMenuItem {
-  icon: any
+  icon: React.ComponentType<{ className?: string }>
   label: string
   href: string
   /** 仅 SYSTEM_ADMIN 可见 */
@@ -76,7 +77,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<(Notification & { message?: string })[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
@@ -162,9 +163,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
+      await fetchWithCookie('/api/auth/logout', {
         method: 'POST',
-        credentials: 'include',
       })
       logout()
       router.push('/login')
@@ -321,7 +321,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       </div>
                       <div className="max-h-64 overflow-y-auto">
                         {notifications.length > 0 ? (
-                          notifications.map((n: any) => (
+                          notifications.map((n) => (
                             <div key={n.id} className="px-4 py-3 hover:bg-muted border-b border-border last:border-0">
                               <p className="text-sm text-foreground">{n.title || n.message || '新通知'}</p>
                               <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString('zh-CN')}</p>

@@ -69,14 +69,14 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
  {
  icon: Bold,
  title: '粗体',
- run: ({ selection, hasSelection }) => ({
- before: '**',
- after: '**',
- placeholder: '粗体文本',
- mode: 'wrap',
- // keep selection
- _selection: hasSelection ? selection : undefined,
- } as any),
+  run: ({ selection, hasSelection }) => ({
+  before: '**',
+  after: '**',
+  placeholder: '粗体文本',
+  mode: 'wrap',
+  // keep selection
+  ...(hasSelection ? {} : {}),
+  }),
  },
  {
  icon: Italic,
@@ -219,11 +219,6 @@ export default function MarkdownEditor({
  setDebouncedValue(value)
  }, 300)
  return () => window.clearTimeout(timer)
- }, [value])
-
- // Keep preview in sync if value changes externally
- useEffect(() => {
- setDebouncedValue(value)
  }, [value])
 
  const charCount = value.length

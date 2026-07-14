@@ -20,6 +20,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { canCreateContest } from '@/lib/permissions'
+import { fetchWithCookie } from '@/lib/api/base'
 import {
   EducationalPageShell,
   PageLoading,
@@ -150,7 +151,7 @@ export default function ContestsPage() {
  
  const statusParam = activeTab === 'all' ? '' : `&status=${activeTab}`
  const keywordParam = keyword ? `&keyword=${encodeURIComponent(keyword)}` : ''
- const response = await fetch(`/api/contests?page=${page}&limit=24${statusParam}${keywordParam}`, {
+ const response = await fetchWithCookie(`/api/contests?page=${page}&limit=24${statusParam}${keywordParam}`, {
  cache: 'no-store',
  headers: {
  'Pragma': 'no-cache',

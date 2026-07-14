@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { Users, Search, Plus, Calendar, TrendingUp, X, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
@@ -132,7 +132,7 @@ function ClassesPageContent() {
   const handleClassClick = async (classData: Class) => {
     if (!user) {
       try {
-        const response = await fetch(`/api/classes/${classData.id}`)
+        const response = await fetchWithCookie(`/api/classes/${classData.id}`)
         const data = await response.json()
         
         if (data.success) {

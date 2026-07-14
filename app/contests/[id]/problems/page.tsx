@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
 import { CheckCircle, XCircle, MinusCircle, AlertCircle, FileText } from 'lucide-react'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface Problem {
  id: string
@@ -27,8 +28,8 @@ export default function ContestProblemsPage() {
 
  useEffect(() => {
  fetchProblems()
- fetch(`/api/contests/${params.id}`)
- .then((r) => r.json())
+ fetchWithCookie(`/api/contests/${params.id}`)
+  .then((r) => r.json())
  .then((d) => {
  if (d.success && d.data?.title) setContestTitle(d.data.title)
  })
@@ -37,7 +38,7 @@ export default function ContestProblemsPage() {
 
  const fetchProblems = async () => {
  try {
- const res = await fetch(`/api/contests/${params.id}/problems`)
+ const res = await fetchWithCookie(`/api/contests/${params.id}/problems`)
  const data = await res.json()
  
  if (data.success) {

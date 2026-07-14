@@ -26,7 +26,7 @@ import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canManageContent } from '@/lib/permissions'
 import Link from 'next/link'
@@ -134,7 +134,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         setProblemLoading(true)
         setProblemError(null)
         
-        const response = await fetch(`/api/problems/${problemId}`)
+        const response = await fetchWithCookie(`/api/problems/${problemId}`)
         const data = await response.json()
         
         if (data.success) {
@@ -215,7 +215,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           ? `/api/problems/${problemId}/submissions?userId=${user.id}` 
           : `/api/problems/${problemId}/submissions`
         
-        const response = await fetch(url, { cache: 'no-store' })
+        const response = await fetchWithCookie(url, { cache: 'no-store' })
         const data = await response.json()
         
         if (data.success) {

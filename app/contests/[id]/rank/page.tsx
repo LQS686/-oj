@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Trophy, AlertCircle, Medal } from 'lucide-react'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface RankItem {
  rank: number
@@ -64,7 +65,7 @@ export default function ContestRankPage() {
 
  const fetchRank = async () => {
  try {
- const res = await fetch(`/api/contests/${params.id}/rank`)
+ const res = await fetchWithCookie(`/api/contests/${params.id}/rank`)
  const data = await res.json()
  
  if (data.success) {

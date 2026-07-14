@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import { useEffect, memo } from 'react'
 import { usePathname } from 'next/navigation'
 import Logo from './navbar/Logo'
 import NavLinks from './navbar/NavLinks'
@@ -40,4 +40,4 @@ const Navbar = () => {
   )
 }
 
-export default React.memo(Navbar)
+export default memo(Navbar)

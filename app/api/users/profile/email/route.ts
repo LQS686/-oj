@@ -7,7 +7,7 @@ import { withApi, ok, readJson, throw400, throw401, throw404, throw409 } from '@
 import { getMongoClient } from '@/lib/mongodb-direct'
 import bcrypt from 'bcryptjs'
 import { ObjectId } from 'mongodb'
-import { getUserWithPassword, updateCurrentUserEmail } from '@/lib/user/service'
+import { getUserWithPassword, changeCurrentUserEmail } from '@/lib/user/service'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 

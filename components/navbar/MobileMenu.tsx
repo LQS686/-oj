@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
@@ -55,7 +55,7 @@ export default function MobileMenu() {
  }
 
  return (
- <React.Fragment>
+ <>
  <button
  onClick={() => setIsMenuOpen(true)}
  className="lg:hidden btn-ghost btn p-2.5 group"
@@ -105,7 +105,7 @@ export default function MobileMenu() {
  })}
 
  {user && (
- <React.Fragment>
+ <>
  <div className="pt-4 mt-4 border-t border-border">
  <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
  个人中心
@@ -159,12 +159,12 @@ export default function MobileMenu() {
  <span>退出登录</span>
  </button>
  </div>
- </React.Fragment>
+ </>
  )}
  </div>
  </div>
  </div>
  )}
- </React.Fragment>
+ </>
  )
 }

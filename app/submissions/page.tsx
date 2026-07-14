@@ -5,8 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, FileText, User, Clock, Database, Calendar, CheckCircle, XCircle, AlertTriangle, Code, Clock as TimeIcon, Filter, X, Eye } from 'lucide-react'
 import { formatTime, formatMemory } from '@/lib/utils'
-import { getStatusColor, getStatusText } from '@/lib/status'
-import { fetchWithAuth } from '@/lib/api/base'
+import { getStatusText } from '@/lib/status'
+import { fetchWithCookie } from '@/lib/api/base'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 
 interface Submission {
@@ -30,22 +30,7 @@ interface Submission {
  message?: string
  passedTests?: number
  totalTests?: number
- isLate?: boolean
-}
-
-const STATUS_TEXT_ZH: Record<string, string> = {
-  AC: '通过', Accepted: '通过',
-  WA: '答案错误', 'Wrong Answer': '答案错误',
-  TLE: '超时', 'Time Limit Exceeded': '超时',
-  MLE: '超内存', 'Memory Limit Exceeded': '超内存',
-  RE: '运行错误', 'Runtime Error': '运行错误',
-  CE: '编译错误', 'Compile Error': '编译错误',
-  PE: '格式错误', 'Presentation Error': '格式错误',
-  OLE: '输出超限', 'Output Limit Exceeded': '输出超限',
-  CSP: '无法启动',
-  PC: '部分正确', 'Partly Correct': '部分正确',
-  SE: '系统错误', 'System Error': '系统错误',
-  Pending: '等待评测', Judging: '评测中', Running: '运行中',
+  isLate?: boolean
 }
 
 function SubmissionsContent() {
@@ -72,8 +57,6 @@ function SubmissionsContent() {
  let response;
  
  if (assignmentId && classId) {
- console.log('📊 [数据隔离] 加载作业提交记录', { assignmentId, classId, problemId, userId })
- 
  const params = new URLSearchParams({
  page: page.toString(),
  limit: '20'
@@ -83,12 +66,10 @@ function SubmissionsContent() {
  if (userId) params.append('userId', userId)
  if (status) params.append('status', status)
  
- response = await fetchWithAuth(
+ response = await fetchWithCookie(
  `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params.toString()}`
  )
  } else {
- console.log('📊 [数据隔离] 加载题库提交记录', { problemId, userId })
- 
  const params = new URLSearchParams({
  page: page.toString(),
  limit: '20'
@@ -98,7 +79,7 @@ function SubmissionsContent() {
  if (userId) params.append('userId', userId)
  if (status) params.append('status', status)
  
- response = await fetch(`/api/submissions?${params.toString()}`)
+ response = await fetchWithCookie(`/api/submissions?${params.toString()}`)
  }
  
  const data = await response.json()
@@ -107,14 +88,13 @@ function SubmissionsContent() {
  setSubmissions(data.data.submissions || [])
  const totalPagesValue = data.data.pagination?.totalPages || Math.ceil((data.data.pagination?.total || 0) / 20)
  setTotalPages(totalPagesValue)
- console.log(`✅ 加载了 ${(data.data.submissions || []).length} 条提交记录`)
  } else {
- console.error('获取提交记录失败:', data.error)
  setSubmissions([])
  setTotalPages(1)
  }
- } catch (error) {
- console.error('获取提交记录失败:', error)
+ } catch {
+ setSubmissions([])
+ setTotalPages(1)
  } finally {
  setLoading(false)
  }
@@ -278,7 +258,7 @@ function SubmissionsContent() {
  {submission.user.nickname || submission.user.username}
  </Link>
  </td>
- <td className="px-6 py-4" title={STATUS_TEXT_ZH[submission.status] || submission.status}>
+  <td className="px-6 py-4" title={getStatusText(submission.status)}>
  {getStatusBadge(submission.status)}
  </td>
  <td className="px-6 py-4">

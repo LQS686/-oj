@@ -12,6 +12,7 @@ import {
   ArrowLeft, Plus, Edit, Trash2, X, Save, AlertCircle, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface Category {
  id: string
@@ -38,7 +39,7 @@ export default function TrainingCategoriesPage() {
  const loadCategories = useCallback(async () => {
  try {
  setLoading(true)
- const res = await fetch('/api/training-categories', { cache: 'no-store' })
+ const res = await fetchWithCookie('/api/training-categories', { cache: 'no-store' })
  const data = await res.json()
  setItems(Array.isArray(data?.data?.items) ? data.data.items : [])
  } catch {
@@ -54,7 +55,7 @@ export default function TrainingCategoriesPage() {
  if (!newName.trim()) { toast.error('请输入分类名'); return }
  setSaving(true)
  try {
- const res = await fetch('/api/training-categories', {
+ const res = await fetchWithCookie('/api/training-categories', {
  method: 'POST',
  cache: 'no-store',
  headers: { 'Content-Type': 'application/json' },
@@ -87,7 +88,7 @@ export default function TrainingCategoriesPage() {
  if (!editingId) return
  setSaving(true)
  try {
- const res = await fetch(`/api/training-categories/${editingId}`, {
+ const res = await fetchWithCookie(`/api/training-categories/${editingId}`, {
  method: 'PUT',
  cache: 'no-store',
  headers: { 'Content-Type': 'application/json' },
@@ -115,7 +116,7 @@ export default function TrainingCategoriesPage() {
  }
  if (!confirm(`确定删除分类「${name}」？`)) return
  try {
- const res = await fetch(`/api/training-categories/${id}`, {
+ const res = await fetchWithCookie(`/api/training-categories/${id}`, {
  method: 'DELETE',
  cache: 'no-store',
  })

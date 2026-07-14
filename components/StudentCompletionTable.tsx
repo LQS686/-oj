@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, Code, X, FileCode, Copy, Check } from 'lucide-react'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface RawSubmission {
  id: string
@@ -123,7 +124,7 @@ function SubmissionModal({
  setCodeMap(prev => ({ ...prev, [sub.id]: sub.code! }))
  return
  }
- const res = await fetch(`/api/submissions/${sub.id}`)
+  const res = await fetchWithCookie(`/api/submissions/${sub.id}`)
  const data = await res.json()
  if (data.success && data.data?.code) {
  setCodeMap(prev => ({ ...prev, [sub.id]: data.data.code }))

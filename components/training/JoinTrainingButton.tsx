@@ -14,6 +14,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2, LogIn, Play, UserPlus, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface JoinTrainingButtonProps {
  trainingId: string
@@ -47,11 +48,11 @@ export function JoinTrainingButton({
  joiningRef.current = true
  setIsJoining(true)
  try {
- const res = await fetch(`/api/trainings/${trainingId}/join`, {
- method: 'POST',
- cache: 'no-store',
- headers: { 'Content-Type': 'application/json' },
- })
+  const res = await fetchWithCookie(`/api/trainings/${trainingId}/join`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+  })
  const data = await res.json()
  if (!res.ok || !data.success) {
  toast.error(data.error || '加入失败')
@@ -74,10 +75,10 @@ export function JoinTrainingButton({
  joiningRef.current = true
  setIsJoining(true)
  try {
- const res = await fetch(`/api/trainings/${trainingId}/join`, {
- method: 'DELETE',
- cache: 'no-store',
- })
+  const res = await fetchWithCookie(`/api/trainings/${trainingId}/join`, {
+    method: 'DELETE',
+    cache: 'no-store',
+  })
  const data = await res.json()
  if (!res.ok || !data.success) {
  toast.error(data.error || '退出失败')

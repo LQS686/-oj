@@ -9,6 +9,7 @@ import {
 } from '@/contexts/ContestProblemWorkspaceContext'
 import ContestProblemSidebar from '@/components/contest/ContestProblemSidebar'
 import ContestProblemMainHeader from '@/components/contest/ContestProblemMainHeader'
+import { fetchWithCookie } from '@/lib/api/base'
 
 export default function ContestProblemsWorkspaceLayout({
   children,
@@ -28,8 +29,8 @@ export default function ContestProblemsWorkspaceLayout({
     async function load() {
       try {
         const [cRes, pRes] = await Promise.all([
-          fetch(`/api/contests/${contestId}`),
-          fetch(`/api/contests/${contestId}/problems`, { cache: 'no-store' }),
+          fetchWithCookie(`/api/contests/${contestId}`),
+          fetchWithCookie(`/api/contests/${contestId}/problems`, { cache: 'no-store' }),
         ])
         const cData = await cRes.json()
         const pData = await pRes.json()

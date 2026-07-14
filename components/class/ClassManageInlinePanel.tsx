@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import {
   Mail,
   Send,
@@ -85,7 +85,7 @@ export default function ClassManageInlinePanel({
   const loadSettings = useCallback(async () => {
     try {
       setSettingsLoading(true)
-      const res = await fetch(`/api/classes/${classId}`)
+      const res = await fetchWithCookie(`/api/classes/${classId}`)
       const data = await res.json()
       if (data.success) {
         const c = data.data

@@ -20,7 +20,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import Link from 'next/link'
 import AssignmentOpenLink from '@/components/assignment/AssignmentOpenLink'
 import { ClassWorkspaceShell, PageLoading } from '@/components/common'
@@ -103,7 +103,7 @@ function ClassDetailContent() {
   const fetchClassDetail = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/classes/${classId}`)
+      const response = await fetchWithCookie(`/api/classes/${classId}`)
       const data = await response.json()
       if (data.success) setClass(data.data)
       else setError(data.error || '加载失败')
@@ -117,7 +117,7 @@ function ClassDetailContent() {
   const fetchAssignments = useCallback(async () => {
     try {
       setAssignmentsLoading(true)
-      const response = await fetch(`/api/classes/${classId}/assignments`)
+      const response = await fetchWithCookie(`/api/classes/${classId}/assignments`)
       const data = await response.json()
       if (data.success) setAssignments(data.data?.assignments || [])
     } catch {
@@ -130,7 +130,7 @@ function ClassDetailContent() {
   const fetchNotes = useCallback(async () => {
     try {
       setNotesLoading(true)
-      const response = await fetch(`/api/classes/${classId}/notes`)
+      const response = await fetchWithCookie(`/api/classes/${classId}/notes`)
       const data = await response.json()
       if (data.success) setNotes(data.data?.notes || [])
     } catch {

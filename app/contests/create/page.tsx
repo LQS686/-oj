@@ -6,7 +6,7 @@ import { ArrowLeft, Search, Plus, Trash2, Save, AlertCircle } from 'lucide-react
 import { useUser } from '@/contexts/UserContext'
 import toast from 'react-hot-toast'
 import { canCreateContest } from '@/lib/permissions'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 
 interface Problem {
  id: string
@@ -56,7 +56,7 @@ export default function CreateContestPage() {
  }
  setSearching(true)
  try {
- const response = await fetch(`/api/problems?search=${encodeURIComponent(query)}&limit=5`)
+ const response = await fetchWithCookie(`/api/problems?search=${encodeURIComponent(query)}&limit=5`)
  const data = await response.json()
  if (data.success) {
  // Filter out already added problems
@@ -94,7 +94,7 @@ export default function CreateContestPage() {
  
  if (numbers.length === 0) return
 
- const response = await fetch(`/api/problems?numbers=${encodeURIComponent(numbers.join(','))}`)
+ const response = await fetchWithCookie(`/api/problems?numbers=${encodeURIComponent(numbers.join(','))}`)
  const data = await response.json()
  
  if (data.success) {

@@ -1,9 +1,14 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import MarkdownRenderer from '../common/MarkdownRenderer'
 import { FileCode, FileInput, FileOutput, Lightbulb, Tag, Copy, Check, ArrowUp } from 'lucide-react'
+import type { Problem } from '@/types/models'
+
+interface ProblemWithExplanation extends Problem {
+  samples: Array<{ input: string; output: string; explanation?: string }>
+}
 
 interface ProblemDescriptionProps {
-  problem: any
+  problem: ProblemWithExplanation
   /** 竞赛等场景：弱化区块标题、不重复标签区 */
   compact?: boolean
   hideTags?: boolean
@@ -91,7 +96,7 @@ export default function ProblemDescription({
  )}
  <div>
  {(problem.samples && problem.samples.length > 0) ? (
- problem.samples.map((sample: any, index: number) => (
+ problem.samples.map((sample, index: number) => (
  <div key={index} className="mb-6 last:mb-0 animate-fadeIn">
  <div className="grid md:grid-cols-2 gap-4">
  <div className="group">

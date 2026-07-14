@@ -17,7 +17,7 @@ import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import SubmissionResultModal, { type SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 import { useTrainingProblemWorkspace } from '@/contexts/TrainingProblemWorkspaceContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import type { Problem } from '@/types/models'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
@@ -92,7 +92,7 @@ export default function TrainingProblemDetailPage({
     try {
       setLoading(true)
       setError('')
-      const res = await fetch(`/api/problems/${problemId}`)
+      const res = await fetchWithCookie(`/api/problems/${problemId}`)
       const data = await res.json()
       if (data.success) {
         setProblem(data.data)
@@ -112,7 +112,7 @@ export default function TrainingProblemDetailPage({
       const url = user
         ? `/api/problems/${problemId}/submissions?userId=${user.id}`
         : `/api/problems/${problemId}/submissions`
-      const res = await fetch(url, { cache: 'no-store' })
+      const res = await fetchWithCookie(url, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) {
         setSubmissions(data.data.submissions || [])

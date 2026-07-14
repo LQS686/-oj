@@ -3,15 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
- Lock,
- PenSquare,
- AlertCircle,
- Sparkles,
- ChevronRight
+  Lock,
+  PenSquare,
+  AlertCircle,
+  Sparkles,
+  ChevronRight
 } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import { useUser } from '@/contexts/UserContext'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface SolutionTabPanelProps {
  problemId: string
@@ -78,9 +79,9 @@ export default function SolutionTabPanel({
  params.set('isAssignmentContext', '1')
  }
 
- const response = await fetch(
- `/api/solutions/check-permission?${params.toString()}`
- )
+  const response = await fetchWithCookie(
+    `/api/solutions/check-permission?${params.toString()}`
+  )
  const data = await response.json().catch(() => null)
 
  if (cancelled) return
@@ -127,7 +128,7 @@ export default function SolutionTabPanel({
  params.set('isAssignmentContext', '1')
  }
 
- const response = await fetch(`/api/solutions?${params.toString()}`)
+  const response = await fetchWithCookie(`/api/solutions?${params.toString()}`)
  const data = await response.json().catch(() => null)
 
  if (cancelled) return

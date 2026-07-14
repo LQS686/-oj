@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import MarkdownEditor from '@/components/solution/MarkdownEditor'
 import { logger } from '@/lib/logger'
+import { fetchWithCookie } from '@/lib/api/base'
 
 const CODE_LANGUAGES: { value: string; label: string }[] = [
  { value: 'cpp', label: 'C++' },
@@ -65,7 +66,7 @@ export default function NewSolutionPage() {
  try {
  setProblemLoading(true)
  setProblemError(null)
- const res = await fetch(`/api/problems/${problemId}`)
+ const res = await fetchWithCookie(`/api/problems/${problemId}`)
  const data = await res.json().catch(() => null)
  if (cancelled) return
  if (res.ok && data?.success) {
@@ -129,7 +130,7 @@ export default function NewSolutionPage() {
  setError(null)
 
  try {
- const res = await fetch('/api/solutions', {
+ const res = await fetchWithCookie('/api/solutions', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({

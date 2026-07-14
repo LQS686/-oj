@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import AdminLayout from '@/components/AdminLayout'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import {
  Plus, Trash2, Edit, Check, X, Key, Server,
  Cpu, Save, Loader2, AlertCircle, Eye, EyeOff, Sparkles, Wand2
@@ -160,7 +160,7 @@ export default function AIModelsPage() {
 
  const fetchPresets = async () => {
  try {
- const res = await fetch('/api/ai/providers-presets')
+ const res = await fetchWithCookie('/api/ai/providers-presets')
  const data = await res.json()
  if (data.success) setPresets(data.data)
  } catch {

@@ -22,6 +22,7 @@ class ErrorMonitor {
   private errorStats: Map<string, ErrorStats> = new Map();
   private thresholds: Map<string, ErrorThreshold> = new Map();
   private readonly MAX_OCCURRENCES = 100; // 每个错误最多保存的发生记录数
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     // 初始化默认阈值
@@ -62,7 +63,15 @@ class ErrorMonitor {
 
   private startCleanupTask() {
     // 每小时清理一次过期的错误统计
-    setInterval(() => this.cleanup(), 60 * 60 * 1000);
+    this.cleanupTimer = setInterval(() => this.cleanup(), 60 * 60 * 1000);
+  }
+
+  dispose() {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+    this.errorStats.clear();
   }
 
   private cleanup() {

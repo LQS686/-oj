@@ -6,6 +6,7 @@ import { Trophy, TrendingUp, Minus, RefreshCw, AlertCircle, ChevronUp, Crown, Me
 import Link from 'next/link'
 import io from 'socket.io-client'
 import { EducationalPageShell, PageLoading } from '@/components/common'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface UserRanking {
  id: string
@@ -49,7 +50,7 @@ export default function RankPage() {
  setLoadingMore(true)
  }
  
- const res = await fetch(`/api/rankings?type=${type}&page=${pageNum}&limit=50`)
+ const res = await fetchWithCookie(`/api/rankings?type=${type}&page=${pageNum}&limit=50`)
  
  if (!res.ok) throw new Error('Failed to fetch')
  
@@ -73,7 +74,7 @@ export default function RankPage() {
 
  const fetchMyRank = useCallback(async (type: string) => {
  try {
- const res = await fetch(`/api/rankings/my-rank?type=${type}`)
+ const res = await fetchWithCookie(`/api/rankings/my-rank?type=${type}`)
  if (res.ok) {
  const data = await res.json()
  if (data.success) {

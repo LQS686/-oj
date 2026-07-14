@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Code2, Mail, Sparkles, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useSettings } from '@/contexts/SettingsContext'
+import { fetchWithCookie } from '@/lib/api/base'
 
 export default function ForgotPasswordPage() {
  const { settings } = useSettings()
@@ -18,7 +19,7 @@ export default function ForgotPasswordPage() {
  setLoading(true)
 
  try {
- const response = await fetch('/api/auth/forgot-password', {
+ const response = await fetchWithCookie('/api/auth/forgot-password', {
  method: 'POST',
  headers: {
  'Content-Type': 'application/json',

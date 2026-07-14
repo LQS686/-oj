@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Camera, Upload, X, Check, AlertCircle, History, Trash2, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useUser } from '@/contexts/UserContext'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface UploadHistory {
  id: string
@@ -37,7 +38,7 @@ export default function AvatarUploader({
 
  const fetchHistory = async () => {
  try {
- const res = await fetch('/api/users/avatar/history')
+ const res = await fetchWithCookie('/api/users/avatar/history')
  const data = await res.json()
  if (data.success) {
  setHistory(data.data)
@@ -139,7 +140,7 @@ export default function AvatarUploader({
  formData.append('chunkIndex', i.toString())
  formData.append('file', chunk)
 
- const res = await fetch('/api/users/avatar/upload/chunk', {
+  const res = await fetchWithCookie('/api/users/avatar/upload/chunk', {
  method: 'POST',
  body: formData
  })
@@ -161,7 +162,7 @@ export default function AvatarUploader({
 
  try {
  // 1. Init
- const initRes = await fetch('/api/users/avatar/upload/init', {
+  const initRes = await fetchWithCookie('/api/users/avatar/upload/init', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({
@@ -179,7 +180,7 @@ export default function AvatarUploader({
  await uploadChunks(uploadId, file)
 
  // 3. Complete
- const completeRes = await fetch('/api/users/avatar/upload/complete', {
+  const completeRes = await fetchWithCookie('/api/users/avatar/upload/complete', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({
@@ -217,7 +218,7 @@ export default function AvatarUploader({
  // We can call the profile update API.
  
  try {
- const res = await fetch('/api/users/profile', {
+  const res = await fetchWithCookie('/api/users/profile', {
  method: 'PUT',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ avatar: historyItem.url }) // Assuming this API supports avatar update

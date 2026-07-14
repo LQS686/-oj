@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, X, Plus, Info, AlertCircle } from 'lucide-react'
+import { fetchWithCookie } from '@/lib/api/base'
 import toast from 'react-hot-toast'
 
 interface Problem {
@@ -41,7 +42,7 @@ export default function CreateMyTrainingPage() {
 
  // 鉴权检查：未登录跳登录页
  useEffect(() => {
- fetch('/api/auth/me', { cache: 'no-store' })
+ fetchWithCookie('/api/auth/me', { cache: 'no-store' })
  .then(r => r.ok ? r.json() : null)
  .then(data => {
  if (data?.success && data.data) {
@@ -61,7 +62,7 @@ export default function CreateMyTrainingPage() {
  useEffect(() => {
  if (!authed) return
  // 拉取题目列表（后端 pageSize 上限 50）
- fetch('/api/problems?pageSize=50', { cache: 'no-store' })
+ fetchWithCookie('/api/problems?pageSize=50', { cache: 'no-store' })
  .then(r => r.json())
  .then(data => {
  const items = Array.isArray(data?.data?.problems) ? data.data.problems : []
@@ -99,7 +100,7 @@ export default function CreateMyTrainingPage() {
  setSubmitting(true)
  try {
  // 不传 categoryType / isPublic / status / isRecommended，后端对普通用户自动强制为私有草稿
- const res = await fetch('/api/trainings', {
+ const res = await fetchWithCookie('/api/trainings', {
  method: 'POST',
  cache: 'no-store',
  headers: { 'Content-Type': 'application/json' },

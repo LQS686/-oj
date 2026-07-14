@@ -12,6 +12,7 @@
  * 5. fetch：cache: 'no-store'
  */
 import { useEffect, useState, useCallback } from 'react'
+import { fetchWithCookie } from '@/lib/api/base'
 import Link from 'next/link'
 import { BookOpen, AlertCircle, RefreshCw, Plus, UserCheck } from 'lucide-react'
 import TrainingCard from '@/components/training/TrainingCard'
@@ -54,7 +55,7 @@ export default function TrainingListPage() {
         params.set('categoryType', 'contest')
       }
 
-      const res = await fetch(`/api/trainings?${params.toString()}`, {
+      const res = await fetchWithCookie(`/api/trainings?${params.toString()}`, {
         cache: 'no-store',
         signal,
         headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' },
@@ -91,7 +92,7 @@ export default function TrainingListPage() {
 
   // 拉取当前用户
   useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
+    fetchWithCookie('/api/auth/me', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.success && data.data) {

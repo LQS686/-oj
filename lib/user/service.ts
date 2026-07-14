@@ -16,6 +16,7 @@ import {
 import { escapeHtml } from '@/lib/sanitize'
 import { clearAuthUserCache } from '@/lib/api/handler'
 import { isSystemAdmin, isAdmin } from '@/lib/permissions'
+import { AppError } from '@/lib/errors'
 
 export interface UserProfile {
   id: string
@@ -57,16 +58,6 @@ export async function getUserStats(userId: string) {
     ])
     return { solved, submissions, contests }
   }, { ttl: 30_000 })
-}
-
-export async function getUserPreferences(_userId: string) {
-  // 偏好数据由 UserAiPreference 表承载，统一在 AI 业务层处理
-  return null
-}
-
-export async function updateUserPreferences(_userId: string, data: any) {
-  // 偏好更新由 AI 业务层处理
-  return data
 }
 
 export async function updateUserProfile(userId: string, data: Partial<{
@@ -176,7 +167,7 @@ export async function getUserFullStats(userId: string) {
   type SubmissionData = (typeof submissions)[number]
 
   // 最近10条提交
-  const recentSubmissions = submissions.slice(0, 10).map((sub: any) => ({
+  const recentSubmissions = submissions.slice(0, 10).map((sub) => ({
     id: sub.id,
     problemId: sub.problem?.problemNumber || sub.problemId,
     realProblemId: sub.problemId,
@@ -189,12 +180,12 @@ export async function getUserFullStats(userId: string) {
 
   // AC 提交
   const acSubmissions = submissions.filter(
-    (sub: any) => sub.status === 'AC'
+    (sub) => sub.status === 'AC'
   )
 
   // 难度分布（AC 唯一题）
   const solvedProblemsMap = new Map<string, string | null>()
-  acSubmissions.forEach((sub: any) => {
+  acSubmissions.forEach((sub) => {
     if (sub.problem && !solvedProblemsMap.has(sub.problemId)) {
       solvedProblemsMap.set(sub.problemId, sub.problem.difficulty)
     }
@@ -207,7 +198,7 @@ export async function getUserFullStats(userId: string) {
   })
   const difficultyDistribution = Object.entries(difficultyCount)
     .map(([difficulty, count]: [string, number]) => ({ difficulty, count }))
-    .sort((a: any, b: any) => b.count - a.count)
+    .sort((a, b) => b.count - a.count)
 
   // 各状态提交数
   const statusCount: Record<string, number> = submissions.reduce(
@@ -343,14 +334,10 @@ export async function updateCurrentUserBasic(
   data: { nickname?: string; bio?: string; avatar?: string }
 ) {
   if (data.nickname !== undefined && (data.nickname.length < 1 || data.nickname.length > 50)) {
-    const err: any = new Error('昵称长度应在1-50个字符之间')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('INVALID_NICKNAME', '昵称长度应在1-50个字符之间')
   }
   if (data.bio !== undefined && data.bio.length > 500) {
-    const err: any = new Error('个人简介不能超过500个字符')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('INVALID_BIO', '个人简介不能超过500个字符')
   }
 
   const client = await getMongoClient()
@@ -382,7 +369,7 @@ export async function updateCurrentUserBasic(
       role: true,
       updatedAt: true,
     },
-  }).then((result: any) => {
+  }).then((result) => {
     if (result) clearUserCache(userId)
     return result
   })
@@ -398,14 +385,10 @@ export async function changeCurrentUserPassword(
   bcryptModule: typeof import('bcryptjs')
 ) {
   if (!currentPassword || !newPassword) {
-    const err: any = new Error('请提供当前密码和新密码')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('MISSING_FIELDS', '请提供当前密码和新密码')
   }
   if (newPassword.length < 8) {
-    const err: any = new Error('新密码长度至少为8位')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('PASSWORD_TOO_SHORT', '新密码长度至少为8位')
   }
 
   const userRecord = await prisma.user.findUnique({
@@ -413,15 +396,11 @@ export async function changeCurrentUserPassword(
     select: { password: true },
   })
   if (!userRecord) {
-    const err: any = new Error('用户不存在')
-    err.status = 404
-    throw err
+    throw AppError.notFound('用户不存在')
   }
   const isPasswordValid = await bcryptModule.compare(currentPassword, userRecord.password)
   if (!isPasswordValid) {
-    const err: any = new Error('当前密码错误')
-    err.status = 401
-    throw err
+    throw AppError.badRequest('WRONG_PASSWORD', '当前密码错误')
   }
   const hashedPassword = await bcryptModule.hash(newPassword, 10)
   const client = await getMongoClient()
@@ -489,11 +468,9 @@ function validatePreferenceValue(key: string, value: any): boolean {
 /**
  * 合并并更新用户偏好
  */
-export async function updateUserPreferencesCollection(userId: string, body: any) {
+export async function updateUserPreferencesCollection(userId: string, body: Record<string, unknown>) {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    const err: any = new Error('无效的偏好设置数据')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('INVALID_DATA', '无效的偏好设置数据')
   }
   const client = await getMongoClient()
   const db = client.db()
@@ -503,9 +480,7 @@ export async function updateUserPreferencesCollection(userId: string, body: any)
   for (const key of Object.keys(body)) {
     if (!ALLOWED_PREFERENCE_KEYS.includes(key)) continue
     if (!validatePreferenceValue(key, body[key])) {
-      const err: any = new Error(`无效的偏好设置值: ${key}`)
-      err.status = 400
-      throw err
+      throw AppError.badRequest('INVALID_PREFERENCE', `无效的偏好设置值: ${key}`)
     }
     updatedPrefs[key] = body[key]
   }
@@ -533,28 +508,20 @@ export async function uploadUserAvatar(
   pathModule: typeof import('path')
 ) {
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-    const err: any = new Error('仅支持 JPG、PNG、GIF、WebP 格式的图片')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('INVALID_FILE_TYPE', '仅支持 JPG、PNG、GIF、WebP 格式的图片')
   }
   if (file.size > MAX_FILE_SIZE) {
-    const err: any = new Error('文件大小不能超过 5MB')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('FILE_TOO_LARGE', '文件大小不能超过 5MB')
   }
   const ext = pathModule.extname(file.name).toLowerCase()
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    const err: any = new Error('不支持的文件格式')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('UNSUPPORTED_FORMAT', '不支持的文件格式')
   }
   const safeFilename = cryptoModule.randomUUID() + ext
   const filePath = pathModule.join(uploadDir, safeFilename)
   const resolvedPath = pathModule.resolve(filePath)
   if (!resolvedPath.startsWith(pathModule.resolve(uploadDir))) {
-    const err: any = new Error('非法的文件路径')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('INVALID_PATH', '非法的文件路径')
   }
   const buffer = Buffer.from(await file.arrayBuffer())
   // 魔数校验
@@ -566,9 +533,7 @@ export async function uploadUserAvatar(
     return false
   }
   if (!magic(ext)) {
-    const err: any = new Error('文件内容与声明格式不匹配')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('FILE_MISMATCH', '文件内容与声明格式不匹配')
   }
   await writeFile(filePath, buffer)
   const avatarUrl = `/uploads/avatars/${safeFilename}`
@@ -601,19 +566,19 @@ export async function listActiveUsers(limit = 5) {
     }),
   ])
   const userScores = new Map<string, number>()
-  solutionCounts.forEach((item: any) => {
+  solutionCounts.forEach((item) => {
     userScores.set(item.authorId, (userScores.get(item.authorId) || 0) + item._count.id * 3)
   })
-  commentCounts.forEach((item: any) => {
+  commentCounts.forEach((item) => {
     userScores.set(item.authorId, (userScores.get(item.authorId) || 0) + item._count.id)
   })
-  recentSubmitters.forEach((item: any) => {
+  recentSubmitters.forEach((item) => {
     userScores.set(item.userId, (userScores.get(item.userId) || 0) + item._count.id)
   })
   const sortedUserIds = Array.from(userScores.entries())
-    .sort((a: any, b: any) => b[1] - a[1])
+    .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map((entry: any) => entry[0])
+    .map((entry) => entry[0])
   if (sortedUserIds.length === 0) {
     return prisma.user.findMany({
       take: limit,
@@ -646,7 +611,7 @@ export async function listActiveUsers(limit = 5) {
       },
     },
   })
-  return sortedUserIds.map((id: any) => users.find((u: any) => u.id === id)).filter((u: any) => u !== undefined)
+  return sortedUserIds.map((id) => users.find((u) => u.id === id)).filter((u) => u !== undefined)
 }
 
 /**
@@ -923,10 +888,7 @@ export function assertAssignableRole(
 ): asserts role is 'ADMIN' | 'TEACHER' | 'STUDENT' {
   const assignable = getAssignableRoles(operatorRole)
   if (!role || !assignable.includes(role)) {
-    const err: any = new Error('无效的角色类型或无权分配该角色')
-    err.status = 400
-    err.code = 'INVALID_ROLE'
-    throw err
+    throw AppError.badRequest('INVALID_ROLE', '无效的角色类型或无权分配该角色')
   }
 }
 
@@ -971,10 +933,7 @@ export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: nu
  */
 export function assertValidRole(role: string | undefined): asserts role is 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT' {
   if (!role || !VALID_ADMIN_ROLES.includes(role)) {
-    const err: any = new Error('无效的角色类型')
-    err.status = 400
-    err.code = 'INVALID_ROLE'
-    throw err
+    throw AppError.badRequest('INVALID_ROLE', '无效的角色类型')
   }
 }
 
@@ -992,31 +951,19 @@ export async function assertCanUpdateUser(
 ) {
   if (targetUserId === operatorUserId) {
     if ('isBanned' in body || 'role' in body) {
-      const err: any = new Error('不能修改自己的权限或状态')
-      err.status = 400
-      err.code = 'CANNOT_MODIFY_SELF'
-      throw err
+      throw AppError.badRequest('CANNOT_MODIFY_SELF', '不能修改自己的权限或状态')
     }
   }
   const target = await prisma.user.findUnique({ where: { id: targetUserId } })
   if (!target) {
-    const err: any = new Error('用户不存在')
-    err.status = 404
-    err.code = 'NOT_FOUND'
-    throw err
+    throw AppError.notFound('用户不存在')
   }
   if (isSystemAdmin(target)) {
-    const err: any = new Error('超级管理员不可被修改')
-    err.status = 403
-    err.code = 'FORBIDDEN'
-    throw err
+    throw AppError.forbidden('超级管理员不可被修改')
   }
   // 管理员不能管理其他管理员
   if (isAdmin({ role: operatorRole }) && isAdmin(target)) {
-    const err: any = new Error('管理员不能管理其他管理员')
-    err.status = 403
-    err.code = 'FORBIDDEN'
-    throw err
+    throw AppError.forbidden('管理员不能管理其他管理员')
   }
   return target
 }
@@ -1033,30 +980,18 @@ export async function assertCanDeleteUser(
   operatorRole: string | undefined | null
 ) {
   if (targetUserId === operatorUserId) {
-    const err: any = new Error('不能删除自己的账号')
-    err.status = 400
-    err.code = 'CANNOT_DELETE_SELF'
-    throw err
+    throw AppError.badRequest('CANNOT_DELETE_SELF', '不能删除自己的账号')
   }
   const target = await prisma.user.findUnique({ where: { id: targetUserId } })
   if (!target) {
-    const err: any = new Error('用户不存在')
-    err.status = 404
-    err.code = 'NOT_FOUND'
-    throw err
+    throw AppError.notFound('用户不存在')
   }
   if (isSystemAdmin(target)) {
-    const err: any = new Error('超级管理员不可被删除')
-    err.status = 403
-    err.code = 'FORBIDDEN'
-    throw err
+    throw AppError.forbidden('超级管理员不可被删除')
   }
   // 管理员不能管理其他管理员
   if (isAdmin({ role: operatorRole }) && isAdmin(target)) {
-    const err: any = new Error('管理员不能管理其他管理员')
-    err.status = 403
-    err.code = 'FORBIDDEN'
-    throw err
+    throw AppError.forbidden('管理员不能管理其他管理员')
   }
 }
 
@@ -1072,7 +1007,7 @@ export async function adminUpdateUser(
   },
   bcryptModule: typeof import('bcryptjs')
 ) {
-  const updateData: any = {}
+  const updateData: Record<string, unknown> = {}
   // 修改密码或封禁时需递增 tokenVersion，使旧 Token 失效
   let shouldInvalidateTokens = false
 
@@ -1088,10 +1023,7 @@ export async function adminUpdateUser(
   }
   if (body.password) {
     if (body.password.length < 8) {
-      const err: any = new Error('密码长度至少为8位')
-      err.status = 400
-      err.code = 'PASSWORD_TOO_SHORT'
-      throw err
+      throw AppError.badRequest('PASSWORD_TOO_SHORT', '密码长度至少为8位')
     }
     updateData.password = await bcryptModule.hash(body.password, 10)
     shouldInvalidateTokens = true
@@ -1138,10 +1070,10 @@ export async function filterUserIdsForBatchAction(
   // 跳过自己
   const filtered = userIds.filter((id) => id !== operatorUserId)
   if (filtered.length === 0) {
-    const err: any = new Error(action === 'update' ? '不能修改自己的角色' : '不能删除自己的账号')
-    err.status = 400
-    err.code = action === 'update' ? 'CANNOT_MODIFY_SELF' : 'CANNOT_DELETE_SELF'
-    throw err
+    throw AppError.badRequest(
+      action === 'update' ? 'CANNOT_MODIFY_SELF' : 'CANNOT_DELETE_SELF',
+      action === 'update' ? '不能修改自己的角色' : '不能删除自己的账号'
+    )
   }
   // 跳过超级管理员；ADMIN 操作时还要跳过其他管理员
   const protectedRoles = isAdmin({ role: operatorRole }) ? ['SYSTEM_ADMIN', 'ADMIN'] : ['SYSTEM_ADMIN']
@@ -1149,13 +1081,10 @@ export async function filterUserIdsForBatchAction(
     where: { id: { in: filtered }, role: { in: protectedRoles } },
     select: { id: true },
   })
-  const protectedIds = new Set(protectedUsers.map((u: any) => u.id))
+  const protectedIds = new Set(protectedUsers.map((u) => u.id))
   const finalUserIds = filtered.filter((id) => !protectedIds.has(id))
   if (finalUserIds.length === 0) {
-    const err: any = new Error('选中的用户不可被' + (action === 'update' ? '修改' : '删除'))
-    err.status = 403
-    err.code = 'FORBIDDEN'
-    throw err
+    throw AppError.forbidden('选中的用户不可被' + (action === 'update' ? '修改' : '删除'))
   }
   return { finalUserIds, skippedCount: userIds.length - finalUserIds.length }
 }
@@ -1192,21 +1121,15 @@ export async function changeCurrentUserEmail(
   newEmail: string
 ): Promise<{ email: string }> {
   if (!newEmail || typeof newEmail !== 'string') {
-    const err: any = new Error('请提供新邮箱')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('MISSING_EMAIL', '请提供新邮箱')
   }
   // 简单邮箱格式校验
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
-    const err: any = new Error('邮箱格式不正确')
-    err.status = 400
-    throw err
+    throw AppError.badRequest('INVALID_EMAIL', '邮箱格式不正确')
   }
   const existing = await prisma.user.findUnique({ where: { email: newEmail } })
   if (existing && existing.id !== userId) {
-    const err: any = new Error('该邮箱已被使用')
-    err.status = 409
-    throw err
+    throw AppError.conflict('该邮箱已被使用')
   }
   await prisma.user.update({ where: { id: userId }, data: { email: newEmail } })
   clearUserCache(userId)
@@ -1230,9 +1153,6 @@ export async function isEmailTaken(email: string, excludeUserId: string) {
   const u = await prisma.user.findUnique({ where: { email } })
   return !!(u && u.id !== excludeUserId)
 }
-
-/** 别名：与 changeCurrentUserEmail 保持一致（getUserService 自带别名也行） */
-export { changeCurrentUserEmail as updateCurrentUserEmail }
 
 /** 读用户角色位（role）— 用于题解鉴权 */
 export async function getUserRoleFlags(userId: string) {
@@ -1282,20 +1202,14 @@ export async function registerNewUser(input: {
     where: { username: input.sanitizedUsername },
   })
   if (existingUsername) {
-    const err: any = new Error('用户名已被使用')
-    err.status = 400
-    err.code = 'BAD_REQUEST'
-    throw err
+    throw AppError.badRequest('BAD_REQUEST', '用户名已被使用')
   }
   // 检查邮箱
   const existingEmail = await prisma.user.findUnique({
     where: { email: input.sanitizedEmail },
   })
   if (existingEmail) {
-    const err: any = new Error('邮箱已被注册')
-    err.status = 400
-    err.code = 'BAD_REQUEST'
-    throw err
+    throw AppError.badRequest('BAD_REQUEST', '邮箱已被注册')
   }
 
   const isFirstUser = input.isFirstUser === true

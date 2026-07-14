@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Megaphone, Pin, ArrowLeft, Loader2 } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import type { PublicAnnouncementDetail } from '@/lib/announcement/service'
+import { fetchWithCookie } from '@/lib/api/base'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 export default function AnnouncementDetailPage() {
@@ -25,7 +26,7 @@ export default function AnnouncementDetailPage() {
       try {
         setLoading(true)
         setError('')
-        const res = await fetch(`/api/announcements/${id}`)
+        const res = await fetchWithCookie(`/api/announcements/${id}`)
         const json = await res.json()
         if (!json.success && !json.ok) {
           throw new Error(json.error || '加载失败')

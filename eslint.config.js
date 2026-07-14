@@ -101,7 +101,6 @@ export default [
       '参考资源/**',
       '**/*.config.js',
       '**/*.config.ts',
-      'server.ts',
     ],
   },
 ];

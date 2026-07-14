@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import {
  Clock,
  CheckCircle2,
@@ -182,7 +182,7 @@ export default function AssignmentDetailPage() {
  const fetchProblemDetail = useCallback(async (problemId: string) => {
  try {
  setProblemLoading(true)
- const response = await fetch(`/api/problems/${problemId}`)
+ const response = await fetchWithCookie(`/api/problems/${problemId}`)
  const data = await response.json()
  if (data.success) {
  setProblemDetail(data.data)

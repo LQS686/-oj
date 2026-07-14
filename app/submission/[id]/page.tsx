@@ -9,6 +9,7 @@ import { getStatusText } from '@/lib/status'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface TestResult {
  testId: string
@@ -72,21 +73,6 @@ const FINAL_STATUSES = new Set([
 function isFinalStatus(status: string | undefined | null): boolean {
  if (!status) return false
  return FINAL_STATUSES.has(status)
-}
-
-const STATUS_TEXT_ZH: Record<string, string> = {
-  AC: '通过', Accepted: '通过',
-  WA: '答案错误', 'Wrong Answer': '答案错误',
-  TLE: '超时', 'Time Limit Exceeded': '超时',
-  MLE: '超内存', 'Memory Limit Exceeded': '超内存',
-  RE: '运行错误', 'Runtime Error': '运行错误',
-  CE: '编译错误', 'Compile Error': '编译错误',
-  PE: '格式错误', 'Presentation Error': '格式错误',
-  OLE: '输出超限', 'Output Limit Exceeded': '输出超限',
-  CSP: '无法启动',
-  PC: '部分正确', 'Partly Correct': '部分正确',
-  SE: '系统错误', 'System Error': '系统错误',
-  Pending: '等待评测', Judging: '评测中', Running: '运行中',
 }
 
 function getTestStatusIcon(status: string) {
@@ -217,7 +203,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  isRefreshingRef.current = true
  if (showRefreshing) setIsRefreshing(true)
  try {
- const response = await fetch(`/api/submissions/${id}`)
+ const response = await fetchWithCookie(`/api/submissions/${id}`)
  const data = await response.json()
 
  if (data.success) {
@@ -336,7 +322,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
  try {
  setHistoryLoading(true)
- const response = await fetch(`/api/problems/${submission.problem.id}/submissions`)
+ const response = await fetchWithCookie(`/api/problems/${submission.problem.id}/submissions`)
  const data = await response.json()
 
  if (data.success) {
@@ -522,7 +508,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  <div className="text-sm text-muted-foreground mb-2">状态</div>
  <div className="flex items-center gap-2 flex-wrap">
  {getStatusBadge(submission.status)}
- <span className="text-sm text-muted-foreground">{STATUS_TEXT_ZH[submission.status] || submission.status}</span>
+  <span className="text-sm text-muted-foreground">{getStatusText(submission.status)}</span>
  </div>
  </div>
  <div className={`rounded-xl border p-4 ${statusCardBorder}`}>

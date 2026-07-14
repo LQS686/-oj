@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Check, ChevronsUpDown, Loader2, Cpu, Zap } from 'lucide-react'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface Model {
  id: string
@@ -33,7 +34,7 @@ export function ModelSelector({ value, onChange, className = '', showThinking = 
  const fetchModels = async () => {
  try {
  setLoading(true)
- const res = await fetch('/api/ai/models')
+ const res = await fetchWithCookie('/api/ai/models')
  const data = await res.json()
  if (data.success) {
  const allModels = data.data.models as Model[]

@@ -13,6 +13,7 @@ import {
  Search, ExternalLink, ChevronUp, ChevronDown
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface TrainingProblem {
  id: string
@@ -87,7 +88,7 @@ export default function EditTrainingPage() {
  const fetchDetail = useCallback(async () => {
  try {
  setLoading(true)
- const res = await fetch(`/api/trainings/${id}`, { cache: 'no-store' })
+ const res = await fetchWithCookie(`/api/trainings/${id}`, { cache: 'no-store' })
  const data = await res.json()
  if (data.success) {
  const t = data.data as TrainingDetail
@@ -128,7 +129,7 @@ export default function EditTrainingPage() {
  const t = setTimeout(() => {
  const params = new URLSearchParams({ limit: '50' })
  if (searchKw) params.set('keyword', searchKw)
- fetch(`/api/problems?${params}`, { cache: 'no-store' })
+ fetchWithCookie(`/api/problems?${params}`, { cache: 'no-store' })
  .then(r => r.json())
  .then(data => {
  const items = Array.isArray(data?.data?.items) ? data.data.items
@@ -148,7 +149,7 @@ export default function EditTrainingPage() {
  }
  setSaving(true)
  try {
- const res = await fetch(`/api/trainings/${id}`, {
+ const res = await fetchWithCookie(`/api/trainings/${id}`, {
  method: 'PUT',
  cache: 'no-store',
  headers: { 'Content-Type': 'application/json' },
@@ -180,7 +181,7 @@ export default function EditTrainingPage() {
  // 题目操作（不自动 fetchDetail，由调用者决定是否刷新）
  const patchProblems = async (payload: any) => {
  try {
- const res = await fetch(`/api/trainings/${id}/problems`, {
+ const res = await fetchWithCookie(`/api/trainings/${id}/problems`, {
  method: 'PATCH',
  cache: 'no-store',
  headers: { 'Content-Type': 'application/json' },

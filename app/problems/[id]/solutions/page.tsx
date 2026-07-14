@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import { useUser } from '@/contexts/UserContext'
+import { fetchWithCookie } from '@/lib/api/base'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
 
 type PermissionReason =
@@ -83,9 +84,9 @@ export default function SolutionsListPage() {
  setPermissionLoading(true)
  setPermissionError(null)
 
- const response = await fetch(
- `/api/solutions/check-permission?problemId=${pid}`
- )
+ const response = await fetchWithCookie(
+  `/api/solutions/check-permission?problemId=${pid}`
+  )
  const data = await response.json().catch(() => null)
 
  if (cancelled) return
@@ -127,7 +128,7 @@ export default function SolutionsListPage() {
  setSolutionsLoading(true)
  setSolutionsError(null)
 
- const response = await fetch(`/api/solutions?problemId=${pid}`)
+ const response = await fetchWithCookie(`/api/solutions?problemId=${pid}`)
  const data = await response.json().catch(() => null)
 
  if (cancelled) return
@@ -166,7 +167,7 @@ export default function SolutionsListPage() {
 
  const fetchProblem = async () => {
  try {
- const response = await fetch(`/api/problems/${pid}`)
+ const response = await fetchWithCookie(`/api/problems/${pid}`)
  const data = await response.json().catch(() => null)
  if (data?.success && data.data) {
  setProblem({

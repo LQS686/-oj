@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { Timer, MemoryStick, CheckCircle2, FileCode } from 'lucide-react'
 import { useTrainingProblemWorkspace } from '@/contexts/TrainingProblemWorkspaceContext'
 import type { Problem } from '@/types/models'
+import { fetchWithCookie } from '@/lib/api/base'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -16,7 +17,7 @@ export default function TrainingProblemMainHeader() {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/problems/${problemId}`)
+    fetchWithCookie(`/api/problems/${problemId}`)
       .then((r) => r.json())
       .then((d) => {
         if (!cancelled && d.success) setProblem(d.data)

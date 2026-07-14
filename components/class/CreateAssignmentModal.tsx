@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { BookOpen, AlertCircle, X } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
 
@@ -47,7 +47,7 @@ export default function CreateAssignmentModal({
       let page = 1
       const pageSize = 50
       for (;;) {
-        const response = await fetch(`/api/problems?page=${page}&pageSize=${pageSize}`)
+        const response = await fetchWithCookie(`/api/problems?page=${page}&pageSize=${pageSize}`)
         const data = await response.json()
         if (!data.success) {
           setError(data.error || '获取题目列表失败')

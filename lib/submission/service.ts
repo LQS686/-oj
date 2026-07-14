@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { AppError } from '@/lib/errors'
 import { addJudgeJob } from '@/lib/judge/queue'
 import { createSubmissionDirect, incrementProblemSubmitCount, updateSubmissionDirect } from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
@@ -130,9 +131,7 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
     logger.error('查找题目错误', error)
   }
   if (!problem) {
-    const err: any = new Error('题目不存在')
-    err.status = 404
-    throw err
+    throw AppError.notFound('题目不存在')
   }
 
   // 创建提交记录

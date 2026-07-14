@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, UserCheck, AlertCircle, LogIn, Play } from 'lucide-react'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface Contest {
  id: string
@@ -33,12 +34,12 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
  const checkStatus = async () => {
  try {
  setLoading(true)
- const res = await fetch(`/api/contests/${contest.id}`)
+ const res = await fetchWithCookie(`/api/contests/${contest.id}`)
  const data = await res.json()
  
  if (data.success) {
- setIsRegistered(!!data.data.isRegistered)
- const authRes = await fetch('/api/auth/me')
+  setIsRegistered(!!data.data.isRegistered)
+  const authRes = await fetchWithCookie('/api/auth/me')
  setIsLoggedIn(authRes.ok)
  }
  } catch (err) {
@@ -53,7 +54,7 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
  setRegistering(true)
  setError('')
 
- const res = await fetch(`/api/contests/${contest.id}/register`, {
+ const res = await fetchWithCookie(`/api/contests/${contest.id}/register`, {
  method: 'POST',
  headers: {
  'Content-Type': 'application/json'

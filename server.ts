@@ -32,6 +32,17 @@ function validateEnvironment(): void {
     process.exit(1)
   }
 
+  // 校验 JWT_SECRET 不使用默认占位符
+  const DEFAULT_JWT_SECRET = 'your-secure-random-string-at-least-32-characters-long'
+  if (process.env.JWT_SECRET === DEFAULT_JWT_SECRET) {
+    logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    logger.error('⚠️  JWT_SECRET 使用了默认占位符，存在严重安全风险！')
+    logger.error('   请运行以下命令生成安全密钥并写入 .env：')
+    logger.error('   node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
+    logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    process.exit(1)
+  }
+
   // 软必需：AI_CONFIG_ENCRYPTION_KEY 用于加密 AI 服务商的 API Key
   // 缺失时仅警告，不退出 — 但会：
   //   1) GET /api/admin/ai/providers 的 maskApiKey 降级为显示 ********

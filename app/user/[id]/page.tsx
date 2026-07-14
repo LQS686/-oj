@@ -8,6 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import type { User as UserType, ActivityData, RecentSubmission, DifficultyDistribution } from '@/types/models'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { motion, easeOut } from 'framer-motion'
+import { fetchWithCookie } from '@/lib/api/base'
 
 export default function UserProfilePage() {
  const params = useParams()
@@ -32,7 +33,7 @@ export default function UserProfilePage() {
 
  const fetchUserInfo = async () => {
  try {
- const res = await fetch(`/api/users/${id}/info`)
+ const res = await fetchWithCookie(`/api/users/${id}/info`)
  const data = await res.json()
  if (data.success) {
  setUser(data.data)
@@ -49,7 +50,7 @@ export default function UserProfilePage() {
 
  const fetchUserStats = async () => {
  try {
- const res = await fetch(`/api/users/${id}/stats`)
+ const res = await fetchWithCookie(`/api/users/${id}/stats`)
  const data = await res.json()
  if (data.success) {
  const heatmapData = data.data.activity.lastWeek

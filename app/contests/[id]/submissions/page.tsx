@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface Submission {
  id: string
@@ -41,7 +42,7 @@ export default function ContestSubmissionsPage() {
  const fetchSubmissions = async () => {
  try {
  setLoading(true)
- const res = await fetch(`/api/contests/${params.id}/submissions?page=${page}&limit=20`)
+ const res = await fetchWithCookie(`/api/contests/${params.id}/submissions?page=${page}&limit=20`)
  const data = await res.json()
  
  if (data.success) {

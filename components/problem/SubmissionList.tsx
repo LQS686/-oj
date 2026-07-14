@@ -1,16 +1,17 @@
-import React from 'react'
 import { Clock, MemoryStick, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getStatusConfig } from '@/lib/status'
+import type { Submission } from '@/types/models'
+import type { UserData } from '@/lib/api/auth'
 
 interface SubmissionListProps {
- submissions: any[]
+ submissions: Submission[]
  loading: boolean
  error: string | null
- user: any
+ user: UserData | null
  fromAssignment: string | null
  classId: string | null
- onSelect: (submission: any) => void
+ onSelect: (submission: Submission) => void
 }
 
 export default function SubmissionList({
@@ -64,7 +65,7 @@ export default function SubmissionList({
 
  return (
  <div className="card-static rounded-lg overflow-hidden">
- {submissions.map((sub: any) => {
+ {submissions.map((sub) => {
  const statusConfig = getStatusConfig(sub.status)
 
  return (

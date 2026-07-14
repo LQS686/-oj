@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Search, Plus, Trash2, Save, AlertCircle, Trophy } from 'lucide-react'
 import type { Problem } from '@/types/models'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 
 export default function EditContestPage() {
@@ -85,7 +85,7 @@ export default function EditContestPage() {
  }
  setSearching(true)
  try {
- const response = await fetch(`/api/problems?search=${encodeURIComponent(query)}&limit=5`)
+ const response = await fetchWithCookie(`/api/problems?search=${encodeURIComponent(query)}&limit=5`)
  const data = await response.json()
  if (data.success) {
  const filtered = (data.data.problems || []).filter((p: Problem) =>
@@ -121,7 +121,7 @@ export default function EditContestPage() {
  
  if (numbers.length === 0) return
 
- const response = await fetch(`/api/problems?numbers=${encodeURIComponent(numbers.join(','))}`)
+ const response = await fetchWithCookie(`/api/problems?numbers=${encodeURIComponent(numbers.join(','))}`)
  const data = await response.json()
  
  if (data.success) {

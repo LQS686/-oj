@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Megaphone, Pin, ChevronRight } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
+import { fetchWithCookie } from '@/lib/api/base'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 
 export default function AnnouncementsListPage() {
@@ -12,7 +13,7 @@ export default function AnnouncementsListPage() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/announcements?limit=20')
+    fetchWithCookie('/api/announcements?limit=20')
       .then((r) => r.json())
       .then((json) => {
         if (!cancelled && (json.success || json.ok) && json.data?.items) {

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useCallback, ReactNode } from 'react'
+import { useState, useRef, useCallback, ReactNode } from 'react'
 import { useClickOutside } from '@/hooks/useClickOutside'
 
 interface DropdownProps {

@@ -18,6 +18,7 @@ import {
 import MarkdownEditor from '@/components/solution/MarkdownEditor'
 import { useUser } from '@/contexts/UserContext'
 import { logger } from '@/lib/logger'
+import { fetchWithCookie } from '@/lib/api/base'
 import { canManageContent } from '@/lib/permissions'
 
 const CODE_LANGUAGES: { value: string; label: string }[] = [
@@ -93,7 +94,7 @@ export default function EditSolutionPage() {
  setLoadError(null)
  setForbidden(false)
 
- const res = await fetch(`/api/solutions/${solutionId}`)
+ const res = await fetchWithCookie(`/api/solutions/${solutionId}`)
  const data = await res.json().catch(() => null)
 
  if (cancelled) return
@@ -127,8 +128,8 @@ export default function EditSolutionPage() {
 
  // 同步加载题目信息用于面包屑
  if (s.problemId) {
- fetch(`/api/problems/${s.problemId}`)
- .then((r) => r.json().catch(() => null))
+ fetchWithCookie(`/api/problems/${s.problemId}`)
+  .then((r) => r.json().catch(() => null))
  .then((pd) => {
  if (cancelled) return
  if (pd?.success && pd.data) {
@@ -213,7 +214,7 @@ export default function EditSolutionPage() {
  setError(null)
 
  try {
- const res = await fetch(`/api/solutions/${solutionId}`, {
+ const res = await fetchWithCookie(`/api/solutions/${solutionId}`, {
  method: 'PATCH',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({

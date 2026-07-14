@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { getStatusColor } from '@/lib/status'
 import ProblemDescription from '@/components/problem/ProblemDescription'
@@ -92,7 +93,7 @@ export default function ContestProblemDetailPage({
     try {
       setLoading(true)
       setError('')
-      const res = await fetch(`/api/problems/${problemId}`)
+      const res = await fetchWithCookie(`/api/problems/${problemId}`)
       const data = await res.json()
       if (data.success) {
         setProblem(data.data)
@@ -109,7 +110,7 @@ export default function ContestProblemDetailPage({
   const fetchSubmissions = async () => {
     try {
       setSubmissionsLoading(true)
-      const res = await fetch(
+      const res = await fetchWithCookie(
         `/api/contests/${contestId}/submissions?problemId=${problemId}&userId=${user?.id || ''}`,
         { cache: 'no-store' }
       )
@@ -248,7 +249,7 @@ export default function ContestProblemDetailPage({
         setLastResult(null)
         setShowJudgeStatus(false)
 
-        const res = await fetch(`/api/contests/${contestId}/submissions`, {
+        const res = await fetchWithCookie(`/api/contests/${contestId}/submissions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ problemId, code, language }),

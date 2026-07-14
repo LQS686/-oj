@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import type { HomeDashboardData } from '@/lib/home/dashboard'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 
@@ -127,7 +127,7 @@ function DashboardView() {
       try {
         setLoading(true)
         setError('')
-        const res = await fetchWithAuth('/api/home/dashboard')
+        const res = await fetchWithCookie('/api/home/dashboard')
         const json = await res.json()
         if (!json.success && !json.ok) {
           throw new Error(json.error || '加载失败')
@@ -323,7 +323,7 @@ function GuestView() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/announcements?limit=6')
+    fetchWithCookie('/api/announcements?limit=6')
       .then((r) => r.json())
       .then((json) => {
         if (!cancelled && (json.success || json.ok) && json.data?.items) {
