@@ -84,9 +84,16 @@ export const POST = withApi.public(async (req) => {
     { status: 201 }
   )
 
+  // Cookie secure 配置：
+  // - FORCE_SECURE_COOKIE=false：强制禁用（HTTP 测试环境）
+  // - FORCE_SECURE_COOKIE=true：强制启用
+  // - 未设置且生产环境：默认启用
+  const isSecureCookie = process.env.FORCE_SECURE_COOKIE === 'true' ||
+    (process.env.NODE_ENV === 'production' && process.env.FORCE_SECURE_COOKIE !== 'false')
+
   response.cookies.set('token', token, {
     httpOnly: true,
-    secure: process.env.FORCE_SECURE_COOKIE === 'true' || process.env.NODE_ENV === 'production',
+    secure: isSecureCookie,
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60,
   })
