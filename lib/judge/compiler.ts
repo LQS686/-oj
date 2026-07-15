@@ -166,7 +166,8 @@ export async function compileCode(code: string, language: string): Promise<Compi
     let spawnCmd: string
     let spawnArgs: string[]
     if (useSandbox) {
-      const runnerPath = join(__dirname, 'runner.sh')
+      // ESM 环境下 __dirname 不可靠，使用 process.cwd() 构建路径
+      const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
       spawnCmd = 'bash'
       spawnArgs = [runnerPath, '512', '15', '64', 'g++', '-O2', '-std=c++17', '-o', outputPath, sourcePath]
       if (language === 'c') {

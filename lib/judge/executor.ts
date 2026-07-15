@@ -320,7 +320,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       let args = runInfo.args
       const useRunnerWrapper = isLinux && ['cpp', 'c', 'python', 'java', 'javascript'].includes(language)
       if (useRunnerWrapper) {
-        const runnerPath = join(__dirname, 'runner.sh')
+        // ESM 环境下 __dirname 不可靠，使用 process.cwd() 构建路径
+        const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
         const memMb = String(memoryLimit)
         // CPU 秒数向上取整，确保不与 extraTime 窗口冲突
         const cpuSec = String(Math.max(1, Math.ceil(hardTimeoutMs / 1000)))
