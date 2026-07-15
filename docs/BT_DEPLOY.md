@@ -47,6 +47,13 @@
 
    > ⚠️ **注意**：URL 必须是 `http://` 开头，不能用 `https://`（IP 无法申请证书）
 
+   `.env` 中的 `FORCE_SECURE_COOKIE` 必须设为 `false`，否则 Cookie 在 HTTP 下无法保存：
+
+   ```bash
+   cd /www/wwwroot/dashan-oj
+   sed -i 's/FORCE_SECURE_COOKIE=.*/FORCE_SECURE_COOKIE=false/' .env
+   ```
+
 2. **宝塔 Nginx 配置（仅 HTTP）**：
 
    宝塔 → 网站 → 添加站点 → 域名填服务器 IP `43.139.231.170`

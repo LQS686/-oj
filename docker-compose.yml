@@ -17,6 +17,7 @@ services:
       - AI_CONFIG_ENCRYPTION_KEY=${AI_CONFIG_ENCRYPTION_KEY:?err}
       - USE_DOCKER=false
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - FORCE_SECURE_COOKIE=${FORCE_SECURE_COOKIE:-true}
       - PORT=3000
       - REDIS_URL=redis://:${REDIS_PASSWORD:?err}@redis:6379
     depends_on:
