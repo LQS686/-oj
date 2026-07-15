@@ -82,7 +82,7 @@ export async function touchAiModelPreference(userId: string, modelId: string) {
       },
     })
   } catch (e) {
-    console.error('Failed to update preference', e)
+    logger.error('Failed to update preference', e)
   }
 }
 

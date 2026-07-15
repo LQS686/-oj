@@ -145,12 +145,13 @@ export default function SettingsPage() {
  const data = await response.json()
 
  if (data.success) {
- showMessage('success', '资料更新成功')
- const updatedUser = { ...user, ...data.data }
- setUserLocal(updatedUser)
- setUser(updatedUser)
- localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar, role: updatedUser.role }))
- } else {
+showMessage('success', '资料更新成功')
+const updatedUser = { ...user, ...data.data }
+setUserLocal(updatedUser)
+setUser(updatedUser)
+// 修复 P0：不存 role 到 localStorage，防止 XSS 窃取越权
+localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar }))
+} else {
  showMessage('error', data.error || '更新失败')
  }
  } catch (error) {
@@ -334,11 +335,12 @@ export default function SettingsPage() {
  const data = await response.json()
 
  if (data.success) {
- showMessage('success', '邮箱更改成功')
- const updatedUser = { ...user, email: data.newEmail }
- setUserLocal(updatedUser)
- setUser(updatedUser)
- localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar, role: updatedUser.role }))
+showMessage('success', '邮箱更改成功')
+const updatedUser = { ...user, email: data.newEmail }
+setUserLocal(updatedUser)
+setUser(updatedUser)
+// 修复 P0：不存 role 到 localStorage
+localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar }))
  setEmailChange({
  newEmail: '',
  currentPassword: '',
@@ -465,15 +467,16 @@ export default function SettingsPage() {
  头像
  </label>
  <AvatarUploader 
- currentAvatar={user?.avatar}
- onAvatarUpdate={(newUrl) => {
- const updatedUser = { ...user, avatar: newUrl }
- setUserLocal(updatedUser)
- setUser(updatedUser)
- localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar, role: updatedUser.role }))
- showMessage('success', '头像更新成功')
- }}
- />
+currentAvatar={user?.avatar}
+onAvatarUpdate={(newUrl) => {
+const updatedUser = { ...user, avatar: newUrl }
+setUserLocal(updatedUser)
+setUser(updatedUser)
+// 修复 P0：不存 role 到 localStorage
+localStorage.setItem('user', JSON.stringify({ id: updatedUser.id, username: updatedUser.username, nickname: updatedUser.nickname, avatar: updatedUser.avatar }))
+showMessage('success', '头像更新成功')
+}}
+/>
  </div>
 
  <div className="space-y-5">

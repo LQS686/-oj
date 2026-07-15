@@ -322,12 +322,22 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       if (useRunnerWrapper) {
         // ESM 环境下 __dirname 不可靠，使用 process.cwd() 构建路径
         const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
-        const memMb = String(memoryLimit)
+        // P1 修复：ulimit 参数上限保护，防止恶意 Problem.memoryLimit 撑爆系统
+        //   memMb ≤ 4096（4GB），cpuSec ≤ 300（5min），stackMb ≤ 64
+        const safeMem = Math.min(Math.max(16, Number(memoryLimit) || 256), 4096)
+        const safeCpu = Math.min(Math.max(1, Math.ceil(Number(hardTimeoutMs) / 1000) || 10), 300)
+        const safeStack = Math.min(Math.max(1, Number(memoryLimit) || 16), 64)
+        const memMb = String(safeMem)
         // CPU 秒数向上取整，确保不与 extraTime 窗口冲突
-        const cpuSec = String(Math.max(1, Math.ceil(hardTimeoutMs / 1000)))
-        const stackMb = String(Math.min(memoryLimit, 64))
+        const cpuSec = String(safeCpu)
+        const stackMb = String(safeStack)
+        // P1 修复：command 白名单（防止 runInfo.command 来自恶意构造）
+        const commandPath = typeof runInfo.command === 'string' ? runInfo.command.split(/[\n\r;|&`$()<>]/)[0] : ''
+        if (!commandPath || !/^[a-zA-Z0-9_./\-]+$/.test(commandPath)) {
+          throw new Error(`非法的 command 路径: ${runInfo.command}`)
+        }
         command = 'bash'
-        args = [runnerPath, memMb, cpuSec, stackMb, runInfo.command, ...runInfo.args]
+        args = [runnerPath, memMb, cpuSec, stackMb, commandPath, ...runInfo.args]
       }
 
       logger.debug(`执行命令`, { command, args, extraTime, hardTimeoutMs })

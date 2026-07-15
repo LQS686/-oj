@@ -4,7 +4,7 @@
  * GET  公开：按 problemId 列出题解（带权限校验、点赞状态）
  * POST 鉴权：创建题解
  */
-import { withApi, ok, readJson, readQuery, throw400, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, fail, readJson, readQuery, throw400, throw404 } from '@/lib/api/withApi'
 import {
   listSolutionsWithPermission,
   createUserSolution,
@@ -32,10 +32,8 @@ export const GET = withApi.public(async (req) => {
 
   if (!result.found) throw404('题目不存在')
   if (!result.allowed) {
-    return Response.json(
-      { ok: false, success: false, error: '无权查看题解', permission: result.permission, code: 'FORBIDDEN' },
-      { status: 403 }
-    )
+    // 修复：使用统一 fail() + extra 透传 permission 字段，避免手工 Response.json 拼装破坏响应格式
+    return fail('FORBIDDEN', '无权查看题解', 403, { permission: result.permission })
   }
   return ok({
     items: result.items,

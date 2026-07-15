@@ -13,6 +13,7 @@ import {
 } from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
 import { cache } from '@/lib/cache'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 
 // 监听评测完成事件（热重载守卫：避免 Next.js dev 模式重复注册监听器）
 if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', async (job: QueuedJob, result: JudgeResult) => {
@@ -152,7 +153,7 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
     
     // 更新为系统错误
     await updateSubmissionDirect(job.id, {
-      status: 'SE',
+      status: SubmissionStatus.SYSTEM_ERROR,
       message: `系统错误: ${error.message}`
     })
 

@@ -4,6 +4,7 @@
  */
 import { prisma, Prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { CacheKeys } from '@/lib/constants/cache-keys'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
 import { ensureTotalScoreIs100, redistributeTestScores } from '@/lib/problem/testcase'
 import { trimAll, escapeHtml } from '@/lib/sanitize'
@@ -655,8 +656,8 @@ export async function applyProblemVerification(input: VerifyProblemInput) {
  * 清除单道题目的全部缓存（byId + statusCounts）
  */
 export function clearProblemCache(problemId: string) {
-  cache.delete(`problem:byId:${problemId}`)
-  cache.delete(`problem:statusCounts:${problemId}`)
+  cache.delete(CacheKeys.problem.byId(problemId))
+  cache.delete(CacheKeys.problem.statusCounts(problemId))
   cache.deleteByPrefix('problem:tags')
 }
 

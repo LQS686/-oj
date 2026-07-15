@@ -5,7 +5,7 @@
  * PATCH  鉴权：更新（作者 / 管理员 / 教师）
  * DELETE 鉴权：删除（作者 / 管理员 / 教师，级联删评论）
  */
-import { withApi, ok, readJson, readQuery, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, fail, readJson, readQuery, throw400, throw403, throw404 } from '@/lib/api/withApi'
 import { canAccessAdmin, canManageContent } from '@/lib/permissions'
 import { verifyToken } from '@/lib/auth'
 import {
@@ -48,10 +48,8 @@ export const GET = withApi.public(async (req, ctx) => {
 
   if (!result.found) throw404('题解不存在')
   if (!result.allowed) {
-    return Response.json(
-      { ok: false, success: false, error: '无权查看题解', permission: result.permission, code: 'FORBIDDEN' },
-      { status: 403 }
-    )
+    // 修复：使用统一 fail() + extra 透传 permission 字段
+    return fail('FORBIDDEN', '无权查看题解', 403, { permission: result.permission })
   }
   return ok({ ...result.solution, permission: result.permission })
 })

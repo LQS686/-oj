@@ -53,7 +53,7 @@ export const POST = withApi.public(async (req) => {
   const sanitizedEmail = (email as string).toLowerCase()
   const sanitizedNickname = nickname ? escapeHtml(nickname as string) : sanitizedUsername
 
-  const hashedPassword = await bcrypt.hash(password as string, 10)
+  const hashedPassword = await bcrypt.hash(password as string, 12)
 
   // 首用户判定：User 表为空时，该新用户自动成为 SYSTEM_ADMIN
   const userCount = await prisma.user.count()

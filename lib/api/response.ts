@@ -17,6 +17,11 @@ export interface ApiFail {
   success: false
   error: string
   code: string
+  /**
+   * 失败响应携带的额外信息（如 permission 权限详情）。
+   * 不会与 data 字段冲突，apiClient 在 fail 路径不会读取 data。
+   */
+  [key: string]: unknown
 }
 
 export type ApiResponse<T = unknown> = ApiSuccess<T> | ApiFail
@@ -26,8 +31,19 @@ export const ok = <T>(data: T, init?: globalThis.ResponseInit): Response => {
   return Response.json(body, init)
 }
 
-export const fail = (code: string, message: string, status: number = 400): Response => {
-  const body: ApiFail = { ok: false, success: false, error: message, code }
+/**
+ * 失败响应统一出口。
+ * - extra：透传额外字段（如 permission 权限详情），便于前端细化处理。
+ *   注意：apiClient 在 fail 路径会 throw，不会自动消费 data/extra；
+ *   前端若用 fetchWithCookie + 手动 res.json()，可以读取 extra 字段。
+ */
+export const fail = (
+  code: string,
+  message: string,
+  status: number = 400,
+  extra?: Record<string, unknown>
+): Response => {
+  const body: ApiFail = { ok: false, success: false, error: message, code, ...(extra || {}) }
   return Response.json(body, { status })
 }
 

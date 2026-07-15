@@ -3,6 +3,8 @@ import type { NextRequest } from 'next/server'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { getUserFromRequest } from '@/lib/auth'
 import { canAccessAdmin } from '@/lib/permissions'
+import crypto from 'crypto'
+import { logger } from '@/lib/logger'
 
 // 写操作方法集合：需进行 CSRF Origin/Referer 校验
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -15,6 +17,12 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/notifications': { maxRequests: 200, windowMs: 60000 },
   // AI 生成日志轮询：2s 间隔，单任务 30 次/min，多任务并发可能更高
   '/api/admin/ai/generate': { maxRequests: 200, windowMs: 60000 },
+  // 修复 P1：补充限流白名单（之前大量写接口无显式限流）
+  '/api/submissions': { maxRequests: 20, windowMs: 60000 },
+  '/api/solutions': { maxRequests: 10, windowMs: 60000 },
+  '/api/comments': { maxRequests: 30, windowMs: 60000 },
+  '/api/classes': { maxRequests: 20, windowMs: 60000 },
+  '/api/contests/join': { maxRequests: 10, windowMs: 60000 },
 }
 
 /**
@@ -28,7 +36,9 @@ function isAllowedOrigin(request: NextRequest): boolean {
 
   const host = request.headers.get('host')
   if (!host) {
-    return true // 无 Host 头时放行（异常环境由上游处理）
+    // 修复 P0：无 Host 头视为异常，fail-closed 拒绝写方法。
+    //   仅读取 Host 失败时（理论上不应发生在 Next.js）才放行。
+    return false
   }
 
   const origin = request.headers.get('origin')
@@ -62,13 +72,22 @@ function isAllowedOrigin(request: NextRequest): boolean {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // P1 修复：注入 requestId，便于全链路日志追踪
+  const incomingRequestId = request.headers.get('x-request-id')
+  const requestId = incomingRequestId && incomingRequestId.length <= 128
+    ? incomingRequestId
+    : crypto.randomUUID()
+  logger.setContext({ requestId })
+
   // 拦截 /admin/* 页面路由（不含 /api/admin/*）：
   // 基于 JWT payload 中的 role 判定，仅 SYSTEM_ADMIN 和 ADMIN 可放行。
   // /api/admin/* 由 API 路由的 withApi.admin 处理，此处不拦截。
   if (pathname.startsWith('/admin') && !pathname.startsWith('/api/')) {
     const payload = getUserFromRequest(request)
     if (!payload || !canAccessAdmin({ role: payload.role })) {
-      return NextResponse.redirect(new URL('/403', request.url))
+      const redirect = NextResponse.redirect(new URL('/403', request.url))
+      redirect.headers.set('x-request-id', requestId)
+      return redirect
     }
     return NextResponse.next()
   }
@@ -119,7 +138,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next()
+  // P1 修复：把 requestId 注入响应头，便于客户端在浏览器 DevTools Network 面板追溯
+  const response = NextResponse.next()
+  response.headers.set('x-request-id', requestId)
+  return response
 }
 
 // middleware 需解析 JWT（jsonwebtoken 为 Node 库），使用 Node.js runtime

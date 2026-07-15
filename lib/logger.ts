@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -36,6 +36,63 @@ function parseLogLevel(level: string | undefined): LogLevel {
   return LOG_LEVELS.includes(normalized) ? normalized : 'info';
 }
 
+/**
+ * 敏感字段脱敏
+ * 递归遍历对象/数组，将指定字段的值替换为 ***REDACTED***，防止
+ * password / token / cookie / apiKey / secret / authorization 等敏感字段泄漏到日志。
+ */
+const SENSITIVE_KEYS = new Set([
+  'password',
+  'passwd',
+  'pwd',
+  'token',
+  'accessToken',
+  'refreshToken',
+  'jwt',
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'apiKey',
+  'apikey',
+  'api_key',
+  'secret',
+  'encryptionKey',
+  'privateKey',
+  'sessionId',
+  'csrfToken',
+])
+
+const REDACTED = '***REDACTED***'
+
+function redactValue(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
+  if (value === null || value === undefined) return value
+  if (typeof value !== 'object') return value
+
+  if (seen.has(value as object)) return '[Circular]'
+  seen.add(value as object)
+
+  if (Array.isArray(value)) {
+    return value.map(v => redactValue(v, seen))
+  }
+
+  const result: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    const lowerKey = k.toLowerCase()
+    const isSensitive = [...SENSITIVE_KEYS].some(s => lowerKey === s.toLowerCase() || lowerKey.includes(s.toLowerCase()))
+    if (isSensitive && (typeof v === 'string' || typeof v === 'number')) {
+      result[k] = REDACTED
+    } else if (typeof v === 'string' && v.length > 0 && (lowerKey.includes('bearer') || /^eyJ[A-Za-z0-9_-]{20,}/.test(v))) {
+      // JWT-like 字符串（eyJ... 开头）也脱敏
+      result[k] = REDACTED
+    } else if (typeof v === 'object' && v !== null) {
+      result[k] = redactValue(v, seen)
+    } else {
+      result[k] = v
+    }
+  }
+  return result
+}
+
 class Logger {
   private level: LogLevel;
   private defaultContext: LogContext = {};
@@ -60,13 +117,13 @@ class Logger {
 
   private formatMessage(level: LogLevel, message: string, meta?: any, context?: LogContext) {
     const timestamp = new Date().toISOString();
-    const mergedContext = { ...this.defaultContext, ...context };
+    const mergedContext = redactValue({ ...this.defaultContext, ...context });
     return {
       timestamp,
       level,
       message,
-      ...(Object.keys(mergedContext).length > 0 && { context: mergedContext }),
-      ...(meta && { meta }),
+      ...(Object.keys(mergedContext as object).length > 0 && { context: mergedContext }),
+      ...(meta && { meta: redactValue(meta) }),
     };
   }
 
@@ -117,7 +174,7 @@ class Logger {
 
   error(message: string, error?: any, context?: LogContext) {
     if (this.shouldLog('error')) {
-      let errorMeta = error;
+      let errorMeta: unknown = error;
       if (error instanceof Error) {
         const { name, message: errMsg, stack, ...rest } = error;
         errorMeta = {
@@ -127,9 +184,11 @@ class Logger {
           ...rest
         };
       }
-      const logMessage = this.formatMessage('error', message, errorMeta, context);
+      // 修复：errorMeta 也走脱敏（防止错误对象含敏感字段）
+      const redactedErrorMeta = redactValue(errorMeta);
+      const logMessage = this.formatMessage('error', message, redactedErrorMeta, context);
       console.error(JSON.stringify(logMessage));
-      this.writeToFile('error', message, errorMeta, context);
+      this.writeToFile('error', message, redactedErrorMeta, context);
     }
   }
 

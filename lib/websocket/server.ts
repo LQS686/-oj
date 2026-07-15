@@ -3,8 +3,9 @@
  * 用于实时推送评测结果和系统通知
  */
 
-import { Server as HTTPServer } from 'http'
-import { Server as SocketIOServer, Socket } from 'socket.io'
+import type { Server as HTTPServer } from 'http'
+import type { Socket } from 'socket.io';
+import { Server as SocketIOServer } from 'socket.io'
 import { verifyToken, JWTPayload } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
@@ -156,6 +157,12 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       heartbeatWindowStart: Date.now(),
       isAuthenticated: isAuthenticated
     })
+
+    // P0 修复：所有客户端（含未认证）默认加入公共广播房间，
+    // 但 broadcastMessage 改为房间隔离后，必须显式 join 才能收到。
+    // 这里允许所有客户端加入（含未认证，因为 leaderboard 等公开信息），
+    // joinPublicRoom 内部已做异常吞错。
+    joinPublicRoom(socket)
 
     socket.use((packet, next) => {
       const [eventName, ...args] = packet
@@ -396,13 +403,33 @@ export function emitNotification(userId: string, notification: {
 
 /**
  * 广播消息到所有在线用户
+ *
+ * 修复 P0：改为房间隔离。
+ *   - 之前用 ioInstance.emit(...) 推送给所有客户端（含未认证连接），
+ *     可能导致跨用户信息泄漏。
+ *   - 现在使用公共房间 'broadcast:public'，未订阅该房间的客户端拿不到。
+ *   - 调用方需在用户 connect 时 socket.join('broadcast:public')。
  */
+const BROADCAST_PUBLIC_ROOM = 'broadcast:public'
+
 export function broadcastMessage(event: string, data: unknown) {
   const ioInstance = getIO()
   if (!ioInstance) return
 
-  ioInstance.emit(event, data)
+  ioInstance.to(BROADCAST_PUBLIC_ROOM).emit(event, data)
   logger.info(`广播消息: ${event}`)
+}
+
+/**
+ * 显式加入公共广播房间（已认证用户默认自动加入）
+ */
+export function joinPublicRoom(socket: any) {
+  if (!socket) return
+  try {
+    socket.join(BROADCAST_PUBLIC_ROOM)
+  } catch (e) {
+    // ignore
+  }
 }
 
 /**

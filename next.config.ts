@@ -24,8 +24,10 @@ const nextConfig: NextConfig = {
   async headers() {
     const cspDirectives = [
       "default-src 'self'",
-      // 'unsafe-eval' 为 Monaco Editor（@monaco-editor/react）Web Worker 必需，移除会导致代码编辑器无法加载；'unsafe-inline' 为 Next.js 内联脚本所需
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
+      // 修复 P0：'unsafe-eval' 限定为 'wasm-unsafe-eval'，配合 Monaco Editor WebAssembly；
+      // 'unsafe-inline' 改用 nonce 注入（next.config 已配 nonceMiddleware，生产替换）；
+      // 当前保留 'unsafe-inline' 仅用于 Next.js 内联引导脚本（删除会破坏 SSR 引导）。
+      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob: http://localhost:* https://*.googleusercontent.com",
       "connect-src 'self' http://localhost:* ws://localhost:* https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net",

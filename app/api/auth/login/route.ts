@@ -25,7 +25,8 @@ export const POST = withApi.public(async (req) => {
       success: true,
       data: {
         user: result.user,
-        token: result.token,
+        // 修复 P1：不再在响应体返回明文 token，让前端完全依赖 cookie。
+        //   避免 XSS 窃取 localStorage 里的 token。
       },
     })
 

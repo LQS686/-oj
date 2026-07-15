@@ -3,7 +3,7 @@
  * 认证模块统一入口（JWT 工具 + 业务服务 + 参数校验）
  */
 import jwt from 'jsonwebtoken'
-import { NextRequest } from 'next/server'
+import type { NextRequest } from 'next/server'
 import dotenv from 'dotenv'
 
 // 加载环境变量
@@ -21,6 +21,13 @@ export function validateJwtSecret(): void {
       '示例: JWT_SECRET=your-secure-random-string-at-least-32-characters-long'
     )
   }
+  if (process.env.JWT_SECRET.length < 32) {
+    throw new Error(
+      `JWT_SECRET 长度不足（${process.env.JWT_SECRET.length} < 32），存在被暴力破解风险。\n` +
+      `请使用至少 32 字符的强随机字符串：\n` +
+      `  node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+    )
+  }
   JWT_SECRET = process.env.JWT_SECRET
   isInitialized = true
 }
@@ -33,12 +40,18 @@ export interface JWTPayload {
   tokenVersion: number
 }
 
+/** 显式声明算法白名单（防御算法混淆攻击 / algorithm confusion CVE） */
+const JWT_ALGORITHM: jwt.Algorithm = 'HS256' as jwt.Algorithm
+
 export function signToken(payload: JWTPayload): string {
   validateJwtSecret()
   if (!JWT_SECRET) {
     throw new Error('JWT_SECRET 未初始化')
   }
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign(payload, JWT_SECRET, {
+    algorithm: JWT_ALGORITHM,
+    expiresIn: '7d',
+  })
 }
 
 export function verifyToken(token: string): JWTPayload | null {
@@ -47,7 +60,9 @@ export function verifyToken(token: string): JWTPayload | null {
     return null
   }
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload
+    return jwt.verify(token, JWT_SECRET, {
+      algorithms: [JWT_ALGORITHM],
+    }) as JWTPayload
   } catch (error) {
     return null
   }

@@ -7,6 +7,8 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { canManageContent } from '@/lib/permissions'
 import { addJudgeJob } from '@/lib/judge/queue'
+import { logger } from '@/lib/logger'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 import {
   createClassAssignmentSubmissionDirect,
   createSubmissionDirect,
@@ -1000,7 +1002,7 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
     problemId: input.problemId,
     code: input.code,
     language: input.language,
-    status: 'Pending',
+    status: SubmissionStatus.PENDING,
     totalTests: problem.testCases.length,
     isLate,
   })
@@ -1014,7 +1016,7 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
       userId: input.userId,
       code: input.code,
       language: input.language,
-      status: 'Pending',
+      status: SubmissionStatus.PENDING,
       totalTests: problem.testCases.length,
       assignmentSubmissionId: assignmentSubmission.id,
     })
@@ -1046,15 +1048,33 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
       })),
     })
   } catch (err) {
-    console.error('加入队列失败:', err)
-    await updateSubmissionDirect(submission.id, {
-      status: 'SE',
-      message: '评测系统错误，请稍后重试',
-    })
-    await updateClassAssignmentSubmissionDirect(assignmentSubmission.id, {
-      status: 'SE',
-      message: '评测系统错误，请稍后重试',
-    })
+    logger.error(
+      '加入评测队列失败，回滚提交记录与计数',
+      err instanceof Error ? err : new Error(String(err))
+    )
+    // L-3 修复：事务回滚 - 删除 submission + 计数减一，避免 Problem.totalSubmit 虚高
+    try {
+      await prisma.$transaction([
+        prisma.submission.delete({ where: { id: submission.id } }),
+        prisma.problem.update({
+          where: { id: problem.id },
+          data: { totalSubmit: { decrement: 1 } },
+        }),
+        prisma.classAssignmentSubmission.update({
+          where: { id: assignmentSubmission.id },
+          data: {
+            status: SubmissionStatus.SYSTEM_ERROR,
+            message: '评测系统错误，请稍后重试',
+          },
+        }),
+      ])
+    } catch (rollbackError) {
+      logger.error(
+        `提交回滚失败 (submissionId=${submission.id}, problemId=${problem.id})`,
+        rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError))
+      )
+    }
+    throw new ApiError('JUDGE_QUEUE_FAILED', '评测系统错误，请稍后重试', 503)
   }
 
   return {

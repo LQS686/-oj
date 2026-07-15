@@ -10,6 +10,7 @@ import type { ResultState } from './types'
 import { join } from 'path'
 import { logger } from '@/lib/logger'
 import { emitJudgeProgress } from '@/lib/websocket/server'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 
 // 单测点执行+比较（单次运行，不含重测）
 async function runOnce(

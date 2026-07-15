@@ -8,6 +8,7 @@ import rehypeSanitize from 'rehype-sanitize'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import type { ExtraProps } from 'react-markdown'
+import { markdownSanitizeSchema } from '@/lib/markdown/sanitize-schema'
 
 interface MarkdownContentProps {
  content: string
@@ -62,7 +63,7 @@ export default function MarkdownContent({
  <div className={`markdown-body ${className}`}>
  <ReactMarkdown
  remarkPlugins={[remarkGfm, remarkMath]}
- rehypePlugins={[rehypeSanitize, rehypeKatex]}
+ rehypePlugins={[[rehypeSanitize, markdownSanitizeSchema], rehypeKatex]}
  components={{
  code({className, children, ...props}: ComponentPropsWithoutRef<'code'> & ExtraProps) {
  const match = /language-(\w+)/.exec(className || '')

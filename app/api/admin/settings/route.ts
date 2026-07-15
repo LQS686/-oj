@@ -28,5 +28,7 @@ export const PUT = withApi.systemAdmin(async (req, _ctx) => {
 
   const newSettings = await getSystemSettings()
 
-  return ok({ message: '设置已保存', data: newSettings })
+  // 修复：ok() 已包装一层 data 字段，这里不能再嵌套 data。
+  // 之前 ok({ message, data: newSettings }) 会导致前端 response.data.data 才是 settings。
+  return ok({ ...newSettings, message: '设置已保存' })
 })

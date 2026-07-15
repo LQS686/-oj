@@ -13,6 +13,8 @@ import {
   updateSubmissionDirect,
 } from '@/lib/mongodb-direct'
 import { addJudgeJob } from '@/lib/judge/queue'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
+import { CacheKeys } from '@/lib/constants/cache-keys'
 
 export interface ContestFilter {
   keyword?: string
@@ -71,14 +73,14 @@ export async function createContest(data: any, authorId: string) {
 }
 
 export async function updateContest(id: string, data: any) {
-  cache.delete(`contest:byId:${id}`)
+  cache.delete(CacheKeys.contest.byId(id))
   cache.deleteByPrefix('contest:list:')
   cache.deleteByPrefix('contest:rank')
   return prisma.contest.update({ where: { id }, data })
 }
 
 export async function deleteContest(id: string) {
-  cache.delete(`contest:byId:${id}`)
+  cache.delete(CacheKeys.contest.byId(id))
   cache.deleteByPrefix('contest:list:')
   cache.deleteByPrefix('contest:rank')
   return prisma.contest.delete({ where: { id } })
@@ -260,7 +262,7 @@ export async function updateContestWithProblems(
       })
     }
   }
-  cache.delete(`contest:byId:${contestId}`)
+  cache.delete(CacheKeys.contest.byId(contestId))
   return updated
 }
 
@@ -550,14 +552,14 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
     contestId: input.contestId,
     language: input.language,
     code: input.code,
-    status: 'Pending',
+    status: SubmissionStatus.PENDING,
     totalTests: problem.testCases.length,
   })
 
   // 更新题目总提交数
   await incrementProblemSubmitCount(problem.id)
 
-  // 5. 加入评测队列
+  // 5. 加入评测队列；失败时事务回滚（删除 submission + 计数减一）
   try {
     await addJudgeJob({
       submissionId: submission.id,
@@ -578,18 +580,29 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
         memoryLimit: tc.memoryLimit ?? undefined,
       })),
     })
-    logger.info(`✅ 竞赛提交 ${submission.id} 已加入评测队列`)
+    logger.info(`竞赛提交 ${submission.id} 已加入评测队列`)
   } catch (queueError) {
-    console.error('加入队列失败:', queueError)
-    // 依然返回成功，但标记为系统错误
-    await updateSubmissionDirect(submission.id, {
-      status: 'SE',
-      message: '评测系统错误，请稍后重试',
-    })
+    logger.error('加入评测队列失败，回滚提交记录与计数', queueError instanceof Error ? queueError : new Error(String(queueError)))
+    // L-3 修复：事务回滚 - 删除提交记录 + 计数减一，避免 Problem.totalSubmit 虚高
+    try {
+      await prisma.$transaction([
+        prisma.submission.delete({ where: { id: submission.id } }),
+        prisma.problem.update({
+          where: { id: problem.id },
+          data: { totalSubmit: { decrement: 1 } },
+        }),
+      ])
+    } catch (rollbackError) {
+      logger.error(
+        `提交回滚失败 (submissionId=${submission.id}, problemId=${problem.id})，可能存在计数不一致`,
+        rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError))
+      )
+    }
+    throw new ApiError('JUDGE_QUEUE_FAILED', '评测系统错误，请稍后重试', 503)
   }
 
   // 提交后失效该竞赛的排行榜缓存（不同 limit 的缓存都要清）
-  cache.deleteByPrefix(`contest:rank:${input.contestId}`)
+  cache.deleteByPrefix(CacheKeys.contest.rankPrefix(input.contestId))
 
   return {
     submissionId: submission.id,
@@ -657,7 +670,7 @@ export async function adminUpdateContest(
       })
     }
   }
-  cache.delete(`contest:byId:${contestId}`)
+  cache.delete(CacheKeys.contest.byId(contestId))
   return { message: '更新成功' }
 }
 
@@ -682,7 +695,7 @@ export async function adminGetContestWithProblems(contestId: string) {
 }
 
 export async function adminDeleteContest(contestId: string) {
-  cache.delete(`contest:byId:${contestId}`)
+  cache.delete(CacheKeys.contest.byId(contestId))
   return prisma.contest.delete({ where: { id: contestId } })
 }
 

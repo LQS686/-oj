@@ -1,7 +1,7 @@
 /**
  * /api/solutions/[id]/like - 切换题解点赞
  */
-import { withApi, ok, readQuery, throw400, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, fail, readQuery, throw400, throw404 } from '@/lib/api/withApi'
 import { toggleSolutionLike, loadSolutionViewUser } from '@/lib/solution/service'
 import { isObjectId } from '@/lib/api/validation'
 import { logger } from '@/lib/logger'
@@ -21,17 +21,12 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   } catch (err: any) {
     logger.error('切换题解点赞失败', err)
     if (err?.status === 403) {
-      return Response.json(
-        { ok: false, success: false, error: '无权操作', permission: err.permission, code: 'FORBIDDEN' },
-        { status: 403 }
-      )
+      // 修复：使用统一 fail() + extra 透传 permission
+      return fail('FORBIDDEN', '无权操作', 403, { permission: err.permission })
     }
     if (err?.status === 404) throw404('资源不存在')
     if (err?.status === 503) {
-      return Response.json(
-        { ok: false, success: false, error: '服务暂时不可用', code: 'SERVICE_UNAVAILABLE' },
-        { status: 503 }
-      )
+      return fail('SERVICE_UNAVAILABLE', '服务暂时不可用', 503)
     }
     throw err
   }

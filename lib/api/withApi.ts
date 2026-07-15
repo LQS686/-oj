@@ -36,6 +36,7 @@ import { getUserFromRequest } from '@/lib/auth'
 import { getClassMembership, type ClassMembership } from '@/lib/class/auth'
 import { getCachedUser, type AuthUser, type ApiContext } from './handler'
 import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
+import { assertCsrf } from '@/lib/security/csrf'
 
 export type { AuthUser, ApiContext }
 
@@ -76,6 +77,18 @@ async function safeCall(
   errorCode: string,
   req: NextRequest
 ): Promise<Response> {
+  // P1：注入 requestId 到 logger context，便于全链路日志追踪
+  //    middleware 已写入 x-request-id 响应头，这里同步到 logger
+  const { logger } = await import('@/lib/logger')
+  const requestId = req.headers.get('x-request-id') || undefined
+  const url = req.nextUrl?.pathname || ''
+  const method = req.method || 'GET'
+  logger.setContext({
+    requestId,
+    method,
+    path: url,
+    errorCode,
+  })
   try {
     const result = await fn()
     if (result instanceof Response) return result
@@ -132,10 +145,15 @@ export interface RouteHandler {
 export const withApi = {
   /**
    * 公开路由：无需登录
+   * 安全（P1-4 修复）：写方法（POST/PUT/PATCH/DELETE）必须携带合法 CSRF token
    */
   public(handler: RouteHandler) {
     return async (req: NextRequest, ctx: any) => {
       return safeCall(async () => {
+        // CSRF 保护：仅写方法检查，GET/HEAD/OPTIONS 放行
+        if (req.method && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+          assertCsrf(req)
+        }
         const resolved = await resolveCtxParams(ctx)
         return handler(req, resolved)
       }, 'PUBLIC', req)

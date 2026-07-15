@@ -7,6 +7,7 @@
 import { MongoClient, ObjectId, ReadPreference, WriteConcern } from 'mongodb'
 import { logger } from './logger'
 import bcrypt from 'bcryptjs'
+import { canTransition as canSubmissionTransition } from '@/lib/constants/submission-status'
 
 const MONGODB_URI = process.env.DATABASE_URL || 'mongodb://localhost:27017/oj_platform?replicaSet=rs0'
 
@@ -179,6 +180,27 @@ export async function updateSubmissionDirect(
     for (const key of allowedFields) {
       if (key in data && data[key as keyof typeof data] !== undefined) {
         sanitized[key] = data[key as keyof typeof data]
+      }
+    }
+
+    // P0 修复：状态机守卫
+    //   1) 若要更新 status，先读当前状态
+    //   2) 通过 canTransition 校验合法转换
+    //   3) 仅在 PENDING/JUDGING 状态下允许非合法转换（recover 场景）
+    if (typeof sanitized.status === 'string') {
+      const current = await db.collection('Submission').findOne(
+        { _id: new ObjectId(submissionId) },
+        { projection: { status: 1 } }
+      )
+      const currentStatus = (current?.status as string | undefined) ?? ''
+      const nextStatus = sanitized.status as string
+      if (currentStatus && !canSubmissionTransition(currentStatus, nextStatus)) {
+        // 允许 recover 路径：Pending/Judging 状态可被强制覆盖（worker.ts:188）
+        if (currentStatus !== 'Pending' && currentStatus !== 'Judging') {
+          throw new Error(
+            `非法状态转换: ${currentStatus} -> ${nextStatus} (submissionId=${submissionId})`
+          )
+        }
       }
     }
 

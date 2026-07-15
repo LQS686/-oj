@@ -53,9 +53,9 @@ export function useNotificationSocket({
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
-      auth: {
-        userId: userId,
-      },
+      // 修复 P0：移除 auth.userId，依赖 cookie 服务端验签，
+      // 防止前端伪造 userId 监听他人通知。
+      withCredentials: true,
     })
 
     socketRef.current = socket
@@ -76,6 +76,18 @@ export function useNotificationSocket({
         callbackRef.current(notification)
       }
     })
+
+    // 修复 P1：防御性校验 - 即使服务端做了房间隔离，前端也校验消息归属
+    // （当前 NotificationData 无 userId 字段，仅在服务端有；
+    //  若未来加入，校验 data.userId === userId）
+    if (typeof (socket as any).use === 'function') {
+      ;(socket as any).use((packet: any[], next: (err?: Error) => void) => {
+        if (packet[0] === 'notification' && packet[1]?.userId && packet[1].userId !== userId) {
+          return next(new Error('Notification from foreign user'))
+        }
+        next()
+      })
+    }
 
     socket.on('disconnect', () => {
       setIsConnected(false)

@@ -132,6 +132,29 @@ export async function redistributeAllProblemScores(): Promise<void> {
  * 测试点压缩包解析
  * ========================================================================== */
 
+/**
+ * P0 修复：Zip Slip 路径穿越防护。
+ *   拒绝任何含路径分隔符、绝对路径前缀、Windows 盘符、Unicode 路径分隔符的 entryName。
+ *   合法名形如 "1.in" / "test2.out"，不应包含 "/" "\\" ":" "*" "?" "<" ">" "|" 等。
+ */
+export function isSafeZipEntryName(name: string): boolean {
+  if (typeof name !== 'string' || name.length === 0) return false
+  if (name.length > 128) return false
+  // 禁止路径分隔符（POSIX + Windows）
+  if (/[\\/]/.test(name)) return false
+  // 禁止绝对路径前缀（POSIX）
+  if (name.startsWith('/') || name.startsWith('\\')) return false
+  // 禁止 Windows 盘符
+  if (/^[a-zA-Z]:[\\/]/.test(name)) return false
+  // 禁止父目录引用
+  if (name === '..' || name === '.' || name.includes('..')) return false
+  // 禁止 Unicode 路径分隔符（U+2028 / U+2029 / U+FF0F 等）
+  if (/[\u2028\u2029\uFF0F\uFF3C]/.test(name)) return false
+  // 禁止 NUL 字节
+  if (name.includes('\u0000')) return false
+  return true
+}
+
 export const TESTCASE_UPLOAD_CONFIG = {
   MAX_FILE_SIZE: 50 * 1024 * 1024,
   MAX_UNZIP_SIZE: 100 * 1024 * 1024,
@@ -191,6 +214,20 @@ export async function parseTestCaseZip(zipBuffer: Buffer): Promise<ValidationRes
 
     const testCaseMap = new Map<number, { in?: Buffer; out?: Buffer; inName?: string; outName?: string }>()
     let totalUnzipSize = 0
+
+    // P0 修复：Zip Slip 路径穿越防护
+    //   即使当前不把 entry 落盘到 path.join(baseDir, entryName)，也要在解析入口拒绝任何
+    //   含路径分隔符、绝对路径、Windows 盘符等危险 entryName 的压缩包。
+    //   防御深度：未来若增加"压缩包导出到临时目录"功能时，本校验直接复用。
+    for (const entry of fileEntries) {
+      const fileName = entry.entryName
+      if (!isSafeZipEntryName(fileName)) {
+        return {
+          success: false,
+          error: `压缩包内文件名不安全（疑似 Zip Slip 攻击）: ${fileName}`,
+        }
+      }
+    }
 
     // 逐个解压，累计实际字节数（不依赖 zip 头声明的可伪造大小），超过上限立即中止
     for (const entry of fileEntries) {

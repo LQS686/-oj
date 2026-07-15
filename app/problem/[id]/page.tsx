@@ -740,6 +740,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                   id="code-editor"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
+                  maxLength={65536}
                   className="w-full h-[360px] rounded-xl bg-muted text-foreground font-mono text-sm p-3 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
                   spellCheck={false}
                   placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
