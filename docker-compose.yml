@@ -4,7 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
+        # JWT_SECRET 构建时占位符，运行时通过 environment 注入真实值
         JWT_SECRET: ${JWT_SECRET:-build-placeholder-not-used-at-runtime}
+        # NEXT_PUBLIC_* 在构建时被硬编码到客户端 JS 中，必须通过 ARG 传递
+        # 修改 FRONTEND_URL 后必须重新 build 镜像才能生效（docker compose build --no-cache app）
         NEXT_PUBLIC_API_URL: ${FRONTEND_URL:-http://localhost:3000}
         NEXT_PUBLIC_BASE_URL: ${FRONTEND_URL:-http://localhost:3000}
     image: oj-platform:app
@@ -17,6 +20,9 @@ services:
       - AI_CONFIG_ENCRYPTION_KEY=${AI_CONFIG_ENCRYPTION_KEY:?err}
       - USE_DOCKER=false
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      # FORCE_SECURE_COOKIE 必须传递给容器：
+      # - HTTP 部署（如 IP 测试）设为 false，否则 Cookie 无法设置，登录失败
+      # - HTTPS 部署（域名+证书）设为 true 或不设置（默认 true）
       - FORCE_SECURE_COOKIE=${FORCE_SECURE_COOKIE:-true}
       - PORT=3000
       - REDIS_URL=redis://:${REDIS_PASSWORD:?err}@redis:6379

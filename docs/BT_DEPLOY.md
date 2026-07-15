@@ -281,3 +281,74 @@ docker compose up -d
 | MongoDB 副本集未初始化 | `docker compose logs mongo` 查看日志，keyfile 由容器自动生成无需手动管理 |
 | 构建超过 10 分钟 | 首次构建较慢，后续升级仅增量构建 |
 | API 返回 502 | 等待 40 秒健康检查通过后刷新 |
+
+---
+
+## 部署注意事项（重要！）
+
+以下是部署过程中踩过的坑，后续开发和维护时务必注意：
+
+### 1. NEXT_PUBLIC_* 环境变量在构建时硬编码
+
+`NEXT_PUBLIC_API_URL` 和 `NEXT_PUBLIC_BASE_URL` 会在 `next build` 时被硬编码到客户端 JS 中。
+
+- **修改 `FRONTEND_URL` 后必须重新构建镜像**：`docker compose build --no-cache app`
+- 仅修改 `.env` 文件后重启容器**不会生效**，因为客户端 JS 中的 URL 已固化
+- Dockerfile 通过 `ARG` 接收这些值，docker-compose.yml 从 `FRONTEND_URL` 传递
+
+### 2. HTTP 部署必须禁用 Secure Cookie
+
+HTTP 协议下浏览器不会保存带 `Secure` 标志的 Cookie，导致登录后刷新页面返回 401。
+
+- `.env` 中 `FORCE_SECURE_COOKIE=false`（IP 测试时必须）
+- docker-compose.yml 已将 `FORCE_SECURE_COOKIE` 传递给容器
+- login/register 路由中通过三值逻辑处理：`true` / `false` / 未设置
+
+### 3. CSP 不能包含 upgrade-insecure-requests
+
+`upgrade-insecure-requests` 指令会强制浏览器将 HTTP 请求升级为 HTTPS。
+
+- HTTP 部署时会导致静态资源（CSS/JS）请求变为 `https://` 协议而加载失败
+- 域名切换到 HTTPS 后方可考虑添加此指令
+- 配置位于 `next.config.ts` 的 `headers()` 函数中
+
+### 4. 服务器必须绑定 0.0.0.0
+
+`server.ts` 中 `hostname` 必须为 `0.0.0.0`，不能用 `localhost`。
+
+- `localhost` 只监听 127.0.0.1，Docker 容器外无法访问
+- Dockerfile 中已设置 `ENV HOSTNAME="0.0.0.0"`
+
+### 5. 评测编译必须使用 spawn（不能用 exec）
+
+Alpine Linux 上 `exec`（通过 shell 执行命令）存在兼容性问题。
+
+- `lib/judge/compiler.ts` 中使用 `spawn` 直接调用命令数组
+- `spawn` 不经过 shell 解析，更可靠且安全
+- 切勿改回 `exec`，否则评测编译会静默失败（exitCode=1，stderr 为空）
+
+### 6. runner.sh 路径必须用 process.cwd()（不能用 __dirname）
+
+ESM/tsx 环境下 `__dirname` 不可靠（可能指向 npx 缓存目录）。
+
+- `lib/judge/compiler.ts` 和 `lib/judge/executor.ts` 中使用 `process.cwd()`
+- `runner.sh` 位于 `lib/judge/runner.sh`，通过 `join(process.cwd(), 'lib', 'judge', 'runner.sh')` 定位
+
+### 7. nextjs 用户需要 root 组权限（非沙箱评测模式）
+
+Alpine Linux 默认不允许非 root 用户执行 `ulimit`（runner.sh 中用于资源限制）。
+
+- Dockerfile 中 `usermod -aG root nextjs` 解决此问题
+- 如移除此行，评测编译会失败（spawn exitCode=1，stderr 为空）
+- 长期方案：改用 Docker 沙箱评测（`USE_DOCKER=true`）可避免此权限提升
+
+### 8. .env 文件值不要用反引号
+
+`.env` 文件中值的反引号（`` ` ``）在 shell 中是命令替换符号，可能导致解析问题。
+
+```
+# 错误
+FRONTEND_URL=`http://example.com`
+# 正确
+FRONTEND_URL=http://example.com
+```

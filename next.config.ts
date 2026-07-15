@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'none'",
+      // 注意：不要添加 "upgrade-insecure-requests" 指令！
+      // 该指令会强制浏览器将 HTTP 请求升级为 HTTPS，导致 HTTP 部署环境下
+      // 静态资源（CSS/JS）请求变为 https:// 协议而加载失败（ERR_CONNECTION_REFUSED）。
+      // 在域名备案完成、切换到 HTTPS 后方可考虑添加此指令。
     ].join("; ");
 
     return [

@@ -55,7 +55,11 @@ const languageConfigs: Record<string, {
 
 /**
  * 使用 spawn 执行编译命令，收集 stdout/stderr/exitCode
- * 比 exec 更可靠（无 maxBuffer 限制，不经过 shell 解析）
+ *
+ * 重要：必须使用 spawn 而非 exec！
+ * - exec 在 Alpine Linux 上存在 shell 解析问题，且 maxBuffer 限制可能导致截断
+ * - spawn 直接调用命令数组，不经过 shell，更可靠且安全
+ * - 切勿改回 exec，否则评测编译会静默失败（exitCode=1，stderr 为空）
  */
 function spawnCompile(cmd: string, args: string[], timeoutMs: number): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -168,7 +172,8 @@ export async function compileCode(code: string, language: string): Promise<Compi
     // 使用 runner.sh 进行资源限制
     const useRunnerSh = true
     if (useSandbox && useRunnerSh) {
-      // ESM 环境下 __dirname 不可靠，使用 process.cwd() 构建路径
+      // 重要：ESM/tsx 环境下 __dirname 不可靠（可能指向缓存目录或 undefined），
+      // 必须使用 process.cwd() 构建路径，否则 runner.sh 找不到导致编译失败。
       const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
       spawnCmd = 'bash'
       spawnArgs = [runnerPath, '512', '15', '64', 'g++', '-O2', '-std=c++17', '-o', outputPath, sourcePath]

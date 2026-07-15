@@ -61,6 +61,8 @@ function validateEnvironment(): void {
 }
 
 const dev = process.env.NODE_ENV !== 'production'
+// 必须绑定 0.0.0.0 而非 localhost，否则 Docker 容器外无法访问服务。
+// Dockerfile 中已设置 ENV HOSTNAME="0.0.0.0"，这里读取环境变量以保持一致。
 const hostname = process.env.HOSTNAME || '0.0.0.0'
 const port = parseInt(process.env.PORT || '3000', 10)
 
