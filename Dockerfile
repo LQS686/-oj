@@ -94,7 +94,7 @@ RUN npm config set registry https://registry.npmmirror.com && npm install --omit
 RUN mkdir -p /app/temp /app/logs && \
     chown -R nextjs:nodejs /app/temp /app/logs
 
-USER nextjs
+# USER nextjs
 
 EXPOSE 3000
 
