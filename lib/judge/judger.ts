@@ -109,11 +109,12 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
     compileResult = await compileCode(job.code, job.language)
 
     if (!compileResult.success) {
-      logger.warn(`编译失败`, { compileState: compileResult.compileState })
+      logger.warn(`编译失败`, { compileState: compileResult.compileState, stderr: compileResult.stderr })
       const compileState = compileResult.compileState
       const stateLabel = COMPILE_STATE_MESSAGES[compileState] || ''
       const detail = compileResult.error || '编译错误'
-      const message = stateLabel ? `${stateLabel}: ${detail}` : detail
+      const stderrInfo = compileResult.stderr ? `\n${compileResult.stderr.substring(0, 500)}` : ''
+      const message = stateLabel ? `${stateLabel}: ${detail}${stderrInfo}` : `${detail}${stderrInfo}`
       return {
         ...result,
         status: 'CE',
