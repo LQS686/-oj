@@ -165,7 +165,9 @@ export async function compileCode(code: string, language: string): Promise<Compi
     // 构建编译参数
     let spawnCmd: string
     let spawnArgs: string[]
-    if (useSandbox) {
+    // 临时禁用 runner.sh 以排查问题
+    const useRunnerSh = false
+    if (useSandbox && useRunnerSh) {
       // ESM 环境下 __dirname 不可靠，使用 process.cwd() 构建路径
       const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
       spawnCmd = 'bash'
