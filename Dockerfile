@@ -20,7 +20,10 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 # 安装依赖（使用淘宝镜像）
 COPY package*.json ./
-RUN npm config set registry https://registry.npmmirror.com && npm install
+# 修复：使用 --ignore-scripts 跳过 package.json 中的 postinstall="prisma generate"，
+#   因为此时 prisma/schema.prisma 还未被 COPY 进来，prisma generate 会失败。
+#   真实的 prisma generate 在下面 COPY prisma 之后单独执行。
+RUN npm config set registry https://registry.npmmirror.com && npm install --ignore-scripts
 
 # 复制Prisma schema并生成客户端
 COPY prisma ./prisma/
