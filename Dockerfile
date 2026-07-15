@@ -90,11 +90,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_m
 # 安装生产依赖
 RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts
 
-# 创建必要的目录
+# 创建必要的目录并设置权限
 RUN mkdir -p /app/temp /app/logs && \
-    chown -R nextjs:nodejs /app/temp /app/logs
+    chown -R nextjs:nodejs /app/temp /app/logs && \
+    usermod -aG root nextjs
 
-# USER nextjs
+USER nextjs
 
 EXPOSE 3000
 
