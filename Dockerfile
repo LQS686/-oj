@@ -94,13 +94,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_m
 RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts
 
 # 创建必要的目录并设置权限
-# usermod -aG root: 将 nextjs 加入 root 组，使 runner.sh 中的 ulimit 命令可执行。
+# addgroup nextjs root: 将 nextjs 加入 root 组，使 runner.sh 中的 ulimit 命令可执行。
 # 原因：Alpine Linux 默认不允许非 root 用户执行 ulimit -v/-t/-s（需 CAP_SYS_RESOURCE）。
-# 如移除此行，评测编译会失败（spawn exitCode=1，stderr 为空）。
+# 之前用 usermod -aG root，但 Alpine 默认不装 shadow 包（usermod 不存在）。
+# addgroup 是 BusyBox 内置命令，无需额外依赖。
 # 长期方案：改用 Docker 沙箱评测（USE_DOCKER=true）可避免此权限提升。
 RUN mkdir -p /app/temp /app/logs && \
     chown -R nextjs:nodejs /app/temp /app/logs && \
-    usermod -aG root nextjs
+    addgroup nextjs root
 
 USER nextjs
 
