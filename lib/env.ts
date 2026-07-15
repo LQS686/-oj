@@ -7,10 +7,10 @@
  *   校验逻辑重复且 next dev 路径完全跳过。统一在这里校验 + 触发。
  *
  * 校验范围：
- *   - JWT_SECRET（生产必填，长度 ≥ 32）
- *   - DATABASE_URL（生产必填，协议 mongodb）
- *   - AI_CONFIG_ENCRYPTION_KEY（生产必填，32 字节 base64/hex）
- *   - FRONTEND_URL（生产必填，用于 WebSocket CORS）
+ *   - JWT_SECRET（必填，长度 ≥ 32）
+ *   - DATABASE_URL（必填，协议 mongodb）
+ *   - AI_CONFIG_ENCRYPTION_KEY（**可选**，缺失仅 warn；AI 功能模块自校验）
+ *   - FRONTEND_URL（生产必填，用于 WebSocket CORS；缺失仅 warn）
  *   - NODE_ENV（默认 'development'）
  *
  * 启动行为：
@@ -102,12 +102,16 @@ export function validateEnvironment(): EnvironmentCheckResult {
   const dbErr = checkDatabaseUrl()
   if (dbErr) errors.push(dbErr)
 
-  // AI_CONFIG_ENCRYPTION_KEY：生产必填，dev warn
+  // AI_CONFIG_ENCRYPTION_KEY：所有环境都仅 warn，不 throw。
+  //   原因：
+  //     1) AI 功能（题解生成/AI Provider 配置）是 P2 增强功能，不是核心 OJ 链路。
+  //     2) 即便不配，OJ 题目提交、评测、用户系统都能正常工作。
+  //     3) 严格 throw 会导致全新部署"只要不用 AI 就必须先生成密钥"，体验差。
+  //   实际校验下移到 /api/admin/ai/providers 路由 handler：
+  //     - GET 路由：缺密钥时 maskApiKey 降级为 ********
+  //     - POST 路由：缺密钥时返回 400 提示用户配置
   const encErr = checkEncryptionKey()
-  if (encErr) {
-    if (isProd) errors.push(encErr)
-    else warnings.push(encErr)
-  }
+  if (encErr) warnings.push(encErr)
 
   // FRONTEND_URL：仅生产必填
   const feErr = checkFrontendUrl()
@@ -143,11 +147,9 @@ export function checkEnvironment(): EnvironmentCheckResult {
 
   if (checkJwtSecret()) errors.push('JWT_SECRET')
   if (checkDatabaseUrl()) errors.push('DATABASE_URL')
+  // AI 密钥始终为软警告，不影响 OJ 核心功能
   const encErr = checkEncryptionKey()
-  if (encErr) {
-    if (process.env.NODE_ENV === 'production') errors.push('AI_CONFIG_ENCRYPTION_KEY')
-    else warnings.push('AI_CONFIG_ENCRYPTION_KEY')
-  }
+  if (encErr) warnings.push('AI_CONFIG_ENCRYPTION_KEY')
   const feErr = checkFrontendUrl()
   if (feErr) warnings.push('FRONTEND_URL')
 

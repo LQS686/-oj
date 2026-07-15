@@ -88,4 +88,31 @@ describe('env', () => {
     expect(() => validateEnvironment()).not.toThrow()
     expect(() => validateEnvironment()).not.toThrow()
   })
+
+  it('AI_CONFIG_ENCRYPTION_KEY 缺失时仅警告，不 throw（AI 是软功能）', async () => {
+    // 修复：AI 密钥从硬必需改为软警告
+    //   原因：全新部署未启用 AI 功能时不应阻塞 OJ 核心启动
+    reloadEnv()
+    process.env.JWT_SECRET = 'a'.repeat(48)
+    process.env.DATABASE_URL = 'mongodb://localhost:27017/test'
+    // 即便生产模式也不 throw（验证 NODE_ENV 不影响 AI 密钥）
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: 'production',
+      writable: true,
+      configurable: true,
+    })
+    const { validateEnvironment } = await import('../lib/env')
+    expect(() => validateEnvironment()).not.toThrow()
+  })
+
+  it('checkEnvironment 在缺 AI 密钥时仍返回 ok=true（仅警告）', async () => {
+    reloadEnv()
+    process.env.JWT_SECRET = 'a'.repeat(48)
+    process.env.DATABASE_URL = 'mongodb://localhost:27017/test'
+    const { checkEnvironment } = await import('../lib/env')
+    const result = checkEnvironment()
+    expect(result.ok).toBe(true)
+    expect(result.warnings).toContain('AI_CONFIG_ENCRYPTION_KEY')
+    expect(result.missing).not.toContain('AI_CONFIG_ENCRYPTION_KEY')
+  })
 })
