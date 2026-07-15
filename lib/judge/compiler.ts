@@ -1,14 +1,11 @@
 // 代码编译器（简化版 - 实际应在Docker中执行）
 import { writeFile, mkdir, unlink } from 'fs/promises'
-import { exec } from 'child_process'
-import { promisify } from 'util'
+import { spawn } from 'child_process'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 import { CompileState } from './types'
-
-const execPromise = promisify(exec)
 
 // 编译超时（毫秒）：Windows 下 MinGW g++ 首次启动较慢（含 Defender 扫描），需更宽松；
 // Linux 下 runner.sh 的 cpu_sec=15 为硬限制，exec timeout 略大作为兜底
@@ -54,6 +51,32 @@ const languageConfigs: Record<string, {
     extension: '.js',
     needsCompile: false,
   },
+}
+
+/**
+ * 使用 spawn 执行编译命令，收集 stdout/stderr/exitCode
+ * 比 exec 更可靠（无 maxBuffer 限制，不经过 shell 解析）
+ */
+function spawnCompile(cmd: string, args: string[], timeoutMs: number): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { timeout: timeoutMs })
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout?.on('data', (data) => { stdout += data.toString() })
+    child.stderr?.on('data', (data) => { stderr += data.toString() })
+
+    child.on('error', (err) => {
+      reject(err)
+    })
+
+    child.on('close', (code, signal) => {
+      if (signal) {
+        logger.debug(`编译进程被信号终止`, { signal, cmd, args })
+      }
+      resolve({ exitCode: code ?? 1, stdout, stderr })
+    })
+  })
 }
 
 // 编译错误信息过滤：将 stderr 中的临时绝对路径与 solution_* 文件名替换为 solution.{ext}
@@ -139,52 +162,66 @@ export async function compileCode(code: string, language: string): Promise<Compi
     const useDocker = process.env.USE_DOCKER === 'true'
     const useSandbox = isLinux && !useDocker
 
-    let compileCommandStr = compileCommand
+    // 构建编译参数
+    let spawnCmd: string
+    let spawnArgs: string[]
     if (useSandbox) {
       const runnerPath = join(__dirname, 'runner.sh')
-      // mem_mb=512（编译器内存上限），cpu_sec=15（编译 CPU 上限），stack_mb=64
-      compileCommandStr = `bash ${runnerPath} 512 15 64 ${compileCommand}`
+      spawnCmd = 'bash'
+      spawnArgs = [runnerPath, '512', '15', '64', 'g++', '-O2', '-std=c++17', '-o', outputPath, sourcePath]
+      if (language === 'c') {
+        spawnArgs = [runnerPath, '512', '15', '64', 'gcc', '-O2', '-std=c11', '-o', outputPath, sourcePath]
+      } else if (language === 'java') {
+        spawnArgs = [runnerPath, '512', '15', '64', 'javac', sourcePath]
+      }
+    } else {
+      // 非沙箱模式（Windows 或 Docker 模式）
+      if (language === 'cpp') {
+        spawnCmd = 'g++'
+        spawnArgs = ['-O2', '-std=c++17', '-o', outputPath, sourcePath]
+      } else if (language === 'c') {
+        spawnCmd = 'gcc'
+        spawnArgs = ['-O2', '-std=c11', '-o', outputPath, sourcePath]
+      } else if (language === 'java') {
+        spawnCmd = 'javac'
+        spawnArgs = [sourcePath]
+      } else {
+        spawnCmd = 'true'
+        spawnArgs = []
+      }
     }
 
-    logger.debug(`编译命令`, { command: compileCommandStr })
+    logger.debug(`编译命令`, { cmd: spawnCmd, args: spawnArgs, useSandbox })
 
     try {
-      const { stderr } = await execPromise(compileCommandStr, {
-        timeout: DEFAULT_COMPILE_TIMEOUT,
-        maxBuffer: 1024 * 1024, // 1MB buffer
-      })
+      const { exitCode, stderr } = await spawnCompile(spawnCmd, spawnArgs, DEFAULT_COMPILE_TIMEOUT)
 
-      // 编译成功
-      return {
-        success: true,
-        compileState: CompileState.CompileSuccessfully,
-        compiledPath: outputPath,
-        stderr: stderr || undefined,
-      }
-    } catch (error) {
-      const err = error as { killed?: boolean; signal?: string; stderr?: string; message?: string; code?: string | number }
-      // 编译超时
-      if (err.killed === true || err.signal === 'SIGTERM') {
+      if (exitCode === 0) {
         return {
-          success: false,
-          compileState: CompileState.CompileTimeLimitExceeded,
-          error: '编译超时',
+          success: true,
+          compileState: CompileState.CompileSuccessfully,
+          compiledPath: outputPath,
+          stderr: stderr || undefined,
         }
       }
-      // maxBuffer 超限识别为 CE（编译输出过长）
-      const isMaxBuffer = err.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ||
-        (typeof err.message === 'string' && err.message.includes('maxBuffer'))
-      // 编译失败：过滤 stderr 中的临时路径与 solution_* 文件名
-      const rawStderr = err.stderr || err.message || ''
+
+      // 编译失败
       const ext = config.extension.substring(1)
-      const filteredStderr = isMaxBuffer
-        ? `${filterCompileError(rawStderr, ext)}\n[编译输出过长，已截断]`
-        : filterCompileError(rawStderr, ext)
+      const filteredStderr = filterCompileError(stderr, ext)
+      logger.warn(`编译失败详情`, { exitCode, stderr: filteredStderr, cmd: spawnCmd, args: spawnArgs })
       return {
         success: false,
         compileState: CompileState.CompileError,
         error: '编译错误',
         stderr: filteredStderr,
+      }
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error)
+      logger.error(`编译执行异常`, { error: errMsg, cmd: spawnCmd, args: spawnArgs })
+      return {
+        success: false,
+        compileState: CompileState.CompileError,
+        error: `编译执行异常: ${errMsg}`,
       }
     }
   } catch (error) {
