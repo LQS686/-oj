@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
       args:
         JWT_SECRET: ${JWT_SECRET:-build-placeholder-not-used-at-runtime}
+        NEXT_PUBLIC_API_URL: ${FRONTEND_URL:-http://localhost:3000}
+        NEXT_PUBLIC_BASE_URL: ${FRONTEND_URL:-http://localhost:3000}
     image: oj-platform:app
     ports:
       - "3000:3000"

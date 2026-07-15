@@ -21,8 +21,97 @@
 ## 前置条件
 
 1. 服务器已安装宝塔面板
-2. 域名 DNS 已解析到服务器 IP
+2. 域名 DNS 已解析到服务器 IP（可选，域名备案期间可用 IP 测试）
 3. 宝塔安全组已放行 80/443 端口
+
+---
+
+## 场景 A：域名已备案
+
+如果域名已备案完成，直接按下面的步骤操作即可。
+
+---
+
+## 场景 B：域名备案中，先用 IP 测试
+
+如果域名还在备案，可以先用服务器 IP 测试，等备案完成后再切换。
+
+### 用 IP 测试的部署步骤
+
+1. **首次部署时使用 IP 作为站点 URL**：
+
+   ```bash
+   cd /www/wwwroot/oj-platform
+   sudo bash scripts/bt-deploy.sh http://43.139.231.170
+   ```
+
+   > ⚠️ **注意**：URL 必须是 `http://` 开头，不能用 `https://`（IP 无法申请证书）
+
+2. **宝塔 Nginx 配置（仅 HTTP）**：
+
+   宝塔 → 网站 → 添加站点 → 域名填服务器 IP `43.139.231.170`
+
+   配置文件使用以下简化版（无 SSL）：
+
+   ```nginx
+   server {
+       listen 80;
+       server_name 43.139.231.170;
+
+       client_max_body_size 50M;
+
+       location /socket.io/ {
+           proxy_pass http://127.0.0.1:3000;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection "upgrade";
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_read_timeout 86400;
+       }
+
+       location / {
+           proxy_pass http://127.0.0.1:3000;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+   ```
+
+3. **测试访问**：
+
+   浏览器访问 `http://43.139.231.170`
+
+### 域名备案完成后切换
+
+1. **修改 .env 文件**：
+
+   ```bash
+   cd /www/wwwroot/oj-platform
+   # 编辑 .env，将 FRONTEND_URL 改为域名
+   sed -i 's|FRONTEND_URL=.*|FRONTEND_URL=https://dsoj.run|' .env
+   sed -i 's|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=https://dsoj.run|' .env
+   sed -i 's|NEXT_PUBLIC_BASE_URL=.*|NEXT_PUBLIC_BASE_URL=https://dsoj.run|' .env
+   ```
+
+2. **强制重新构建镜像**（必须，因为 `NEXT_PUBLIC_*` 在构建时硬编码）：
+
+   ```bash
+   docker compose build --no-cache app
+   docker compose up -d
+   ```
+
+3. **配置 Nginx SSL**：
+
+   宝塔 → 网站 → 找到原站点 → 添加域名 `dsoj.run` → SSL → Let's Encrypt → 申请证书
+
+   然后替换配置文件为下面的 HTTPS 版本。
 
 ---
 

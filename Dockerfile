@@ -6,9 +6,14 @@ WORKDIR /app
 # 设置构建时环境变量（仅构建时使用，不写入镜像层）
 ARG JWT_SECRET
 ARG DATABASE_URL=mongodb://localhost:27017/oj_platform
+# NEXT_PUBLIC_* 必须在构建时传递，会被硬编码到 JS 中
+ARG NEXT_PUBLIC_API_URL=http://localhost:3000
+ARG NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ENV NEXT_PHASE=phase-production-build
 ENV JWT_SECRET=${JWT_SECRET}
 ENV DATABASE_URL=${DATABASE_URL}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
 
 # 使用国内镜像源
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
