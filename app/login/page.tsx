@@ -155,19 +155,17 @@ export default function LoginPage() {
             </Link>
           </div>
 
+          {/* 安全修复（2026-07）：删除默认账户提示
+              原显示 'admin / admin123' 和 'user1 / user123' 测试账号泄露，
+              改为提示首次注册自动成为系统管理员。 */}
           <div className="mt-8 p-5 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-all duration-300 hover:shadow-sm">
             <p className="text-sm text-primary-light font-semibold mb-3 flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
-              测试账号
+              首次使用？
             </p>
-            <div className="text-sm text-muted-foreground space-y-3">
-              <p className="flex flex-wrap items-center justify-between gap-2">
-                <span>管理员:</span>
-                <code className="bg-muted px-3 py-1.5 rounded-lg border border-border font-mono text-foreground text-xs hover:border-primary/30 transition-colors duration-200">admin / admin123</code>
-              </p>
-              <p className="flex flex-wrap items-center justify-between gap-2">
-                <span>普通用户:</span>
-                <code className="bg-muted px-3 py-1.5 rounded-lg border border-border font-mono text-foreground text-xs hover:border-primary/30 transition-colors duration-200">user1 / user123</code>
+            <div className="text-sm text-muted-foreground">
+              <p>
+                还没有账号？首个通过注册创建的用户将<strong className="text-foreground">自动成为系统管理员</strong>，可访问后台进行题目、竞赛、班级等管理。
               </p>
             </div>
           </div>

@@ -11,6 +11,7 @@
 ## 功能特性
 
 ### 核心功能
+
 - **用户认证系统** — JWT + httpOnly Cookie 统一认证（token 不再落 localStorage），密码 bcrypt 加密，tokenVersion 吊销机制
 - **题目管理** — 题目列表、详情展示（KaTeX 数学公式渲染）、统计分析、AI 辅助出题
 - **题库筛选** — 内嵌搜索栏；难度下拉多选；标签弹窗多选（OR 匹配）
@@ -19,10 +20,12 @@
 - **评测结果** — AC/WA/TLE/MLE/RE/CE 全状态支持，详细测试点结果
 
 ### 首页与公告
+
 - **学习仪表盘** — 今日解题、连续打卡、本周通过率、Rating 等统计
 - **系统公告** — 首页 6 列卡片展示，置顶与过期时间；详情页 `/announcements/[id]`；后台「运营管理 → 系统公告」
 
 ### 班级系统
+
 - **班级管理** — 创建/加入班级，用户名直邀机制（邀请码已废除），成员角色权限（班主任/助教/学生）
 - **班级作业** — 标签页式作业详情，题目切换与代码编辑提交一体
 - **完成度追踪** — 学生完成情况矩阵、提交记录与代码查看
@@ -30,9 +33,11 @@
 - **班级排行榜** — 基于解题与表现的班级内排名（非积分商城）
 
 ### 列表与导航（卡片布局）
+
 - 竞赛、训练题单、班级列表、首页「近期作业 / 即将开始竞赛 / 系统公告」等大屏均为 **6 列卡片网格**（`grid-cols-2 sm:grid-cols-3 lg:grid-cols-6`）
 
 ### 其他功能
+
 - **竞赛模式** — ACM/OI 赛制，实时榜单，赛题管理
 - **训练题单** — 官方 / 竞赛真题 / 我的题单分类
 - **社区讨论** — 题解评论、帖子发布
@@ -89,11 +94,12 @@ REDIS_URL=redis://localhost:6379
 
 # 可选（AI 配置加密；未配置时降级为不加密，仅开发环境允许）
 AI_CONFIG_ENCRYPTION_KEY=your-32-char-hex-key
-
-# 可选（测试账号；未配置时使用默认值）
-TEST_ADMIN_EMAIL=admin@example.com
-TEST_ADMIN_PASSWORD=admin123
 ```
+
+> ⚠️ **重要**：本项目**无任何默认账户**（包括管理员/测试用户）。
+> 部署后首个通过 `/api/auth/register` 注册的用户将自动成为 `SYSTEM_ADMIN`，
+> 可在后台管理题目、竞赛、班级等。
+> 详见 `app/api/auth/register/route.ts` 的 `isFirstUser` 判定逻辑。
 
 > ⚠️ **生产环境强制要求**：必须设置 `JWT_SECRET`（≥32 字符）与 `USE_DOCKER=true`（评测沙箱）。Windows 开发环境下若未启用 Docker，评测机会在启动时输出安全告警但仍可运行（仅供开发）。
 
@@ -106,16 +112,17 @@ docker-compose up -d --build
 docker-compose logs -f app
 ```
 
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| app | 3000 | Next.js 应用 |
-| mongo | 27017 | MongoDB (副本集) |
-| redis | 6379 | Redis 缓存 |
-| nginx | 80/443 | 反向代理 |
+| 服务  | 端口   | 说明             |
+| ----- | ------ | ---------------- |
+| app   | 3000   | Next.js 应用     |
+| mongo | 27017  | MongoDB (副本集) |
+| redis | 6379   | Redis 缓存       |
+| nginx | 80/443 | 反向代理         |
 
 ## 技术架构
 
 ### 前端
+
 - **框架**: Next.js 16 App Router + React 19
 - **语言**: TypeScript（严格模式，无 `as any` 类型绕过）
 - **样式**: Tailwind CSS
@@ -123,6 +130,7 @@ docker-compose logs -f app
 - **通信**: WebSocket (Socket.IO) 实时评测推送，cookie 自动携带鉴权
 
 ### 后端
+
 - **API**: Next.js API Routes，`withApi` 统一封装鉴权 + JSON 解析 + 异常处理（5 种模式：public / auth / admin / systemAdmin / class）
 - **数据库**: MongoDB Replica Set + Prisma ORM（38 个模型）
 - **认证**: JWT + httpOnly Cookie 统一模式（token 不再落 localStorage），tokenVersion 吊销机制
@@ -130,6 +138,7 @@ docker-compose logs -f app
 - **安全**: 4 级 RBAC 权限、SSRF 防护、魔数校验上传、execSync 命令注入防护、CSRF + 限流中间件
 
 ### 评测系统
+
 - 内存队列 (EventEmitter) / BullMQ（可选）
 - Docker 沙箱隔离编译执行（生产强制；Windows 开发环境告警降级）
 - 输出比对 + 时间/内存检查
@@ -140,16 +149,18 @@ docker-compose logs -f app
 本项目经过完整的安全加固流程，覆盖 P0-P3 全部 20 项优化项。
 
 ### 角色体系（4 级）
-| 角色 | 标识 | 权限 |
-|------|------|------|
-| 系统管理员 | `SYSTEM_ADMIN` | 全部权限，唯一可分配 `ADMIN` 的角色 |
-| 管理员 | `ADMIN` | 内容与用户管理，不可管理其他 `ADMIN` |
-| 教师 | `TEACHER` | 出题、建班、建赛 |
-| 学生 | `STUDENT` | 默认角色，答题与参与 |
+
+| 角色       | 标识           | 权限                                 |
+| ---------- | -------------- | ------------------------------------ |
+| 系统管理员 | `SYSTEM_ADMIN` | 全部权限，唯一可分配 `ADMIN` 的角色  |
+| 管理员     | `ADMIN`        | 内容与用户管理，不可管理其他 `ADMIN` |
+| 教师       | `TEACHER`      | 出题、建班、建赛                     |
+| 学生       | `STUDENT`      | 默认角色，答题与参与                 |
 
 > 角色判断统一使用 `canAccessAdmin(user)` / `canManageContent(user)`（见 `lib/permissions.ts`），禁止直接 `isAdmin(user)` 比较。
 
 ### 关键安全措施
+
 - **JWT 安全** — httpOnly + Secure + SameSite Cookie，tokenVersion 吊销，payload 仅含 userId/email/username/role
 - **SSRF 防护** — `validateAiBaseUrl()` 阻止 AI 服务商 baseUrl 指向内网/元数据端点（`lib/ai/providers.ts`）
 - **文件上传** — `detectImageMime()` 魔数校验（JPEG/PNG/GIF/WebP），拒绝伪造扩展名（`lib/upload.ts`）
@@ -212,6 +223,7 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 ```
 
 ### 缓存分层
+
 - **鉴权层** — `lib/api/handler.ts` 的 `userCache` Map（60s TTL，LRU 10000 条），仅缓存 role/tokenVersion
 - **业务层** — `lib/cache.ts`（基于内存 + 可选 Redis），缓存题目、竞赛、用户统计等
 - **清理入口** — `lib/user/service.ts` 的 `clearUserCache` 统一调用 `clearAuthUserCache`（鉴权层）+ 业务缓存
@@ -219,6 +231,7 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 ## 更新日志
 
 ### 2026/07（安全加固与冗余清理）
+
 - **邀请码废除** — 移除 `ClassInvite` 模型与全部邀请码相关 API/页面，班级加入改用用户名直邀
 - **认证统一** — JWT token 全部走 httpOnly Cookie，前端不再读写 localStorage；`UserContext`、`useSubmissionSocket`、批量注册 XHR 等全部清理
 - **4 级角色体系** — 标准化为 `SYSTEM_ADMIN` / `ADMIN` / `TEACHER` / `STUDENT`；`lib/permissions.ts` 为单一来源；9 个路由文件的 `isAdmin(user)` 改为 `canAccessAdmin(user)`
@@ -236,6 +249,7 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 - **测试改进** — 测试凭据从硬编码改为环境变量；API Key 前缀打印从 8 字符减至 4 字符
 
 ### 2026/06（近期）
+
 - **系统公告**：`SystemAnnouncement` 模型；公开 API + 后台 CRUD；首页与 `/announcements` 6 列卡片 + 详情页
 - **首页仪表盘**：移除「推荐训练」「继续学习」「班级动态」；近期作业 / 即将竞赛 / 公告均为 6 列布局
 - **列表页卡片化**：竞赛、训练题单、班级列表改为 6 列卡片网格
@@ -244,16 +258,19 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 - **成员活动**：`getClassMemberActivity` 不再包含积分流水与 `totalPoints`
 
 ### 2026/06（架构）
+
 - **API 中间件**：`lib/api/withApi.ts`、`withPermission`；统一 `ok()` / 错误码
 - **业务层抽离**：auth / user / contest / problem / submission / notification / class / training 等
 - **团队 → 班级重构**：模型与路由统一为 Class；`scripts/migrate-team-to-class.ts`
 - **稳定性**：错误边界、logger、Prisma 调用收敛至 service 层
 
 ### 2026/05
+
 - 作业详情页标签页 + 字母切换式布局；完成情况矩阵与提交记录弹窗
 - 导航栏移动端 Drawer；KaTeX 修复；`fetchWithAuth` 统一封装
 
 ### 2026/02
+
 - Docker 部署；MongoDB 副本集；WebSocket 评测推送；安全头与 XSS 防护
 
 ## 许可证

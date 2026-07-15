@@ -1,22 +1,39 @@
 import { MongoClient } from 'mongodb'
-import bcrypt from 'bcryptjs'
 import { logger } from '../lib/logger'
 
 const url = process.env.DATABASE_URL || 'mongodb://localhost:27017/oj_platform'
 
+/**
+ * prisma/seed.ts
+ * 种子数据填充（用于开发/演示环境）
+ *
+ * 重要原则：
+ *   1. **不创建任何默认账户**（包括管理员/测试用户）
+ *      真实部署的第一个用户应通过 /api/auth/register 自动成为 SYSTEM_ADMIN
+ *      （见 app/api/auth/register/route.ts 的 isFirstUser 判定）。
+ *   2. 仅填充非敏感内容：题目、测试样例、竞赛、训练计划、成就定义等。
+ *   3. 若需演示用题目，请运行 `npm run db:seed` 后再手动通过注册接口创建管理员。
+ *
+ * 安全审计修复（2026-07）：
+ *   之前 seed 创建 'admin / admin123' + 10 个 'user1~user10 / user123' 测试账户，
+ *   凭据在 README/login 页可见，任何新部署都被攻击者直接登录管理后台。
+ *   修复方案：完全移除账户创建，仅保留内容数据填充。
+ */
 async function main() {
   logger.info('开始填充种子数据...')
-  
+
   const client = new MongoClient(url)
-  
+
   try {
     await client.connect()
     logger.info('已连接到 MongoDB')
-    
+
     const db = client.db()
-    
-    logger.info('清空现有数据...')
-    await db.collection('User').deleteMany({})
+
+    logger.info('清空现有内容数据（不动 User 表，避免误删真实账户）...')
+    // P0 修复：删除 User 表清空逻辑，避免误删真实账户；
+    //   之前 seed.ts 同时清空 User 表，会导致真实部署被覆盖为空。
+    //   现在 User 表完全由 API 注册接口管理（首注册用户自动成为 SYSTEM_ADMIN）。
     await db.collection('Problem').deleteMany({})
     await db.collection('TestCase').deleteMany({})
     await db.collection('Submission').deleteMany({})
@@ -28,55 +45,8 @@ async function main() {
     await db.collection('TrainingProblem').deleteMany({})
     await db.collection('Achievement').deleteMany({})
 
-    // 创建管理员用户
-    const adminPassword = await bcrypt.hash('admin123', 10)
-    const adminResult = await db.collection('User').insertOne({
-      username: 'assistant',
-      email: 'admin@oj.com',
-      password: adminPassword,
-      nickname: '系统管理员',
-      bio: '平台管理员账号',
-      rating: 3000,
-      rank: '传奇',
-      color: '#dc2626',
-      role: 'SYSTEM_ADMIN',
-      isBanned: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-    const adminId = adminResult.insertedId
-
-    logger.info('创建管理员用户: admin')
-
-    // 创建测试用户
-    const testUsers: any[] = []
-    const ratings = [1200, 1400, 1600, 1900, 2100, 2400, 2600, 2800, 3000, 3200]
-    const ranks = ['新手', '绿名', '蓝名', '黄名', '紫名', '红名', '红名', '红名', '传奇', '传奇']
-    const colors = ['#808080', '#22c55e', '#3b82f6', '#f59e0b', '#9333ea', '#dc2626', '#dc2626', '#dc2626', '#dc2626', '#dc2626']
-
-    for (let i = 1; i <= 10; i++) {
-      const password = await bcrypt.hash('user123', 10)
-      
-      const result = await db.collection('User').insertOne({
-        username: `user${i}`,
-        email: `user${i}@oj.com`,
-        password,
-        nickname: `测试用户${i}`,
-        bio: `这是测试用户${i}的个人简介`,
-        rating: ratings[i - 1],
-        rank: ranks[i - 1],
-        color: colors[i - 1],
-        role: 'STUDENT',
-        isBanned: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      testUsers.push({ _id: result.insertedId, username: `user${i}` })
-    }
-
-    logger.info(`创建${testUsers.length}个测试用户`)
-
-    // 创建题目
+    // 创建题目（authorId 为可选，真实部署应关联注册后的首个管理员）
+    //   P0 修复：不再创建 adminUser 记录；authorId 暂时置 null（admin 用户注册后可通过 API 关联）
     const problems = [
       {
         title: 'A+B Problem',
@@ -93,7 +63,7 @@ async function main() {
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: adminId,
+        authorId: null,
       },
       {
         title: '过河卒',
@@ -108,7 +78,7 @@ async function main() {
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: adminId,
+        authorId: null,
       },
       {
         title: '铺地毯',
@@ -123,13 +93,13 @@ async function main() {
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: adminId,
+        authorId: null,
       },
       {
         title: '方格取数',
         description: '在一个 n×n 的方格棋盘上，每个方格中有一个数字。从左上角走到右下角，只能向右或向下走，求能取到的最大数字和。',
         input: '第一行一个整数 n，接下来 n 行每行 n 个整数。',
-        output: '输出最大和。',
+        output: '输出最大数字和。',
         samples: [
           { input: '3\n1 2 3\n4 5 6\n7 8 9', output: '29' },
         ],
@@ -138,7 +108,7 @@ async function main() {
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: adminId,
+        authorId: null,
       },
       {
         title: '最长上升子序列',
@@ -153,7 +123,7 @@ async function main() {
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: adminId,
+        authorId: null,
       },
     ]
 
@@ -167,7 +137,7 @@ async function main() {
         updatedAt: new Date(),
       })
       createdProblems.push({ _id: result.insertedId, title: problems[i].title })
-      
+
       // 为每个题目创建测试用例
       await db.collection('TestCase').insertOne({
         problemId: result.insertedId,
@@ -182,7 +152,7 @@ async function main() {
 
     logger.info(`创建${createdProblems.length}个题目`)
 
-    // 创建竞赛
+    // 创建竞赛（authorId 同样置 null，注册管理员后通过 API 关联）
     const contestResult = await db.collection('Contest').insertOne({
       title: '新手赛 2024.10',
       description: '适合新手参加的比赛，包含基础题目。',
@@ -191,7 +161,7 @@ async function main() {
       endTime: new Date('2024-10-25T17:00:00'),
       duration: 180,
       isPublic: true,
-      authorId: adminId,
+      authorId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -231,7 +201,7 @@ async function main() {
         createdAt: new Date(),
         updatedAt: new Date(),
       })
-      
+
       // 添加题目到训练
       if (createdProblems.length > 0) {
         await db.collection('TrainingProblem').insertOne({
@@ -258,11 +228,11 @@ async function main() {
 
     logger.info(`创建${achievements.length}个成就`)
 
-    logger.info('种子数据填充完成')
-    logger.info('登录信息：')
-    logger.info('管理员账号: admin / admin123')
-    logger.info('测试账号: user1~user10 / user123')
-    
+    logger.info('种子数据填充完成（仅内容数据，未创建任何账户）')
+    logger.info('提示：')
+    logger.info('  - 部署完成后，第一个访问 /api/auth/register 注册的用户将自动成为 SYSTEM_ADMIN')
+    logger.info('  - 通过注册创建管理员后，可在后台将 seed 创建的题目/竞赛的 authorId 关联到该用户')
+
   } catch (error) {
     logger.error('种子数据填充错误', error)
     process.exit(1)
