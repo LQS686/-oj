@@ -46,6 +46,14 @@ interface AiJob {
   params: GenerationParams
 }
 
+/**
+ * User-level rate limit (P1)
+ *   同 solution-queue：每个用户 10 分钟内最多 3 次入队。
+ *   防止单用户刷大量 AI 出题任务。
+ */
+const AI_USER_LIMIT_WINDOW_MS = 10 * 60 * 1000
+const AI_USER_LIMIT_MAX = 3
+
 type JobStatus = 'waiting' | 'active' | 'completed' | 'failed'
 
 interface QueuedJob {
@@ -76,6 +84,20 @@ class AiQueue extends EventEmitter {
   }
 
   async add(data: AiJob): Promise<string> {
+    // P1：User-level rate limit（防止单用户刷大量 AI 出题任务）
+    const since = new Date(Date.now() - AI_USER_LIMIT_WINDOW_MS)
+    const recentCount = await prisma.aiGenerationLog.count({
+      where: {
+        userId: data.userId,
+        createdAt: { gte: since },
+      },
+    })
+    if (recentCount >= AI_USER_LIMIT_MAX) {
+      throw new Error(
+        `AI 出题生成频率过高，请稍后再试（${AI_USER_LIMIT_WINDOW_MS / 60000} 分钟内最多 ${AI_USER_LIMIT_MAX} 次）`
+      )
+    }
+
     const job: QueuedJob = {
       id: data.logId,
       data,

@@ -40,6 +40,15 @@ interface SolutionJob {
   params: SolutionGenerationParams
 }
 
+/**
+ * User-level rate limit
+ *   P1 修复：防止单用户疯狂点击"AI 生成"按钮刷出大量任务，占满队列。
+ *   每个用户 10 分钟内最多 3 次入队（含 PENDING/PROCESSING/COMPLETED）。
+ *   实际写在 add() 里检查最近 10 分钟的 AiGenerationLog 计数。
+ */
+const SOLUTION_USER_LIMIT_WINDOW_MS = 10 * 60 * 1000
+const SOLUTION_USER_LIMIT_MAX = 3
+
 type JobStatus = 'waiting' | 'active' | 'completed' | 'failed'
 
 interface QueuedJob {
@@ -66,6 +75,23 @@ class SolutionQueue extends EventEmitter {
   private maxConcurrent = parseInt(process.env.AI_SOLUTION_MAX_CONCURRENT || '2', 10)
 
   async add(data: SolutionJob): Promise<string> {
+    // P1：User-level rate limit
+    //   检查最近 10 分钟内该用户的入队次数，超过上限拒绝。
+    //   注意：写入 AiGenerationLog 之前先校验，避免无效日志。
+    const userId = data.triggeredBy || data.authorId
+    const since = new Date(Date.now() - SOLUTION_USER_LIMIT_WINDOW_MS)
+    const recentCount = await prisma.aiGenerationLog.count({
+      where: {
+        userId,
+        createdAt: { gte: since },
+      },
+    })
+    if (recentCount >= SOLUTION_USER_LIMIT_MAX) {
+      throw new Error(
+        `AI 题解生成频率过高，请稍后再试（${SOLUTION_USER_LIMIT_WINDOW_MS / 60000} 分钟内最多 ${SOLUTION_USER_LIMIT_MAX} 次）`
+      )
+    }
+
     const job: QueuedJob = {
       id: data.logId,
       data,

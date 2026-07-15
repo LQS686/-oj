@@ -95,6 +95,9 @@ export const POST = withApi.public(async (req) => {
     httpOnly: true,
     secure: isSecureCookie,
     sameSite: 'lax',
+    // P1 强化：priority='high' 提示浏览器优先保留
+    priority: 'high',
+    path: '/',
     maxAge: 7 * 24 * 60 * 60,
   })
 

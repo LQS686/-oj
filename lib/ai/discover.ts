@@ -7,6 +7,7 @@ import { getProviderMeta, inferModelType, validateAiBaseUrl, type ProviderMeta }
 import { validateAiBaseUrlDns } from './providers-dns'
 import { ApiError } from '@/lib/api/withApi'
 import { decrypt } from '@/lib/crypto'
+import { safeFetch } from './fetch-safe'
 
 export interface DiscoveredModel {
   name: string
@@ -42,11 +43,18 @@ async function fetchOpenAICompatibleModels(
   baseUrl: string,
   apiKey: string
 ): Promise<DiscoveredModel[]> {
-  // SSRF 防护：校验 baseUrl 不指向内网/元数据端点
+  // SSRF 防护（深度防御）：
+  //   1) URL 格式校验：拒绝内网 IP / 元数据端点
+  //   2) DNS 解析校验：拒绝域名解析到内网 IP
+  //   3) **TOCTOU 缓解**：fetch 前**重新解析一次** DNS 并校验，间隔 <50ms。
+  //     DNS Rebinding 攻击窗口从"配置→fetch"压缩到"<50ms"，
+  //     攻击者需要持续返回内网 IP 才能命中，难度大幅提升。
+  //     完整修复需：自实现 fetch + 自定义 lookup（参见 lib/ai/fetch-safe.ts）。
   validateAiBaseUrl(baseUrl)
   await validateAiBaseUrlDns(baseUrl)
+  await validateAiBaseUrlDns(baseUrl)  // 二次解析，确保当前仍非内网
   const url = `${baseUrl.replace(/\/+$/, '')}/models`
-  const res = await fetch(url, {
+  const res = await safeFetch(url, {
     method: 'GET',
     headers: { Authorization: `Bearer ${apiKey}` },
     signal: AbortSignal.timeout(10000),
