@@ -41,7 +41,7 @@
 1. **首次部署时使用 IP 作为站点 URL**：
 
    ```bash
-   cd /www/wwwroot/oj-platform
+   cd /www/wwwroot/dashan-oj
    sudo bash scripts/bt-deploy.sh http://43.139.231.170
    ```
 
@@ -84,16 +84,24 @@
    }
    ```
 
-3. **测试访问**：
+3. **修改 Cookie 配置**（HTTP 下必须）：
 
-   浏览器访问 `http://43.139.231.170`
+   ```bash
+   # HTTP 协议下必须禁用 secure cookie，否则无法登录
+   sed -i 's/FORCE_SECURE_COOKIE=.*/FORCE_SECURE_COOKIE=false/' .env
+   docker compose restart app
+   ```
+
+4. **测试访问**：
+
+   浏览器访问 `http://43.139.231.170`，点击"注册"创建首个管理员账号
 
 ### 域名备案完成后切换
 
 1. **修改 .env 文件**：
 
    ```bash
-   cd /www/wwwroot/oj-platform
+   cd /www/wwwroot/dashan-oj
    # 编辑 .env，将 FRONTEND_URL 改为域名
    sed -i 's|FRONTEND_URL=.*|FRONTEND_URL=https://dsoj.run|' .env
    sed -i 's|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=https://dsoj.run|' .env
@@ -127,7 +135,7 @@
 
 ```bash
 cd /www/wwwroot
-git clone https://gitee.com/carefree-old-man/dashan-oj.git oj-platform
+git clone https://gitee.com/carefree-old-man/dashan-oj.git
 cd oj-platform
 ```
 
@@ -212,12 +220,9 @@ server {
 
 ## 第五步：验证
 
-浏览器访问 `https://dsoj.run`，使用以下账号登录：
+浏览器访问 `https://dsoj.run`（或 `http://服务器IP`）。
 
-| 角色 | 用户名 | 密码 |
-|------|--------|------|
-| 管理员 | admin | admin123 |
-| 测试用户 | user1 | user123（user1~user10） |
+> **注意**：系统管理员账号是**首位注册用户**，没有预设的 `admin` 账号。首次访问请点击"注册"创建管理员账号。
 
 ---
 
@@ -226,7 +231,7 @@ server {
 在宝塔终端中执行：
 
 ```bash
-cd /www/wwwroot/oj-platform
+cd /www/wwwroot/dashan-oj
 git pull
 sudo bash scripts/bt-deploy.sh
 ```
@@ -238,7 +243,7 @@ sudo bash scripts/bt-deploy.sh
 ## 日常运维
 
 ```bash
-cd /www/wwwroot/oj-platform
+cd /www/wwwroot/dashan-oj
 
 # 查看容器状态
 docker compose ps
