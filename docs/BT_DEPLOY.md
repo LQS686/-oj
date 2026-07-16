@@ -270,6 +270,25 @@ docker compose down
 docker compose up -d
 ```
 
+### 清理 Docker 构建垃圾
+
+每次 `docker compose build` 都会产生构建缓存、悬挂镜像等垃圾，长期累积会撑满磁盘（之前导致 ENOSPC 构建失败）。`bt-deploy.sh` 已在构建后自动清理，手动清理命令：
+
+```bash
+# 查看 Docker 磁盘占用
+docker system df
+
+# 一键清理构建垃圾（安全，不影响运行中的容器和数据卷）
+docker builder prune -af    # 清理 BuildKit 构建缓存（占用最大）
+docker image prune -f       # 清理悬挂镜像 (<none>:<none>)
+docker container prune -f   # 清理已停止的容器
+
+# ⚠️ 危险！切勿执行，会删除 mongo_data/redis_data 数据卷导致数据丢失
+# docker system prune -af --volumes   ← 不要执行！
+```
+
+> `bt-deploy.sh` 升级脚本已内置自动清理（步骤 4），每次升级后无需手动清理。
+
 ---
 
 ## 常见问题
