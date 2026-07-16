@@ -357,7 +357,7 @@ export default function RankPage() {
  initial={{ y: 100 }}
  animate={{ y: 0 }}
  exit={{ y: 100 }}
- className="fixed bottom-0 left-0 right-0 card-static border-t border-border z-50"
+ className="fixed bottom-0 left-0 right-0 card-static border-t border-border z-40"
  >
  <div className="container mx-auto px-4 py-3 flex items-center justify-between">
  <div className="flex items-center gap-4">

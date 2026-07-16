@@ -396,7 +396,7 @@ export default function ProblemsPage() {
                     <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${difficultyOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {difficultyOpen && (
-                    <div className="absolute right-0 sm:left-0 z-30 mt-1 w-52 max-h-72 overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
+                    <div className="absolute right-0 sm:left-0 z-50 mt-1 w-52 max-h-72 overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
                       <button
                         type="button"
                         onClick={() => setSelectedDifficulties([])}
@@ -462,7 +462,7 @@ export default function ProblemsPage() {
 
       {tagModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-backdrop-in"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4 animate-backdrop-in"
           onClick={() => setTagModalOpen(false)}
         >
           <div

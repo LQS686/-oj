@@ -281,7 +281,7 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
  className="input"
  />
  {searchResults.length > 0 && (
- <div className="absolute top-full left-0 right-0 mt-2 card-static rounded-xl shadow-xl z-10">
+ <div className="absolute top-full left-0 right-0 mt-2 card-static rounded-xl shadow-xl z-50">
  {searchResults.map(problem => (
  <button
  key={problem.id}

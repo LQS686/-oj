@@ -366,7 +366,7 @@ function SubmissionsContent() {
 
  {selectedSubmission && assignmentId && (
  <div
- className="fixed inset-0 bg-background/80 flex items-center justify-center p-4 z-50"
+ className="fixed inset-0 bg-background/80 flex items-center justify-center p-4 z-[110]"
  onClick={() => setSelectedSubmission(null)}
  >
  <div

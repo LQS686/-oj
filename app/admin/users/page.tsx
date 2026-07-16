@@ -758,7 +758,7 @@ export default function AdminUsersPage() {
  </div>
 
  {showEditModal && selectedUser && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-md w-full mx-4">
  <h3 className="text-lg font-bold text-foreground mb-4">编辑用户角色</h3>
  <div className="mb-4">
@@ -804,7 +804,7 @@ export default function AdminUsersPage() {
  )}
 
  {resetTarget && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-md w-full mx-4">
  <h3 className="text-lg font-bold text-foreground mb-1">重置密码</h3>
  <p className="text-sm text-muted-foreground mb-4">
@@ -845,7 +845,7 @@ export default function AdminUsersPage() {
  )}
 
  {showDeleteModal && selectedUser && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-md w-full mx-4">
  <h3 className="text-lg font-bold text-foreground mb-4">确认删除</h3>
  <p className="text-muted-foreground mb-6">
@@ -874,7 +874,7 @@ export default function AdminUsersPage() {
  )}
 
  {showBatchRegisterModal && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto py-4">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] overflow-y-auto py-4">
  <div className="card p-6 max-w-4xl w-full mx-4 my-auto">
  <div className="flex items-center justify-between mb-6">
  <h3 className="text-lg font-bold text-foreground">批量注册用户</h3>
@@ -1135,7 +1135,7 @@ export default function AdminUsersPage() {
  )}
 
  {showBatchEditModal && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-md w-full mx-4">
  <h3 className="text-lg font-bold text-foreground mb-4">批量修改角色</h3>
  <p className="text-muted-foreground mb-4">
@@ -1173,7 +1173,7 @@ export default function AdminUsersPage() {
  )}
 
  {showBatchDeleteModal && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-md w-full mx-4">
  <h3 className="text-lg font-bold text-foreground mb-4">批量删除用户</h3>
  <p className="text-muted-foreground mb-6">

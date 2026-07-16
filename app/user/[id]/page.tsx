@@ -225,7 +225,7 @@ export default function UserProfilePage() {
  className="aspect-square bg-muted/25 rounded-lg flex items-center justify-center text-4xl hover:bg-muted transition-all cursor-pointer group relative"
  >
  {emoji}
- <div className="absolute bottom-full mb-3 hidden group-hover:block px-4 py-2 bg-background-secondary text-foreground text-sm rounded-xl whitespace-nowrap border border-border shadow-xl z-10">
+ <div className="absolute bottom-full mb-3 hidden group-hover:block px-4 py-2 bg-background-secondary text-foreground text-sm rounded-xl whitespace-nowrap border border-border shadow-xl z-30">
  示例徽章 {index + 1}
  </div>
  </div>

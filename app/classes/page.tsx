@@ -424,7 +424,7 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4" onClick={onClose}>
       <div className="card-static rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h3 className="text-lg font-semibold text-foreground">班级详情</h3>

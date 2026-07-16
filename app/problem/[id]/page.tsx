@@ -778,7 +778,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
       {selectedSubmission && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fadeIn"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[110] animate-fadeIn"
           onClick={() => setSelectedSubmission(null)}
         >
           <div

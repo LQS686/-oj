@@ -463,7 +463,7 @@ export default function AssignmentDetailPage() {
  <MoreHorizontal className="w-5 h-5" />
  </button>
  {showActions && (
- <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-10 py-1 min-w-[100px]">
+ <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 py-1 min-w-[100px]">
  <button
  type="button"
  className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted text-error transition-colors"

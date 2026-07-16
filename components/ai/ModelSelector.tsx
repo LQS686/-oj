@@ -94,11 +94,11 @@ export function ModelSelector({ value, onChange, className = '', showThinking = 
 
  {isOpen && !loading && (
  <>
- <div 
- className="fixed inset-0 z-10"
+ <div
+ className="fixed inset-0 z-40"
  onClick={() => setIsOpen(false)}
  />
- <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+ <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
  {models.length === 0 ? (
  <div className="p-3 text-center text-gray-500 text-sm">无可用模型</div>
  ) : (

@@ -721,7 +721,7 @@ export default function AIModelsPage() {
  </div>
 
  {showProviderForm && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4">
  <div className="card p-6 w-full max-w-md">
  <div className="flex items-center justify-between mb-6">
  <h3 className="text-lg font-bold text-foreground">
@@ -857,7 +857,7 @@ export default function AIModelsPage() {
  )}
 
  {showModelForm && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4">
  <div className="card p-6 w-full max-w-md">
  <div className="flex items-center justify-between mb-6">
  <h3 className="text-lg font-bold text-foreground">
@@ -996,7 +996,7 @@ export default function AIModelsPage() {
 
  {/* 自动发现模型抽屉 */}
  {discoverModalOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+ <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
  <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
  <div className="flex items-center justify-between p-5 border-b border-border">
  <div className="flex items-center gap-3">

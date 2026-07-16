@@ -143,7 +143,7 @@ export default function Confetti({ trigger, duration = 3000, count = 120 }: Conf
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 z-[60] pointer-events-none"
+      className="fixed inset-0 z-[120] pointer-events-none"
       aria-hidden="true"
     />
   )

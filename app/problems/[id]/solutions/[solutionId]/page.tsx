@@ -463,7 +463,7 @@ export default function SolutionDetailPage() {
  {/* 删除确认弹窗 */}
  {showDeleteConfirm && (
  <div
- className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-fadeIn"
+ className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[110] animate-fadeIn"
  onClick={() => !deleting && setShowDeleteConfirm(false)}
  >
  <div

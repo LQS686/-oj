@@ -104,7 +104,7 @@ export default function CreateClassModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 sm:p-6"
+      className="fixed inset-0 z-[110] flex items-center justify-center overflow-hidden bg-black/60 p-4 sm:p-6"
       onClick={onClose}
       role="presentation"
     >

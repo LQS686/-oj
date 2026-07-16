@@ -527,7 +527,7 @@ export default function AdminProblemsPage() {
 
  {activeTab === 'list' && (
  <>
- <div className="card p-4 overflow-visible relative z-30">
+ <div className="card p-4 overflow-visible relative">
  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
@@ -670,7 +670,7 @@ export default function AdminProblemsPage() {
  </div>
 
  {showDeleteModal && deletingProblem && (
- <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
+ <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4" onClick={() => setShowDeleteModal(false)}>
  <div className="card p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
  <h3 className="text-lg font-bold text-foreground mb-4">确认删除</h3>
  <p className="text-muted-foreground mb-6">
@@ -699,7 +699,7 @@ export default function AdminProblemsPage() {
  )}
 
  {showBatchSourceModal && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-md w-full mx-4">
  <h3 className="text-lg font-bold text-foreground mb-4">批量修改来源标记</h3>
  <p className="text-muted-foreground mb-4 text-sm">正在修改 <span className="text-foreground font-bold">{batchSourceIds.length}</span> 个题目的来源属性。</p>

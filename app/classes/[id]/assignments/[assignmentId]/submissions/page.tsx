@@ -479,7 +479,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  </div>
 
  {showCodeModal && selectedSubmission && (
- <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+ <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4">
  <div className="card max-w-4xl w-full max-h-[90vh] overflow-hidden">
  <div className="p-6 border-b border-border">
  <div className="flex items-center justify-between">

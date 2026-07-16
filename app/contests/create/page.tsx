@@ -359,7 +359,7 @@ export default function CreateContestPage() {
  </div>
  
  {searchResults.length > 0 && (
- <div className="absolute top-full left-0 right-0 mt-2 card rounded-xl shadow-xl z-20 max-h-80 overflow-y-auto divide-y divide-border">
+ <div className="absolute top-full left-0 right-0 mt-2 card rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto divide-y divide-border">
  {searchResults.map(problem => (
  <button
  key={problem.id}

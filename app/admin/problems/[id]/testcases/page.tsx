@@ -684,7 +684,7 @@ export default function ProblemTestCasesPage() {
  </div>
 
  {showAiModal && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-2xl w-full mx-4">
  <div className="flex justify-between items-center mb-6 border-b border-border pb-4">
  <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -773,7 +773,7 @@ export default function ProblemTestCasesPage() {
  )}
 
  {showVerifyModal && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-2xl w-full mx-4">
  <div className="flex justify-between items-center mb-6 border-b border-border pb-4">
  <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -852,7 +852,7 @@ export default function ProblemTestCasesPage() {
  )}
 
  {showLogsModal && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
  <div className="card p-6 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
  <div className="flex justify-between items-center mb-4 border-b border-border pb-4">
  <h3 className="text-xl font-bold text-foreground flex items-center gap-2">

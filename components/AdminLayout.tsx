@@ -290,18 +290,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </aside>
 
-      <button
-        className="fixed top-4 left-4 z-40 p-2 rounded-lg shadow-lg md:hidden bg-background-secondary border border-border"
-        onClick={() => setSidebarOpen(true)}
-        aria-label="打开侧边栏"
-      >
-        <Menu className="w-5 h-5 text-foreground" />
-      </button>
+      {!sidebarOpen && (
+        <button
+          className="fixed top-4 left-4 z-40 p-2 rounded-lg shadow-lg md:hidden bg-background-secondary border border-border"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="打开侧边栏"
+        >
+          <Menu className="w-5 h-5 text-foreground" />
+        </button>
+      )}
 
       <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
         sidebarOpen ? 'md:ml-72' : 'md:ml-20'
       }`}>
-        <header className="sticky top-0 z-20 border-b bg-background-secondary border-border">
+        <header className="sticky top-0 z-50 border-b bg-background-secondary border-border">
           <div className="px-4 md:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl md:text-2xl font-bold text-foreground">
