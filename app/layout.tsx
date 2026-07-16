@@ -11,14 +11,31 @@ import PageTransition from "@/components/common/PageTransition"
 
 export const metadata: Metadata = {
   title: `首页 - ${SITE_TITLE_SUFFIX}`,
-  description: "海量题库、实时评测、专业竞赛，助你从入门到精通",
-  keywords: ["OJ", "编程", "算法", "竞赛", "题库", "在线评测"],
-  authors: [{ name: "OJ Platform Class" }],
+  description: "代码如山·算法为径。大山 OJ 是一站式在线编程学习与竞赛平台，从入门到顶峰的清晰成长路径。",
+  keywords: ["大山 OJ", "OJ", "编程", "算法", "竞赛", "题库", "在线评测", "学习平台", "训练"],
+  authors: [{ name: "Dashan OJ Team" }],
+  icons: {
+    icon: [{ url: "/logos/dsojlogo.png", type: "image/png" }],
+    shortcut: "/logos/dsojlogo.png",
+    apple: "/logos/dsojlogo.png",
+  },
   openGraph: {
     title: `首页 - ${SITE_TITLE_SUFFIX}`,
-    description: "海量题库、实时评测、专业竞赛，助你从入门到精通",
+    description: "代码如山·算法为径。大山 OJ 是一站式在线编程学习与竞赛平台，从入门到顶峰的清晰成长路径。",
     type: "website",
     locale: "zh_CN",
+    images: [
+      {
+        url: "/logos/dsojlogo.png",
+        width: 1024,
+        height: 1024,
+        alt: "大山 OJ Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/logos/dsojlogo.png"],
   },
 }
 

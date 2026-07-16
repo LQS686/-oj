@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Code2, Mail, Sparkles, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Mail, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useSettings } from '@/contexts/SettingsContext'
 import { fetchWithCookie } from '@/lib/api/base'
 
@@ -51,17 +51,23 @@ export default function ForgotPasswordPage() {
  <div className="w-full max-w-md relative z-10">
  <div className="text-center mb-10">
  <Link href="/" className="inline-flex items-center gap-3 group">
- <div className="relative">
- <div className="absolute inset-0 bg-primary blur-xl opacity-40 group-hover:opacity-60 transition-opacity rounded-lg"></div>
- <div className="relative w-14 h-14 bg-primary rounded-lg flex items-center justify-center shadow-xl">
- <Code2 className="w-7 h-7 text-white" />
- </div>
- </div>
- <div className="text-left">
- <span className="text-2xl font-extrabold text-foreground">{settings.siteName}</span>
- <p className="text-xs text-muted-foreground">{settings.siteDescription}</p>
- </div>
- </Link>
+      <div className="relative">
+        <div className="absolute inset-0 bg-primary blur-xl opacity-40 group-hover:opacity-60 transition-opacity rounded-lg"></div>
+        <div className="relative w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-xl ring-1 ring-border/40">
+          <img
+            src="/logos/dsojlogo.png"
+            alt="大山 OJ Logo"
+            width={56}
+            height={56}
+            className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
+          />
+        </div>
+      </div>
+      <div className="text-left">
+        <span className="text-2xl font-extrabold text-foreground">{settings.siteName}</span>
+        <p className="text-xs text-muted-foreground">{settings.siteDescription}</p>
+      </div>
+    </Link>
  </div>
 
  <div className="card-static rounded-lg p-8 md:p-10">

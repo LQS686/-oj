@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Code2, CheckCircle2, XCircle, User, Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react'
+import { CheckCircle2, XCircle, User, Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
@@ -94,8 +94,14 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center">
-              <Code2 className="w-7 h-7 text-white" />
+            <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-md ring-1 ring-border/40">
+              <img
+                src="/logos/dsojlogo.png"
+                alt="大山 OJ Logo"
+                width={56}
+                height={56}
+                className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
+              />
             </div>
             <div className="text-left">
               <span className="text-2xl font-extrabold text-foreground">{settings.siteName}</span>

@@ -183,7 +183,7 @@
 
 html {
   scroll-behavior: smooth;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
 }
@@ -192,8 +192,6 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  overflow-y: visible;
-  overflow-x: hidden;
   min-height: 100vh;
   padding-top: 56px;
   line-height: 1.6;

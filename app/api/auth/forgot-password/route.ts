@@ -59,7 +59,7 @@ export const POST = withApi.public(async (req) => {
 
   // 检查 SMTP 是否已配置
   const settings = await getSystemSettings()
-  const siteName = settings.siteName || 'OJ Platform'
+  const siteName = settings.siteName || '大山 OJ'
 
   const tempPassword = generateTempPassword()
   const username = user.username

@@ -5,8 +5,8 @@ import { settingsApi } from '@/lib/api'
 import type { SystemSettings } from '@/lib/settings'
 
 const defaultSettings: SystemSettings = {
-  siteName: 'OJ Platform',
-  siteDescription: '在线评测系统',
+  siteName: '大山 OJ',
+  siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
   allowRegistration: true,
   allowGuestSubmission: false,
   defaultLanguage: 'cpp',
@@ -34,7 +34,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const fetchSettings = useCallback(async () => {
     try {
       const settingsData = await settingsApi.getPublicSettings()
-      setSettings({ ...defaultSettings, ...settingsData })
+      const merged = { ...defaultSettings, ...settingsData }
+      // 防御：若 API 返回空字符串（绕过后端校验的脏数据），回退到默认品牌信息
+      merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
+      merged.siteDescription = (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
+      setSettings(merged)
     } catch (error) {
       console.error('获取系统设置失败:', error)
     } finally {

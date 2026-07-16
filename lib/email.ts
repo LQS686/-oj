@@ -165,7 +165,7 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
  */
 export async function sendTestEmail(to: string): Promise<SendMailResult> {
   const settings = await getSystemSettings()
-  const siteName = settings.siteName || 'OJ Platform'
+  const siteName = settings.siteName || '大山 OJ'
   const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
 
   return sendMail({

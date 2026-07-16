@@ -13,8 +13,8 @@ export default function AdminSettingsPage() {
  const [error, setError] = useState('')
  const [success, setSuccess] = useState('')
  const [settings, setSettings] = useState<SystemSettings>({
- siteName: 'OJ Platform',
- siteDescription: '在线评测系统',
+ siteName: '大山 OJ',
+ siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
  allowRegistration: true,
  allowGuestSubmission: false,
  defaultLanguage: 'cpp',

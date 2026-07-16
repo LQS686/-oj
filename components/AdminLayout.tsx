@@ -20,15 +20,16 @@ import {
   Sparkles,
   Bell,
   Megaphone,
-  User,
   ChevronDown,
   Cpu,
   BookOpen,
-  Activity
+  Activity,
+  UserCircle
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import type { Notification } from '@/types/models'
+import { getRoleLabel } from '@/lib/permissions'
 
 interface AdminMenuItem {
   icon: React.ComponentType<{ className?: string }>
@@ -217,7 +218,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     </div>
                     <div>
                       <h1 className="text-lg font-bold text-foreground">管理后台</h1>
-                      <p className="text-xs text-muted-foreground">OJ Platform</p>
+                      <p className="text-xs text-muted-foreground">大山 OJ</p>
                     </div>
                   </div>
               )}
@@ -313,17 +314,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   (item.href !== '/admin' && pathname.startsWith(item.href))
                 )?.label || '管理后台'}
               </h2>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div className="relative" ref={notificationRef}>
                   <button
                     onClick={() => setNotificationOpen(!notificationOpen)}
-                    className="p-2 rounded-lg hover:bg-muted transition-colors relative focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="btn-ghost btn p-2.5 relative group"
                     aria-label="通知"
                   >
-                    <Bell className="w-5 h-5 text-muted-foreground" />
+                    <Bell className="w-5 h-5" />
                     {unreadCount > 0 && (
-                      <span className="absolute top-0 right-0 w-4 h-4 rounded-full text-[10px] flex items-center justify-center text-white bg-error">
-                        {unreadCount > 9 ? '9+' : unreadCount}
+                      <span className="absolute -top-0.5 -right-0.5 badge-primary badge min-w-[18px] h-[18px] text-[10px]">
+                        {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     )}
                   </button>
@@ -359,32 +360,72 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <div className="relative" ref={userMenuRef}>
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-primary/10 transition-all duration-200 group"
                     aria-label="用户菜单"
                   >
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary">
-                      <User className="w-4 h-4 text-white" />
+                    {user.avatar ? (
+                      <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
+                        <img
+                          src={user.avatar}
+                          alt="Avatar"
+                          width={40}
+                          height={40}
+                          className="object-cover w-full h-full"
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : (
+                      <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
+                        <div className="avatar-fallback text-sm">
+                          {user.username?.charAt(0).toUpperCase()}
+                        </div>
+                      </div>
+                    )}
+                    <div className="hidden md:flex flex-col items-start">
+                      <span className="text-sm font-semibold text-foreground leading-tight group-hover:text-primary-light transition-colors duration-300">
+                        {user.nickname || user.username}
+                      </span>
+                      <span className="text-xs text-muted-foreground leading-tight group-hover:text-primary/70 transition-colors duration-300">
+                        {getRoleLabel(user?.role)}
+                      </span>
                     </div>
-                    <div className="hidden md:flex flex-col items-end">
-                      <span className="text-sm font-medium text-foreground">{user?.nickname || user?.username || '管理员'}</span>
-                      <span className="text-xs text-muted-foreground">{user?.email || ''}</span>
-                    </div>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 hidden md:block group-hover:text-primary-light ${userMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
 
                   {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 rounded-xl border py-1 z-50 shadow-lg bg-background-secondary border-border">
+                    <div className="absolute right-0 mt-2 w-52 rounded-xl border py-1.5 z-50 shadow-lg bg-background-secondary border-border">
                       <Link
-                        href="/admin/settings"
-                        className="block px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                        href={`/user/${user.id}`}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
                         onClick={() => setUserMenuOpen(false)}
                       >
-                        系统设置
+                        <UserCircle className="w-[18px] h-[18px]" />
+                        个人主页
                       </Link>
+                      {isSystemAdmin(user) && (
+                        <Link
+                          href="/admin/settings"
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Settings className="w-[18px] h-[18px]" />
+                          系统设置
+                        </Link>
+                      )}
+                      <Link
+                        href="/"
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <LogOut className="w-[18px] h-[18px]" />
+                        返回主站
+                      </Link>
+                      <div className="my-1 border-t border-border" />
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left px-4 py-2.5 text-sm text-error hover:bg-error/10 transition-colors"
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-error hover:bg-error/10 transition-colors"
                       >
+                        <LogOut className="w-[18px] h-[18px]" />
                         退出登录
                       </button>
                     </div>

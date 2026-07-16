@@ -34,6 +34,15 @@ export default function GlobalError({
  }}
  >
  <div style={{ textAlign: 'center', maxWidth: '32rem' }}>
+ <div style={{ width: '4rem', height: '4rem', margin: '0 auto 1.5rem', borderRadius: '0.75rem', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+ <img
+ src="/logos/dsojlogo.png"
+ alt="大山 OJ Logo"
+ width={64}
+ height={64}
+ style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+ />
+ </div>
  <AlertTriangle
  size={64}
  color="#ef4444"

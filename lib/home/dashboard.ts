@@ -17,30 +17,12 @@ function startOfDay(d: Date): Date {
   return x
 }
 
-function localDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function computeStreak(uniqueAcDates: string[]): number {
-  if (uniqueAcDates.length === 0) return 0
-  const set = new Set(uniqueAcDates)
-  let streak = 0
-  const cursor = startOfDay(new Date())
-  for (;;) {
-    const key = localDateKey(cursor)
-    if (!set.has(key)) break
-    streak++
-    cursor.setDate(cursor.getDate() - 1)
-  }
-  return streak
-}
-
 export interface HomeDashboardStats {
   todaySolved: number
-  streak: number
   weeklyPassRate: number
   weeklyPassRateDelta: number | null
   totalSolved: number
+  weeklySubmissions: number
   rating: number
   rank: string
 }
@@ -105,10 +87,6 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
   }
   const totalSolved = acByProblem.size
 
-  const acDates = [...acByProblem.values()].map((d) => localDateKey(d))
-  const uniqueDates = [...new Set(acDates)]
-  const streak = computeStreak(uniqueDates)
-
   const weekSubs = submissions.filter((s) => new Date(s.submittedAt) >= weekStart)
   const prevWeekSubs = submissions.filter((s) => {
     const t = new Date(s.submittedAt)
@@ -127,10 +105,10 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
 
   return {
     todaySolved: todayAcProblems.size,
-    streak,
     weeklyPassRate: weekRate,
     weeklyPassRateDelta,
-    totalSolved: user?.solvedCount ?? totalSolved,
+    totalSolved: user?.solvedCount || totalSolved,
+    weeklySubmissions: weekSubs.length,
     rating: user?.rating ?? 1500,
     rank: user?.rank ?? '新手',
   }

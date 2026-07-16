@@ -1,5 +1,5 @@
 
-// Prisma Schema for OJ Platform with MongoDB
+// Prisma Schema for 大山 OJ with MongoDB
 generator client {
   provider = "prisma-client-js"
 }

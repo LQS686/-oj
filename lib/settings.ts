@@ -5,8 +5,8 @@ import { encrypt, decrypt, maskApiKey } from '@/lib/crypto'
 const SETTINGS_KEY = 'system_settings'
 
 const defaultSettings = {
-  siteName: 'OJ Platform',
-  siteDescription: '在线评测系统',
+  siteName: '大山 OJ',
+  siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
   allowRegistration: true,
   allowGuestSubmission: false,
   defaultLanguage: 'cpp',
@@ -27,6 +27,9 @@ export type SystemSettings = typeof defaultSettings
 
 /**
  * 读取原始设置（smtpPassword 保持加密态），供内部发信服务使用。
+ *
+ * 兜底：若数据库中 siteName/siteDescription 为空字符串（历史脏数据或绕过校验写入），
+ * 回退到默认值，确保对外永不返回空品牌信息。
  */
 async function getRawSystemSettings(): Promise<SystemSettings> {
   try {
@@ -34,14 +37,21 @@ async function getRawSystemSettings(): Promise<SystemSettings> {
       where: { key: SETTINGS_KEY }
     })
     if (setting && setting.value && typeof setting.value === 'object') {
-      return { ...defaultSettings, ...(setting.value as Record<string, unknown>) } as SystemSettings
+      const merged = { ...defaultSettings, ...(setting.value as Record<string, unknown>) } as SystemSettings
+      // 空值兜底（防止历史脏数据导致前端显示空白）
+      merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
+      merged.siteDescription = (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
+      return merged
     }
   } catch (error) {
     logger.error('获取系统设置失败', error)
   }
 
   if (memorySettings) {
-    return { ...defaultSettings, ...memorySettings } as SystemSettings
+    const merged = { ...defaultSettings, ...memorySettings } as SystemSettings
+    merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
+    merged.siteDescription = (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
+    return merged
   }
 
   return defaultSettings
@@ -59,6 +69,8 @@ export async function getSystemSettings(): Promise<SystemSettings> {
 export function getSystemSettingsSync(): SystemSettings {
   if (memorySettings) {
     const merged = { ...defaultSettings, ...memorySettings } as SystemSettings
+    merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
+    merged.siteDescription = (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
     return { ...merged, smtpPassword: merged.smtpPassword ? maskApiKey(merged.smtpPassword) : '' }
   }
   return defaultSettings
@@ -81,6 +93,16 @@ export async function saveSystemSettings(settings: Partial<SystemSettings>): Pro
       if (k in incoming && typeof incoming[k] === 'string') {
         incoming[k] = (incoming[k] as string).trim()
       }
+    }
+
+    // 网站名称/描述：trim 后若为空，回退到默认值，避免前端显示空白
+    if ('siteName' in incoming && typeof incoming.siteName === 'string') {
+      const trimmed = (incoming.siteName as string).trim()
+      incoming.siteName = trimmed || defaultSettings.siteName
+    }
+    if ('siteDescription' in incoming && typeof incoming.siteDescription === 'string') {
+      const trimmed = (incoming.siteDescription as string).trim()
+      incoming.siteDescription = trimmed || defaultSettings.siteDescription
     }
 
     if ('smtpPassword' in incoming) {

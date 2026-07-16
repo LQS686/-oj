@@ -17,8 +17,8 @@ export const GET = withApi.public(async () => {
     })
   } catch (error) {
     return ok({
-      siteName: 'OJ Platform',
-      siteDescription: '在线评测系统',
+      siteName: '大山 OJ',
+      siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
       allowRegistration: true,
       defaultLanguage: 'cpp',
     })

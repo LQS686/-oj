@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
-import { FileText, Plus, Edit, Trash2, Eye, EyeOff, Search, Trophy, Database, Users, Loader2, History } from 'lucide-react'
-import { DIFFICULTY_COLORS } from '@/lib/constants'
+import { FileText, Plus, Edit, Trash2, Eye, EyeOff, Search, Trophy, Database, Loader2, History, ChevronDown, Check } from 'lucide-react'
+import { DIFFICULTIES } from '@/lib/constants'
+import { getDifficultyColor } from '@/lib/status'
 import { formatDate, formatDateTime } from '@/lib/utils'
 
 interface Problem {
@@ -55,7 +56,8 @@ export default function AdminProblemsPage() {
  const [initialLoading, setInitialLoading] = useState(true)
  const [error, setError] = useState('')
  const [searchQuery, setSearchQuery] = useState('')
- const [difficultyFilter, setDifficultyFilter] = useState('all')
+ const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
+ const [difficultyOpen, setDifficultyOpen] = useState(false)
  const [aiStatusFilter, setAiStatusFilter] = useState('all')
  const [showDeleteModal, setShowDeleteModal] = useState(false)
  const [deletingProblem, setDeletingProblem] = useState<Problem | null>(null)
@@ -67,6 +69,17 @@ export default function AdminProblemsPage() {
  const [activeTab, setActiveTab] = useState<ActiveTab>('list')
  const [logs, setLogs] = useState<LogEntry[]>([])
  const [logsLoading, setLogsLoading] = useState(false)
+ const difficultyRef = useRef<HTMLDivElement>(null)
+
+ useEffect(() => {
+ const handleClickOutside = (e: MouseEvent) => {
+ if (difficultyRef.current && !difficultyRef.current.contains(e.target as Node)) {
+ setDifficultyOpen(false)
+ }
+ }
+ document.addEventListener('mousedown', handleClickOutside)
+ return () => document.removeEventListener('mousedown', handleClickOutside)
+ }, [])
 
  useEffect(() => {
  fetchProblems(true)
@@ -238,23 +251,7 @@ export default function AdminProblemsPage() {
  return matchesSearch && matchesDifficulty && matchesAi
  })
 
- const getDifficultyColor = (difficulty: string) => {
- const color = DIFFICULTY_COLORS[difficulty]
- if (color) {
- const [textColor, bgColor] = color.split(' ')
- return `tag ${bgColor.replace('/10', '/20')} ${textColor}`
- }
- return 'tag'
- }
-
- const getDifficultyBgClass = (difficulty: string) => {
- switch (difficulty) {
- case '简单': return 'bg-secondary/10 text-secondary-light border-secondary/30'
- case '中等': return 'bg-accent/10 text-accent-light border-accent/30'
- case '困难': return 'bg-error/10 text-error border-error/30'
- default: return 'bg-muted text-muted-foreground border-muted/30'
- }
- }
+ const difficultyLabel = difficultyFilter === 'all' ? '全部难度' : difficultyFilter
 
  const columns: Column<Problem>[] = [
  {
@@ -283,7 +280,7 @@ export default function AdminProblemsPage() {
  label: '难度',
  sortable: true,
  render: (value) => (
- <span className={`tag text-[10px] px-2 py-0.5 rounded-full border ${getDifficultyBgClass(value)}`}>
+ <span className={`difficulty-tag ${getDifficultyColor(value)}`}>
  {value}
  </span>
  ),
@@ -528,23 +525,25 @@ export default function AdminProblemsPage() {
 
  {activeTab === 'list' && (
  <>
- <div className="card p-4 overflow-visible relative">
- <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+ {/* 筛选栏：搜索 + AI来源 + 难度下拉（用 card-static 避免 overflow:hidden 截断下拉菜单） */}
+ <div className="card-static p-3 relative z-20">
+ <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
- <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+ <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
  <input
  type="text"
  placeholder="搜索题目编号或标题..."
  value={searchQuery}
  onChange={(e) => setSearchQuery(e.target.value)}
- className="input pl-10 py-2.5 text-sm"
+ className="input pl-9 py-2 text-sm"
  />
  </div>
  </div>
 
  <div className="flex gap-2 flex-wrap items-center">
- <div className="flex gap-1 p-1 rounded-lg bg-muted">
+ {/* AI 来源筛选 */}
+ <div className="flex gap-0.5 p-0.5 rounded-lg bg-muted">
  {[
  { id: 'all', label: '全部' },
  { id: 'manual', label: '人工' },
@@ -554,7 +553,7 @@ export default function AdminProblemsPage() {
  <button
  key={tab.id}
  onClick={() => setAiStatusFilter(tab.id)}
- className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+ className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
  aiStatusFilter === tab.id
  ? 'bg-primary text-white'
  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -565,76 +564,66 @@ export default function AdminProblemsPage() {
  ))}
  </div>
 
- <div className="flex gap-1 p-1 rounded-lg bg-muted">
- {[
- { id: 'all', label: '全部' },
- { id: '简单', label: '简单' },
- { id: '中等', label: '中等' },
- { id: '困难', label: '困难' }
- ].map(tab => (
+ {/* 难度筛选：下拉单选，全站统一 8 级体系 */}
+ <div className="relative" ref={difficultyRef}>
  <button
- key={tab.id}
- onClick={() => setDifficultyFilter(tab.id)}
- className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
- difficultyFilter === tab.id
- ? 'bg-primary text-white'
- : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+ type="button"
+ onClick={() => setDifficultyOpen(o => !o)}
+ className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors max-w-[9rem] truncate ${
+ difficultyFilter !== 'all' ? 'border-primary/40 text-primary' : 'text-foreground'
  }`}
  >
- {tab.label}
+ <span className="truncate">{difficultyLabel}</span>
+ <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${difficultyOpen ? 'rotate-180' : ''}`} />
  </button>
- ))}
+ {difficultyOpen && (
+ <div className="absolute right-0 z-[60] mt-1 w-44 max-h-72 overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
+ <button
+ type="button"
+ onClick={() => { setDifficultyFilter('all'); setDifficultyOpen(false) }}
+ className={`w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2 ${
+ difficultyFilter === 'all' ? 'text-primary font-medium' : 'text-muted-foreground'
+ }`}
+ >
+ {difficultyFilter === 'all' && <Check className="w-4 h-4" />}
+ <span className={difficultyFilter === 'all' ? '' : 'ml-6'}>全部难度</span>
+ </button>
+ {DIFFICULTIES.map(d => {
+ const selected = difficultyFilter === d
+ return (
+ <button
+ key={d}
+ type="button"
+ onClick={() => { setDifficultyFilter(d); setDifficultyOpen(false) }}
+ className={`w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2 ${
+ selected ? 'text-primary font-medium' : 'text-muted-foreground'
+ }`}
+ >
+ {selected && <Check className="w-4 h-4" />}
+ <span className={`difficulty-tag ${getDifficultyColor(d)} ${selected ? 'ml-0' : 'ml-6'}`}>{d}</span>
+ </button>
+ )
+ })}
+ </div>
+ )}
+ </div>
  </div>
  </div>
  </div>
 
- </div>
-
- <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
- <div className="card p-4">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center">
- <FileText className="w-5 h-5 text-primary" />
- </div>
- <div>
- <div className="text-muted-foreground text-xs">总题目数</div>
- <div className="text-xl font-bold text-foreground">{problems.length}</div>
- </div>
- </div>
- </div>
- <div className="card p-4">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-lg bg-secondary/100/10 flex items-center justify-center">
- <Eye className="w-5 h-5 text-secondary-light" />
- </div>
- <div>
- <div className="text-muted-foreground text-xs">公开题目</div>
- <div className="text-xl font-bold text-secondary-light">{problems.filter(p => p.isPublic).length}</div>
- </div>
- </div>
- </div>
- <div className="card p-4">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-lg bg-accent/100/10 flex items-center justify-center">
- <Trophy className="w-5 h-5 text-accent-light" />
- </div>
- <div>
- <div className="text-muted-foreground text-xs">竞赛题目</div>
- <div className="text-xl font-bold text-accent-light">{problems.filter(p => p.visibility === 'contest').length}</div>
- </div>
- </div>
- </div>
- <div className="card p-4">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-lg bg-muted0/10 flex items-center justify-center">
- <EyeOff className="w-5 h-5 text-muted-foreground" />
- </div>
- <div>
- <div className="text-muted-foreground text-xs">隐藏题目</div>
- <div className="text-xl font-bold text-muted-foreground">{problems.filter(p => !p.isPublic && p.visibility !== 'contest').length}</div>
- </div>
- </div>
- </div>
+ {/* 统计行：紧凑内联统计 */}
+ <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm px-1">
+ <span className="text-muted-foreground">共 <span className="text-lg font-bold text-foreground">{problems.length}</span> 题</span>
+ <span className="text-border">|</span>
+ <span className="text-secondary-light">公开 {problems.filter(p => p.isPublic).length}</span>
+ <span className="text-accent-light">竞赛 {problems.filter(p => p.visibility === 'contest').length}</span>
+ <span className="text-muted-foreground">隐藏 {problems.filter(p => !p.isPublic && p.visibility !== 'contest').length}</span>
+ {filteredProblems.length !== problems.length && (
+ <>
+ <span className="text-border">|</span>
+ <span className="text-primary">筛选后 {filteredProblems.length} 题</span>
+ </>
+ )}
  </div>
 
  <DataTable<Problem>

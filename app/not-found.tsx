@@ -5,6 +5,18 @@ export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="text-center animate-fadeIn">
+        <Link href="/" className="inline-block mb-8 group" aria-label="返回首页">
+          <div className="w-16 h-16 mx-auto rounded-xl overflow-hidden bg-white shadow-md ring-1 ring-border/40 transition-transform duration-200 group-hover:scale-105">
+            <img
+              src="/logos/dsojlogo.png"
+              alt="大山 OJ Logo"
+              width={64}
+              height={64}
+              className="w-full h-full object-contain"
+            />
+          </div>
+        </Link>
+
         <div className="relative mb-8">
           <div className="absolute inset-0 bg-primary/10 rounded-full blur-3xl scale-150" />
           <span className="text-[180px] md:text-[220px] font-extrabold text-foreground opacity-30 select-none">

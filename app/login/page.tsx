@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Code2, Mail, Lock, Eye, EyeOff, Sparkles, AlertCircle } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Sparkles, AlertCircle } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
@@ -43,8 +43,14 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center">
-              <Code2 className="w-7 h-7 text-white" />
+            <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-md ring-1 ring-border/40">
+              <img
+                src="/logos/dsojlogo.png"
+                alt="大山 OJ Logo"
+                width={56}
+                height={56}
+                className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
+              />
             </div>
             <div className="text-left">
               <span className="text-2xl font-extrabold text-foreground">{settings.siteName}</span>
@@ -155,17 +161,18 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          {/* 安全修复（2026-07）：删除默认账户提示
-              原显示 'admin / admin123' 和 'user1 / user123' 测试账号泄露，
-              改为提示首次注册自动成为系统管理员。 */}
+          {/* 欢迎提示卡片：面向终端用户，不暴露后台管理员机制 */}
           <div className="mt-8 p-5 rounded-xl bg-primary/5 border border-primary/10 hover:border-primary/20 transition-all duration-300 hover:shadow-sm">
             <p className="text-sm text-primary-light font-semibold mb-3 flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
-              首次使用？
+              欢迎来到大山 OJ
             </p>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground space-y-2">
               <p>
-                还没有账号？首个通过注册创建的用户将<strong className="text-foreground">自动成为系统管理员</strong>，可访问后台进行题目、竞赛、班级等管理。
+                代码如山，算法为径。在这里开启你的算法攀登之旅——从入门到顶峰，逐步攻克每一道难题。
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                支持多种编程语言在线评测、竞赛训练与学习成长追踪。
               </p>
             </div>
           </div>

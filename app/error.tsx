@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
+import Link from 'next/link'
 import { logger } from '@/lib/logger'
 import { AlertCircle, RefreshCw, Home } from 'lucide-react'
-import Link from 'next/link'
 
 export default function Error({
   error,
@@ -19,6 +19,18 @@ export default function Error({
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="text-center max-w-md animate-fadeIn">
+        <Link href="/" className="inline-block mb-6 group" aria-label="返回首页">
+          <div className="w-16 h-16 mx-auto rounded-xl overflow-hidden bg-white shadow-md ring-1 ring-border/40 transition-transform duration-200 group-hover:scale-105">
+            <img
+              src="/logos/dsojlogo.png"
+              alt="大山 OJ Logo"
+              width={64}
+              height={64}
+              className="w-full h-full object-contain"
+            />
+          </div>
+        </Link>
+
         <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-error to-red-600 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-error/30 transition-transform duration-300 hover:scale-110 hover:rotate-3">
           <AlertCircle className="w-10 h-10 text-white" />
         </div>
