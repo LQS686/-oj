@@ -294,7 +294,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <Menu className="w-5 h-5 text-foreground" />
       </button>
 
-      <main className={`flex-1 overflow-auto transition-all duration-300 ${
+      <main className={`flex-1 transition-all duration-300 ${
         sidebarOpen ? 'md:ml-72' : 'md:ml-20'
       }`}>
         <header className="sticky top-0 z-20 border-b bg-background-secondary border-border">
