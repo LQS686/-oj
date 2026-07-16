@@ -37,9 +37,7 @@ import toast from 'react-hot-toast'
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
   { value: 'c', label: 'C', version: 'C11' },
-  { value: 'java', label: 'Java', version: 'Java 17' },
   { value: 'python', label: 'Python', version: 'Python 3.10' },
-  { value: 'javascript', label: 'JavaScript', version: 'Node.js 18' }
 ]
 
 function getStorageKey(problemId: string, classId: string | null, assignmentId: string | null): string {

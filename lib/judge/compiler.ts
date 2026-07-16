@@ -23,6 +23,8 @@ export interface CompileResult {
 }
 
 // 语言配置
+// 评测机减负（2026-07）：移除 java/javascript 支持，仅保留 C/C++/Python
+//   节省镜像体积 ~500MB（openjdk11-jdk + node + py3-pip + gfortran）
 const languageConfigs: Record<string, {
   extension: string
   compileCommand?: (source: string, output: string) => string
@@ -38,17 +40,8 @@ const languageConfigs: Record<string, {
     compileCommand: (source, output) => `gcc -O2 -std=c11 -o "${output}" "${source}"`,
     needsCompile: true,
   },
-  java: {
-    extension: '.java',
-    compileCommand: (source, _output) => `javac "${source}"`,
-    needsCompile: true,
-  },
   python: {
     extension: '.py',
-    needsCompile: false,
-  },
-  javascript: {
-    extension: '.js',
     needsCompile: false,
   },
 }
@@ -125,16 +118,8 @@ export async function compileCode(code: string, language: string): Promise<Compi
 
   // Java: 解析主类名作为源文件名，javac 据此产出 {className}.class
   // 其他语言: 保持 solution_* 命名
-  let sourceName = filename
-  let compiledBasename = filename
-  if (language === 'java') {
-    const classMatch = code.match(/(?:public\s+)?class\s+(\w+)/)
-    if (classMatch) {
-      sourceName = classMatch[1]
-      compiledBasename = classMatch[1]
-    }
-    // 无 class 声明（语法错误）回退为 solution_*，由 javac 报 CE
-  }
+  const sourceName = filename
+  const compiledBasename = filename
 
   const sourcePath = join(tempDir, `${sourceName}${config.extension}`)
 
@@ -179,8 +164,6 @@ export async function compileCode(code: string, language: string): Promise<Compi
       spawnArgs = [runnerPath, '512', '15', '64', 'g++', '-O2', '-std=c++17', '-o', outputPath, sourcePath]
       if (language === 'c') {
         spawnArgs = [runnerPath, '512', '15', '64', 'gcc', '-O2', '-std=c11', '-o', outputPath, sourcePath]
-      } else if (language === 'java') {
-        spawnArgs = [runnerPath, '512', '15', '64', 'javac', sourcePath]
       }
     } else {
       // 非沙箱模式（Windows 或 Docker 模式）
@@ -190,9 +173,6 @@ export async function compileCode(code: string, language: string): Promise<Compi
       } else if (language === 'c') {
         spawnCmd = 'gcc'
         spawnArgs = ['-O2', '-std=c11', '-o', outputPath, sourcePath]
-      } else if (language === 'java') {
-        spawnCmd = 'javac'
-        spawnArgs = [sourcePath]
       } else {
         spawnCmd = 'true'
         spawnArgs = []
@@ -246,9 +226,7 @@ export function getRunCommand(language: string, compiledPath: string, inputPath?
   const commands: Record<string, string> = {
     cpp: compiledPath,
     c: compiledPath,
-    java: `java -cp "${join(compiledPath, '..')}" ${compiledPath.split(/[/\\]/).pop()!.replace('.class', '')}`,
     python: `python "${compiledPath}"`,
-    javascript: `node "${compiledPath}"`,
   }
 
   let command = commands[language] || compiledPath

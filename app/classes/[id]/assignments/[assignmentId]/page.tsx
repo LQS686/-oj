@@ -32,9 +32,7 @@ import SubmissionResultModal, { SubmissionResultData } from '@/components/submis
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
  { value: 'c', label: 'C', version: 'C11' },
- { value: 'java', label: 'Java', version: 'Java 17' },
  { value: 'python', label: 'Python', version: 'Python 3.10' },
- { value: 'javascript', label: 'JavaScript', version: 'Node.js 18' }
 ]
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')

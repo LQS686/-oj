@@ -18,14 +18,11 @@ import MarkdownEditor from '@/components/solution/MarkdownEditor'
 import { logger } from '@/lib/logger'
 import { fetchWithCookie } from '@/lib/api/base'
 
+// 评测机减负（2026-07）：移除 java/javascript/go/rust，仅保留 C/C++/Python
 const CODE_LANGUAGES: { value: string; label: string }[] = [
  { value: 'cpp', label: 'C++' },
  { value: 'c', label: 'C' },
- { value: 'java', label: 'Java' },
  { value: 'python', label: 'Python' },
- { value: 'javascript', label: 'JavaScript' },
- { value: 'go', label: 'Go' },
- { value: 'rust', label: 'Rust' }
 ]
 
 interface ProblemSummary {

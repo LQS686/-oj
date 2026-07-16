@@ -166,17 +166,14 @@ function analyzeCodeComplexity(code: string, language: string): {
 }
 
 function getLanguageKey(language: string): string | null {
+  // 评测机减负（2026-07）：移除 java/javascript，仅保留 C/C++/Python
   const langMap: Record<string, string> = {
     'python': 'python',
     'python3': 'python',
     'py': 'python',
-    'javascript': 'javascript',
-    'js': 'javascript',
-    'nodejs': 'javascript',
     'cpp': 'cpp',
     'c++': 'cpp',
     'c': 'cpp',
-    'java': 'java',
   };
   return langMap[language.toLowerCase()] || null;
 }

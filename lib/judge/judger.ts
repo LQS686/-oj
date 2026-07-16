@@ -259,19 +259,13 @@ export async function cleanup(compiledPath?: string, language?: string) {
   await tryUnlink(compiledPath)
 
   // cpp/c：compiledPath 是可执行文件，需额外清理源文件 solution_*.cpp/.c
+  // python：源文件就是 compiledPath（无需额外清理）
+  // 评测机减负（2026-07）：移除 java 特殊清理逻辑
   if (language === 'cpp' || language === 'c') {
     const dir = path.dirname(compiledPath)
     const stem = path.basename(compiledPath, path.extname(compiledPath))
     const sourceExt = language === 'cpp' ? '.cpp' : '.c'
     await tryUnlink(path.join(dir, stem + sourceExt))
-  }
-
-  // Java 情况：compiledPath 无扩展名，实际产物是 {className}.class 与源文件 {className}.java
-  // 不清理会导致高并发下两个 Java 提交（均 public class Main）互相覆盖
-  const ext = path.extname(compiledPath)
-  if (language === 'java' || (!language && !ext)) {
-    await tryUnlink(`${compiledPath}.class`)
-    await tryUnlink(`${compiledPath}.java`)
   }
 }
 

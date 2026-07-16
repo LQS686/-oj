@@ -318,7 +318,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       // （RLIMIT_AS / RLIMIT_CPU / RLIMIT_STACK，参考 LemonLime watcher_unix.cpp）
       let command = runInfo.command
       let args = runInfo.args
-      const useRunnerWrapper = isLinux && ['cpp', 'c', 'python', 'java', 'javascript'].includes(language)
+      const useRunnerWrapper = isLinux && ['cpp', 'c', 'python'].includes(language)
       if (useRunnerWrapper) {
         // ESM 环境下 __dirname 不可靠，使用 process.cwd() 构建路径
         const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
@@ -644,18 +644,10 @@ function getRunInfo(language: string, compiledPath: string): { command: string, 
       command: relativeCompiledPath,
       args: []
     },
-    java: {
-      command: 'java',
-      args: [relativeCompiledPath.replace('.class', '')]
-    },
     python: {
       command: process.platform === 'win32' ? 'python' : 'python3',
       args: [relativeCompiledPath]
     },
-    javascript: {
-      command: 'node',
-      args: [relativeCompiledPath]
-    }
   }
 
   const cmdInfo = commands[language] || { command: relativeCompiledPath, args: [] }
@@ -696,9 +688,7 @@ function getDockerImage(language: string): string {
   const images: Record<string, string> = {
     cpp: 'gcc:12',
     c: 'gcc:12',
-    java: 'openjdk:17',
     python: 'python:3.11',
-    javascript: 'node:18',
   }
   return images[language] || 'ubuntu:22.04'
 }
@@ -751,9 +741,7 @@ function getDockerRunCommand(language: string, compiledPath: string, inputPath: 
   const commands: Record<string, string> = {
     cpp: `./${safeCompiledPath} < ${safeInputPath}`,
     c: `./${safeCompiledPath} < ${safeInputPath}`,
-    java: `java ${safeCompiledPath.replace('.class', '')} < ${safeInputPath}`,
     python: `python3 ${safeCompiledPath} < ${safeInputPath}`,
-    javascript: `node ${safeCompiledPath} < ${safeInputPath}`,
   }
 
   return commands[language] || safeCompiledPath

@@ -10,7 +10,7 @@ import { toInt } from '@/lib/api/validation'
 import { logger } from '@/lib/logger'
 
 // 支持的提交语言白名单（与 lib/judge/compiler.ts 的 languageConfigs 一致）
-const ALLOWED_LANGUAGES = ['cpp', 'c', 'java', 'python', 'javascript']
+const ALLOWED_LANGUAGES = ['cpp', 'c', 'python']
 
 export const GET = withApi.public(async (req) => {
   const q = readQuery<{

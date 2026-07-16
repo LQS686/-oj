@@ -43,18 +43,24 @@ WORKDIR /app
 # 使用国内镜像源
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
-# 安装必要的系统依赖（用于编译器）
-# bash: runner.sh 依赖；coreutils: 提供 /usr/bin/time 用于资源统计回退
+# 安装必要的系统依赖（仅支持 C/C++/Python 评测）
+#   - bash: runner.sh 依赖
+#   - coreutils: 提供 /usr/bin/time 用于资源统计回退
+#   - python3: Python 解释器
+#   - g++/gcc: C/C++ 编译器
+#   - make/musl-dev: 标准构建工具链
+# 移除项（评测机减负）：
+#   - openjdk11-jdk: ~250MB（JDK + JRE）
+#   - gfortran: ~80MB（Fortran 编译器，从未启用）
+#   - py3-pip: ~50MB（pip 包管理器，运行时不需要）
+# 减负后镜像预计：~600MB（原 ~1.2GB，节省 ~50%）
 RUN apk add --no-cache \
     bash \
     coreutils \
     python3 \
-    py3-pip \
     make \
     g++ \
     gcc \
-    gfortran \
-    openjdk11-jdk \
     musl-dev
 
 # 设置环境变量
