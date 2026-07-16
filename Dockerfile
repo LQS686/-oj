@@ -79,27 +79,20 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # 复制必要文件
-# P1 修复（2026-07）：构建磁盘空间不足 (ENOSPC)。
-#   根因：之前 runner 阶段既 COPY standalone + tailwindcss/prisma 子集，又
-#   `npm install --omit=dev` 全量安装，磁盘峰值叠加 ~1.5GB 触发 ENOSPC。
-#   Next.js standalone 已经自带最精简的 node_modules（output_file_tracing），
-#   无需再 npm install。仅需补充 standalone 不追踪的依赖：
-#     - .prisma client（动态加载，被 .swc 排除）
-#     - @prisma client（运行时入口）
-#     - tailwindcss 构建产物（runtime 端不需，仅打包时，但 next build 已生成 static）
-#   解决方案：删除 `npm install --omit=dev` 行 + 冗余的 tailwind COPY（构建时已内嵌到 .next/static）。
+# P0 修复（2026-07）：重建 runner 阶段文件结构。
+#   之前问题：在 standalone 之外又额外 COPY server.ts / lib / prisma / tsconfig，
+#   这些其实是 standalone 内部追踪的，结果造成 /app/ 下有双份文件互相干扰，
+#   server.ts 运行时找不到正确的 lib 路径，导致进程启动后立即退出。
+#   之前未察觉是因为只看到 (unhealthy) 而没看 logs。
+#
+#   修复策略：使用 next.config.ts 的 outputFileTracingIncludes 显式追踪
+#   server.ts 和 lib（这是 Next.js 标准做法），然后只 COPY standalone 即可。
+#   Prisma client 必须单独 COPY，因为 .prisma 是动态生成的。
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
 
-# 复制服务器和库文件
-COPY --from=builder --chown=nextjs:nodejs /app/server.ts ./
-COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.server.json ./
-
-# 复制 Prisma 客户端（standalone 不会追踪这些动态加载文件）
+# Prisma client 必须单独 COPY（standalone 不追踪动态生成的内容）
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
@@ -120,5 +113,8 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# 启动命令 - 使用tsx运行server.ts
+# 启动命令 - 使用 tsx 运行 server.ts（自定义 server，包含 socket.io）
+#   cwd: /app，因为 next.config 的 outputFileTracingIncludes 已将 server.ts 复制到
+#        /app/.next/standalone/server.ts，但我们需要从 /app 直接启动以便 npx tsx 能解析
+#   注意：现在 server.ts / lib 都在 /app/ 顶层（来自 .next/standalone/ 整个目录被解压）
 CMD ["npx", "tsx", "server.ts"]
