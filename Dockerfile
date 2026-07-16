@@ -79,6 +79,15 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # 复制必要文件
+# P1 修复（2026-07）：构建磁盘空间不足 (ENOSPC)。
+#   根因：之前 runner 阶段既 COPY standalone + tailwindcss/prisma 子集，又
+#   `npm install --omit=dev` 全量安装，磁盘峰值叠加 ~1.5GB 触发 ENOSPC。
+#   Next.js standalone 已经自带最精简的 node_modules（output_file_tracing），
+#   无需再 npm install。仅需补充 standalone 不追踪的依赖：
+#     - .prisma client（动态加载，被 .swc 排除）
+#     - @prisma client（运行时入口）
+#     - tailwindcss 构建产物（runtime 端不需，仅打包时，但 next build 已生成 static）
+#   解决方案：删除 `npm install --omit=dev` 行 + 冗余的 tailwind COPY（构建时已内嵌到 .next/static）。
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
@@ -90,18 +99,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.server.json ./
 
-# 复制tailwind和postcss配置
-COPY --from=builder --chown=nextjs:nodejs /app/tailwind.config.ts ./
-COPY --from=builder --chown=nextjs:nodejs /app/postcss.config.mjs ./
-
-# 复制node_modules中的prisma和tailwindcss
+# 复制 Prisma 客户端（standalone 不会追踪这些动态加载文件）
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@tailwindcss ./node_modules/@tailwindcss
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_modules/tailwindcss
-
-# 安装生产依赖
-RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts
 
 # 创建必要的目录并设置权限
 # addgroup nextjs root: 将 nextjs 加入 root 组，使 runner.sh 中的 ulimit 命令可执行。
