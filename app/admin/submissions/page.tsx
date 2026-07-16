@@ -18,53 +18,67 @@ interface Submission {
 }
 
 export default function AdminSubmissionsPage() {
- const router = useRouter()
- const [submissions, setSubmissions] = useState<Submission[]>([])
- const [loading, setLoading] = useState(true)
- const [error, setError] = useState('')
- const [searchQuery, setSearchQuery] = useState('')
- const [statusFilter, setStatusFilter] = useState('all')
- const [page, setPage] = useState(1)
- const [pageSize, setPageSize] = useState(20)
- const [totalPages, setTotalPages] = useState(1)
- const [total, setTotal] = useState(0)
+  const router = useRouter()
+  const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalByStatus, setTotalByStatus] = useState<Record<string, number>>({})
 
- useEffect(() => {
- fetchSubmissions()
- }, [page, statusFilter, pageSize])
+  // 分段按钮分组定义：key → 发送给 API 的 status 值（逗号分隔表示多状态）
+  const statusGroups: { key: string; label: string; status: string }[] = [
+    { key: 'all', label: '全部', status: 'all' },
+    { key: 'ac', label: '通过', status: 'AC' },
+    { key: 'failed', label: '失败', status: 'WA,TLE,MLE,CE,RE' },
+    { key: 'pending', label: '等待', status: 'PENDING' },
+  ]
 
- const fetchSubmissions = async () => {
- try {
- setLoading(true)
- const params = new URLSearchParams({
- page: String(page),
- pageSize: String(pageSize),
- ...(statusFilter !== 'all' && { status: statusFilter })
- })
- 
- const response = await fetchWithAuth(`/api/admin/submissions?${params}`)
+  useEffect(() => {
+    fetchSubmissions()
+  }, [page, statusFilter, pageSize])
 
- if (response.status === 403) {
- setError('需要管理员权限')
- setTimeout(() => router.push('/'), 2000)
- return
- }
+  const fetchSubmissions = async () => {
+    try {
+      setLoading(true)
+      const group = statusGroups.find((g) => g.key === statusFilter)
+      const apiStatus = group?.status ?? 'all'
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(apiStatus !== 'all' && { status: apiStatus })
+      })
 
- const data = await response.json()
- if (data.success) {
- const submissionsData = data.data?.submissions || data.data || []
- setSubmissions(Array.isArray(submissionsData) ? submissionsData : [])
- setTotal(data.data?.total || data.total || submissionsData.length || 0)
- setTotalPages(data.data?.totalPages || Math.ceil((data.data?.total || data.total || submissionsData.length || 0) / pageSize))
- } else {
- setError(data.error || '获取提交记录失败')
- }
- } catch (err) {
- setError('网络错误')
- } finally {
- setLoading(false)
- }
- }
+      const response = await fetchWithAuth(`/api/admin/submissions?${params}`)
+
+      if (response.status === 403) {
+        setError('需要管理员权限')
+        setTimeout(() => router.push('/403'), 2000)
+        return
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        const submissionsData = data.data?.submissions || data.data || []
+        setSubmissions(Array.isArray(submissionsData) ? submissionsData : [])
+        setTotal(data.data?.total || data.total || submissionsData.length || 0)
+        setTotalPages(data.data?.totalPages || Math.ceil((data.data?.total || data.total || submissionsData.length || 0) / pageSize))
+        if (data.data?.totalByStatus) {
+          setTotalByStatus(data.data.totalByStatus)
+        }
+      } else {
+        setError(data.error || '获取提交记录失败')
+      }
+    } catch (err) {
+      setError('网络错误')
+    } finally {
+      setLoading(false)
+    }
+  }
 
  const getStatusIcon = (status: string) => {
  switch (status) {
@@ -96,6 +110,9 @@ export default function AdminSubmissionsPage() {
  submission.problem?.title?.toLowerCase().includes(searchQuery.toLowerCase())
  return matchesSearch
  }) : []
+
+ // 全局总提交数：各状态计数之和（不受当前状态筛选影响），用于统计卡显示全局数字
+ const globalTotal = Object.values(totalByStatus).reduce((sum, n) => sum + n, 0)
 
  const columns: Column<Submission>[] = [
  {
@@ -212,50 +229,52 @@ export default function AdminSubmissionsPage() {
  />
  </div>
  </div>
- <select
- value={statusFilter}
- onChange={(e) => {
- setStatusFilter(e.target.value)
- setPage(1)
- }}
- className="input w-auto"
- >
- <option value="all">全部状态</option>
- <option value="AC">通过</option>
- <option value="WA">答案错误</option>
- <option value="TLE">时间超限</option>
- <option value="MLE">内存超限</option>
- <option value="CE">编译错误</option>
- <option value="RE">运行错误</option>
- <option value="PENDING">等待评测</option>
- </select>
+ <div className="flex gap-1 p-1 rounded-lg bg-muted">
+			{statusGroups.map((group) => (
+				<button
+					key={group.key}
+					type="button"
+					onClick={() => {
+						setStatusFilter(group.key)
+						setPage(1)
+					}}
+					className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+						statusFilter === group.key
+							? 'bg-primary text-white'
+							: 'text-muted-foreground hover:text-foreground'
+					}`}
+				>
+					{group.label}
+				</button>
+			))}
+		</div>
  </div>
  </div>
 
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">总提交数</div>
- <div className="text-2xl font-bold text-foreground mt-1">{total}</div>
- </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">通过</div>
- <div className="text-2xl font-bold text-secondary mt-1">
- {submissions.filter(s => s.status === 'AC').length}
- </div>
- </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">错误</div>
- <div className="text-2xl font-bold text-error mt-1">
- {submissions.filter(s => ['WA', 'RE', 'CE', 'TLE', 'MLE'].includes(s.status)).length}
- </div>
- </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">等待评测</div>
- <div className="text-2xl font-bold text-info mt-1">
- {submissions.filter(s => s.status === 'PENDING').length}
- </div>
- </div>
- </div>
+		<div className="card p-4">
+			<div className="text-muted-foreground text-sm">总提交数</div>
+			<div className="text-2xl font-bold text-foreground mt-1">{globalTotal}</div>
+		</div>
+		<div className="card p-4">
+			<div className="text-muted-foreground text-sm">通过 (AC)</div>
+			<div className="text-2xl font-bold text-secondary mt-1">
+				{totalByStatus['AC'] || 0}
+			</div>
+		</div>
+		<div className="card p-4">
+			<div className="text-muted-foreground text-sm">错误</div>
+			<div className="text-2xl font-bold text-error mt-1">
+				{(['WA', 'RE', 'CE', 'TLE', 'MLE'] as const).reduce((sum, s) => sum + (totalByStatus[s] || 0), 0)}
+			</div>
+		</div>
+		<div className="card p-4">
+			<div className="text-muted-foreground text-sm">等待评测</div>
+			<div className="text-2xl font-bold text-info mt-1">
+				{totalByStatus['PENDING'] || 0}
+			</div>
+		</div>
+	</div>
 
  <DataTable
  data={filteredSubmissions}
@@ -263,7 +282,7 @@ export default function AdminSubmissionsPage() {
  idKey="id"
  loading={loading}
  emptyMessage={searchQuery || statusFilter !== 'all' ? '没有找到匹配的记录' : '暂无提交记录'}
- onRowClick={(row) => router.push(`/submission/${row.id}`)}
+ onRowClick={(row) => router.push(`/admin/submissions/${row.id}`)}
  pagination={{
  page,
  pageSize,

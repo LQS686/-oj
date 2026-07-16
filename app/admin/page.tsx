@@ -2,18 +2,24 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import {
- Users,
- FileText,
- Send,
- TrendingUp,
- Activity,
- CheckCircle,
- XCircle,
- Clock,
- ArrowRight
+  Users,
+  FileText,
+  Send,
+  TrendingUp,
+  Activity,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ArrowRight,
+  Bot,
+  Plus,
+  Trophy,
+  Sparkles,
+  UserPlus
 } from 'lucide-react'
 
 interface DashboardStats {
@@ -30,6 +36,13 @@ interface DashboardStats {
  status: string
  submittedAt: string
  }>
+ aiToday: {
+ pending: number
+ processing: number
+ completed: number
+ failed: number
+ totalTokens: number
+ }
 }
 
 export default function AdminDashboard() {
@@ -47,7 +60,7 @@ export default function AdminDashboard() {
  if (!response.ok) {
  if (response.status === 403) {
  setError('需要管理员权限')
- setTimeout(() => router.push('/'), 2000)
+ setTimeout(() => router.push('/403'), 2000)
  return
  }
  setError(data.error || '加载失败')
@@ -227,6 +240,116 @@ export default function AdminDashboard() {
  </div>
  </div>
  </div>
+
+ <Link
+ href="/admin/ai-monitor"
+ className="card p-6 group lg:col-span-4 hover:border-primary/40 transition-colors cursor-pointer"
+ >
+ <div className="flex items-center justify-between mb-4">
+ <div className="flex items-center gap-3">
+ <div>
+ <p className="text-sm text-muted-foreground mb-1">AI 任务（今日）</p>
+ <p className="text-3xl font-bold text-foreground">
+ {(stats?.aiToday?.pending || 0) +
+ (stats?.aiToday?.processing || 0) +
+ (stats?.aiToday?.completed || 0) +
+ (stats?.aiToday?.failed || 0)}
+ </p>
+ <p className="text-sm text-muted-foreground mt-2">
+ Token 消耗：{(stats?.aiToday?.totalTokens || 0).toLocaleString()}
+ </p>
+ </div>
+ </div>
+ <div className="flex items-center gap-3">
+ <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+ style={{ background: 'rgba(139, 92, 246, 0.1)' }}>
+ <Bot className="w-6 h-6 text-primary" />
+ </div>
+ <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+ </div>
+ </div>
+ <div className="grid grid-cols-4 gap-3">
+ <div className="text-center">
+ <p className="text-xs text-muted-foreground mb-1">待处理</p>
+ <p className="text-xl font-bold text-primary-light">{stats?.aiToday?.pending || 0}</p>
+ </div>
+ <div className="text-center">
+ <p className="text-xs text-muted-foreground mb-1">处理中</p>
+ <p className="text-xl font-bold text-accent-light">{stats?.aiToday?.processing || 0}</p>
+ </div>
+ <div className="text-center">
+ <p className="text-xs text-muted-foreground mb-1">已完成</p>
+ <p className="text-xl font-bold text-secondary-light">{stats?.aiToday?.completed || 0}</p>
+ </div>
+ <div className="text-center">
+ <p className="text-xs text-muted-foreground mb-1">失败</p>
+ <p className="text-xl font-bold text-error">{stats?.aiToday?.failed || 0}</p>
+ </div>
+ </div>
+ </Link>
+ </div>
+
+ <div className="space-y-4">
+ <h3 className="text-lg font-bold text-foreground">快捷操作</h3>
+ <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+ <Link
+ href="/admin/problems/create"
+ className="card p-5 group hover:border-primary/40 transition-colors cursor-pointer flex items-center gap-3"
+ >
+ <div
+ className="w-10 h-10 rounded-xl flex items-center justify-center"
+ style={{ background: 'rgba(59, 130, 246, 0.1)' }}
+ >
+ <Plus className="w-5 h-5 text-primary" />
+ </div>
+ <div>
+ <p className="text-sm font-semibold text-foreground">创建题目</p>
+ <p className="text-xs text-muted-foreground">新增编程题目</p>
+ </div>
+ </Link>
+
+ <Link
+ href="/admin/contests/create"
+ className="card p-5 group hover:border-primary/40 transition-colors cursor-pointer flex items-center gap-3"
+ >
+ <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
+ <Trophy className="w-5 h-5 text-secondary" />
+ </div>
+ <div>
+ <p className="text-sm font-semibold text-foreground">创建竞赛</p>
+ <p className="text-xs text-muted-foreground">发起一场竞赛</p>
+ </div>
+ </Link>
+
+ <Link
+ href="/admin/ai-generation"
+ className="card p-5 group hover:border-primary/40 transition-colors cursor-pointer flex items-center gap-3"
+ >
+ <div
+ className="w-10 h-10 rounded-xl flex items-center justify-center"
+ style={{ background: 'rgba(139, 92, 246, 0.1)' }}
+ >
+ <Sparkles className="w-5 h-5 text-primary" />
+ </div>
+ <div>
+ <p className="text-sm font-semibold text-foreground">AI 出题</p>
+ <p className="text-xs text-muted-foreground">智能生成题目</p>
+ </div>
+ </Link>
+
+ <Link
+ href="/admin/users"
+ className="card p-5 group hover:border-primary/40 transition-colors cursor-pointer flex items-center gap-3"
+ >
+ <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+ <UserPlus className="w-5 h-5 text-accent" />
+ </div>
+ <div>
+ <p className="text-sm font-semibold text-foreground">批量注册</p>
+ <p className="text-xs text-muted-foreground">用户管理</p>
+ </div>
+ </Link>
+ </div>
  </div>
 
  <div className="space-y-4">
@@ -244,7 +367,7 @@ export default function AdminDashboard() {
  columns={recentSubmissionColumns}
  idKey="id"
  emptyMessage="暂无提交记录"
- onRowClick={(row) => router.push(`/submission/${row.id}`)}
+ onRowClick={(row) => router.push(`/admin/submissions/${row.id}`)}
  />
  </div>
  </div>

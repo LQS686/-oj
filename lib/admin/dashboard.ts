@@ -12,6 +12,14 @@ export interface DashboardRecentSubmission {
   submittedAt: Date
 }
 
+export interface DashboardAiToday {
+  pending: number
+  processing: number
+  completed: number
+  failed: number
+  totalTokens: number
+}
+
 export interface DashboardData {
   totalUsers: number
   totalProblems: number
@@ -20,6 +28,7 @@ export interface DashboardData {
   userGrowth: number
   submissionGrowth: number
   recentSubmissions: DashboardRecentSubmission[]
+  aiToday: DashboardAiToday
 }
 
 /**
@@ -78,15 +87,40 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
   const lastWeek = new Date(now)
   lastWeek.setDate(lastWeek.getDate() - 7)
 
-  const [todaySubmissions, newUsersThisWeek, newSubmissionsThisWeek] = await Promise.all([
+  const [
+    todaySubmissions,
+    newUsersThisWeek,
+    newSubmissionsThisWeek,
+    aiPending,
+    aiProcessing,
+    aiCompleted,
+    aiFailed,
+    aiTokensAgg,
+  ] = await Promise.all([
     prisma.submission.count({ where: { submittedAt: { gte: today } } }),
     prisma.user.count({ where: { createdAt: { gte: lastWeek } } }),
     prisma.submission.count({ where: { submittedAt: { gte: lastWeek } } }),
+    prisma.aiGenerationLog.count({ where: { status: 'PENDING', createdAt: { gte: today } } }),
+    prisma.aiGenerationLog.count({ where: { status: 'PROCESSING', createdAt: { gte: today } } }),
+    prisma.aiGenerationLog.count({ where: { status: 'COMPLETED', createdAt: { gte: today } } }),
+    prisma.aiGenerationLog.count({ where: { status: 'FAILED', createdAt: { gte: today } } }),
+    prisma.aiGenerationLog.aggregate({
+      where: { createdAt: { gte: today } },
+      _sum: { tokensUsed: true },
+    }),
   ])
 
   const userGrowth = totalUsers > 0 ? Number(((newUsersThisWeek / totalUsers) * 100).toFixed(1)) : 0
   const submissionGrowth =
     totalSubmissions > 0 ? Number(((newSubmissionsThisWeek / totalSubmissions) * 100).toFixed(1)) : 0
+
+  const aiToday: DashboardAiToday = {
+    pending: aiPending,
+    processing: aiProcessing,
+    completed: aiCompleted,
+    failed: aiFailed,
+    totalTokens: aiTokensAgg._sum.tokensUsed ?? 0,
+  }
 
   return {
     totalUsers,
@@ -96,5 +130,6 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
     userGrowth,
     submissionGrowth,
     recentSubmissions,
+    aiToday,
   }
 }

@@ -294,10 +294,12 @@ export interface ListAdminSubmissionsResult {
   page: number
   pageSize: number
   totalPages: number
+  totalByStatus: Record<string, number>
 }
 
 /**
  * 管理员提交记录列表（带 user/problem enrich）
+ * status 参数支持逗号分隔的多状态（如 "WA,TLE,MLE,CE,RE"）
  */
 export async function listAdminSubmissions(filter: {
   page?: number
@@ -308,7 +310,23 @@ export async function listAdminSubmissions(filter: {
   const pageSize = filter.pageSize ?? 50
   const where: any = {}
   if (filter.status && filter.status !== 'all') {
-    where.status = filter.status
+    const statuses = filter.status.split(',').map((s) => s.trim()).filter(Boolean)
+    if (statuses.length === 1) {
+      where.status = statuses[0]
+    } else if (statuses.length > 1) {
+      where.status = { in: statuses }
+    }
+  }
+  // 全局状态统计（不受 status 筛选影响），用于前端统计卡显示全局数字
+  const statusGroups = await prisma.submission.groupBy({
+    by: ['status'],
+    _count: { _all: true },
+  })
+  const totalByStatus: Record<string, number> = {}
+  let globalTotal = 0
+  for (const g of statusGroups) {
+    totalByStatus[g.status] = g._count._all
+    globalTotal += g._count._all
   }
   const [total, submissionsRaw] = await Promise.all([
     prisma.submission.count({ where }),
@@ -334,6 +352,8 @@ export async function listAdminSubmissions(filter: {
       },
     }),
   ])
+  // 当无状态筛选时，total 应等于全局总数；用统计结果覆盖以避免分页漂移
+  const finalTotal = !filter.status || filter.status === 'all' ? globalTotal : total
   // 批量查询用户和题目信息，避免 N+1（原每条提交 2 次查询，pageSize=50 时 100 次往返）
   const userIds = [...new Set(submissionsRaw.map((s: any) => s.userId).filter(Boolean))]
   const problemIds = [...new Set(submissionsRaw.map((s: any) => s.problemId).filter(Boolean))]
@@ -368,9 +388,10 @@ export async function listAdminSubmissions(filter: {
   }))
   return {
     submissions,
-    total,
+    total: finalTotal,
     page,
     pageSize,
-    totalPages: Math.ceil(total / pageSize),
+    totalPages: Math.ceil(finalTotal / pageSize),
+    totalByStatus,
   }
 }

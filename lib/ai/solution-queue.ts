@@ -74,6 +74,18 @@ class SolutionQueue extends EventEmitter {
   /** 最大并发数（默认 2，可通过 AI_SOLUTION_MAX_CONCURRENT 环境变量覆盖） */
   private maxConcurrent = parseInt(process.env.AI_SOLUTION_MAX_CONCURRENT || '2', 10)
 
+  /**
+   * 暴露队列运行时状态，供管理端监控接口读取
+   * 不抛异常：队列空时返回全 0（maxConcurrent 仍返回当前配置值）
+   */
+  getStatus(): { waiting: number; active: number; maxConcurrent: number } {
+    return {
+      waiting: this.queue.length,
+      active: this.processing.size,
+      maxConcurrent: this.maxConcurrent,
+    }
+  }
+
   async add(data: SolutionJob): Promise<string> {
     // P1：User-level rate limit
     //   检查最近 10 分钟内该用户的入队次数，超过上限拒绝。

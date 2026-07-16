@@ -8,8 +8,8 @@ import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
 import {
   LayoutDashboard,
   FileText,
+  FileCode,
   Users,
-  Shield,
   Settings,
   LogOut,
   Menu,
@@ -22,7 +22,8 @@ import {
   User,
   ChevronDown,
   Cpu,
-  BookOpen
+  BookOpen,
+  Activity
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
@@ -42,12 +43,18 @@ interface AdminLayoutProps {
 
 const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
   {
+    label: 'AI 助手',
+    items: [
+      { icon: Sparkles, label: 'AI 智能出题', href: '/admin/ai-generation' },
+      { icon: Cpu, label: 'AI 模型管理', href: '/admin/ai-models' },
+      { icon: Activity, label: 'AI 任务监控', href: '/admin/ai-monitor', systemAdminOnly: true },
+    ]
+  },
+  {
     label: '内容管理',
     items: [
       { icon: LayoutDashboard, label: '仪表盘', href: '/admin' },
       { icon: FileText, label: '题目管理', href: '/admin/problems' },
-      { icon: Sparkles, label: 'AI 智能出题', href: '/admin/ai-generation' },
-      { icon: Cpu, label: 'AI 模型管理', href: '/admin/ai-models' },
     ]
   },
   {
@@ -63,7 +70,7 @@ const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
   {
     label: '系统管理',
     items: [
-      { icon: Shield, label: '提交记录', href: '/admin/submissions' },
+      { icon: FileCode, label: '提交记录', href: '/admin/submissions' },
       { icon: Settings, label: '系统设置', href: '/admin/settings', systemAdminOnly: true },
     ]
   }

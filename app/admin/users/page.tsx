@@ -6,7 +6,7 @@ import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { isSystemAdmin } from '@/lib/permissions'
-import { Users, Search, Shield, User, Mail, Calendar, MoreHorizontal, Edit, Trash2, ShieldCheck, ShieldOff, UserPlus, Upload, X, Plus, CheckSquare, Square, FileText, AlertCircle, CheckCircle, Loader2, Download, KeyRound } from 'lucide-react'
+import { Users, Search, Shield, User, Mail, Calendar, MoreHorizontal, Edit, Trash2, ShieldCheck, ShieldOff, UserPlus, Upload, X, Plus, CheckSquare, Square, FileText, AlertCircle, CheckCircle, Loader2, Download, KeyRound, TrendingUp } from 'lucide-react'
 
 /**
  * 本地角色展示映射（四级角色体系：SYSTEM_ADMIN / ADMIN / TEACHER / STUDENT）
@@ -25,6 +25,32 @@ function getRoleDisplay(role?: string) {
  if (role === 'TEACHER') return ROLE_DISPLAY.TEACHER
  if (role === 'STUDENT') return ROLE_DISPLAY.STUDENT
  return ROLE_DISPLAY.STUDENT
+}
+
+/**
+ * 角色展示顺序（用于统计卡的角色分布横向条形）。
+ * 与 lib/permissions.ts 的旧 API 保持独立，避免污染权限系统实现。
+ */
+const ROLE_ORDER: string[] = ['SYSTEM_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT']
+
+const ROLE_BAR_COLOR: Record<string, string> = {
+ SYSTEM_ADMIN: 'bg-error',
+ ADMIN: 'bg-error',
+ TEACHER: 'bg-warning',
+ STUDENT: 'bg-info',
+}
+
+/**
+ * 计算最近 7 天内新增的用户数（本周增长）。
+ * 复用现有 users 数据，不引入新数据源。
+ */
+function getWeeklyGrowth(users: User[]): number {
+ const now = Date.now()
+ const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+ return users.filter(u => {
+ const created = new Date(u.createdAt).getTime()
+ return !isNaN(created) && now - created <= sevenDaysMs
+ }).length
 }
 
 interface User {
@@ -109,7 +135,7 @@ export default function AdminUsersPage() {
 
  if (response.status === 403) {
  setError('需要管理员权限')
- setTimeout(() => router.push('/'), 2000)
+ setTimeout(() => router.push('/403'), 2000)
  return
  }
 
@@ -630,33 +656,44 @@ export default function AdminUsersPage() {
  </button>
  </div>
 
- <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
  <div className="card p-4">
  <div className="text-muted-foreground text-sm">总用户数</div>
- <div className="text-2xl font-bold text-foreground mt-1">{users.length}</div>
+ <div className="text-3xl font-bold text-foreground mt-1">{users.length}</div>
+ {(() => {
+ const weeklyGrowth = getWeeklyGrowth(users)
+ if (weeklyGrowth <= 0) return null
+ return (
+ <div className="text-xs text-secondary-light mt-2 flex items-center gap-1">
+ <TrendingUp className="w-3 h-3" />
+ 本周新增 {weeklyGrowth} 人
+ </div>
+ )
+ })()}
  </div>
  <div className="card p-4">
- <div className="text-muted-foreground text-sm">系统管理员</div>
- <div className="text-2xl font-bold text-error mt-1">
- {users.filter(u => getUserRole(u) === 'SYSTEM_ADMIN').length}
+ <div className="text-muted-foreground text-sm mb-2">角色分布</div>
+ <div className="space-y-2">
+ {ROLE_ORDER.map(role => {
+ const count = users.filter(u => getUserRole(u) === role).length
+ const percent = users.length > 0 ? (count / users.length) * 100 : 0
+ const display = getRoleDisplay(role)
+ const barColor = ROLE_BAR_COLOR[role] || 'bg-primary'
+ return (
+ <div key={role} className="flex items-center gap-2">
+ <div className="w-20 text-xs text-muted-foreground shrink-0">{display.label}</div>
+ <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+ <div
+ className={`h-full ${barColor} transition-all duration-300`}
+ style={{ width: `${percent}%` }}
+ />
+ </div>
+ <div className="w-20 text-xs text-foreground text-right shrink-0">
+ {count} <span className="text-muted-foreground">({percent.toFixed(0)}%)</span>
  </div>
  </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">管理员</div>
- <div className="text-2xl font-bold text-warning mt-1">
- {users.filter(u => getUserRole(u) === 'ADMIN').length}
- </div>
- </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">教师</div>
- <div className="text-2xl font-bold text-accent-light mt-1">
- {users.filter(u => getUserRole(u) === 'TEACHER').length}
- </div>
- </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">学生</div>
- <div className="text-2xl font-bold text-info mt-1">
- {users.filter(u => getUserRole(u) === 'STUDENT').length}
+ )
+ })}
  </div>
  </div>
  </div>
@@ -675,17 +712,27 @@ export default function AdminUsersPage() {
  />
  </div>
  </div>
- <select
- value={roleFilter}
- onChange={(e) => setRoleFilter(e.target.value)}
- className="input w-auto"
+ <div className="flex gap-1 p-1 rounded-lg bg-muted">
+ {[
+ { id: 'all', label: '全部' },
+ { id: 'SYSTEM_ADMIN', label: '系统管理员' },
+ { id: 'ADMIN', label: '管理员' },
+ { id: 'TEACHER', label: '教师' },
+ { id: 'STUDENT', label: '学生' }
+ ].map(tab => (
+ <button
+ key={tab.id}
+ onClick={() => setRoleFilter(tab.id)}
+ className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+ roleFilter === tab.id
+ ? 'bg-primary text-foreground'
+ : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+ }`}
  >
- <option value="all">全部角色</option>
- <option value="SYSTEM_ADMIN">系统管理员</option>
- <option value="ADMIN">管理员</option>
- <option value="TEACHER">教师</option>
- <option value="STUDENT">学生</option>
- </select>
+ {tab.label}
+ </button>
+ ))}
+ </div>
  </div>
  </div>
 
@@ -695,7 +742,14 @@ export default function AdminUsersPage() {
  idKey="id"
  key={tableKey}
  emptyMessage={searchQuery || roleFilter !== 'all' ? '没有找到匹配的用户' : '暂无用户'}
- onRowClick={(row) => router.push(`/admin/users/${row.id}`)}
+ onRowClick={(row) => {
+ // 与编辑按钮一致的锁定判断：系统管理员 / （非系统管理员操作时的）管理员不可编辑
+ const locked = row.role === 'SYSTEM_ADMIN' || (!operatorIsSystemAdmin && row.role === 'ADMIN')
+ if (locked) return
+ setSelectedUser(row)
+ setEditRole(getUserRole(row))
+ setShowEditModal(true)
+ }}
  batchActions={[
  { label: '批量修改角色', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchEditModal(true) } },
  { label: '批量删除', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchDeleteModal(true) }, danger: true },

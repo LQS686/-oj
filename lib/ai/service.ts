@@ -46,6 +46,70 @@ export async function listRecentAiLogs(userId: string, take = 20) {
 }
 
 /**
+ * AI 日志 + 关联用户名（跨用户查询用）
+ */
+export type AiLogWithUser = Prisma.AiGenerationLogGetPayload<{
+  include: { user: { select: { username: true } } }
+}>
+
+/**
+ * 列出全部用户的 AI 生成日志（管理员视角，跨用户）
+ * - 按 createdAt 降序
+ * - 支持可选的 status / userId / model 过滤
+ *   （AiGenerationLog 没有独立 model 列，modelId 存在 params JSON 中；
+ *    当前 Prisma 客户端的 JsonFilter 不支持 path 过滤，model 过滤在内存中完成）
+ * - 分页 + 返回 totalCount
+ */
+export async function listAllAiLogs(filters: {
+  status?: string
+  userId?: string
+  model?: string
+  page: number
+  pageSize?: number
+}): Promise<{ items: AiLogWithUser[]; totalCount: number }> {
+  const page = Math.max(1, Math.floor(filters.page))
+  const pageSize = Math.max(1, filters.pageSize ?? 20)
+
+  const where: Prisma.AiGenerationLogWhereInput = {}
+  if (filters.status) {
+    where.status = filters.status
+  }
+  if (filters.userId) {
+    where.userId = filters.userId
+  }
+
+  // model 存在 params.modelId JSON 字段中，JsonFilter 不支持 path 过滤，
+  // 需要把 status/userId 过滤后的记录取回内存再过滤 + 分页
+  if (filters.model) {
+    const all = await prisma.aiGenerationLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { username: true } } },
+    })
+    const filtered = all.filter(
+      (log) => (log.params as Record<string, unknown> | null)?.modelId === filters.model
+    )
+    return {
+      items: filtered.slice((page - 1) * pageSize, page * pageSize),
+      totalCount: filtered.length,
+    }
+  }
+
+  const [items, totalCount] = await Promise.all([
+    prisma.aiGenerationLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { user: { select: { username: true } } },
+    }),
+    prisma.aiGenerationLog.count({ where }),
+  ])
+
+  return { items, totalCount }
+}
+
+/**
  * 获取单条 AI 生成日志
  */
 export async function getAiLogById(logId: string) {

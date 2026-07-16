@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Briefcase, Search, Eye, EyeOff, Trash2 } from 'lucide-react'
+import { Briefcase, Plus, Search, Eye, EyeOff, Trash2 } from 'lucide-react'
 
 interface Class {
  id: string
@@ -26,6 +26,10 @@ export default function AdminClassesPage() {
  const [searchQuery, setSearchQuery] = useState('')
  const [selectedClass, setSelectedClass] = useState<Class | null>(null)
  const [showDeleteModal, setShowDeleteModal] = useState(false)
+ const [showEditModal, setShowEditModal] = useState(false)
+ const [editName, setEditName] = useState('')
+ const [editDescription, setEditDescription] = useState('')
+ const [saving, setSaving] = useState(false)
 
  useEffect(() => {
  fetchClasses()
@@ -38,7 +42,7 @@ export default function AdminClassesPage() {
 
  if (response.status === 403) {
  setError('需要管理员权限')
- setTimeout(() => router.push('/'), 2000)
+ setTimeout(() => router.push('/403'), 2000)
  return
  }
 
@@ -93,6 +97,37 @@ export default function AdminClassesPage() {
  }
  } catch (err) {
  alert('网络错误')
+ }
+ }
+
+ const handleEditClass = async () => {
+ if (!selectedClass) return
+
+ if (!editName.trim()) {
+ alert('班级名称不能为空')
+ return
+ }
+
+ setSaving(true)
+ try {
+ const response = await fetchWithAuth(`/api/admin/classes/${selectedClass.id}`, {
+ method: 'PATCH',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ name: editName, description: editDescription })
+ })
+
+ const data = await response.json()
+ if (data.success) {
+ setShowEditModal(false)
+ setSelectedClass(null)
+ fetchClasses()
+ } else {
+ alert(data.error || '保存失败')
+ }
+ } catch (err) {
+ alert('网络错误')
+ } finally {
+ setSaving(false)
  }
  }
 
@@ -205,6 +240,7 @@ export default function AdminClassesPage() {
 
 return (<>
  <div className="space-y-6">
+ <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
  <div className="flex items-center gap-3">
  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
  style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
@@ -214,6 +250,14 @@ return (<>
  <h1 className="text-2xl font-bold text-foreground">班级管理</h1>
  <p className="text-sm text-muted-foreground">管理平台班级和成员</p>
  </div>
+ </div>
+ <button
+ onClick={() => router.push('/admin/classes/create')}
+ className="btn btn-primary flex items-center gap-2"
+ >
+ <Plus className="w-5 h-5" />
+ 新建班级
+ </button>
  </div>
 
  <div className="card p-4">
@@ -257,9 +301,61 @@ return (<>
  columns={columns}
  idKey="id"
  emptyMessage={searchQuery ? '没有找到匹配的班级' : '暂无班级'}
- onRowClick={(row) => router.push(`/admin/classes/${row.id}`)}
+ onRowClick={(row) => {
+ setSelectedClass(row)
+ setEditName(row.name)
+ setEditDescription(row.description || '')
+ setShowEditModal(true)
+ }}
  />
  </div>
+
+ {showEditModal && selectedClass && (
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+ <div className="card p-6 max-w-md w-full mx-4">
+ <h3 className="text-lg font-bold text-foreground mb-4">编辑班级</h3>
+ <div className="mb-4">
+ <label className="block text-sm font-medium text-muted-foreground mb-2">班级名称</label>
+ <input
+ type="text"
+ value={editName}
+ onChange={(e) => setEditName(e.target.value)}
+ placeholder="请输入班级名称"
+ className="input"
+ />
+ </div>
+ <div className="mb-6">
+ <label className="block text-sm font-medium text-muted-foreground mb-2">描述</label>
+ <textarea
+ value={editDescription}
+ onChange={(e) => setEditDescription(e.target.value)}
+ placeholder="请输入班级描述"
+ rows={3}
+ className="input resize-none"
+ />
+ </div>
+ <div className="flex gap-3 justify-end">
+ <button
+ onClick={() => {
+ setShowEditModal(false)
+ setSelectedClass(null)
+ }}
+ disabled={saving}
+ className="btn btn-ghost"
+ >
+ 取消
+ </button>
+ <button
+ onClick={handleEditClass}
+ disabled={saving}
+ className="btn btn-primary"
+ >
+ {saving ? '保存中...' : '保存'}
+ </button>
+ </div>
+ </div>
+ </div>
+ )}
 
  {showDeleteModal && selectedClass && (
  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

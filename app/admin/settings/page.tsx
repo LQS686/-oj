@@ -40,7 +40,7 @@ export default function AdminSettingsPage() {
 
  if (response.status === 403) {
  setError('需要管理员权限')
- setTimeout(() => router.push('/'), 2000)
+ setTimeout(() => router.push('/403'), 2000)
  return
  }
 

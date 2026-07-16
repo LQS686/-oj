@@ -2250,6 +2250,35 @@ export async function adminUpdateClassVisibility(classId: string, isPublic: bool
   return isPublic ? '班级已设为公开' : '班级已设为私有'
 }
 
+/**
+ * 管理员更新班级信息（名称 / 描述 / 可见性）
+ * 仅传入的字段会被更新；若只更新可见性，保留原有提示文案以保持向后兼容。
+ */
+export async function adminUpdateClass(
+  classId: string,
+  data: { isPublic?: boolean; name?: string; description?: string | null }
+) {
+  const classData = await prisma.class.findUnique({ where: { id: classId } })
+  if (!classData) {
+    throw new ApiError('NOT_FOUND', '班级不存在', 404)
+  }
+
+  const updateData: { isPublic?: boolean; name?: string; description?: string | null } = {}
+  if (data.isPublic !== undefined) updateData.isPublic = data.isPublic
+  if (data.name !== undefined) updateData.name = data.name.trim()
+  if (data.description !== undefined) updateData.description = data.description
+
+  await prisma.class.update({ where: { id: classId }, data: updateData })
+
+  // 仅切换可见性时保留原提示文案
+  const onlyVisibility =
+    data.isPublic !== undefined && data.name === undefined && data.description === undefined
+  if (onlyVisibility) {
+    return data.isPublic ? '班级已设为公开' : '班级已设为私有'
+  }
+  return '班级信息更新成功'
+}
+
 /** 管理员删除班级 */
 export async function adminDeleteClass(classId: string) {
   await prisma.class.delete({ where: { id: classId } })

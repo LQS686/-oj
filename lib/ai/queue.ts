@@ -83,6 +83,18 @@ class AiQueue extends EventEmitter {
     super()
   }
 
+  /**
+   * 暴露队列运行时状态，供管理端监控接口读取
+   * 不抛异常：队列空时返回全 0（maxConcurrent 仍返回当前配置值）
+   */
+  getStatus(): { waiting: number; active: number; maxConcurrent: number } {
+    return {
+      waiting: this.queue.length,
+      active: this.processing.size,
+      maxConcurrent: this.maxConcurrent,
+    }
+  }
+
   async add(data: AiJob): Promise<string> {
     // P1：User-level rate limit（防止单用户刷大量 AI 出题任务）
     const since = new Date(Date.now() - AI_USER_LIMIT_WINDOW_MS)
