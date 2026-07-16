@@ -11,8 +11,14 @@ import { canTransition as canSubmissionTransition } from '@/lib/constants/submis
 
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL
-  if (!url && process.env.NODE_ENV === 'production') {
-    throw new Error('生产环境必须设置 DATABASE_URL 环境变量')
+  if (!url) {
+    // 构建阶段跳过（next build 时 NEXT_PHASE=phase-production-build）
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      return 'mongodb://localhost:27017/oj_platform'
+    }
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('生产环境必须设置 DATABASE_URL 环境变量')
+    }
   }
   return url || 'mongodb://localhost:27017/oj_platform?replicaSet=rs0'
 }

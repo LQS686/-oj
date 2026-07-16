@@ -1,5 +1,2 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # pre-commit 钩子：lint-staged 自动 lint + typecheck 已暂存文件
 npx lint-staged

@@ -5,8 +5,16 @@ let redisClient: Redis | null = null
 
 function getRedisUrl(): string {
   const url = process.env.REDIS_URL
-  if (!url && process.env.NODE_ENV === 'production') {
-    throw new Error('生产环境必须设置 REDIS_URL 环境变量')
+  if (!url) {
+    // 构建阶段跳过（next build 时 NEXT_PHASE=phase-production-build）
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      return 'redis://localhost:6379'
+    }
+    if (process.env.NODE_ENV === 'production') {
+      // 运行时未配置 REDIS_URL：降级为 warn 而非 throw，避免构建/启动硬失败
+      // 实际连接失败会由 ioredis 的 error 事件捕获并记录
+      logger.warn('⚠️ [配置] 生产环境未设置 REDIS_URL，使用默认值 redis://localhost:6379。请检查 .env / docker-compose 配置。')
+    }
   }
   return url || 'redis://localhost:6379'
 }
