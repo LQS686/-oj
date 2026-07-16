@@ -115,8 +115,10 @@ RUN npm config set registry https://registry.npmmirror.com && npm install --omit
 # 之前用 usermod -aG root，但 Alpine 默认不装 shadow 包（usermod 不存在）。
 # addgroup 是 BusyBox 内置命令，无需额外依赖。
 # 长期方案：改用 Docker 沙箱评测（USE_DOCKER=true）可避免此权限提升。
-RUN mkdir -p /app/temp /app/logs && \
-    chown -R nextjs:nodejs /app/temp /app/logs && \
+# public/uploads/avatars: 头像持久化目录，docker-compose 会挂载 volume 到此处，
+# 预创建并 chown 确保 nextjs 用户有写权限（volume 首次挂载时属主为 root，需要显式赋权）
+RUN mkdir -p /app/temp /app/logs /app/public/uploads/avatars && \
+    chown -R nextjs:nodejs /app/temp /app/logs /app/public/uploads && \
     addgroup nextjs root
 
 USER nextjs

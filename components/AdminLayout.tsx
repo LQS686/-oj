@@ -85,6 +85,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const canAccess = canAccessAdmin(user)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [avatarError, setAvatarError] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [notifications, setNotifications] = useState<(Notification & { message?: string })[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -363,7 +364,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-primary/10 transition-all duration-200 group"
                     aria-label="用户菜单"
                   >
-                    {user.avatar ? (
+                    {user.avatar && !avatarError ? (
                       <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
                         <img
                           src={user.avatar}
@@ -372,6 +373,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                           height={40}
                           className="object-cover w-full h-full"
                           loading="lazy"
+                          onError={() => setAvatarError(true)}
                         />
                       </div>
                     ) : (

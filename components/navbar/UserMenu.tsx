@@ -23,6 +23,7 @@ import Dropdown from '../common/Dropdown'
 export default function UserMenu() {
  const router = useRouter()
  const [unreadCount, setUnreadCount] = useState(0)
+ const [avatarError, setAvatarError] = useState(false)
  const { user, logout: contextLogout } = useUser()
 
  const canAccessAdminUser = canAccessAdmin(user)
@@ -142,7 +143,7 @@ export default function UserMenu() {
  className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-primary/10 transition-all duration-200 group"
  aria-label="用户菜单"
  >
- {user.avatar ? (
+ {user.avatar && !avatarError ? (
  <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
  <Image 
  src={user.avatar} 
@@ -151,14 +152,15 @@ export default function UserMenu() {
  height={40} 
  className="object-cover w-full h-full" 
  loading="lazy"
+ onError={() => setAvatarError(true)}
  />
  </div>
  ) : (
- <div className="avatar avatar-md">
-            <div className="avatar-fallback text-sm">
-             {user.username?.charAt(0).toUpperCase()}
-            </div>
-           </div>
+ <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
+ <div className="avatar-fallback text-sm">
+ {user.username?.charAt(0).toUpperCase()}
+ </div>
+ </div>
  )}
  <div className="hidden sm:flex flex-col items-start">
  <span className="text-sm font-semibold text-foreground leading-tight group-hover:text-primary-light transition-colors duration-300">

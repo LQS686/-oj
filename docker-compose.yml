@@ -40,6 +40,7 @@ services:
     volumes:
       - app_temp:/app/temp
       - app_logs:/app/logs
+      - app_uploads:/app/public/uploads
     logging:
       driver: "json-file"
       options:
@@ -126,6 +127,7 @@ volumes:
   redis_data:
   app_temp:
   app_logs:
+  app_uploads:
 
 networks:
   oj-network:
