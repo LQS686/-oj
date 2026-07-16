@@ -2,6 +2,31 @@ import type { NextRequest } from 'next/server';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
+/**
+ * 统一日志时间戳格式：本地时区 ISO 8601 带时区偏移
+ * 例：2026-07-16T14:09:49.182+08:00
+ *
+ * 选用本地时区（而非 UTC）原因：
+ *  - 运维查看后台日志时需快速对应本地时间，UTC 需心算偏移易误判
+ *  - 保留时区偏移（+08:00）既无歧义，又保持 ISO 8601 机器可读性
+ */
+export function formatLogTimestamp(date: Date = new Date()): string {
+  const offset = -date.getTimezoneOffset() // 分钟，东八区为 +480
+  const sign = offset >= 0 ? '+' : '-'
+  const abs = Math.abs(offset)
+  const offsetStr = `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`
+
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  const s = String(date.getSeconds()).padStart(2, '0')
+  const ms = String(date.getMilliseconds()).padStart(3, '0')
+
+  return `${y}-${m}-${d}T${h}:${min}:${s}.${ms}${offsetStr}`
+}
+
 export interface LogContext {
   requestId?: string;
   userId?: string;
@@ -116,7 +141,7 @@ class Logger {
   }
 
   private formatMessage(level: LogLevel, message: string, meta?: any, context?: LogContext) {
-    const timestamp = new Date().toISOString();
+    const timestamp = formatLogTimestamp();
     const mergedContext = redactValue({ ...this.defaultContext, ...context });
     return {
       timestamp,

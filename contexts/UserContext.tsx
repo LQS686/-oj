@@ -55,7 +55,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const login = useCallback((userData: User, token?: string) => {
     if (typeof window === 'undefined') return
     setUser(userData)
-    refreshUser()
+    void refreshUser()
   }, [refreshUser])
 
   const logout = useCallback(async () => {

@@ -23,13 +23,11 @@ export function optional(value: unknown): string | undefined {
   return String(value)
 }
 
-export function toInt(value: unknown, name: string, def = 0): number {
+export function toInt(value: string | undefined, name: string, def: number, min?: number): number {
   if (value === undefined || value === null || value === '') return def
-  const v = Number(value)
-  if (!Number.isFinite(v) || !Number.isInteger(v)) {
-    throw new ValidationError(`${name} 必须是整数`)
-  }
-  return v
+  const n = parseInt(value, 10)
+  if (isNaN(n)) return def
+  return min !== undefined ? Math.max(min, n) : n
 }
 
 export function toBool(value: unknown): boolean {

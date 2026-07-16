@@ -21,7 +21,7 @@ import { logger } from '@/lib/logger'
 function getClientIp(req: Request): string {
   const fwd = req.headers.get('x-forwarded-for')
   if (fwd) return fwd.split(',')[0]!.trim()
-  return req.headers.get('x-real-ip') || '0.0.0.0'
+  return req.headers.get('x-real-ip') || 'unknown'
 }
 
 export const GET = withApi.public(async (req, ctx) => {

@@ -1,6 +1,7 @@
 import { Clock, MemoryStick, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getStatusConfig } from '@/lib/status'
+import { formatDateTime } from '@/lib/utils'
 import type { Submission } from '@/types/models'
 import type { UserData } from '@/lib/api/auth'
 
@@ -117,7 +118,7 @@ export default function SubmissionList({
 
  {/* 提交时间 */}
  <div className="col-span-3 flex items-center justify-end text-sm text-muted-foreground">
- {new Date(sub.submittedAt).toLocaleString('zh-CN')}
+ {formatDateTime(sub.submittedAt)}
  </div>
  </div>
  )

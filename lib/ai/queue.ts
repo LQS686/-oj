@@ -134,7 +134,8 @@ class AiQueue extends EventEmitter {
 
     while (this.queue.length > 0 || this.processing.size > 0) {
       while (this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
-        const job = this.queue.shift()!
+        const job = this.queue.shift()
+        if (!job) break
         job.status = 'active'
         job.startedAt = new Date()
         this.processing.set(job.id, job)

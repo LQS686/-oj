@@ -203,7 +203,19 @@ export async function listSubmissionsAdvanced(
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { submittedAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        problemId: true,
+        userId: true,
+        language: true,
+        status: true,
+        score: true,
+        time: true,
+        memory: true,
+        passedTests: true,
+        totalTests: true,
+        message: true,
+        submittedAt: true,
         problem: { select: { id: true, title: true } },
         user: { select: { id: true, username: true, nickname: true } },
       },
@@ -230,7 +242,7 @@ export async function listSubmissionsAdvanced(
  * 提交详情：先查 Submission，找不到再回退到 ClassAssignmentSubmission
  */
 export async function getSubmissionDetailOrClassAssignment(id: string) {
-  let submission: any = await prisma.submission.findUnique({
+  const submission: any = await prisma.submission.findUnique({
     where: { id },
     include: {
       problem: { select: { id: true, problemNumber: true, title: true, difficulty: true } },

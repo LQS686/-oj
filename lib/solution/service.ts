@@ -52,8 +52,11 @@ export async function createSolution(data: any, authorId: string) {
 }
 
 export async function updateSolution(id: string, data: any) {
+  // LOGIC-09: 先写 DB 再清缓存；同时补清列表前缀，避免列表仍展示旧数据
+  const result = await prisma.solution.update({ where: { id }, data })
   cache.delete(`solution:byId:${id}`)
-  return prisma.solution.update({ where: { id }, data })
+  cache.deleteByPrefix('solution:list:')
+  return result
 }
 
 export async function deleteSolution(id: string) {
@@ -359,6 +362,8 @@ export async function deleteUserSolution(
   await prisma.comment.deleteMany({ where: { solutionId: id } })
   await prisma.solution.delete({ where: { id } })
   clearSolutionCache(id)
+  // LOGIC-10: 补清列表缓存，避免列表仍展示已删除的题解
+  cache.deleteByPrefix('solution:list:')
 }
 
 /**
@@ -412,6 +417,13 @@ export async function toggleSolutionLike(
     ])
   } catch (err: any) {
     if (err?.code !== 'P2002') throw err
+    // P2002: 已有记录说明已点赞，重新查询确认实际状态
+    const existing = await solutionLikeModel.findUnique({
+      where: { solutionId_userId: { solutionId: id, userId: requesterId } },
+    })
+    const updated = await prisma.solution.findUnique({ where: { id }, select: { likes: true } })
+    clearSolutionCache(id)
+    return { liked: !!existing, likes: updated?.likes ?? 0 }
   }
   const updated = await prisma.solution.findUnique({ where: { id }, select: { likes: true } })
   clearSolutionCache(id)

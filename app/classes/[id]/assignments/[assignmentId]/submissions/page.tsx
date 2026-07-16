@@ -7,6 +7,7 @@ import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils'
 import type { Assignment } from '@/types/models'
 
 interface Submission {
@@ -417,7 +418,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  return (
  <tr key={submission.id} className="hover:bg-muted">
  <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
- {new Date(submission.submittedAt).toLocaleString('zh-CN')}
+ {formatDateTime(submission.submittedAt)}
  {submission.isLate && (
  <span className="ml-2 text-xs text-red-400">(逾期)</span>
  )}

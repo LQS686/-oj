@@ -7,6 +7,7 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { ArrowLeft, User, Calendar, Tag, Edit, Trash2, FileText, AlertCircle } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils'
 
 interface Note {
  id: string
@@ -168,7 +169,7 @@ export default function NoteDetailPage() {
  </div>
  <div className="flex items-center gap-2">
  <Calendar className="w-4 h-4" />
- <span>{new Date(note.createdAt).toLocaleString('zh-CN')}</span>
+ <span>{formatDateTime(note.createdAt)}</span>
  </div>
  <span className="tag">
  {note.category}
@@ -183,7 +184,7 @@ export default function NoteDetailPage() {
 
  {note.updatedAt !== note.createdAt && (
  <p className="mt-2 text-xs text-muted-foreground">
- 最后编辑于 {new Date(note.updatedAt).toLocaleString('zh-CN')}
+ 最后编辑于 {formatDateTime(note.updatedAt)}
  </p>
  )}
  </div>

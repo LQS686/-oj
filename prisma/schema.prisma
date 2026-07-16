@@ -243,6 +243,7 @@ model ContestParticipant {
   joinedAt  DateTime @default(now())
 
   @@unique([contestId, userId]) // 确保同一用户在同一竞赛中只有一条参与记录
+  @@index([contestId, score])
 }
 
 // 班级
@@ -417,6 +418,7 @@ model Comment {
   @@index([solutionId])
   @@index([authorId])
   @@index([solutionId, isDeleted])
+  @@index([parentId])
 }
 
 // 题解
@@ -662,6 +664,7 @@ model AiGenerationLog {
   
   @@index([userId])
   @@index([createdAt])
+  @@index([status, createdAt])
 }
 
 // AI模型配置（全局思考模型设置存储，被 AiProvider/AiModel 的混合配置方案使用）
@@ -757,6 +760,8 @@ model VerificationLog {
   status    String   // SUCCESS, FAILED
   details   Json     // 详细报告：执行时间、修正数量、错误信息等
   createdAt DateTime @default(now())
+
+  @@index([problemId])
 }
 
 model SystemConfig {

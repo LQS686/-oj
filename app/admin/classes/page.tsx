@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Briefcase, Plus, Search, Eye, EyeOff, Trash2 } from 'lucide-react'
+import { formatDate } from '@/lib/utils'
 
 interface Class {
  id: string
@@ -177,7 +178,7 @@ export default function AdminClassesPage() {
  sortable: true,
  render: (value) => (
  <span className="text-sm text-muted-foreground">
- {new Date(value).toLocaleDateString('zh-CN')}
+ {formatDate(value)}
  </span>
  ),
  },

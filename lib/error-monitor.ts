@@ -1,4 +1,4 @@
-import { logger } from './logger';
+import { logger, formatLogTimestamp } from './logger';
 import { redisCache } from './redis';
 
 export interface ErrorStats {
@@ -112,7 +112,7 @@ class ErrorMonitor {
 
   async trackError(error: Error | string, context?: Record<string, any>) {
     const key = this.getErrorKey(error, context);
-    const now = new Date().toISOString();
+    const now = formatLogTimestamp();
 
     // 更新错误统计
     let stats = this.errorStats.get(key);

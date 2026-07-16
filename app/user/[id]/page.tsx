@@ -9,6 +9,7 @@ import type { User as UserType, ActivityData, RecentSubmission, DifficultyDistri
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { motion, easeOut } from 'framer-motion'
 import { fetchWithCookie } from '@/lib/api/base'
+import { formatDate } from '@/lib/utils'
 
 export default function UserProfilePage() {
  const params = useParams()
@@ -184,7 +185,7 @@ export default function UserProfilePage() {
  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
  <Calendar className="w-4.5 h-4.5 text-primary-light" />
  </div>
- <span className="font-medium">加入于 {new Date(user.createdAt).toLocaleDateString('zh-CN')}</span>
+ <span className="font-medium">加入于 {formatDate(user.createdAt)}</span>
  </div>
  </div>
  </motion.div>

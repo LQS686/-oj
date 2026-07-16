@@ -17,13 +17,17 @@ function startOfDay(d: Date): Date {
   return x
 }
 
+function localDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function computeStreak(uniqueAcDates: string[]): number {
   if (uniqueAcDates.length === 0) return 0
   const set = new Set(uniqueAcDates)
   let streak = 0
   const cursor = startOfDay(new Date())
   for (;;) {
-    const key = cursor.toISOString().split('T')[0]
+    const key = localDateKey(cursor)
     if (!set.has(key)) break
     streak++
     cursor.setDate(cursor.getDate() - 1)
@@ -101,7 +105,7 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
   }
   const totalSolved = acByProblem.size
 
-  const acDates = [...acByProblem.values()].map((d) => d.toISOString().split('T')[0])
+  const acDates = [...acByProblem.values()].map((d) => localDateKey(d))
   const uniqueDates = [...new Set(acDates)]
   const streak = computeStreak(uniqueDates)
 

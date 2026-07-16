@@ -15,7 +15,7 @@ import {
   CheckCircle, CheckCircle2, XCircle, AlertTriangle, Copy, Check,
   ChevronDown, ChevronRight, Target, RefreshCw, Loader2, Info, Shield
 } from 'lucide-react'
-import { formatTime, formatMemory } from '@/lib/utils'
+import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText } from '@/lib/status'
 import { fetchWithAuth } from '@/lib/api/base'
 
@@ -481,7 +481,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
               <span className="text-muted-foreground">提交时间:</span>
               <span className="text-foreground flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
-                {new Date(submission.submittedAt).toLocaleString('zh-CN')}
+                {formatDateTime(submission.submittedAt)}
               </span>
             </div>
           </div>

@@ -145,7 +145,8 @@ class JudgeQueue extends EventEmitter {
     while (this.queue.length > 0 || this.processing.size > 0) {
       // 启动新任务（如果有空闲槽位）
       while (this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
-        const job = this.queue.shift()!
+        const job = this.queue.shift()
+        if (!job) break
         job.status = 'active'
         job.startedAt = new Date()
         this.processing.set(job.id, job)

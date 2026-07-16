@@ -1,3 +1,7 @@
+/**
+ * @deprecated 此模块已废弃，请使用 lib/api/validation.ts 中的新校验函数
+ * 保留是为了向后兼容，新代码应使用 lib/api/validation.ts
+ */
 import { escapeHtml, stripTags } from './sanitize'
 
 export function validateObjectId(id: string): boolean {

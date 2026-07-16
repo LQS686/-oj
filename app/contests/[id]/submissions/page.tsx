@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchWithCookie } from '@/lib/api/base'
+import { formatDateTime } from '@/lib/utils'
 
 interface Submission {
  id: string
@@ -125,7 +126,7 @@ export default function ContestSubmissionsPage() {
  {submissions.map((sub) => (
  <tr key={sub.id} className="hover:bg-muted">
  <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
- {new Date(sub.submittedAt).toLocaleString('zh-CN')}
+ {formatDateTime(sub.submittedAt)}
  </td>
  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
  <Link 

@@ -36,7 +36,6 @@ import { getUserFromRequest } from '@/lib/auth'
 import { getClassMembership, type ClassMembership } from '@/lib/class/auth'
 import { getCachedUser, type AuthUser, type ApiContext } from './handler'
 import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
-import { assertCsrf } from '@/lib/security/csrf'
 
 export type { AuthUser, ApiContext }
 
@@ -145,15 +144,14 @@ export interface RouteHandler {
 export const withApi = {
   /**
    * 公开路由：无需登录
-   * 安全（P1-4 修复）：写方法（POST/PUT/PATCH/DELETE）必须携带合法 CSRF token
+   *
+   * CSRF 防护：由 middleware.ts 的 isAllowedOrigin 统一处理（Origin/Referer 同源校验），
+   * 对所有 /api/* 写操作生效。lib/security/csrf.ts 的 token 机制为预留扩展，前端未集成，
+   * 不在此处强制，避免 public 写路由（login/register/logout/forgot-password）被误拦。
    */
   public(handler: RouteHandler) {
     return async (req: NextRequest, ctx: any) => {
       return safeCall(async () => {
-        // CSRF 保护：仅写方法检查，GET/HEAD/OPTIONS 放行
-        if (req.method && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-          assertCsrf(req)
-        }
         const resolved = await resolveCtxParams(ctx)
         return handler(req, resolved)
       }, 'PUBLIC', req)

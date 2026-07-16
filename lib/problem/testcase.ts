@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger'
 import AdmZip from 'adm-zip'
 import path from 'path'
 import fs from 'fs'
+import { writeFile, mkdir, rm, access } from 'fs/promises'
 
 // 重新导出纯函数以兼容服务端 import（不会把 fs 传到客户端因为这些函数本身无副作用）
 export {
@@ -120,7 +121,11 @@ export async function redistributeTestScores(problemId: string): Promise<void> {
 export async function redistributeAllProblemScores(): Promise<void> {
   try {
     const problems = await prisma.problem.findMany({ select: { id: true } })
-    for (const p of problems) await redistributeTestScores(p.id)
+    const BATCH_SIZE = 10
+    for (let i = 0; i < problems.length; i += BATCH_SIZE) {
+      const batch = problems.slice(i, i + BATCH_SIZE)
+      await Promise.allSettled(batch.map(p => redistributeTestScores(p.id)))
+    }
     logger.info(`已重新分配 ${problems.length} 个题目的测试用例分数`)
   } catch (error) {
     logger.error('重新分配所有题目分数失败', error)
@@ -304,13 +309,14 @@ export async function saveTestCaseFiles(
 ): Promise<{ success: boolean; error?: string; paths?: string[] }> {
   try {
     const problemDir = path.join(baseDir, problemId)
-    if (!fs.existsSync(problemDir)) fs.mkdirSync(problemDir, { recursive: true })
+    const dirExists = await access(problemDir).then(() => true).catch(() => false)
+    if (!dirExists) await mkdir(problemDir, { recursive: true })
     const savedPaths: string[] = []
     for (const tc of testCases) {
       const inPath = path.join(problemDir, `${tc.number}.in`)
       const outPath = path.join(problemDir, `${tc.number}.out`)
-      fs.writeFileSync(inPath, tc.inputContent, 'utf-8')
-      fs.writeFileSync(outPath, tc.outputContent, 'utf-8')
+      await writeFile(inPath, tc.inputContent, 'utf-8')
+      await writeFile(outPath, tc.outputContent, 'utf-8')
       savedPaths.push(inPath, outPath)
     }
     return { success: true, paths: savedPaths }
@@ -326,7 +332,8 @@ export async function deleteTestCaseFiles(
 ): Promise<void> {
   try {
     const problemDir = path.join(baseDir, problemId)
-    if (fs.existsSync(problemDir)) fs.rmSync(problemDir, { recursive: true, force: true })
+    const dirExists = await access(problemDir).then(() => true).catch(() => false)
+    if (dirExists) await rm(problemDir, { recursive: true, force: true })
   } catch (error) {
     logger.error('删除测试点文件失败', error)
   }

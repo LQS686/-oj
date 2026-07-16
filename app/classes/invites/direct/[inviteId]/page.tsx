@@ -7,6 +7,7 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Mail, Users, Check, X, Clock, Calendar, AlertCircle, UserCheck } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
+import { formatDateTime } from '@/lib/utils'
 
 interface InviteDetail {
   invite: {
@@ -206,12 +207,12 @@ export default function DirectInviteDetailPage() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 shrink-0" />
-              <span>邀请时间：{new Date(invite.createdAt).toLocaleString('zh-CN')}</span>
+              <span>邀请时间：{formatDateTime(invite.createdAt)}</span>
             </div>
             {invite.expiresAt && (
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 shrink-0" />
-                <span>过期时间：{new Date(invite.expiresAt).toLocaleString('zh-CN')}</span>
+                <span>过期时间：{formatDateTime(invite.expiresAt)}</span>
               </div>
             )}
           </div>

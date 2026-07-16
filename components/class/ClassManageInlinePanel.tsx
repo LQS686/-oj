@@ -16,6 +16,7 @@ import {
   Save,
   Trash2,
 } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils'
 
 type DirectInvite = {
   id: string
@@ -385,7 +386,7 @@ export default function ClassManageInlinePanel({
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{inv.message}</p>
                   ) : null}
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    {new Date(inv.createdAt).toLocaleString('zh-CN')}
+                    {formatDateTime(inv.createdAt)}
                   </p>
                 </div>
                 <span className="text-xs text-muted-foreground shrink-0">
@@ -423,7 +424,7 @@ export default function ClassManageInlinePanel({
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{req.message}</p>
                     ) : null}
                     <p className="text-[11px] text-muted-foreground mt-1">
-                      {new Date(req.createdAt).toLocaleString('zh-CN')}
+                      {formatDateTime(req.createdAt)}
                     </p>
                   </div>
                   {req.status === 'pending' ? (

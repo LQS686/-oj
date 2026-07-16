@@ -16,6 +16,11 @@ if (!USE_DOCKER && process.platform === 'win32') {
   logger.warn('⚠️ [安全] Windows 本地进程评测已显式确认 (ALLOW_LOCAL_JUDGE_ON_WINDOWS=1)，无 Docker 沙箱隔离。生产环境必须设置 USE_DOCKER=true。')
 }
 
+// PERF-01 修复：生产环境强制使用 Docker 沙箱评测，禁止本地评测，避免无隔离的进程执行风险。
+if (process.env.NODE_ENV === 'production' && process.env.USE_DOCKER !== 'true') {
+  throw new Error('生产环境必须设置 USE_DOCKER=true，禁止本地评测')
+}
+
 export interface ExecuteOptions {
   code: string
   language: string
@@ -720,9 +725,21 @@ async function ensureDockerImage(image: string): Promise<void> {
 
   logger.info(`Docker 镜像不存在，开始拉取`, { image })
   try {
-    execSync(`docker pull ${image}`, {
-      stdio: 'inherit',
-      timeout: 300_000, // 5 分钟，足以拉取 ~1.2GB 镜像
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn('docker', ['pull', image], { stdio: 'inherit' })
+      const timer = setTimeout(() => {
+        proc.kill()
+        reject(new Error('docker pull 超时'))
+      }, 300_000)
+      proc.on('close', (code) => {
+        clearTimeout(timer)
+        if (code === 0) resolve()
+        else reject(new Error(`docker pull 失败，退出码: ${code}`))
+      })
+      proc.on('error', (err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
     })
     pulledImages.add(image)
     logger.info(`Docker 镜像拉取完成`, { image })

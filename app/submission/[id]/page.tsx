@@ -4,7 +4,7 @@ import { use, useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, FileCode, Clock, Database, User, Calendar, Code, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, History, Target, RefreshCw, Loader2, Info } from 'lucide-react'
-import { formatTime, formatMemory } from '@/lib/utils'
+import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText } from '@/lib/status'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
@@ -609,7 +609,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  <span className="text-muted-foreground">提交时间:</span>
  <span className="text-foreground flex items-center gap-1">
  <Calendar className="w-4 h-4" />
- {new Date(submission.submittedAt).toLocaleString('zh-CN')}
+ {formatDateTime(submission.submittedAt)}
  </span>
  </div>
  </div>
@@ -695,12 +695,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  </span>
  </div>
  <span className="text-xs text-muted-foreground">
- {new Date(item.submittedAt).toLocaleString('zh-CN', { 
- month: '2-digit', 
- day: '2-digit', 
- hour: '2-digit', 
- minute: '2-digit' 
- })}
+ {formatDateTime(item.submittedAt)}
  </span>
  </div>
  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">

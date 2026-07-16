@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Clock, FileText, List, BarChart2, Info, Play, Timer, CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { formatDateTimeShort } from '@/lib/utils'
 
 interface Contest {
   id: string
@@ -29,14 +30,7 @@ function formatDuration(ms: number) {
 }
 
 function formatContestRange(start: Date, end: Date) {
-  const fmt = (d: Date) =>
-    d.toLocaleString('zh-CN', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
+  const fmt = (d: Date) => formatDateTimeShort(d)
   return `${fmt(new Date(start))} — ${fmt(new Date(end))}`
 }
 

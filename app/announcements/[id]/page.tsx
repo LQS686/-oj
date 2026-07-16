@@ -8,6 +8,7 @@ import { EducationalPageShell, PageLoading } from '@/components/common'
 import type { PublicAnnouncementDetail } from '@/lib/announcement/service'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { formatDateTime } from '@/lib/utils'
 
 export default function AnnouncementDetailPage() {
   const params = useParams()
@@ -87,7 +88,7 @@ export default function AnnouncementDetailPage() {
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-6 pb-6 border-b border-border">
           <span>发布者：{item.authorName}</span>
           {item.publishedAt && (
-            <span>发布时间：{new Date(item.publishedAt).toLocaleString('zh-CN')}</span>
+            <span>发布时间：{formatDateTime(item.publishedAt)}</span>
           )}
         </div>
         <div className="text-foreground text-base leading-relaxed whitespace-pre-wrap">{item.content}</div>

@@ -9,7 +9,14 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 // 基础数据库 URL
-const dbUrl = process.env.DATABASE_URL || "mongodb://localhost:27017/oj_platform?replicaSet=rs0"
+function getDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL
+  if (!url && process.env.NODE_ENV === 'production') {
+    throw new Error('生产环境必须设置 DATABASE_URL 环境变量')
+  }
+  return url || "mongodb://localhost:27017/oj_platform?replicaSet=rs0"
+}
+const dbUrl = getDatabaseUrl()
 
 // 主库客户端配置（写操作 + 强一致性读）
 // 增加连接池参数 maxPoolSize 和 connectTimeoutMS

@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger'
 import { ArrowLeft, Upload, X, Plus, Sparkles, Loader2, Save, FileText, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
 import { ModelSelector } from '@/components/ai/ModelSelector'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase-scoring'
+import { formatDateTime } from '@/lib/utils'
 
 interface TestCase {
  input: string
@@ -880,7 +881,7 @@ export default function ProblemTestCasesPage() {
  {log.status === 'SUCCESS' ? '验证通过' : '验证失败'}
  </span>
  <span className="text-xs text-muted-foreground">
- {new Date(log.createdAt).toLocaleString()}
+ {formatDateTime(log.createdAt)}
  </span>
  </div>
  <div className="text-sm text-muted-foreground space-y-1">

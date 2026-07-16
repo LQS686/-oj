@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Zap,
 } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils'
 
 interface QueueStatus {
   waiting: number
@@ -429,7 +430,7 @@ export default function AiMonitorPage() {
                       </td>
                       <td className="py-2 px-2 text-muted-foreground">{(it.tokensUsed || 0).toLocaleString()}</td>
                       <td className="py-2 px-2 text-muted-foreground whitespace-nowrap">
-                        {new Date(it.createdAt).toLocaleString('zh-CN')}
+                        {formatDateTime(it.createdAt)}
                       </td>
                       <td className="py-2 px-2 text-error text-xs max-w-xs truncate" title={it.error || ''}>
                         {it.error || '-'}

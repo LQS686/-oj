@@ -1,5 +1,6 @@
-import { logger } from '../../../lib/logger';
-import { GenerationMode, PromptContext, PromptGenerator, PromptResult, PromptCrossUseException } from './core/types';
+import { logger, formatLogTimestamp } from '../../../lib/logger';
+import type { PromptContext, PromptGenerator, PromptResult} from './core/types';
+import { GenerationMode, PromptCrossUseException } from './core/types';
 import { ParamGenPromptGenerator } from './paramgen/generator';
 import { TestDataGenPromptGenerator } from './test-data/generator';
 
@@ -61,7 +62,7 @@ class PromptLoader {
 
   private logAudit(context: PromptContext, error: Error) {
       // In a real system, this would write to DB or structured log file
-      logger.warn('[PROMPT_AUDIT_LOG]', { timestamp: new Date().toISOString(), mode: context.mode, error: error.message, stack: error.stack, contextSummary: this.summarizeContext(context) });
+      logger.warn('[PROMPT_AUDIT_LOG]', { timestamp: formatLogTimestamp(), mode: context.mode, error: error.message, stack: error.stack, contextSummary: this.summarizeContext(context) });
   }
 
   private summarizeContext(context: any): string {

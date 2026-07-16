@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Shield, Search, User, FileText, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils'
 
 interface Submission {
  id: string
@@ -174,7 +175,7 @@ export default function AdminSubmissionsPage() {
  render: (value) => (
  <div className="flex items-center gap-2 text-muted-foreground">
  <Clock className="w-4 h-4" />
- <span className="text-sm">{new Date(value).toLocaleString('zh-CN')}</span>
+ <span className="text-sm">{formatDateTime(value)}</span>
  </div>
  ),
  },

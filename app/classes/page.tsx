@@ -8,6 +8,7 @@ import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
+import { formatDate } from '@/lib/utils'
 import CreateClassModal from '@/components/class/CreateClassModal'
 import {
   EducationalPageShell,
@@ -459,7 +460,7 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-primary-light" />
-                  <span>{new Date(classData.createdAt).toLocaleDateString()}</span>
+                  <span>{formatDate(classData.createdAt)}</span>
                 </div>
                 {classData.isPublic ? (
                   <span className="tag tag-success flex items-center gap-1">
@@ -603,7 +604,7 @@ function ClassCard({
         </span>
         <span className="flex items-center gap-1.5">
           <Calendar className="w-3.5 h-3.5 shrink-0" />
-          {new Date(classData.createdAt).toLocaleDateString('zh-CN')}
+          {formatDate(classData.createdAt)}
         </span>
       </div>
     </Link>

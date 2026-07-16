@@ -9,6 +9,7 @@ import { fetchWithAuth } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ClassWorkspaceShell, PageLoading } from '@/components/common'
 import { useClass } from '@/hooks/useClass'
+import { formatDate } from '@/lib/utils'
 
 interface ActivityStats {
   overall: {
@@ -302,7 +303,7 @@ export default function MemberActivityPage() {
               {stats.activityTrend?.map((item) => (
                 <div key={item.date} className="flex items-center gap-2">
                   <div className="w-16 text-xs text-muted-foreground shrink-0">
-                    {new Date(item.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+                    {formatDate(item.date)}
                   </div>
                   <div className="flex-1">
                     <div className="bg-muted rounded-full h-2">

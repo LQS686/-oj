@@ -194,11 +194,11 @@ async function recoverPendingJobs() {
       return
     }
     logger.info(`发现 ${pendingSubmissions.length} 个待恢复任务，重新入队`)
-    for (const sub of pendingSubmissions) {
+    await Promise.allSettled(pendingSubmissions.map(async (sub) => {
       try {
         if (!sub.problem) {
           logger.warn(`跳过恢复：题目不存在`, { submissionId: sub.id })
-          continue
+          return
         }
         const testCases = sub.problem.testCases.map(tc => ({
           id: tc.id,
@@ -225,7 +225,7 @@ async function recoverPendingJobs() {
       } catch (err) {
         logger.error(`恢复任务失败`, err, { submissionId: sub.id })
       }
-    }
+    }))
   } catch (err) {
     logger.error('扫描待恢复任务失败', err)
   }

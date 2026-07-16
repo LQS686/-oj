@@ -27,6 +27,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
 import { canManageContent } from '@/lib/permissions'
 import { isClassAdminApiRole, isClassStudentApiRole, normalizeClassRoleToApi } from '@/lib/class/roles'
+import { formatDateTime } from '@/lib/utils'
 import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 
 const languageOptions = [
@@ -485,12 +486,12 @@ export default function AssignmentDetailPage() {
  <div className="flex items-center gap-1.5">
  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
  <span className="text-muted-foreground">开始</span>
- <span className="font-medium text-foreground">{new Date(assignment.startTime).toLocaleString('zh-CN')}</span>
+ <span className="font-medium text-foreground">{formatDateTime(assignment.startTime)}</span>
  </div>
  <div className="flex items-center gap-1.5">
  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
  <span className="text-muted-foreground">截止</span>
- <span className="font-medium text-foreground">{new Date(assignment.endTime).toLocaleString('zh-CN')}</span>
+ <span className="font-medium text-foreground">{formatDateTime(assignment.endTime)}</span>
  </div>
  <div className="flex items-center gap-1.5">
  <FileCode className="w-3.5 h-3.5 text-muted-foreground" />

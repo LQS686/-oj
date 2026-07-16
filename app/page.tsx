@@ -27,6 +27,7 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { HomeDashboardData } from '@/lib/home/dashboard'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
+import { formatDate } from '@/lib/utils'
 
 /* ---------- non-logged-in feature cards ---------- */
 
@@ -87,8 +88,8 @@ function AnnouncementsGrid({ items }: { items: PublicAnnouncementItem[] }) {
                 )}
                 <span className="text-xs text-muted-foreground truncate">
                   {item.publishedAt
-                    ? new Date(item.publishedAt).toLocaleDateString('zh-CN')
-                    : new Date(item.createdAt).toLocaleDateString('zh-CN')}
+                    ? formatDate(item.publishedAt)
+                    : formatDate(item.createdAt)}
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-foreground line-clamp-2 mb-2">{item.title}</h3>

@@ -8,6 +8,8 @@ const MAX_CACHE_SIZE = 10000
 class Cache {
   private storage: Map<string, { value: any; expiry: number }> = new Map()
   private cleanupInterval: NodeJS.Timeout
+  // PERF-05 singleflight：缓存 miss 时去重并发同 key 回源请求
+  private inflight: Map<string, Promise<any>> = new Map()
 
   constructor() {
     // 每5分钟清理一次过期缓存
@@ -22,6 +24,20 @@ class Cache {
       }
     }
   }
+
+  dispose() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval)
+      this.cleanupInterval = null as any
+    }
+    this.storage.clear()
+    this.inflight.clear()
+  }
+
+  /**
+   * TODO: 多实例部署时应将 cache 后端改为 Redis 优先 + 内存 fallback
+   * 当前为单进程内存缓存，多实例部署时各实例缓存独立
+   */
 
   /**
    * LRU 淘汰：容量超限时移除最久未使用的条目。
@@ -58,18 +74,30 @@ class Cache {
       return cached.value
     }
 
-    // 缓存不存在或已过期，执行函数获取新值
-    const value = await fn()
+    // PERF-05 singleflight：缓存 miss 时复用同 key 的 in-flight Promise，避免并发重复回源
+    const inflightPromise = this.inflight.get(key)
+    if (inflightPromise) {
+      return inflightPromise as Promise<T>
+    }
 
-    // 设置缓存
-    const ttl = options.ttl || 5 * 60 * 1000 // 默认5分钟
-    this.evictIfNeeded()
-    this.storage.set(key, {
-      value,
-      expiry: now + ttl
-    })
+    // 发起新请求并登记 in-flight
+    const promise = fn()
+    this.inflight.set(key, promise)
+    try {
+      const value = await promise
 
-    return value
+      // 设置缓存（保持现有 LRU 与 MAX_CACHE_SIZE 检查）
+      const ttl = options.ttl || 5 * 60 * 1000 // 默认5分钟
+      this.evictIfNeeded()
+      this.storage.set(key, {
+        value,
+        expiry: now + ttl
+      })
+
+      return value
+    } finally {
+      this.inflight.delete(key)
+    }
   }
 
   set(key: string, value: any, ttl: number = 5 * 60 * 1000) {

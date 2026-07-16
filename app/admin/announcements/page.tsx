@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Megaphone, Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils'
 
 interface AnnouncementRow {
   id: string
@@ -194,7 +195,7 @@ export default function AdminAnnouncementsPage() {
                       {row.content}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      {row.authorName} · 更新于 {new Date(row.updatedAt).toLocaleString('zh-CN')}
+                      {row.authorName} · 更新于 {formatDateTime(row.updatedAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">

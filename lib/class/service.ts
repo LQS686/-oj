@@ -845,7 +845,8 @@ export async function computeAssignmentStatistics(
   // 提交趋势
   const trendMap = new Map<string, { date: string; count: number; acCount: number }>()
   submissions.forEach((s: any) => {
-    const date = new Date(s.submittedAt).toISOString().split('T')[0]
+    const _d = new Date(s.submittedAt)
+    const date = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`
     let row = trendMap.get(date)
     if (!row) {
       row = { date, count: 0, acCount: 0 }
@@ -2142,13 +2143,6 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
     throw new ApiError('ALREADY_PROCESSED', `该申请已被${request.status === 'approved' ? '批准' : '拒绝'}`, 400)
   }
   if (input.action === 'approve') {
-    // 检查班级容量
-    if (classRecord.maxMembers > 0) {
-      const currentCount = await prisma.classMember.count({ where: { classId: input.classId } })
-      if (currentCount >= classRecord.maxMembers) {
-        throw new ApiError('CLASS_FULL', '班级已满员', 400)
-      }
-    }
     // 检查是否已存在成员
     const existing = await prisma.classMember.findUnique({
       where: { classId_userId: { classId: input.classId, userId: request.userId } },
@@ -2161,16 +2155,22 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
       })
       return { message: '该用户已是班级成员' }
     }
-    // 创建成员 + 更新申请
-    await prisma.$transaction([
-      prisma.classMember.create({
+    // 创建成员 + 更新申请（事务内重新检查容量，避免并发下超额）
+    await prisma.$transaction(async (tx) => {
+      if (classRecord.maxMembers > 0) {
+        const currentCount = await tx.classMember.count({ where: { classId: input.classId } })
+        if (currentCount >= classRecord.maxMembers) {
+          throw new ApiError('CLASS_FULL', '班级已满员', 400)
+        }
+      }
+      await tx.classMember.create({
         data: { classId: input.classId, userId: request.userId, role: 'student' },
-      }),
-      prisma.classJoinRequest.update({
+      })
+      await tx.classJoinRequest.update({
         where: { id: input.requestId },
         data: { status: 'approved' },
-      }),
-    ])
+      })
+    })
     return { message: '已批准加入申请' }
   }
 

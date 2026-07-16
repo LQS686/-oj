@@ -6,6 +6,7 @@ import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'luci
 import { fetchWithAuth } from '@/lib/api/base'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import type { Notification } from '@/types/models'
+import { formatDate } from '@/lib/utils'
 
 export default function NotificationsPage() {
  const router = useRouter()
@@ -140,7 +141,7 @@ export default function NotificationsPage() {
  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时前`
  if (seconds < 604800) return `${Math.floor(seconds / 86400)} 天前`
  
- return date.toLocaleDateString('zh-CN')
+ return formatDate(date)
  }
 
  const showSkeleton = loading && notifications.length === 0

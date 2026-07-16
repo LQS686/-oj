@@ -30,6 +30,7 @@ import SubmissionResultModal, { SubmissionResultData } from '@/components/submis
 import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canManageContent } from '@/lib/permissions'
+import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import toast from 'react-hot-toast'
@@ -835,7 +836,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                 <div className="card-static p-4">
                   <p className="text-xs text-muted-foreground mb-1">提交时间</p>
                   <p className="font-semibold text-foreground text-sm">
-                    {new Date(selectedSubmission.submittedAt).toLocaleString('zh-CN')}
+                    {formatDateTime(selectedSubmission.submittedAt)}
                   </p>
                 </div>
               </div>

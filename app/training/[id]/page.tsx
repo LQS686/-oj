@@ -27,6 +27,7 @@ import JoinTrainingButton from '@/components/training/JoinTrainingButton'
 import { ProgressCircle } from '@/components/training/ProgressCircle'
 import type { TrainingDetail, TrainingProblemStatus } from '@/lib/training/types'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { formatDate } from '@/lib/utils'
 
 interface User {
  id: string
@@ -488,7 +489,7 @@ export default function TrainingDetailPage() {
  <div className="flex items-center justify-between text-sm">
  <span className="text-muted-foreground">创建时间</span>
  <span className="text-foreground text-xs">
- {new Date(training.createdAt).toLocaleDateString('zh-CN')}
+ {formatDate(training.createdAt)}
  </span>
  </div>
  <div className="flex items-center justify-between text-sm">

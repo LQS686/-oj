@@ -258,8 +258,9 @@ export async function getUserFullStats(userId: string) {
 
   const buildHeatmap = (entries: Map<string, Date>) =>
     Array.from(entries.values()).reduce((acc: Record<string, number>, date: Date) => {
-      const d = new Date(date).toISOString().split('T')[0]
-      acc[d] = (acc[d] || 0) + 1
+      const d = new Date(date)
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      acc[dateKey] = (acc[dateKey] || 0) + 1
       return acc
     }, {})
 
@@ -1196,11 +1197,6 @@ export async function getUserRoleFlags(userId: string) {
   })
 }
 
-/** 读用户完整信息（用于创建训练计划等需要 role 鉴权） */
-export async function getUserFullInfo(userId: string) {
-  return prisma.user.findUnique({ where: { id: userId } })
-}
-
 /* ============================================================================
  * 注册流程（原 /api/auth/register）
  * ========================================================================== */
@@ -1248,30 +1244,46 @@ export async function registerNewUser(input: {
 
   const isFirstUser = input.isFirstUser === true
 
-  const user = await prisma.user.create({
-    data: {
-      username: input.sanitizedUsername,
-      email: input.sanitizedEmail,
-      password: input.hashedPassword,
-      nickname: input.sanitizedNickname,
-      rating: 1500,
-      rank: isFirstUser ? '管理员' : '新手',
-      color: isFirstUser ? '#FF6B6B' : '#808080',
-      role: isFirstUser ? 'SYSTEM_ADMIN' : 'STUDENT',
-      isBanned: false,
-    },
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      nickname: true,
-      rating: true,
-      rank: true,
-      color: true,
-      role: true,
-      createdAt: true,
-    },
-  })
+  let user
+  try {
+    user = await prisma.user.create({
+      data: {
+        username: input.sanitizedUsername,
+        email: input.sanitizedEmail,
+        password: input.hashedPassword,
+        nickname: input.sanitizedNickname,
+        rating: 1500,
+        rank: isFirstUser ? '管理员' : '新手',
+        color: isFirstUser ? '#FF6B6B' : '#808080',
+        role: isFirstUser ? 'SYSTEM_ADMIN' : 'STUDENT',
+        isBanned: false,
+      },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        nickname: true,
+        rating: true,
+        rank: true,
+        color: true,
+        role: true,
+        createdAt: true,
+      },
+    })
+  } catch (err: any) {
+    if (err?.code === 'P2002') {
+      // 唯一约束冲突：用户名或邮箱已被注册
+      const target = err.meta?.target as string[] | undefined
+      if (target?.includes('username')) {
+        throw AppError.badRequest('BAD_REQUEST', '用户名已被使用')
+      }
+      if (target?.includes('email')) {
+        throw AppError.badRequest('BAD_REQUEST', '邮箱已被注册')
+      }
+      throw AppError.badRequest('BAD_REQUEST', '用户名或邮箱已被使用')
+    }
+    throw err
+  }
 
   // TOCTOU 防护：并发注册时，多个请求可能同时通过 count===0 判定。
   // 创建后二次校验 SYSTEM_ADMIN 数量，若 >1 说明已有更早的超管，将当前用户降级为 STUDENT。

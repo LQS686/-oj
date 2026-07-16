@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
+import { formatDate } from '@/lib/utils'
 
 interface AdminTraining {
  id: string
@@ -160,7 +161,7 @@ export default function AdminTrainingsPage() {
  label: '创建时间',
  render: (value: string) => (
  <span className="text-muted-foreground text-xs">
- {new Date(value).toLocaleDateString('zh-CN')}
+ {formatDate(value)}
  </span>
  ),
  },

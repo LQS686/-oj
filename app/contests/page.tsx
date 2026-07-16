@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { canCreateContest } from '@/lib/permissions'
 import { fetchWithCookie } from '@/lib/api/base'
+import { formatDateTimeShort } from '@/lib/utils'
 import {
   EducationalPageShell,
   LIST_GRID_CLASS,
@@ -98,15 +99,6 @@ function getContestStatus(startTime: string, endTime: string): string {
  } else {
  return '已结束'
  }
-}
-
-function formatTime(dateString: string) {
- return new Date(dateString).toLocaleString('zh-CN', {
- month: '2-digit',
- day: '2-digit',
- hour: '2-digit',
- minute: '2-digit'
- })
 }
 
 function getTimeRemaining(startTime: string): string {
@@ -284,7 +276,7 @@ export default function ContestsPage() {
               <div className={`space-y-1 overflow-hidden ${LIST_GRID_CARD_FOOTER}`}>
                 <span className="flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{formatTime(contest.startTime)}</span>
+                  <span className="truncate">{formatDateTimeShort(contest.startTime)}</span>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 shrink-0" />

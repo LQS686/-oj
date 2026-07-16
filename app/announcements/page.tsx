@@ -6,6 +6,7 @@ import { Megaphone, Pin, ChevronRight } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
+import { formatDate } from '@/lib/utils'
 
 export default function AnnouncementsListPage() {
   const [items, setItems] = useState<PublicAnnouncementItem[]>([])
@@ -69,8 +70,8 @@ export default function AnnouncementsListPage() {
                 )}
                 <span className="text-xs text-muted-foreground truncate">
                   {item.publishedAt
-                    ? new Date(item.publishedAt).toLocaleDateString('zh-CN')
-                    : new Date(item.createdAt).toLocaleDateString('zh-CN')}
+                    ? formatDate(item.publishedAt)
+                    : formatDate(item.createdAt)}
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-foreground line-clamp-2 mb-2">{item.title}</h3>

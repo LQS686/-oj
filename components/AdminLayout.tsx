@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
+import { formatDateTime } from '@/lib/utils'
 import {
   LayoutDashboard,
   FileText,
@@ -337,7 +338,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                           notifications.map((n) => (
                             <div key={n.id} className="px-4 py-3 hover:bg-muted border-b border-border last:border-0">
                               <p className="text-sm text-foreground">{n.title || n.message || '新通知'}</p>
-                              <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString('zh-CN')}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{formatDateTime(n.createdAt)}</p>
                             </div>
                           ))
                         ) : (

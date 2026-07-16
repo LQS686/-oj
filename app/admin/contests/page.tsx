@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
+import { formatDate } from '@/lib/utils'
 import { Trophy, Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
 interface Contest {
@@ -168,7 +169,7 @@ export default function AdminContestsPage() {
  label: '时间',
  render: (_value, contest) => (
  <div className="text-sm text-muted-foreground">
- <div>{new Date(contest.startTime).toLocaleDateString('zh-CN')}</div>
+ <div>{formatDate(contest.startTime)}</div>
  <div className="text-xs">
  {Math.ceil((new Date(contest.endTime).getTime() - new Date(contest.startTime).getTime()) / (1000 * 60 * 60))} 小时
  </div>

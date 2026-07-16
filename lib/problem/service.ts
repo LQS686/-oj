@@ -83,8 +83,10 @@ export async function createProblem(data: any, authorId: string) {
 }
 
 export async function updateProblem(id: string, data: any) {
+  // LOGIC-09: 先写 DB 再清缓存，避免缓存清空后、DB 写入前出现缓存击穿读到旧值
+  const result = await prisma.problem.update({ where: { id }, data })
   clearProblemCache(id)
-  return prisma.problem.update({ where: { id }, data })
+  return result
 }
 
 export async function deleteProblem(id: string) {
@@ -756,6 +758,19 @@ export async function deleteAdminProblem(id: string) {
   const problem = await prisma.problem.findUnique({ where: { id } })
   if (!problem) throw new ApiError('NOT_FOUND', '题目不存在', 404)
 
+  // 回退已 AC 用户的 solvedCount
+  const acUsers = await prisma.submission.findMany({
+    where: { problemId: id, status: 'AC' },
+    select: { userId: true },
+    distinct: 'userId',
+  })
+  if (acUsers.length > 0) {
+    await prisma.user.updateMany({
+      where: { id: { in: acUsers.map(u => u.userId) } },
+      data: { solvedCount: { decrement: 1 } },
+    })
+  }
+
   // 显式删除相关数据，解决外键约束问题
   await prisma.submission.deleteMany({ where: { problemId: id } })
   await prisma.solution.deleteMany({ where: { problemId: id } })
@@ -812,6 +827,28 @@ export async function batchUpdateProblemDifficulty(problemIds: string[], difficu
  * 批量删除题目：级联删除 submissions / solutions / contestProblems / trainingProblems / favorites / testCases
  */
 export async function batchDeleteProblems(problemIds: string[]) {
+  // 回退已 AC 用户的 solvedCount
+  const acUsers = await prisma.submission.findMany({
+    where: { problemId: { in: problemIds }, status: 'AC' },
+    select: { userId: true, problemId: true },
+    distinct: ['userId', 'problemId'],
+  })
+  if (acUsers.length > 0) {
+    // 按用户聚合每人对多少道题 AC（每道题回退 1）
+    const userAcCount = new Map<string, number>()
+    acUsers.forEach(u => {
+      userAcCount.set(u.userId, (userAcCount.get(u.userId) ?? 0) + 1)
+    })
+    await Promise.all(
+      Array.from(userAcCount.entries()).map(([userId, count]) =>
+        prisma.user.update({
+          where: { id: userId },
+          data: { solvedCount: { decrement: count } },
+        })
+      )
+    )
+  }
+
   await prisma.submission.deleteMany({ where: { problemId: { in: problemIds } } })
   await prisma.solution.deleteMany({ where: { problemId: { in: problemIds } } })
   await prisma.contestProblem.deleteMany({ where: { problemId: { in: problemIds } } })

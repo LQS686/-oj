@@ -237,6 +237,9 @@ async function runThinkingStep(config: AiConfig, context: PromptContext): Promis
 
     // DeepSeek v4 thinking 模式：思维链在 reasoning_content，主输出在 content
     // 优先读取 reasoning_content（如有），否则回退到 content
+    if (!response.choices?.length) {
+      throw new Error('AI thinking step 返回空 choices 数组')
+    }
     const msg = response.choices[0].message as any
     // 与生成步骤保持一致：优先读 content（最终输出），仅当 content 为空时回退到 reasoning_content（原始思维链）
     // thinking prompt 要求结构化设计分析，该分析在 content 中
@@ -329,6 +332,9 @@ export async function generateProblems(params: GenerationParams, userId?: string
       () => client.chat.completions.create(merged as any),
       { maxRetries: 2, backoffMs: 800, opName: userPromptOverride ? 'ai-regen' : 'ai-generate' }
     )
+    if (!response.choices?.length) {
+      throw new Error('AI 返回空 choices 数组')
+    }
     const msg = response.choices[0].message as any
     const content = msg?.content || msg?.reasoning_content || ''
     if (!content) {

@@ -239,6 +239,9 @@ export async function generateSolutionForProblem(
       () => client.chat.completions.create(mergedRegen as any),
       { maxRetries: 2, backoffMs: 800, opName: overridePrompt ? 'solution-regen' : 'solution-generate' }
     )
+    if (!response.choices?.length) {
+      throw new Error('solution-generator: AI 返回空 choices 数组')
+    }
     const msg = response.choices[0].message as any
     const content = msg?.content || msg?.reasoning_content || ''
     if (!content) {

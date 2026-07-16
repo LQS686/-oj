@@ -9,7 +9,14 @@ import { logger } from './logger'
 import bcrypt from 'bcryptjs'
 import { canTransition as canSubmissionTransition } from '@/lib/constants/submission-status'
 
-const MONGODB_URI = process.env.DATABASE_URL || 'mongodb://localhost:27017/oj_platform?replicaSet=rs0'
+function getDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL
+  if (!url && process.env.NODE_ENV === 'production') {
+    throw new Error('生产环境必须设置 DATABASE_URL 环境变量')
+  }
+  return url || 'mongodb://localhost:27017/oj_platform?replicaSet=rs0'
+}
+const MONGODB_URI = getDatabaseUrl()
 
 // 缓存客户端实例
 let cachedClient: MongoClient | null = null
@@ -231,7 +238,7 @@ export async function incrementProblemAcceptedCount(problemId: string) {
  */
 export async function isFirstAccepted(problemId: string, userId: string, currentSubmissionId: string) {
   return withRetry(async () => {
-    const client = await getMongoRoClient() // 使用只读客户端
+    const client = await getMongoClient() // 使用主库客户端，避免复制延迟导致并发 AC 重复计数
     const db = client.db()
 
     const previousAC = await db.collection('Submission').findOne({

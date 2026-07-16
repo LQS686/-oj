@@ -12,6 +12,7 @@ import {
 import Link from 'next/link'
 import { DIFFICULTIES, DIFFICULTY_COLORS } from '@/lib/constants'
 import { TOPICS } from '@/lib/ai/prompts/core/types'
+import { formatDateTime } from '@/lib/utils'
 
 interface AIModel {
  id: string
@@ -677,7 +678,7 @@ export default function AIGenerationPage() {
  </span>
  </div>
  <span className="text-xs text-muted-foreground">
- {new Date(log.createdAt).toLocaleString('zh-CN')}
+ {formatDateTime(log.createdAt)}
  </span>
  </div>
  {log.error && <p className="text-xs text-error mt-1">{log.error}</p>}

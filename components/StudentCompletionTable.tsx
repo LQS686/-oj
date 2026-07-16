@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, Code, X, FileCode, Copy, Check } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { formatDateTime, formatDateTimeShort } from '@/lib/utils'
 
 interface RawSubmission {
  id: string
@@ -50,18 +51,6 @@ interface StudentCompletionTableProps {
 }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-
-function formatSubmittedAt(iso?: string) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 const statusConfig: Record<string, { label: string; className: string; iconColor: string }> = {
  AC: { label: '通过', className: 'text-secondary bg-secondary/10', iconColor: 'text-secondary' },
@@ -129,7 +118,7 @@ function SubmissionModal({
  if (data.success && data.data?.code) {
  setCodeMap(prev => ({ ...prev, [sub.id]: data.data.code }))
  }
- } catch { } finally {
+ } catch (e) { console.error('加载用户代码失败:', e) } finally {
  setLoadingIds(prev => {
  const next = new Set(prev)
  next.delete(sub.id)
@@ -149,7 +138,7 @@ function SubmissionModal({
  await navigator.clipboard.writeText(currentCode)
  setCopied(true)
  setTimeout(() => setCopied(false), 2000)
- } catch { }
+ } catch (e) { console.error('复制到剪贴板失败:', e) }
  }
 
  const currentCode = selectedSubId ? codeMap[selectedSubId] || null : null
@@ -215,7 +204,7 @@ function SubmissionModal({
  </span>
  </div>
  <div className="text-[11px] text-muted-foreground tabular-nums">
- {new Date(sub.submittedAt).toLocaleString('zh-CN')}
+ {formatDateTime(sub.submittedAt)}
  </div>
  </button>
  )
@@ -365,7 +354,7 @@ export default function StudentCompletionTable({ students, problems, assignmentT
        <span className={`text-xs font-semibold tabular-nums ${scoreClass}`}>{submission.score} 分</span>
        <span className={`text-[10px] font-medium ${cfg?.iconColor || 'text-muted-foreground'}`}>{statusLabel}</span>
        <span className="text-[10px] text-muted-foreground tabular-nums leading-tight">
-         {formatSubmittedAt(submission.submittedAt)}
+         {formatDateTimeShort(submission.submittedAt ?? '')}
        </span>
      </div>
    )

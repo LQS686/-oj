@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, FileText, User, Clock, Database, Calendar, CheckCircle, XCircle, AlertTriangle, Code, Clock as TimeIcon, Filter, X, Eye } from 'lucide-react'
-import { formatTime, formatMemory } from '@/lib/utils'
+import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText } from '@/lib/status'
 import { fetchWithCookie } from '@/lib/api/base'
 import { EducationalPageShell, PageLoading } from '@/components/common'
@@ -309,7 +309,7 @@ function SubmissionsContent() {
  <td className="px-6 py-4">
  <span className="text-sm text-muted-foreground flex items-center gap-1">
  <Calendar className="w-3 h-3" />
- {new Date(submission.submittedAt).toLocaleString('zh-CN')}
+ {formatDateTime(submission.submittedAt)}
  </span>
  </td>
  <td className="px-6 py-4">
@@ -421,7 +421,7 @@ function SubmissionsContent() {
  <p className="text-sm text-muted-foreground mb-1">提交时间</p>
  <p className="font-medium text-foreground flex items-center gap-2">
  <Calendar className="w-4 h-4 text-muted-foreground" />
- {new Date(selectedSubmission.submittedAt).toLocaleString('zh-CN')}
+ {formatDateTime(selectedSubmission.submittedAt)}
  </p>
  </div>
  </div>

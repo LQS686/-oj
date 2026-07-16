@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Search, Command } from 'lucide-react'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { fetchWithCookie } from '@/lib/api/base'
+import { formatDate } from '@/lib/utils'
 
 interface SearchResult {
  problems: Array<{
@@ -216,7 +217,7 @@ export default function SearchBar() {
  {contest.title}
  </div>
  <div className="text-xs text-muted-foreground mt-1">
- {new Date(contest.startTime).toLocaleDateString()}
+ {formatDate(contest.startTime)}
  </div>
  </Link>
  ))}

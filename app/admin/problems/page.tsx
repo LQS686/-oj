@@ -6,6 +6,7 @@ import { DataTable, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { FileText, Plus, Edit, Trash2, Eye, EyeOff, Search, Trophy, Database, Users, Loader2, History } from 'lucide-react'
 import { DIFFICULTY_COLORS } from '@/lib/constants'
+import { formatDate, formatDateTime } from '@/lib/utils'
 
 interface Problem {
  id: string
@@ -331,7 +332,7 @@ export default function AdminProblemsPage() {
  sortable: true,
  render: (value) => (
  <span className="text-sm text-muted-foreground">
- {new Date(value).toLocaleDateString('zh-CN')}
+ {formatDate(value)}
  </span>
  ),
  },
@@ -416,7 +417,7 @@ export default function AdminProblemsPage() {
  label: '时间',
  render: (value) => (
  <span className="text-sm text-muted-foreground">
- {new Date(value).toLocaleString()}
+ {formatDateTime(value)}
  </span>
  ),
  },

@@ -143,6 +143,14 @@ class ApiClient {
         throw networkError;
       }
 
+      // 401 是正常的"未认证"状态（如 /auth/me 在未登录时探测），
+      // 不应作为 error 记录，避免控制台噪音。
+      // 认证相关接口（/auth/me, /auth/verify 等）的 401 由调用方静默处理。
+      const errCode = (error as ClientApiError)?.code
+      if (errCode === 'UNAUTHORIZED') {
+        throw error;
+      }
+
       logger.error(`API请求失败: ${endpoint}`, error);
       throw error;
     } finally {

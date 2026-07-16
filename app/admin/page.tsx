@@ -21,6 +21,7 @@ import {
   Sparkles,
   UserPlus
 } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils'
 
 interface DashboardStats {
  totalUsers: number
@@ -162,7 +163,7 @@ export default function AdminDashboard() {
  label: '提交时间',
  render: (value) => (
  <span className="text-sm text-muted-foreground">
- {new Date(value).toLocaleString('zh-CN')}
+ {formatDateTime(value)}
  </span>
  ),
  },

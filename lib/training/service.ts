@@ -180,7 +180,7 @@ export async function listPublicTrainingsAdvanced(
   ])
 
   // 批量拉取当前用户在这些题单上的进度
-  let progressMap = new Map<string, { solvedCount: number; attemptedCount: number; isJoined: boolean }>()
+  const progressMap = new Map<string, { solvedCount: number; attemptedCount: number; isJoined: boolean }>()
   if (filter.userId && trainings.length > 0) {
     const trainingIds = trainings.map((t: any) => t.id)
     const enrollments = await prisma.trainingEnrollment.findMany({
@@ -401,14 +401,15 @@ export async function addTrainingProblems(
   problems: Array<{ problemId: string; orderIndex?: number; score?: number; required?: boolean }>
 ) {
   cache.delete(byIdKey(trainingId))
+  if (problems.length === 0) return { count: 0 }
   // 计算起始 orderIndex
-  const existing = await prisma.trainingProblem.findMany({
+  const latest = await prisma.trainingProblem.findMany({
     where: { trainingId },
     orderBy: { orderIndex: 'desc' },
     take: 1,
     select: { orderIndex: true },
   })
-  let next = (existing[0]?.orderIndex ?? -1) + 1
+  let next = (latest[0]?.orderIndex ?? -1) + 1
   const data = problems.map((p: any) => ({
     trainingId,
     problemId: p.problemId,
@@ -416,13 +417,17 @@ export async function addTrainingProblems(
     score: p.score ?? 100,
     required: p.required ?? true,
   }))
-  // MongoDB 不支持 skipDuplicates，逐条 create 跳过重复
+  // 先查询已存在的 trainingId+problemId 组合，再批量插入未存在的
+  const existingProblems = await prisma.trainingProblem.findMany({
+    where: { trainingId },
+    select: { problemId: true },
+  })
+  const existingIds = new Set(existingProblems.map(e => e.problemId))
+  const toCreate = data.filter(item => !existingIds.has(item.problemId))
   let count = 0
-  for (const item of data) {
-    try {
-      await prisma.trainingProblem.create({ data: item })
-      count++
-    } catch { /* skip duplicate */ }
+  if (toCreate.length > 0) {
+    const result = await prisma.trainingProblem.createMany({ data: toCreate })
+    count = result.count
   }
   return { count }
 }
@@ -479,10 +484,16 @@ export async function enrollTraining(trainingId: string, userId: string) {
     where: { trainingId_userId: { trainingId, userId } },
   })
   if (existing) return existing
-  const result = await prisma.trainingEnrollment.create({
-    data: { trainingId, userId },
+  const result = await prisma.$transaction(async (tx) => {
+    const enrollment = await tx.trainingEnrollment.create({
+      data: { trainingId, userId },
+    })
+    await tx.training.update({
+      where: { id: trainingId },
+      data: { joinCount: { increment: 1 } },
+    })
+    return enrollment
   })
-  await incrementJoinCount(trainingId, 1)
   cache.delete(enrollmentKey(userId, trainingId))
   cache.delete(userEnrollmentsKey(userId))
   return result
@@ -493,10 +504,15 @@ export async function unenrollTraining(trainingId: string, userId: string) {
     where: { trainingId_userId: { trainingId, userId } },
   })
   if (!existing) return null
-  await prisma.trainingEnrollment.delete({
-    where: { trainingId_userId: { trainingId, userId } },
+  await prisma.$transaction(async (tx) => {
+    await tx.trainingEnrollment.delete({
+      where: { trainingId_userId: { trainingId, userId } },
+    })
+    await tx.training.update({
+      where: { id: trainingId },
+      data: { joinCount: { increment: -1 } },
+    })
   })
-  await incrementJoinCount(trainingId, -1)
   cache.delete(enrollmentKey(userId, trainingId))
   cache.delete(userEnrollmentsKey(userId))
   return existing
@@ -607,7 +623,7 @@ export async function getTrainingWithProblemStatuses(
   })
   if (!training) return null
 
-  let problemStatuses: Record<string, { status: TrainingProblemStatus; lastStatus: string | null; submittedAt: Date | null }> = {}
+  const problemStatuses: Record<string, { status: TrainingProblemStatus; lastStatus: string | null; submittedAt: Date | null }> = {}
   let isJoined = false
   if (userId) {
     const enrollment = await prisma.trainingEnrollment.findUnique({
@@ -705,7 +721,7 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
     },
   })
 
-  let problemStatuses: Record<string, TrainingProblemStatus> = {}
+  const problemStatuses: Record<string, TrainingProblemStatus> = {}
   if (userId) {
     const problemIds = trainingProblems.map((p: any) => p.problemId)
     if (problemIds.length > 0) {

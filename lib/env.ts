@@ -20,6 +20,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import { prisma } from '@/lib/prisma'
 
 let validated = false
 
@@ -79,6 +80,13 @@ function checkFrontendUrl(): string | null {
   return null
 }
 
+function checkTz(): string | null {
+  if (process.env.NODE_ENV === 'production' && !process.env.TZ) {
+    return '生产环境建议设置 TZ 环境变量（如 TZ=Asia/Shanghai），确保日期时间处理一致'
+  }
+  return null
+}
+
 /**
  * 执行完整环境变量校验。
  * - 缺关键变量：抛出 Error（含修复指引）
@@ -117,6 +125,10 @@ export function validateEnvironment(): EnvironmentCheckResult {
   const feErr = checkFrontendUrl()
   if (feErr) warnings.push(feErr)
 
+  // TZ：生产环境建议设置，确保日期时间处理一致
+  const tzErr = checkTz()
+  if (tzErr) warnings.push(tzErr)
+
   if (warnings.length > 0) {
     for (const w of warnings) {
       logger.warn(`[env] ${w}`)
@@ -130,6 +142,10 @@ export function validateEnvironment(): EnvironmentCheckResult {
   }
 
   validated = true
+  // 校验 Prisma client 是否正确生成（warn 而非 throw：旧 client 仍可工作，仅功能降级）
+  if (!(prisma as any).solutionView || !(prisma as any).solutionLike) {
+    logger.warn('⚠️  Prisma client 未正确生成（缺少 solutionView/solutionLike 模型）。请运行: npx prisma generate')
+  }
   logger.info('[env] 环境变量校验通过', {
     NODE_ENV: process.env.NODE_ENV || 'development',
     hasRedis: !!process.env.REDIS_URL,

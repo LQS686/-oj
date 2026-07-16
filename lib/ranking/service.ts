@@ -180,43 +180,45 @@ export async function listRankingByType(type: 'rating' | 'solved', page: number,
  * 当前用户的实时排名（rating / solved 模式分别计算）
  */
 export async function getMyRankAdvanced(userId: string, type: 'rating' | 'solved' = 'rating') {
-  let rank = 0
-  if (type === 'solved') {
-    const currentUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { solvedCount: true, rating: true },
-    })
-    if (currentUser) {
-      const count = await prisma.user.count({
-        where: {
-          isBanned: false,
-          OR: [
-            { solvedCount: { gt: currentUser.solvedCount } },
-            { solvedCount: currentUser.solvedCount, rating: { gt: currentUser.rating } },
-          ],
-        },
+  return cache.get('ranking:myRankAdvanced', [userId, type], async () => {
+    let rank = 0
+    if (type === 'solved') {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { solvedCount: true, rating: true },
       })
-      rank = count + 1
-    }
-  } else {
-    const currentUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { rating: true, solvedCount: true },
-    })
-    if (currentUser) {
-      const count = await prisma.user.count({
-        where: {
-          isBanned: false,
-          OR: [
-            { rating: { gt: currentUser.rating } },
-            { rating: currentUser.rating, solvedCount: { gt: currentUser.solvedCount } },
-          ],
-        },
+      if (currentUser) {
+        const count = await prisma.user.count({
+          where: {
+            isBanned: false,
+            OR: [
+              { solvedCount: { gt: currentUser.solvedCount } },
+              { solvedCount: currentUser.solvedCount, rating: { gt: currentUser.rating } },
+            ],
+          },
+        })
+        rank = count + 1
+      }
+    } else {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { rating: true, solvedCount: true },
       })
-      rank = count + 1
+      if (currentUser) {
+        const count = await prisma.user.count({
+          where: {
+            isBanned: false,
+            OR: [
+              { rating: { gt: currentUser.rating } },
+              { rating: currentUser.rating, solvedCount: { gt: currentUser.solvedCount } },
+            ],
+          },
+        })
+        rank = count + 1
+      }
     }
-  }
-  return { rank, userId }
+    return { rank, userId }
+  }, { ttl: 30_000 })
 }
 
 /**

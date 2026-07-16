@@ -3,8 +3,16 @@ import { logger } from './logger'
 
 let redisClient: Redis | null = null
 
+function getRedisUrl(): string {
+  const url = process.env.REDIS_URL
+  if (!url && process.env.NODE_ENV === 'production') {
+    throw new Error('生产环境必须设置 REDIS_URL 环境变量')
+  }
+  return url || 'redis://localhost:6379'
+}
+
 function createRedisClient(): Redis {
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379'
+  const redisUrl = getRedisUrl()
   
   const client = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,

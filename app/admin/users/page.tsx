@@ -7,6 +7,7 @@ import { fetchWithAuth } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { isSystemAdmin } from '@/lib/permissions'
 import { Users, Search, Shield, User, Mail, Calendar, MoreHorizontal, Edit, Trash2, ShieldCheck, ShieldOff, UserPlus, Upload, X, Plus, CheckSquare, Square, FileText, AlertCircle, CheckCircle, Loader2, Download, KeyRound, TrendingUp } from 'lucide-react'
+import { formatDate } from '@/lib/utils'
 
 /**
  * 本地角色展示映射（四级角色体系：SYSTEM_ADMIN / ADMIN / TEACHER / STUDENT）
@@ -527,7 +528,7 @@ export default function AdminUsersPage() {
  render: (value: string) => (
  <div className="flex items-center gap-2 text-muted-foreground">
  <Calendar className="w-4 h-4" />
- {new Date(value).toLocaleDateString('zh-CN')}
+ {formatDate(value)}
  </div>
  ),
  },

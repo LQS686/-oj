@@ -358,6 +358,7 @@ export async function computeContestRankings(contestId: string) {
   })
 
   const startTime = contest.startTime.getTime()
+  const endTime = contest.endTime ? contest.endTime.getTime() : null
   const userStatsMap = new Map<string, ContestUserStats>()
 
   // 预填充
@@ -387,6 +388,8 @@ export async function computeContestRankings(contestId: string) {
     const problemStats = stats.problems[sub.problemId]
     const relativeTime = new Date(sub.submittedAt).getTime() - startTime
     if (relativeTime < 0) return
+    // 过滤竞赛结束后的提交（管理员补提交或评测延迟不应计入排名）
+    if (endTime && new Date(sub.submittedAt).getTime() > endTime) return
 
     // ACM 逻辑
     if (contest.type === 'ACM') {
@@ -450,6 +453,37 @@ export async function computeContestRankings(contestId: string) {
   }
 }
 
+/**
+ * 竞赛结束后将最终排名写入 ContestParticipant 表
+ * 应在竞赛结束时调用（定时任务或管理员手动触发）
+ */
+export async function finalizeContestRankings(contestId: string) {
+  const contest = await prisma.contest.findUnique({ where: { id: contestId } })
+  if (!contest) throw new Error('竞赛不存在')
+
+  const result = await computeContestRankings(contestId)
+  if (!result) return
+
+  const rankList = result.rankings
+
+  // 批量更新 rank 和 score
+  await Promise.all(
+    rankList.map((entry: any) =>
+      prisma.contestParticipant.update({
+        where: { contestId_userId: { contestId, userId: entry.user.id } },
+        data: {
+          rank: entry.rank,
+          score: entry.totalScore,
+        },
+      }).catch(() => {
+        // 忽略：可能参与者已退出
+      })
+    )
+  )
+
+  logger.info(`竞赛 ${contestId} 排名已落库，共 ${rankList.length} 名参赛者`)
+}
+
 /* ============================================================================
  * 竞赛提交列表（含 user/problem 关联）
  * ========================================================================== */
@@ -477,7 +511,20 @@ export async function listContestSubmissionsPaged(
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { submittedAt: 'desc' },
-      include: {
+      // SEC-03: 使用 select 显式列出字段，排除 code 字段，避免代码泄露
+      select: {
+        id: true,
+        problemId: true,
+        userId: true,
+        language: true,
+        status: true,
+        score: true,
+        time: true,
+        memory: true,
+        passedTests: true,
+        totalTests: true,
+        message: true,
+        submittedAt: true,
         user: { select: { id: true, username: true, nickname: true } },
         problem: { select: { id: true, title: true, problemNumber: true } },
       },

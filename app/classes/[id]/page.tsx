@@ -29,6 +29,7 @@ import ClassManageInlinePanel from '@/components/class/ClassManageInlinePanel'
 import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
 import { classRoleDisplayLabel, normalizeClassRoleToApi } from '@/lib/class/roles'
+import { formatDate } from '@/lib/utils'
 
 interface Assignment {
   id: string
@@ -463,7 +464,7 @@ function ClassDetailContent() {
                           <h3 className="font-medium line-clamp-1">{n.title}</h3>
                           <p className="text-[11px] text-muted-foreground mt-1">
                             {n.author?.nickname || n.author?.username || '匿名'} ·{' '}
-                            {new Date(n.createdAt).toLocaleDateString('zh-CN')}
+                            {formatDate(n.createdAt)}
                           </p>
                         </Link>
                       ))}
@@ -509,11 +510,7 @@ function ClassDetailContent() {
                             <span className="text-muted-foreground/80">
                               {' '}
                               · 加入{' '}
-                              {new Date(m.joinedAt).toLocaleDateString('zh-CN', {
-                                year: 'numeric',
-                                month: '2-digit',
-                                day: '2-digit',
-                              })}
+                              {formatDate(m.joinedAt)}
                             </span>
                           ) : null}
                         </p>
@@ -587,7 +584,7 @@ function ClassDetailContent() {
                 <dt className="text-muted-foreground text-xs mb-0.5">创建时间</dt>
                 <dd className="text-foreground inline-flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                  {new Date(classData.createdAt).toLocaleDateString('zh-CN')}
+                  {formatDate(classData.createdAt)}
                 </dd>
               </div>
             </dl>

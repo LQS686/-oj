@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest} from 'next/server';
+import { NextResponse } from 'next/server';
+import { logger } from './logger';
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -19,6 +21,7 @@ interface RateLimitStore {
 }
 
 class MemoryStore implements RateLimitStore {
+  private static readonly MAX_ENTRIES = 10000
   private store: Map<string, RateLimitEntry> = new Map();
   private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -52,6 +55,13 @@ class MemoryStore implements RateLimitStore {
         this.store.delete(key);
       }
     }
+    // LRU 上限保护：如果清理后仍超过最大条目数，删除最早的
+    if (this.store.size > MemoryStore.MAX_ENTRIES) {
+      const keysToDelete = [...this.store.keys()].slice(0, this.store.size - MemoryStore.MAX_ENTRIES)
+      for (const key of keysToDelete) {
+        this.store.delete(key)
+      }
+    }
   }
 
   destroy(): void {
@@ -83,7 +93,7 @@ class RedisStore implements RateLimitStore {
       this.useRedis = true;
     } catch (error) {
       // fail-open：Redis 不可用时降级到内存存储，不影响限流功能本身
-      console.warn('[rate-limit] Redis 不可用，降级为内存存储:', error instanceof Error ? error.message : error);
+      logger.warn('[rate-limit] Redis 不可用，降级为内存存储', { error: error instanceof Error ? error.message : String(error) });
       this.useRedis = false;
     }
   }
@@ -110,7 +120,7 @@ class RedisStore implements RateLimitStore {
       }
       return entry;
     } catch (error) {
-      console.warn('[rate-limit] Redis get 失败:', error instanceof Error ? error.message : error);
+      logger.warn('[rate-limit] Redis get 失败', { error: error instanceof Error ? error.message : String(error) });
       return undefined;
     }
   }
@@ -123,7 +133,7 @@ class RedisStore implements RateLimitStore {
       const ttl = Math.ceil((entry.resetTime - Date.now()) / 1000);
       await this.redis.setex(`ratelimit:${key}`, ttl, JSON.stringify(entry));
     } catch (error) {
-      console.warn('[rate-limit] Redis set 失败:', error instanceof Error ? error.message : error);
+      logger.warn('[rate-limit] Redis set 失败', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -134,7 +144,7 @@ class RedisStore implements RateLimitStore {
     try {
       await this.redis.del(`ratelimit:${key}`);
     } catch (error) {
-      console.warn('[rate-limit] Redis delete 失败:', error instanceof Error ? error.message : error);
+      logger.warn('[rate-limit] Redis delete 失败', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -172,7 +182,7 @@ async function checkRateLimit(
   try {
     entry = await redisStore.get(key);
   } catch (error) {
-    console.warn('[rate-limit] 读取 Redis 计数失败，回退内存:', error instanceof Error ? error.message : error);
+    logger.warn('[rate-limit] 读取 Redis 计数失败，回退内存', { error: error instanceof Error ? error.message : String(error) });
   }
 
   if (!entry) {
@@ -193,7 +203,7 @@ async function checkRateLimit(
   try {
     await redisStore.set(key, newEntry);
   } catch (error) {
-    console.warn('[rate-limit] 写入 Redis 计数失败:', error instanceof Error ? error.message : error);
+    logger.warn('[rate-limit] 写入 Redis 计数失败', { error: error instanceof Error ? error.message : String(error) });
   }
 
   const result: RateLimitResult = {
