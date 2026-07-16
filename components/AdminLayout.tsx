@@ -197,7 +197,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="flex">
       <aside className={`fixed left-0 top-0 h-screen transition-all duration-300 z-30 flex flex-col border-r ${
         sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0 md:w-20'
       } bg-background-secondary`}
