@@ -55,7 +55,6 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 #   - openjdk11-jdk: ~250MB（JDK + JRE）
 #   - gfortran: ~80MB（Fortran 编译器，从未启用）
 #   - py3-pip: ~50MB（pip 包管理器，运行时不需要）
-# 减负后镜像预计：~600MB（原 ~1.2GB，节省 ~50%）
 RUN apk add --no-cache \
     bash \
     coreutils \
@@ -70,7 +69,7 @@ RUN apk add --no-cache \
 # 设置环境变量
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-# USE_DOCKER=false: 在容器内直接执行评测更简单可靠（容器内已装 g++/gcc/openjdk）。
+# USE_DOCKER=false: 在容器内直接执行评测更简单可靠（容器内已装 g++/gcc）。
 # sibling 容器卷挂载复杂（评测容器看不到宿主文件），如需 Docker 沙箱需另配 docker.sock + 卷挂载。
 ENV USE_DOCKER=false
 
@@ -78,30 +77,37 @@ ENV USE_DOCKER=false
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# 复制必要文件
-# P0 修复（2026-07）：重建 runner 阶段文件结构。
-#   之前问题：在 standalone 之外又额外 COPY server.ts / lib / prisma / tsconfig，
-#   这些其实是 standalone 内部追踪的，结果造成 /app/ 下有双份文件互相干扰，
-#   server.ts 运行时找不到正确的 lib 路径，导致进程启动后立即退出。
-#   之前未察觉是因为只看到 (unhealthy) 而没看 logs。
-#
-#   修复策略：使用 next.config.ts 的 outputFileTracingIncludes 显式追踪
-#   server.ts 和 lib（这是 Next.js 标准做法），然后只 COPY standalone 即可。
-#   Prisma client 必须单独 COPY，因为 .prisma 是动态生成的。
+# 复制 standalone 产物（Next.js 构建输出 + 追踪到的依赖）
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
 
-# Prisma client 必须单独 COPY（standalone 不追踪动态生成的内容）
+# 显式复制 server.ts 和 lib（standalone 不追踪自定义 server 文件）
+# 这一步是必须的：server.ts 用 tsx 启动，不在 Next.js 构建图里，
+# 默认 standalone 不会包含它，必须显式 COPY。
+COPY --from=builder --chown=nextjs:nodejs /app/server.ts ./
+COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.server.json ./
+
+# 复制tailwind和postcss配置
+COPY --from=builder --chown=nextjs:nodejs /app/tailwind.config.ts ./
+COPY --from=builder --chown=nextjs:nodejs /app/postcss.config.mjs ./
+
+# 复制node_modules中的prisma和tailwindcss
+# .prisma 是动态生成的，standalone 不追踪，必须单独 COPY
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@tailwindcss ./node_modules/@tailwindcss
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_modules/tailwindcss
 
-# 复制 tsx（自定义 server 启动器，在 devDependencies，standalone 不追踪）
-# 错误日志：npm warn exec The following package was not found: tsx@4.23.1
-# 修复：从 builder 阶段直接复制 tsx + 它的依赖 esbuild / get-tsconfig
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tsx ./node_modules/tsx
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@esbuild ./node_modules/@esbuild
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/get-tsconfig ./node_modules/get-tsconfig
+# 安装生产依赖
+# 关键：standalone 模式只追踪 Next.js 构建图里的依赖，但 server.ts 动态 import 了
+# 很多模块（dotenv、socket.io、ioredis、jsonwebtoken、openai、mongodb、bcryptjs、adm-zip、
+# katex、nodemailer 等），这些可能没被完全追踪。必须运行 npm install --omit=dev 确保所有
+# 生产依赖都装上。tsx 现在在 dependencies 中（之前在 devDependencies），也会被装上。
+RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts
 
 # 创建必要的目录并设置权限
 # addgroup nextjs root: 将 nextjs 加入 root 组，使 runner.sh 中的 ulimit 命令可执行。
@@ -121,7 +127,5 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # 启动命令 - 使用 tsx 运行 server.ts（自定义 server，包含 socket.io）
-#   cwd: /app，因为 next.config 的 outputFileTracingIncludes 已将 server.ts 复制到
-#        /app/.next/standalone/server.ts，但我们需要从 /app 直接启动以便 npx tsx 能解析
-#   注意：现在 server.ts / lib 都在 /app/ 顶层（来自 .next/standalone/ 整个目录被解压）
+# tsx 已在 dependencies 中，npm install --omit=dev 会安装，npx 可直接本地解析。
 CMD ["npx", "tsx", "server.ts"]

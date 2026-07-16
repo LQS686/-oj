@@ -4,15 +4,6 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: 'standalone',
 
-  // P0 修复（2026-07）：让 standalone 模式追踪 server.ts 和 lib。
-  //   原因：自定义 server.ts（用 tsx 启动）不在 Next.js 构建图里，
-  //   默认 standalone 不会追踪它们，导致 /app/.next/standalone/server.ts 不存在。
-  //   显式声明后，next build 会把 server.ts / lib 复制到 standalone 目录，
-  //   Docker runner 阶段只需要 COPY 一份即可，避免双份文件冲突。
-  outputFileTracingIncludes: {
-    '/': ['./server.ts', './lib/**/*', './prisma/**/*', './public/**/*'],
-  },
-
   images: {
     remotePatterns: [
       {
