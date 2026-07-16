@@ -1,5 +1,5 @@
 import sharp from 'sharp'
-import { join, basename } from 'path'
+import { join, basename, extname } from 'path'
 import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'fs/promises'
 import { existsSync, createWriteStream, createReadStream } from 'fs'
 import { pipeline } from 'stream/promises'
@@ -176,4 +176,33 @@ export async function cleanOldTempFiles() {
   } catch (e) {
     logger.error('Clean temp error', e)
   }
+}
+
+/**
+ * 根据头像 URL 删除已上传的头像文件（主图 + 缩略图）。
+ *
+ * URL 形如 `/uploads/avatars/6a56e5cbd3a1c74a64086490_1784194471277.webp`，
+ * 缩略图命名规则见 processAvatar：在扩展名前插入 `_thumb`。
+ *
+ * 安全：仅处理 `/uploads/avatars/` 前缀的 URL，防止传入任意路径删除文件；
+ * 文件不存在时静默忽略（已经是干净状态）。
+ */
+export async function deleteAvatarFilesByUrl(avatarUrl: string): Promise<void> {
+  if (!avatarUrl || !avatarUrl.startsWith('/uploads/avatars/')) return
+
+  const filename = basename(avatarUrl)
+  if (!filename) return
+
+  // 主图
+  const mainPath = join(UPLOAD_DIR, filename)
+  // 缩略图：在扩展名前插入 _thumb（与 processAvatar 中 thumbFilename 命名一致）
+  const ext = extname(filename)
+  const baseName = ext ? filename.slice(0, -ext.length) : filename
+  const thumbFilename = `${baseName}_thumb${ext}`
+  const thumbPath = join(UPLOAD_DIR, thumbFilename)
+
+  await Promise.all([
+    unlink(mainPath).catch(() => {}),
+    unlink(thumbPath).catch(() => {}),
+  ])
 }

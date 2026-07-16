@@ -28,6 +28,7 @@ export default function AvatarUploader({
  const [error, setError] = useState<string | null>(null)
  const [history, setHistory] = useState<UploadHistory[]>([])
  const [showHistory, setShowHistory] = useState(false)
+ const [deletingId, setDeletingId] = useState<string | null>(null)
  
  const fileInputRef = useRef<HTMLInputElement>(null)
  const CHUNK_SIZE = 1024 * 1024 // 1MB
@@ -216,19 +217,43 @@ export default function AvatarUploader({
  // Let's call a simple update profile API or similar if we had one for just URL.
  // Or just re-upload? No, that's wasteful.
  // We can call the profile update API.
- 
+
  try {
   const res = await fetchWithCookie('/api/users/profile', {
- method: 'PUT',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({ avatar: historyItem.url }) // Assuming this API supports avatar update
- })
- if (res.ok) {
- onAvatarUpdate(historyItem.url)
- }
+   method: 'PUT',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({ avatar: historyItem.url }) // Assuming this API supports avatar update
+  })
+  if (res.ok) {
+   onAvatarUpdate(historyItem.url)
+  }
  } catch (e) {
- console.error(e)
+  console.error(e)
  }
+ }
+
+ const handleHistoryDelete = async (e: React.MouseEvent, historyItem: UploadHistory) => {
+  // 阻止冒泡，避免触发卡片的选择头像逻辑
+  e.stopPropagation()
+  // 浏览器原生确认：删除不可恢复（含上传文件）
+  if (!window.confirm('确定删除该历史头像？删除后将同步移除已上传的图片文件，且不可恢复。')) return
+
+  setDeletingId(historyItem.id)
+  try {
+   const res = await fetchWithCookie(`/api/users/avatar/history/${historyItem.id}`, {
+    method: 'DELETE',
+   })
+   const data = await res.json()
+   if (!res.ok || !data.success) {
+    throw new Error(data.error || '删除失败')
+   }
+   // 从列表中移除
+   setHistory((prev) => prev.filter((item) => item.id !== historyItem.id))
+  } catch (err: any) {
+   setError(err.message || '删除头像历史失败')
+  } finally {
+   setDeletingId(null)
+  }
  }
 
  return (
@@ -358,9 +383,11 @@ export default function AvatarUploader({
  <h4 className="text-sm font-medium text-gray-900 mb-3">历史头像</h4>
  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
  {history.map((item) => (
- <button 
+ <div 
  key={item.id} 
  className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:ring-2 hover:ring-blue-500 hover:border-transparent transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+ role="button"
+ tabIndex={0}
  onClick={() => handleHistorySelect(item)}
  onKeyDown={(e) => {
  if (e.key === 'Enter' || e.key === ' ') {
@@ -383,7 +410,22 @@ export default function AvatarUploader({
  <Check size={12} />
  </div>
  </div>
+ {/* 删除按钮：右上角，hover 显示；点击删除 DB 记录 + 上传文件 */}
+ <button
+ type="button"
+ disabled={deletingId === item.id}
+ onClick={(e) => handleHistoryDelete(e, item)}
+ className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-1.5 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+ title="删除该历史头像"
+ aria-label={`删除历史头像 ${item.filename}`}
+ >
+ {deletingId === item.id ? (
+ <Loader2 size={12} className="animate-spin" />
+ ) : (
+ <Trash2 size={12} />
+ )}
  </button>
+ </div>
  ))}
  {history.length === 0 && (
  <div className="col-span-full text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-lg border border-dashed border-gray-200">

@@ -17,6 +17,7 @@ import { escapeHtml } from '@/lib/sanitize'
 import { clearAuthUserCache } from '@/lib/api/handler'
 import { isSystemAdmin, isAdmin } from '@/lib/permissions'
 import { AppError } from '@/lib/errors'
+import { logger } from '@/lib/logger'
 
 export interface UserProfile {
   id: string
@@ -646,6 +647,49 @@ export async function listAvatarHistory(userId: string, take = 20) {
     orderBy: { createdAt: 'desc' },
     take,
   })
+}
+
+/**
+ * 删除一条头像历史记录，并同步删除上传的图片文件（主图 + 缩略图）。
+ *
+ * 安全：
+ * 1. 校验 historyId 对应记录归属当前 userId，防止越权删除他人头像
+ * 2. 拒绝删除当前正在使用的头像（user.avatar === history.url），避免出现指向已删除文件的悬空引用
+ *
+ * 文件删除失败不抛错（DB 记录已删，文件可由后续清理任务兜底），
+ * 但会记录日志便于排查。
+ */
+export async function deleteAvatarHistory(userId: string, historyId: string): Promise<void> {
+  const record = await prisma.avatarHistory.findUnique({ where: { id: historyId } })
+  if (!record) {
+    throw AppError.notFound('头像历史记录不存在')
+  }
+  if (record.userId !== userId) {
+    throw AppError.forbidden('无权删除该头像历史')
+  }
+
+  // 拒绝删除当前正在使用的头像：避免 user.avatar 指向已删除文件
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { avatar: true },
+  })
+  if (user?.avatar && record.url && user.avatar === record.url) {
+    throw AppError.badRequest(
+      'AVATAR_IN_USE',
+      '该头像正在使用中，请先切换到其他头像后再删除'
+    )
+  }
+
+  await prisma.avatarHistory.delete({ where: { id: historyId } })
+
+  // 同步删除文件系统中的图片（主图 + 缩略图）
+  try {
+    const { deleteAvatarFilesByUrl } = await import('@/lib/upload')
+    await deleteAvatarFilesByUrl(record.url)
+  } catch (e) {
+    // 文件删除失败不阻断流程：DB 记录已删，文件残留可由清理任务兜底
+    logger.error('删除头像文件失败', e instanceof Error ? e : new Error(String(e)))
+  }
 }
 
 /* ============================================================================
