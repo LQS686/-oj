@@ -128,9 +128,7 @@ Write-Host "访问地址:" -ForegroundColor White
 Write-Host "  应用主页: http://localhost:3000" -ForegroundColor Cyan
 Write-Host "  Nginx: http://localhost:8080" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "默认账号:" -ForegroundColor White
-Write-Host "  管理员: admin / admin123" -ForegroundColor Cyan
-Write-Host "  测试账号: user1 ~ user10 / user123" -ForegroundColor Cyan
+Write-Host "首次使用: 访问网站注册首个账号，将自动获得系统管理员权限" -ForegroundColor Cyan
 Write-Host ""
 
 # 测试API

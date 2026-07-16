@@ -164,7 +164,7 @@ echo ""
 echo -e "  容器状态:"
 docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || docker compose ps
 echo ""
-echo -e "  默认账号: ${GREEN}admin / admin123${NC}"
+echo -e "  ${BOLD}首次使用：访问网站注册首个账号，将自动获得系统管理员权限${NC}"
 echo ""
 
 if [ -n "$DOMAIN" ]; then
