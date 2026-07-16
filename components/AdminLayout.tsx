@@ -100,8 +100,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   useEffect(() => {
     document.body.style.paddingTop = '0'
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflowY = 'hidden'
     return () => {
       document.body.style.paddingTop = '56px'
+      document.body.style.overflow = ''
+      document.documentElement.style.overflowY = ''
     }
   }, [])
 
@@ -197,7 +201,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="flex">
+    <div className="h-screen overflow-hidden flex">
       <aside className={`fixed left-0 top-0 h-screen transition-all duration-300 z-30 flex flex-col border-r ${
         sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0 md:w-20'
       } bg-background-secondary`}
@@ -294,7 +298,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <Menu className="w-5 h-5 text-foreground" />
       </button>
 
-      <main className={`flex-1 transition-all duration-300 ${
+      <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
         sidebarOpen ? 'md:ml-72' : 'md:ml-20'
       }`}>
         <header className="sticky top-0 z-20 border-b bg-background-secondary border-border">
