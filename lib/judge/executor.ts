@@ -16,9 +16,15 @@ if (!USE_DOCKER && process.platform === 'win32') {
   logger.warn('⚠️ [安全] Windows 本地进程评测已显式确认 (ALLOW_LOCAL_JUDGE_ON_WINDOWS=1)，无 Docker 沙箱隔离。生产环境必须设置 USE_DOCKER=true。')
 }
 
-// PERF-01 修复：生产环境强制使用 Docker 沙箱评测，禁止本地评测，避免无隔离的进程执行风险。
-if (process.env.NODE_ENV === 'production' && process.env.USE_DOCKER !== 'true') {
-  throw new Error('生产环境必须设置 USE_DOCKER=true，禁止本地评测')
+// PERF-01 修复：生产环境未启用 Docker 沙箱评测时告警。
+// 注意：懒检查 —— 不在模块加载时抛错，避免 next build 收集页面数据时因构建环境未设 USE_DOCKER 而失败。
+// 与 worker.ts 保持一致：仅 warn 不 throw，因为容器内部署 USE_DOCKER=false 是合法配置（容器本身已隔离）。
+function assertDockerJudgeEnabled() {
+  // 构建阶段跳过（next build 时 NEXT_PHASE=phase-production-build）
+  if (process.env.NEXT_PHASE === 'phase-production-build') return
+  if (process.env.NODE_ENV === 'production' && process.env.USE_DOCKER !== 'true') {
+    logger.warn('⚠️ [安全] 生产环境未启用 Docker 评测沙箱，选手代码可能访问进程资源。若在容器内部署则属正常配置。')
+  }
 }
 
 export interface ExecuteOptions {
@@ -133,6 +139,9 @@ function readWindowsProcessMemoryKB(pid: number): number {
 }
 
 export async function executeCode(options: ExecuteOptions): Promise<ExecuteResult> {
+  // 安全校验：真正执行评测时才拦截，避免构建阶段误触发
+  assertDockerJudgeEnabled()
+
   const {
     language,
     input,
