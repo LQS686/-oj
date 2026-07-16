@@ -370,7 +370,7 @@ export default function ProblemsPage() {
         description={`共 ${totalProblems} 道题目`}
         icon={BookOpen}
         toolbar={
-          <div className="card-static rounded-lg border border-border p-2">
+          <div className="card-static rounded-lg border border-border p-2 relative z-10">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <div className="relative flex-1 min-w-0 flex items-center">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
