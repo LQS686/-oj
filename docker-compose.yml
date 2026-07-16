@@ -46,9 +46,16 @@ services:
         max-size: "10m"
         max-file: "5"
     healthcheck:
-      # P1 修复：拆分 liveness 与 readiness
-      #   liveness (process alive): /api/health — 不依赖 DB/Redis
-      #   readiness (deps OK):     /api/health/db + /api/health/redis
+      # P0 修复（2026-07）：改用静态页面 /healthcheck-static 替代 /api/health
+      #   之前用 /api/health 反复失败：
+      #     - API route 是动态路由，依赖 next-runtime 正确编译并注册
+      #     - standalone 模式下 dynamic API route 注册可能有问题
+      #     - 任何 import 失败或编译异常都会让 route 失效返回 404
+      #   静态页面优势：
+      #     - 编译期固定产物 (.next/server/app/healthcheck-static.html)
+      #     - 不依赖任何 lib / withApi / 工具函数
+      #     - 即便应用其他模块崩了，只要 Next.js 还能响应 HTTP 就返回 200
+      #     - 容器编排层真正判断"进程还活着"
       test:
         [
           "CMD",
@@ -56,7 +63,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:3000/api/health",
+          "http://localhost:3000/healthcheck-static",
         ]
       interval: 30s
       timeout: 10s
