@@ -49,6 +49,8 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 #   - python3: Python 解释器
 #   - g++/gcc: C/C++ 编译器
 #   - make/musl-dev: 标准构建工具链
+#   - wget: docker-compose healthcheck 必需（Alpine 默认不装，~250KB）
+#   - curl: 健康诊断备用（docker exec 时手动调用更直观）
 # 移除项（评测机减负）：
 #   - openjdk11-jdk: ~250MB（JDK + JRE）
 #   - gfortran: ~80MB（Fortran 编译器，从未启用）
@@ -61,7 +63,9 @@ RUN apk add --no-cache \
     make \
     g++ \
     gcc \
-    musl-dev
+    musl-dev \
+    wget \
+    curl
 
 # 设置环境变量
 ENV NODE_ENV=production
