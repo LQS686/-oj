@@ -338,7 +338,7 @@ ESM/tsx 环境下 `__dirname` 不可靠（可能指向 npx 缓存目录）。
 
 Alpine Linux 默认不允许非 root 用户执行 `ulimit`（runner.sh 中用于资源限制）。
 
-- Dockerfile 中 `usermod -aG root nextjs` 解决此问题
+- Dockerfile 中 `addgroup nextjs root` 解决此问题（Alpine 无 `usermod`，用 `addgroup`）
 - 如移除此行，评测编译会失败（spawn exitCode=1，stderr 为空）
 - 长期方案：改用 Docker 沙箱评测（`USE_DOCKER=true`）可避免此权限提升
 
@@ -352,3 +352,30 @@ FRONTEND_URL=`http://example.com`
 # 正确
 FRONTEND_URL=http://example.com
 ```
+
+### 9. Dockerfile runner 阶段必须保留 `npm install --omit=dev`（P0！）
+
+**这是 2026-07-16 多日宕机的根因，切勿再次移除！**
+
+Next.js standalone 模式只追踪构建图里的依赖，**不会追踪自定义 server.ts 动态 import 的模块**（dotenv、socket.io、ioredis、jsonwebtoken、openai、mongodb、bcryptjs、adm-zip、katex、nodemailer 等）。移除 `npm install --omit=dev` 会导致这些生产依赖全部缺失，server.ts 启动即崩溃。
+
+- **必须保留**：`RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts`
+- **不要为了省磁盘空间而移除它**：如需节省磁盘，用 `docker builder prune -af` 清理构建缓存
+- **`tsx` 必须在 `dependencies` 中**（不能在 `devDependencies`）：server.ts 生产环境用 tsx 启动，`npm install --omit=dev` 必须能装上它
+
+### 10. Dockerfile runner 阶段必须显式 COPY server.ts 和 lib
+
+Next.js standalone **不会自动追踪自定义 server 文件**。必须显式 COPY：
+
+```dockerfile
+COPY --from=builder --chown=nextjs:nodejs /app/server.ts ./
+COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.server.json ./
+```
+
+**不要用 `outputFileTracingIncludes` 替代显式 COPY**：tracing 机制会在 `/app/` 下产生双份文件冲突，导致 server.ts 找不到正确的 lib 路径。
+
+### 11. Healthcheck 必须用静态页面
+
+`/api/health` 是动态 API route，任何 import 失败都会让它返回 404。Healthcheck 必须用静态页面 `/healthcheck-static`（`force-static`），编译期固定产物，不依赖任何 lib。
