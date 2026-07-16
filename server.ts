@@ -5,6 +5,8 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'http'
 import { parse } from 'url'
+import { join, extname } from 'path'
+import { readFile, access } from 'fs/promises'
 import next from 'next'
 import { initWebSocketServer, closeWebSocket } from './lib/websocket/server'
 import dotenv from 'dotenv'
@@ -99,6 +101,69 @@ function parseMultipart(body: Buffer, boundary: string): Array<{
     cursor = nextStart
   }
   return parts
+}
+
+/**
+ * 前置路由：直接用 Node 原生方式服务 /uploads/ 静态文件。
+ *
+ * 问题背景：Next.js 16 standalone 模式 + Turbopack 构建时，
+ * public 目录的静态文件服务只覆盖构建时已存在的文件，
+ * 运行时新增的头像文件（由用户上传）不会被服务，导致 404。
+ *
+ * 本函数在 Next.js handler 之前拦截 /uploads/ 请求，
+ * 直接从文件系统读取并返回，绕开 Next.js 的静态文件服务。
+ */
+const STATIC_UPLOADS_DIR = join(process.cwd(), 'public', 'uploads')
+
+const MIME_MAP: Record<string, string> = {
+  '.webp': 'image/webp',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+}
+
+async function serveStaticUpload(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  const url = req.url || ''
+  if (!url.startsWith('/uploads/')) return false
+
+  // 安全：防止路径穿越（如 /uploads/../../etc/passwd）
+  const decoded = decodeURIComponent(url.split('?')[0])
+  const filePath = join(STATIC_UPLOADS_DIR, decoded.replace(/^\/uploads\//, ''))
+  const normalized = filePath.replace(/\\/g, '/')
+  const baseNormalized = STATIC_UPLOADS_DIR.replace(/\\/g, '/')
+  if (!normalized.startsWith(baseNormalized)) {
+    res.statusCode = 403
+    res.end('Forbidden')
+    return true
+  }
+
+  try {
+    await access(filePath)
+  } catch {
+    // 文件不存在，返回 404（不经过 Next.js，减少日志噪音）
+    res.statusCode = 404
+    res.setHeader('Content-Type', 'text/plain')
+    res.end('Not Found')
+    return true
+  }
+
+  const ext = extname(filePath).toLowerCase()
+  const contentType = MIME_MAP[ext] || 'application/octet-stream'
+
+  try {
+    const fileBuffer = await readFile(filePath)
+    res.statusCode = 200
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Cache-Control', 'public, max-age=86400')
+    res.setHeader('Content-Length', fileBuffer.length)
+    res.end(fileBuffer)
+  } catch {
+    res.statusCode = 500
+    res.end('Internal Server Error')
+  }
+  return true
 }
 
 /**
@@ -265,6 +330,12 @@ app.prepare().then(async () => {
         const handled = await handleAvatarChunkDirect(req, res)
         if (handled) return
       }
+
+      // 前置路由：直接服务 /uploads/ 静态文件
+      // Next.js 16 standalone + Turbopack 构建时，public 目录的静态文件服务
+      // 只覆盖构建时已存在的文件，运行时新增的头像文件不会被服务，导致 404。
+      // 在 Next.js handler 之前拦截 /uploads/ 请求，用 Node 原生 fs 直接读取返回。
+      if (await serveStaticUpload(req, res)) return
 
       const parsedUrl = parse(req.url!, true)
       await handle(req, res, parsedUrl)
