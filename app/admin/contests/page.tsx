@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { DataTable, type Column } from '@/components/admin'
+import { DataTable, FilterBar, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
 import { Trophy, Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
@@ -273,8 +273,7 @@ export default function AdminContestsPage() {
  </button>
  </div>
 
- <div className="card p-4">
- <div className="flex gap-4 flex-wrap items-center">
+ <FilterBar activeCount={(searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -297,8 +296,7 @@ export default function AdminContestsPage() {
  <option value="ONGOING">进行中</option>
  <option value="ENDED">已结束</option>
  </select>
- </div>
- </div>
+ </FilterBar>
 
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
  <div className="card p-4">

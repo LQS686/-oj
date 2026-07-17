@@ -438,7 +438,7 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
         </div>
 
         <div className="p-6 space-y-6">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
             {classData.avatar ? (
               <img
                 src={classData.avatar}

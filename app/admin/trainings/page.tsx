@@ -7,7 +7,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { DataTable, type Column } from '@/components/admin'
+import { DataTable, FilterBar, type Column } from '@/components/admin'
 import {
   Plus, Search, Edit, Trash2, Eye, Filter, BookOpen, AlertCircle, RefreshCw
 } from 'lucide-react'
@@ -219,8 +219,7 @@ export default function AdminTrainingsPage() {
  </div>
 
  {/* 筛选 */}
- <div className="card-static p-4">
- <div className="flex flex-col md:flex-row gap-3">
+ <FilterBar activeCount={(keyword ? 1 : 0) + (statusFilter ? 1 : 0)}>
  <div className="flex-1 relative">
  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
  <input
@@ -241,8 +240,7 @@ export default function AdminTrainingsPage() {
  <option value="draft">草稿</option>
  <option value="archived">已归档</option>
  </select>
- </div>
- </div>
+ </FilterBar>
 
  {/* 列表 */}
  {error ? (

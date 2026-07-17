@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { DataTable, type Column } from '@/components/admin'
+import { DataTable, FilterBar, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Shield, Search, User, FileText, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
@@ -216,8 +216,7 @@ export default function AdminSubmissionsPage() {
  </div>
  </div>
 
- <div className="card p-4">
- <div className="flex gap-4 flex-wrap items-center">
+ <FilterBar activeCount={(searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -249,8 +248,7 @@ export default function AdminSubmissionsPage() {
 				</button>
 			))}
 		</div>
- </div>
- </div>
+ </FilterBar>
 
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 		<div className="card p-4">

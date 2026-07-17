@@ -14,7 +14,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
 import Link from 'next/link'
-import { BookOpen, AlertCircle, RefreshCw, Plus, UserCheck } from 'lucide-react'
+import { BookOpen, AlertCircle, RefreshCw, Plus, UserCheck, ChevronLeft, ChevronRight } from 'lucide-react'
 import TrainingCard from '@/components/training/TrainingCard'
 import SourceFilterCards, { type TrainingSource } from '@/components/training/SourceFilterCards'
 import type { TrainingListItem } from '@/lib/training/types'
@@ -219,9 +219,10 @@ export default function TrainingListPage() {
             <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="btn-ghost btn"
+              className="btn-ghost btn p-2.5"
+              aria-label="上一页"
             >
-              上一页
+              <ChevronLeft className="w-5 h-5" />
             </button>
             <span className="text-sm text-muted-foreground px-3">
               第 {page} / {totalPages} 页
@@ -229,9 +230,10 @@ export default function TrainingListPage() {
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
-              className="btn-ghost btn"
+              className="btn-ghost btn p-2.5"
+              aria-label="下一页"
             >
-              下一页
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
         )}

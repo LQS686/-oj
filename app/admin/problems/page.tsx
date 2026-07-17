@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { DataTable, type Column } from '@/components/admin'
+import { DataTable, FilterBar, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { FileText, Plus, Edit, Trash2, Eye, EyeOff, Search, Trophy, Database, Loader2, History, ChevronDown, Check } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
@@ -343,7 +343,7 @@ export default function AdminProblemsPage() {
  e.stopPropagation()
  handleToggleVisibility(problem.id, problem.visibility || (problem.isPublic ? 'public' : 'private'))
  }}
- className={`p-2 rounded-lg transition-colors ${
+ className={`p-2.5 rounded-lg transition-colors ${
  problem.visibility === 'public' || (!problem.visibility && problem.isPublic)
  ? 'text-secondary-light hover:bg-secondary/10'
  : problem.visibility === 'contest'
@@ -365,7 +365,7 @@ export default function AdminProblemsPage() {
  e.stopPropagation()
  router.push(`/admin/problems/${problem.id}/testcases`)
  }}
- className="p-2 text-primary hover:bg-primary/5 rounded-lg transition-colors"
+ className="p-2.5 text-primary hover:bg-primary/5 rounded-lg transition-colors"
  title="测试数据"
  >
  <Database className="w-4 h-4" />
@@ -375,7 +375,7 @@ export default function AdminProblemsPage() {
  e.stopPropagation()
  router.push(`/admin/problems/${problem.id}/edit`)
  }}
- className="p-2 text-primary hover:bg-primary/5 rounded-lg transition-colors"
+ className="p-2.5 text-primary hover:bg-primary/5 rounded-lg transition-colors"
  title="编辑"
  >
  <Edit className="w-4 h-4" />
@@ -386,7 +386,7 @@ export default function AdminProblemsPage() {
  setDeletingProblem(problem)
  setShowDeleteModal(true)
  }}
- className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
+ className="p-2.5 text-error hover:bg-error/10 rounded-lg transition-colors"
  title="删除"
  >
  <Trash2 className="w-4 h-4" />
@@ -525,9 +525,8 @@ export default function AdminProblemsPage() {
 
  {activeTab === 'list' && (
  <>
- {/* 筛选栏：搜索 + AI来源 + 难度下拉（用 card-static 避免 overflow:hidden 截断下拉菜单） */}
- <div className="card-static p-3 relative z-20">
- <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+ {/* 筛选栏：搜索 + AI来源 + 难度下拉 */}
+ <FilterBar activeCount={(searchQuery ? 1 : 0) + (difficultyFilter !== 'all' ? 1 : 0) + (aiStatusFilter !== 'all' ? 1 : 0)}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -577,7 +576,7 @@ export default function AdminProblemsPage() {
  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${difficultyOpen ? 'rotate-180' : ''}`} />
  </button>
  {difficultyOpen && (
- <div className="absolute right-0 z-[60] mt-1 w-44 max-h-72 overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
+ <div className="absolute right-0 z-[60] mt-1 w-44 max-w-[calc(100vw-2rem)] max-h-72 overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
  <button
  type="button"
  onClick={() => { setDifficultyFilter('all'); setDifficultyOpen(false) }}
@@ -608,8 +607,7 @@ export default function AdminProblemsPage() {
  )}
  </div>
  </div>
- </div>
- </div>
+ </FilterBar>
 
  {/* 统计行：紧凑内联统计 */}
  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm px-1">

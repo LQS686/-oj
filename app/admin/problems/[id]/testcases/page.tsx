@@ -639,7 +639,7 @@ export default function ProblemTestCasesPage() {
  </div>
  </div>
 
- <div className="mt-3 pl-16 flex flex-wrap items-center gap-3">
+ <div className="mt-3 pl-0 sm:pl-16 flex flex-wrap items-center gap-3">
  <div className="flex items-center gap-2">
  <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">时间限制(ms)</label>
  <input

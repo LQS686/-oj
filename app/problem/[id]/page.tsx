@@ -15,6 +15,7 @@ import {
   MemoryStick,
   FileCode,
   FileText,
+  History,
   MessageSquare,
   ListChecks,
   Edit3
@@ -75,7 +76,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('cpp')
-  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions'>('description')
+  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions' | 'code'>('description')
   const [submitting, setSubmitting] = useState(false)
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
   const [judgeStatus, setJudgeStatus] = useState<any>(null)
@@ -192,6 +193,17 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     const langKey = getLanguageStorageKey(problemId, classId, fromAssignment)
     localStorage.setItem(langKey, language)
   }, [language, problemId, classId, fromAssignment])
+
+  // 桌面端（>= 1024px）不允许停留在 'code' tab，避免左栏内容为空
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024 && activeTab === 'code') {
+        setActiveTab('description')
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [activeTab])
   
   // 用 ref 跟踪当前提交 ID，避免回调闭包拿到陈旧值
   const currentSubmissionIdRef = useRef<string | null>(null)
@@ -563,7 +575,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     : '0.0'
 
   return (
-    <div className="min-h-screen pb-8">
+    <div className="min-h-screen pb-20 lg:pb-8">
       <div className="container mx-auto px-4 pt-6">
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <span className="font-mono text-sm font-bold text-primary-light bg-primary/10 px-3 py-1 rounded-lg">
@@ -581,14 +593,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           {canEditProblem && problem?.id && (
             <Link
               href={`/admin/problems/${problem.id}/edit`}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary-light hover:bg-primary/10 transition-colors"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-primary-light hover:bg-primary/10 transition-colors"
             >
               <Edit3 className="w-3.5 h-3.5" /> 编辑
             </Link>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-muted-foreground">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-4 mb-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
             <Timer className="w-4 h-4 transition-transform duration-300" />
             <span>时间限制: {problem.timeLimit}ms</span>
@@ -615,7 +627,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
           {/* 左栏：题面 / 题解 / 提交记录（原 tab + 内容） */}
-          <div className="card-static rounded-lg overflow-hidden">
+          <div className={`card-static rounded-lg overflow-hidden ${activeTab === 'code' ? 'hidden lg:block' : ''}`}>
             <div className="flex border-b border-border overflow-x-auto">
               {[
                 { key: 'description', label: '题目描述', icon: BookOpen },
@@ -703,7 +715,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           </div>
 
           {/* 右栏：提交代码（宽屏 sticky，窄屏堆叠在左栏下方） */}
-          <div className="lg:sticky lg:top-4">
+          <div className={`lg:sticky lg:top-4 ${activeTab !== 'code' ? 'hidden lg:block' : ''}`}>
             <div className="card-static rounded-lg overflow-hidden">
               <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border bg-muted">
                 <CodeIcon className="w-4 h-4 text-primary-light" />
@@ -740,7 +752,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   maxLength={65536}
-                  className="w-full h-[360px] rounded-xl bg-muted text-foreground font-mono text-sm p-3 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
+                  className="w-full h-[280px] sm:h-[360px] lg:h-[420px] rounded-xl bg-muted text-foreground font-mono text-sm p-3 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
                   spellCheck={false}
                   placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
                   aria-label="代码编辑器"
@@ -896,6 +908,33 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           router.push(`/submission/${submissionId}`);
         }}
       />
+
+      {/* 移动端底部 Tab Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">
+        <div className="grid grid-cols-3">
+          <button
+            onClick={() => setActiveTab('description')}
+            className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'description' ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-xs">题面</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('code')}
+            className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'code' ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            <CodeIcon className="w-5 h-5" />
+            <span className="text-xs">代码</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('submissions')}
+            className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'submissions' ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            <History className="w-5 h-5" />
+            <span className="text-xs">提交记录</span>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

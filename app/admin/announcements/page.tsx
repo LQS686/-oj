@@ -172,7 +172,7 @@ export default function AdminAnnouncementsPage() {
           <div className="space-y-3">
             {items.map((row) => (
               <div key={row.id} className="card-static rounded-xl p-5">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       {row.isPinned && (

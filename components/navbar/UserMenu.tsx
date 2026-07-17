@@ -127,7 +127,7 @@ export default function UserMenu() {
  <>
  <Link
  href="/notifications"
- className="btn-ghost btn p-2.5 relative group"
+ className="btn-ghost btn p-3 relative group"
  >
  <Bell className="w-5 h-5" />
  {unreadCount > 0 && (

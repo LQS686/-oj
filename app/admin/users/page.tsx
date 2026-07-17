@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { DataTable, type Column } from '@/components/admin'
+import { DataTable, FilterBar, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { isSystemAdmin } from '@/lib/permissions'
@@ -477,7 +477,69 @@ export default function AdminUsersPage() {
  }
  }
 
- const columns: Column<User>[] = [
+ const renderUserActions = (user: User) => {
+		// SYSTEM_ADMIN 不可被管理；ADMIN 操作者不能管理其他 ADMIN
+		const locked = user.role === 'SYSTEM_ADMIN' || (!operatorIsSystemAdmin && user.role === 'ADMIN')
+		const lockReason = user.role === 'SYSTEM_ADMIN'
+			? '系统管理员不可修改'
+			: (!operatorIsSystemAdmin && user.role === 'ADMIN' ? '管理员不能管理其他管理员' : '')
+		// 重置密码：仅 SYSTEM_ADMIN 可操作，且目标不能是 SYSTEM_ADMIN
+		const canReset = operatorIsSystemAdmin && user.role !== 'SYSTEM_ADMIN'
+		return (
+			<div className="flex items-center justify-start gap-2" onClick={e => e.stopPropagation()}>
+				<button
+					onClick={() => {
+						setSelectedUser(user)
+						setEditRole(getUserRole(user))
+						setShowEditModal(true)
+					}}
+					disabled={locked}
+					className={`p-2.5 rounded-lg transition-colors ${
+						locked
+							? 'text-muted-foreground cursor-not-allowed'
+							: 'text-primary hover:bg-primary/5'
+					}`}
+					title={locked ? lockReason : '编辑'}
+				>
+					<Edit className="w-4 h-4" />
+				</button>
+				{operatorIsSystemAdmin && (
+					<button
+						onClick={() => {
+							setResetTarget(user)
+							setResetPassword('')
+						}}
+						disabled={!canReset}
+						className={`p-2.5 rounded-lg transition-colors ${
+							!canReset
+								? 'text-muted-foreground cursor-not-allowed'
+								: 'text-yellow-600 hover:bg-yellow-600/10'
+						}`}
+						title={!canReset ? '系统管理员密码不可重置' : '重置密码'}
+					>
+						<KeyRound className="w-4 h-4" />
+					</button>
+				)}
+				<button
+					onClick={() => {
+						setSelectedUser(user)
+						setShowDeleteModal(true)
+					}}
+					disabled={locked}
+					className={`p-2.5 rounded-lg transition-colors ${
+						locked
+							? 'text-muted-foreground cursor-not-allowed'
+							: 'text-error hover:bg-error/10'
+					}`}
+					title={locked ? lockReason : '删除'}
+				>
+					<Trash2 className="w-4 h-4" />
+				</button>
+			</div>
+		)
+	}
+
+	const columns: Column<User>[] = [
  {
  key: 'username',
  label: '用户',
@@ -535,68 +597,8 @@ export default function AdminUsersPage() {
  {
  key: 'id',
  label: '操作',
- className: 'w-44',
- render: (_, user) => {
- // SYSTEM_ADMIN 不可被管理；ADMIN 操作者不能管理其他 ADMIN
- const locked = user.role === 'SYSTEM_ADMIN' || (!operatorIsSystemAdmin && user.role === 'ADMIN')
- const lockReason = user.role === 'SYSTEM_ADMIN'
- ? '系统管理员不可修改'
- : (!operatorIsSystemAdmin && user.role === 'ADMIN' ? '管理员不能管理其他管理员' : '')
- // 重置密码：仅 SYSTEM_ADMIN 可操作，且目标不能是 SYSTEM_ADMIN
- const canReset = operatorIsSystemAdmin && user.role !== 'SYSTEM_ADMIN'
- return (
- <div className="flex items-center justify-start gap-2" onClick={e => e.stopPropagation()}>
- <button
- onClick={() => {
- setSelectedUser(user)
- setEditRole(getUserRole(user))
- setShowEditModal(true)
- }}
- disabled={locked}
- className={`p-2 rounded-lg transition-colors ${
- locked
- ? 'text-muted-foreground cursor-not-allowed'
- : 'text-primary hover:bg-primary/5'
- }`}
- title={locked ? lockReason : '编辑'}
- >
- <Edit className="w-4 h-4" />
- </button>
- {operatorIsSystemAdmin && (
- <button
- onClick={() => {
- setResetTarget(user)
- setResetPassword('')
- }}
- disabled={!canReset}
- className={`p-2 rounded-lg transition-colors ${
- !canReset
- ? 'text-muted-foreground cursor-not-allowed'
- : 'text-yellow-600 hover:bg-yellow-600/10'
- }`}
- title={!canReset ? '系统管理员密码不可重置' : '重置密码'}
- >
- <KeyRound className="w-4 h-4" />
- </button>
- )}
- <button
- onClick={() => {
- setSelectedUser(user)
- setShowDeleteModal(true)
- }}
- disabled={locked}
- className={`p-2 rounded-lg transition-colors ${
- locked
- ? 'text-muted-foreground cursor-not-allowed'
- : 'text-error hover:bg-error/10'
- }`}
- title={locked ? lockReason : '删除'}
- >
- <Trash2 className="w-4 h-4" />
- </button>
- </div>
- )
- },
+ className: 'w-32',
+ render: (_, user) => renderUserActions(user),
  },
  ]
 
@@ -699,8 +701,7 @@ export default function AdminUsersPage() {
  </div>
  </div>
 
- <div className="card p-4">
- <div className="flex gap-4 flex-wrap items-center">
+ <FilterBar activeCount={(searchQuery ? 1 : 0) + (roleFilter !== 'all' ? 1 : 0)}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -734,8 +735,7 @@ export default function AdminUsersPage() {
  </button>
  ))}
  </div>
- </div>
- </div>
+ </FilterBar>
 
  <DataTable
  data={filteredUsers}
@@ -752,10 +752,39 @@ export default function AdminUsersPage() {
  setShowEditModal(true)
  }}
  batchActions={[
- { label: '批量修改角色', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchEditModal(true) } },
- { label: '批量删除', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchDeleteModal(true) }, danger: true },
- ]}
- />
+			{ label: '批量修改角色', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchEditModal(true) } },
+			{ label: '批量删除', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchDeleteModal(true) }, danger: true },
+		]}
+		mobileCardRenderer={(row) => (
+			<div className="space-y-2">
+				<div>
+					<p className="text-xs text-muted-foreground">用户名</p>
+					<p className="text-sm font-medium text-foreground">{row.username}</p>
+				</div>
+				<div>
+					<p className="text-xs text-muted-foreground">邮箱</p>
+					<p className="text-sm text-foreground">{row.email}</p>
+				</div>
+				<div>
+					<p className="text-xs text-muted-foreground">角色</p>
+					<span className={`tag ${getRoleDisplay(row.role).color}`}>{getRoleDisplay(row.role).label}</span>
+				</div>
+				<div>
+					<p className="text-xs text-muted-foreground">统计</p>
+					<p className="text-sm text-muted-foreground">
+						提交 {row._count?.submissions || 0} · 出题 {row._count?.problems || 0}
+					</p>
+				</div>
+				<div>
+					<p className="text-xs text-muted-foreground">注册时间</p>
+					<p className="text-sm text-muted-foreground">{formatDate(row.createdAt)}</p>
+				</div>
+				<div className="flex gap-2 pt-2">
+					{renderUserActions(row)}
+				</div>
+			</div>
+		)}
+		/>
  </div>
 
  {showEditModal && selectedUser && (
@@ -876,7 +905,7 @@ export default function AdminUsersPage() {
 
  {showBatchRegisterModal && (
  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] overflow-y-auto py-4">
- <div className="card p-6 max-w-4xl w-full mx-4 my-auto">
+ <div className="card p-6 max-w-2xl w-full mx-4 my-auto max-h-[90vh] overflow-y-auto">
  <div className="flex items-center justify-between mb-6">
  <h3 className="text-lg font-bold text-foreground">批量注册用户</h3>
  <button
@@ -930,7 +959,7 @@ export default function AdminUsersPage() {
  </div>
 
  <div className="max-h-[400px] overflow-y-auto space-y-3">
- <div className="grid grid-cols-12 gap-2 items-center px-3 py-2 text-xs text-muted-foreground font-medium">
+ <div className="hidden sm:grid grid-cols-1 sm:grid-cols-12 gap-2 items-center px-3 py-2 text-xs text-muted-foreground font-medium">
  <div className="col-span-3">用户名</div>
  <div className="col-span-3">邮箱（可选）</div>
  <div className={`col-span-2 ${useUnifiedPassword ? 'opacity-50' : ''}`}>
@@ -940,7 +969,7 @@ export default function AdminUsersPage() {
  <div className="col-span-1"></div>
  </div>
  {batchUsers.map((user, index) => (
- <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 bg-muted rounded-lg">
+ <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-3 bg-muted rounded-lg">
  <div className="col-span-3">
  <input
  type="text"

@@ -411,7 +411,7 @@ export default function EditProblemPage() {
  <div className="flex items-center gap-4">
  <button
  onClick={() => router.back()}
- className="p-2 hover:bg-muted rounded-lg transition-colors"
+ className="p-2.5 hover:bg-muted rounded-lg transition-colors"
  >
  <ArrowLeft className="w-5 h-5 text-muted-foreground" />
  </button>

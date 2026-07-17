@@ -308,7 +308,7 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
 
  <div className="space-y-2">
  {contestProblems.map((problem, index) => (
- <div key={problem.id} className="flex items-center justify-between p-4 card-static rounded-xl border border-border">
+ <div key={problem.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 card-static rounded-xl border border-border">
  <div className="flex items-center gap-3">
  <span className="w-6 h-6 flex items-center justify-center bg-muted rounded-full text-xs font-bold text-muted-foreground">
  {String.fromCharCode(65 + index)}

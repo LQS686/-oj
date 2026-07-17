@@ -325,7 +325,7 @@ export default function ContestsPage() {
             ].map((tab) => (
               <button 
                 key={tab.key}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                className={`px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                   activeTab === tab.key
                     ? 'bg-primary text-white shadow-sm'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'

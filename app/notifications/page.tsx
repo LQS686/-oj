@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { fetchWithAuth } from '@/lib/api/base'
 import { EducationalPageShell, PageLoading } from '@/components/common'
+import { DataTable, type Column } from '@/components/admin'
 import type { Notification } from '@/types/models'
 import { formatDate } from '@/lib/utils'
 
@@ -146,6 +147,82 @@ export default function NotificationsPage() {
 
  const showSkeleton = loading && notifications.length === 0
 
+ const columns: Column<Notification>[] = [
+  {
+   key: 'type',
+   label: '类型',
+   className: 'w-16 text-center',
+   render: (value) => (
+    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-base mx-auto">
+     {getNotificationIcon(value as string)}
+    </div>
+   ),
+  },
+  {
+   key: 'title',
+   label: '内容',
+   render: (value, row) => (
+    <div className="flex items-center gap-2 min-w-0">
+     {!row.isRead && (
+      <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+     )}
+     <div className="min-w-0">
+      <div className={`font-semibold truncate ${!row.isRead ? 'text-foreground' : 'text-muted-foreground'}`}>
+       {value as string}
+      </div>
+      <p className={`text-sm truncate ${!row.isRead ? 'text-foreground/80' : 'text-muted-foreground'}`}>
+       {row.content}
+      </p>
+     </div>
+    </div>
+   ),
+  },
+  {
+   key: 'createdAt',
+   label: '时间',
+   className: 'w-40',
+   render: (value) => (
+    <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+     <Clock className="w-3 h-3" />
+     {getTimeAgo(value as string)}
+    </span>
+   ),
+  },
+  {
+   key: 'id',
+   label: '操作',
+   className: 'w-32 text-right',
+   render: (_, row) => (
+    <div className="flex gap-1 justify-end">
+     {!row.isRead && (
+      <button
+       onClick={(e) => {
+        e.stopPropagation()
+        markAsRead(row.id)
+       }}
+       className="p-2.5 text-muted-foreground hover:text-primary-light hover:bg-primary/10 rounded-lg transition-colors"
+       aria-label="标记已读"
+       title="标记为已读"
+      >
+       <Eye className="w-4 h-4" />
+      </button>
+     )}
+     <button
+      onClick={(e) => {
+       e.stopPropagation()
+       deleteNotification(row.id)
+      }}
+      className="p-2.5 text-muted-foreground hover:text-error hover:bg-error/10 rounded-lg transition-colors"
+      aria-label="删除"
+      title="删除"
+     >
+      <Trash2 className="w-4 h-4" />
+     </button>
+    </div>
+   ),
+  },
+ ]
+
   return (
   <EducationalPageShell
   width="narrow"
@@ -218,77 +295,70 @@ export default function NotificationsPage() {
  </div>
  </div>
  ) : (
- <div className="animate-fadeIn">
- <div className="card-static rounded-t-lg overflow-hidden">
- <div className="bg-muted px-4 py-3 text-sm font-semibold text-muted-foreground border-b border-border">
- <div className="grid grid-cols-12 gap-4">
- <div className="col-span-1 text-center">类型</div>
- <div className="col-span-8">内容</div>
- <div className="col-span-3 text-right">时间</div>
- </div>
- </div>
- </div>
- <div className="card-static rounded-b-lg border-t-0 overflow-hidden">
- {notifications.map((notification) => (
- <div
- key={notification.id}
- onClick={() => handleNotificationClick(notification)}
- className={`grid grid-cols-12 gap-4 px-4 py-3 border-b border-border hover:bg-primary/5 transition-colors group cursor-pointer ${
- !notification.isRead ? 'bg-primary/5' : ''
- }`}
- >
- <div className="col-span-1 flex items-center justify-center">
- <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-base">
- {getNotificationIcon(notification.type)}
- </div>
- </div>
-
- <div className="col-span-8 flex items-center gap-2 min-w-0">
- {!notification.isRead && (
- <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
- )}
- <div className="min-w-0">
- <div className={`font-semibold truncate ${!notification.isRead ? 'text-foreground' : 'text-muted-foreground'}`}>
- {notification.title}
- </div>
- <p className={`text-sm truncate ${!notification.isRead ? 'text-foreground/80' : 'text-muted-foreground'}`}>
- {notification.content}
- </p>
- </div>
- </div>
-
- <div className="col-span-3 flex items-center justify-end gap-2">
- <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
- <Clock className="w-3 h-3" />
- {getTimeAgo(notification.createdAt)}
- </span>
- {!notification.isRead && (
- <button
- onClick={(e) => {
- e.stopPropagation()
- markAsRead(notification.id)
- }}
- className="p-1.5 text-muted-foreground hover:text-primary-light hover:bg-primary/10 rounded-md transition-colors"
- title="标记为已读"
- >
- <Eye className="w-4 h-4" />
- </button>
- )}
- <button
- onClick={(e) => {
- e.stopPropagation()
- deleteNotification(notification.id)
- }}
- className="p-1.5 text-muted-foreground hover:text-error hover:bg-error/10 rounded-md transition-colors"
- title="删除"
- >
- <Trash2 className="w-4 h-4" />
- </button>
- </div>
- </div>
- ))}
- </div>
- </div>
+  <div className="animate-fadeIn">
+  <DataTable
+  data={notifications}
+  columns={columns}
+  idKey="id"
+  loading={false}
+  emptyMessage={filter === 'unread' ? '没有未读通知' : '暂无通知'}
+  onRowClick={(row) => handleNotificationClick(row)}
+  mobileCardRenderer={(row) => (
+  <div className="space-y-3">
+  <div className="flex items-center gap-2">
+  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-base">
+  {getNotificationIcon(row.type)}
+  </div>
+  {!row.isRead && (
+  <span className="px-2 py-0.5 rounded-full bg-primary/15 text-primary-light text-xs font-medium">
+  未读
+  </span>
+  )}
+  </div>
+  <div>
+  <p className={`text-sm font-medium ${row.isRead ? 'text-muted-foreground' : 'text-foreground'}`}>
+  {row.title}
+  </p>
+  {row.content && (
+  <p className="text-xs text-muted-foreground mt-1">{row.content}</p>
+  )}
+  </div>
+  <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+  <span className="text-xs text-muted-foreground flex items-center gap-1">
+  <Clock className="w-3 h-3" />
+  {getTimeAgo(row.createdAt)}
+  </span>
+  <div className="flex gap-1">
+  {!row.isRead && (
+  <button
+  onClick={(e) => {
+  e.stopPropagation()
+  markAsRead(row.id)
+  }}
+  className="p-2.5 text-muted-foreground hover:text-primary-light hover:bg-primary/10 rounded-lg transition-colors"
+  aria-label="标记已读"
+  title="标记为已读"
+  >
+  <Eye className="w-4 h-4" />
+  </button>
+  )}
+  <button
+  onClick={(e) => {
+  e.stopPropagation()
+  deleteNotification(row.id)
+  }}
+  className="p-2.5 text-muted-foreground hover:text-error hover:bg-error/10 rounded-lg transition-colors"
+  aria-label="删除"
+  title="删除"
+  >
+  <Trash2 className="w-4 h-4" />
+  </button>
+  </div>
+  </div>
+  </div>
+  )}
+  />
+  </div>
  )}
 
  {totalPages > 1 && (

@@ -871,7 +871,7 @@ export default function AIGenerationPage() {
  <Target className="w-3.5 h-3.5 text-muted-foreground" />
  目标难度
  </label>
- <div className="grid grid-cols-4 gap-2">
+ <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
  {DIFFICULTIES.map(d => {
  const active = difficulty === d
  return (

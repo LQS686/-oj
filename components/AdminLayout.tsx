@@ -83,7 +83,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter()
   const { user, isLoading, logout } = useUser()
   const canAccess = canAccessAdmin(user)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
@@ -91,6 +92,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [unreadCount, setUnreadCount] = useState(0)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
+
+  // 桌面端（≥ 768px）默认展开，移动端默认收起
+  // 初始渲染使用 false（移动端友好），useEffect 中根据视口调整，避免水合不一致
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      setSidebarOpen(true)
+    }
+    setMounted(true)
+  }, [])
 
   // 权限门：仅 SYSTEM_ADMIN / ADMIN 可访问后台，未通过则跳到 /403
   // 等待用户信息加载完成后再判定，避免短暂闪现 / 误判
@@ -194,6 +204,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     .filter((g) => g.items.length > 0)
   const allMenuItems = visibleGroups.flatMap((g) => g.items)
 
+  // 移动端点击导航项后自动收回侧边栏（桌面端保持原状态）
+  const closeSidebarOnMobile = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setSidebarOpen(false)
+    }
+  }
+
   // 鉴权完成前或鉴权未通过时，不渲染后台内容，避免短暂闪现
   if (isLoading || !user || !canAccess) {
     return (
@@ -205,36 +222,40 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="h-screen overflow-hidden flex">
-      <aside className={`fixed left-0 top-0 h-screen transition-all duration-300 z-30 flex flex-col border-r ${
-        sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0 md:w-20'
-      } bg-background-secondary`}
-      >
+      <aside className={`fixed left-0 top-0 h-screen z-40 flex flex-col border-r bg-background-secondary transition-[transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        sidebarOpen ? 'w-72 translate-x-0' : '-translate-x-full md:translate-x-0 md:w-20'
+      }`}>
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <div className="p-4">
-            <div className="flex items-center justify-between mb-8">
-              {sidebarOpen && (
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary">
+            <div className={`flex items-center mb-8 transition-all duration-300 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
+              {sidebarOpen ? (
+                <>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary flex-shrink-0">
                       <LayoutDashboard className="w-5 h-5 text-white" />
                     </div>
-                    <div>
-                      <h1 className="text-lg font-bold text-foreground">管理后台</h1>
-                      <p className="text-xs text-muted-foreground">大山 OJ</p>
+                    <div className="min-w-0 overflow-hidden">
+                      <h1 className="text-lg font-bold text-foreground truncate whitespace-nowrap">管理后台</h1>
+                      <p className="text-xs text-muted-foreground whitespace-nowrap">大山 OJ</p>
                     </div>
                   </div>
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    className="p-2 hover:bg-muted rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 flex-shrink-0"
+                    aria-label="收起侧边栏"
+                  >
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  aria-label="展开侧边栏"
+                >
+                  <Menu className="w-5 h-5 text-muted-foreground" />
+                </button>
               )}
-              {!sidebarOpen && (
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto bg-primary">
-                  <LayoutDashboard className="w-5 h-5 text-white" />
-                </div>
-              )}
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 hover:bg-muted rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 hidden md:block"
-                aria-label={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
-              >
-                {sidebarOpen ? <X className="w-5 h-5 text-muted-foreground" /> : <Menu className="w-5 h-5 text-muted-foreground" />}
-              </button>
             </div>
 
             <nav className="space-y-1">
@@ -243,11 +264,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   {groupIdx > 0 && (
                     <div className="my-3 border-t border-border" />
                   )}
-                  {sidebarOpen && (
-                    <p className="px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <div className={`overflow-hidden transition-[max-height,opacity,margin] duration-300 ${
+                    sidebarOpen ? 'max-h-8 opacity-100 my-0' : 'max-h-0 opacity-0 my-0'
+                  }`}>
+                    <p className="px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                       {group.label}
                     </p>
-                  )}
+                  </div>
                   {group.items.map((item) => {
                     const Icon = item.icon
                     const isActive = pathname === item.href ||
@@ -257,18 +280,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                        onClick={closeSidebarOnMobile}
+                        title={sidebarOpen ? undefined : item.label}
+                        className={`flex items-center py-3 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group ${
+                          sidebarOpen ? 'px-4 gap-3' : 'justify-center px-2 gap-0'
+                        } ${
                           isActive
                             ? 'bg-primary text-white'
                             : 'text-foreground hover:bg-muted'
                         }`}
                       >
                         <Icon className="w-5 h-5 flex-shrink-0" />
-                        {sidebarOpen && (
-                          <span className="font-medium transition-opacity duration-200 group-hover:opacity-100">
-                            {item.label}
-                          </span>
-                        )}
+                        <span className={`font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                          sidebarOpen ? 'opacity-100 max-w-[180px]' : 'opacity-0 max-w-0'
+                        }`}>
+                          {item.label}
+                        </span>
                       </Link>
                     )
                   })}
@@ -281,40 +308,51 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className="flex-shrink-0 p-4 border-t border-border">
           <Link
             href="/"
-            className="flex items-center gap-3 px-4 py-3 text-foreground hover:bg-muted rounded-xl transition-colors duration-200 group"
+            onClick={closeSidebarOnMobile}
+            title={sidebarOpen ? undefined : '返回主站'}
+            className={`flex items-center py-3 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group ${
+              sidebarOpen ? 'px-4 gap-3' : 'justify-center px-2 gap-0'
+            } text-foreground hover:bg-muted`}
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            {sidebarOpen && (
-              <span className="font-medium transition-opacity duration-200 group-hover:opacity-100">
-                返回主站
-              </span>
-            )}
+            <span className={`font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              sidebarOpen ? 'opacity-100 max-w-[180px]' : 'opacity-0 max-w-0'
+            }`}>
+              返回主站
+            </span>
           </Link>
         </div>
       </aside>
 
-      {!sidebarOpen && (
-        <button
-          className="fixed top-4 left-4 z-40 p-2 rounded-lg shadow-lg md:hidden bg-background-secondary border border-border"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="打开侧边栏"
-        >
-          <Menu className="w-5 h-5 text-foreground" />
-        </button>
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
       )}
 
       <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
         sidebarOpen ? 'md:ml-72' : 'md:ml-20'
       }`}>
-        <header className="sticky top-0 z-50 border-b bg-background-secondary border-border">
+        <header className="sticky top-0 z-20 border-b bg-background-secondary border-border">
           <div className="px-4 md:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl md:text-2xl font-bold text-foreground">
-                {allMenuItems.find(item =>
-                  pathname === item.href ||
-                  (item.href !== '/admin' && pathname.startsWith(item.href))
-                )?.label || '管理后台'}
-              </h2>
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="md:hidden p-3 -ml-2 rounded-lg hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 flex-shrink-0"
+                  aria-label={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
+                >
+                  {sidebarOpen ? <X className="w-5 h-5 text-foreground" /> : <Menu className="w-5 h-5 text-foreground" />}
+                </button>
+                <h2 className="text-xl md:text-2xl font-bold text-foreground truncate">
+                  {allMenuItems.find(item =>
+                    pathname === item.href ||
+                    (item.href !== '/admin' && pathname.startsWith(item.href))
+                  )?.label || '管理后台'}
+                </h2>
+              </div>
               <div className="flex items-center gap-2">
                 <div className="relative" ref={notificationRef}>
                   <button

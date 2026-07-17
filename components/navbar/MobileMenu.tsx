@@ -85,7 +85,7 @@ export default function MobileMenu() {
  <>
  <button
  onClick={() => setIsMenuOpen(true)}
- className="lg:hidden btn-ghost btn p-2.5 group"
+ className="lg:hidden btn-ghost btn p-3 group"
  aria-label="打开菜单"
  >
  <Menu className="w-5 h-5" />
@@ -135,7 +135,7 @@ export default function MobileMenu() {
              <Link
                href={link.href}
                onClick={() => setIsMenuOpen(false)}
-               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+               className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${
                  isActive
                    ? 'bg-primary/10 text-primary-light font-semibold'
                    : 'text-foreground hover:bg-muted hover:text-primary-light'
@@ -172,7 +172,7 @@ export default function MobileMenu() {
                <Link
                  href="/admin"
                  onClick={() => setIsMenuOpen(false)}
-                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-primary-light hover:bg-primary/10"
+                 className="flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 text-primary-light hover:bg-primary/10"
                >
                  <Settings className="w-5 h-5 shrink-0" />
                  <span>后台管理</span>
@@ -190,7 +190,7 @@ export default function MobileMenu() {
                <Link
                  href="/submissions"
                  onClick={() => setIsMenuOpen(false)}
-                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-foreground hover:bg-muted hover:text-primary-light"
+                 className="flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 text-foreground hover:bg-muted hover:text-primary-light"
                >
                  <ListChecks className="w-5 h-5 shrink-0" />
                  <span>提交记录</span>
@@ -207,7 +207,7 @@ export default function MobileMenu() {
              <Link
                href={`/user/${user.id}`}
                onClick={() => setIsMenuOpen(false)}
-               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-foreground hover:bg-muted hover:text-primary-light"
+               className="flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 text-foreground hover:bg-muted hover:text-primary-light"
              >
                <User className="w-5 h-5 shrink-0" />
                <span>个人主页</span>
@@ -223,7 +223,7 @@ export default function MobileMenu() {
              <Link
                href="/classes"
                onClick={() => setIsMenuOpen(false)}
-               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-foreground hover:bg-muted hover:text-primary-light"
+               className="flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 text-foreground hover:bg-muted hover:text-primary-light"
              >
                <Users className="w-5 h-5 shrink-0" />
                <span>我的班级</span>
@@ -239,7 +239,7 @@ export default function MobileMenu() {
              <Link
                href="/settings"
                onClick={() => setIsMenuOpen(false)}
-               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-foreground hover:bg-muted hover:text-primary-light"
+               className="flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 text-foreground hover:bg-muted hover:text-primary-light"
              >
                <Settings className="w-5 h-5 shrink-0" />
                <span>设置</span>
@@ -254,7 +254,7 @@ export default function MobileMenu() {
            >
              <button
                onClick={handleLogout}
-               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 text-error hover:bg-error/10"
+               className="flex items-center gap-3 w-full px-3 py-3 rounded-xl transition-all duration-200 text-error hover:bg-error/10"
              >
                <LogOut className="w-5 h-5 shrink-0" />
                <span>退出登录</span>

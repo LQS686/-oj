@@ -1,7 +1,18 @@
 'use client'
 
-import { useState, useMemo, ReactNode } from 'react'
+import { useState, useMemo, useEffect, ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  return isMobile
+}
 
 export interface Column<T> {
   key: keyof T
@@ -30,6 +41,7 @@ export interface DataTableProps<T> {
   }
   idKey: string
   onRowClick?: (row: T) => void
+  mobileCardRenderer?: (row: T) => ReactNode
 }
 
 interface SortConfig {
@@ -102,8 +114,10 @@ export default function DataTable<T>({
   emptyMessage = '暂无数据',
   pagination,
   idKey,
-  onRowClick
+  onRowClick,
+  mobileCardRenderer
 }: DataTableProps<T>) {
+  const isMobile = useIsMobile()
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: '',
     direction: null,
@@ -165,13 +179,15 @@ export default function DataTable<T>({
     <thead>
       <tr className="border-b border-border">
         {batchActions && batchActions.length > 0 && (
-          <th className="px-4 py-3 w-4">
-            <input
-              type="checkbox"
-              checked={selectedRows.size === data.length && data.length > 0}
-              onChange={handleSelectAll}
-              className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary/50"
-            />
+          <th className="px-4 py-3 w-12">
+            <label className="inline-flex items-center justify-center w-9 h-9 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedRows.size === data.length && data.length > 0}
+                onChange={handleSelectAll}
+                className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary/50"
+              />
+            </label>
           </th>
         )}
         {columns.map((column) => (
@@ -252,12 +268,14 @@ export default function DataTable<T>({
             >
               {batchActions && batchActions.length > 0 && (
                 <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={(e) => handleSelectRow(rowId, e.target.checked)}
-                    className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary/50"
-                  />
+                  <label className="inline-flex items-center justify-center w-9 h-9 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => handleSelectRow(rowId, e.target.checked)}
+                      className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary/50"
+                    />
+                  </label>
                 </td>
               )}
               {columns.map((column) => {
@@ -303,7 +321,7 @@ export default function DataTable<T>({
             <button
               onClick={() => onPageChange(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="btn btn-ghost px-3 py-1 text-sm disabled:opacity-50"
+              className="btn btn-ghost px-3.5 py-2 text-sm disabled:opacity-50"
             >
               <ChevronDown className="w-4 h-4 rotate-90" />
             </button>
@@ -311,12 +329,88 @@ export default function DataTable<T>({
             <button
               onClick={() => onPageChange(Math.min(totalPages, page + 1))}
               disabled={page === totalPages || totalPages === 0}
-              className="btn btn-ghost px-3 py-1 text-sm disabled:opacity-50"
+              className="btn btn-ghost px-3.5 py-2 text-sm disabled:opacity-50"
             >
               <ChevronUp className="w-4 h-4 rotate-90" />
             </button>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  const renderMobileCards = () => {
+    if (loading) {
+      return (
+        <div className="p-4 space-y-3">
+          {Array.from({ length: 5 }).map((_, idx) => (
+            <div key={`skeleton-card-${idx}`} className="card p-4">
+              <div className="h-4 w-3/4 rounded bg-muted animate-pulse mb-2"></div>
+              <div className="h-4 w-1/2 rounded bg-muted animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    if (data.length === 0) {
+      return (
+        <div className="px-4 py-12 text-center text-muted-foreground">
+          {emptyMessage}
+        </div>
+      )
+    }
+    return (
+      <div className="p-4 space-y-3">
+        {sortedData.map((row) => {
+          const rowId = String(row[idKey as keyof T])
+          const isSelected = selectedRows.has(rowId)
+          return (
+            <div
+              key={rowId}
+              className={`card p-4 transition-colors ${onRowClick ? 'cursor-pointer hover:border-primary/40' : ''} ${isSelected ? 'border-primary ring-1 ring-primary/20' : ''}`}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+            >
+              {batchActions && batchActions.length > 0 && (
+                <div className="flex items-center justify-between mb-3 pb-3 border-b border-border" onClick={e => e.stopPropagation()}>
+                  <label className="inline-flex items-center justify-center w-9 h-9 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => handleSelectRow(rowId, e.target.checked)}
+                      className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary/50"
+                    />
+                  </label>
+                  {isSelected && (
+                    <span className="text-xs text-primary-light font-medium">已选择</span>
+                  )}
+                </div>
+              )}
+              {mobileCardRenderer ? (
+                mobileCardRenderer(row)
+              ) : (
+                <dl className="space-y-2">
+                  {columns.map((column) => {
+                    const value = typeof column.key === 'string' && column.key.includes('.')
+                      ? column.key.split('.').reduce((acc: any, key: any) => acc?.[key], row)
+                      : row[column.key as keyof T]
+                    return (
+                      <div key={String(column.key)} className="flex items-start gap-3">
+                        <dt className="text-xs text-muted-foreground uppercase tracking-wider flex-shrink-0 min-w-[80px]">
+                          {column.label}
+                        </dt>
+                        <dd className="text-sm text-foreground flex-1 break-words">
+                          {column.render ? column.render(value, row) : (
+                            <span>{String(value ?? '')}</span>
+                          )}
+                        </dd>
+                      </div>
+                    )
+                  })}
+                </dl>
+              )}
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -343,12 +437,18 @@ export default function DataTable<T>({
           </div>
         </div>
       )}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          {renderHeader()}
-          {renderBody()}
-        </table>
-      </div>
+      {isMobile ? (
+        renderMobileCards()
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              {renderHeader()}
+              {renderBody()}
+            </table>
+          </div>
+        </>
+      )}
       {renderPagination()}
     </div>
   )

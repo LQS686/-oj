@@ -511,7 +511,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
                 ></div>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-border">
               <div className="text-center">
                 <div className="text-2xl font-bold text-secondary">{submission.passedTests}</div>
                 <div className="text-xs text-muted-foreground">通过</div>
