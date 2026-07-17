@@ -234,9 +234,13 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           setSubmissions([])
         }
       } else {
-        url = user 
-          ? `/api/problems/${problemId}/submissions?userId=${user.id}` 
-          : `/api/problems/${problemId}/submissions`
+        // 提交记录需登录后查看；未登录直接显示空列表，由 SubmissionList 引导登录
+        // API 已强制普通用户仅能查询自己的提交（userId = 当前用户）
+        if (!user) {
+          setSubmissions([])
+          return
+        }
+        url = `/api/problems/${problemId}/submissions?userId=${user.id}`
         
         const response = await fetchWithCookie(url, { cache: 'no-store' })
         const data = await response.json()

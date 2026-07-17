@@ -1,5 +1,6 @@
-import { Clock, MemoryStick, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Clock, MemoryStick, AlertCircle, CheckCircle2, LogIn } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { getStatusConfig } from '@/lib/status'
 import { formatDateTime } from '@/lib/utils'
 import type { Submission } from '@/types/models'
@@ -55,9 +56,20 @@ export default function SubmissionList({
  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
  <Clock className="w-6 h-6 text-muted-foreground" />
  </div>
- <p className="text-muted-foreground">
- {user ? '你还没有提交过这道题目' : '请登录后查看提交记录'}
- </p>
+ {user ? (
+ <p className="text-muted-foreground">你还没有提交过这道题目</p>
+ ) : (
+ <div className="space-y-3">
+ <p className="text-muted-foreground">请登录后查看提交记录</p>
+ <Link
+ href={`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname + window.location.search : '')}`}
+ className="btn btn-primary btn-sm inline-flex items-center gap-2"
+ >
+ <LogIn className="w-4 h-4" />
+ 登录
+ </Link>
+ </div>
+ )}
  </div>
  )
  }

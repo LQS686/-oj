@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useUser } from '@/contexts/UserContext'
 import { formatDateTime } from '@/lib/utils'
 
 interface Submission {
@@ -30,15 +31,27 @@ interface Submission {
 export default function ContestSubmissionsPage() {
  const params = useParams()
  const router = useRouter()
+ const { user, isLoading: userLoading } = useUser()
  const [submissions, setSubmissions] = useState<Submission[]>([])
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
  const [page, setPage] = useState(1)
  const [totalPages, setTotalPages] = useState(1)
 
+ // 鉴权：竞赛提交记录需登录后查看
  useEffect(() => {
+ if (userLoading) return
+ if (!user) {
+   const redirect = encodeURIComponent(`/contests/${params.id}/submissions`)
+   router.replace(`/login?redirect=${redirect}`)
+ }
+ }, [userLoading, user, params.id, router])
+
+ useEffect(() => {
+ if (userLoading) return
+ if (!user) return
  fetchSubmissions()
- }, [page])
+ }, [page, userLoading, user])
 
  const fetchSubmissions = async () => {
  try {
@@ -89,6 +102,19 @@ export default function ContestSubmissionsPage() {
  default:
  return 'bg-muted text-muted-foreground'
  }
+ }
+
+ // 鉴权未完成时显示加载占位
+ if (userLoading || !user) {
+   return (
+     <div className="card p-8">
+       <div className="animate-pulse space-y-4">
+         {[1, 2, 3, 4, 5].map(i => (
+           <div key={i} className="h-12 bg-muted rounded"></div>
+         ))}
+       </div>
+     </div>
+   )
  }
 
  if (loading && submissions.length === 0) return (

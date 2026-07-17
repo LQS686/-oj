@@ -7,6 +7,7 @@ import { ArrowLeft, FileText, User, Clock, Database, Calendar, CheckCircle, XCir
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText } from '@/lib/status'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useUser } from '@/contexts/UserContext'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 
 interface Submission {
@@ -36,6 +37,7 @@ interface Submission {
 function SubmissionsContent() {
  const searchParams = useSearchParams()
  const router = useRouter()
+ const { user, isLoading: userLoading } = useUser()
  const [submissions, setSubmissions] = useState<Submission[]>([])
  const [loading, setLoading] = useState(true)
  const [page, setPage] = useState(1)
@@ -48,9 +50,21 @@ function SubmissionsContent() {
  const assignmentId = searchParams.get('assignmentId')
  const classId = searchParams.get('classId')
 
+ // 鉴权：提交记录必须登录后查看
+ // 班级作业提交列表（assignmentId + classId）走独立鉴权链路，未登录时也会被 API 拒绝
+ const requiresAuth = !assignmentId || !classId
  useEffect(() => {
+ if (userLoading) return
+ if (requiresAuth && !user) {
+   router.replace('/login?redirect=' + encodeURIComponent('/submissions?' + searchParams.toString()))
+ }
+ }, [userLoading, user, requiresAuth, router, searchParams])
+
+ useEffect(() => {
+ if (userLoading) return
+ if (requiresAuth && !user) return
  fetchSubmissions()
- }, [page, problemId, userId, status, assignmentId, classId])
+ }, [page, problemId, userId, status, assignmentId, classId, user, userLoading, requiresAuth])
 
  const fetchSubmissions = async () => {
  try {
@@ -146,6 +160,11 @@ function SubmissionsContent() {
  {text}
  </span>
  )
+ }
+
+ // 鉴权未完成时显示加载占位，避免渲染表格
+ if (userLoading || (requiresAuth && !user)) {
+   return <PageLoading label="加载中..." />
  }
 
  return (
