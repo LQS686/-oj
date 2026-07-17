@@ -56,14 +56,14 @@
 
 2. **宝塔 Nginx 配置（仅 HTTP）**：
 
-   宝塔 → 网站 → 添加站点 → 域名填服务器 IP `43.139.231.170`
+   宝塔 → 网站 → 添加站点 → 域名填 `dsoj.run`
 
    配置文件使用以下简化版（无 SSL）：
 
    ```nginx
    server {
        listen 80;
-       server_name 43.139.231.170;
+       server_name dsoj.run;
 
        client_max_body_size 50M;
 
@@ -101,7 +101,7 @@
 
 4. **测试访问**：
 
-   浏览器访问 `http://43.139.231.170`，点击"注册"创建首个管理员账号
+   浏览器访问 `https://dsoj.run`，点击"注册"创建首个管理员账号
 
 ### 域名备案完成后切换
 
@@ -293,13 +293,13 @@ docker container prune -f   # 清理已停止的容器
 
 ## 常见问题
 
-| 问题 | 解决方法 |
-|------|---------|
-| 80/443 端口冲突 | 检查是否有其他进程占用：`lsof -i :80` |
-| Docker 镜像拉取失败 | 脚本会自动配置 Docker 镜像加速器（docker.1ms.run + docker.xuanyuan.me），如仍失败可在 `/etc/docker/daemon.json` 中更换加速地址后执行 `systemctl restart docker` |
-| MongoDB 副本集未初始化 | `docker compose logs mongo` 查看日志，keyfile 由容器自动生成无需手动管理 |
-| 构建超过 10 分钟 | 首次构建较慢，后续升级仅增量构建 |
-| API 返回 502 | 等待 40 秒健康检查通过后刷新 |
+| 问题                   | 解决方法                                                                                                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 80/443 端口冲突        | 检查是否有其他进程占用：`lsof -i :80`                                                                                                                           |
+| Docker 镜像拉取失败    | 脚本会自动配置 Docker 镜像加速器（docker.1ms.run + docker.xuanyuan.me），如仍失败可在 `/etc/docker/daemon.json` 中更换加速地址后执行 `systemctl restart docker` |
+| MongoDB 副本集未初始化 | `docker compose logs mongo` 查看日志，keyfile 由容器自动生成无需手动管理                                                                                        |
+| 构建超过 10 分钟       | 首次构建较慢，后续升级仅增量构建                                                                                                                                |
+| API 返回 502           | 等待 40 秒健康检查通过后刷新                                                                                                                                    |
 
 ---
 

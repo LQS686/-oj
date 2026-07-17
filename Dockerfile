@@ -7,8 +7,8 @@ WORKDIR /app
 ARG JWT_SECRET
 ARG DATABASE_URL=mongodb://localhost:27017/oj_platform
 # NEXT_PUBLIC_* 必须在构建时传递，会被硬编码到 JS 中
-ARG NEXT_PUBLIC_API_URL=http://localhost:3000
-ARG NEXT_PUBLIC_BASE_URL=http://localhost:3000
+ARG NEXT_PUBLIC_API_URL=https://dsoj.run
+ARG NEXT_PUBLIC_BASE_URL=https://dsoj.run
 ENV NEXT_PHASE=phase-production-build
 ENV JWT_SECRET=${JWT_SECRET}
 ENV DATABASE_URL=${DATABASE_URL}

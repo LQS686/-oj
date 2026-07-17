@@ -703,10 +703,20 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 下区：版权 */}
-          <div className="border-t border-border/60 py-4">
+          {/* 下区：版权 + ICP备案 */}
+          <div className="border-t border-border/60 py-4 flex flex-col items-center gap-1.5">
             <p className="text-center text-xs text-muted-foreground/80">
               &copy; {new Date().getFullYear()} {siteName} · 代码如山·算法为径·陪你从入门到顶峰
+            </p>
+            <p className="text-center text-[11px] text-muted-foreground/60 flex items-center gap-1.5">
+              <a
+                href="https://beian.miit.gov.cn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors duration-200"
+              >
+                蜀ICP备2026040117号-1
+              </a>
             </p>
           </div>
         </div>
