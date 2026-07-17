@@ -1,3 +1,7 @@
+# syntax=docker/dockerfile:1.4
+# 启用 BuildKit 缓存：apk / npm / next build 三处慢操作使用 --mount=type=cache，
+# 即使 docker compose build --no-cache 也能复用 host 上的包缓存，大幅缩短构建时间。
+
 # 构建阶段 - 使用国内镜像源
 FROM node:20-alpine AS builder
 
@@ -15,15 +19,19 @@ ENV DATABASE_URL=${DATABASE_URL}
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
 
-# 使用国内镜像源
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+# 使用清华 TUNA 镜像源（比 aliyun 更稳定，gcc/g++ 等大包下载不易卡住）
+# BuildKit 缓存 /var/cache/apk，下次 build 时直接复用已下载的 .apk 包
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
+    sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
 
 # 安装依赖（使用淘宝镜像）
+# BuildKit 缓存 /root/.npm，下次 build 时复用已下载的 npm 包
 COPY package*.json ./
 # 修复：使用 --ignore-scripts 跳过 package.json 中的 postinstall="prisma generate"，
 #   因为此时 prisma/schema.prisma 还未被 COPY 进来，prisma generate 会失败。
 #   真实的 prisma generate 在下面 COPY prisma 之后单独执行。
-RUN npm config set registry https://registry.npmmirror.com && npm install --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set registry https://registry.npmmirror.com && npm install --ignore-scripts
 
 # 复制Prisma schema并生成客户端
 COPY prisma ./prisma/
@@ -33,29 +41,20 @@ RUN npx prisma generate
 COPY . .
 
 # 构建应用
-RUN npm run build
+# BuildKit 缓存 .next/cache，下次 build 时复用 Next.js 的构建缓存（如 SWC 转换、TypeScript 类型检查）
+RUN --mount=type=cache,target=/app/.next/cache \
+    npm run build
 
 # 生产阶段 - 使用国内镜像源
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# 使用国内镜像源
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
-
-# 安装必要的系统依赖（仅支持 C/C++/Python 评测）
-#   - bash: runner.sh 依赖
-#   - coreutils: 提供 /usr/bin/time 用于资源统计回退
-#   - python3: Python 解释器
-#   - g++/gcc: C/C++ 编译器
-#   - make/musl-dev: 标准构建工具链
-#   - wget: docker-compose healthcheck 必需（Alpine 默认不装，~250KB）
-#   - curl: 健康诊断备用（docker exec 时手动调用更直观）
-# 移除项（评测机减负）：
-#   - openjdk11-jdk: ~250MB（JDK + JRE）
-#   - gfortran: ~80MB（Fortran 编译器，从未启用）
-#   - py3-pip: ~50MB（pip 包管理器，运行时不需要）
-RUN apk add --no-cache \
+# 使用清华 TUNA 镜像源 + BuildKit 缓存
+# 关键：apk add 是构建中最慢的步骤（gcc/g++ 等大包 ~100MB+），缓存后下次 build 秒级完成
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
+    sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
+    apk add --no-cache \
     bash \
     coreutils \
     python3 \
@@ -107,7 +106,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_m
 # 很多模块（dotenv、socket.io、ioredis、jsonwebtoken、openai、mongodb、bcryptjs、adm-zip、
 # katex、nodemailer 等），这些可能没被完全追踪。必须运行 npm install --omit=dev 确保所有
 # 生产依赖都装上。tsx 现在在 dependencies 中（之前在 devDependencies），也会被装上。
-RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts
+# BuildKit 缓存 /root/.npm，复用 builder 阶段已下载的 npm 包
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts
 
 # 创建必要的目录并设置权限
 # addgroup nextjs root: 将 nextjs 加入 root 组，使 runner.sh 中的 ulimit 命令可执行。

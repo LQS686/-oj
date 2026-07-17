@@ -206,7 +206,12 @@ deploy() {
   info "拉取基础镜像..."
   docker compose pull mongo redis nginx 2>&1 | tail -1
 
-  info "构建 OJ 应用镜像（约 5-10 分钟）..."
+  # 启用 BuildKit：Dockerfile 中 --mount=type=cache 依赖 BuildKit 才能生效
+  # BuildKit 缓存 apk / npm / next build 三处慢操作的下载产物到 host，
+  # 后续 --no-cache 也能秒级复用，避免每次重新下载 gcc/g++ 等大包
+  export DOCKER_BUILDKIT=1
+
+  info "构建 OJ 应用镜像（首次约 5-10 分钟，后续复用缓存秒级完成）..."
   docker compose build --build-arg JWT_SECRET="${JWT_SECRET}" 2>&1 | tail -5
 
   info "启动所有服务..."

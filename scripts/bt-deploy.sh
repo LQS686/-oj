@@ -114,19 +114,30 @@ fi
 step "拉取基础镜像"
 docker compose pull mongo redis
 
-step "构建应用镜像（约 5 分钟）"
+# 启用 BuildKit：Dockerfile 中 --mount=type=cache 依赖 BuildKit 才能生效
+# BuildKit 缓存 apk / npm / next build 三处慢操作的下载产物到 host，
+# 后续 --no-cache 也能秒级复用，避免每次重新下载 gcc/g++ 等大包
+export DOCKER_BUILDKIT=1
+
+step "构建应用镜像（首次约 5-10 分钟，后续复用缓存秒级完成）"
 docker compose build app
 
 # ============================================================
 # 4. 清理 Docker 构建垃圾（防止磁盘被撑满）
 # ============================================================
 step "清理 Docker 构建缓存"
-# BuildKit 缓存每次 build 都会累积，是多日宕机时 ENOSPC 的根因，必须清理。
-# image/container prune 只删未使用的，不影响正在运行的容器和数据卷。
-docker builder prune -af
+# 注意：不能执行 `docker builder prune -af`，否则会清掉 BuildKit cache mount
+# （Dockerfile 中 --mount=type=cache 持久化的 apk / npm 包），下次构建
+# 又要重新下载 gcc/g++ 等大包，重新陷入 13+ 分钟卡顿。
+# 改用精细清理：
+#   - image prune: 删悬挂镜像（dangling，无 tag 的旧 layer），释放主要磁盘占用
+#   - container prune: 删停止的容器
+#   - builder prune --filter until=168h: 仅清理 7 天前的 build cache，保留近期缓存
+#     （BuildKit cache mount 会自然复用，老 layer 才是磁盘占大头）
 docker image prune -f
 docker container prune -f
-info "Docker 垃圾已清理"
+docker builder prune -af --filter "until=168h" 2>/dev/null || true
+info "Docker 垃圾已清理（保留近 7 天 BuildKit 缓存）"
 
 # ============================================================
 # 5. 启动服务

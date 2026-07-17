@@ -118,6 +118,9 @@
 2. **强制重新构建镜像**（必须，因为 `NEXT_PUBLIC_*` 在构建时硬编码）：
 
    ```bash
+   # 启用 BuildKit 以使用 Dockerfile 中的 --mount=type=cache 缓存（apk/npm/next build）
+   # 首次构建会下载包到 host 缓存，后续 --no-cache 也能秒级复用
+   export DOCKER_BUILDKIT=1
    docker compose build --no-cache app
    docker compose up -d
    ```
@@ -279,9 +282,12 @@ docker compose up -d
 docker system df
 
 # 一键清理构建垃圾（安全，不影响运行中的容器和数据卷）
-docker builder prune -af    # 清理 BuildKit 构建缓存（占用最大）
-docker image prune -f       # 清理悬挂镜像 (<none>:<none>)
-docker container prune -f   # 清理已停止的容器
+# 注意：不要执行 `docker builder prune -af`！会清掉 BuildKit cache mount
+# （Dockerfile 中 --mount=type=cache 持久化的 apk / npm 包），下次构建
+# 又要重新下载 gcc/g++ 等大包，重新陷入 13+ 分钟卡顿。
+docker image prune -f                    # 清理悬挂镜像 (<none>:<none>)
+docker container prune -f                # 清理已停止的容器
+docker builder prune -af --filter "until=168h"   # 仅清理 7 天前的 build cache，保留近期 BuildKit 缓存
 
 # ⚠️ 危险！切勿执行，会删除 mongo_data/redis_data 数据卷导致数据丢失
 # docker system prune -af --volumes   ← 不要执行！
@@ -311,7 +317,7 @@ docker container prune -f   # 清理已停止的容器
 
 `NEXT_PUBLIC_API_URL` 和 `NEXT_PUBLIC_BASE_URL` 会在 `next build` 时被硬编码到客户端 JS 中。
 
-- **修改 `FRONTEND_URL` 后必须重新构建镜像**：`docker compose build --no-cache app`
+- **修改 `FRONTEND_URL` 后必须重新构建镜像**：`export DOCKER_BUILDKIT=1 && docker compose build --no-cache app`（启用 BuildKit 以复用 Dockerfile 中的 `--mount=type=cache`，避免重新下载大包）
 - 仅修改 `.env` 文件后重启容器**不会生效**，因为客户端 JS 中的 URL 已固化
 - Dockerfile 通过 `ARG` 接收这些值，docker-compose.yml 从 `FRONTEND_URL` 传递
 

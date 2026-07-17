@@ -79,8 +79,13 @@ foreach ($item in $judgeImages) {
 Write-Host ""
 Write-Host "[3/6] 构建OJ应用镜像..." -ForegroundColor Yellow
 
+# 启用 BuildKit：Dockerfile 中 --mount=type=cache 依赖 BuildKit 才能生效
+# BuildKit 缓存 apk / npm / next build 三处慢操作的下载产物到 host，
+# 后续 --no-cache 也能秒级复用，避免每次重新下载 gcc/g++ 等大包
+$env:DOCKER_BUILDKIT = "1"
+
 # 构建应用镜像
-Write-Host "  正在构建（这可能需要5-10分钟）..." -ForegroundColor Cyan
+Write-Host "  正在构建（首次约 5-10 分钟，后续复用缓存秒级完成）..." -ForegroundColor Cyan
 $buildResult = docker build -t oj-platform:app -f Dockerfile . 2>&1
 
 if ($LASTEXITCODE -eq 0) {
