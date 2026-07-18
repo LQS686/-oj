@@ -7,7 +7,7 @@
 import { MongoClient, ObjectId, ReadPreference, WriteConcern } from 'mongodb'
 import { logger } from './logger'
 import bcrypt from 'bcryptjs'
-import { canTransition as canSubmissionTransition } from '@/lib/constants/submission-status'
+import { canTransition as canSubmissionTransition, normalizeStatus } from '@/lib/constants/submission-status'
 
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL
@@ -199,7 +199,8 @@ export async function updateSubmissionDirect(
     // P0 修复：状态机守卫
     //   1) 若要更新 status，先读当前状态
     //   2) 通过 canTransition 校验合法转换
-    //   3) 仅在 PENDING/JUDGING 状态下允许非合法转换（recover 场景）
+    //   3) 仅在 PENDING/JUDGING/RUNNING 状态下允许非合法转换（recover 场景）
+    //      归一化后比较，兼容历史大驼峰写法（'Pending'/'Judging'）与枚举大写（'PENDING'/'JUDGING'）
     if (typeof sanitized.status === 'string') {
       const current = await db.collection('Submission').findOne(
         { _id: new ObjectId(submissionId) },
@@ -208,8 +209,9 @@ export async function updateSubmissionDirect(
       const currentStatus = (current?.status as string | undefined) ?? ''
       const nextStatus = sanitized.status as string
       if (currentStatus && !canSubmissionTransition(currentStatus, nextStatus)) {
-        // 允许 recover 路径：Pending/Judging 状态可被强制覆盖（worker.ts:188）
-        if (currentStatus !== 'Pending' && currentStatus !== 'Judging') {
+        // 允许 recover 路径：PENDING/JUDGING/RUNNING 状态可被强制覆盖（worker 重试/竞态/恢复/跳过中间状态）
+        const normalized = normalizeStatus(currentStatus)
+        if (normalized !== 'PENDING' && normalized !== 'JUDGING' && normalized !== 'RUNNING') {
           throw new Error(
             `非法状态转换: ${currentStatus} -> ${nextStatus} (submissionId=${submissionId})`
           )
@@ -255,6 +257,32 @@ export async function isFirstAccepted(problemId: string, userId: string, current
     })
 
     return !previousAC
+  })
+}
+
+/**
+ * 检查用户在指定作业中是否首次 AC 此题（作业维度，区别于全局 isFirstAccepted）
+ * 读取 ClassAssignmentSubmission 表，判断除当前提交外是否还存在 AC 记录。
+ */
+export async function isFirstAcInAssignment(
+  assignmentId: string,
+  problemId: string,
+  userId: string,
+  currentSubmissionId: string
+): Promise<boolean> {
+  return withRetry(async () => {
+    const client = await getMongoClient() // 使用主库客户端，避免复制延迟导致并发 AC 重复计数
+    const db = client.db()
+
+    const existing = await db.collection('ClassAssignmentSubmission').findOne({
+      assignmentId: new ObjectId(assignmentId),
+      problemId: new ObjectId(problemId),
+      userId: new ObjectId(userId),
+      status: 'AC',
+      _id: { $ne: new ObjectId(currentSubmissionId) },
+    })
+
+    return !existing
   })
 }
 
@@ -328,6 +356,32 @@ export async function updateClassAssignmentSubmissionDirect(
     for (const key of allowedFields) {
       if (key in data && data[key as keyof typeof data] !== undefined) {
         sanitized[key] = data[key as keyof typeof data]
+      }
+    }
+
+    // P0 修复：状态机守卫（与 updateSubmissionDirect 一致）
+    //   1) 若要更新 status，先读当前状态
+    //   2) 通过 canSubmissionTransition 校验合法转换
+    //   3) 仅在 PENDING/JUDGING/RUNNING 状态下允许非合法转换（recover 场景，worker 重试/竞态/恢复/跳过中间状态）
+    //      归一化后比较，兼容历史大驼峰写法（'Pending'/'Judging'）与枚举大写（'PENDING'/'JUDGING'）
+    if (typeof sanitized.status === 'string') {
+      const current = await db.collection('ClassAssignmentSubmission').findOne(
+        { _id: new ObjectId(submissionId) },
+        { projection: { status: 1 } }
+      )
+      const currentStatus = (current?.status as string | undefined) ?? ''
+      const nextStatus = sanitized.status as string
+      if (currentStatus && !canSubmissionTransition(currentStatus, nextStatus)) {
+        logger.warn(
+          `非法状态转换: ClassAssignmentSubmission ${submissionId} ${currentStatus} -> ${nextStatus}`
+        )
+        // 允许 recover 路径：PENDING/JUDGING/RUNNING 状态可被强制覆盖（与 updateSubmissionDirect 一致）
+        const normalized = normalizeStatus(currentStatus)
+        if (normalized !== 'PENDING' && normalized !== 'JUDGING' && normalized !== 'RUNNING') {
+          throw new Error(
+            `非法状态转换: ${currentStatus} -> ${nextStatus} (submissionId=${submissionId})`
+          )
+        }
       }
     }
 
@@ -460,6 +514,7 @@ export async function updateClassAssignmentDirect(
     startTime?: Date
     endTime?: Date
     problemIds?: string[]
+    allowLateSubmission?: boolean
   }
 ) {
   return withRetry(async () => {
@@ -467,7 +522,7 @@ export async function updateClassAssignmentDirect(
     const db = client.db()
 
     const updateData: any = { ...data }
-    
+
     if (data.problemIds) {
       updateData.problemIds = data.problemIds.map(id => new ObjectId(id))
     }
@@ -490,15 +545,50 @@ export async function deleteClassAssignmentDirect(assignmentId: string) {
 
     await client.withSession(async (session) => {
       await session.withTransaction(async () => {
-        // 1. 删除相关提交记录
+        const assignmentObjectId = new ObjectId(assignmentId)
+
+        // 1. 查询所有 ClassAssignmentSubmission 的 ID（用于清理主 Submission 表引用）
+        const submissions = await db
+          .collection('ClassAssignmentSubmission')
+          .find({ assignmentId: assignmentObjectId }, { session })
+          .toArray()
+        const submissionIds = submissions.map((s) => s._id)
+
+        // 2. 删除 ClassAssignmentProblemProgress（计时记录）
+        await db
+          .collection('ClassAssignmentProblemProgress')
+          .deleteMany({ assignmentId: assignmentObjectId }, { session })
+
+        // 3. 删除 ClassAssignmentProblem（单题配置表，Phase 2+ 预留）
+        await db
+          .collection('ClassAssignmentProblem')
+          .deleteMany({ assignmentId: assignmentObjectId }, { session })
+
+        // 4. 删除 AssignmentCompletionRewardLog（奖励日志，Phase 2+ 预留）
+        await db
+          .collection('AssignmentCompletionRewardLog')
+          .deleteMany({ assignmentId: assignmentObjectId }, { session })
+
+        // 5. 置空主 Submission 表中的 assignmentSubmissionId 引用（保留 Submission 记录本身）
+        if (submissionIds.length > 0) {
+          await db
+            .collection('Submission')
+            .updateMany(
+              { assignmentSubmissionId: { $in: submissionIds } },
+              { $unset: { assignmentSubmissionId: '' } },
+              { session }
+            )
+        }
+
+        // 6. 删除 ClassAssignmentSubmission（原有逻辑）
         await db
           .collection('ClassAssignmentSubmission')
-          .deleteMany({ assignmentId: new ObjectId(assignmentId) }, { session })
+          .deleteMany({ assignmentId: assignmentObjectId }, { session })
 
-        // 2. 删除作业本身
+        // 7. 删除 ClassAssignment 本身（原有逻辑）
         await db
           .collection('ClassAssignment')
-          .deleteOne({ _id: new ObjectId(assignmentId) }, { session })
+          .deleteOne({ _id: assignmentObjectId }, { session })
       })
     })
   })

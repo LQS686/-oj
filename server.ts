@@ -369,6 +369,20 @@ app.prepare().then(async () => {
   await import('./lib/judge/init')
   logger.info('评测 Worker 启动完成')
 
+  // 重启后重置残留的 AI 任务（PENDING/PROCESSING）
+  // 内存队列在进程重启后会清空，所有 PENDING/PROCESSING 任务永远不会被消费，
+  // 标记为 FAILED 让用户通过 retry 手动重试，避免前端无意义轮询。
+  // 不阻塞启动：失败仅记日志，不影响服务器可用性。
+  try {
+    const { resetStaleTasksOnStartup } = await import('./lib/ai/service')
+    const resetCount = await resetStaleTasksOnStartup()
+    if (resetCount > 0) {
+      logger.info(`[startup] 重置 ${resetCount} 个残留 AI 任务为 FAILED`)
+    }
+  } catch (err) {
+    logger.error('[startup] 重置残留 AI 任务失败（不阻塞启动）', err as Error)
+  }
+
   httpServer.listen(port, () => {
     logger.info(`服务器运行在 http://${hostname}:${port}`)
     logger.info(`WebSocket 服务在 ws://${hostname}:${port}/socket.io`)

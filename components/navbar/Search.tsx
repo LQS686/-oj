@@ -6,6 +6,7 @@ import { Search, Command } from 'lucide-react'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
+import { getDifficultyColor } from '@/lib/status'
 
 interface SearchResult {
  problems: Array<{
@@ -143,11 +144,7 @@ export default function SearchBar() {
  {problem.problemNumber ? `${problem.problemNumber} ` : ''}{problem.title}
  </div>
  <div className="flex items-center gap-2 mt-1">
- <span className={`text-xs px-2 py-0.5 rounded-full ${
- problem.difficulty === 'easy' ? 'bg-secondary/10 text-secondary-dark' :
- problem.difficulty === 'medium' ? 'bg-accent/10 text-accent-dark' :
- 'bg-error/10 text-error'
- }`}>
+ <span className={`text-xs px-2 py-0.5 rounded-full ${getDifficultyColor(problem.difficulty)}`}>
  {problem.difficulty}
  </span>
  <span className="text-xs text-muted-foreground">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
 import {
@@ -13,7 +13,6 @@ import {
  Eye,
  Trash2,
  Sparkles,
- RefreshCw,
  Clock,
  Code2,
  AlertCircle,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
 import { formatRelativeTime } from '@/lib/utils'
+import { ProblemAiPanel } from '@/components/ai/ProblemAiPanel'
 
 interface Sample {
  input: string
@@ -74,16 +74,15 @@ export default function EditProblemPage() {
 
  const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '', explanation: '' }])
 
+ // 题目是否为 AI 生成（用于 ProblemAiPanel 决定是否显示"建议元数据"按钮）
+ const [isAiGenerated, setIsAiGenerated] = useState(false)
+
  // 题解管理
  const [solutions, setSolutions] = useState<AdminSolutionItem[]>([])
  const [solutionsLoading, setSolutionsLoading] = useState(true)
  const [solutionsError, setSolutionsError] = useState('')
  const [deletingSolutionId, setDeletingSolutionId] = useState<string | null>(null)
- const [regenerating, setRegenerating] = useState(false)
  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
- // 题解生成轮询（使用 ref 避免 setInterval 闭包内拿到过期 state）
- const pollingRef = useRef<{ logId: string; intervalId: ReturnType<typeof setInterval> | null }>({ logId: '', intervalId: null })
 
  const fetchProblemData = useCallback(async () => {
  try {
@@ -108,6 +107,7 @@ export default function EditProblemPage() {
  if (data.success) {
  const problem = data.data
  setProblemNumber(problem.problemNumber || '')
+ setIsAiGenerated(Boolean(problem.isAiGenerated))
  setTitle(problem.title || '')
  setDescription(problem.description || '')
  setInput(problem.input || '')
@@ -201,124 +201,6 @@ export default function EditProblemPage() {
  } finally {
  setDeletingSolutionId(null)
  setTimeout(() => setActionMessage(null), 3000)
- }
- }
-
- const stopSolutionPolling = useCallback(() => {
- if (pollingRef.current.intervalId) {
- clearInterval(pollingRef.current.intervalId)
- }
- pollingRef.current = { logId: '', intervalId: null }
- }, [])
-
- const startSolutionPolling = useCallback((logId: string) => {
- // 清理旧轮询，避免重复轮询
- if (pollingRef.current.intervalId) {
- clearInterval(pollingRef.current.intervalId)
- }
-
- const poll = async () => {
- // 页面不可见时跳过本轮，等切回时由 visibilitychange 触发
- if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
- try {
- const res = await fetchWithAuth(`/api/admin/ai/solution/status?logId=${logId}`)
- const data = await res.json()
- if (!data.success) return
-
- const { status, error } = data.data || {}
- if (status === 'COMPLETED') {
- stopSolutionPolling()
- fetchSolutions() // 刷新题解列表
- setActionMessage({ type: 'success', text: '题解生成完成' })
- setTimeout(() => setActionMessage(null), 4000)
- } else if (status === 'FAILED') {
- stopSolutionPolling()
- setActionMessage({ type: 'error', text: error || '题解生成失败' })
- setTimeout(() => setActionMessage(null), 4000)
- }
- // PENDING/PROCESSING 继续轮询
- } catch (e) {
- console.error('轮询题解状态失败', e)
- }
- }
-
- // 立即轮询一次，然后每 2s 轮询
- poll()
- const intervalId = setInterval(poll, 2000)
- pollingRef.current = { logId, intervalId }
- }, [fetchSolutions, stopSolutionPolling])
-
- // 可见性感知：切回页面时立即轮询一次
- useEffect(() => {
- const onVisibilityChange = () => {
- if (document.visibilityState === 'visible' && pollingRef.current.logId) {
- const currentLogId = pollingRef.current.logId
- fetchWithAuth(`/api/admin/ai/solution/status?logId=${currentLogId}`)
- .then((r) => r.json())
- .then((data) => {
- if (!data.success) return
- const { status, error } = data.data || {}
- if (status === 'COMPLETED') {
- stopSolutionPolling()
- fetchSolutions()
- setActionMessage({ type: 'success', text: '题解生成完成' })
- setTimeout(() => setActionMessage(null), 4000)
- } else if (status === 'FAILED') {
- stopSolutionPolling()
- setActionMessage({ type: 'error', text: error || '题解生成失败' })
- setTimeout(() => setActionMessage(null), 4000)
- }
- })
- .catch(() => {})
- }
- }
- document.addEventListener('visibilitychange', onVisibilityChange)
- return () => document.removeEventListener('visibilitychange', onVisibilityChange)
- }, [fetchSolutions, stopSolutionPolling])
-
- // 组件卸载时清理轮询
- useEffect(() => {
- return () => {
- if (pollingRef.current.intervalId) {
- clearInterval(pollingRef.current.intervalId)
- }
- }
- }, [])
-
- const handleRegenerateSolution = async () => {
- const ok = window.confirm(
- '将删除原 AI 官方题解并重新生成。确定继续吗？'
- )
- if (!ok) return
- try {
- setRegenerating(true)
- setActionMessage(null)
- const response = await fetchWithAuth(
- `/api/admin/problems/${problemId}/regenerate-solution`,
- { method: 'POST' }
- )
- const data = await response.json().catch(() => null)
- if (response.ok && data?.success) {
- const logId = data.data?.logId
- setActionMessage({ type: 'success', text: 'AI 题解已重新入队生成' })
- if (logId) {
- // 启动轮询，等待生成完成后自动刷新
- startSolutionPolling(logId)
- } else {
- // 兼容无 logId 的旧接口：直接刷新
- await fetchSolutions()
- }
- } else {
- setActionMessage({
- type: 'error',
- text: data?.error || '重新生成失败'
- })
- }
- } catch (err: any) {
- setActionMessage({ type: 'error', text: err?.message || '网络错误' })
- } finally {
- setRegenerating(false)
- setTimeout(() => setActionMessage(null), 4000)
  }
  }
 
@@ -790,24 +672,10 @@ export default function EditProblemPage() {
  题解管理（{solutions.length}）
  </h2>
  <p className="text-xs text-muted-foreground">
- 管理该题下的所有题解，AI 题解可一键重新生成
+ 管理该题下的所有题解（AI 题解可使用下方 AI 操作面板重新生成）
  </p>
  </div>
  </div>
- <button
- type="button"
- onClick={handleRegenerateSolution}
- disabled={regenerating}
- className="btn btn-primary text-sm flex items-center gap-2"
- title="删除原 AI 官方题解并重新入队生成"
- >
- {regenerating ? (
- <Loader2 className="w-4 h-4 animate-spin" />
- ) : (
- <RefreshCw className="w-4 h-4" />
- )}
- AI 重新生成
- </button>
  </div>
 
  {actionMessage && (
@@ -934,22 +802,6 @@ export default function EditProblemPage() {
  <Eye className="w-3.5 h-3.5" />
  查看
  </button>
- {s.isAiGenerated && (
- <button
- type="button"
- onClick={handleRegenerateSolution}
- disabled={regenerating}
- className="px-3 py-1.5 text-xs rounded-lg bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white border border-purple-600/50 flex items-center gap-1 shadow-sm transition-all"
- title="删除此题解并重新生成"
- >
- {regenerating ? (
- <Loader2 className="w-3.5 h-3.5 animate-spin" />
- ) : (
- <RefreshCw className="w-3.5 h-3.5" />
- )}
- AI 重新生成
- </button>
- )}
  <button
  type="button"
  onClick={() => handleDeleteSolution(s.id)}
@@ -970,6 +822,21 @@ export default function EditProblemPage() {
  </div>
  )}
  </section>
+
+ {/*
+   题目 AI 操作面板（Phase 4）
+   - 重新生成题解（替代原内嵌按钮 + startSolutionPolling 状态机）
+   - 跳转测试数据生成 / 智能分析 / 建议元数据
+   任务入队后的进度展示由 AiWorkspaceShell 右下角任务列表统一处理。
+ */}
+ <ProblemAiPanel
+   problemId={problemId}
+   isAiGenerated={isAiGenerated}
+   onTaskEnqueued={() => {
+     // AI 题解重新生成入队后刷新题解列表，便于稍后看到新生成的题解
+     fetchSolutions()
+   }}
+ />
  </div>
  )
 }

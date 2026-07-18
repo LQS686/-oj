@@ -45,15 +45,15 @@ export default function AssignmentProblemPicker({
 
   if (problemsLoading) {
     return (
-      <div className="flex flex-1 min-h-0 items-center justify-center text-muted-foreground text-sm py-8">
+      <div className="flex items-center justify-center text-muted-foreground text-sm py-8">
         加载题库中…
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-hidden">
-      <div className="shrink-0 space-y-2">
+    <div className="flex flex-col gap-3">
+      <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
           输入题号，英文或中文逗号分隔，如 <span className="font-mono text-foreground">P1001,P1002,P1005</span>
           ，将按输入顺序加入作业。
@@ -78,16 +78,16 @@ export default function AssignmentProblemPicker({
         {batchHint ? <p className="text-xs text-muted-foreground">{batchHint}</p> : null}
       </div>
 
-      <div className="flex flex-col flex-1 min-h-0">
-        <p className="text-xs font-medium text-foreground mb-2 shrink-0">
+      <div className="flex flex-col">
+        <p className="text-xs font-medium text-foreground mb-2">
           已选题目（共 {orderedIds.length} 题，可调整顺序）
         </p>
         {selectedOrdered.length === 0 ? (
-          <div className="flex-1 min-h-[10rem] rounded-lg border border-dashed border-border flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
+          <div className="min-h-[6rem] rounded-lg border border-dashed border-border flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
             尚未添加题目，请在上方输入题号后点击「添加」
           </div>
         ) : (
-          <div className="flex-1 min-h-[10rem] overflow-y-auto rounded-lg border border-border divide-y divide-border">
+          <div className="rounded-lg border border-border divide-y divide-border">
             {selectedOrdered.map((problem, index) => (
               <div
                 key={problem.id}

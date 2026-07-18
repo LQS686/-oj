@@ -37,6 +37,10 @@ export interface SolutionGenerationResult {
   content: string
   /** 标程语言（来自 stdLang 或 AI 推断） */
   language?: string
+  /** Python 版本标程代码（Task 32：多语言标程同步，翻译自 C++ 标程） */
+  solutionPython?: string
+  /** AI 自评 5 维质量分数（Task 31.2：completeness/accuracy/readability/codeMatch/difficultyMatch，0-5） */
+  qualityScores?: Record<string, number>
   /** 本次调用消耗的 tokens */
   tokensUsed: number
 }
@@ -96,6 +100,8 @@ const SYSTEM_PROMPT = `你是一位资深的算法竞赛选手与教学者，擅
 # 你的任务
 - 阅读用户给出的【题目描述】与【标程代码】
 - 按下方【题解结构】输出严格 5 段式 markdown 题解
+- 提供与 C++ 标程功能等价的 Python 3 翻译版本（solution_python 字段）
+- 对本次题解做 5 维度自评（qualityScores 字段）
 - 严格按 JSON 格式返回（不要使用 \`\`\`json 包裹，不要在 JSON 外添加任何文字）
 
 # 题解结构（5 段，必须全部出现，使用 H2 标题 ## 分隔）
@@ -116,14 +122,39 @@ const SYSTEM_PROMPT = `你是一位资深的算法竞赛选手与教学者，擅
    - 列出本题的易错点、边界情况、常数优化点
    - 若有等价解法，可一句话点出
 
+# 多语言标程同步（Task 32）
+- 若标程语言为 C++（cpp），必须在 solution_python 字段给出功能等价的 Python 3 翻译
+- 若标程语言本身即为 Python，solution_python 可直接复制标程代码
+- 若标程为其他语言（Java / Go 等），仍尽量提供 Python 翻译；确实无法翻译时返回空字符串 ""
+- Python 代码须可直接运行（使用 sys.stdin / input() 读取输入，print 输出）
+- 翻译须保持算法等价，不改变时间复杂度（常数因子差异可接受）
+
+# 质量自评（Task 31.2）
+- 对本次题解做 5 维度自评，每维 0-5 分（整数）：
+  - completeness 完整性：5 段是否齐全（5=全部齐全，0=缺失多半）
+  - accuracy 准确性：算法描述是否正确（5=完全正确，0=有明显错误）
+  - readability 可读性：markdown 结构是否清晰（5=结构优良，0=混乱）
+  - codeMatch 标程匹配度：参考代码与标程语言是否一致（5=完全一致，0=不匹配）
+  - difficultyMatch 难度匹配度：题解深度是否匹配难度（5=深度恰当，0=深度不足）
+
 # 输出 JSON Schema
 {
   "content": "<完整题解 markdown 字符串，包含上述 5 段>",
-  "language": "<标程语言，如 cpp / python / java / go / javascript>"
+  "language": "<标程语言，如 cpp / python / java / go / javascript>",
+  "solution_python": "<Python 3 版本标程代码，基于 C++ 标程功能等价翻译；无法翻译时为空字符串>",
+  "qualityScores": {
+    "completeness": 0-5,
+    "accuracy": 0-5,
+    "readability": 0-5,
+    "codeMatch": 0-5,
+    "difficultyMatch": 0-5
+  }
 }
 
 # 严格规则
 - content 字段必须是合法字符串（双引号需转义为 \\"）
+- solution_python 字段必须是合法字符串（换行用 \\n 转义，双引号用 \\" 转义）
+- qualityScores 必须包含全部 5 个维度，值为 0-5 的整数
 - 不要在 JSON 外输出 \`\`\`markdown 包裹
 - 不要输出 \`<think>\` 思考块
 - 不要添加任何额外字段（如 status / message / debug）`
@@ -176,11 +207,16 @@ function escapePromptInjection(s: string): string {
 /**
  * 生成 AI 题解
  *
+ * @param params 题解生成参数
+ * @param _userId 触发用户 ID（用于 AI 配置解析）
+ * @param opts.temperatureOverride 覆盖默认温度（Task 31.4：质量评分重试时降至 0.2）
+ *
  * @throws 调用失败 / 解析失败 / 内容异常时抛错，由上层 queue 处理
  */
 export async function generateSolutionForProblem(
   params: SolutionGenerationParams,
-  _userId?: string
+  _userId?: string,
+  opts?: { temperatureOverride?: number }
 ): Promise<SolutionGenerationResult> {
   if (!params.problemId || !params.title) {
     throw new Error('solution-generator: problemId 与 title 必填')
@@ -202,7 +238,8 @@ export async function generateSolutionForProblem(
       { role: 'user' as const, content: userPrompt }
     ],
     // 题解写作需要一定创造性；优先使用 config 配置，默认 0.7
-    temperature: config.temperature ?? 0.7,
+    // Task 31.4：opts.temperatureOverride 覆盖（质量评分重试时降至 0.2）
+    temperature: opts?.temperatureOverride ?? config.temperature ?? 0.7,
     response_format: { type: 'json_object' as const },
     // 题解 5 段 markdown 通常 1500-4000 tokens，给 8192 留足余量；优先使用 config 配置
     max_tokens: config.maxTokens || 8192
@@ -315,12 +352,40 @@ export async function generateSolutionForProblem(
 
   const language: string | undefined = (parsed?.language || params.stdLang || '').toString().trim() || undefined
 
+  // Task 32.1：提取 Python 版本标程（容错：缺失或空字符串时为 undefined）
+  const rawPython = (parsed?.solution_python || '').toString()
+  const solutionPython: string | undefined = rawPython.trim() || undefined
+  if (!solutionPython) {
+    logger.warn('[solution-generator] Python 翻译缺失或为空，将仅写入 C++ 标程', {
+      problemId: params.problemId,
+      stdLang: params.stdLang,
+    })
+  }
+
+  // Task 31.2：提取 AI 自评质量分数（容错：缺失或格式错误时为 undefined）
+  let qualityScores: Record<string, number> | undefined
+  if (parsed?.qualityScores && typeof parsed.qualityScores === 'object') {
+    const validKeys = ['completeness', 'accuracy', 'readability', 'codeMatch', 'difficultyMatch']
+    const extracted: Record<string, number> = {}
+    let hasAny = false
+    for (const k of validKeys) {
+      const v = (parsed.qualityScores as Record<string, unknown>)[k]
+      if (typeof v === 'number' && v >= 0 && v <= 5) {
+        extracted[k] = Math.round(v)
+        hasAny = true
+      }
+    }
+    if (hasAny) qualityScores = extracted
+  }
+
   logger.info('[solution-generator] 题解生成成功', {
     problemId: params.problemId,
     contentLength: content.length,
     language,
+    hasPython: !!solutionPython,
+    hasQualityScores: !!qualityScores,
     tokensUsed
   })
 
-  return { content, language, tokensUsed }
+  return { content, language, solutionPython, qualityScores, tokensUsed }
 }

@@ -33,10 +33,20 @@ const widthClass = {
 }
 
 /**
- * 教学向页面外壳：统一标题区、间距与信息密度，避免营销式大留白。
+ * 教学向页面外壳：统一间距与信息密度，避免营销式大留白。
+ *
+ * 标题策略：
+ * - 桌面端：顶部导航栏 NavLinks 已高亮当前页面，不再渲染 H1 标题，避免重复
+ * - 移动端：导航栏菜单折叠，需要在页面顶部显示 H1 标题标识当前位置（sm:hidden）
+ *
+ * 工具栏与操作按钮：
+ * - 若同时存在 toolbar 和 actions，桌面端合并为一行（toolbar 在左，actions 在右）
+ * - 移动端自动堆叠，避免挤压
+ * - 若只有 actions，右对齐显示
  */
 export function EducationalPageShell({
   title,
+  // 以下 prop 保留但不再在桌面端渲染（向后兼容）
   description,
   icon: Icon,
   iconClassName = 'bg-primary text-primary-foreground',
@@ -60,26 +70,22 @@ export function EducationalPageShell({
           </Link>
         )}
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3 min-w-0">
-            {Icon && (
-              <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${iconClassName}`}
-              >
-                <Icon className="w-5 h-5" />
+        {/* 移动端标题：桌面端导航栏已高亮当前页面，无需重复；移动端导航菜单折叠，需要 H1 标识 */}
+        <h1 className="sm:hidden text-lg font-bold text-foreground mb-4">{title}</h1>
+
+        {/* 工具栏 + 操作按钮：合并为一行，避免 actions 孤立成行 */}
+        {(toolbar || actions) && (
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+            {toolbar && (
+              <div className="sm:flex-1 min-w-0">{toolbar}</div>
+            )}
+            {actions && (
+              <div className="flex items-center gap-2 flex-shrink-0 sm:ml-auto">
+                {actions}
               </div>
             )}
-            <div className="min-w-0">
-              <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{title}</h1>
-              {description != null && (
-                <p className="text-muted-foreground text-sm mt-0.5">{description}</p>
-              )}
-            </div>
           </div>
-          {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
-        </div>
-
-        {toolbar && <div className="mb-6">{toolbar}</div>}
+        )}
 
         <div>
           {children}

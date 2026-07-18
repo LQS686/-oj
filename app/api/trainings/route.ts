@@ -2,9 +2,9 @@
  * /api/trainings - 训练计划列表/创建
  *
  * GET  公开：分页查询（仅公开、已发布）
- * POST 鉴权：所有登录用户可创建（普通用户默认私有草稿）
+ * POST 鉴权：仅管理员可创建（普通用户请通过后台管理页面）
  */
-import { withApi, ok, readJson, readQuery, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
 import {
   createTrainingWithProblems,
   listPublicTrainingsAdvanced,
@@ -24,6 +24,7 @@ export const GET = withApi.public(async (req) => {
     categoryId?: string
     categoryType?: string
     recommended?: string
+    joined?: string
   }>(req)
   let page = toInt(q.page, 'page', 1)
   let limit = toInt(q.limit || q.pageSize, 'limit', 20)
@@ -43,6 +44,7 @@ export const GET = withApi.public(async (req) => {
       ? q.categoryType
       : undefined,
     isRecommended: q.recommended === 'true' ? true : undefined,
+    joinedOnly: q.joined === 'true' ? true : undefined,
     userId,
   })
 
@@ -50,7 +52,11 @@ export const GET = withApi.public(async (req) => {
 })
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  // 所有登录用户均可创建题单（普通用户默认私有草稿）
+  // 仅管理员可通过后台管理页面创建题单
+  if (!canAccessAdmin(user)) {
+    throw403('仅管理员可创建题单')
+  }
+
   const body = await readJson<{
     title: string
     description: string
@@ -69,14 +75,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     throw400('VALIDATION', '缺少必要参数（title/description）')
   }
 
-  // 普通用户（admin=false）创建时强制为私有草稿，isRecommended=false
-  const adminFlag = canAccessAdmin(user)
-  const isPublic = adminFlag ? (body.isPublic ?? true) : false
-  const status = adminFlag ? (body.status ?? 'published') : 'draft'
-  const isRecommended = adminFlag ? (body.isRecommended ?? false) : false
-
-  // 分类仅 admin 可选；普通用户若传则丢弃
-  const categoryType = adminFlag && (body.categoryType === 'official' || body.categoryType === 'contest')
+  const categoryType = body.categoryType === 'official' || body.categoryType === 'contest'
     ? body.categoryType
     : null
 
@@ -85,9 +84,9 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     description: body.description,
     difficulty: body.difficulty ?? null,
     categoryType,
-    isPublic,
-    status,
-    isRecommended,
+    isPublic: body.isPublic ?? true,
+    status: body.status ?? 'published',
+    isRecommended: body.isRecommended ?? false,
     authorId: user.id,
     categoryId: body.categoryId,
     tags: body.tags,

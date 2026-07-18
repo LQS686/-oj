@@ -25,16 +25,20 @@ export const PUT = withApi.admin(async (req, ctx) => {
     timeout?: number
     isActive?: boolean
     params?: Record<string, unknown>
+    // Task 35.5：每百万 tokens 单价（用于成本估算）
+    pricePerMillionTokens?: number | null
   }>(req)
   const {
     name, model, providerId, type,
     maxTokens, temperature, timeout, isActive, params: modelParams,
+    pricePerMillionTokens,
   } = body
 
   const updatedModel = await updateAiModel(id, {
     name, model, providerId, type,
     maxTokens, temperature, timeout, isActive,
     params: modelParams,
+    pricePerMillionTokens,
   })
 
   return ok(updatedModel)

@@ -8,9 +8,10 @@ import type { PromptContext, GeneratedProblem } from './prompts/core/types';
 import { GenerationMode } from './prompts/core/types'
 import { checkGeneratedProblem, checkTestDataQuality } from './quality-check'
 import { safeJsonParse as _safeJsonParse } from './response-parser'
+import { computePromptHash } from './prompt-hash'
 
 export interface GenerationParams {
-  mode: 'parametric' | 'test_data';
+  mode: 'parametric' | 'test_data' | 'analyze' | 'suggest_metadata' | 'similar' | 'test_data_incremental' | 'diagnose';
   // Parametric Mode Fields
   type?: string;
   difficulty?: string;
@@ -34,6 +35,27 @@ export interface GenerationParams {
   // ✅ New: Specific Model ID to use
   modelId?: string;
 
+  // Suggest Metadata Mode Fields（题目元数据建议输入）
+  samples?: any[];
+  problemInput?: string;
+  problemOutput?: string;
+
+  // Phase 6: Similar mode — 原题信息（作为 prompt 上下文注入）
+  sourceProblem?: {
+    title: string;
+    description: string;
+    input?: string;
+    output?: string;
+    tags?: string[];
+    difficulty?: string;
+    stdCode?: string | null;
+    stdLang?: string | null;
+  };
+
+  // Phase 6: Test data incremental — 已覆盖/缺失维度
+  coveredDimensions?: Array<{ id: string; name: string }>;
+  missingDimensions?: Array<{ id: string; name: string }>;
+
   // ✅ New: 内部重试标记（由 route.ts retry 路径传入，generator 据此走降温度路径）
   // _reduceTemperature: true → 基础温度 cap 到 0.2（适合 JSON 解析失败后的重试）
   // _retry: true → 标记这是重试（仅用于日志/审计，generator 当前不消费）
@@ -48,6 +70,8 @@ export interface GenerationResult {
   tokensUsed: number;
   /** 质量自检问题列表（仅记录，不阻塞导入） */
   qualityIssues?: Array<{ problemIndex: number; reason: string; details?: string[] }>;
+  /** Phase 6: 本次生成使用的 prompt 哈希（SHA-256） */
+  promptHash?: string;
 }
 
 function safeJsonParse(content: string): any {
@@ -145,7 +169,7 @@ function isRetryableError(err: any): boolean {
  *   - backoffMs：首次重试前的等待（毫秒），后续按指数退避
  *   - 仅对 isRetryableError(err) 为 true 的错误重试
  */
-async function callWithRetry<T>(
+export async function callWithRetry<T>(
   fn: () => Promise<T>,
   opts: { maxRetries?: number; backoffMs?: number; opName?: string } = {}
 ): Promise<T> {
@@ -195,6 +219,32 @@ function mapToContext(params: GenerationParams): PromptContext {
             hasSolution: !!params.solutionCode && !!params.solutionLanguage
         };
     }
+    // Phase 6: 测试数据增量补充
+    if (params.mode === 'test_data_incremental') {
+        return {
+            mode: GenerationMode.TEST_DATA_INCREMENTAL,
+            title: params.title || '',
+            description: params.description || '',
+            inputDescription: params.inputDescription || '',
+            outputDescription: params.outputDescription || '',
+            count: params.count || 5,
+            hasSolution: !!params.solutionCode && !!params.solutionLanguage,
+            coveredDimensions: params.coveredDimensions || [],
+            missingDimensions: params.missingDimensions || []
+        };
+    }
+    // Phase 6: 相似题生成（复用 ParamGen 字段 + 注入原题信息）
+    if (params.mode === 'similar' && params.sourceProblem) {
+        return {
+            mode: GenerationMode.SIMILAR,
+            type: params.type || 'programming',
+            difficulty: params.difficulty || '入门',
+            topic: params.topic || [],
+            count: params.count || 1,
+            additionalInfo: params.additionalInfo,
+            sourceProblem: params.sourceProblem
+        };
+    }
     // 默认 ParamGen（AI 出题）
     return {
         mode: GenerationMode.PARAM_GEN,
@@ -204,6 +254,18 @@ function mapToContext(params: GenerationParams): PromptContext {
         count: params.count || 1,
         additionalInfo: params.additionalInfo
     };
+}
+
+/**
+ * Phase 6 Task 39.2: 为给定参数计算 prompt 哈希（不调用 AI）
+ *
+ * 用于在任务开始时记录 promptHash，便于失败诊断关联同类失败任务。
+ * 复用 mapToContext + promptLoader.getPrompt，与 generateProblems 内部逻辑一致。
+ */
+export function computePromptHashForParams(params: GenerationParams): string {
+  const context = mapToContext(params)
+  const { systemPrompt, userPrompt } = promptLoader.getPrompt(context)
+  return computePromptHash(systemPrompt, userPrompt)
 }
 
 async function runThinkingStep(config: AiConfig, context: PromptContext): Promise<{ content: string, tokens: number }> {
@@ -470,7 +532,8 @@ export async function generateProblems(params: GenerationParams, userId?: string
         problems: normalizedProblems,
         thought: thoughtProcess,
         tokensUsed: totalTokens,
-        qualityIssues: qualityIssues.length > 0 ? qualityIssues : undefined
+        qualityIssues: qualityIssues.length > 0 ? qualityIssues : undefined,
+        promptHash: computePromptHash(systemPrompt, finalUserPrompt)
     };
 
   } catch (error: any) {

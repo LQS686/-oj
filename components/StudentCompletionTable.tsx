@@ -1,35 +1,42 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, Code, X, FileCode, Copy, Check } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, Code, X, FileCode, Copy, Check, Timer } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDateTime, formatDateTimeShort } from '@/lib/utils'
+import { formatDurationMs } from '@/components/class/ProblemTimer'
 
 interface RawSubmission {
- id: string
- userId?: string
- problemId: string
- status: string
- score: number
- submittedAt: string
- code?: string
- language?: string
+  id: string
+  userId?: string
+  problemId: string
+  status: string
+  score: number
+  submittedAt: string
+  code?: string
+  language?: string
+  /** 作业维度做题用时（毫秒），仅 AC 时有意义 */
+  timeElapsedMs?: number
 }
 
 interface StudentSubmission {
- problemId: string
- status: string
- score: number
- submittedAt?: string
+  problemId: string
+  status: string
+  score: number
+  submittedAt?: string
+  /** 作业维度做题用时（毫秒），仅 AC 时有意义 */
+  timeElapsedMs?: number
 }
 
 interface Student {
- id: string
- name: string
- avatar: string
- submissions: Record<string, StudentSubmission>
- totalScore: number
- completedCount: number
+  id: string
+  name: string
+  avatar: string
+  submissions: Record<string, StudentSubmission>
+  totalScore: number
+  completedCount: number
+  /** 已通过题目的累计用时（毫秒） */
+  totalTimeMs: number
 }
 
 interface Problem {
@@ -271,7 +278,7 @@ function SubmissionModal({
 export default function StudentCompletionTable({ students, problems, assignmentTitle, onProblemClick, allSubmissions, classId, assignmentId }: StudentCompletionTableProps) {
  const [searchTerm, setSearchTerm] = useState('')
  const [statusFilter, setStatusFilter] = useState('all')
- const [sortField, setSortField] = useState<'name' | 'score' | 'completed'>('name')
+ const [sortField, setSortField] = useState<'name' | 'score' | 'completed' | 'time'>('name')
  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
  const [modalState, setModalState] = useState<{
@@ -304,6 +311,9 @@ export default function StudentCompletionTable({ students, problems, assignmentT
  break
  case 'completed':
  comparison = a.completedCount - b.completedCount
+ break
+ case 'time':
+ comparison = a.totalTimeMs - b.totalTimeMs
  break
  }
  return sortOrder === 'asc' ? comparison : -comparison
@@ -345,6 +355,22 @@ export default function StudentCompletionTable({ students, problems, assignmentT
        <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem]">
          <Clock className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
          <span className="text-[10px] text-muted-foreground">评测中</span>
+       </div>
+     )
+   }
+
+   // AC 时：用"用时 mm:ss 通过"替代纯"通过"，把做题用时作为副标签突出展示
+   if (submission.status === 'AC' && typeof submission.timeElapsedMs === 'number' && submission.timeElapsedMs > 0) {
+     return (
+       <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem] cursor-pointer hover:opacity-90 transition-opacity">
+         <span className={`text-xs font-semibold tabular-nums ${scoreClass}`}>{submission.score} 分</span>
+         <span className={`text-[10px] font-medium flex items-center gap-0.5 ${cfg?.iconColor || 'text-muted-foreground'}`}>
+           <Timer className="w-2.5 h-2.5" />
+           {formatDurationMs(submission.timeElapsedMs)} 通过
+         </span>
+         <span className="text-[10px] text-muted-foreground tabular-nums leading-tight">
+           {formatDateTimeShort(submission.submittedAt ?? '')}
+         </span>
        </div>
      )
    }
@@ -427,6 +453,22 @@ export default function StudentCompletionTable({ students, problems, assignmentT
  </span>
  </th>
  <th className="px-3 py-2.5 font-medium text-muted-foreground text-center w-[72px]">完成数</th>
+ <th
+ className="px-3 py-2.5 font-medium text-muted-foreground text-center cursor-pointer hover:text-foreground transition-colors select-none w-[88px]"
+ onClick={() => {
+ if (sortField === 'time') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+ else { setSortField('time'); setSortOrder('asc'); }
+ }}
+ title="已通过题目的累计做题用时"
+ >
+ <span className="inline-flex items-center justify-center w-full">
+ <Timer className="w-3 h-3 mr-1" />
+ 总用时
+ {sortField === 'time' && (
+ <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${sortOrder === 'desc' ? '' : 'rotate-180'}`} />
+ )}
+ </span>
+ </th>
  </tr>
  </thead>
  <tbody className="divide-y divide-border/40">
@@ -463,10 +505,22 @@ export default function StudentCompletionTable({ students, problems, assignmentT
  <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground align-middle">
  <span className="inline-flex items-center justify-center w-full">{student.completedCount} / {problems.length}</span>
  </td>
+ <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground align-middle">
+ <span className="inline-flex items-center justify-center w-full">
+ {student.totalTimeMs > 0 ? (
+ <span className="inline-flex items-center gap-1 text-foreground/80">
+ <Timer className="w-3 h-3" />
+ {formatDurationMs(student.totalTimeMs)}
+ </span>
+ ) : (
+ <span className="text-muted-foreground/50">—</span>
+ )}
+ </span>
+ </td>
  </tr>
  )) : (
  <tr>
- <td colSpan={problems.length + 3} className="py-12 text-center text-muted-foreground text-sm">
+ <td colSpan={problems.length + 4} className="py-12 text-center text-muted-foreground text-sm">
  暂无学生数据
  </td>
  </tr>
@@ -478,7 +532,14 @@ export default function StudentCompletionTable({ students, problems, assignmentT
  {filteredStudents.length > 0 && (
  <div className="px-5 py-2.5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
  <span>共 {filteredStudents.length} 名学生</span>
+ <div className="flex items-center gap-4">
  <span>平均分：{Math.round(filteredStudents.reduce((sum, s) => sum + s.totalScore, 0) / filteredStudents.length || 0)}</span>
+ <span>
+ 平均用时：{formatDurationMs(
+ Math.round(filteredStudents.reduce((sum, s) => sum + s.totalTimeMs, 0) / filteredStudents.length || 0)
+ )}
+ </span>
+ </div>
  </div>
  )}
  </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import {
  Plus, Trash2, Edit, Check, X, Key, Server,
- Cpu, Save, Loader2, AlertCircle, Eye, EyeOff, Sparkles, Wand2
+ Cpu, Save, Loader2, AlertCircle, Eye, EyeOff, Sparkles, Wand2, HeartOff
 } from 'lucide-react'
 import { getProviderMeta } from '@/lib/ai/providers'
 
@@ -27,6 +27,12 @@ interface AIModel {
  temperature: number
  isActive: boolean
  params?: Record<string, any>
+ /** Task 35.5: 每百万 tokens 单价（用于成本估算，单位：元） */
+ pricePerMillionTokens?: number | null
+ /** Phase 6 Task 38: 模型健康状态（'healthy' | 'degraded' | 'down' | null） */
+ healthStatus?: string | null
+ /** Phase 6 Task 38: 最近健康检查时间 */
+ lastHealthCheckAt?: string | null
  provider?: {
  name: string
  slug: string
@@ -100,6 +106,8 @@ export default function AIModelsPage() {
  const [selectedDiscovered, setSelectedDiscovered] = useState<Set<string>>(new Set())
  const [showAdvanced, setShowAdvanced] = useState(false)
  const [paramsText, setParamsText] = useState('{}')
+ // Phase 6 Task 38.4: 重置健康度 loading 状态
+ const [resettingHealthId, setResettingHealthId] = useState<string | null>(null)
 
  const [providerForm, setProviderForm] = useState({
  name: '',
@@ -114,7 +122,8 @@ export default function AIModelsPage() {
  providerId: '',
  type: 'generation',
  maxTokens: 4096,
- temperature: 0.7
+ temperature: 0.7,
+ pricePerMillionTokens: null as number | null
  })
 
  useEffect(() => {
@@ -401,7 +410,7 @@ export default function AIModelsPage() {
  setSuccess(editingModel ? '模型已更新' : '模型已创建')
  setShowModelForm(false)
  setEditingModel(null)
- setModelForm({ name: '', model: '', providerId: '', type: 'generation', maxTokens: 4096, temperature: 0.7 })
+ setModelForm({ name: '', model: '', providerId: '', type: 'generation', maxTokens: 4096, temperature: 0.7, pricePerMillionTokens: null })
  setParamsText('{}')
  setShowAdvanced(false)
  fetchData()
@@ -439,12 +448,12 @@ export default function AIModelsPage() {
 
  const handleDeleteModel = async (id: string) => {
  if (!confirm('确定要删除此模型吗？')) return
- 
+
  try {
  const res = await fetchWithAuth(`/api/admin/ai/models/${id}`, {
  method: 'DELETE'
  })
- 
+
  const data = await res.json()
  if (data.success) {
  setSuccess('模型已删除')
@@ -455,6 +464,35 @@ export default function AIModelsPage() {
  }
  } catch {
  setError('网络错误')
+ }
+ }
+
+ /**
+ * Phase 6 Task 38.4: 重置模型健康度
+ *
+ * 调 POST /api/admin/ai/models/[id]/reset-health
+ * 清空 healthStatus（变回 healthy）+ 更新 lastHealthCheckAt = now()
+ */
+ const handleResetHealth = async (id: string) => {
+ setResettingHealthId(id)
+ setError('')
+ try {
+ const res = await fetchWithAuth(`/api/admin/ai/models/${id}/reset-health`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ })
+ const data = await res.json()
+ if (data.success) {
+ setSuccess('模型健康度已重置')
+ fetchData()
+ setTimeout(() => setSuccess(''), 3000)
+ } else {
+ setError(data.error || '重置失败')
+ }
+ } catch {
+ setError('网络错误')
+ } finally {
+ setResettingHealthId(null)
  }
  }
 
@@ -477,7 +515,8 @@ export default function AIModelsPage() {
  providerId: model.providerId,
  type: model.type,
  maxTokens: model.maxTokens,
- temperature: model.temperature
+ temperature: model.temperature,
+ pricePerMillionTokens: model.pricePerMillionTokens ?? null
  })
  setParamsText(JSON.stringify(model.params || {}, null, 2))
  setShowAdvanced(!!model.params && Object.keys(model.params).length > 0)
@@ -500,19 +539,6 @@ export default function AIModelsPage() {
 
  return (
  <div className="space-y-6">
- <div className="flex items-center justify-between">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-xl flex items-center justify-center"
- style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)' }}>
- <Cpu className="w-5 h-5 text-foreground" />
- </div>
- <div>
- <h1 className="text-2xl font-bold text-foreground">AI 模型管理</h1>
- <p className="text-sm text-muted-foreground">配置和管理 AI 服务商和模型</p>
- </div>
- </div>
- </div>
-
  {error && (
  <div className="bg-error/10 border border-red-500/30 text-error px-4 py-3 rounded-lg flex items-center gap-2">
  <AlertCircle className="w-4 h-4" />
@@ -641,7 +667,7 @@ export default function AIModelsPage() {
  return
  }
  setEditingModel(null)
- setModelForm({ name: '', model: '', providerId: '', type: 'generation', maxTokens: 4096, temperature: 0.7 })
+ setModelForm({ name: '', model: '', providerId: '', type: 'generation', maxTokens: 4096, temperature: 0.7, pricePerMillionTokens: null })
  setParamsText('{}')
  setShowAdvanced(false)
  setShowModelForm(true)
@@ -680,8 +706,30 @@ export default function AIModelsPage() {
  <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300" title="模型支持 thinking 参数注入">🧠 思考参数</span>
  )}
  <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">📏 {model.maxTokens} tokens</span>
+ {typeof model.pricePerMillionTokens === 'number' && model.pricePerMillionTokens > 0 && (
+ <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" title="每百万 tokens 单价">
+ 💰 ¥{model.pricePerMillionTokens}/M
+ </span>
+ )}
  {hasV4AdvancedParams(model) && (
  <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300" title={JSON.stringify(model.params, null, 2)}>⚙️ v4 高级参数</span>
+ )}
+ {/* Phase 6 Task 38.4: 健康状态徽章（仅 degraded / down 显示） */}
+ {model.healthStatus === 'degraded' && (
+ <span
+ className="text-xs px-1.5 py-0.5 rounded bg-warning/20 text-warning"
+ title={model.lastHealthCheckAt ? `最近检查：${new Date(model.lastHealthCheckAt).toLocaleString()}` : '健康度降级'}
+ >
+ ⚠️ 降级
+ </span>
+ )}
+ {model.healthStatus === 'down' && (
+ <span
+ className="text-xs px-1.5 py-0.5 rounded bg-error/20 text-error"
+ title={model.lastHealthCheckAt ? `最近检查：${new Date(model.lastHealthCheckAt).toLocaleString()}` : '健康度异常'}
+ >
+ ⛔ 异常
+ </span>
  )}
  </div>
  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
@@ -699,6 +747,21 @@ export default function AIModelsPage() {
  </div>
  </div>
  <div className="flex items-center gap-2">
+ {/* Phase 6 Task 38.4: 重置健康度按钮（仅 degraded / down 显示） */}
+ {(model.healthStatus === 'degraded' || model.healthStatus === 'down') && (
+ <button
+ onClick={() => handleResetHealth(model.id)}
+ disabled={resettingHealthId === model.id}
+ className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+ title="重置健康度"
+ >
+ {resettingHealthId === model.id ? (
+ <Loader2 className="w-4 h-4 animate-spin" />
+ ) : (
+ <HeartOff className="w-4 h-4" />
+ )}
+ </button>
+ )}
  <button
  onClick={() => editModel(model)}
  className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -943,6 +1006,28 @@ export default function AIModelsPage() {
  className="input"
  />
  </div>
+ </div>
+
+ {/* Task 35.5: 每百万 tokens 单价（用于成本估算） */}
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">
+ 单价（元 / 百万 tokens）
+ </label>
+ <input
+ type="number"
+ step="0.01"
+ min="0"
+ value={modelForm.pricePerMillionTokens ?? ''}
+ onChange={(e) => {
+ const v = e.target.value
+ setModelForm({ ...modelForm, pricePerMillionTokens: v === '' ? null : parseFloat(v) })
+ }}
+ placeholder="留空表示未配置"
+ className="input"
+ />
+ <p className="text-xs text-muted-foreground mt-1">
+ 用于在监控页 / 仪表盘估算 AI 任务成本。留空则不计入成本统计。
+ </p>
  </div>
 
  {/* 高级参数折叠区 */}

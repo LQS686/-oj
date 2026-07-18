@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Megaphone, Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
+import { Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
 interface AnnouncementRow {
@@ -146,14 +146,7 @@ export default function AdminAnnouncementsPage() {
 
   return (
       <div className="p-6 max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Megaphone className="w-8 h-8 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">系统公告</h1>
-              <p className="text-sm text-muted-foreground">管理首页展示的公告</p>
-            </div>
-          </div>
+        <div className="flex justify-end mb-6">
           <button type="button" className="btn btn-primary" onClick={openCreate}>
             <Plus className="w-4 h-4" />
             新建公告

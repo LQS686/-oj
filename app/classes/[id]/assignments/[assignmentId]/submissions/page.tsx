@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { formatDurationMs } from '@/components/class/ProblemTimer'
 import type { Assignment } from '@/types/models'
 
 interface Submission {
@@ -34,6 +35,9 @@ interface Submission {
  message?: string
  submittedAt: string
  isLate: boolean
+ // Phase 1：作业计时字段
+ timeElapsedMs?: number
+ isFirstAc?: boolean
 }
 
 export default function AssignmentSubmissionsPage({ params }: { params: Promise<{ id: string; assignmentId: string }> }) {
@@ -265,6 +269,31 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  bg: 'bg-purple-500/20',
  label: 'RE'
  }
+ case 'SE':
+ case 'system_error':
+ return {
+ icon: <AlertCircle className="w-5 h-5" />,
+ color: 'text-muted-foreground',
+ bg: 'bg-gray-500/20',
+ label: '系统错误'
+ }
+ case 'removed':
+ case 'REMOVED':
+ return {
+ icon: <XCircle className="w-5 h-5" />,
+ color: 'text-muted-foreground',
+ bg: 'bg-gray-500/20',
+ label: '题目已移除'
+ }
+ case 'PENDING':
+ case 'Judging':
+ case 'Running':
+ return {
+ icon: <Clock className="w-5 h-5 animate-pulse" />,
+ color: 'text-primary',
+ bg: 'bg-primary/10',
+ label: status
+ }
  default:
  if (score > 0 && score < 100) {
  return {
@@ -293,7 +322,9 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  <div className="container mx-auto px-4 py-8">
  <button
  onClick={() => {
- const returnTab = isFromLeaderboard ? 'leaderboard' : 'info'
+ // 返回作业详情页的题目 tab（作业详情页支持 ?tab=problems 或 ?tab=completion）
+ // 从完成情况统计跳来时返回 completion，否则返回 problems
+ const returnTab = isFromLeaderboard ? 'completion' : 'problems'
  router.push(`/classes/${classId}/assignments/${assignmentId}?tab=${returnTab}`)
  }}
  className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
@@ -365,6 +396,8 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  <option value="TLE">TLE (超时)</option>
  <option value="MLE">MLE (内存超限)</option>
  <option value="RE">RE (运行错误)</option>
+ <option value="SYSTEM_ERROR">SYSTEM_ERROR (系统错误)</option>
+ <option value="REMOVED">REMOVED (题目已移除)</option>
  </select>
  </div>
  </div>
@@ -400,6 +433,9 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  </th>
  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
  状态
+ </th>
+ <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+ 用时
  </th>
  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
  得分
@@ -444,6 +480,16 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  {statusInfo.icon}
  <span className="font-medium">{statusInfo.label}</span>
  </div>
+ </td>
+ <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
+ {submission.isFirstAc && submission.timeElapsedMs ? (
+ <span className="inline-flex items-center gap-1 text-secondary">
+ <Clock className="w-3 h-3" />
+ {formatDurationMs(submission.timeElapsedMs)}
+ </span>
+ ) : (
+ <span className="text-muted-foreground/60">—</span>
+ )}
  </td>
  <td className="px-6 py-4 whitespace-nowrap text-sm">
  <span className={`px-2 py-1 rounded text-sm font-medium ${

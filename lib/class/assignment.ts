@@ -35,33 +35,6 @@ export async function getClassAssignment(assignmentId: string) {
   })
 }
 
-export async function listClassAssignments(
-  classId: string,
-  options: { skip?: number; take?: number; upcoming?: boolean } = {}
-) {
-  const { skip = 0, take = 50, upcoming = false } = options
-  return prisma.classAssignment.findMany({
-    where: { classId },
-    orderBy: upcoming ? { endTime: 'asc' } : { createdAt: 'desc' },
-    skip,
-    take,
-  })
-}
-
-export async function updateClassAssignment(
-  assignmentId: string,
-  data: Partial<Omit<CreateClassAssignmentInput, 'classId' | 'createdBy'>>
-) {
-  return prisma.classAssignment.update({
-    where: { id: assignmentId },
-    data,
-  })
-}
-
-export async function deleteClassAssignment(assignmentId: string) {
-  return prisma.classAssignment.delete({ where: { id: assignmentId } })
-}
-
 /**
  * 查询用户在某作业下某题目的提交历史
  */

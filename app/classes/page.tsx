@@ -187,7 +187,6 @@ function ClassesPageContent() {
     <>
     <EducationalPageShell
       title="班级"
-      description="加入班级，与伙伴一起学习和进步"
       icon={Users}
       actions={
         user && canCreate ? (

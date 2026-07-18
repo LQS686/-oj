@@ -47,7 +47,7 @@ const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
   {
     label: 'AI 助手',
     items: [
-      { icon: Sparkles, label: 'AI 智能出题', href: '/admin/ai-generation' },
+      { icon: Sparkles, label: 'AI 工作区', href: '/admin/ai' },
       { icon: Cpu, label: 'AI 模型管理', href: '/admin/ai-models' },
       { icon: Activity, label: 'AI 任务监控', href: '/admin/ai-monitor', systemAdminOnly: true },
     ]
@@ -274,7 +274,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   {group.items.map((item) => {
                     const Icon = item.icon
                     const isActive = pathname === item.href ||
-                                   (item.href !== '/admin' && pathname.startsWith(item.href))
+                                   (item.href !== '/admin' && pathname.startsWith(item.href + '/'))
 
                     return (
                       <Link
@@ -349,7 +349,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <h2 className="text-xl md:text-2xl font-bold text-foreground truncate">
                   {allMenuItems.find(item =>
                     pathname === item.href ||
-                    (item.href !== '/admin' && pathname.startsWith(item.href))
+                    (item.href !== '/admin' && pathname.startsWith(item.href + '/'))
                   )?.label || '管理后台'}
                 </h2>
               </div>

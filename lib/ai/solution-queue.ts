@@ -17,6 +17,7 @@ import { prisma } from '../prisma'
 import type { Prisma } from '@prisma/client'
 import type { SolutionGenerationParams } from './solution-generator';
 import { generateSolutionForProblem } from './solution-generator'
+import { scoreSolutionQuality, type SolutionQualityScore } from './quality-check'
 
 /** 题解生成任务超时时间（默认 5 分钟，可通过 AI_SOLUTION_TIMEOUT_MS 环境变量覆盖） */
 const AI_SOLUTION_TIMEOUT_MS = parseInt(process.env.AI_SOLUTION_TIMEOUT_MS || '300000', 10)
@@ -88,19 +89,21 @@ class SolutionQueue extends EventEmitter {
 
   async add(data: SolutionJob): Promise<string> {
     // P1：User-level rate limit
-    //   检查最近 10 分钟内该用户的入队次数，超过上限拒绝。
+    //   仅统计 PENDING / PROCESSING 任务：已结束（COMPLETED / FAILED / DISCARDED）不占用资源，
+    //   不应阻塞新提交（与 lib/ai/queue.ts 题目生成队列限流策略保持一致）。
     //   注意：写入 AiGenerationLog 之前先校验，避免无效日志。
     const userId = data.triggeredBy || data.authorId
     const since = new Date(Date.now() - SOLUTION_USER_LIMIT_WINDOW_MS)
     const recentCount = await prisma.aiGenerationLog.count({
       where: {
         userId,
+        status: { in: ['PENDING', 'PROCESSING'] },
         createdAt: { gte: since },
       },
     })
     if (recentCount >= SOLUTION_USER_LIMIT_MAX) {
       throw new Error(
-        `AI 题解生成频率过高，请稍后再试（${SOLUTION_USER_LIMIT_WINDOW_MS / 60000} 分钟内最多 ${SOLUTION_USER_LIMIT_MAX} 次）`
+        `AI 题解生成频率过高，请稍后再试（${SOLUTION_USER_LIMIT_WINDOW_MS / 60000} 分钟内最多 ${SOLUTION_USER_LIMIT_MAX} 次并发任务）`
       )
     }
 
@@ -198,18 +201,76 @@ class SolutionQueue extends EventEmitter {
       )
 
       // 写题解前再次确认题目存在（防止题目已被删除）
+      // Task 31.3：同时取 difficulty 用于质量评分
       const problem = await prisma.problem.findUnique({
         where: { id: job.data.params.problemId },
-        select: { id: true, title: true }
+        select: { id: true, title: true, difficulty: true }
       })
       if (!problem) {
         throw new Error(`题目不存在：${job.data.params.problemId}`)
+      }
+
+      // === Task 31.3 + 31.4：质量评分 + 低分自动重试 ===
+      // 计算首次质量评分（5 维度，启发式 + AI 自评参考）
+      const stdLang = job.data.params.stdLang
+      let qualityScore: SolutionQualityScore = scoreSolutionQuality(
+        { content: result.content, language: result.language, qualityScores: result.qualityScores },
+        stdLang,
+        problem.difficulty || undefined
+      )
+
+      // Task 31.4：评分 < 3 自动重试（温度降至 0.2，最多 1 次），重试后取较高分
+      let finalResult = result
+      if (qualityScore.overall < 3) {
+        logger.warn('[solution-queue] 题解质量评分 < 3，触发低分重试', {
+          logId: job.id,
+          problemId: problem.id,
+          firstScore: qualityScore.overall,
+        })
+        try {
+          const retryResult = await generateSolutionForProblem(
+            job.data.params,
+            job.data.triggeredBy,
+            { temperatureOverride: 0.2 }
+          )
+          const retryScore = scoreSolutionQuality(
+            { content: retryResult.content, language: retryResult.language, qualityScores: retryResult.qualityScores },
+            stdLang,
+            problem.difficulty || undefined
+          )
+          // 取较高分
+          if (retryScore.overall >= qualityScore.overall) {
+            finalResult = retryResult
+            qualityScore = retryScore
+            logger.info('[solution-queue] 低分重试后采用重试结果', {
+              logId: job.id,
+              firstScore: qualityScore.overall,
+              retryScore: retryScore.overall,
+            })
+          } else {
+            logger.info('[solution-queue] 低分重试分数更低，保留首次结果', {
+              logId: job.id,
+              firstScore: qualityScore.overall,
+              retryScore: retryScore.overall,
+            })
+          }
+        } catch (retryErr) {
+          // 重试失败不阻塞，保留首次结果
+          logger.warn('[solution-queue] 低分重试失败，保留首次结果', {
+            logId: job.id,
+            err: retryErr instanceof Error ? retryErr.message : String(retryErr),
+          })
+        }
       }
 
       // 写入 Solution 记录
       // 同题同源的旧 AI 标程题解先删除（保持「同一题目只有一份 AI_OFFICIAL 标程题解」）
       // 注：sourceType / codeLanguage 为 schema 新增字段
       // 使用 $transaction 保证 deleteMany + create 原子性，避免中途失败导致题解丢失
+      //
+      // Task 32.2：写入 code（C++ 标程，向后兼容） + codePython（Python 翻译）
+      // Task 32.3：Python 翻译失败时容错（codePython 为 null）
+      // Task 31.3：写入 qualityScore（综合分 0-5）
       //
       // 超时保护：若 executeJob 已因超时把日志标 FAILED，则跳过写 Solution + COMPLETED 日志，
       // 避免覆盖已被 catch 标记的 FAILED 状态（检查与写库之间无 await，避免竞态）
@@ -226,9 +287,13 @@ class SolutionQueue extends EventEmitter {
             problemId: problem.id,
             authorId: job.data.authorId,
             title: `AI 标程题解 - ${problem.title}`,
-            content: result.content,
+            content: finalResult.content,
             code: job.data.params.stdCode || null,
-            codeLanguage: job.data.params.stdLang || result.language || null,
+            codeLanguage: job.data.params.stdLang || finalResult.language || null,
+            // Task 32.2：Python 版本标程（翻译失败时为 null，容错）
+            codePython: finalResult.solutionPython || null,
+            // Task 31.3：质量评分综合分（0-5）
+            qualityScore: qualityScore.overall,
             isOfficial: true,
             isAiGenerated: true,
             sourceType: 'AI_OFFICIAL'
@@ -247,11 +312,24 @@ class SolutionQueue extends EventEmitter {
           result: {
             solutionId: solution.id,
             problemId: problem.id,
-            content: result.content,
-            language: result.language || job.data.params.stdLang || null,
-            tokensUsed: result.tokensUsed
+            content: finalResult.content,
+            language: finalResult.language || job.data.params.stdLang || null,
+            // Task 31.3：质量评分详情写入日志（供前端展示徽章）
+            qualityScore: qualityScore.overall,
+            qualityScores: {
+              completeness: qualityScore.completeness,
+              accuracy: qualityScore.accuracy,
+              readability: qualityScore.readability,
+              codeMatch: qualityScore.codeMatch,
+              difficultyMatch: qualityScore.difficultyMatch,
+              overall: qualityScore.overall,
+              notes: qualityScore.notes,
+            },
+            // Task 32.2：标记是否含 Python 翻译
+            hasPythonSolution: !!finalResult.solutionPython,
+            tokensUsed: finalResult.tokensUsed
           } as Prisma.InputJsonValue,
-          tokensUsed: result.tokensUsed
+          tokensUsed: finalResult.tokensUsed
         }
       })
 
@@ -259,8 +337,10 @@ class SolutionQueue extends EventEmitter {
         logId: job.id,
         problemId: problem.id,
         solutionId: solution.id,
-        contentLength: result.content.length,
-        tokensUsed: result.tokensUsed
+        contentLength: finalResult.content.length,
+        qualityScore: qualityScore.overall,
+        hasPython: !!finalResult.solutionPython,
+        tokensUsed: finalResult.tokensUsed
       })
 
       job.status = 'completed'

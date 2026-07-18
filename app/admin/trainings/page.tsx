@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, type Column } from '@/components/admin'
 import {
-  Plus, Search, Edit, Trash2, Eye, Filter, BookOpen, AlertCircle, RefreshCw
+  Plus, Search, Edit, Trash2, Eye, Filter, AlertCircle, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -199,26 +199,7 @@ export default function AdminTrainingsPage() {
 
  return (
  <div className="space-y-6">
- <div className="flex items-center justify-between">
- <div>
- <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
- <BookOpen className="w-6 h-6 text-primary-light" />
- 题单管理
- </h1>
- <p className="text-sm text-muted-foreground mt-1">创建、编辑、发布题单</p>
- </div>
- <div className="flex items-center gap-2">
- <Link href="/admin/trainings/categories" className="btn-ghost btn">
- 分类管理
- </Link>
- <Link href="/admin/trainings/create" className="btn-primary btn">
- <Plus className="w-4 h-4" />
- 新建题单
- </Link>
- </div>
- </div>
-
- {/* 筛选 */}
+ {/* 筛选 + 操作按钮合并到同一行 */}
  <FilterBar activeCount={(keyword ? 1 : 0) + (statusFilter ? 1 : 0)}>
  <div className="flex-1 relative">
  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -240,6 +221,15 @@ export default function AdminTrainingsPage() {
  <option value="draft">草稿</option>
  <option value="archived">已归档</option>
  </select>
+ <div className="flex items-center gap-2 ml-auto">
+ <Link href="/admin/trainings/categories" className="btn-ghost btn">
+ 分类管理
+ </Link>
+ <Link href="/admin/trainings/create" className="btn-primary btn">
+ <Plus className="w-4 h-4" />
+ 新建题单
+ </Link>
+ </div>
  </FilterBar>
 
  {/* 列表 */}

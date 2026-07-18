@@ -303,7 +303,6 @@ export default function ContestsPage() {
   return (
     <EducationalPageShell
       title="竞赛"
-      description="参加竞赛，挑战自我"
       icon={Trophy}
       iconClassName="bg-accent text-white"
       actions={

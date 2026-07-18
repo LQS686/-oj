@@ -91,6 +91,9 @@ export async function clearUserCache(userId: string) {
   clearAuthUserCache(userId)
   // 任何用户变更（role / isBanned / rating / solvedCount / 删除）都会影响榜单
   clearRankingCache()
+  // Phase 1：清理班级作业计时缓存（其他游戏化命名空间待 Phase 2+ 添加时再清理）
+  // 注：timing progress 走 DB 查询，缓存目前仅作为预留命名空间；此处按前缀清理避免脏数据
+  cache.deleteByPrefix(`timing:progress:`)
 }
 
 /* ============================================================================

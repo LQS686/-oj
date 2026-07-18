@@ -16,7 +16,7 @@ import {
   ChevronDown, ChevronRight, Target, RefreshCw, Loader2, Info, Shield
 } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
-import { getStatusText } from '@/lib/status'
+import { getStatusText, getDifficultyColor } from '@/lib/status'
 import { fetchWithAuth } from '@/lib/api/base'
 
 interface TestResult {
@@ -275,22 +275,6 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
         {text}
       </span>
     )
-  }
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
-      case 'easy':
-      case '简单':
-        return 'tag-success'
-      case 'medium':
-      case '中等':
-        return 'tag-warning'
-      case 'hard':
-      case '困难':
-        return 'tag-error'
-      default:
-        return 'tag-primary'
-    }
   }
 
   const handleCopyCode = async () => {

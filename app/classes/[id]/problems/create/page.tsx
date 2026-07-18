@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Search, Plus, BookOpen, AlertCircle, ArrowLeft, PlusCircle } from 'lucide-react'
+import { DIFFICULTIES, DIFFICULTY_COLORS, migrateDifficulty, type Difficulty } from '@/lib/constants'
 
 interface Problem {
  id: string
@@ -33,7 +34,7 @@ export default function CreateClassProblemPage() {
  const [formData, setFormData] = useState({
  title: '',
  description: '',
- difficulty: 'Medium' as 'Easy' | 'Medium' | 'Hard',
+ difficulty: '普及' as Difficulty,
  tags: '',
  timeLimit: 1000,
  memoryLimit: 256
@@ -132,11 +133,7 @@ export default function CreateClassProblemPage() {
  }
  }
 
- const difficultyColors: Record<string, string> = {
- Easy: 'text-secondary-light bg-secondary/10',
- Medium: 'text-amber-400 bg-accent/100/10',
- Hard: 'text-error bg-error/10'
- }
+ const difficultyColors = DIFFICULTY_COLORS
 
  return (
  <div className="min-h-screen">
@@ -240,8 +237,8 @@ export default function CreateClassProblemPage() {
  <div className="flex-1">
  <div className="flex items-center gap-3 mb-2">
  <h3 className="font-medium text-foreground">{problem.title}</h3>
- <span className={`tag ${difficultyColors[problem.difficulty]}`}>
- {problem.difficulty}
+ <span className={`tag ${difficultyColors[migrateDifficulty(problem.difficulty)] || ''}`}>
+ {migrateDifficulty(problem.difficulty)}
  </span>
  </div>
  <div className="flex gap-1 flex-wrap">
@@ -306,12 +303,12 @@ export default function CreateClassProblemPage() {
  </label>
  <select
  value={formData.difficulty}
- onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
+ onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as Difficulty })}
  className="input"
  >
- <option value="Easy">简单</option>
- <option value="Medium">中等</option>
- <option value="Hard">困难</option>
+ {DIFFICULTIES.map(d => (
+ <option key={d} value={d}>{d}</option>
+ ))}
  </select>
  </div>
 

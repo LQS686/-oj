@@ -65,7 +65,6 @@ export default function AnnouncementDetailPage() {
     <EducationalPageShell
       width="narrow"
       title="系统公告"
-      description="平台通知与重要说明"
       icon={Megaphone}
       actions={
         <button type="button" className="btn btn-ghost" onClick={() => router.back()}>

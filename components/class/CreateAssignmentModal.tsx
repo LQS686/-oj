@@ -6,10 +6,25 @@ import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
 
-function defaultDeadline() {
+// 将 Date 转为 <input type="datetime-local"> 所需的本地时间字符串 "YYYY-MM-DDTHH:mm"
+// 不能用 toISOString().slice(0,16) —— 那会返回 UTC 时间，导致默认值显示偏移 8 小时
+function toLocalDatetimeInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function defaultStartTime() {
+  // 默认开始时间：当前时间 + 1 分钟（避免 upcoming 状态立即变 active 的边界情况）
+  const date = new Date()
+  date.setMinutes(date.getMinutes() + 1)
+  return toLocalDatetimeInput(date)
+}
+
+function defaultEndTime() {
+  // 默认结束时间：当前时间 + 7 天
   const date = new Date()
   date.setDate(date.getDate() + 7)
-  return date.toISOString().slice(0, 16)
+  return toLocalDatetimeInput(date)
 }
 
 export default function CreateAssignmentModal({
@@ -31,11 +46,12 @@ export default function CreateAssignmentModal({
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    deadline: defaultDeadline(),
+    startTime: defaultStartTime(),
+    endTime: defaultEndTime(),
   })
 
   const resetForm = useCallback(() => {
-    setFormData({ title: '', description: '', deadline: defaultDeadline() })
+    setFormData({ title: '', description: '', startTime: defaultStartTime(), endTime: defaultEndTime() })
     setSelectedProblems([])
     setError('')
   }, [])
@@ -94,7 +110,11 @@ export default function CreateAssignmentModal({
       setError('请输入作业标题')
       return
     }
-    if (!formData.deadline) {
+    if (!formData.startTime) {
+      setError('请选择开始时间')
+      return
+    }
+    if (!formData.endTime) {
       setError('请选择截止时间')
       return
     }
@@ -102,8 +122,18 @@ export default function CreateAssignmentModal({
       setError('请至少选择一个题目')
       return
     }
-    if (new Date(formData.deadline) <= new Date()) {
-      setError('截止时间必须晚于当前时间')
+    const startMs = new Date(formData.startTime).getTime()
+    const endMs = new Date(formData.endTime).getTime()
+    if (Number.isNaN(startMs)) {
+      setError('开始时间格式无效')
+      return
+    }
+    if (Number.isNaN(endMs)) {
+      setError('截止时间格式无效')
+      return
+    }
+    if (startMs >= endMs) {
+      setError('开始时间必须早于截止时间')
       return
     }
 
@@ -115,8 +145,8 @@ export default function CreateAssignmentModal({
         body: JSON.stringify({
           title: formData.title,
           description: formData.description,
-          deadline: new Date(formData.deadline).toISOString(),
-          endTime: new Date(formData.deadline).toISOString(),
+          startTime: new Date(formData.startTime).toISOString(),
+          endTime: new Date(formData.endTime).toISOString(),
           problemIds: selectedProblems,
         }),
       })
@@ -143,7 +173,7 @@ export default function CreateAssignmentModal({
       role="presentation"
     >
       <div
-        className="card-static rounded-xl w-full max-w-2xl h-[min(780px,calc(100dvh-2rem))] flex flex-col shadow-xl border border-border overflow-hidden"
+        className="card-static rounded-xl w-full max-w-2xl h-[80vh] flex flex-col shadow-xl border border-border overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -160,10 +190,10 @@ export default function CreateAssignmentModal({
         </div>
 
         <form
-          onSubmit={handleSubmit}
-          className="grid flex-1 min-h-0 overflow-hidden grid-rows-[auto_minmax(0,1fr)_auto_auto]"
-        >
-          <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60 min-h-0">
+            onSubmit={handleSubmit}
+            className="flex-1 min-h-0 overflow-y-auto flex flex-col"
+          >
+          <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 作业标题 <span className="text-error">*</span>
@@ -189,21 +219,37 @@ export default function CreateAssignmentModal({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                截止时间 <span className="text-error">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.deadline}
-                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                className="input w-full"
-                required
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  开始时间 <span className="text-error">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.startTime}
+                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                  className="input w-full"
+                  required
+                />
+                <p className="text-xs text-muted-foreground mt-1">到达此时间后学生可提交</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  截止时间 <span className="text-error">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.endTime}
+                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                  className="input w-full"
+                  required
+                />
+                <p className="text-xs text-muted-foreground mt-1">超过此时间为逾期提交</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col min-h-0 overflow-hidden px-5 py-3">
+          <div className="px-5 py-3">
             <label className="block text-sm font-medium text-foreground mb-2 shrink-0">
               按题号添加题目 <span className="text-error">*</span>
             </label>
@@ -215,7 +261,7 @@ export default function CreateAssignmentModal({
             />
           </div>
 
-          <div className="shrink-0 px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
+          <div className="px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex gap-2 text-xs text-muted-foreground">
               <AlertCircle className="w-4 h-4 shrink-0 text-primary mt-0.5" />
               <span>仅支持按题号添加；成员按下方列表顺序做题。</span>
@@ -225,7 +271,7 @@ export default function CreateAssignmentModal({
             )}
           </div>
 
-          <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
+          <div className="flex gap-3 px-5 py-4 border-t border-border">
             <button type="submit" disabled={loading || problemsLoading} className="btn btn-primary flex-1">
               {loading ? '创建中...' : '创建作业'}
             </button>

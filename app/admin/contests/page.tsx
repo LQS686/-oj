@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
-import { Trophy, Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
 interface Contest {
  id: string
@@ -253,26 +253,6 @@ export default function AdminContestsPage() {
  return (
  <>
  <div className="space-y-6">
- <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-xl flex items-center justify-center"
- style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
- <Trophy className="w-5 h-5 text-white" />
- </div>
- <div>
- <h1 className="text-2xl font-bold text-foreground">竞赛管理</h1>
- <p className="text-sm text-muted-foreground">管理平台竞赛活动</p>
- </div>
- </div>
- <button
- onClick={() => router.push('/admin/contests/create')}
- className="btn btn-primary flex items-center gap-2"
- >
- <Plus className="w-5 h-5" />
- 创建竞赛
- </button>
- </div>
-
  <FilterBar activeCount={(searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
@@ -296,6 +276,13 @@ export default function AdminContestsPage() {
  <option value="ONGOING">进行中</option>
  <option value="ENDED">已结束</option>
  </select>
+ <button
+ onClick={() => router.push('/admin/contests/create')}
+ className="btn btn-primary flex items-center gap-2 ml-auto"
+ >
+ <Plus className="w-5 h-5" />
+ 创建竞赛
+ </button>
  </FilterBar>
 
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

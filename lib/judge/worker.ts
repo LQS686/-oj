@@ -5,31 +5,33 @@ import { prisma } from '@/lib/prisma'
 import type { JudgeJob, JudgeResult, QueuedJob } from './queue'
 import type { ComparisonMode } from './types'
 import { emitSubmissionUpdate, broadcastMessage } from '@/lib/websocket/server'
-import { 
-  updateSubmissionDirect, 
-  updateClassAssignmentSubmissionDirect, 
-  incrementProblemAcceptedCount, 
-  isFirstAccepted 
+import {
+  updateSubmissionDirect,
+  updateClassAssignmentSubmissionDirect,
+  incrementProblemAcceptedCount,
+  isFirstAccepted,
+  isFirstAcInAssignment,
 } from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
 import { cache } from '@/lib/cache'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
+import { finalizeTiming } from '@/lib/gamification/timing'
 
 // 监听评测完成事件（热重载守卫：避免 Next.js dev 模式重复注册监听器）
 if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', async (job: QueuedJob, result: JudgeResult) => {
   try {
     logger.info(`更新数据库`, { submissionId: result.submissionId, status: result.status })
-    
+
     // 获取完整的提交记录
     const submission = await prisma.submission.findUnique({
       where: { id: result.submissionId }
     })
-    
+
     if (!submission) {
       logger.error(`未找到提交记录`, undefined, { submissionId: result.submissionId })
       return
     }
-    
+
     // 更新提交记录（使用 direct MongoDB 驱动绕过 Prisma 事务）
     await updateSubmissionDirect(result.submissionId, {
       status: result.status,
@@ -46,15 +48,17 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
     cache.delete(`problem:statusCounts:${submission.problemId}`)
 
     // 如果AC，更新题目通过数
+    // 标记首次 AC（提升作用域，供后续作业计时使用）
+    let isFirstAcGlobal = false
     if (result.status === 'AC') {
       // 检查是否是该用户第一次AC此题
       // 查找该用户在此题目上除了当前提交之外的AC记录
-      const isFirst = await isFirstAccepted(submission.problemId, submission.userId, result.submissionId)
+      isFirstAcGlobal = await isFirstAccepted(submission.problemId, submission.userId, result.submissionId)
 
       // 只有第一次AC才增加题目的totalAccepted
-      if (isFirst) {
+      if (isFirstAcGlobal) {
         await incrementProblemAcceptedCount(submission.problemId)
-        
+
         // ✅ 增加用户解题数
         await prisma.user.update({
           where: { id: submission.userId },
@@ -62,7 +66,7 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
         })
 
         logger.info(`用户首次AC题目`, { problemId: submission.problemId })
-        
+
         // 📢 广播排行榜更新
         broadcastMessage('leaderboard:update', {
              type: 'update',
@@ -74,29 +78,26 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
 
     // ✅ 同步到 ClassAssignmentSubmission
     // 只更新已存在的作业提交记录（由作业提交 API 创建）
+    // assignmentSubmissionId 提升到外层，供后续 WebSocket 推送 timeElapsedMs 使用
+    let assignmentSubmissionId: string | null = null
     try {
       logger.info(`开始同步作业提交记录`)
-      
+
       // ✅ 检查是否有关联的作业提交ID
       if (submission.assignmentSubmissionId) {
         logger.info(`找到关联的作业提交记录`, { assignmentSubmissionId: submission.assignmentSubmissionId })
-        
-        // ✅ 查询作业提交记录的详细信息，包括isLate字段
+        assignmentSubmissionId = submission.assignmentSubmissionId
+
+        // ✅ 查询作业提交记录的详细信息
         const assignmentSubmission = await prisma.classAssignmentSubmission.findUnique({
           where: { id: submission.assignmentSubmissionId }
         })
-        
-        // 计算最终分数：如果是逾期提交，则分数为0
-        let finalScore = result.score
-        if (assignmentSubmission) {
-          if (assignmentSubmission.isLate) {
-            finalScore = 0
-            logger.warn(`逾期提交，分数设置为0`, { assignmentSubmissionId: submission.assignmentSubmissionId })
-          } else {
-            logger.info(`非逾期提交，使用原始分数`, { finalScore })
-          }
-        }
-        
+
+        // Phase 1 调整：作业维度仅记录 isLate 标记，不再强制将逾期提交的分数置 0。
+        // 评分一致性：作业提交分数 = 评测原始分数（result.score）。
+        // 是否计入有效成绩由前端统计逻辑根据 isLate 字段决定。
+        const finalScore = result.score
+
         // ✅ 精确更新对应的作业提交记录
         await updateClassAssignmentSubmissionDirect(submission.assignmentSubmissionId, {
             status: result.status,
@@ -106,8 +107,70 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
             passedTests: result.passedTests,
             message: result.message
         })
-        
+
         logger.info(`已更新作业提交记录`, { assignmentSubmissionId: submission.assignmentSubmissionId, status: result.status, score: finalScore })
+
+        // ✅ Phase 1：班级作业首次 AC 时，终结计时并将用时写入 ClassAssignmentSubmission
+        // - 使用「作业维度首次 AC」(isFirstAcInAssignment)，区别于全局首次 AC (isFirstAcGlobal)
+        //   作业维度：查询 ClassAssignmentSubmission 表，仅判断本作业内是否首次 AC
+        //   全局维度：查询 Submission 表，触发 solvedCount++ 与题目通过数
+        // - finalizeTiming 内部已做幂等处理（已完成则返回已有 finalTimeMs）
+        // - 不调用 grantFirstAcRewards（Phase 2+ 启用）
+        // - 失败仅 logger.error，不阻断主流程
+        if (assignmentSubmission && result.status === 'AC') {
+          let isFirstAcInAssign = false
+          try {
+            isFirstAcInAssign = await isFirstAcInAssignment(
+              assignmentSubmission.assignmentId,
+              submission.problemId,
+              submission.userId,
+              assignmentSubmission.id
+            )
+          } catch (checkErr) {
+            logger.error(
+              'isFirstAcInAssignment 检查失败',
+              checkErr instanceof Error ? checkErr : new Error(String(checkErr)),
+              { assignmentSubmissionId: assignmentSubmission.id }
+            )
+          }
+          if (isFirstAcInAssign) {
+            try {
+              const finalTimeMs = await finalizeTiming(
+                assignmentSubmission.assignmentId,
+                submission.problemId,
+                submission.userId
+              )
+              if (finalTimeMs != null) {
+                await prisma.classAssignmentSubmission.update({
+                  where: { id: assignmentSubmission.id },
+                  data: {
+                    timeElapsedMs: finalTimeMs,
+                    isFirstAc: true,
+                  },
+                })
+                logger.info(`已写入作业计时`, {
+                  assignmentSubmissionId: assignmentSubmission.id,
+                  finalTimeMs,
+                })
+              } else {
+                // 用户从未打开题目作答页就直接提交 AC：无计时数据，仅标记 isFirstAc
+                await prisma.classAssignmentSubmission.update({
+                  where: { id: assignmentSubmission.id },
+                  data: { isFirstAc: true },
+                })
+                logger.warn(`首次 AC 但无计时数据`, {
+                  assignmentSubmissionId: assignmentSubmission.id,
+                })
+              }
+            } catch (timingErr) {
+              logger.error(
+                'finalizeTiming 集成失败',
+                timingErr instanceof Error ? timingErr : new Error(String(timingErr)),
+                { assignmentSubmissionId: assignmentSubmission.id }
+              )
+            }
+          }
+        }
       } else {
         logger.info(`普通题库提交，无需同步到作业`)
       }
@@ -115,9 +178,23 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
       logger.error(`同步作业提交记录失败`, syncError)
       // 不影响主流程
     }
-    
+
     // 📡 实时推送评测结果
     try {
+      // 作业提交 AC 时，附带作业维度的做题用时（timeElapsedMs），
+      // 让前端弹窗能显示"本道题目用时 xx"
+      let assignmentTimeElapsedMs: number | undefined
+      if (assignmentSubmissionId && result.status === 'AC') {
+        try {
+          const refreshed = await prisma.classAssignmentSubmission.findUnique({
+            where: { id: assignmentSubmissionId },
+            select: { timeElapsedMs: true },
+          })
+          assignmentTimeElapsedMs = refreshed?.timeElapsedMs ?? undefined
+        } catch {
+          // 查询失败不影响推送主流程
+        }
+      }
       emitSubmissionUpdate(submission.userId, {
         id: result.submissionId,
         status: result.status,
@@ -129,6 +206,7 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
         problemId: submission.problemId,
         message: result.message,
         testResults: result.testResults,
+        timeElapsedMs: assignmentTimeElapsedMs,
       })
     } catch (wsError) {
       logger.error(`WebSocket 推送失败`, wsError)
@@ -145,17 +223,29 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
   try {
     logger.error(`评测失败`, error, { jobId: job.id })
     
-    // 获取提交记录（用于实时推送）
+    // 获取提交记录（用于实时推送 + 判断是否关联作业）
     const submission = await prisma.submission.findUnique({
       where: { id: job.id },
-      select: { userId: true },
+      select: { userId: true, assignmentSubmissionId: true },
     })
-    
+
     // 更新为系统错误
     await updateSubmissionDirect(job.id, {
       status: SubmissionStatus.SYSTEM_ERROR,
       message: `系统错误: ${error.message}`
     })
+
+    // 同步更新班级作业提交表（如果关联了作业）
+    if (submission?.assignmentSubmissionId) {
+      try {
+        await updateClassAssignmentSubmissionDirect(submission.assignmentSubmissionId, {
+          status: SubmissionStatus.SYSTEM_ERROR,
+          message: `系统错误: ${error.message || '评测失败'}`,
+        })
+      } catch (e) {
+        logger.error('同步作业提交 SE 状态失败', e)
+      }
+    }
 
     // 📡 实时推送错误状态
     if (submission) {

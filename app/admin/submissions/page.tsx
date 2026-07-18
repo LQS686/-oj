@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Shield, Search, User, FileText, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Search, User, FileText, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
 interface Submission {
@@ -205,17 +205,6 @@ export default function AdminSubmissionsPage() {
 
  return (
  <div className="space-y-6">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-xl flex items-center justify-center"
- style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
- <Shield className="w-5 h-5 text-white" />
- </div>
- <div>
- <h1 className="text-2xl font-bold text-foreground">提交记录</h1>
- <p className="text-sm text-muted-foreground">查看所有用户的提交记录</p>
- </div>
- </div>
-
  <FilterBar activeCount={(searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">

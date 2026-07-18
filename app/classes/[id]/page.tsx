@@ -6,6 +6,7 @@ import {
   Users,
   BookOpen,
   FileText,
+  ListChecks,
   UserPlus,
   LogOut,
   Megaphone,
@@ -28,6 +29,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import ClassManageInlinePanel from '@/components/class/ClassManageInlinePanel'
 import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
+import CreateClassTrainingModal from '@/components/class/CreateClassTrainingModal'
 import { classRoleDisplayLabel, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDate } from '@/lib/utils'
 
@@ -36,9 +38,18 @@ interface Assignment {
   title: string
   startTime?: string
   deadline: string
+  endTime?: string
   problemCount: number
   createdByName?: string
   createdBy?: string
+}
+
+// 三态作业状态判定：与后端 getAssignmentStatus 一致
+function getAssignmentStatus(startTime?: string | null, endTime?: string | null): 'upcoming' | 'active' | 'ended' {
+  const now = Date.now()
+  if (startTime && new Date(startTime).getTime() > now) return 'upcoming'
+  if (endTime && new Date(endTime).getTime() < now) return 'ended'
+  return 'active'
 }
 
 interface Note {
@@ -47,6 +58,20 @@ interface Note {
   content: string
   author: { nickname?: string; username?: string }
   createdAt: string
+}
+
+interface ClassTraining {
+  id: string
+  title: string
+  description: string
+  problemCount: number
+  joinCount: number
+  createdAt: string
+  userProgress?: {
+    solvedCount: number
+    progressPercentage: number
+    isJoined: boolean
+  }
 }
 
 interface ClassMemberRow {
@@ -92,12 +117,15 @@ function ClassDetailContent() {
   const [error, setError] = useState('')
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [notes, setNotes] = useState<Note[]>([])
+  const [trainings, setTrainings] = useState<ClassTraining[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
   const [notesLoading, setNotesLoading] = useState(false)
-  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'ongoing' | 'ended'>('all')
+  const [trainingsLoading, setTrainingsLoading] = useState(false)
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'upcoming' | 'active' | 'ended'>('all')
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false)
   const [editAssignmentOpen, setEditAssignmentOpen] = useState(false)
   const [editAssignmentId, setEditAssignmentId] = useState<string | null>(null)
+  const [createTrainingOpen, setCreateTrainingOpen] = useState(false)
 
   useDocumentTitle(classData?.name)
 
@@ -141,6 +169,19 @@ function ClassDetailContent() {
     }
   }, [classId])
 
+  const fetchTrainings = useCallback(async () => {
+    try {
+      setTrainingsLoading(true)
+      const response = await fetchWithCookie(`/api/classes/${classId}/trainings?limit=20`)
+      const data = await response.json()
+      if (data.success) setTrainings(data.data?.items || [])
+    } catch {
+      /* ignore */
+    } finally {
+      setTrainingsLoading(false)
+    }
+  }, [classId])
+
   useEffect(() => {
     void fetchClassDetail()
   }, [fetchClassDetail])
@@ -149,8 +190,9 @@ function ClassDetailContent() {
     if (!isManageTab) {
       void fetchAssignments()
       void fetchNotes()
+      void fetchTrainings()
     }
-  }, [classId, isManageTab, fetchAssignments, fetchNotes])
+  }, [classId, isManageTab, fetchAssignments, fetchNotes, fetchTrainings])
 
   useEffect(() => {
     if (searchParams.get('createAssignment') === '1') {
@@ -281,8 +323,8 @@ function ClassDetailContent() {
 
   const filteredAssignments = assignments.filter((a) => {
     if (assignmentFilter === 'all') return true
-    const end = new Date(a.deadline)
-    return assignmentFilter === 'ongoing' ? new Date() <= end : new Date() > end
+    const status = getAssignmentStatus(a.startTime, a.endTime || a.deadline)
+    return status === assignmentFilter
   })
 
   const fmt = (d?: string) =>
@@ -345,7 +387,8 @@ function ClassDetailContent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {/* 作业 */}
               <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
@@ -362,8 +405,8 @@ function ClassDetailContent() {
                   )}
                 </div>
                 <div className="p-4">
-                  <div className="flex gap-1.5 mb-3">
-                    {(['all', 'ongoing', 'ended'] as const).map((f) => (
+                  <div className="flex gap-1.5 mb-3 flex-wrap">
+                    {(['all', 'upcoming', 'active', 'ended'] as const).map((f) => (
                       <button
                         key={f}
                         type="button"
@@ -372,7 +415,7 @@ function ClassDetailContent() {
                           assignmentFilter === f ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
                         }`}
                       >
-                        {f === 'all' ? '全部' : f === 'ongoing' ? '进行中' : '已结束'}
+                        {f === 'all' ? '全部' : f === 'upcoming' ? '未开始' : f === 'active' ? '进行中' : '已结束'}
                       </button>
                     ))}
                   </div>
@@ -383,10 +426,12 @@ function ClassDetailContent() {
                   ) : (
                     <div className="space-y-1.5 max-h-64 overflow-y-auto">
                       {filteredAssignments.map((a) => {
-                        const ended = new Date() > new Date(a.deadline)
-                        const status = ended
-                          ? { text: '已结束', cls: 'text-error bg-error/10' }
-                          : { text: '进行中', cls: 'text-secondary bg-secondary/10' }
+                        const status = getAssignmentStatus(a.startTime, a.endTime || a.deadline)
+                        const statusInfo = status === 'upcoming'
+                          ? { text: '未开始', cls: 'text-blue-400 bg-blue-500/10' }
+                          : status === 'active'
+                          ? { text: '进行中', cls: 'text-secondary bg-secondary/10' }
+                          : { text: '已结束', cls: 'text-muted-foreground bg-muted' }
                         return (
                           <div
                             key={a.id}
@@ -400,8 +445,8 @@ function ClassDetailContent() {
                             >
                               <div className="flex items-center gap-1.5 mb-1">
                                 <span className="font-medium truncate">{a.title}</span>
-                                <span className={`text-[11px] px-1.5 py-0.5 rounded-full shrink-0 ${status.cls}`}>
-                                  {status.text}
+                                <span className={`text-[11px] px-1.5 py-0.5 rounded-full shrink-0 ${statusInfo.cls}`}>
+                                  {statusInfo.text}
                                 </span>
                               </div>
                               <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-2">
@@ -434,6 +479,61 @@ function ClassDetailContent() {
                 </div>
               </div>
 
+              {/* 题单（中间栏）：班级私有题单 */}
+              <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <ListChecks className="w-4 h-4" /> 题单
+                  </h2>
+                  {user && isClassAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setCreateTrainingOpen(true)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary-light hover:underline"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> 创建
+                    </button>
+                  )}
+                </div>
+                <div className="p-4">
+                  {trainingsLoading ? (
+                    <p className="text-center py-8 text-sm text-muted-foreground">加载中…</p>
+                  ) : trainings.length === 0 ? (
+                    <p className="text-center py-8 text-sm text-muted-foreground">暂无题单</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {trainings.map((t) => {
+                        const progress = t.userProgress?.progressPercentage ?? 0
+                        return (
+                          <Link
+                            key={t.id}
+                            href={`/training/${t.id}`}
+                            className="group block p-3 rounded-lg border border-border hover:border-primary/30 text-sm transition-colors"
+                          >
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="font-medium truncate flex-1">{t.title}</span>
+                              {t.userProgress?.isJoined && (
+                                <span className="text-[11px] px-1.5 py-0.5 rounded-full shrink-0 text-secondary bg-secondary/10">
+                                  {progress}%
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-2">
+                              <span>{t.problemCount || 0} 题</span>
+                              <span>{t.joinCount || 0} 人加入</span>
+                              {t.userProgress?.solvedCount !== undefined && (
+                                <span>已解 {t.userProgress.solvedCount}</span>
+                              )}
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 笔记 */}
               <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
@@ -615,6 +715,17 @@ function ClassDetailContent() {
         onDeleted={() => {
           void fetchAssignments()
           void fetchClassDetail()
+        }}
+      />
+      <CreateClassTrainingModal
+        classId={classId}
+        open={createTrainingOpen}
+        onClose={() => setCreateTrainingOpen(false)}
+        onCreated={(trainingId) => {
+          void fetchTrainings()
+          void fetchClassDetail()
+          // 创建后跳转到题单详情页继续编辑
+          router.push(`/training/${trainingId}`)
         }}
       />
     </ClassWorkspaceShell>

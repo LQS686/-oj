@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/api/base'
-import { Settings, Save, Mail, Shield, Globe, Send } from 'lucide-react'
+import { Save, Mail, Shield, Globe, Send } from 'lucide-react'
 import type { SystemSettings } from '@/lib/settings'
 
 export default function AdminSettingsPage() {
@@ -141,17 +141,6 @@ export default function AdminSettingsPage() {
 
  return (
  <div className="space-y-6">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-xl flex items-center justify-center"
- style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
- <Settings className="w-5 h-5 text-white" />
- </div>
- <div>
- <h1 className="text-2xl font-bold text-foreground">系统设置</h1>
- <p className="text-sm text-muted-foreground">配置系统参数和选项</p>
- </div>
- </div>
-
  {error && !error.includes('权限') && (
  <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg">
  {error}

@@ -19,7 +19,7 @@ export const GET = withApi.public(async (req) => {
     page?: string
     pageSize?: string
     search?: string
-    difficulty?: 'easy' | 'medium' | 'hard'
+    difficulty?: string
     tag?: string
   }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)

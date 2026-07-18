@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, FileCode, Clock, Database, User, Calendar, Code, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, History, Target, RefreshCw, Loader2, Info } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
-import { getStatusText } from '@/lib/status'
+import { getStatusText, getDifficultyColor } from '@/lib/status'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
@@ -442,22 +442,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
  return <CheckCircle2 className="w-4 h-4 text-[var(--difficulty-medium)]" />
  default:
  return <Clock className="w-4 h-4 text-muted-foreground" />
- }
- }
-
- const getDifficultyColor = (difficulty: string) => {
- switch (difficulty.toLowerCase()) {
- case 'easy':
- case '简单':
- return 'tag-success'
- case 'medium':
- case '中等':
- return 'tag-warning'
- case 'hard':
- case '困难':
- return 'tag-error'
- default:
- return 'tag-primary'
  }
  }
 

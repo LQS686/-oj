@@ -8,7 +8,6 @@ import {
   findClassAssignment,
   getCurrentClassMember,
   getUserCanManageContent,
-  hasFullScoreOnProblem,
   listAssignmentSubmissions,
 } from '@/lib/class/service'
 import { isClassAdminApiRole } from '@/lib/class/roles'
@@ -32,21 +31,20 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
     limit?: string
   }>(req)
 
-  // 权限校验：查看其他用户的提交需要满足以下条件之一
-  if (q.userId && q.userId !== user.id) {
-    const canManageContent = await getUserCanManageContent(user.id)
-    const isClassStaff = isClassAdminApiRole(memberRole)
+  // 判断是否为管理员（系统管理员 / 班级 owner / 班级 assistant）
+  const canManageContent = await getUserCanManageContent(user.id)
+  const isClassStaff = isClassAdminApiRole(memberRole)
+  const isAdmin = canManageContent || isClassStaff
 
-    let hasFullScore = false
-    if (q.problemId) {
-      hasFullScore = await hasFullScoreOnProblem(user.id, assignmentId, q.problemId)
+  // 非管理员强制 userId = user.id，仅能查看自己的提交
+  let effectiveUserId = q.userId
+  if (!isAdmin) {
+    // 如果带了 userId 但不是自己的，返回 403
+    if (q.userId && q.userId !== user.id) {
+      throw403('无权查看其他用户的提交记录')
     }
-
-    if (!canManageContent && !isClassStaff && !hasFullScore) {
-      throw403(
-        '只有系统管理员、班级创建人、班级管理员或完成该题目并获得满分的用户可以查看他人的提交记录'
-      )
-    }
+    // 强制只查自己的
+    effectiveUserId = user.id
   }
 
   const assignment = await findClassAssignment(assignmentId, id)
@@ -57,7 +55,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
 
   const result = await listAssignmentSubmissions(id, assignmentId, {
     problemId: q.problemId,
-    userId: q.userId,
+    userId: effectiveUserId,
     status: q.status,
     page,
     pageSize,

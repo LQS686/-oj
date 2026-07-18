@@ -33,7 +33,6 @@ export default function AnnouncementsListPage() {
     <EducationalPageShell
       width="default"
       title="系统公告"
-      description="平台通知与重要说明"
       icon={Megaphone}
     >
       {loading ? (

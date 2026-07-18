@@ -170,7 +170,6 @@ function SubmissionsContent() {
  return (
  <EducationalPageShell
  title="提交记录"
- description="查看代码提交与评测结果"
  icon={FileText}
  backHref={assignmentId && classId ? `/classes/${classId}/assignments/${assignmentId}` : undefined}
  backLabel="返回"

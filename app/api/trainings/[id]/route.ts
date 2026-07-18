@@ -7,6 +7,8 @@ import {
   updateTrainingAndProblems,
   deleteTraining,
   incrementViewCount,
+  isClassMember,
+  canManageClassTraining,
 } from '@/lib/training/service'
 import { isObjectId } from '@/lib/api/validation'
 import { verifyToken } from '@/lib/auth'
@@ -23,10 +25,16 @@ export const GET = withApi.public(async (req, ctx) => {
 
   const result = await getTrainingWithProblemStatuses(id, userId)
   if (!result) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
-  const training = result
+  const training = result as any
 
-  // 草稿仅作者/admin 可见
-  if (training.status === 'draft') {
+  // 班级私有题单（classId 不为空）：仅班级成员可访问
+  const trainingClassId: string | null = training.classId ?? null
+  if (trainingClassId) {
+    if (!(await isClassMember(trainingClassId, userId))) {
+      throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
+    }
+  } else if (training.status === 'draft') {
+    // 公开题单的草稿：仅作者/admin 可见
     if (!userId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
     const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
     const authorId: string | null = training.author?.id ?? null
@@ -40,20 +48,23 @@ export const GET = withApi.public(async (req, ctx) => {
 })
 
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
-  if (!canManageContent(user)) throw throw403('无权限编辑训练计划')
-
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
-  // 仅作者或管理员可改
   const found = await prisma.training.findUnique({
     where: { id },
-    select: { authorId: true },
+    select: { authorId: true, classId: true },
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
+
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
-  if (!canAccessAdmin(u) && found.authorId !== user.id) {
-    throw403('只有作者或管理员可以编辑')
+  const isClassTraining = !!found.classId
+  const canEdit = isClassTraining
+    ? await canManageClassTraining(found.classId!, user.id)
+    : canManageContent(user) && (canAccessAdmin(u) || found.authorId === user.id)
+
+  if (!canEdit) {
+    throw403('无权限编辑训练计划')
   }
 
   const body = await readJson<{
@@ -69,9 +80,14 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     cover?: string
   }>(req)
 
-  // 发布/推荐等高级设置仅管理员可改
-  const canPublish = canAccessAdmin(user)
-  if (!canPublish) {
+  // 班级题单：不允许修改发布/推荐/分类等公开属性
+  // 公开题单：发布/推荐等高级设置仅管理员可改
+  if (isClassTraining) {
+    delete (body as any).categoryType
+    delete (body as any).isRecommended
+    delete (body as any).status
+    delete (body as any).isPublic
+  } else if (!canAccessAdmin(user)) {
     delete (body as any).categoryType
     delete (body as any).isRecommended
     delete (body as any).status
@@ -83,19 +99,23 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 })
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
-  if (!canManageContent(user)) throw throw403('无权限删除训练计划')
-
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
   const found = await prisma.training.findUnique({
     where: { id },
-    select: { authorId: true },
+    select: { authorId: true, classId: true },
   })
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
+
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
-  if (!canAccessAdmin(u) && found.authorId !== user.id) {
-    throw403('只有作者或管理员可以删除')
+  const isClassTraining = !!found.classId
+  const canDelete = isClassTraining
+    ? await canManageClassTraining(found.classId!, user.id)
+    : canManageContent(user) && (canAccessAdmin(u) || found.authorId === user.id)
+
+  if (!canDelete) {
+    throw403('无权限删除训练计划')
   }
   await deleteTraining(id)
   return ok({ id })

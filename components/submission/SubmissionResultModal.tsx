@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import Confetti from './Confetti'
 import { formatTime, formatMemory } from '@/lib/utils'
+import { formatDurationMs } from '@/components/class/ProblemTimer'
 
 export interface TestResultItem {
   testId?: string
@@ -36,6 +37,8 @@ export interface SubmissionResultData {
   totalTests: number
   message?: string | null
   testResults?: TestResultItem[]
+  /** 作业维度做题用时（毫秒），仅作业提交 AC 时携带 */
+  timeElapsedMs?: number
 }
 
 export interface JudgeProgressData {
@@ -457,9 +460,15 @@ export default function SubmissionResultModal({
                 </div>
               )}
 
-              {/* 三项关键指标（CE 不展示用时内存） */}
+              {/* 三项关键指标（CE 不展示用时内存；作业 AC 时额外展示做题用时） */}
               {isFinal && result && (
-                <div className={`grid gap-3 ${isCE ? 'grid-cols-1' : 'grid-cols-3'} mb-5`}>
+                <div className={`grid gap-3 ${
+                  isCE
+                    ? 'grid-cols-1'
+                    : (isAC && result.timeElapsedMs && result.timeElapsedMs > 0)
+                      ? 'grid-cols-4'
+                      : 'grid-cols-3'
+                } mb-5`}>
                   <MetricCard
                     label="得分"
                     value={`${result.score}`}
@@ -480,6 +489,14 @@ export default function SubmissionResultModal({
                       value={formatMemory(result.memory)}
                       icon={<Database className="w-3.5 h-3.5" />}
                       highlight={isAC}
+                    />
+                  )}
+                  {!isCE && isAC && result.timeElapsedMs != null && result.timeElapsedMs > 0 && (
+                    <MetricCard
+                      label="做题用时"
+                      value={formatDurationMs(result.timeElapsedMs)}
+                      icon={<Clock className="w-3.5 h-3.5" />}
+                      highlight
                     />
                   )}
                 </div>

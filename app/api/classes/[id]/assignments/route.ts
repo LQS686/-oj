@@ -29,7 +29,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
   const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以查看作业')
 
-  const q = readQuery<{ page?: string; pageSize?: string; status?: 'ongoing' | 'ended' }>(req)
+  const q = readQuery<{ page?: string; pageSize?: string; status?: 'upcoming' | 'active' | 'ongoing' | 'ended' }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)
   const pageSize = Math.max(1, parseInt(q.pageSize || '20') || 20)
 
@@ -60,6 +60,41 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const finalEndTime = body.endTime || body.deadline
   if (!body.title || !finalEndTime || !body.problemIds || body.problemIds.length === 0) {
     throw400('MISSING_FIELDS', '请填写完整的作业信息')
+  }
+
+  // === 输入校验 ===
+  // title 长度校验：1-200 字符（trim 后）
+  const titleTrimmed = body.title!.trim()
+  if (titleTrimmed.length < 1 || titleTrimmed.length > 200) {
+    throw400('INVALID_TITLE', '标题长度必须为 1-200 字符')
+  }
+  // description 长度校验：0-2000 字符（如果提供）
+  if (body.description && body.description.length > 2000) {
+    throw400('INVALID_DESCRIPTION', '描述长度不能超过 2000 字符')
+  }
+  // problemIds 数量校验：1-50 个
+  if (body.problemIds!.length > 50) {
+    throw400('INVALID_PROBLEM_COUNT', '题目数量必须为 1-50 个')
+  }
+  // problemIds 每个元素 ObjectId 格式校验
+  for (const pid of body.problemIds!) {
+    if (!isObjectId(pid)) {
+      throw400('INVALID_PROBLEM_ID', `无效的题目 ID: ${pid}`)
+    }
+  }
+  // 时间字符串有效性校验
+  if (body.startTime && Number.isNaN(new Date(body.startTime).getTime())) {
+    throw400('INVALID_DATE_FORMAT', '开始时间格式无效')
+  }
+  if (Number.isNaN(new Date(finalEndTime!).getTime())) {
+    throw400('INVALID_DATE_FORMAT', '结束时间格式无效')
+  }
+  // startTime < endTime 校验（两者都提供时）
+  if (
+    body.startTime &&
+    new Date(body.startTime).getTime() >= new Date(finalEndTime!).getTime()
+  ) {
+    throw400('INVALID_TIME_RANGE', '开始时间必须早于结束时间')
   }
 
   // 检查班级是否存在

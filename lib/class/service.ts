@@ -18,7 +18,7 @@ import {
   updateSubmissionDirect,
 } from '@/lib/mongodb-direct'
 import { createNotification, createNotifications } from '@/lib/notification/service'
-import { normalizeClassRoleToApi, isClassAdminApiRole, isClassAdminRole } from '@/lib/class/roles'
+import { normalizeClassRoleToApi, isClassAdminApiRole, isClassAdminRole, isClassOwnerRole } from '@/lib/class/roles'
 
 /* ============================================================================
  * 班级 CRUD
@@ -378,10 +378,27 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
  * 班级作业（增强 service：列表统计 / 创建 / 详情 / 统计 / 提交 / 进度）
  * ========================================================================== */
 
+export type AssignmentStatus = 'upcoming' | 'active' | 'ended'
+
+/**
+ * 根据作业的 startTime / endTime 推断当前状态。
+ *  - null startTime 视为已开始（兼容旧数据）
+ *  - null endTime 视为永不结束（兼容旧数据）
+ */
+export function getAssignmentStatus(
+  startTime: Date | null | undefined,
+  endTime: Date | null | undefined
+): AssignmentStatus {
+  const now = new Date()
+  if (startTime && new Date(startTime) > now) return 'upcoming'
+  if (endTime && new Date(endTime) < now) return 'ended'
+  return 'active'
+}
+
 export interface ListClassAssignmentsFilter {
   page?: number
   pageSize?: number
-  status?: 'ongoing' | 'ended'
+  status?: 'upcoming' | 'active' | 'ongoing' | 'ended'
 }
 
 export async function listClassAssignmentsWithStats(
@@ -392,8 +409,20 @@ export async function listClassAssignmentsWithStats(
   const pageSize = filter.pageSize ?? 20
   const where: any = { classId }
   const now = new Date()
-  if (filter.status === 'ongoing') where.endTime = { gte: now }
-  else if (filter.status === 'ended') where.endTime = { lt: now }
+  if (filter.status === 'upcoming') {
+    where.startTime = { gt: now }
+  } else if (filter.status === 'active' || filter.status === 'ongoing') {
+    // active 状态：已开始但未结束。null startTime 视为已开始；null endTime 视为永不结束。
+    // 用 AND 显式排除 upcoming（startTime <= now 或 startTime 为 null）
+    // 用 OR 显式包含 null endTime（兼容旧数据）
+    where.AND = [
+      { OR: [{ startTime: { lte: now } }, { startTime: null }] },
+      { OR: [{ endTime: { gte: now } }, { endTime: null }] },
+    ]
+  } else if (filter.status === 'ended') {
+    // null endTime 不归入 ended
+    where.endTime = { lt: now }
+  }
 
   const [assignments, total, memberCount] = await Promise.all([
     prisma.classAssignment.findMany({
@@ -738,7 +767,7 @@ export async function computeAssignmentStatistics(
     ([userId, solvedSet]) => {
       const ms = submissions.filter((s: any) => s.userId === userId)
       const totalScore = ms.reduce((sum: any, s: any) => {
-        const isLate = s.isLate || (deadline ? s.submittedAt > deadline : false)
+        const isLate = s.isLate || false
         return sum + (isLate ? 0 : s.score || 0)
       }, 0)
       const avgScore = ms.length > 0 ? totalScore / ms.length : 0
@@ -765,7 +794,7 @@ export async function computeAssignmentStatistics(
     const uniqueUsers = new Set(ps.map((s: any) => s.userId))
     const acUsers = new Set(acs.map((s: any) => s.userId))
     const totalScore = ps.reduce((sum: any, s: any) => {
-      const isLate = s.isLate || (deadline ? s.submittedAt > deadline : false)
+      const isLate = s.isLate || false
       return sum + (isLate ? 0 : s.score || 0)
     }, 0)
     const avgProblemScore = ps.length > 0 ? totalScore / ps.length : 0
@@ -788,13 +817,13 @@ export async function computeAssignmentStatistics(
     const us = submissions.filter((s: any) => s.userId === userId)
     const solved = memberCompletionMap.get(userId) || new Set()
     const totalUserScore = us.reduce((sum: any, s: any) => {
-      const isLate = s.isLate || (deadline ? s.submittedAt > deadline : false)
+      const isLate = s.isLate || false
       return sum + (isLate ? 0 : s.score || 0)
     }, 0)
     const avgUserScore = us.length > 0 ? totalUserScore / us.length : 0
     const accuracy = totalProblems > 0 ? (solved.size / totalProblems) * 100 : 0
     const lateSubmissions = us.filter((s: any) => {
-      return s.isLate || (deadline ? s.submittedAt > deadline : false)
+      return s.isLate || false
     }).length
 
     const problemScores: { [k: string]: number | string } = {}
@@ -803,7 +832,7 @@ export async function computeAssignmentStatistics(
       const ps = us.filter((s: any) => s.problemId === problemId)
       if (ps.length > 0) {
         const valid = ps.map((s: any) => {
-          const isLate = s.isLate || (deadline ? s.submittedAt > deadline : false)
+          const isLate = s.isLate || false
           return { score: isLate ? 0 : s.score || 0, status: s.status, isLate }
         })
         const max = valid.reduce((m: any, c: any) => (c.score > m.score ? c : m))
@@ -950,6 +979,9 @@ export async function listAssignmentSubmissions(
       message: s.message,
       submittedAt: s.submittedAt,
       isLate: s.isLate,
+      // Phase 1：作业计时字段
+      timeElapsedMs: s.timeElapsedMs || 0,
+      isFirstAc: s.isFirstAc || false,
     }
   })
 
@@ -974,7 +1006,25 @@ export interface SubmitAssignmentInput {
   language: string
 }
 
+// 与 /api/submissions 路由保持一致的语言白名单
+const ASSIGNMENT_ALLOWED_LANGUAGES = ['cpp', 'c', 'python']
+
+// 同一用户对同一题目的最小提交间隔（毫秒），防止刷屏
+const SUBMIT_RATE_LIMIT_MS = 10_000
+
 export async function submitAssignmentCode(input: SubmitAssignmentInput) {
+  // 前置输入校验
+  if (!ASSIGNMENT_ALLOWED_LANGUAGES.includes(input.language)) {
+    throw new ApiError('INVALID_LANGUAGE', '不支持的语言', 400)
+  }
+  const codeLen = input.code?.length ?? 0
+  if (codeLen < 10) {
+    throw new ApiError('CODE_TOO_SHORT', '代码长度不能少于 10 个字符', 400)
+  }
+  if (codeLen > 50_000) {
+    throw new ApiError('CODE_TOO_LONG', '代码长度不能超过 50000 个字符', 400)
+  }
+
   const assignment = await prisma.classAssignment.findUnique({
     where: { id: input.assignmentId, classId: input.classId },
   })
@@ -982,6 +1032,46 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
 
   if (!assignment.problemIds.includes(input.problemId)) {
     return { ok: false, code: 400, reason: '该题目不在当前作业中' as const }
+  }
+
+  // 作业状态校验：upcoming 拒绝提交；ended 根据 allowLateSubmission 判定
+  const status = getAssignmentStatus(assignment.startTime, assignment.endTime)
+  if (status === 'upcoming') {
+    throw new ApiError('ASSIGNMENT_NOT_STARTED', '作业尚未开始，无法提交', 403)
+  }
+
+  const deadline = assignment.endTime ? new Date(assignment.endTime) : null
+  const now = new Date()
+  let isLate = deadline ? now > deadline : false
+
+  if (status === 'ended') {
+    if (!assignment.allowLateSubmission) {
+      throw new ApiError('ASSIGNMENT_ENDED', '作业已结束，不接受新提交', 403)
+    }
+    // 允许逾期提交：强制 isLate = true（即使 endTime 刚过）
+    isLate = true
+  }
+
+  // 频率限制：查最近一次该用户+该题目的提交时间，10 秒内拒绝重复提交
+  const recentSubmission = await prisma.classAssignmentSubmission.findFirst({
+    where: {
+      assignmentId: input.assignmentId,
+      problemId: input.problemId,
+      userId: input.userId,
+    },
+    orderBy: { submittedAt: 'desc' },
+    select: { submittedAt: true },
+  })
+  if (recentSubmission) {
+    const elapsed = now.getTime() - new Date(recentSubmission.submittedAt).getTime()
+    if (elapsed < SUBMIT_RATE_LIMIT_MS) {
+      const waitSec = Math.ceil((SUBMIT_RATE_LIMIT_MS - elapsed) / 1000)
+      throw new ApiError(
+        'SUBMIT_TOO_FREQUENT',
+        `提交过于频繁，请 ${waitSec} 秒后重试`,
+        429
+      )
+    }
   }
 
   const problem = await prisma.problem.findUnique({
@@ -992,10 +1082,6 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
   if (!problem.testCases || problem.testCases.length === 0) {
     return { ok: false, code: 400, reason: '题目没有测试用例，无法评测' as const }
   }
-
-  const deadline = assignment.endTime ? new Date(assignment.endTime) : null
-  const now = new Date()
-  const isLate = deadline ? now > deadline : false
 
   const assignmentSubmission = await createClassAssignmentSubmissionDirect({
     assignmentId: input.assignmentId,
@@ -1271,7 +1357,7 @@ export async function createNewClassProblem(
       input: '',
       output: '',
       samples: [],
-      difficulty: data.difficulty || 'Medium',
+      difficulty: data.difficulty || '普及',
       tags: data.tags || [],
       timeLimit: data.timeLimit || 1000,
       memoryLimit: data.memoryLimit || 256,
@@ -2000,6 +2086,8 @@ export async function buildClassAssignmentDetail(
         status: s.status,
         score: s.score || 0,
         submittedAt: s.submittedAt,
+        // Phase 1：作业维度做题用时，用于完成情况统计表展示与排序
+        timeElapsedMs: s.timeElapsedMs || 0,
       }))
     : []
 
@@ -2028,6 +2116,8 @@ export async function buildClassAssignmentDetail(
       startTime: assignment.startTime,
       endTime: assignment.endTime,
       deadline: assignment.endTime,
+      status: getAssignmentStatus(assignment.startTime, assignment.endTime),
+      allowLateSubmission: assignment.allowLateSubmission,
       problems: problems.map((p: any) => ({
         id: p.id,
         title: p.title,
@@ -2052,6 +2142,31 @@ export async function buildClassAssignmentDetail(
   }
 }
 
+/**
+ * 重新计算指定作业下所有提交的 isLate 标记。
+ * 通常在作业 endTime 被修改后调用，以保证历史提交的逾期标记与新截止时间一致。
+ */
+export async function recalculateLateFlags(assignmentId: string): Promise<void> {
+  const assignment = await prisma.classAssignment.findUnique({ where: { id: assignmentId } })
+  if (!assignment || !assignment.endTime) return
+
+  const deadline = new Date(assignment.endTime)
+  const submissions = await prisma.classAssignmentSubmission.findMany({
+    where: { assignmentId },
+    select: { id: true, submittedAt: true, isLate: true },
+  })
+
+  for (const s of submissions) {
+    const newIsLate = new Date(s.submittedAt) > deadline
+    if (s.isLate !== newIsLate) {
+      await prisma.classAssignmentSubmission.update({
+        where: { id: s.id },
+        data: { isLate: newIsLate },
+      })
+    }
+  }
+}
+
 /** 班级管理员更新作业：含校验、默认值补全、写入 */
 export async function updateClassAssignment(
   classId: string,
@@ -2063,12 +2178,37 @@ export async function updateClassAssignment(
     endTime?: string | Date
     deadline?: string | Date
     problemIds?: string[]
+    allowLateSubmission?: boolean
   }
 ) {
   const finalEndTime = body.endTime || body.deadline
   if (!body.title || !body.problemIds || body.problemIds.length === 0) {
     throw new ApiError('MISSING_FIELDS', '请填写完整的作业信息', 400)
   }
+  // 强化输入校验：长度 / 数量
+  if (body.title.length > 200) {
+    throw new ApiError('INVALID_TITLE', '作业标题不能超过 200 字符', 400)
+  }
+  if (body.description && body.description.length > 2000) {
+    throw new ApiError('INVALID_DESCRIPTION', '作业描述不能超过 2000 字符', 400)
+  }
+  if (body.problemIds.length > 50) {
+    throw new ApiError('INVALID_PROBLEMS', '作业题目数量不能超过 50 个', 400)
+  }
+  // 日期格式校验（Date.isValid）
+  if (body.startTime) {
+    const d = new Date(body.startTime)
+    if (isNaN(d.getTime())) {
+      throw new ApiError('INVALID_START_TIME', '开始时间格式无效', 400)
+    }
+  }
+  if (finalEndTime) {
+    const d = new Date(finalEndTime)
+    if (isNaN(d.getTime())) {
+      throw new ApiError('INVALID_END_TIME', '结束时间格式无效', 400)
+    }
+  }
+
   const existing = await prisma.classAssignment.findUnique({
     where: { id: assignmentId, classId },
   })
@@ -2085,6 +2225,26 @@ export async function updateClassAssignment(
     : existing.startTime || undefined
   const finalEndDate = finalEndTime ? new Date(finalEndTime) : existing.endTime || undefined
 
+  // startTime < endTime 校验（综合新旧值）
+  if (finalStartTime && finalEndDate && finalStartTime.getTime() >= finalEndDate.getTime()) {
+    throw new ApiError('INVALID_TIME_RANGE', '开始时间必须早于结束时间', 400)
+  }
+
+  // 状态校验：读取作业当前状态（基于现有 startTime/endTime）
+  const status = getAssignmentStatus(existing.startTime, existing.endTime)
+  // ended 状态下拒绝修改 problemIds
+  if (
+    status === 'ended' &&
+    body.problemIds &&
+    JSON.stringify(body.problemIds) !== JSON.stringify(existing.problemIds)
+  ) {
+    throw new ApiError(
+      'ASSIGNMENT_ENDED_CANNOT_MODIFY_PROBLEMS',
+      '作业已结束，不能修改题目列表',
+      403
+    )
+  }
+
   const { updateClassAssignmentDirect } = await import('@/lib/mongodb-direct')
   await updateClassAssignmentDirect(assignmentId, {
     title: body.title,
@@ -2092,17 +2252,55 @@ export async function updateClassAssignment(
     startTime: finalStartTime,
     endTime: finalEndDate,
     problemIds: body.problemIds,
+    allowLateSubmission: typeof body.allowLateSubmission === 'boolean' ? body.allowLateSubmission : undefined,
   })
+
+  // active 状态下修改 problemIds 时，对被移除的题目清理孤儿提交与计时进度
+  if (status === 'active' && body.problemIds) {
+    const removedProblemIds = existing.problemIds.filter(
+      (id) => !body.problemIds!.includes(id)
+    )
+    if (removedProblemIds.length > 0) {
+      // 标记孤儿提交为 REMOVED（终态，保留记录但不再参与统计/评测）
+      await prisma.classAssignmentSubmission.updateMany({
+        where: { assignmentId, problemId: { in: removedProblemIds } },
+        data: { status: SubmissionStatus.REMOVED },
+      })
+      // 删除计时进度记录
+      await prisma.classAssignmentProblemProgress.deleteMany({
+        where: { assignmentId, problemId: { in: removedProblemIds } },
+      })
+    }
+  }
+
+  // 若 endTime 被修改，重新计算所有提交的 isLate 标记
+  const oldEndTimeMs = existing.endTime ? existing.endTime.getTime() : null
+  const newEndTimeMs = finalEndDate ? finalEndDate.getTime() : null
+  if (oldEndTimeMs !== newEndTimeMs) {
+    await recalculateLateFlags(assignmentId)
+  }
+
   return { id: assignmentId }
 }
 
-/** 班级管理员删除作业：先校验存在，再删除 */
-export async function deleteClassAssignment(classId: string, assignmentId: string) {
+/** 班级管理员删除作业：先校验存在 + 仅 owner 可删，再删除 */
+export async function deleteClassAssignment(
+  classId: string,
+  assignmentId: string,
+  userId: string
+) {
   const assignment = await prisma.classAssignment.findUnique({
     where: { id: assignmentId, classId },
   })
   if (!assignment) {
     throw new ApiError('NOT_FOUND', '作业不存在', 404)
+  }
+  // 权限收紧：仅 owner 可删除作业（assertClassAdmin 允许 owner + assistant，这里再加一道 owner 检查）
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+  if (!member || !isClassOwnerRole(member.role)) {
+    throw new ApiError('FORBIDDEN', '只有班级创建者可以删除作业', 403)
   }
   const { deleteClassAssignmentDirect } = await import('@/lib/mongodb-direct')
   await deleteClassAssignmentDirect(assignmentId)

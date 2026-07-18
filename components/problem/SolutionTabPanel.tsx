@@ -1,18 +1,56 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Lock,
   PenSquare,
   AlertCircle,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Code2
 } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import { useUser } from '@/contexts/UserContext'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
 import { fetchWithCookie } from '@/lib/api/base'
+
+/**
+ * Phase 6 Task 32.4: 语言 Tab 优先级排序
+ *
+ * C++ / Python 优先展示（标程多语言同步后这两个最常见），其他语言按字母序追加。
+ * 仅展示有值的语言（即 solutions 中至少有 1 篇使用该语言）。
+ */
+const LANGUAGE_PRIORITY: Record<string, number> = {
+  cpp: 0,
+  'c++': 0,
+  python: 1,
+  python3: 1,
+}
+
+function normalizeLanguage(lang: string): string {
+  const key = (lang || '').toLowerCase().trim()
+  if (key === 'c++' || key === 'cpp' || key === 'c') return 'cpp'
+  if (key === 'python' || key === 'python3' || key === 'py') return 'python'
+  if (key === 'java') return 'java'
+  if (key === 'javascript' || key === 'js' || key === 'typescript' || key === 'ts') return key
+  return key
+}
+
+function getLanguageLabel(norm: string): string {
+  switch (norm) {
+    case 'cpp': return 'C++'
+    case 'python': return 'Python'
+    case 'java': return 'Java'
+    case 'javascript': return 'JavaScript'
+    case 'typescript': return 'TypeScript'
+    default: return norm
+  }
+}
+
+function getLanguagePriority(norm: string): number {
+  return LANGUAGE_PRIORITY[norm] ?? 100
+}
 
 interface SolutionTabPanelProps {
  problemId: string
@@ -65,6 +103,9 @@ export default function SolutionTabPanel({
  const [solutions, setSolutions] = useState<SolutionListItem[]>([])
  const [solutionsLoading, setSolutionsLoading] = useState(false)
  const [solutionsError, setSolutionsError] = useState<string | null>(null)
+
+ // Phase 6 Task 32.4: 语言筛选 tab（'all' = 全部，'cpp' / 'python' / ... = 按语言过滤）
+ const [languageFilter, setLanguageFilter] = useState<string>('all')
 
  useEffect(() => {
  let cancelled = false
@@ -181,6 +222,36 @@ export default function SolutionTabPanel({
  router.push(`/problems/${problemId}/solutions/${solutionId}`)
  }
 
+ // Phase 6 Task 32.4: 派生可用语言列表（仅展示有值的语言）
+ const availableLanguages = useMemo(() => {
+  const counts = new Map<string, number>()
+  for (const s of solutions) {
+   const norm = normalizeLanguage(s.codeLanguage)
+   counts.set(norm, (counts.get(norm) ?? 0) + 1)
+  }
+  return Array.from(counts.entries())
+   .map(([norm, count]) => ({ norm, count }))
+   .sort((a, b) => {
+    const pa = getLanguagePriority(a.norm)
+    const pb = getLanguagePriority(b.norm)
+    if (pa !== pb) return pa - pb
+    return a.norm.localeCompare(b.norm)
+   })
+ }, [solutions])
+
+ // Phase 6 Task 32.4: 当前选中的语言若已无对应题解，回退到 'all'
+ useEffect(() => {
+  if (languageFilter === 'all') return
+  const stillExists = solutions.some(s => normalizeLanguage(s.codeLanguage) === languageFilter)
+  if (!stillExists) setLanguageFilter('all')
+ }, [solutions, languageFilter])
+
+ // Phase 6 Task 32.4: 按语言过滤后的题解列表
+ const filteredSolutions = useMemo(() => {
+  if (languageFilter === 'all') return solutions
+  return solutions.filter(s => normalizeLanguage(s.codeLanguage) === languageFilter)
+ }, [solutions, languageFilter])
+
  if (permissionLoading) {
  return (
  <div className="space-y-4" aria-busy="true" aria-live="polite">
@@ -233,7 +304,14 @@ export default function SolutionTabPanel({
  <div className="flex items-center justify-between gap-3 flex-wrap">
  <div className="flex items-center gap-2 text-sm text-muted-foreground">
  <Sparkles className="w-4 h-4 text-primary-light" />
- <span>共 {solutions.length} 篇题解</span>
+ <span>
+ 共 {solutions.length} 篇题解
+ {languageFilter !== 'all' && (
+  <span className="ml-1 text-primary-light">
+   · 当前筛选 {getLanguageLabel(languageFilter)}（{filteredSolutions.length}）
+  </span>
+ )}
+ </span>
  </div>
  <button
  onClick={handleWriteSolution}
@@ -244,6 +322,42 @@ export default function SolutionTabPanel({
  <ChevronRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" />
  </button>
  </div>
+
+ {/* Phase 6 Task 32.4: 语言切换 Tab（仅展示有值的语言） */}
+ {solutions.length > 0 && availableLanguages.length > 1 && (
+ <div className="flex items-center gap-1.5 flex-wrap border-b border-border pb-2">
+ <button
+ onClick={() => setLanguageFilter('all')}
+ className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors flex items-center gap-1 ${
+  languageFilter === 'all'
+  ? 'bg-primary/10 text-primary border-b-2 border-primary'
+  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+ }`}
+ >
+ <Code2 className="w-3.5 h-3.5" />
+ 全部
+ <span className="opacity-60">({solutions.length})</span>
+ </button>
+ {availableLanguages.map(({ norm, count }) => {
+  const active = languageFilter === norm
+  return (
+  <button
+   key={norm}
+   onClick={() => setLanguageFilter(norm)}
+   className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+   active
+    ? 'bg-primary/10 text-primary border-b-2 border-primary'
+    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+   }`}
+   title={`仅展示 ${getLanguageLabel(norm)} 题解`}
+  >
+   {getLanguageLabel(norm)}
+   <span className="opacity-60 ml-0.5">({count})</span>
+  </button>
+  )
+ })}
+ </div>
+ )}
 
  {solutionsLoading && (
  <div className="space-y-4" aria-busy="true" aria-live="polite">
@@ -281,9 +395,26 @@ export default function SolutionTabPanel({
  </div>
  )}
 
- {!solutionsLoading && !solutionsError && solutions.length > 0 && (
+ {!solutionsLoading && !solutionsError && solutions.length > 0 && filteredSolutions.length === 0 && (
+ <div className="text-center py-12">
+ <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+ <Code2 className="w-8 h-8 text-muted-foreground" />
+ </div>
+ <p className="text-muted-foreground">
+ 暂无 {getLanguageLabel(languageFilter)} 题解
+ </p>
+ <button
+ onClick={() => setLanguageFilter('all')}
+ className="mt-2 text-xs text-primary hover:text-primary-dark"
+ >
+ 查看全部语言
+ </button>
+ </div>
+ )}
+
+ {!solutionsLoading && !solutionsError && filteredSolutions.length > 0 && (
  <div className="card-static rounded-lg overflow-hidden">
- {solutions.map((solution) => (
+ {filteredSolutions.map((solution) => (
  <SolutionCard
  key={solution.id}
  solution={solution}

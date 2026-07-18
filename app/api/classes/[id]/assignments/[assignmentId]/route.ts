@@ -47,6 +47,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     endTime?: string | Date
     deadline?: string | Date
     problemIds?: string[]
+    allowLateSubmission?: boolean
   }>(req)
   await assertClassAdmin(id, user.id, '只有管理员可以更新作业')
   return ok(await updateClassAssignment(id, assignmentId, body))
@@ -58,5 +59,5 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
     throw400('INVALID_ID', '无效的ID')
   }
   await assertClassAdmin(id, user.id, '只有管理员可以删除作业')
-  return ok(await deleteClassAssignment(id, assignmentId))
+  return ok(await deleteClassAssignment(id, assignmentId, user.id))
 })

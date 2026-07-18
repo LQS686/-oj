@@ -3,6 +3,10 @@ import type { PromptContext, PromptGenerator, PromptResult} from './core/types';
 import { GenerationMode, PromptCrossUseException } from './core/types';
 import { ParamGenPromptGenerator } from './paramgen/generator';
 import { TestDataGenPromptGenerator } from './test-data/generator';
+import { AnalyzePromptGenerator } from './analyze/generator';
+import { SuggestMetadataPromptGenerator } from './suggest-metadata/generator';
+import { SimilarPromptGenerator } from './similar/generator';
+import { TestDataIncrementalGenerator } from './test-data/incremental-generator';
 
 class PromptLoader {
   private static instance: PromptLoader;
@@ -12,6 +16,11 @@ class PromptLoader {
     this.generators = new Map();
     this.generators.set(GenerationMode.PARAM_GEN, new ParamGenPromptGenerator());
     this.generators.set(GenerationMode.TEST_DATA_GEN, new TestDataGenPromptGenerator());
+    this.generators.set(GenerationMode.ANALYZE, new AnalyzePromptGenerator());
+    this.generators.set(GenerationMode.SUGGEST_METADATA, new SuggestMetadataPromptGenerator());
+    // Phase 6：相似题生成 + 测试数据增量补充
+    this.generators.set(GenerationMode.SIMILAR, new SimilarPromptGenerator());
+    this.generators.set(GenerationMode.TEST_DATA_INCREMENTAL, new TestDataIncrementalGenerator());
 
     // Freeze the generators map to prevent runtime tampering
     Object.freeze(this.generators);

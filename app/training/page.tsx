@@ -5,27 +5,26 @@
  * 题单列表页
  *
  * 设计要点：
- * 1. 3 大来源分类卡片（官方题单 / 竞赛考级真题 / 我的题单）
+ * 1. 3 大来源分类卡片（官方题单 / 竞赛考级真题 / 我的收藏）
  * 2. 卡片网格：编号+标题+作者+收藏+进度环
- * 3. 用户可创建自己的题单（"我的"分类）
- * 4. 防御性：API 字段错位时降级为空
- * 5. fetch：cache: 'no-store'
+ * 3. 题单只能由管理员通过后台管理页面创建
+ * 4. "我的收藏"分类通过 API joined=true 过滤，仅显示当前用户已加入的题单
+ * 5. 防御性：API 字段错位时降级为空
+ * 6. fetch：cache: 'no-store'
  */
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
-import Link from 'next/link'
-import { BookOpen, AlertCircle, RefreshCw, Plus, UserCheck, ChevronLeft, ChevronRight } from 'lucide-react'
+import { BookOpen, AlertCircle, RefreshCw, Bookmark, ChevronLeft, ChevronRight } from 'lucide-react'
 import TrainingCard from '@/components/training/TrainingCard'
 import SourceFilterCards, { type TrainingSource } from '@/components/training/SourceFilterCards'
 import type { TrainingListItem } from '@/lib/training/types'
-import { canManageContent } from '@/lib/permissions'
 import { EducationalPageShell, LIST_GRID_CLASS } from '@/components/common'
 
 const SOURCE_LABELS: Record<TrainingSource, string> = {
   all: '全部题单',
   official: '官方题单',
   contest: '竞赛/考级真题',
-  mine: '我的题单',
+  mine: '我的收藏',
 }
 
 export default function TrainingListPage() {
@@ -37,8 +36,6 @@ export default function TrainingListPage() {
   const [total, setTotal] = useState(0)
   const [source, setSource] = useState<TrainingSource>('official')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
-  const currentUserIdRef = useRef<string | null>(null)
   const isFirstLoad = useRef(true)
 
   const fetchTrainings = useCallback(async (signal?: AbortSignal) => {
@@ -56,6 +53,9 @@ export default function TrainingListPage() {
         params.set('categoryType', 'official')
       } else if (source === 'contest') {
         params.set('categoryType', 'contest')
+      } else if (source === 'mine') {
+        // 仅返回当前用户已加入（收藏）的题单
+        params.set('joined', 'true')
       }
 
       const res = await fetchWithCookie(`/api/trainings?${params.toString()}`, {
@@ -71,16 +71,10 @@ export default function TrainingListPage() {
         setTotalPages(1)
         return
       }
-      let items: TrainingListItem[] = Array.isArray(data.data?.items) ? data.data.items : []
+      const items: TrainingListItem[] = Array.isArray(data.data?.items) ? data.data.items : []
 
-      if (source === 'mine') {
-        items = items.filter(t =>
-          t.userProgress?.isJoined || t.author?.id === currentUserIdRef.current
-        )
-      }
-
-      items = items.map((item, idx) => ({ ...item, number: (page - 1) * 24 + idx + 1 } as any))
-      setTrainings(items)
+      const numberedItems = items.map((item, idx) => ({ ...item, number: (page - 1) * 24 + idx + 1 } as any))
+      setTrainings(numberedItems)
       setTotal(typeof data.data?.total === 'number' ? data.data.total : 0)
       setTotalPages(typeof data.data?.totalPages === 'number' ? data.data.totalPages : 1)
     } catch (e: any) {
@@ -93,25 +87,15 @@ export default function TrainingListPage() {
     }
   }, [page, source])
 
-  // 拉取当前用户
+  // 拉取当前用户登录状态
   useEffect(() => {
     fetchWithCookie('/api/auth/me', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.success && data.data) {
-          setIsLoggedIn(true)
-          currentUserIdRef.current = data.data.id
-          setCurrentUserRole(data.data.role ?? null)
-        } else {
-          setIsLoggedIn(false)
-          currentUserIdRef.current = null
-          setCurrentUserRole(null)
-        }
+        setIsLoggedIn(data?.success && data.data ? true : false)
       })
       .catch(() => {
         setIsLoggedIn(false)
-        currentUserIdRef.current = null
-        setCurrentUserRole(null)
       })
   }, [])
 
@@ -127,21 +111,10 @@ export default function TrainingListPage() {
     setPage(1)
   }
 
-  const canCreateTraining = canManageContent({ role: currentUserRole })
-
   return (
     <EducationalPageShell
       title="训练题单"
-      description={`分组学习，循序渐进 · 共 ${total} 个题单`}
       icon={BookOpen}
-      actions={
-        isLoggedIn && canCreateTraining ? (
-          <Link href="/training/create" className="btn-primary btn" title="创建我自己的题单">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">创建题单</span>
-          </Link>
-        ) : undefined
-      }
       toolbar={
         <SourceFilterCards active={source} onChange={handleSourceChange} isLoggedIn={isLoggedIn} />
       }
@@ -188,22 +161,20 @@ export default function TrainingListPage() {
         ) : trainings.length === 0 ? (
           <div className="card-static rounded-lg p-16 text-center animate-fadeIn">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
-              {source === 'mine' ? <UserCheck className="w-8 h-8 text-muted-foreground" /> : <BookOpen className="w-8 h-8 text-muted-foreground" />}
+              {source === 'mine'
+                ? <Bookmark className="w-8 h-8 text-muted-foreground" />
+                : <BookOpen className="w-8 h-8 text-muted-foreground" />}
             </div>
             <div className="text-foreground text-xl font-semibold mb-2">
-              {source === 'mine' ? '还没有我的题单' : '暂无题单'}
+              {source === 'mine' ? '还没有收藏的题单' : '暂无题单'}
             </div>
-            <div className="text-muted-foreground mb-4">
+            <div className="text-muted-foreground">
               {source === 'mine'
-                ? isLoggedIn ? '去"官方题单"或"竞赛真题"逛逛，加入感兴趣的题单；或自己创建一个' : '登录后即可查看'
+                ? isLoggedIn
+                  ? '去"官方题单"或"竞赛真题"逛逛，加入感兴趣的题单即可收藏'
+                  : '登录后即可查看收藏的题单'
                 : '当前分类下还没有题单'}
             </div>
-            {isLoggedIn && source === 'mine' && (
-              <Link href="/training/create" className="btn-primary btn">
-                <Plus className="w-4 h-4" />
-                创建我的第一个题单
-              </Link>
-            )}
           </div>
         ) : (
           <div className={`${LIST_GRID_CLASS} animate-fadeIn`}>

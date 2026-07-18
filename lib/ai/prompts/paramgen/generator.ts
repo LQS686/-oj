@@ -1,7 +1,16 @@
 
-import { GenerationMode, ParamGenContext, PromptGenerator, PromptResult } from '../core/types';
+import type { ParamGenContext, PromptGenerator, PromptResult } from '../core/types';
+import { GenerationMode } from '../core/types';
 import { fillTemplate, PROBLEM_JSON_TEMPLATE } from './json-template';
-import { DIFFICULTY_PROFILES, Difficulty } from '../core/quality-gates';
+import type { Difficulty } from '../core/quality-gates';
+import { DIFFICULTY_PROFILES } from '../core/quality-gates';
+// Task 40.4：复用共享段（json-output-spec / solution-structure）
+import {
+  JSON_OUTPUT_SPEC,
+  SINGLE_PROBLEM_CONSTRAINT,
+  TEST_CASE_COVERAGE_REQUIREMENT,
+} from '../shared/json-output-spec';
+import { SOLUTION_STRUCTURE_SPEC, SOLUTION_CODE_SPEC } from '../shared/solution-structure';
 
 export class ParamGenPromptGenerator implements PromptGenerator {
   generate(context: ParamGenContext): PromptResult {
@@ -24,6 +33,7 @@ export class ParamGenPromptGenerator implements PromptGenerator {
     const timeLimit = Math.round((timeMin + timeMax) / 2)
     const memoryLimit = Math.round((memMin + memMax) / 2)
 
+    // Task 40.4：组合共享段构建 system prompt（行为不变，仅结构复用）
     const systemPrompt = `你是一位资深的算法竞赛 JSON 填空机器人。
 
 # 角色与原则
@@ -33,10 +43,11 @@ export class ParamGenPromptGenerator implements PromptGenerator {
 - 禁止添加 / 删除模板中的字段，禁止在 JSON 之外添加任何解释、markdown 标记（\`\`\`json 等）、think 块
 
 # 全局约束（不可违反）
-1. **业务决策（2026-06）**：单次 AI 调用只生成 1 道题；顶层必须是长度为 1 的 JSON 数组 [ { ... } ]，严禁输出多个对象的数组或顶层对象
-2. **字段名 snake_case**：与模板完全一致，包括 test_cases / time_limit / memory_limit / solution_cpp / solution_python / solution_article（不要写成 camelCase）
-3. **JSON 转义**：中文标点、字符串、代码中可能含双引号 / 反引号 / 换行，**必须用 \\" 和 \\n 转义**，否则 JSON 非法
-4. **内容完整性**：字段内容必须完整闭合，禁止中途截断；test_cases 必须包含 **15 个对象**（不是 3 个），覆盖 10 个维度（最小值 / 最大值 / 边界 / 反例 / 随机 / 全相同 / 单调 / 极端比例 / 倒数边界 / 随机压力）；标程代码可在标准编译器下编译运行
+${SINGLE_PROBLEM_CONSTRAINT}
+
+${JSON_OUTPUT_SPEC}
+
+${TEST_CASE_COVERAGE_REQUIREMENT}
 
 # 字段填充指引
 - 算法主题（来自用户 topic 数组）：决定题目考察的算法 / 数据结构 / 编程语法，是出题核心
@@ -50,15 +61,8 @@ export class ParamGenPromptGenerator implements PromptGenerator {
 - tags：**2-4 个**中文标签字符串数组；标签必须能精确定位本题用到的算法 / 数据结构 / 思路，参考用户选择的主题（如"动态规划 + 背包"应出 ["动态规划", "背包", "时间优化"] 这种具体标签，而非 ["动态规划", "算法"] 这种通用词）；**禁止**用难度词（"入门" / "普及" / "提高" / "NOI" 等）做标签
 - hint：1-2 句数据范围提示
 - time_limit / memory_limit：本次出题对应档位「${difficulty}」的推荐值为 time_limit=${timeLimit}ms / memory_limit=${memoryLimit}MB（模板中已预填，请勿随意修改以避免与档位不匹配）
-- solution_cpp：C++17 标程（字符串里可能含 \\n 换行；含双引号必须转义为 \\"）
-- solution_python：Python3 标程
-- solution_article：5 段式 markdown 题解，使用 H2 ## 分隔（不要用 H1 或 H3）：
-  1. ## 思路分析 — 为什么选这个算法（结合数据范围 / 题目约束）
-  2. ## 算法描述 — 分步骤描述执行过程
-  3. ## 复杂度分析 — 时间复杂度 + 空间复杂度（附推导）
-  4. ## 参考代码 — 用 \`\`\`cpp 包裹完整 C++17 代码，**内容必须与 solution_cpp 字段完全一致**（不要再写第二份标程；直接复制 solution_cpp 的内容）
-  5. ## 关键点说明 — 易错点 / 边界情况 / 常数优化
-  - 总字数 800-2500 字（视难度而定），字符串内可能含双引号 / 反引号 / 换行，**必须用 \\" 和 \\n 转义**`;
+${SOLUTION_CODE_SPEC}
+- ${SOLUTION_STRUCTURE_SPEC}`;
 
     const userPrompt = `请根据算法主题「${topic.join('、')}」、难度「${difficulty}」、类型「${type}」，生成 1 道题。
 

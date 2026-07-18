@@ -28,6 +28,17 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // 游戏化字段（Phase 1 预留，Phase 2+ 启用）
+  exp             Int       @default(0)     // 累计经验值
+  level           Int       @default(1)     // 当前等级
+  coins           Int       @default(0)     // 金币余额
+  title           String?                   // 用户称号（来自成就/商城）
+  dailyCoinEarned Int       @default(0)     // 当日已获得金币（每日 0 点重置）
+  dailyCoinResetAt DateTime?                // 每日金币计数器重置时间
+  lastAcDate      DateTime?                 // 最后一次 AC 日期（用于每日首 AC bonus）
+  newbieBonusUsed Int       @default(0)     // 新手保护期已用次数（上限 10）
+  lastRating      Int       @default(1500)  // 上次 rating，用于进步奖励对比
+
   // 关系
   submissions   Submission[]
   problems      Problem[]
@@ -50,16 +61,16 @@ model User {
   // 申请关系
   joinRequests          ClassJoinRequest[] @relation("JoinRequestUser")
   reviewedRequests      ClassJoinRequest[] @relation("JoinRequestReviewer")
-  
+
   // 竞赛参与
   contestParticipations ContestParticipant[]
-  
+
   // 头像历史
   avatarHistory AvatarHistory[]
 
   // AI生成记录
   aiGenerations AiGenerationLog[]
-  
+
   // AI 偏好
   aiPreferences UserAiPreference[]
 
@@ -68,6 +79,18 @@ model User {
   trainingEnrollments  TrainingEnrollment[]
 
   systemAnnouncements SystemAnnouncement[]
+
+  // 游戏化关系（Phase 1 预留）
+  coinTransactions       CoinTransaction[]
+  purchases              PurchaseTransaction[]
+  problemProgress        ClassAssignmentProblemProgress[]
+  completionRewardLogs   AssignmentCompletionRewardLog[]
+  contestRankingRewards  ContestRankingRewardLog[]
+  contestCompletionRewards ContestCompletionRewardLog[]
+  rewardLogs             RewardGrantLog[]
+  achievementProgress    AchievementProgress[]
+  createdShopItems       ShopItem[]              @relation("ShopItemCreator")
+  rewardConfigChanges    RewardConfigChangeLog[]
 
   @@index([rating])
   @@index([solvedCount])
@@ -116,23 +139,30 @@ model Problem {
   isAiGenerated Boolean     @default(false)
   aiStatus      String      @default("MANUAL_CREATED") // MANUAL_CREATED, AI_ASSISTED, AI_GENERATED
   aiPrompt      String?     // 生成该题目的原始提示词
-  
+
   // 标程（用于验证数据）
   stdCode       String?
   stdLang       String?
-  
+
+  // 游戏化奖励配置（Phase 1 预留，Phase 2+ 启用；null = 按难度默认值）
+  expReward        Int?     // 自定义经验奖励
+  coinReward       Int?     // 自定义金币奖励
+  timeThresholds   Json?    // 自定义用时阈值 { gold, silver, bronze } (ms)
+
   verificationLogs VerificationLog[]
-  
+
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  
+
   submissions   Submission[]
   testCases     TestCase[]
   solutions     Solution[]
   contestProblems ContestProblem[]
   trainingProblems TrainingProblem[]
   favorites     Favorite[]
-  
+  assignmentProblems ClassAssignmentProblem[]
+  problemProgress    ClassAssignmentProblemProgress[]
+
   @@index([isPublic])
   @@index([difficulty])
   @@index([visibility])
@@ -205,11 +235,21 @@ model Contest {
   author      User        @relation(fields: [authorId], references: [id])
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  
+
+  // 游戏化奖励配置（Phase 1 预留，Phase 2+ 启用）
+  unifiedExpReward  Int?    // 竞赛统一经验奖励（覆盖题目/难度默认）
+  unifiedCoinReward Int?    // 竞赛统一金币奖励
+  completionTiers   Json?   // 完成度奖励层次 [{ minSolved, expReward, coinReward }]
+  rankingRewards    Json?   // 排名奖励层次 [{ maxRank, expReward, coinReward }]
+
   problems    ContestProblem[]
   submissions Submission[]
   participants ContestParticipant[]
-  
+
+  // 游戏化关系（Phase 1 预留）
+  rankingRewardLogs     ContestRankingRewardLog[]
+  completionRewardLogs  ContestCompletionRewardLog[]
+
   @@index([isPublic])
   @@index([startTime])
   @@index([endTime])
@@ -226,6 +266,10 @@ model ContestProblem {
   problem    Problem  @relation(fields: [problemId], references: [id])
   orderIndex Int
   score      Int      @default(100)
+
+  // 游戏化奖励覆盖（Phase 1 预留，Phase 2+ 启用；null = 按竞赛统一/题目/难度默认）
+  expReward  Int?
+  coinReward Int?
 
   @@index([contestId])
 }
@@ -263,6 +307,7 @@ model Class {
   assignments ClassAssignment[]
   notes       ClassNote[]
   directInvites ClassDirectInvite[]
+  trainings   Training[]
 }
 
 // 班级成员
@@ -300,9 +345,38 @@ model ClassAssignment {
   createdBy   String                    @db.ObjectId
   createdAt   DateTime                  @default(now())
 
+  // 游戏化奖励配置（Phase 1 预留，Phase 2+ 启用；null = 按题目/难度默认）
+  unifiedExpReward           Int?     // 作业统一经验奖励
+  unifiedCoinReward          Int?     // 作业统一金币奖励
+  unifiedTimeThresholds      Json?    // 作业统一用时阈值 { gold, silver, bronze } (ms)
+  completionTiers            Json?    // 完成度奖励层次 [{ minCompletion, expReward, coinReward }]
+  allowLateSubmission        Boolean @default(false) // 是否允许逾期提交
+  lateSubmissionRewardRatio  Float    @default(0.5)  // 逾期提交奖励比例
+
   submissions ClassAssignmentSubmission[]
+  problems    ClassAssignmentProblem[]
+  problemProgress ClassAssignmentProblemProgress[]
+  completionRewardLogs AssignmentCompletionRewardLog[]
 
   @@index([classId])
+}
+
+// 班级作业题目（每题独立配置覆盖作业统一配置，Phase 1 预留）
+model ClassAssignmentProblem {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId  String   @db.ObjectId
+  assignment    ClassAssignment @relation(fields: [assignmentId], references: [id])
+  problemId     String   @db.ObjectId
+  problem       Problem  @relation(fields: [problemId], references: [id])
+  orderIndex    Int      @default(0)
+
+  // 单题覆盖作业统一配置（null = 按作业统一/题目/难度默认）
+  expReward      Int?
+  coinReward     Int?
+  timeThresholds Json?   // { gold, silver, bronze } (ms)
+
+  @@unique([assignmentId, problemId])
+  @@index([assignmentId])
 }
 
 // 班级作业提交记录
@@ -329,6 +403,10 @@ model ClassAssignmentSubmission {
   // 提交时间信息
   submittedAt     DateTime              @default(now())
   isLate          Boolean               @default(false)  // 是否逾期提交
+
+  // 计时与首次 AC 标记（Phase 1 启用）
+  timeElapsedMs   Int                   @default(0)  // 完成用时（ms），由 finalizeTiming 写入
+  isFirstAc       Boolean               @default(false)  // 是否为该题在该作业上下文中的首次 AC
 
   @@index([assignmentId, userId])  // 优化按作业和用户查询
   @@index([assignmentId, problemId])  // 优化按作业和题目查询
@@ -431,8 +509,14 @@ model Solution {
   title         String
   content       String
   language      String?   // 冗余字段，新代码不再写入，保留兼容旧数据
-  code          String?   // 题解配套代码
+  // Task 26.6：code 字段保留（向后兼容），存 C++ 版本标程
+  code          String?   // 题解配套代码（C++ 标程，向后兼容）
   codeLanguage  String?   // 题解配套代码语言（语义更清晰的别名，与 language 保持同步）
+  // Task 26.5：Python 版本标程（多语言标程同步，Task 32）
+  // 与 code 字段配合：code 存 C++ 版本，codePython 存 Python 版本（翻译自 C++）
+  codePython    String?
+  // Task 26.5：题解质量评分（0-5，Task 31 由 scoreSolutionQuality 写入）
+  qualityScore  Float?
   views         Int       @default(0)
   likes         Int       @default(0)
   isOfficial    Boolean   @default(false)            // 是否标程题解（置顶展示）
@@ -521,6 +605,10 @@ model Training {
   categoryId    String?           @db.ObjectId
   category      TrainingCategory? @relation(fields: [categoryId], references: [id])
 
+  // 班级私有题单：classId 不为空时仅在所属班级可见
+  classId       String?           @db.ObjectId
+  class         Class?            @relation(fields: [classId], references: [id], onDelete: Cascade)
+
   problems      TrainingProblem[]
   enrollments   TrainingEnrollment[]
 
@@ -529,6 +617,7 @@ model Training {
   @@index([categoryId])
   @@index([categoryType])
   @@index([authorId])
+  @@index([classId])
 }
 
 // 题单分类
@@ -572,13 +661,21 @@ model TrainingEnrollment {
 
 // 成就
 model Achievement {
-  id          String            @id @default(auto()) @map("_id") @db.ObjectId
-  name        String            @unique
-  description String
-  icon        String
-  condition   String
-  
-  users       UserAchievement[]
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  name            String            @unique
+  description     String
+  icon            String
+  condition       String
+
+  // 游戏化扩展（Phase 1 预留，Phase 2+ 启用）
+  category        String            @default("learning")  // learning / milestone / diversity / contribution
+  rarity          String            @default("common")    // common / rare / epic / legendary
+  coinReward      Int               @default(0)           // 解锁时发放金币
+  expReward       Int               @default(0)           // 解锁时发放经验
+  progressTarget  Int?                                    // 进度目标值（用于进度追踪，null=一次性成就）
+
+  users           UserAchievement[]
+  progress        AchievementProgress[]
 }
 
 // 用户成就
@@ -654,17 +751,26 @@ model AiGenerationLog {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   userId      String   @db.ObjectId
   user        User     @relation(fields: [userId], references: [id])
-  status      String   // PENDING, COMPLETED, FAILED
-  params      Json     // 请求参数：类型、难度、知识点等
+  // PENDING / PROCESSING / COMPLETED / FAILED / DISCARDED
+  // - DISCARDED：预览-确认工作流中用户丢弃的预览任务（Task 27）
+  // - AiGenerationLog.status 是 String 而非 enum（MongoDB 不依赖 DB 层枚举约束）
+  status      String
+  params      Json     // 请求参数：类型、难度、知识点等（含 mode / batchId / parentLogId / promptHash 等）
   result      Json?    // 生成的题目数据（数组）
   error       String?  // 错误信息
   tokensUsed  Int      @default(0)
+  // Task 26.3：预估成本（tokensUsed * model.pricePerMillionTokens / 1_000_000）
+  // 注：MongoDB connector 不支持 Decimal 类型，改用 Float?（精度足够用于成本估算）
+  estimatedCost Float?
+  // Task 26.3 / Task 36：父任务 ID，串联任务链（出题 → 题解、出题失败 → 诊断、批量出题关联）
+  parentLogId String?  @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@index([userId])
   @@index([createdAt])
   @@index([status, createdAt])
+  @@index([parentLogId])
 }
 
 // AI模型配置（全局思考模型设置存储，被 AiProvider/AiModel 的混合配置方案使用）
@@ -718,7 +824,7 @@ model AiModel {
   providerId  String     @db.ObjectId
   provider    AiProvider @relation(fields: [providerId], references: [id])
   type        String     // "generation", "thinking"
-  
+
   // Configs
   maxTokens   Int        @default(2048)
   temperature Float      @default(0.7)
@@ -728,11 +834,22 @@ model AiModel {
   // DeepSeek v4 模型使用 { thinking: { type: "enabled" }, reasoning_effort: "high" } 控制思考模式
   params      Json       @default("{}")
 
+  // Task 26.1：每百万 tokens 单价（用于估算任务成本，null = 未配置则不估算）
+  // 注：MongoDB connector 不支持 Decimal 类型，改用 Float?（精度足够用于成本估算）
+  pricePerMillionTokens Float?
+
+  // Task 26.2：模型健康度（null / 'healthy' / 'degraded' / 'down'，默认 null 视为 healthy）
+  // - degraded：连续 3 次 API 错误（Task 38）
+  // - down：连续 5 次 API 错误
+  // - 由队列 executeJob 失败时更新，管理端可手动 reset
+  healthStatus       String?
+  lastHealthCheckAt  DateTime?
+
   isActive    Boolean    @default(true)
-  
+
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
-  
+
   preferences UserAiPreference[]
 }
 
@@ -788,4 +905,197 @@ model SystemAnnouncement {
 
   @@index([isPublished, isPinned, publishedAt])
   @@index([expiresAt])
+}
+
+/* ============================================================================
+ * 游戏化系统模型（Phase 1 预留，Phase 2+ 启用）
+ * - ClassAssignmentProblemProgress：班级作业题目计时核心（Phase 1 启用）
+ * - CoinTransaction：金币流水
+ * - ShopItem / PurchaseTransaction：商城
+ * - AssignmentCompletionRewardLog / ContestRankingRewardLog / ContestCompletionRewardLog：奖励日志
+ * - RewardGrantLog：幂等保障表
+ * - AchievementProgress：成就进度
+ * - RewardConfigChangeLog：配置变更审计
+ * ========================================================================== */
+
+// 金币流水（审计用，所有金币变动都记录）
+model CoinTransaction {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
+  source       String   // first_ac / assignment_completion / contest_ranking / contest_completion / achievement / registration / rating_improvement / level_milestone / shop_purchase / admin_adjust
+  amount       Int      // 正数为获得，负数为消耗
+  balanceAfter Int      // 变动后余额（快照）
+  reason       String?  // 描述
+  relatedId    String?  // 关联资源 ID（如题目ID/作业ID/商品ID）
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([source])
+}
+
+// 商城商品
+model ShopItem {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String
+  icon        String?
+  category    String    // title / avatar_frame / theme_color / consumable
+  price       Int       // 金币价格
+  stock       Int?      // 库存（null=无限）
+  isActive    Boolean   @default(true)
+  isSystem    Boolean   @default(false)  // 系统固定物品（不可删除）
+  creatorId   String?   @db.ObjectId     // 创建者ID（管理员），系统物品为 null
+  creator     User?     @relation("ShopItemCreator", fields: [creatorId], references: [id])
+  metadata    Json?     // 物品元数据（如称号文本、头像框URL、主题色值等）
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  purchases   PurchaseTransaction[]
+
+  @@index([isActive, category])
+  @@index([isSystem])
+  @@index([creatorId])
+}
+
+// 购买交易记录
+model PurchaseTransaction {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  itemId    String   @db.ObjectId
+  item      ShopItem @relation(fields: [itemId], references: [id])
+  pricePaid Int      // 实际支付价格（快照）
+  status    String   @default("completed")  // completed / refunded
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, itemId])
+  @@index([userId])
+}
+
+// 班级作业题目作答进度（计时核心，Phase 1 启用）
+model ClassAssignmentProblemProgress {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId  String    @db.ObjectId
+  assignment    ClassAssignment @relation(fields: [assignmentId], references: [id])
+  problemId     String    @db.ObjectId
+  problem       Problem   @relation(fields: [problemId], references: [id])
+  userId        String    @db.ObjectId
+  user          User      @relation(fields: [userId], references: [id])
+
+  timeStarted    DateTime  @default(now())  // 首次打开时间
+  timeElapsedMs  Int       @default(0)       // 累计用时（ms，不含暂停期间）
+  lastResumedAt  DateTime?                   // 最近一次 resume 时间（null=已暂停）
+  isPaused       Boolean   @default(false)   // 是否暂停中
+  completedAt    DateTime?                   // 首次 AC 完成时间
+  finalTimeMs    Int?                         // 完成时的最终用时（ms）
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([assignmentId, problemId, userId])
+  @@index([assignmentId, userId])
+  @@index([userId])
+}
+
+// 班级作业完成度奖励发放日志
+model AssignmentCompletionRewardLog {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId  String   @db.ObjectId
+  assignment    ClassAssignment @relation(fields: [assignmentId], references: [id])
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+  tierIndex     Int      // 命中的层次索引
+  minCompletion Float    // 该层次最低完成率
+  expGranted    Int      // 实际发放经验
+  coinGranted   Int      // 实际发放金币
+  createdAt     DateTime @default(now())
+
+  @@unique([assignmentId, userId, tierIndex])
+  @@index([assignmentId, userId])
+}
+
+// 竞赛排名奖励发放日志
+model ContestRankingRewardLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  contestId   String   @db.ObjectId
+  contest     Contest  @relation(fields: [contestId], references: [id])
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  rank        Int      // 最终排名
+  expGranted  Int      // 实际发放经验
+  coinGranted Int      // 实际发放金币
+  createdAt   DateTime @default(now())
+
+  @@unique([contestId, userId])
+  @@index([contestId, rank])
+}
+
+// 竞赛完成度奖励发放日志
+model ContestCompletionRewardLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  contestId   String   @db.ObjectId
+  contest     Contest  @relation(fields: [contestId], references: [id])
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  tierIndex   Int      // 命中的层次索引
+  minSolved   Int      // 该层次最低解题数
+  expGranted  Int      // 实际发放经验
+  coinGranted Int      // 实际发放金币
+  createdAt   DateTime @default(now())
+
+  @@unique([contestId, userId, tierIndex])
+  @@index([contestId, userId])
+}
+
+// 奖励发放幂等表（防重复发放）
+model RewardGrantLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  source      String   // first_ac / assignment_completion / contest_ranking / contest_completion / achievement / registration / rating_improvement / level_milestone / shop_purchase
+  relatedId   String?  // 关联资源 ID（题目ID/作业ID/竞赛ID/成就ID 等）
+  expGranted  Int      @default(0)
+  coinGranted Int      @default(0)
+  status      String   @default("success")  // success / failed
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, source, relatedId])
+  @@index([source, relatedId])
+  @@index([status])
+  @@index([userId, createdAt])
+}
+
+// 成就进度追踪
+model AchievementProgress {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String      @db.ObjectId
+  user          User        @relation(fields: [userId], references: [id])
+  achievementId String      @db.ObjectId
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  progress      Int         @default(0)  // 当前进度
+  target        Int                      // 目标值
+  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+// 奖励配置变更审计日志
+model RewardConfigChangeLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  targetType  String   // problem / assignment / contest / contest_problem / assignment_problem
+  targetId    String   @db.ObjectId
+  field       String   // 变更字段
+  oldValue    String?  // 旧值（序列化）
+  newValue    String?  // 新值（序列化）
+  operatorId  String   @db.ObjectId
+  operator    User     @relation(fields: [operatorId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([operatorId])
 }

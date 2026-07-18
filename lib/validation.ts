@@ -3,6 +3,7 @@
  * 保留是为了向后兼容，新代码应使用 lib/api/validation.ts
  */
 import { escapeHtml, stripTags } from './sanitize'
+import { isValidDifficulty, migrateDifficulty } from './constants'
 
 export function validateObjectId(id: string): boolean {
   if (!id || typeof id !== 'string') {
@@ -146,10 +147,14 @@ export function validateProblemDescription(description: string): boolean {
   return description.trim().length >= 10
 }
 
+/**
+ * @deprecated 已废弃，请改用 lib/constants.ts 的 isValidDifficulty()
+ * 难度校验全站统一使用 8 档标准（入门/普及-/普及/普及+/提高/提高+/省选/NOI）
+ * 旧版 4 档（简单/中等/困难）可通过 migrateDifficulty() 自动迁移
+ */
 export function validateDifficulty(difficulty: string): boolean {
-  const validDifficulties = ['入门', '普及-', '普及', '普及+', '提高', '提高+', '省选', 'NOI', 
-    '简单', '中等', '困难', 'easy', 'medium', 'hard', 'Easy', 'Medium', 'Hard']
-  return validDifficulties.includes(difficulty)
+  // 兼容旧调用方：接受 8 档标准值或旧版 4 档/英文值（通过 migrateDifficulty 判断是否可迁移）
+  return isValidDifficulty(difficulty) || isValidDifficulty(migrateDifficulty(difficulty))
 }
 
 export function validateTimeLimit(timeLimit: number): boolean {

@@ -2,13 +2,17 @@
  * /api/admin/ai/generate - AI 题目生成（管理员）
  *
  * GET  查日志列表 / 单条日志状态
+ *      Query 参数：
+ *        - logId: 指定则返回单条详情
+ *        - mode:  按任务模式过滤（parametric / test_data / analyze / suggest_metadata / similar / diagnose）
+ *                 不传 mode 时返回全部历史
  * POST 入队生成任务
  */
 import { withApi, ok, readJson } from '@/lib/api/withApi'
 import {
   enqueueAiGeneration,
   getAiLogById,
-  listRecentAiLogs,
+  listUserAiTasks,
   retryAiGeneration,
   validateAiGenerateBody,
   type AiGenerateBody,
@@ -16,7 +20,7 @@ import {
 
 /**
  * GET /api/admin/ai/generate
- *   无 logId -> 返回当前用户最近 20 条
+ *   无 logId -> 返回当前用户任务列表（可按 mode 过滤）
  *   有 logId -> 返回单条
  */
 export const GET = withApi.admin(async (req, _ctx, { user }) => {
@@ -24,7 +28,8 @@ export const GET = withApi.admin(async (req, _ctx, { user }) => {
   const logId = searchParams.get('logId')
 
   if (!logId) {
-    return ok(await listRecentAiLogs(user.id, 20))
+    const mode = searchParams.get('mode') || undefined
+    return ok(await listUserAiTasks(user.id, { mode }))
   }
   return ok(await getAiLogById(logId))
 })

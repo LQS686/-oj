@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth } from '@/lib/api/base'
 import { Clock, Database, BookOpen, TrendingUp, ArrowLeft, Play, Target, AlertCircle } from 'lucide-react'
+import { getDifficultyColor } from '@/lib/status'
 
 interface ClassProblem {
  id: string
@@ -64,12 +65,6 @@ export default function ClassProblemDetailPage() {
  }
  }
 
- const difficultyColors: Record<string, string> = {
- Easy: 'text-secondary-light bg-secondary/10 border-secondary/20',
- Medium: 'text-amber-400 bg-accent/100/10 border-amber-500/20',
- Hard: 'text-error bg-error/10 border-error/20'
- }
-
  if (loading) {
  return (
  <div className="min-h-screen flex items-center justify-center">
@@ -124,7 +119,7 @@ export default function ClassProblemDetailPage() {
  <h1 className="text-2xl font-bold text-foreground">{problem.title}</h1>
  </div>
  <div className="flex items-center gap-3 flex-wrap">
- <span className={`tag border ${difficultyColors[problem.difficulty]}`}>
+ <span className={`tag border ${getDifficultyColor(problem.difficulty)}`}>
  {problem.difficulty}
  </span>
  {problem.tags.map((tag, idx) => (

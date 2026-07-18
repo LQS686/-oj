@@ -40,4 +40,10 @@ export const CacheKeys = {
   home: {
     dashboardPrefix: () => 'home:dashboard',
   },
+  // 班级作业题目作答进度（计时核心）
+  timing: {
+    progressPrefix: () => 'timing:progress',
+    progress: (assignmentId: string, problemId: string, userId: string) =>
+      `timing:progress:${assignmentId}:${problemId}:${userId}`,
+  },
 } as const

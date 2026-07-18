@@ -17,6 +17,8 @@ interface SubmissionUpdate {
   problemId?: string
   message?: string
   testResults?: any[]
+  /** 作业维度做题用时（毫秒），仅作业提交 AC 时携带 */
+  timeElapsedMs?: number
 }
 
 interface JudgeProgress {

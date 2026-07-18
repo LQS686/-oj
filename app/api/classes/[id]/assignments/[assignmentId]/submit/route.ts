@@ -1,6 +1,12 @@
 /**
  * 作业代码提交（评测）
  * POST /api/classes/[id]/assignments/[assignmentId]/submit
+ *
+ * 业务层（submitAssignmentCode）会在以下情况抛出 ApiError，由 withApi 统一捕获：
+ *   - INVALID_LANGUAGE / CODE_TOO_SHORT / CODE_TOO_LONG  → 400
+ *   - ASSIGNMENT_NOT_STARTED / ASSIGNMENT_ENDED          → 403
+ *   - SUBMIT_TOO_FREQUENT                                → 429
+ *   - JUDGE_QUEUE_FAILED                                 → 503
  */
 import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
@@ -15,9 +21,6 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const body = await readJson<{ problemId?: string; code?: string; language?: string }>(req)
   if (!body.problemId || !body.code || !body.language) {
     throw400('MISSING_FIELDS', '缺少必填字段')
-  }
-  if (body.code!.trim().length < 10) {
-    throw400('CODE_TOO_SHORT', '代码长度不能少于10个字符')
   }
 
   const member = await getCurrentClassMember(id, user.id)

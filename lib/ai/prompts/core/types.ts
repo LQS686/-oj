@@ -1,7 +1,32 @@
 
 export enum GenerationMode {
   PARAM_GEN = 'ParamGen',
-  TEST_DATA_GEN = 'TestDataGen'
+  TEST_DATA_GEN = 'TestDataGen',
+  /**
+   * 题目智能分析：只读分析已有题目，输出 5 维度评估结果
+   * （标签建议 / 难度建议 / 质量问题 / 测试维度缺口 / 提示建议）
+   */
+  ANALYZE = 'Analyze',
+  /**
+   * 元数据建议：基于题目描述生成 tags / difficulty / hint / timeLimit / memoryLimit
+   * 不生成 testCases / 标程
+   */
+  SUGGEST_METADATA = 'SuggestMetadata',
+  /**
+   * 相似题生成（Task 28）：基于已有题目生成变体，读取原题信息作为 prompt 上下文，
+   * 走与 PARAM_GEN 一致的预览-确认流程
+   */
+  SIMILAR = 'Similar',
+  /**
+   * 失败诊断（Task 30）：对 FAILED 任务的 error / result.parseError / result.qualityIssues
+   * 自动分析，调用轻量 AI 返回 { failureType, suggestedFix }
+   */
+  DIAGNOSE = 'Diagnose',
+  /**
+   * 测试数据增量补充（Task 33）：基于 inferCoveredDimensions 推断已覆盖维度，
+   * 仅生成缺失维度的测试点，**追加**而非 deleteMany 原有数据
+   */
+  TEST_DATA_INCREMENTAL = 'TestDataIncremental',
 }
 
 /**
@@ -89,7 +114,107 @@ export interface TestDataGenContext extends BaseContext {
   hasSolution?: boolean;
 }
 
-export type PromptContext = ParamGenContext | TestDataGenContext;
+/**
+ * 题目智能分析上下文（只读分析，不修改题目）
+ */
+export interface AnalyzeContext extends BaseContext {
+  mode: GenerationMode.ANALYZE;
+  problem: {
+    title: string;
+    description: string;
+    input?: string;
+    output?: string;
+    samples?: any[];
+    tags?: string[];
+    difficulty?: string;
+    stdCode?: string | null;
+    stdLang?: string | null;
+    hint?: string | null;
+  };
+}
+
+/**
+ * 元数据建议上下文（轻量，只输出元数据）
+ */
+export interface SuggestMetadataContext extends BaseContext {
+  mode: GenerationMode.SUGGEST_METADATA;
+  description: string;
+  samples?: any[];
+  input?: string;
+  output?: string;
+}
+
+/**
+ * 相似题生成上下文（Task 28）
+ *
+ * 基于已有题目信息生成变体，复用 ParamGen 模板 + 注入原题信息
+ */
+export interface SimilarContext extends BaseContext {
+  mode: GenerationMode.SIMILAR;
+  type: string;
+  difficulty: string;
+  topic: string[];
+  count: number;
+  additionalInfo?: string;
+  /** 原题信息（作为 prompt 上下文注入） */
+  sourceProblem: {
+    title: string;
+    description: string;
+    input?: string;
+    output?: string;
+    tags?: string[];
+    difficulty?: string;
+    stdCode?: string | null;
+    stdLang?: string | null;
+  };
+}
+
+/**
+ * 失败诊断上下文（Task 30）
+ *
+ * 分析 FAILED 任务的 error / parseError / qualityIssues，返回 { failureType, suggestedFix }
+ */
+export interface DiagnoseContext extends BaseContext {
+  mode: GenerationMode.DIAGNOSE;
+  /** 原任务的错误信息 */
+  error: string;
+  /** 原任务的 mode（用于分类失败类型） */
+  originalMode: string;
+  /** 原任务的解析错误信息（如有） */
+  parseError?: string;
+  /** 原任务的质量问题（如有） */
+  qualityIssues?: string[];
+  /** 原任务的 promptHash（用于关联同类失败任务，Task 39.4） */
+  promptHash?: string;
+}
+
+/**
+ * 测试数据增量补充上下文（Task 33）
+ *
+ * 基于现有测试点推断已覆盖维度，仅生成缺失维度的测试点
+ */
+export interface TestDataIncrementalContext extends BaseContext {
+  mode: GenerationMode.TEST_DATA_INCREMENTAL;
+  title: string;
+  description: string;
+  inputDescription: string;
+  outputDescription: string;
+  count: number;
+  hasSolution?: boolean;
+  /** 已覆盖的维度（来自 inferCoveredDimensions） */
+  coveredDimensions: Array<{ id: string; name: string }>;
+  /** 缺失的维度（需要 AI 补充的） */
+  missingDimensions: Array<{ id: string; name: string }>;
+}
+
+export type PromptContext =
+  | ParamGenContext
+  | TestDataGenContext
+  | AnalyzeContext
+  | SuggestMetadataContext
+  | SimilarContext
+  | DiagnoseContext
+  | TestDataIncrementalContext;
 
 export interface PromptResult {
   systemPrompt: string;

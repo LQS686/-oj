@@ -28,7 +28,10 @@
 
 - **班级管理** — 创建/加入班级，用户名直邀机制（邀请码已废除），成员角色权限（班主任/助教/学生）
 - **班级作业** — 标签页式作业详情，题目切换与代码编辑提交一体
-- **完成度追踪** — 学生完成情况矩阵、提交记录与代码查看
+- **作业三态模型** — `upcoming`（未开始）/ `active`（进行中）/ `ended`（已结束）统一判定，前后端一致；`allowLateSubmission` 开关控制 ended 状态是否仍接受逾期提交
+- **作业计时** — 作业维度首次 AC 触发 `finalizeTiming`，记录每题做题用时（`timeElapsedMs`）；与全局题库 AC 解耦（`isFirstAcInAssignment` vs `isFirstAcGlobal`）
+- **完成度追踪** — 学生完成情况矩阵（AC 显示"用时 mm:ss 通过"）、总用时列（可排序）、平均用时统计；提交记录与代码查看
+- **状态守卫** — 未开始/已结束（不允许逾期）时提交按钮禁用，ProblemTimer 作业结束后不启动
 - **笔记系统** — 班级知识库
 - **班级排行榜** — 基于解题与表现的班级内排名（非积分商城）
 
@@ -39,9 +42,9 @@
 ### 其他功能
 
 - **竞赛模式** — ACM/OI 赛制，实时榜单，赛题管理
-- **训练题单** — 官方 / 竞赛真题 / 我的题单分类
+- **训练题单** — 官方 / 竞赛真题 / 我的收藏分类（个人创建已移除，仅管理员可创建）
 - **社区讨论** — 题解评论、帖子发布
-- **AI 能力** — AI 模型配置、智能辅助出题、代码分析（含 SSRF 防护）
+- **AI 工作台** — 4 大功能 tab（智能出题 / 题目分析 / 元数据建议 / 测试数据生成）；AI 任务队列（拆分为 service/queue 多文件架构）；难度系统统一为洛谷 8 级标准（入门/普及-/普及/普及+/提高/提高+/省选/NOI）
 - **响应式设计** — 移动端 Drawer 抽屉菜单适配
 - **Docker 部署** — 一键部署，MongoDB 副本集 + Redis 缓存 + Nginx 反代
 
@@ -229,6 +232,23 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 - **清理入口** — `lib/user/service.ts` 的 `clearUserCache` 统一调用 `clearAuthUserCache`（鉴权层）+ 业务缓存
 
 ## 更新日志
+
+### 2026/07（班级作业审查优化 + AI 工作台重构 + UI 规范化）
+
+- **班级作业三态模型** — 统一 `upcoming`/`active`/`ended` 状态判定（`getAssignmentStatus`），前后端一致；`allowLateSubmission` 字段控制 ended 状态是否接受逾期提交
+- **作业计时解耦** — `isFirstAcInAssignment`（查 `ClassAssignmentSubmission` 表）替代 `isFirstAcGlobal` 触发 `finalizeTiming`；学生先在题库 AC 后在作业中 AC 仍可正确记录用时
+- **状态机修复** — `PENDING`/`JUDGING`/`RUNNING` → 任意状态（含 `AC`）的 recover 路径，归一化后比较兼容历史大驼峰写法
+- **用时统计** — 提交弹窗 AC 时展示"做题用时"指标卡；完成情况统计表 AC 显示"用时 mm:ss 通过"、新增"总用时"列（可排序）与平均用时
+- **作业级联清理** — `deleteClassAssignmentDirect` 事务清理 `ClassAssignmentProblemProgress` / `ClassAssignmentProblem` / `AssignmentCompletionRewardLog`，并置空 `Submission.assignmentSubmissionId`
+- **isLate 自动重算** — 修改 `endTime` 后自动调用 `recalculateLateFlags` 重算所有提交的 isLate 标记
+- **API 守卫** — 提交频率限制（10s/429）、语言白名单（cpp/c/python）、代码长度校验、`/submissions` 权限漏洞修复（非管理员强制 userId=self）
+- **前端状态守卫** — 未开始/已结束（不允许逾期）时提交按钮禁用 + 状态横幅；ProblemTimer `assignmentEndedRef` 边界控制
+- **AI 工作台重构** — `lib/ai/service.ts` 拆分为 8 个文件、`lib/ai/queue.ts` 拆分为 10 个文件；新增 4 个功能 tab（智能出题/题目分析/元数据建议/测试数据生成）与 `AiTaskResultViewer` 轮询组件
+- **难度系统统一** — 全站对齐洛谷 8 级标准（入门/普及-/普及/普及+/提高/提高+/省选/NOI），`getDifficultyColor` 单一来源
+- **题单功能调整** — 移除个人题单创建（仅管理员可创建），恢复"我的收藏"分类（`joinedOnly` 过滤）
+- **后台 UI 规范化** — 移除重复页面标题（H1）；统一操作工具栏（左描述右按钮）；FilterBar 合并搜索框与操作按钮
+- **REMOVED 提交状态** — 作业移除题目时孤儿提交标记为 `removed`（终态，不再计入统计但保留记录）
+- **stale 任务重置** — 服务启动时 `resetStaleTasksOnStartup` 将遗留 PENDING/PROCESSING 任务标记为 FAILED
 
 ### 2026/07（安全加固与冗余清理）
 

@@ -164,7 +164,6 @@ export default function RankPage() {
   return (
   <EducationalPageShell
   title="全站排行榜"
-  description="每 30 秒更新一次"
   icon={Trophy}
   iconClassName="bg-accent text-white"
   actions={

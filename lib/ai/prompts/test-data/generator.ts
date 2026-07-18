@@ -1,6 +1,9 @@
 
-import { GenerationMode, TestDataGenContext, PromptGenerator, PromptResult } from '../core/types';
+import type { TestDataGenContext, PromptGenerator, PromptResult } from '../core/types';
+import { GenerationMode } from '../core/types';
 import { TEST_DATA_QUALITY_GATES, THINKING_STEP_FRAME, renderTestCaseDimensions } from '../core/quality-gates';
+// Task 40.5：复用共享段（json-output-spec）
+import { JSON_OUTPUT_SPEC } from '../shared/json-output-spec';
 
 export class TestDataGenPromptGenerator implements PromptGenerator {
   generate(context: TestDataGenContext): PromptResult {
@@ -79,10 +82,7 @@ ${TEST_DATA_QUALITY_GATES.map(g => `- ${g}`).join('\n')}
 仅返回一个 JSON 对象：
 ${exampleJson}
 
-注意：
-- 字符串中的换行必须用 \\n 转义（不要写裸换行）
-- 不要添加任何 markdown 标记（\`\`\`json 等）
-- 不要在 JSON 外添加任何解释文字`;
+${JSON_OUTPUT_SPEC}`;
 
     return {
       systemPrompt,

@@ -10,11 +10,12 @@ import { ensureTotalScoreIs100, redistributeTestScores } from '@/lib/problem/tes
 import { trimAll, escapeHtml } from '@/lib/sanitize'
 import { ApiError } from '@/lib/api/withApi'
 import type { TestCaseInput } from '@/types/api'
+import { DIFFICULTIES, isValidDifficulty, migrateDifficulty, type Difficulty } from '@/lib/constants'
 
 export interface ProblemListFilter {
   keyword?: string
   tagIds?: string[]
-  difficulty?: 'easy' | 'medium' | 'hard'
+  difficulty?: Difficulty
   isPublic?: boolean
   categoryId?: string
 }
@@ -344,7 +345,11 @@ export async function listProblemSubmissionsMerged(
  * 管理员视角：列出全部题目（含隐藏字段）/ 创建题目（含自动编号）
  * ========================================================================== */
 
-export async function listAllProblemsForAdmin(opts?: { page?: number; pageSize?: number }) {
+export async function listAllProblemsForAdmin(opts?: {
+  page?: number
+  pageSize?: number
+  q?: string
+}) {
   const page = opts?.page
   const pageSize = opts?.pageSize
   const usePaging =
@@ -352,8 +357,23 @@ export async function listAllProblemsForAdmin(opts?: { page?: number; pageSize?:
   // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
   const take = usePaging ? (pageSize as number) : 500
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
+
+  // q 关键字模糊匹配题号 / 标题（不区分大小写）
+  // - "P1000" / "1000" / 标题片段均能匹配
+  // - 模糊查询时强制分页，避免无 q 时一次性返回全表
+  const q = opts?.q?.trim()
+  const where = q
+    ? {
+        OR: [
+          { problemNumber: { contains: q, mode: 'insensitive' as const } },
+          { title: { contains: q, mode: 'insensitive' as const } },
+        ],
+      }
+    : {}
+
   const [data, total] = await Promise.all([
     prisma.problem.findMany({
+      where,
       skip,
       take,
       orderBy: [{ problemNumber: 'asc' }, { createdAt: 'desc' }],
@@ -378,7 +398,7 @@ export async function listAllProblemsForAdmin(opts?: { page?: number; pageSize?:
         aiStatus: true,
       },
     }),
-    prisma.problem.count(),
+    prisma.problem.count({ where }),
   ])
   return {
     data,
@@ -478,8 +498,19 @@ export async function createAdminProblem(
   if (typeof description !== 'string' || description.length < 10) {
     throw new ApiError('INVALID_DESCRIPTION', '题目描述至少需要10个字符', 400)
   }
-  if (!['简单', '中等', '困难', '入门'].includes(difficulty as string)) {
-    throw new ApiError('INVALID_DIFFICULTY', '难度值无效，必须是：入门、简单、中等、困难', 400)
+  // 难度校验：统一使用洛谷 8 档标准（lib/constants.ts）
+  // - 合法 8 档直接通过
+  // - 旧版 4 档（简单/中等/困难）或英文值自动迁移为 8 档标准
+  // - 完全无法识别的值拒绝
+  if (!isValidDifficulty(difficulty)) {
+    // 尝试旧版迁移；若仍不是合法 8 档则拒绝
+    if (!isValidDifficulty(migrateDifficulty(difficulty))) {
+      throw new ApiError(
+        'INVALID_DIFFICULTY',
+        `难度值无效，必须是 8 档之一：${DIFFICULTIES.join(' / ')}（旧版简单/中等/困难将自动迁移）`,
+        400
+      )
+    }
   }
   if (timeLimit !== undefined && timeLimit !== null) {
     const t = parseLimit(timeLimit, 1000)
@@ -791,7 +822,8 @@ export type BatchProblemAction = 'visibility' | 'difficulty' | 'delete'
 export type BatchProblemVisibility = 'public' | 'private' | 'contest'
 
 const VALID_VISIBILITY: BatchProblemVisibility[] = ['public', 'private', 'contest']
-const VALID_DIFFICULTY = ['简单', '中等', '困难']
+// 批量修改难度允许 8 档 + 兼容旧版 4 档（自动迁移）
+const VALID_DIFFICULTY_BATCH = [...DIFFICULTIES] as readonly string[]
 
 /**
  * 批量修改题目可见性
@@ -890,8 +922,9 @@ export function validateBatchProblemInput(input: {
       return { action, problemIds, visibility: visibility as BatchProblemVisibility }
     }
     case 'difficulty': {
-      if (!difficulty || !VALID_DIFFICULTY.includes(difficulty)) {
-        throw new ApiError('INVALID_DIFFICULTY', '无效的难度', 400)
+      // 统一使用 8 档标准，旧版 4 档自动迁移
+      if (!difficulty || (!VALID_DIFFICULTY_BATCH.includes(difficulty) && !isValidDifficulty(migrateDifficulty(difficulty)))) {
+        throw new ApiError('INVALID_DIFFICULTY', `难度值无效，必须是 8 档之一：${DIFFICULTIES.join(' / ')}（旧版简单/中等/困难将自动迁移）`, 400)
       }
       return { action, problemIds, difficulty }
     }

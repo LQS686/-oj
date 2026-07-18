@@ -39,6 +39,8 @@ export const SubmissionStatus = {
   CHECKER_SPECIAL_PROBLEM: 'CSP',
   /** 系统错误（评测队列失败、容器异常等） */
   SYSTEM_ERROR: 'SE',
+  /** 已移除（作业修改 problemIds 时，被移除题目的孤儿提交标记；终态，不再计入统计但保留记录） */
+  REMOVED: 'removed',
 } as const
 
 export type SubmissionStatusValue = (typeof SubmissionStatus)[keyof typeof SubmissionStatus]
@@ -65,7 +67,7 @@ export function assertSubmissionStatus(value: unknown): SubmissionStatusValue {
 
 /** 状态机：从当前状态推断允许的下一状态（防御非法转换） */
 const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
-  PENDING: new Set([SubmissionStatus.JUDGING, SubmissionStatus.RUNNING, SubmissionStatus.SYSTEM_ERROR]),
+  PENDING: new Set([SubmissionStatus.JUDGING, SubmissionStatus.RUNNING, SubmissionStatus.SYSTEM_ERROR, SubmissionStatus.REMOVED]),
   JUDGING: new Set([
     SubmissionStatus.RUNNING,
     SubmissionStatus.ACCEPTED,
@@ -79,6 +81,7 @@ const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
     SubmissionStatus.PARTLY_CORRECT,
     SubmissionStatus.CHECKER_SPECIAL_PROBLEM,
     SubmissionStatus.SYSTEM_ERROR,
+    SubmissionStatus.REMOVED,
   ]),
   RUNNING: new Set([
     SubmissionStatus.ACCEPTED,
@@ -91,6 +94,7 @@ const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
     SubmissionStatus.PARTLY_CORRECT,
     SubmissionStatus.CHECKER_SPECIAL_PROBLEM,
     SubmissionStatus.SYSTEM_ERROR,
+    SubmissionStatus.REMOVED,
   ]),
   // 终态：除 SystemError（管理员强制覆盖）外，禁止任何转换
   [SubmissionStatus.ACCEPTED]: new Set([SubmissionStatus.SYSTEM_ERROR]),
@@ -103,6 +107,8 @@ const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
   [SubmissionStatus.PRESENTATION_ERROR]: new Set([SubmissionStatus.SYSTEM_ERROR]),
   [SubmissionStatus.PARTLY_CORRECT]: new Set([SubmissionStatus.SYSTEM_ERROR]),
   [SubmissionStatus.CHECKER_SPECIAL_PROBLEM]: new Set([SubmissionStatus.SYSTEM_ERROR]),
+  // REMOVED：严格终态，不允许转出到任何状态（孤儿提交保留记录但不再参与统计/评测）
+  [SubmissionStatus.REMOVED]: new Set([]),
 }
 
 export function canTransition_REMOVED(from: string, to: string): boolean {
@@ -140,6 +146,7 @@ const LEGACY_TO_ENUM: Record<string, string> = {
   PARTLY_CORRECT: 'PC',
   CHECKER_SPECIAL_PROBLEM: 'CSP',
   SYSTEM_ERROR: 'SE',
+  REMOVED: 'removed',
 }
 
 /**

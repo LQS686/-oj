@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
-import { FileText, Plus, Edit, Trash2, Eye, EyeOff, Search, Trophy, Database, Loader2, History, ChevronDown, Check } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, EyeOff, Search, Trophy, Database, Loader2, History, ChevronDown, Check } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
 import { getDifficultyColor } from '@/lib/status'
 import { formatDate, formatDateTime } from '@/lib/utils'
@@ -482,28 +482,7 @@ export default function AdminProblemsPage() {
  return (
  <>
  <div className="space-y-6">
- <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-xl flex items-center justify-center"
- style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
- <FileText className="w-5 h-5 text-white" />
- </div>
- <div>
- <h1 className="text-2xl font-bold text-foreground">题目管理</h1>
- <p className="text-sm text-muted-foreground">管理和编辑题目库</p>
- </div>
- </div>
- <div className="flex gap-3">
- <button
- onClick={() => router.push('/admin/problems/create')}
- className="btn btn-primary flex items-center gap-2"
- >
- <Plus className="w-5 h-5" />
- 创建题目
- </button>
- </div>
- </div>
-
+ <div className="flex items-center justify-between gap-4 flex-wrap">
  <div className="flex gap-1 p-1 rounded-lg bg-muted w-fit">
  <button
  onClick={() => setActiveTab('list')}
@@ -520,6 +499,14 @@ export default function AdminProblemsPage() {
  }`}
  >
  来源日志
+ </button>
+ </div>
+ <button
+ onClick={() => router.push('/admin/problems/create')}
+ className="btn btn-primary flex items-center gap-2 ml-auto"
+ >
+ <Plus className="w-5 h-5" />
+ 创建题目
  </button>
  </div>
 

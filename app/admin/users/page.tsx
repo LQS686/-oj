@@ -6,7 +6,7 @@ import { DataTable, FilterBar, type Column } from '@/components/admin'
 import { fetchWithAuth } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { isSystemAdmin } from '@/lib/permissions'
-import { Users, Search, Shield, User, Mail, Calendar, MoreHorizontal, Edit, Trash2, ShieldCheck, ShieldOff, UserPlus, Upload, X, Plus, CheckSquare, Square, FileText, AlertCircle, CheckCircle, Loader2, Download, KeyRound, TrendingUp } from 'lucide-react'
+import { Search, Shield, User, Mail, Calendar, MoreHorizontal, Edit, Trash2, ShieldCheck, ShieldOff, UserPlus, Upload, X, Plus, CheckSquare, Square, FileText, AlertCircle, CheckCircle, Loader2, Download, KeyRound, TrendingUp } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 /**
@@ -639,26 +639,7 @@ export default function AdminUsersPage() {
  return (
  <>
  <div className="space-y-6">
- <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-xl flex items-center justify-center"
- style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
- <Users className="w-5 h-5 text-white" />
- </div>
- <div>
- <h1 className="text-2xl font-bold text-foreground">用户管理</h1>
- <p className="text-sm text-muted-foreground">管理系统用户和权限</p>
- </div>
- </div>
- <button
- onClick={() => setShowBatchRegisterModal(true)}
- className="btn btn-primary flex items-center gap-2"
- >
- <UserPlus className="w-4 h-4" />
- 批量注册
- </button>
- </div>
-
+ {/* 统计卡片 */}
  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
  <div className="card p-4">
  <div className="text-muted-foreground text-sm">总用户数</div>
@@ -735,6 +716,13 @@ export default function AdminUsersPage() {
  </button>
  ))}
  </div>
+ <button
+ onClick={() => setShowBatchRegisterModal(true)}
+ className="btn btn-primary flex items-center gap-2 ml-auto"
+ >
+ <UserPlus className="w-4 h-4" />
+ 批量注册
+ </button>
  </FilterBar>
 
  <DataTable

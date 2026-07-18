@@ -367,7 +367,6 @@ export default function ProblemsPage() {
     <>
       <EducationalPageShell
         title="题库"
-        description={`共 ${totalProblems} 道题目`}
         icon={BookOpen}
         toolbar={
           <div className="card-static rounded-lg border border-border p-2 relative z-10">

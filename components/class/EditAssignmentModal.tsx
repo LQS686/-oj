@@ -12,6 +12,8 @@ interface Assignment {
   description: string
   startTime: string
   endTime: string
+  allowLateSubmission?: boolean
+  status?: 'upcoming' | 'active' | 'ended'
   problems: ProblemPickItem[]
 }
 
@@ -64,7 +66,9 @@ export default function EditAssignmentModal({
     description: '',
     startTime: '',
     endTime: '',
+    allowLateSubmission: false,
   })
+  const [assignmentStatus, setAssignmentStatus] = useState<'upcoming' | 'active' | 'ended' | null>(null)
 
   const loadAssignment = useCallback(async () => {
     if (!assignmentId) return
@@ -83,7 +87,9 @@ export default function EditAssignmentModal({
         description: assignment.description || '',
         startTime: formatDateForInput(assignment.startTime),
         endTime: formatDateForInput(assignment.endTime),
+        allowLateSubmission: !!assignment.allowLateSubmission,
       })
+      setAssignmentStatus(assignment.status ?? null)
       setSelectedProblems(assignment.problems.map((p) => p.id))
       setProblems(allProblems)
     } catch (err: unknown) {
@@ -147,8 +153,8 @@ export default function EditAssignmentModal({
           description: formData.description,
           startTime: formData.startTime ? new Date(formData.startTime) : undefined,
           endTime,
-          deadline: endTime,
           problemIds: selectedProblems,
+          allowLateSubmission: formData.allowLateSubmission,
         }),
       })
       const data = await response.json()
@@ -196,7 +202,7 @@ export default function EditAssignmentModal({
       role="presentation"
     >
       <div
-        className="card-static rounded-xl w-full max-w-2xl h-[min(780px,calc(100dvh-2rem))] flex flex-col shadow-xl border border-border overflow-hidden"
+        className="card-static rounded-xl w-full max-w-2xl h-[80vh] flex flex-col shadow-xl border border-border overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -217,9 +223,26 @@ export default function EditAssignmentModal({
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="grid flex-1 min-h-0 overflow-hidden grid-rows-[auto_minmax(0,1fr)_auto_auto]"
+            className="flex-1 min-h-0 overflow-y-auto flex flex-col"
           >
-            <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60 min-h-0">
+            <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60">
+              {assignmentStatus && (
+                <div className={`rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${
+                  assignmentStatus === 'upcoming'
+                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                    : assignmentStatus === 'active'
+                    ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                    : 'border-orange-500/30 bg-orange-500/10 text-orange-400'
+                }`}>
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>
+                    当前状态：
+                    {assignmentStatus === 'upcoming' && '未开始（学生暂时无法提交）'}
+                    {assignmentStatus === 'active' && '进行中（学生可正常提交）'}
+                    {assignmentStatus === 'ended' && '已结束（题目列表已锁定，仅可修改标题/描述/时间）'}
+                  </span>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
                   作业标题 <span className="text-error">*</span>
@@ -264,10 +287,24 @@ export default function EditAssignmentModal({
                   />
                 </div>
               </div>
+              <label className="flex items-start gap-2.5 cursor-pointer rounded-lg border border-border bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={formData.allowLateSubmission}
+                  onChange={(e) => setFormData({ ...formData, allowLateSubmission: e.target.checked })}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-foreground">允许逾期提交</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    开启后，作业结束后学生仍可提交，但提交记录会被标记为「逾期」。
+                  </div>
+                </div>
+              </label>
             </div>
 
-            <div className="flex flex-col min-h-0 overflow-hidden px-5 py-3">
-              <label className="block text-sm font-medium text-foreground mb-2 shrink-0">
+            <div className="px-5 py-3">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 题目 <span className="text-error">*</span>
               </label>
               <AssignmentProblemPicker
@@ -278,7 +315,7 @@ export default function EditAssignmentModal({
               />
             </div>
 
-            <div className="shrink-0 px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
+            <div className="px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
               <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex gap-2 text-xs text-muted-foreground">
                 <AlertCircle className="w-4 h-4 shrink-0 text-primary mt-0.5" />
                 <span>按题号添加；可调整顺序后保存。</span>
@@ -288,7 +325,7 @@ export default function EditAssignmentModal({
               )}
             </div>
 
-            <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
+            <div className="flex gap-3 px-5 py-4 border-t border-border">
               <button type="submit" disabled={loading} className="btn btn-primary flex-1">
                 {loading ? '保存中...' : '保存修改'}
               </button>

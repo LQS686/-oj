@@ -1,24 +1,24 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
 import {
- Clock,
- CheckCircle2,
- Edit,
- Trash2,
- MoreHorizontal,
- FileText,
- BarChart3,
- Send,
- AlertCircle,
- FileCode,
+  Clock,
+  CheckCircle2,
+  Edit,
+  Trash2,
+  FileText,
+  BarChart3,
+  Send,
+  AlertCircle,
+  FileCode,
 } from 'lucide-react'
 import StudentCompletionTable from '@/components/StudentCompletionTable'
 import ProblemDescription from '@/components/problem/ProblemDescription'
+import ProblemTimer from '@/components/class/ProblemTimer'
 import { getDifficultyColor } from '@/lib/status'
 import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
@@ -53,6 +53,7 @@ interface Assignment {
  startTime: string
  endTime: string
  status: string
+ allowLateSubmission?: boolean
  problems: Problem[]
 }
 
@@ -63,6 +64,8 @@ interface Submission {
  status: string
  score: number
  submittedAt: string
+ /** 作业维度做题用时（毫秒），仅 AC 时有意义 */
+ timeElapsedMs?: number
 }
 
 interface ClassMember {
@@ -78,6 +81,7 @@ export default function AssignmentDetailPage() {
  const params = useParams()
  const classId = params.id as string
  const router = useRouter()
+ const searchParams = useSearchParams()
  const { user } = useUser()
  const { classData } = useClass(classId)
  const [assignment, setAssignment] = useState<Assignment | null>(null)
@@ -87,11 +91,12 @@ export default function AssignmentDetailPage() {
  const [allSubmissions, setAllSubmissions] = useState<Submission[]>([])
  const [classMembers, setClassMembers] = useState<ClassMember[]>([])
  const [userRole, setUserRole] = useState<string>('student')
- const [showActions, setShowActions] = useState(false)
- const [editOpen, setEditOpen] = useState(false)
+const [editOpen, setEditOpen] = useState(false)
  const [canManage, setCanManage] = useState(false)
 
- const [activeTab, setActiveTab] = useState<'problems' | 'completion'>('problems')
+ // 初始 tab 由 ?tab= 参数控制（默认 problems）；学生访问 completion 时回退到 problems
+ const initialTab = searchParams.get('tab') === 'completion' ? 'completion' : 'problems'
+ const [activeTab, setActiveTab] = useState<'problems' | 'completion'>(initialTab)
  const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
  const [problemDetail, setProblemDetail] = useState<any>(null)
  const [problemLoading, setProblemLoading] = useState(false)
@@ -203,8 +208,19 @@ export default function AssignmentDetailPage() {
  }, [selectedProblemIndex, assignment?.problems, activeTab, fetchProblemDetail])
 
  useEffect(() => {
+ // 清理本作业历史草稿（localStorage 不支持 glob，需遍历 keys 匹配前缀）
  if (typeof window !== 'undefined') {
- localStorage.removeItem(`code_class_${params.id}_${params.assignmentId}_*`)
+   const prefix = `code_class_${params.id}_${params.assignmentId}_`
+   try {
+     const keysToRemove: string[] = []
+     for (let i = 0; i < localStorage.length; i++) {
+       const key = localStorage.key(i)
+       if (key && key.startsWith(prefix)) keysToRemove.push(key)
+     }
+     keysToRemove.forEach((k) => localStorage.removeItem(k))
+   } catch {
+     // 隐私模式或 localStorage 被禁用时忽略
+   }
  }
  }, [params.id, params.assignmentId])
 
@@ -269,6 +285,7 @@ export default function AssignmentDetailPage() {
  totalTests: data.totalTests || 0,
  message: data.message,
  testResults: data.testResults,
+ timeElapsedMs: data.timeElapsedMs,
  })
  setJudgeStatus({
  submissionId: data.id,
@@ -338,6 +355,9 @@ export default function AssignmentDetailPage() {
  }
  if (!code.trim() || code.trim().length < 10) return
  if (!assignment?.problems?.[selectedProblemIndex]) return
+ // 作业状态守卫：upcoming/ended(无 allowLateSubmission) 禁止提交
+ if (assignment.status === 'upcoming') return
+ if (assignment.status === 'ended' && !assignment.allowLateSubmission) return
  // 防重复提交：用 ref 同步守卫，避免 React state 异步更新间隙双击绕过 disabled
  if (submittingRef.current || submitCooldown) return
  submittingRef.current = true
@@ -365,15 +385,39 @@ export default function AssignmentDetailPage() {
  currentSubmissionIdRef.current = data.submissionId
  setCurrentSubmissionId(data.submissionId)
  } else {
- submittingRef.current = false
- setSubmitting(false)
- setTimeout(() => setSubmitCooldown(false), 3000)
+   submittingRef.current = false
+   setSubmitting(false)
+   // 后端返回 429 (SUBMIT_TOO_FREQUENT) 时，冷却时间延长到 10 秒以匹配限流窗口
+   const cooldownMs = data.code === 'SUBMIT_TOO_FREQUENT' ? 10000 : 3000
+   setTimeout(() => setSubmitCooldown(false), cooldownMs)
  }
  } catch (error) {
  submittingRef.current = false
  setSubmitting(false)
  setTimeout(() => setSubmitCooldown(false), 3000)
  }
+ }
+
+ const handleDeleteAssignment = async () => {
+   if (!assignment) return
+   if (!confirm('确定要删除这个作业吗？此操作不可恢复，所有提交记录将被清除。')) return
+   try {
+     setLoading(true)
+     const response = await fetchWithAuth(
+       `/api/classes/${params.id}/assignments/${params.assignmentId}`,
+       { method: 'DELETE' }
+     )
+     const data = await response.json()
+     if (data.success) {
+       router.push(`/classes/${params.id}?tab=assignments`)
+     } else {
+       setError(data.error || data.message || '删除失败')
+     }
+   } catch (err) {
+     setError('删除失败，请重试')
+   } finally {
+     setLoading(false)
+   }
  }
 
  const getProblemStatus = (problemId: string) => {
@@ -453,27 +497,13 @@ export default function AssignmentDetailPage() {
  >
  <Edit className="w-4 h-4" /> 编辑
  </button>
- <div className="relative">
  <button
  type="button"
- onClick={() => setShowActions(!showActions)}
- className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
- onBlur={() => setTimeout(() => setShowActions(false), 150)}
- aria-label="更多操作"
- >
- <MoreHorizontal className="w-5 h-5" />
- </button>
- {showActions && (
- <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 py-1 min-w-[100px]">
- <button
- type="button"
- className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted text-error transition-colors"
+ onClick={handleDeleteAssignment}
+ className="btn btn-ghost btn-sm border border-error/30 text-error inline-flex items-center gap-1.5 hover:bg-error/10"
  >
  <Trash2 className="w-4 h-4" /> 删除
  </button>
- </div>
- )}
- </div>
  </div>
  )}
  </div>
@@ -591,6 +621,16 @@ export default function AssignmentDetailPage() {
  ) : (
  <span className="text-xs text-muted-foreground/60">未提交</span>
  )}
+ {selectedProblem && (
+ <ProblemTimer
+ key={`${assignment?.id}-${selectedProblem.id}`}
+ classId={classId}
+ assignmentId={params.assignmentId as string}
+ problemId={selectedProblem.id}
+ acHint={selectedProblemStatus?.status === 'AC'}
+ assignmentEndTime={assignment.endTime}
+ />
+ )}
  </div>
  </div>
 
@@ -607,14 +647,32 @@ export default function AssignmentDetailPage() {
  </div>
 
  <div className="px-5 pb-5 space-y-3">
- {!user && (
- <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
- <AlertCircle className="w-4 h-4 shrink-0" />
- 请先登录后再提交代码
- </div>
- )}
+{!user && (
+  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
+    <AlertCircle className="w-4 h-4 shrink-0" />
+    请先登录后再提交代码
+  </div>
+)}
+{user && assignment.status === 'upcoming' && (
+  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm flex items-center gap-2">
+    <AlertCircle className="w-4 h-4 shrink-0" />
+    作业尚未开始，{assignment.startTime ? `将在 ${formatDateTime(assignment.startTime)} 开放提交` : '暂不可提交'}
+  </div>
+)}
+{user && assignment.status === 'ended' && !assignment.allowLateSubmission && (
+  <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm flex items-center gap-2">
+    <AlertCircle className="w-4 h-4 shrink-0" />
+    作业已结束，不再接受新提交
+  </div>
+)}
+{user && assignment.status === 'ended' && assignment.allowLateSubmission && (
+  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
+    <AlertCircle className="w-4 h-4 shrink-0" />
+    作业已结束（允许逾期提交，分数会被标记为逾期）
+  </div>
+)}
 
- <div className="flex items-center justify-between gap-4">
+<div className="flex items-center justify-between gap-4">
  <label className="text-sm font-medium text-foreground whitespace-nowrap">语言</label>
  <select
  value={language}
@@ -643,9 +701,11 @@ export default function AssignmentDetailPage() {
  <div className="flex items-center gap-3 pt-1">
  <button
  onClick={handleSubmit}
- disabled={submitting || submitCooldown || !user}
+ disabled={submitting || submitCooldown || !user || assignment.status === 'upcoming' || (assignment.status === 'ended' && !assignment.allowLateSubmission)}
  title={
  !user ? '请先登录' :
+ assignment.status === 'upcoming' ? '作业尚未开始' :
+ assignment.status === 'ended' && !assignment.allowLateSubmission ? '作业已结束' :
  submitting ? '正在评测中...' :
  submitCooldown ? '请稍后再试' : ''
  }
@@ -665,6 +725,16 @@ export default function AssignmentDetailPage() {
  <>
  <Send className="w-4 h-4" />
  请先登录
+ </>
+ ) : assignment.status === 'upcoming' ? (
+ <>
+ <Clock className="w-4 h-4" />
+ 未开始
+ </>
+ ) : assignment.status === 'ended' && !assignment.allowLateSubmission ? (
+ <>
+ <Clock className="w-4 h-4" />
+ 已结束
  </>
  ) : (
  <>
@@ -705,6 +775,7 @@ export default function AssignmentDetailPage() {
  const submissionsMap: Record<string, any> = {}
  let totalScore = 0
  let completedCount = 0
+ let totalTimeMs = 0
 
  memberSubs.forEach(sub => {
  const existing = submissionsMap[sub.problemId]
@@ -713,14 +784,19 @@ export default function AssignmentDetailPage() {
  problemId: sub.problemId,
  status: sub.status,
  score: sub.score || 0,
- submittedAt: sub.submittedAt
+ submittedAt: sub.submittedAt,
+ timeElapsedMs: sub.timeElapsedMs || 0,
  }
  }
  })
 
  Object.values(submissionsMap).forEach((sub: any) => {
  totalScore += sub.score || 0
- if (sub.status === 'AC') completedCount++
+ if (sub.status === 'AC') {
+ completedCount++
+ // 仅累加 AC 题目的做题用时
+ totalTimeMs += typeof sub.timeElapsedMs === 'number' ? sub.timeElapsedMs : 0
+ }
  })
 
  return {
@@ -729,7 +805,8 @@ export default function AssignmentDetailPage() {
  avatar: member.avatar || '',
  submissions: submissionsMap,
  totalScore,
- completedCount
+ completedCount,
+ totalTimeMs,
  }
  })}
  problems={assignment.problems || []}

@@ -20,6 +20,18 @@ export interface DashboardAiToday {
   totalTokens: number
 }
 
+/** Task 35.2：AI 成本聚合（今日 / 本月） */
+export interface DashboardAiCost {
+  /** 今日预估成本（estimatedCost 之和） */
+  todayCost: number
+  /** 本月预估成本（estimatedCost 之和） */
+  monthCost: number
+  /** 今日任务数（含无成本的任务） */
+  todayTaskCount: number
+  /** 本月任务数 */
+  monthTaskCount: number
+}
+
 export interface DashboardData {
   totalUsers: number
   totalProblems: number
@@ -29,6 +41,8 @@ export interface DashboardData {
   submissionGrowth: number
   recentSubmissions: DashboardRecentSubmission[]
   aiToday: DashboardAiToday
+  /** Task 35.2：AI 成本聚合 */
+  aiCost: DashboardAiCost
 }
 
 /**
@@ -86,6 +100,8 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
   today.setHours(0, 0, 0, 0)
   const lastWeek = new Date(now)
   lastWeek.setDate(lastWeek.getDate() - 7)
+  // Task 35.2：本月起始时间（1 号 0 点）
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
   const [
     todaySubmissions,
@@ -96,6 +112,11 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
     aiCompleted,
     aiFailed,
     aiTokensAgg,
+    // Task 35.2：AI 成本聚合（今日 / 本月）
+    aiTodayCostAgg,
+    aiMonthCostAgg,
+    aiTodayCount,
+    aiMonthCount,
   ] = await Promise.all([
     prisma.submission.count({ where: { submittedAt: { gte: today } } }),
     prisma.user.count({ where: { createdAt: { gte: lastWeek } } }),
@@ -108,6 +129,18 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
       where: { createdAt: { gte: today } },
       _sum: { tokensUsed: true },
     }),
+    // Task 35.2：今日成本聚合
+    prisma.aiGenerationLog.aggregate({
+      where: { createdAt: { gte: today } },
+      _sum: { estimatedCost: true },
+    }),
+    // Task 35.2：本月成本聚合
+    prisma.aiGenerationLog.aggregate({
+      where: { createdAt: { gte: monthStart } },
+      _sum: { estimatedCost: true },
+    }),
+    prisma.aiGenerationLog.count({ where: { createdAt: { gte: today } } }),
+    prisma.aiGenerationLog.count({ where: { createdAt: { gte: monthStart } } }),
   ])
 
   const userGrowth = totalUsers > 0 ? Number(((newUsersThisWeek / totalUsers) * 100).toFixed(1)) : 0
@@ -122,6 +155,14 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
     totalTokens: aiTokensAgg._sum.tokensUsed ?? 0,
   }
 
+  // Task 35.2：AI 成本聚合结果
+  const aiCost: DashboardAiCost = {
+    todayCost: Number(aiTodayCostAgg._sum.estimatedCost ?? 0),
+    monthCost: Number(aiMonthCostAgg._sum.estimatedCost ?? 0),
+    todayTaskCount: aiTodayCount,
+    monthTaskCount: aiMonthCount,
+  }
+
   return {
     totalUsers,
     totalProblems,
@@ -131,5 +172,68 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
     submissionGrowth,
     recentSubmissions,
     aiToday,
+    aiCost,
   }
+}
+
+/**
+ * Task 35.2：AI 成本按用户分组聚合（供监控页 detailed 视图使用）
+ *
+ * 返回今日 / 本月内每个用户的 AI 任务成本（按 estimatedCost 降序）。
+ * 仅返回有 estimatedCost 记录的用户。
+ */
+export async function getAiCostByUser(opts: {
+  since?: Date
+  limit?: number
+}): Promise<Array<{
+  userId: string
+  username: string
+  taskCount: number
+  totalCost: number
+  totalTokens: number
+}>> {
+  const since = opts.since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const limit = Math.min(opts.limit ?? 20, 100)
+
+  const logs = await prisma.aiGenerationLog.findMany({
+    where: {
+      createdAt: { gte: since },
+      estimatedCost: { not: null },
+    },
+    select: {
+      userId: true,
+      estimatedCost: true,
+      tokensUsed: true,
+    },
+    take: 1000,
+  })
+
+  // 按 userId 聚合
+  const stats = new Map<string, { taskCount: number; totalCost: number; totalTokens: number }>()
+  for (const log of logs) {
+    const entry = stats.get(log.userId) || { taskCount: 0, totalCost: 0, totalTokens: 0 }
+    entry.taskCount++
+    entry.totalCost += Number(log.estimatedCost ?? 0)
+    entry.totalTokens += log.tokensUsed
+    stats.set(log.userId, entry)
+  }
+
+  // 查用户名
+  const userIds = Array.from(stats.keys())
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, username: true, nickname: true },
+  })
+  const userMap = new Map(users.map(u => [u.id, u]))
+
+  return Array.from(stats.entries())
+    .map(([userId, s]) => ({
+      userId,
+      username: userMap.get(userId)?.nickname || userMap.get(userId)?.username || '未知用户',
+      taskCount: s.taskCount,
+      totalCost: Number(s.totalCost.toFixed(6)),
+      totalTokens: s.totalTokens,
+    }))
+    .sort((a, b) => b.totalCost - a.totalCost)
+    .slice(0, limit)
 }
