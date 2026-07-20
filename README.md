@@ -41,9 +41,14 @@
 
 ### 其他功能
 
-- **竞赛模式** — ACM/OI 赛制，实时榜单，赛题管理
+- **代码编辑器** — 集成 Monaco Editor，支持 C++/C/Java/Python/JavaScript 等多语言高亮与自动补全
+- **题目预测试** — 提交前自定义测试用例快速验证（`/api/problems/[id]/pretest` + `PretestPanel`）
+- **题目统计** — 提交分布、AC 率、难度通过率等多维统计（`/api/problems/[id]/stats` + `ProblemStatsPanel`）
+- **随机一题** — 训练模式推荐题目（`/api/problems/random`）
+- **竞赛模式** — ACM/OI 赛制，实时榜单，赛题管理、解封
 - **训练题单** — 官方 / 竞赛真题 / 我的收藏分类（个人创建已移除，仅管理员可创建）
-- **社区讨论** — 题解评论、帖子发布
+- **题目导入导出** — 支持 DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces 同步格式
+- **用户热力图** — 用户主页展示一年提交活跃度（`SubmissionHeatmap`）
 - **响应式设计** — 移动端 Drawer 抽屉菜单适配
 - **Docker 部署** — 一键部署，MongoDB 副本集 + Redis 缓存 + Nginx 反代
 
@@ -198,17 +203,19 @@ dashan-oj/
 │   ├── api/                      # withApi（统一封装）、handler（鉴权缓存）、response、validation
 │   ├── auth/                     # 认证服务（JWT、httpOnly Cookie、tokenVersion）
 │   ├── permissions.ts            # 4 级角色权限单一来源（canAccessAdmin 等）
-│   ├── judge/                    # 评测机（Docker 沙箱 + Windows 告警）
+│   ├── judge/                    # 评测机（compiler/executor-core/docker/pretest/process-stats）
 │   ├── class/、problem/、submission/、contest/、training/、solution/
+│   ├── mongodb/                  # MongoDB 直接访问层（client/contest-direct/submission-direct/...）
+│   ├── security/                 # safe-fetch 等通用安全工具
 │   ├── cache.ts                  # 业务层缓存
 │   ├── crypto.ts                 # 通用加密（SMTP 授权码等敏感配置）
 │   ├── upload.ts                 # 文件上传 + 魔数校验
 │   └── prisma.ts
 ├── prisma/schema.prisma          # 38 个模型；已移除 Points* 与 ClassInvite
 ├── hooks/、contexts/             # UserContext、SettingsContext、SWR Provider
-├── tests/                        # vitest 测试（91 用例）
+├── tests/                        # vitest 测试
 ├── scripts/                      # 部署与维护脚本
-└── summary-report.html           # 项目审查报告（交互式 HTML）
+└── docs/                         # 部署 / 命名规范 / 角色体系文档
 ```
 
 ### 业务层调用链
@@ -228,6 +235,20 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 - **清理入口** — `lib/user/service.ts` 的 `clearUserCache` 统一调用 `clearAuthUserCache`（鉴权层）+ 业务缓存
 
 ## 更新日志
+
+### 2026/07（题目功能扩展 + AI 模块下线）
+
+- **代码编辑器** — 新增 [components/code-editor/CodeEditor.tsx](file:///e:/桌面/dsoj/components/code-editor/CodeEditor.tsx)，基于 Monaco Editor，支持多语言高亮与自动补全
+- **题目预测试** — [app/api/problems/[id]/pretest/route.ts](file:///e:/桌面/dsoj/app/api/problems/%5Bid%5D/pretest/route.ts) + [components/problem/PretestPanel.tsx](file:///e:/桌面/dsoj/components/problem/PretestPanel.tsx)，提交前自定义测试用例验证
+- **题目统计** — [app/api/problems/[id]/stats/route.ts](file:///e:/桌面/dsoj/app/api/problems/%5Bid%5D/stats/route.ts) + [ProblemStatsPanel](file:///e:/桌面/dsoj/components/problem/ProblemStatsPanel.tsx)
+- **随机一题** — [app/api/problems/random/route.ts](file:///e:/桌面/dsoj/app/api/problems/random/route.ts) 为训练/刷题模式推荐题目
+- **竞赛解封** — [app/api/admin/contests/[id]/unseal/route.ts](file:///e:/桌面/dsoj/app/api/admin/contests/%5Bid%5D/unseal/route.ts)
+- **题目导入** — [lib/problem/import/](file:///e:/桌面/dsoj/lib/problem/import/) 支持 DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces 六种格式
+- **题目导出** — [lib/problem/export/dsoj-exporter.ts](file:///e:/桌面/dsoj/lib/problem/export/dsoj-exporter.ts)
+- **用户热力图** — [components/user/SubmissionHeatmap.tsx](file:///e:/桌面/dsoj/components/user/SubmissionHeatmap.tsx)
+- **SSRF 防护** — 抽出通用 [lib/security/safe-fetch.ts](file:///e:/桌面/dsoj/lib/security/safe-fetch.ts)，被评测子系统复用
+- **大规模模块拆分** — `lib/class`、`lib/contest`、`lib/problem`、`lib/training`、`lib/user`、`lib/judge`、`lib/mongodb` 均按职责拆分为多个子模块（共 60+ 新文件），service.ts 单文件平均 < 200 行
+- **AI 模块下线** — 移除全部 AI 生成、提示词、队列、providers 模块与相关管理页面/API（净减少约 2.25 万行）
 
 ### 2026/07（班级作业审查优化 + UI 规范化）
 
