@@ -16,7 +16,7 @@ import {
 import { getDifficultyColor } from '@/lib/status'
 import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { EducationalPageShell, DenseListShell, denseListRowClass } from '@/components/common'
 
@@ -124,7 +124,7 @@ export default function ProblemsPage() {
       setLoadingStatus(true)
       const problemIds = problems.map(p => p.id).join(',')
 
-      const response = await fetchWithAuth(
+      const response = await fetchWithCookie(
         `/api/problems/status?problemIds=${problemIds}`
       )
       const data = await response.json()

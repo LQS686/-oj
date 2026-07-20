@@ -111,11 +111,6 @@ const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
   [SubmissionStatus.REMOVED]: new Set([]),
 }
 
-export function canTransition_REMOVED(from: string, to: string): boolean {
-  // 已被下方归一化版 canTransition 取代（保留空实现以防外部 import 报错）
-  return true
-}
-
 /**
  * 历史数据兼容性：早期代码用 'Pending'/'Judging' 大驼峰 + 'Accepted' 长文本，
  * 后期用 'PENDING'/'JUDGING' 大写下划线 + 'AC' 短码。
@@ -207,11 +202,26 @@ export function normalizeStatus(value: unknown): string {
 /**
  * 状态机转换校验（自动归一化两端）。
  *   输入 'Accepted' -> 'AC' 后再查表；'Pending' -> 'PENDING' 后查表。
+ *
+ * fail-closed 策略：
+ *   - 空源状态放行（recover / 首次创建场景，无源状态可校验）
+ *   - 非空未知源状态拒绝转换，防止新增枚举值未及时维护 ALLOWED_TRANSITIONS
+ *     时状态机保护形同虚设。
  */
 export function canTransition(from: string, to: string): boolean {
   const f = normalizeStatus(from) || from
   const t = normalizeStatus(to) || to
+  // 空源状态放行（recover / 首次创建场景）
+  if (!f) return true
   const allowed = ALLOWED_TRANSITIONS[f]
-  if (!allowed) return true
+  if (!allowed) {
+    // fail-closed：未知非空源状态拒绝任何转换，需显式登记到 ALLOWED_TRANSITIONS
+    if (typeof console !== 'undefined') {
+      console.warn(
+        `[submission-status] canTransition 拒绝未知源状态: from=${f}, to=${t}`
+      )
+    }
+    return false
+  }
   return allowed.has(t)
 }

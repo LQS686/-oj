@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { Search, Plus, BookOpen, AlertCircle, ArrowLeft, PlusCircle } from 'lucide-react'
 import { DIFFICULTIES, DIFFICULTY_COLORS, migrateDifficulty, type Difficulty } from '@/lib/constants'
 
@@ -57,7 +57,7 @@ export default function CreateClassProblemPage() {
  setSearchLoading(true)
  setError('')
 
- const response = await fetchWithAuth(`/api/problems?search=${encodeURIComponent(searchQuery)}&pageSize=20`)
+ const response = await fetchWithCookie(`/api/problems?search=${encodeURIComponent(searchQuery)}&pageSize=20`)
 
  const data = await response.json()
 
@@ -108,7 +108,7 @@ export default function CreateClassProblemPage() {
  memoryLimit: formData.memoryLimit
  }
 
- const response = await fetchWithAuth(`/api/classes/${params.id}/problems`, {
+ const response = await fetchWithCookie(`/api/classes/${params.id}/problems`, {
  method: 'POST',
  headers: {
  'Content-Type': 'application/json'

@@ -67,7 +67,7 @@ export async function deleteSolution(id: string) {
 
 /**
  * 清空题解详情缓存
- * （被 updateUserSolution / deleteUserSolution / toggleSolutionLike / 浏览数自增 等调用）
+ * （被 updateUserSolution / deleteUserSolution / 浏览数自增 等调用）
  */
 export function clearSolutionCache(id: string) {
   cache.delete(`solution:byId:${id}`)
@@ -89,7 +89,6 @@ const SOLUTION_LIST_SELECT = {
   title: true,
   codeLanguage: true,
   views: true,
-  likes: true,
   isOfficial: true,
   isAiGenerated: true,
   sourceType: true,
@@ -130,7 +129,7 @@ export async function loadSolutionViewUser(
 }
 
 /**
- * 题解列表（带权限校验 + 点赞状态）
+ * 题解列表（带权限校验）
  */
 export async function listSolutionsWithPermission(
   problemId: string,
@@ -141,7 +140,6 @@ export async function listSolutionsWithPermission(
 ) {
   const { canViewSolutions } = await import('./permissions')
   const { resolveProblemId } = await import('./problem-resolver')
-  const { getLikedSolutionIds } = await import('./like-helper')
 
   const realProblemId = await resolveProblemId(problemId)
   if (!realProblemId) return { found: false as const }
@@ -162,12 +160,10 @@ export async function listSolutionsWithPermission(
     prisma.solution.count({ where }),
   ])
 
-  const likedSet = await getLikedSolutionIds(viewer?.id, items.map((it: any) => it.id))
-  const itemsWithLiked = items.map((it: any) => ({ ...it, isLiked: likedSet.has(it.id) }))
   return {
     found: true as const,
     allowed: true,
-    items: itemsWithLiked,
+    items,
     total,
     page,
     pageSize,
@@ -225,7 +221,7 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
 }
 
 /**
- * 获取题解详情（含权限校验、isLiked、浏览 +1）
+ * 获取题解详情（含权限校验、浏览 +1）
  */
 export async function getSolutionDetailWithPermission(
   id: string,
@@ -235,7 +231,6 @@ export async function getSolutionDetailWithPermission(
   ip: string
 ) {
   const { canViewSolutions } = await import('./permissions')
-  const { isSolutionLiked } = await import('./like-helper')
   const { recordUniqueView } = await import('./view-helper')
   const { logger } = await import('@/lib/logger')
 
@@ -251,9 +246,6 @@ export async function getSolutionDetailWithPermission(
 
   const permission = await canViewSolutions(viewer, solution.problemId, { isAssignmentContext })
   if (!permission.allowed) return { found: true as const, allowed: false, permission }
-
-  // 查询当前用户是否已点赞
-  const liked = await isSolutionLiked(viewerUserId, id)
 
   // 浏览数 +1（按 userId/IP 去重）
   recordUniqueView(id, viewerUserId ?? null, ip)
@@ -273,7 +265,7 @@ export async function getSolutionDetailWithPermission(
   return {
     found: true as const,
     allowed: true,
-    solution: { ...solution, isLiked: liked },
+    solution,
     permission,
   }
 }
@@ -358,76 +350,10 @@ export async function deleteUserSolution(
   if (!isAuthor && !isAdmin && !isTeacher) {
     throw AppError.forbidden('无权删除此题解')
   }
-  // 先删除关联评论，再删除题解
-  await prisma.comment.deleteMany({ where: { solutionId: id } })
   await prisma.solution.delete({ where: { id } })
   clearSolutionCache(id)
   // LOGIC-10: 补清列表缓存，避免列表仍展示已删除的题解
   cache.deleteByPrefix('solution:list:')
-}
-
-/**
- * 切换题解点赞（带权限校验）
- */
-export async function toggleSolutionLike(
-  id: string,
-  isAssignmentContext: boolean,
-  requesterId: string,
-  viewer: SolutionViewUserPayload | null
-) {
-  const { canViewSolutions } = await import('./permissions')
-  const { getSolutionLikeModel } = await import('./like-helper')
-  const { logger } = await import('@/lib/logger')
-
-  const solution = await prisma.solution.findUnique({
-    where: { id },
-    select: { id: true, problemId: true },
-  })
-  if (!solution) {
-    throw AppError.notFound('题解不存在')
-  }
-  const permission = await canViewSolutions(viewer, solution.problemId, { isAssignmentContext })
-  if (!permission.allowed) {
-    throw Object.assign(AppError.forbidden('无权操作此题解'), { permission })
-  }
-
-  const solutionLikeModel = getSolutionLikeModel()
-  if (!solutionLikeModel) {
-    logger.error('prisma.solutionLike 模型不可用，请执行 `npx prisma generate` + `npx prisma db push`')
-    throw new AppError('SERVICE_UNAVAILABLE', '点赞功能暂不可用，请联系管理员执行 prisma generate', 503)
-  }
-
-  const existing = await solutionLikeModel.findUnique({
-    where: { solutionId_userId: { solutionId: id, userId: requesterId } },
-  })
-
-  if (existing) {
-    await prisma.$transaction([
-      solutionLikeModel.delete({ where: { id: existing.id } }),
-      prisma.solution.update({ where: { id }, data: { likes: { decrement: 1 } } }),
-    ])
-    const updated = await prisma.solution.findUnique({ where: { id }, select: { likes: true } })
-    clearSolutionCache(id)
-    return { liked: false, likes: updated?.likes ?? 0 }
-  }
-  try {
-    await prisma.$transaction([
-      solutionLikeModel.create({ data: { solutionId: id, userId: requesterId } }),
-      prisma.solution.update({ where: { id }, data: { likes: { increment: 1 } } }),
-    ])
-  } catch (err: any) {
-    if (err?.code !== 'P2002') throw err
-    // P2002: 已有记录说明已点赞，重新查询确认实际状态
-    const existing = await solutionLikeModel.findUnique({
-      where: { solutionId_userId: { solutionId: id, userId: requesterId } },
-    })
-    const updated = await prisma.solution.findUnique({ where: { id }, select: { likes: true } })
-    clearSolutionCache(id)
-    return { liked: !!existing, likes: updated?.likes ?? 0 }
-  }
-  const updated = await prisma.solution.findUnique({ where: { id }, select: { likes: true } })
-  clearSolutionCache(id)
-  return { liked: true, likes: updated?.likes ?? 0 }
 }
 
 /**

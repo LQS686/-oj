@@ -14,7 +14,7 @@ import {
   validateUsername,
   validatePassword,
   validateRequired,
-} from '@/lib/validation'
+} from '@/lib/api/validation'
 import { trimAll, escapeHtml } from '@/lib/sanitize'
 import { getSystemSettings } from '@/lib/settings'
 

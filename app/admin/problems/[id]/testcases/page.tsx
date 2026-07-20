@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ArrowLeft, Upload, X, Plus, Sparkles, Loader2, Save, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase-scoring'
 import { formatDateTime } from '@/lib/utils'
+import { AI_FEATURE_DISABLED } from '@/lib/ai/feature-flag'
+import { AiDisabledBadge } from '@/components/ai/AiDisabledNotice'
 
 interface TestCase {
   input: string
@@ -66,7 +68,7 @@ export default function ProblemTestCasesPage() {
   const fetchLogs = async () => {
     setLogsLoading(true)
     try {
-      const res = await fetchWithAuth(`/api/admin/problems/${problemId}/verification-logs`)
+      const res = await fetchWithCookie(`/api/admin/problems/${problemId}/verification-logs`)
       const data = await res.json()
       if (data.success) {
         setLogs(Array.isArray(data.data) ? data.data : [])
@@ -85,7 +87,7 @@ export default function ProblemTestCasesPage() {
   const fetchProblemData = async () => {
     try {
       setLoading(true)
-      const response = await fetchWithAuth(`/api/admin/problems/${problemId}`)
+      const response = await fetchWithCookie(`/api/admin/problems/${problemId}`)
 
       if (!response.ok) throw new Error('Failed to fetch problem')
 
@@ -160,7 +162,7 @@ export default function ProblemTestCasesPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetchWithAuth('/api/admin/testcases/upload', {
+      const response = await fetchWithCookie('/api/admin/testcases/upload', {
         method: 'POST',
         body: formData
       })
@@ -224,7 +226,7 @@ export default function ProblemTestCasesPage() {
     setSuccessMsg('')
 
     try {
-      const response = await fetchWithAuth(`/api/admin/problems/${problemId}/verify`, {
+      const response = await fetchWithCookie(`/api/admin/problems/${problemId}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -264,7 +266,7 @@ export default function ProblemTestCasesPage() {
         }
       }
 
-      const response = await fetchWithAuth(`/api/admin/problems/${problemId}`, {
+      const response = await fetchWithCookie(`/api/admin/problems/${problemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -337,11 +339,14 @@ export default function ProblemTestCasesPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <Link
             href={`/admin/ai?tab=test_data&problemId=${encodeURIComponent(problemId)}`}
-            className="btn btn-ghost text-sm flex items-center gap-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+            className={`btn btn-ghost text-sm flex items-center gap-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 ${
+              AI_FEATURE_DISABLED ? 'pointer-events-none opacity-60' : ''
+            }`}
             title="跳转到 AI 工作区生成测试数据"
           >
             <Sparkles className="w-4 h-4" />
             AI 生成测试数据
+            {AI_FEATURE_DISABLED && <AiDisabledBadge />}
           </Link>
           <button
             onClick={() => setShowLogsModal(true)}
@@ -431,13 +436,16 @@ export default function ProblemTestCasesPage() {
           <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-400" />
             AI 智能生成
+            {AI_FEATURE_DISABLED && <AiDisabledBadge />}
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
             根据题目描述和标程自动生成高强度测试数据。
           </p>
           <Link
             href={`/admin/ai?tab=test_data&problemId=${encodeURIComponent(problemId)}`}
-            className="btn btn-ghost w-full flex items-center justify-center gap-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+            className={`btn btn-ghost w-full flex items-center justify-center gap-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 ${
+              AI_FEATURE_DISABLED ? 'pointer-events-none opacity-60' : ''
+            }`}
             title="跳转到 AI 工作区生成测试数据"
           >
             <Sparkles className="w-4 h-4" />

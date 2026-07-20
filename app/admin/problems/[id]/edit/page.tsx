@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import {
  ArrowLeft,
  Plus,
@@ -33,7 +33,6 @@ interface AdminSolutionItem {
  title: string
  codeLanguage: string | null
  views: number
- likes: number
  isOfficial: boolean
  isAiGenerated: boolean
  sourceType: string
@@ -88,7 +87,7 @@ export default function EditProblemPage() {
  try {
  setLoading(true)
  setError('')
- const response = await fetchWithAuth(`/api/admin/problems/${problemId}`)
+ const response = await fetchWithCookie(`/api/admin/problems/${problemId}`)
 
  if (!response.ok) {
  let detail = `HTTP ${response.status}`
@@ -144,7 +143,7 @@ export default function EditProblemPage() {
  try {
  setSolutionsLoading(true)
  setSolutionsError('')
- const response = await fetchWithAuth(
+ const response = await fetchWithCookie(
  `/api/solutions?problemId=${problemId}&pageSize=100`
  )
  if (!response.ok) {
@@ -183,7 +182,7 @@ export default function EditProblemPage() {
  if (!ok) return
  try {
  setDeletingSolutionId(solutionId)
- const response = await fetchWithAuth(`/api/solutions/${solutionId}`, {
+ const response = await fetchWithCookie(`/api/solutions/${solutionId}`, {
  method: 'DELETE'
  })
  const data = await response.json().catch(() => null)
@@ -240,7 +239,7 @@ export default function EditProblemPage() {
  setError('')
 
  try {
- const response = await fetchWithAuth(`/api/admin/problems/${problemId}`, {
+ const response = await fetchWithCookie(`/api/admin/problems/${problemId}`, {
  method: 'PATCH',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({
@@ -789,7 +788,6 @@ export default function EditProblemPage() {
  )}
  <span className="opacity-50">·</span>
  <span>👁 {s.views}</span>
- <span>👍 {s.likes}</span>
  </div>
  </div>
  </div>

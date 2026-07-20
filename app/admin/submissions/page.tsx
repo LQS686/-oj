@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, type Column } from '@/components/admin'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { Search, User, FileText, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
@@ -54,7 +54,7 @@ export default function AdminSubmissionsPage() {
         ...(apiStatus !== 'all' && { status: apiStatus })
       })
 
-      const response = await fetchWithAuth(`/api/admin/submissions?${params}`)
+      const response = await fetchWithCookie(`/api/admin/submissions?${params}`)
 
       if (response.status === 403) {
         setError('需要管理员权限')

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Pencil, AlertCircle, X, Trash2 } from 'lucide-react'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
 
@@ -76,7 +76,7 @@ export default function EditAssignmentModal({
       setDataLoading(true)
       setError('')
       const [assignmentRes, allProblems] = await Promise.all([
-        fetchWithAuth(`/api/classes/${classId}/assignments/${assignmentId}`),
+        fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`),
         fetchAllPublicProblems(),
       ])
       const assignmentData = await assignmentRes.json()
@@ -145,7 +145,7 @@ export default function EditAssignmentModal({
 
     try {
       setLoading(true)
-      const response = await fetchWithAuth(`/api/classes/${classId}/assignments/${assignmentId}`, {
+      const response = await fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -176,7 +176,7 @@ export default function EditAssignmentModal({
     if (!confirm('确定要删除这个作业吗？此操作不可恢复。')) return
     try {
       setLoading(true)
-      const response = await fetchWithAuth(`/api/classes/${classId}/assignments/${assignmentId}`, {
+      const response = await fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`, {
         method: 'DELETE',
       })
       const data = await response.json()

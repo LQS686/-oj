@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import {
   Mail,
   Send,
@@ -74,8 +74,8 @@ export default function ClassManageInlinePanel({
 
   const loadMembershipData = useCallback(async () => {
     const [dRes, rRes] = await Promise.all([
-      fetchWithAuth(`/api/classes/${classId}/invites/direct`),
-      fetchWithAuth(`/api/classes/${classId}/requests`),
+      fetchWithCookie(`/api/classes/${classId}/invites/direct`),
+      fetchWithCookie(`/api/classes/${classId}/requests`),
     ])
     const dData = await dRes.json()
     const rData = await rRes.json()
@@ -129,7 +129,7 @@ export default function ClassManageInlinePanel({
     try {
       setInviteSending(true)
       setInviteHint('')
-      const res = await fetchWithAuth(`/api/classes/${classId}/invites/direct`, {
+      const res = await fetchWithCookie(`/api/classes/${classId}/invites/direct`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -155,7 +155,7 @@ export default function ClassManageInlinePanel({
   }
 
   const reviewRequest = async (requestId: string, action: 'approve' | 'reject') => {
-    const res = await fetchWithAuth(`/api/classes/${classId}/requests/${requestId}`, {
+    const res = await fetchWithCookie(`/api/classes/${classId}/requests/${requestId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
@@ -176,7 +176,7 @@ export default function ClassManageInlinePanel({
     try {
       setSettingsSaving(true)
       setSettingsMsg('')
-      const res = await fetchWithAuth(`/api/classes/${classId}`, {
+      const res = await fetchWithCookie(`/api/classes/${classId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,7 +202,7 @@ export default function ClassManageInlinePanel({
 
   const dissolveClass = async () => {
     if (!confirm('确定解散班级？此操作不可恢复。')) return
-    const res = await fetchWithAuth(`/api/classes/${classId}`, { method: 'DELETE' })
+    const res = await fetchWithCookie(`/api/classes/${classId}`, { method: 'DELETE' })
     const data = await res.json()
     if (data.success) {
       router.push('/classes')

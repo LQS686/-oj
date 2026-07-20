@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, type Column } from '@/components/admin'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
 import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
@@ -34,7 +34,7 @@ export default function AdminContestsPage() {
  const fetchContests = useCallback(async () => {
  try {
  setLoading(true)
- const response = await fetchWithAuth('/api/admin/contests')
+ const response = await fetchWithCookie('/api/admin/contests')
 
  if (response.status === 403) {
  setError('需要管理员权限')
@@ -62,7 +62,7 @@ export default function AdminContestsPage() {
 
  const handleToggleVisibility = async (contestId: string, currentVisibility: boolean) => {
  try {
- const response = await fetchWithAuth(`/api/admin/contests/${contestId}`, {
+ const response = await fetchWithCookie(`/api/admin/contests/${contestId}`, {
  method: 'PATCH',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ isPublic: !currentVisibility })
@@ -83,7 +83,7 @@ export default function AdminContestsPage() {
  if (!selectedContest) return
 
  try {
- const response = await fetchWithAuth(`/api/admin/contests/${selectedContest.id}`, {
+ const response = await fetchWithCookie(`/api/admin/contests/${selectedContest.id}`, {
  method: 'DELETE'
  })
 

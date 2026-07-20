@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { Save, Mail, Shield, Globe, Send } from 'lucide-react'
 import type { SystemSettings } from '@/lib/settings'
 
@@ -36,7 +36,7 @@ export default function AdminSettingsPage() {
 
  const fetchSettings = async () => {
  try {
- const response = await fetchWithAuth('/api/admin/settings')
+ const response = await fetchWithCookie('/api/admin/settings')
 
  if (response.status === 403) {
  setError('需要管理员权限')
@@ -61,7 +61,7 @@ export default function AdminSettingsPage() {
  setSuccess('')
 
  try {
- const response = await fetchWithAuth('/api/admin/settings', {
+ const response = await fetchWithCookie('/api/admin/settings', {
  method: 'PUT',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify(settings)
@@ -89,7 +89,7 @@ export default function AdminSettingsPage() {
  setTestingEmail(true)
  setTestResult(null)
  try {
- const response = await fetchWithAuth('/api/admin/settings/test-email', {
+ const response = await fetchWithCookie('/api/admin/settings/test-email', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ email: testEmail })

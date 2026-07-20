@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Search, Plus, Trash2, Save, AlertCircle, Trophy } from 'lucide-react'
 import type { Problem } from '@/types/models'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 
 export default function EditContestPage() {
@@ -34,7 +34,7 @@ export default function EditContestPage() {
  const fetchData = async () => {
  try {
  setLoading(true)
- const contestRes = await fetchWithAuth(`/api/contests/${id}`)
+ const contestRes = await fetchWithCookie(`/api/contests/${id}`)
  const contestData = await contestRes.json()
  
  if (!contestData.success) {
@@ -50,7 +50,7 @@ export default function EditContestPage() {
  setIsPublic(contest.isPublic)
  setPassword(contest.password || '')
 
- const problemsRes = await fetchWithAuth(`/api/contests/${id}/problems`)
+ const problemsRes = await fetchWithCookie(`/api/contests/${id}/problems`)
  const problemsData = await problemsRes.json()
  
  if (problemsData.success) {
@@ -169,7 +169,7 @@ export default function EditContestPage() {
 
  const duration = Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000)
 
- const response = await fetchWithAuth(`/api/contests/${id}`, {
+ const response = await fetchWithCookie(`/api/contests/${id}`, {
  method: 'PUT',
  headers: {
  'Content-Type': 'application/json',

@@ -6,7 +6,7 @@ import {
   Loader2, AlertCircle, FileSearch, CheckCircle,
   Plus, X, RefreshCw, Save,
 } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ProblemNumberSearch, type ProblemFullInfo } from './ProblemNumberSearch'
 import { ProblemDetailCard } from './ProblemDetailCard'
@@ -69,7 +69,7 @@ export function AnalyzeForm({
   const fetchTask = useCallback(async () => {
     if (!logId) return
     try {
-      const res = await fetchWithAuth(`/api/admin/ai/generate?logId=${logId}`)
+      const res = await fetchWithCookie(`/api/admin/ai/generate?logId=${logId}`)
       const data = await res.json()
       if (data.success && data.data) {
         const log = data.data
@@ -136,7 +136,7 @@ export function AnalyzeForm({
     setCommitted(false)
     setTaskError(null)
     try {
-      const res = await fetchWithAuth('/api/admin/ai/analyze', {
+      const res = await fetchWithCookie('/api/admin/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ problemId: problem.id }),
@@ -177,7 +177,7 @@ export function AnalyzeForm({
     setCommitError('')
     setCommitting(true)
     try {
-      const res = await fetchWithAuth(`/api/admin/problems/${problem.id}`, {
+      const res = await fetchWithCookie(`/api/admin/problems/${problem.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

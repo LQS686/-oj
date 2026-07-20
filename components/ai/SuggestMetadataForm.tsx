@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Loader2, Lightbulb, AlertCircle, Plus, X, CheckCircle,
 } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { DIFFICULTIES } from '@/lib/constants'
 import type { AiTaskStatus } from '@/types/ai'
@@ -95,7 +95,7 @@ export function SuggestMetadataForm({
   const fetchTask = useCallback(async () => {
     if (!logId) return
     try {
-      const res = await fetchWithAuth(`/api/admin/ai/generate?logId=${logId}`)
+      const res = await fetchWithCookie(`/api/admin/ai/generate?logId=${logId}`)
       const data = await res.json()
       if (data.success && data.data) {
         const log = data.data
@@ -183,7 +183,7 @@ export function SuggestMetadataForm({
     setCommittedProblemId(null)
     setTaskError(null)
     try {
-      const res = await fetchWithAuth('/api/admin/ai/suggest-metadata', {
+      const res = await fetchWithCookie('/api/admin/ai/suggest-metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -229,7 +229,7 @@ export function SuggestMetadataForm({
     }
     setCommitting(true)
     try {
-      const res = await fetchWithAuth('/api/admin/problems', {
+      const res = await fetchWithCookie('/api/admin/problems', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

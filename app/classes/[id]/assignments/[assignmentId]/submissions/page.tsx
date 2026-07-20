@@ -3,7 +3,7 @@
 import { useState, useEffect, use, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
@@ -67,7 +67,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  useEffect(() => {
  const fetchAssignment = async () => {
  try {
- const response = await fetchWithAuth(`/api/classes/${classId}/assignments/${assignmentId}`)
+ const response = await fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`)
  const data = await response.json()
  if (data.success) {
  setAssignment(data.data)
@@ -91,7 +91,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  params.append('page', '1')
  params.append('pageSize', '50')
  
- const response = await fetchWithAuth(
+ const response = await fetchWithCookie(
  `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
  { cache: 'no-store' }
  )
@@ -144,7 +144,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  params.append('page', '1')
  params.append('pageSize', '50')
 
- const response = await fetchWithAuth(
+ const response = await fetchWithCookie(
  `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
  { cache: 'no-store' }
  )

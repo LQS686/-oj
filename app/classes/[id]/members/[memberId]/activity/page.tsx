@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { TrendingUp, Award, BookOpen, FileText, BarChart3, Clock, Target } from 'lucide-react'
 import type { ClassMember } from '@/types/models'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ClassWorkspaceShell, PageLoading } from '@/components/common'
 import { useClass } from '@/hooks/useClass'
@@ -60,7 +60,7 @@ export default function MemberActivityPage() {
 
   const fetchMemberInfo = async () => {
     try {
-      const response = await fetchWithAuth(`/api/classes/${classId}`)
+      const response = await fetchWithCookie(`/api/classes/${classId}`)
       if (response.ok) {
         const data = await response.json()
         const member = data.data.members?.find((m: ClassMember) => m.id === memberId)
@@ -76,7 +76,7 @@ export default function MemberActivityPage() {
       setLoading(true)
       setError(null)
 
-      const response = await fetchWithAuth(`/api/classes/${classId}/members/${memberId}/activity`)
+      const response = await fetchWithCookie(`/api/classes/${classId}/members/${memberId}/activity`)
 
       if (response.status === 401) {
         router.push('/login')

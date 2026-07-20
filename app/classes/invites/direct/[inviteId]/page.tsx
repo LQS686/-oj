@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { Mail, Users, Check, X, Clock, Calendar, AlertCircle, UserCheck } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import { formatDateTime } from '@/lib/utils'
@@ -55,7 +55,7 @@ export default function DirectInviteDetailPage() {
     try {
       setLoading(true)
 
-      const response = await fetchWithAuth(`/api/classes/invites/direct/${inviteId}`)
+      const response = await fetchWithCookie(`/api/classes/invites/direct/${inviteId}`)
       const data = await response.json()
 
       if (data.success) {
@@ -76,7 +76,7 @@ export default function DirectInviteDetailPage() {
     try {
       setProcessing(true)
 
-      const response = await fetchWithAuth(`/api/classes/invites/direct/${inviteId}`, {
+      const response = await fetchWithCookie(`/api/classes/invites/direct/${inviteId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'accept' }),
@@ -103,7 +103,7 @@ export default function DirectInviteDetailPage() {
     try {
       setProcessing(true)
 
-      const response = await fetchWithAuth(`/api/classes/invites/direct/${inviteId}`, {
+      const response = await fetchWithCookie(`/api/classes/invites/direct/${inviteId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject' }),

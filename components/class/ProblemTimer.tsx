@@ -23,7 +23,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Clock, CheckCircle2, PauseCircle } from 'lucide-react'
-import { fetchWithCookie as fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 
 export interface ProblemTimerProgress {
@@ -96,7 +96,7 @@ export default function ProblemTimer({
 
   const callTiming = async (action: 'start' | 'pause' | 'resume') => {
     try {
-      const res = await fetchWithAuth(baseUrlRef.current, {
+      const res = await fetchWithCookie(baseUrlRef.current, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
@@ -113,7 +113,7 @@ export default function ProblemTimer({
 
   const fetchProgress = async () => {
     try {
-      const res = await fetchWithAuth(baseUrlRef.current, { method: 'GET' })
+      const res = await fetchWithCookie(baseUrlRef.current, { method: 'GET' })
       const data = await res.json()
       if (data?.success && data?.data?.progress) {
         applyProgress(data.data.progress)

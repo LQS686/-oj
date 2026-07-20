@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { signToken } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { trimAll, escapeHtml, removeNullBytes } from '@/lib/sanitize'
-import { validateRequired } from '@/lib/validation'
+import { validateRequired } from '@/lib/api/validation'
 import { errorMonitor } from '@/lib/error-monitor'
 import type { LoginResponse } from '@/lib/api/auth'
 import { getRedisClient } from '@/lib/redis'
@@ -48,8 +48,9 @@ async function clearLoginAttempts(usernameOrEmail: string): Promise<void> {
   try {
     const client = getRedisClient()
     await client.del(key)
-  } catch {
-    // 静默失败
+  } catch (e) {
+    // 登录成功后清理失败不影响主流程，但需记录便于排查 Redis 连接问题
+    logger.warn('Redis 不可用，跳过登录失败计数清理', e instanceof Error ? e : new Error(String(e)))
   }
 }
 

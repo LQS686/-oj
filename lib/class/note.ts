@@ -90,11 +90,3 @@ export async function incrementClassNoteViews(noteId: string) {
     data: { views: { increment: 1 } },
   })
 }
-
-export async function markClassNoteRead(classId: string, noteId: string, userId: string) {
-  await prisma.noteReadHistory.upsert({
-    where: { userId_noteId: { userId, noteId } },
-    update: { readAt: new Date() },
-    create: { classId, noteId, userId, readAt: new Date() },
-  })
-}

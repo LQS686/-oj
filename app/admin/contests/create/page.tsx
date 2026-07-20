@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { Trophy, ArrowLeft, Save, X, Search, Plus, AlertCircle } from 'lucide-react'
 
@@ -39,7 +39,7 @@ export default function CreateContestPage() {
  useEffect(() => {
  const fetchProblems = async () => {
  try {
- const response = await fetchWithAuth('/api/admin/problems')
+ const response = await fetchWithCookie('/api/admin/problems')
  const data = await response.json()
  if (data.success) {
    const payload = data.data
@@ -117,7 +117,7 @@ export default function CreateContestPage() {
  setError('')
 
  try {
- const response = await fetchWithAuth('/api/admin/contests', {
+ const response = await fetchWithCookie('/api/admin/contests', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({

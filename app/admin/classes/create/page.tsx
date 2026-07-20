@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { Users, ArrowLeft, Save, Globe, Lock, Check, Megaphone, AlertCircle } from 'lucide-react'
 
@@ -25,7 +25,7 @@ export default function CreateClassPage() {
   useEffect(() => {
     const checkPermission = async () => {
       try {
-        const response = await fetchWithAuth('/api/admin/classes')
+        const response = await fetchWithCookie('/api/admin/classes')
         if (response.status === 403) {
           setDenied(true)
           setTimeout(() => router.push('/403'), 2000)
@@ -62,7 +62,7 @@ export default function CreateClassPage() {
 
     try {
       setLoading(true)
-      const response = await fetchWithAuth('/api/classes', {
+      const response = await fetchWithCookie('/api/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

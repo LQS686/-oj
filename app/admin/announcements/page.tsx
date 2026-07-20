@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
@@ -40,7 +40,7 @@ export default function AdminAnnouncementsPage() {
   const load = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetchWithAuth('/api/admin/announcements')
+      const res = await fetchWithCookie('/api/admin/announcements')
       if (res.status === 403) {
         setError('需要管理员权限')
         setTimeout(() => router.push('/403'), 2000)
@@ -96,7 +96,7 @@ export default function AdminAnnouncementsPage() {
         expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
       }
       const url = editing ? `/api/admin/announcements/${editing.id}` : '/api/admin/announcements'
-      const res = await fetchWithAuth(url, {
+      const res = await fetchWithCookie(url, {
         method: editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -118,7 +118,7 @@ export default function AdminAnnouncementsPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return
     try {
-      const res = await fetchWithAuth(`/api/admin/announcements/${deleteTarget.id}`, {
+      const res = await fetchWithCookie(`/api/admin/announcements/${deleteTarget.id}`, {
         method: 'DELETE',
       })
       const data = await res.json()
@@ -134,7 +134,7 @@ export default function AdminAnnouncementsPage() {
   }
 
   const togglePublished = async (row: AnnouncementRow) => {
-    const res = await fetchWithAuth(`/api/admin/announcements/${row.id}`, {
+    const res = await fetchWithCookie(`/api/admin/announcements/${row.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isPublished: !row.isPublished }),

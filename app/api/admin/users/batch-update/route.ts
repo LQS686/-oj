@@ -30,7 +30,11 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
     'update'
   )
 
-  const result = await batchUpdateUserRole(finalUserIds, role as 'ADMIN' | 'TEACHER' | 'STUDENT')
+  const result = await batchUpdateUserRole(
+    finalUserIds,
+    role as 'ADMIN' | 'TEACHER' | 'STUDENT',
+    user.role
+  )
 
   return ok({
     updatedCount: result.count,

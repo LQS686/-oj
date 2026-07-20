@@ -17,7 +17,7 @@ import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import SubmissionResultModal, { type SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 import { useTrainingProblemWorkspace } from '@/contexts/TrainingProblemWorkspaceContext'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import type { Problem } from '@/types/models'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
@@ -265,7 +265,7 @@ export default function TrainingProblemDetailPage({
         setShowJudgeStatus(false)
         setShowResultModal(true)
 
-        const res = await fetchWithAuth('/api/submissions', {
+        const res = await fetchWithCookie('/api/submissions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ problemId, code, language }),

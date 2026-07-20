@@ -75,6 +75,12 @@ describe('SubmissionStatus', () => {
       expect(canTransition('', 'PENDING')).toBe(true)
     })
 
+    it('未知非空源状态应拒绝（fail-closed）', () => {
+      // 防止新增枚举值未及时维护 ALLOWED_TRANSITIONS 导致状态机失效
+      expect(canTransition('UNKNOWN_STATUS', 'AC')).toBe(false)
+      expect(canTransition('QUEUED', 'PENDING')).toBe(false)
+    })
+
     it('同状态到同状态应被拒绝（终态不再自转换）', () => {
       // 终态（AC 等）只允许被 SE 覆盖；AC -> AC 不属于 canTransition 放行路径
       expect(canTransition('AC', 'AC')).toBe(false)

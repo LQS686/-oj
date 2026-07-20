@@ -15,50 +15,10 @@
  * 缓存策略：
  *   - progress 记录走 DB（避免 stale），CacheKeys.timing 仅用于后续 Phase 扩展
  *   - 已完成题目（completedAt != null）不再计时，仅展示最终用时
- *
- * Phase 2+ 预留：
- *   - getEffectiveTimeThresholds / calculateTimeMultiplier 当前不调用，
- *     为后续奖励发放功能（grantFirstAcRewards）准备。
  */
 
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-
-/* ============================================================================
- * 类型定义
- * ========================================================================== */
-
-export interface TimeThresholds {
-  gold?: number   // 金档用时阈值（ms），<=gold 倍率 1.3
-  silver?: number // 银档阈值（ms），<=silver 倍率 1.0
-  bronze?: number // 铜档阈值（ms），<=bronze 倍率 0.8
-}
-
-export interface ProblemRewardConfig {
-  difficulty?: string | null
-  expReward?: number | null
-  coinReward?: number | null
-  timeThresholds?: TimeThresholds | null
-}
-
-export interface AssignmentProblemRewardConfig {
-  expReward?: number | null
-  coinReward?: number | null
-  timeThresholds?: TimeThresholds | null
-}
-
-export interface AssignmentRewardConfig {
-  unifiedExpReward?: number | null
-  unifiedCoinReward?: number | null
-  unifiedTimeThresholds?: TimeThresholds | null
-}
-
-export type TimeMultiplierTier = 'gold' | 'silver' | 'bronze' | 'overtime'
-
-export interface TimeMultiplierResult {
-  tier: TimeMultiplierTier
-  multiplier: number
-}
 
 /* ============================================================================
  * 核心计时函数
@@ -253,102 +213,4 @@ export async function getProgress(
   }
 
   return progress
-}
-
-/* ============================================================================
- * 奖励配置解析（Phase 2+ 预留，本阶段不调用）
- * ========================================================================== */
-
-/**
- * 解析有效用时阈值（四级优先级）
- *
- * 优先级：
- *   1. assignmentProblem.timeThresholds（作业内单题覆盖）
- *   2. assignment.unifiedTimeThresholds（作业统一配置）
- *   3. problem.timeThresholds（题目自身配置）
- *   4. DIFFICULTY_TIME_THRESHOLDS[problem.difficulty]（难度默认）
- *
- * 注：本函数为 Phase 2+ 奖励发放预留，Phase 1 不实际调用。
- */
-export function getEffectiveTimeThresholds(
-  problem: ProblemRewardConfig,
-  assignmentProblem?: AssignmentProblemRewardConfig | null,
-  assignment?: AssignmentRewardConfig | null
-): TimeThresholds {
-  // 1. 作业内单题覆盖
-  if (assignmentProblem?.timeThresholds) {
-    return assignmentProblem.timeThresholds
-  }
-  // 2. 作业统一配置
-  if (assignment?.unifiedTimeThresholds) {
-    return assignment.unifiedTimeThresholds
-  }
-  // 3. 题目自身配置
-  if (problem.timeThresholds) {
-    return problem.timeThresholds
-  }
-  // 4. 难度默认值（Phase 2+ 在 constants.ts 中定义，此处返回空对象作为占位）
-  return getDifficultyDefaultThresholds(problem.difficulty || '')
-}
-
-/**
- * 根据用时计算倍率
- *
- * 档位：
- *   - gold     (<=gold 阈值)   → 1.3
- *   - silver   (<=silver 阈值) → 1.0
- *   - bronze   (<=bronze 阈值) → 0.8
- *   - overtime (超出 bronze)    → 0.6
- *
- * 注：本函数为 Phase 2+ 奖励发放预留，Phase 1 不实际调用。
- */
-export function calculateTimeMultiplier(
-  timeElapsedMs: number,
-  thresholds: TimeThresholds
-): TimeMultiplierResult {
-  const { gold, silver, bronze } = thresholds
-
-  if (gold != null && timeElapsedMs <= gold) {
-    return { tier: 'gold', multiplier: 1.3 }
-  }
-  if (silver != null && timeElapsedMs <= silver) {
-    return { tier: 'silver', multiplier: 1.0 }
-  }
-  if (bronze != null && timeElapsedMs <= bronze) {
-    return { tier: 'bronze', multiplier: 0.8 }
-  }
-  return { tier: 'overtime', multiplier: 0.6 }
-}
-
-/* ============================================================================
- * 内部辅助
- * ========================================================================== */
-
-/**
- * 难度默认用时阈值（Phase 2+ 由 constants.ts 提供，此处硬编码占位）
- *
- * 单位：ms
- *   - 入门：     gold=60s,   silver=180s,  bronze=600s
- *   - 普及-：    gold=120s,  silver=300s,  bronze=900s
- *   - 普及：     gold=180s,  silver=600s,  bronze=1800s
- *   - 普及+：    gold=300s,  silver=900s,  bronze=2700s
- *   - 提高：     gold=600s,  silver=1800s, bronze=3600s
- *   - 提高+：    gold=900s,  silver=2700s, bronze=5400s
- *   - 省选：     gold=1800s, silver=3600s, bronze=7200s
- *   - NOI：      gold=3600s, silver=7200s, bronze=14400s
- */
-function getDifficultyDefaultThresholds(difficulty: string): TimeThresholds {
-  const SEC = 1000
-  const MIN = 60 * SEC
-  const map: Record<string, TimeThresholds> = {
-    '入门': { gold: 1 * MIN, silver: 3 * MIN, bronze: 10 * MIN },
-    '普及-': { gold: 2 * MIN, silver: 5 * MIN, bronze: 15 * MIN },
-    '普及': { gold: 3 * MIN, silver: 10 * MIN, bronze: 30 * MIN },
-    '普及+': { gold: 5 * MIN, silver: 15 * MIN, bronze: 45 * MIN },
-    '提高': { gold: 10 * MIN, silver: 30 * MIN, bronze: 60 * MIN },
-    '提高+': { gold: 15 * MIN, silver: 45 * MIN, bronze: 90 * MIN },
-    '省选': { gold: 30 * MIN, silver: 60 * MIN, bronze: 120 * MIN },
-    'NOI': { gold: 60 * MIN, silver: 120 * MIN, bronze: 240 * MIN },
-  }
-  return map[difficulty] || { gold: 5 * MIN, silver: 15 * MIN, bronze: 45 * MIN }
 }

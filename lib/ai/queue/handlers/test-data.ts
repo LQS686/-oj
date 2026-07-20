@@ -35,6 +35,41 @@ async function runSolutionValidation(ctx: JobExecutionContext): Promise<void> {
   const { solutionCode, solutionLanguage } = job.data.params
   const stats = ctx.stats
 
+  // 解析题目实际 timeLimit / memoryLimit，保证"标程能跑出 output" 与"用户提交标程能 AC"使用同一资源约束，
+  // 避免标程在 2000ms 内跑出 output 但用户提交时因题目实际 timeLimit=1000ms 而 TLE。
+  // 优先级：job.data.params 显式传入 > targetProblemId 查库 > 默认 1000ms / 128MB（与 judger 默认对齐）
+  let problemTimeLimit: number | undefined
+  let problemMemoryLimit: number | undefined
+  if (typeof job.data.params.timeLimit === 'number') {
+    problemTimeLimit = job.data.params.timeLimit
+  }
+  if (typeof job.data.params.memoryLimit === 'number') {
+    problemMemoryLimit = job.data.params.memoryLimit
+  }
+  if (
+    (problemTimeLimit === undefined || problemMemoryLimit === undefined) &&
+    job.data.params.targetProblemId
+  ) {
+    try {
+      const targetProblem = await prisma.problem.findUnique({
+        where: { id: job.data.params.targetProblemId },
+        select: { timeLimit: true, memoryLimit: true }
+      })
+      if (targetProblem) {
+        if (problemTimeLimit === undefined && typeof targetProblem.timeLimit === 'number') {
+          problemTimeLimit = targetProblem.timeLimit
+        }
+        if (problemMemoryLimit === undefined && typeof targetProblem.memoryLimit === 'number') {
+          problemMemoryLimit = targetProblem.memoryLimit
+        }
+      }
+    } catch (e) {
+      logger.warn('Failed to load target problem limits, falling back to defaults', e)
+    }
+  }
+  const effectiveTimeLimit = problemTimeLimit ?? 1000
+  const effectiveMemoryLimit = problemMemoryLimit ?? 128
+
   // 1. Compile Solution
   const compileResult = await compileCode(solutionCode, solutionLanguage)
   if (!compileResult.success) {
@@ -61,25 +96,22 @@ async function runSolutionValidation(ctx: JobExecutionContext): Promise<void> {
           code: solutionCode,
           language: solutionLanguage,
           input: input,
-          timeLimit: 2000, // 2s default for generation
-          memoryLimit: 256, // 256MB default
+          timeLimit: effectiveTimeLimit,
+          memoryLimit: effectiveMemoryLimit,
           compiledPath: compileResult.compiledPath
         })
 
+        // 项目约束：任何测试点执行失败（TLE/RE/非零退出码/异常）必须将整个生成任务标记为 FAILED，
+        // 不允许部分测试点入库导致用户提交被误判为 WA。错误消息包含输入数据前 100 字符以便诊断。
+        const inputPrefix = input.slice(0, 100)
         if (result.timeout) {
-          logger.warn(`Solution TLE on generated input #${i + 1}, skipping.`)
-          stats.failed++
-          continue
+          throw new Error(`Solution TLE on generated input #${i + 1} (input[:100]=${JSON.stringify(inputPrefix)})`)
         }
         if (result.runtimeError) {
-          logger.warn(`Solution Runtime Error on generated input #${i + 1}: ${result.error}, skipping.`)
-          stats.failed++
-          continue
+          throw new Error(`Solution Runtime Error on generated input #${i + 1}: ${result.error} (input[:100]=${JSON.stringify(inputPrefix)})`)
         }
         if (result.exitCode !== 0) {
-          logger.warn(`Solution Non-zero Exit Code on generated input #${i + 1}, skipping.`)
-          stats.failed++
-          continue
+          throw new Error(`Solution Non-zero Exit Code on generated input #${i + 1}: exitCode=${result.exitCode} (input[:100]=${JSON.stringify(inputPrefix)})`)
         }
 
         // Success
@@ -98,8 +130,12 @@ async function runSolutionValidation(ctx: JobExecutionContext): Promise<void> {
         })
 
       } catch (execErr) {
-        logger.error(`Execution error on case #${i+1}`, execErr)
-        stats.failed++
+        // executeCode 异常或其他未捕获错误：按项目约束整体标记 FAILED
+        if (execErr instanceof Error && execErr.message.startsWith('Solution ')) {
+          throw execErr
+        }
+        const inputPrefix = input.slice(0, 100)
+        throw new Error(`Solution Execution Error on case #${i + 1}: ${execErr instanceof Error ? execErr.message : String(execErr)} (input[:100]=${JSON.stringify(inputPrefix)})`)
       }
     }
 

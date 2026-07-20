@@ -118,7 +118,7 @@ export const COMMON_QUALITY_GATES = [
 export const PROBLEM_QUALITY_GATES = [
   ...COMMON_QUALITY_GATES,
   '7. samples 不少于 2 组，每组必须有 input / output 字段',
-  '8. test_cases 不少于 15 组，必须覆盖以下 10 个维度的至少 8 个：(a) 最小值 (b) 最大值/压力 (c) 边界条件 (d) 特殊/反例 (e) 随机典型 (f) 全相同 (g) 严格单调 (h) 极端比例 (i) 倒数边界 (j) 随机压力',
+  '8. test_cases 数量不设上下限——完全由覆盖度决定：必须覆盖以下 10 个维度的至少 8 个：(a) 最小值 (b) 最大值/压力 (c) 边界条件 (d) 特殊/反例 (e) 随机典型 (f) 全相同 (g) 严格单调 (h) 极端比例 (i) 倒数边界 (j) 随机压力。覆盖判定基于 input 中真实体现的数据特征，凑数量无效；只要覆盖达标，组数越少越好',
   '9. tags 数组必须非空，至少 1 个标签',
   '10. hint 字段必须非空，主要说明数据范围，不要直接透露算法'
 ] as const
@@ -128,7 +128,7 @@ export const PROBLEM_QUALITY_GATES = [
  */
 export const TEST_DATA_QUALITY_GATES = [
   '1. JSON 必须合法闭合，不带 ```json 等 markdown 标记',
-  '2. test_cases 数量必须严格等于用户指定的数量（不多不少）',
+  '2. test_cases 数量不设上下限——由覆盖度决定：用户传入的 count 仅作参考下限，若不足以覆盖 10 个维度请自行扩展，若已能覆盖则严格匹配。覆盖判定基于 input 中真实数据特征，凑数量无效',
   '3. input / output 必须是纯数据，不能包含中文字符',
   '4. 严格遵循题目输入格式：行数、列数、字段顺序、值域都必须符合',
   '5. 必须覆盖以下 10 个维度的至少 8 个：(a) 最小值 (b) 最大值/压力 (c) 边界条件 (d) 特殊/反例/特殊字符 (e) 随机典型 (f) 全相同 (g) 严格单调递增或递减 (h) 极端比例 (i) 倒数第二/第三的边界 (j) 接近上限的随机压力'

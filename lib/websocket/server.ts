@@ -114,7 +114,10 @@ export function initWebSocketServer(httpServer: HTTPServer) {
   
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : '*',
+      // P2 安全修复：开发环境不再使用通配 '*'，仅允许本地 Next.js 默认端口访问
+      origin: process.env.NODE_ENV === 'production'
+        ? process.env.FRONTEND_URL
+        : ['http://localhost:3000', 'http://127.0.0.1:3000'],
       methods: ['GET', 'POST'],
       credentials: true,
     },

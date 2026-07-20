@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   AlertTriangle, CheckCircle, Copy, FileText, Tag, Lightbulb,
   Target, ListChecks, AlertCircle, Check, Loader2, RotateCw,
-  Trash2, ShieldCheck, Gauge, Stethoscope,
+  Trash2, ShieldCheck, Gauge, Stethoscope, GitCompare,
 } from 'lucide-react'
 import { DIFFICULTY_COLORS, isValidDifficulty, migrateDifficulty, type Difficulty } from '@/lib/constants'
 import { AiThinkingTrace } from './AiThinkingTrace'
@@ -32,6 +32,10 @@ interface AiResultPanelProps {
   onDiscardPreview?: () => Promise<void> | void
   /** Phase 6 Task 27.5: 重新生成 */
   onRegenerate?: () => Promise<void> | void
+  /** 任务状态：'DISCARDED' 时显示"已丢弃"状态条而非操作按钮。
+   *  来自 AiTask.status（commit 后后端将 isPreview 改为 false + committedProblemIds 写入 result，
+   *  discard 后 status 改为 DISCARDED）。 */
+  taskStatus?: string
 }
 
 /**
@@ -54,6 +58,7 @@ export function AiResultPanel({
   onCommitPreview,
   onDiscardPreview,
   onRegenerate,
+  taskStatus,
 }: AiResultPanelProps) {
   const [copied, setCopied] = useState(false)
   const [committing, setCommitting] = useState(false)
@@ -83,14 +88,34 @@ export function AiResultPanel({
     try { await onDiscardPreview() } finally { setDiscarding(false) }
   }
 
-  // Phase 6 Task 31.5: 质量评分徽章
+  // Phase 6 Task 31.5 + spec 第 7.5 节: 质量评分徽章（0-100 评分体系）
+  // >= 80 高质量（pass）/ 60-80 待复核（warn）/ < 60 已失败（error，任务会 FAILED）
   const renderQualityBadge = (score?: number) => {
     if (score === undefined || score === null) return null
-    const isHigh = score >= 4
+    const isHigh = score >= 80
+    const isFailed = score < 60
+    const colorClass = isFailed ? 'tag-error' : isHigh ? 'tag-success' : 'tag-warning'
+    const label = isFailed ? '已失败' : isHigh ? '高质量' : '待复核'
     return (
-      <span className={`tag text-xs ${isHigh ? 'tag-success' : 'tag-warning'}`} title={`质量评分: ${score}/5`}>
+      <span className={`tag text-xs ${colorClass}`} title={`质量评分: ${score}/100（5 维度各 0-20）`}>
         <ShieldCheck className="w-3 h-3 inline mr-0.5" />
-        {isHigh ? '高质量' : '待复核'} ({score}/5)
+        {label} ({score}/100)
+      </span>
+    )
+  }
+
+  // spec 第 7.5 节: 相似度评分徽章（0-1）
+  // > 0.95 视为重复题（任务会 FAILED）/ > 0.8 warn 提示人工复核 / <= 0.8 不展示
+  const renderSimilarityBadge = (score?: number) => {
+    if (score === undefined || score === null) return null
+    if (score <= 0.8) return null
+    const isFailed = score > 0.95
+    const colorClass = isFailed ? 'tag-error' : 'tag-warning'
+    const label = isFailed ? '重复题' : '相似度提示'
+    return (
+      <span className={`tag text-xs ${colorClass}`} title={`题目相似度: ${(score * 100).toFixed(1)}%（>0.95 视为重复题）`}>
+        <GitCompare className="w-3 h-3 inline mr-0.5" />
+        {label} ({(score * 100).toFixed(1)}%)
       </span>
     )
   }
@@ -138,7 +163,37 @@ export function AiResultPanel({
   }
 
   // Phase 6 Task 27.5: 预览-确认操作栏
+  // 三种状态：
+  // 1. taskStatus === 'DISCARDED' → 显示"已丢弃"状态条（无按钮）
+  // 2. result.isPreview === false 且 committedProblemIds 存在 → 显示"已入库"状态条（无按钮）
+  // 3. result.isPreview === true → 显示入库/丢弃/重新生成按钮
+  // 其他情况（非预览模式）不渲染
   const renderPreviewActions = () => {
+    // 已丢弃
+    if (taskStatus === 'DISCARDED') {
+      return (
+        <div className="bg-muted border border-border rounded-lg p-3">
+          <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+            <Trash2 className="w-4 h-4" />
+            已丢弃 — 该预览题目未入库
+          </p>
+        </div>
+      )
+    }
+    // 已入库（result.committedProblemIds 由后端 commitPreviewedProblem 写入）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const committedIds = (result as any).committedProblemIds as string[] | undefined
+    if (!result.isPreview && committedIds && committedIds.length > 0) {
+      return (
+        <div className="bg-secondary/5 border border-secondary/20 rounded-lg p-3">
+          <p className="text-sm font-medium text-secondary flex items-center gap-1.5">
+            <CheckCircle className="w-4 h-4" />
+            已入库 — 共 {committedIds.length} 题
+          </p>
+        </div>
+      )
+    }
+    // 仍是预览状态 → 显示按钮
     if (!result.isPreview) return null
     return (
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
@@ -200,24 +255,33 @@ export function AiResultPanel({
 
     // 字段适配：兼容两种存储格式
     // - previewProblems（队列写入）：camelCase + stdCode + solution{content, code, codeLanguage}
-    // - problems（旧版/直接生成）：snake_case + solution_cpp + solution_python + solution_article
+    // - problems（旧版/直接生成）：snake_case + solution_cpp + solution_article
+    // spec 第 2.1/6.6/6.7 节：C++ 标程是唯一权威，不再读取 / 不再展示 solution_python
     const isPreviewFormat = !!result.previewProblems?.[0]
     const testCaseList: Array<{ input: string; output: string; score?: number }> =
       (rawProblem.testCases as any) || (rawProblem.test_cases as any) || []
     const timeLimit = (rawProblem.timeLimit as number) ?? rawProblem.time_limit
     const memoryLimit = (rawProblem.memoryLimit as number) ?? rawProblem.memory_limit
-    // 标程：优先 previewProblems 的 stdCode/stdLang，其次 problems 的 solution_cpp/solution_python
+    // 标程：优先 previewProblems 的 stdCode/stdLang，其次 problems 的 solution_cpp
     const solutionCpp =
       (isPreviewFormat && rawProblem.stdLang === 'cpp' ? rawProblem.stdCode : null) ||
       rawProblem.solution_cpp ||
       null
-    const solutionPython =
-      (isPreviewFormat && rawProblem.stdLang === 'python' ? rawProblem.stdCode : null) ||
-      rawProblem.solution_python ||
-      null
     // 题解 markdown：优先 previewProblems 的 solution.content，其次 problems 的 solution_article
     const solutionArticle =
       (isPreviewFormat ? rawProblem.solution?.content : null) || rawProblem.solution_article || null
+
+    // spec 第 7.4/7.5 节：综合质量评分（0-100）+ 相似度评分（0-1）
+    // 后端 parametric.ts 在 qualityResult 计算后回填到 previewProblems[i]
+    const problemQualityScore: number | undefined =
+      typeof rawProblem.qualityScore === 'number' ? rawProblem.qualityScore : undefined
+    const problemSimilarityScore: number | undefined =
+      typeof rawProblem.similarityScore === 'number' ? rawProblem.similarityScore : undefined
+    // 顶层 result.qualityScore 仍保留作为兼容兜底（旧版数据可能存在）
+    const displayQualityScore: number | undefined =
+      problemQualityScore ?? result.qualityScore
+    const displaySimilarityScore: number | undefined =
+      problemSimilarityScore ?? result.similarityScore
 
     // 将 AI 生成题目适配为 ProblemFullInfo 格式，复用 ProblemDetailCard
     const difficulty: Difficulty = rawProblem.difficulty
@@ -268,18 +332,18 @@ export function AiResultPanel({
         </div>
 
         {/* Phase 6 评分徽章（不与 ProblemDetailCard 内的难度/标签重复） */}
-        {result.qualityScore !== undefined && (
+        {(displayQualityScore !== undefined || displaySimilarityScore !== undefined) && (
           <div className="flex items-center gap-2 flex-wrap">
-            {renderQualityBadge(result.qualityScore)}
+            {renderQualityBadge(displayQualityScore)}
+            {renderSimilarityBadge(displaySimilarityScore)}
           </div>
         )}
 
-        {/* 复用题库题目详情卡片：题目信息 + 测试点（默认折叠） + 题解 + 标程 */}
+        {/* 复用题库题目详情卡片：题目信息 + 测试点（默认折叠） + 题解 + C++ 标程 */}
         <ProblemDetailCard
           problem={problemForCard}
           showTestCases={true}
           solutionCpp={solutionCpp || undefined}
-          solutionPython={solutionPython || undefined}
           solutionArticle={solutionArticle || undefined}
         />
 

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText, getDifficultyColor } from '@/lib/status'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface TestResult {
   testId: string
@@ -190,7 +190,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
     isRefreshingRef.current = true
     if (showRefreshing) setIsRefreshing(true)
     try {
-      const response = await fetchWithAuth(`/api/submissions/${id}`)
+      const response = await fetchWithCookie(`/api/submissions/${id}`)
       const data = await response.json()
 
       if (data.success) {

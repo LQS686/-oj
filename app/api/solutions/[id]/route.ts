@@ -33,7 +33,7 @@ export const GET = withApi.public(async (req, ctx) => {
 
   // 提取 viewer（user）
   const viewer = await loadSolutionViewUser(req)
-  // viewer 内部已读 DB，但原始 userId 也需要用于 isSolutionLiked
+  // viewer 内部已读 DB，但原始 userId 仍需透传给 service 层用于浏览数去重
   const token = req.cookies.get('token')?.value
   const viewerUserId = token ? verifyToken(token)?.userId : undefined
 

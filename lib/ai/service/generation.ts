@@ -44,31 +44,45 @@ export async function retryAiGeneration(
     },
   })
 
-  await addAiJob({
-    logId: retryLog.id,
-    userId,
-    params: {
-      mode: (retryParams.mode as 'parametric' | 'test_data' | 'test_data_incremental' | 'analyze' | 'suggest_metadata' | 'similar' | 'diagnose') || 'parametric',
-      type: retryParams.type,
-      difficulty: retryParams.difficulty,
-      topic: retryParams.topic ? (Array.isArray(retryParams.topic) ? retryParams.topic : [retryParams.topic]) : undefined,
-      count: AI_GENERATION_COUNT,
-      additionalInfo: retryParams.additionalInfo,
-      title: retryParams.title,
-      description: retryParams.description,
-      inputDescription: retryParams.inputDescription,
-      outputDescription: retryParams.outputDescription,
-      targetProblemId: retryParams.targetProblemId,
-      solutionCode: retryParams.solutionCode,
-      solutionLanguage: retryParams.solutionLanguage,
-      modelId: retryParams.modelId,
-      samples: Array.isArray(retryParams.samples) ? retryParams.samples : undefined,
-      problemInput: retryParams.problemInput,
-      problemOutput: retryParams.problemOutput,
-      _retry: true,
-      _reduceTemperature: true,
-    },
-  })
+  // P2 修复：addAiJob 失败时回滚 PENDING 日志（与 enqueueAiGeneration 一致）
+  try {
+    await addAiJob({
+      logId: retryLog.id,
+      userId,
+      params: {
+        mode: (retryParams.mode as 'parametric' | 'test_data' | 'test_data_incremental' | 'analyze' | 'suggest_metadata' | 'similar' | 'diagnose') || 'parametric',
+        type: retryParams.type,
+        difficulty: retryParams.difficulty,
+        topic: retryParams.topic ? (Array.isArray(retryParams.topic) ? retryParams.topic : [retryParams.topic]) : undefined,
+        count: AI_GENERATION_COUNT,
+        additionalInfo: retryParams.additionalInfo,
+        title: retryParams.title,
+        description: retryParams.description,
+        inputDescription: retryParams.inputDescription,
+        outputDescription: retryParams.outputDescription,
+        targetProblemId: retryParams.targetProblemId,
+        solutionCode: retryParams.solutionCode,
+        solutionLanguage: retryParams.solutionLanguage,
+        modelId: retryParams.modelId,
+        samples: Array.isArray(retryParams.samples) ? retryParams.samples : undefined,
+        problemInput: retryParams.problemInput,
+        problemOutput: retryParams.problemOutput,
+        _retry: true,
+        _reduceTemperature: true,
+      },
+    })
+  } catch (err) {
+    await prisma.aiGenerationLog.update({
+      where: { id: retryLog.id },
+      data: {
+        status: 'FAILED',
+        error: err instanceof Error ? err.message : String(err),
+      },
+    }).catch((e) => {
+      logger.error('[ai-generate] 回滚 retry PENDING 日志失败', e instanceof Error ? e : new Error(String(e)), { logId: retryLog.id })
+    })
+    throw err
+  }
 
   return { logId: retryLog.id, retriedFrom: retryFromLogId }
 }
@@ -100,6 +114,36 @@ export async function enqueueAiGeneration(userId: string, body: AiGenerateBody) 
     await touchAiModelPreference(userId, body.modelId)
   }
 
+  // Phase 6 Task 7.4：PRE-generation 题目相似度预警
+  // 在 PARAM_GEN / SIMILAR 模式下，根据 topic + difficulty 检索题库相同主题+难度的题目（最多 5 道），
+  // 注入 avoidDuplicateWith 字段；候选题 < 1 道时跳过该字段。
+  // 设计意图：PRE-generation 是建议层，提示 AI 避开雷同；POST-generation 相似度检测会排除已注入的候选题。
+  const mode = (body.mode as 'parametric' | 'test_data' | 'test_data_incremental' | 'analyze' | 'suggest_metadata' | 'similar' | 'diagnose') || 'parametric'
+  let avoidDuplicateWith: Array<{ title: string; tags: string[] }> | undefined
+  if ((mode === 'parametric' || mode === 'similar') && body.difficulty) {
+    // body.topic 可能是 string 或 string[]，统一规整为 string[]
+    const rawTopic = body.topic
+    const topicArr = !rawTopic
+      ? []
+      : Array.isArray(rawTopic)
+        ? rawTopic
+        : [rawTopic]
+    if (topicArr.length > 0) {
+      const candidates = await prisma.problem.findMany({
+        where: {
+          difficulty: body.difficulty,
+          tags: { hasSome: topicArr },
+        },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: { title: true, tags: true },
+      })
+      if (candidates.length > 0) {
+        avoidDuplicateWith = candidates.map(c => ({ title: c.title, tags: c.tags || [] }))
+      }
+    }
+  }
+
   const log = await prisma.aiGenerationLog.create({
     data: {
       userId,
@@ -108,33 +152,50 @@ export async function enqueueAiGeneration(userId: string, body: AiGenerateBody) 
     },
   })
 
-  await addAiJob({
-    logId: log.id,
-    userId,
-    params: {
-      mode: (body.mode as 'parametric' | 'test_data' | 'test_data_incremental' | 'analyze' | 'suggest_metadata' | 'similar' | 'diagnose') || 'parametric',
-      // Parametric
-      type: body.type,
-      difficulty: body.difficulty,
-      topic: body.topic as string[] | undefined,
-      count: AI_GENERATION_COUNT,
-      additionalInfo: body.additionalInfo,
-      // Test Data Gen
-      title: body.title,
-      description: body.description,
-      inputDescription: body.inputDescription,
-      outputDescription: body.outputDescription,
-      // Common
-      targetProblemId: body.targetProblemId,
-      solutionCode: body.solutionCode,
-      solutionLanguage: body.solutionLanguage,
-      modelId: body.modelId,
-      // Suggest Metadata（题目元数据建议输入）
-      samples: body.samples,
-      problemInput: body.problemInput,
-      problemOutput: body.problemOutput,
-    },
-  })
+  // P2 修复：addAiJob 失败时（如频率超限 throw）需回滚 PENDING 日志，避免残留任务
+  // 等待下次进程重启才被 resetStaleTasksOnStartup 清理，造成前端无意义轮询。
+  try {
+    await addAiJob({
+      logId: log.id,
+      userId,
+      params: {
+        mode,
+        // Parametric
+        type: body.type,
+        difficulty: body.difficulty,
+        topic: body.topic as string[] | undefined,
+        count: AI_GENERATION_COUNT,
+        additionalInfo: body.additionalInfo,
+        // Test Data Gen
+        title: body.title,
+        description: body.description,
+        inputDescription: body.inputDescription,
+        outputDescription: body.outputDescription,
+        // Common
+        targetProblemId: body.targetProblemId,
+        solutionCode: body.solutionCode,
+        solutionLanguage: body.solutionLanguage,
+        modelId: body.modelId,
+        // Suggest Metadata（题目元数据建议输入）
+        samples: body.samples,
+        problemInput: body.problemInput,
+        problemOutput: body.problemOutput,
+        // Phase 6 Task 7.4：PRE-generation 候选相似题列表（仅在 PARAM_GEN / SIMILAR 模式且有候选题时注入）
+        avoidDuplicateWith,
+      },
+    })
+  } catch (err) {
+    await prisma.aiGenerationLog.update({
+      where: { id: log.id },
+      data: {
+        status: 'FAILED',
+        error: err instanceof Error ? err.message : String(err),
+      },
+    }).catch((e) => {
+      logger.error('[ai-generate] 回滚 PENDING 日志失败', e instanceof Error ? e : new Error(String(e)), { logId: log.id })
+    })
+    throw err
+  }
 
   return { logId: log.id }
 }
@@ -178,30 +239,30 @@ export async function commitPreviewedProblem(logId: string): Promise<{ problemId
   await prisma.$transaction(async (tx: any) => {
     for (const preview of previewProblems) {
       // 创建 Problem（复用 queue.ts 的 problemNumber 重试逻辑，传入 tx 保证事务一致性）
+      // 注：createProblemWithRetry 的首个参数是题目字段对象（内部会包装成 prisma.create({ data })），
+      // 因此这里直接传字段，不要再外层包 { data: ... }，否则会形成 { data: { data: ... } } 双层嵌套。
       const newProblem = await createProblemWithRetry({
-        data: {
-          problemNumber: preview.problemNumber,
-          title: preview.title,
-          description: preview.description,
-          input: preview.input,
-          output: preview.output,
-          samples: preview.samples || [],
-          hint: preview.hint,
-          difficulty: preview.difficulty,
-          tags: Array.isArray(preview.tags) ? preview.tags : [],
-          timeLimit: preview.timeLimit,
-          memoryLimit: preview.memoryLimit,
-          isPublic: preview.isPublic,
-          visibility: preview.visibility,
-          authorId: preview.authorId,
-          isAiGenerated: true,
-          aiStatus: preview.aiStatus || 'AI_GENERATED',
-          aiPrompt: preview.aiPrompt,
-          stdCode: preview.stdCode,
-          stdLang: preview.stdLang,
-          testCases: {
-            create: preview.testCases || [],
-          },
+        problemNumber: preview.problemNumber,
+        title: preview.title,
+        description: preview.description,
+        input: preview.input,
+        output: preview.output,
+        samples: preview.samples || [],
+        hint: preview.hint,
+        difficulty: preview.difficulty,
+        tags: Array.isArray(preview.tags) ? preview.tags : [],
+        timeLimit: preview.timeLimit,
+        memoryLimit: preview.memoryLimit,
+        isPublic: preview.isPublic,
+        visibility: preview.visibility,
+        authorId: preview.authorId,
+        isAiGenerated: true,
+        aiStatus: preview.aiStatus || 'AI_GENERATED',
+        aiPrompt: preview.aiPrompt,
+        stdCode: preview.stdCode,
+        stdLang: preview.stdLang,
+        testCases: {
+          create: preview.testCases || [],
         },
       }, 3, tx)
       problemIds.push(newProblem.id)

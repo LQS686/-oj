@@ -9,6 +9,7 @@ import { addJudgeJob } from '@/lib/judge/queue'
 import { createSubmissionDirect, incrementProblemSubmitCount, updateSubmissionDirect } from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 import type { Prisma } from '@prisma/client'
 
 export interface SubmissionFilter {
@@ -64,7 +65,7 @@ export async function createSubmission(data: {
   return prisma.submission.create({
     data: {
       ...data,
-      status: 'PENDING',
+      status: SubmissionStatus.PENDING,
       submittedAt: new Date(),
     },
   })
@@ -141,7 +142,7 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
     contestId: body.contestId || undefined,
     language: body.language,
     code: body.code,
-    status: 'Pending',
+    status: SubmissionStatus.PENDING,
     totalTests: problem.testCases.length,
   })
 
@@ -176,7 +177,7 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
   } catch (queueError) {
     logger.error('加入队列失败', queueError)
     await updateSubmissionDirect(submission.id, {
-      status: 'SE',
+      status: SubmissionStatus.SYSTEM_ERROR,
       message: '评测系统错误，请稍后重试',
     })
   }

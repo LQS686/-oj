@@ -6,7 +6,6 @@ import Link from 'next/link'
 import {
  ArrowLeft,
  Eye,
- ThumbsUp,
  Clock,
  Code2,
  Edit,
@@ -17,7 +16,7 @@ import {
  XCircle
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { formatRelativeTime } from '@/lib/utils'
 import { canManageContent } from '@/lib/permissions'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
@@ -31,8 +30,6 @@ interface SolutionDetail {
  codeLanguage: string | null
  code: string | null
  views: number
- likes: number
- isLiked?: boolean
  isOfficial: boolean
  isAiGenerated: boolean
  sourceType: string
@@ -86,7 +83,6 @@ export default function SolutionDetailPage() {
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState<string | null>(null)
  const [notFound, setNotFound] = useState(false)
- const [liking, setLiking] = useState(false)
  const [deleting, setDeleting] = useState(false)
  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
  const [canEditPerm, setCanEditPerm] = useState(false)
@@ -148,44 +144,11 @@ export default function SolutionDetailPage() {
  }
  }
 
- const handleLike = async () => {
- if (!user) {
- router.push('/login')
- return
- }
- if (liking || !solution) return
-
- try {
- setLiking(true)
- const response = await fetchWithAuth(`/api/solutions/${solution.id}/like`, {
- method: 'POST',
- })
- const data = await response.json().catch(() => null)
-
- if (data?.success) {
- setSolution((prev) =>
- prev
- ? {
- ...prev,
- likes: typeof data.data?.likes === 'number' ? data.data.likes : prev.likes + 1,
- }
- : prev
- )
- } else {
- setError(data?.error?.message || '点赞失败')
- }
- } catch {
- setError('网络错误，请稍后重试')
- } finally {
- setLiking(false)
- }
- }
-
  const handleDelete = async () => {
  if (!solution) return
  try {
  setDeleting(true)
- const response = await fetchWithAuth(`/api/solutions/${solution.id}`, {
+ const response = await fetchWithCookie(`/api/solutions/${solution.id}`, {
  method: 'DELETE',
  })
  const data = await response.json().catch(() => null)
@@ -360,37 +323,10 @@ export default function SolutionDetailPage() {
  <Eye className="w-4 h-4" />
  {solution.views} 阅读
  </span>
- <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
- <ThumbsUp className="w-4 h-4" />
- {solution.likes} 点赞
- </span>
  </div>
 
  {/* 操作按钮区 */}
  <div className="flex items-center gap-3 mt-6 pt-6 border-t border-border flex-wrap">
- <button
- onClick={handleLike}
- disabled={liking}
- className={`btn flex items-center gap-2 group ${
- solution.isLiked ? 'btn-primary' : 'btn-ghost'
- }`}
- aria-label={solution.isLiked ? '取消点赞' : '点赞'}
- >
- <ThumbsUp
- className={`w-4 h-4 transition-transform duration-300 ${
- liking ? '' : ''
- } ${solution.isLiked ? 'fill-current' : ''}`}
- />
- <span>
- {liking
- ? '处理中...'
- : solution.isLiked
- ? '已点赞'
- : '点赞'}
- </span>
- <span className="text-muted-foreground">({solution.likes})</span>
- </button>
-
  {canEditOrDelete && (
  <>
  <button

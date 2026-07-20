@@ -1,6 +1,6 @@
 'use client'
 
-import { Eye, ThumbsUp, Clock, Code2 } from 'lucide-react'
+import { Eye, Clock, Code2 } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 
 export interface SolutionListItem {
@@ -11,12 +11,10 @@ export interface SolutionListItem {
  avatar?: string
  }
  createdAt: string
- likes: number
  views: number
  codeLanguage: string
  isAiGenerated: boolean
  isOfficial: boolean
- isLiked?: boolean
 }
 
 interface SolutionCardProps {
@@ -50,7 +48,6 @@ export default function SolutionCard({ solution, onClick }: SolutionCardProps) {
  title,
  author,
  createdAt,
- likes,
  views,
  codeLanguage,
  isAiGenerated,
@@ -120,12 +117,8 @@ export default function SolutionCard({ solution, onClick }: SolutionCardProps) {
  </span>
  </div>
 
- {/* 点赞/浏览列 */}
+ {/* 浏览列 */}
  <div className="col-span-2 flex items-center gap-3 text-sm text-muted-foreground">
- <span className="inline-flex items-center gap-1">
- <ThumbsUp className="w-3.5 h-3.5" />
- <span className="font-medium">{likes}</span>
- </span>
  <span className="inline-flex items-center gap-1">
  <Eye className="w-3.5 h-3.5" />
  <span className="font-medium">{views}</span>

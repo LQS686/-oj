@@ -22,6 +22,8 @@ interface AiWorkspaceSidebarProps {
   onDiscardPreview?: (taskId: string) => void | Promise<void>
   /** 外部传入的初始选中任务 ID（浮动按钮点击跳转时使用） */
   initialSelectedId?: string | null
+  /** 结果版本号：入库/丢弃后递增，触发 AiTaskHistoryPanel 清除 detailCache 强制重新拉取 */
+  resultVersion?: number
   /** 选中状态变化回调（父组件用于动态调整左右栏宽度） */
   onSelectedChange?: (selectedId: string | null) => void
   /** 点击进行中任务卡片回调（与历史记录点击行为一致：定位到详情） */
@@ -54,6 +56,7 @@ export function AiWorkspaceSidebar({
   onCommitPreview,
   onDiscardPreview,
   initialSelectedId,
+  resultVersion,
   onSelectedChange,
   onActiveTaskClick,
   className = '',
@@ -157,6 +160,7 @@ export function AiWorkspaceSidebar({
           onCommitPreview={onCommitPreview}
           onDiscardPreview={onDiscardPreview}
           initialSelectedId={initialSelectedId}
+          resultVersion={resultVersion}
           onSelectedChange={onSelectedChange}
         />
       </div>

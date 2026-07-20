@@ -30,7 +30,31 @@ export const SOLUTION_STRUCTURE_SPEC = `solution_article：5 段式 markdown 题
 /**
  * 标程字段说明（solution_cpp / solution_python）
  *
- * Task 32：多语言标程同步，solution_python 基于 solution_cpp 功能等价翻译
+ * 业务决策（2026-07）：
+ * 1. solution_cpp 改为**必填**——它是题目的标准解答 + output 生成工具，写入 problem.stdCode，
+ *    题解参考代码段使用，必须可独立编译运行，且与题目逻辑严格一致。C++ 标程是题目唯一权威解答。
+ * 2. solution_python 改为**可选**——AI 主动生成则保留，后端不使用；不再作为数据生成工具。
+ * 3. 新增"标程复杂度与 timeLimit 匹配"约束：避免标程运行测试点时 TLE。
+ * 4. 新增"标程代码质量"约束：变量命名 / 注释 / const / 模块化 / iostream。
+ * 5. 新增"禁止使用 C++11 范围 for"约束：教学规范，初学者应建立清晰的循环控制概念。
  */
-export const SOLUTION_CODE_SPEC = `- solution_cpp：C++17 标程（字符串里可能含 \\n 换行；含双引号必须转义为 \\"）
-- solution_python：Python3 标程（基于 solution_cpp 的功能等价翻译，语法适配 Python 特性）`
+export const SOLUTION_CODE_SPEC = `# 标程字段规范
+- solution_cpp（**必填**）：C++17 标程——题目的标准解答 + output 生成工具，写入 problem.stdCode，题解参考代码段使用，必须可独立编译运行，且与题目逻辑严格一致（字符串里可能含 \\n 换行；含双引号必须转义为 \\"）
+- solution_python（**可选**）：Python3 标程——AI 主动生成则保留，后端不使用；C++ 标程是题目唯一权威解答
+
+## 标程复杂度与 timeLimit 匹配
+- 标程时间复杂度必须与题目 timeLimit 匹配，避免标程在测试点上 TLE
+- 参考规则：timeLimit=1000ms 时，O(n²) 算法的 n 上限应 ≤ 3000，O(n log n) 算法的 n 上限应 ≤ 10^6，O(n) 算法的 n 上限应 ≤ 10^7
+- AI 生成 input 时不得超出该上限，否则标程运行会 TLE，任务将 FAILED
+
+## 标程代码质量
+- 变量命名应有意义（避免 a/b/c 等单字母命名，循环变量 i/j/k 除外）
+- 关键步骤应有简洁注释（如 // 状态转移、// 边界处理）
+- 使用 const / constexpr 定义常量（避免 magic number）
+- 函数模块化（复杂逻辑应拆分为函数，main 函数不超过 50 行）
+- 使用 iostream 而非 stdio.h（C++ 风格统一）
+
+## 禁止使用 C++11 范围 for
+- 禁止 \`for (auto x : container)\` / \`for (int x : arr)\` 写法
+- 推荐索引 for：\`for (int i = 0; i < n; i++)\` 或迭代器 for：\`for (auto it = v.begin(); it != v.end(); ++it)\`
+- 理由：教学规范——DSOJ 是教育平台，初学者应建立清晰的循环控制概念（索引访问、元素修改），范围 for 隐藏了这些细节`

@@ -17,7 +17,6 @@ export interface User {
   updatedAt: string
   _count?: {
     submissions: number
-    comments: number
   }
 }
 
@@ -35,6 +34,8 @@ export interface Problem {
   tags: string[]
   timeLimit: number
   memoryLimit: number
+  comparisonMode: string
+  realPrecision: number
   visibility: string
   isPublic: boolean
   totalSubmit: number
@@ -43,6 +44,9 @@ export interface Problem {
   classId: string | null
   isAiGenerated: boolean
   aiStatus: string
+  aiPrompt: string | null
+  stdCode: string | null
+  stdLang: string | null
   createdAt: string
   updatedAt: string
   author?: {
@@ -123,26 +127,6 @@ export interface ContestProblem {
   difficulty: string
   visibility: string
   isPublic: boolean
-}
-
-export interface Comment {
-  id: string
-  content: string
-  solutionId: string | null
-  authorId: string
-  parentId: string | null
-  likes: number
-  isDeleted: boolean
-  createdAt: string
-  updatedAt: string
-  author: {
-    id: string
-    username: string
-    nickname: string
-    rating: number
-    color: string
-    avatar?: string
-  }
 }
 
 export interface Class {
@@ -239,10 +223,6 @@ export interface ActiveUser {
   nickname: string | null
   color: string | null
   avatar: string | null
-  _count?: {
-    posts: number
-    comments: number
-  }
 }
 
 export interface Assignment {

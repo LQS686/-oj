@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { DataTable, type Column } from '@/components/admin'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import {
   Users,
   FileText,
@@ -23,6 +23,8 @@ import {
   DollarSign
 } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { AI_FEATURE_DISABLED } from '@/lib/ai/feature-flag'
+import { AiDisabledBadge } from '@/components/ai/AiDisabledNotice'
 
 interface DashboardStats {
  totalUsers: number
@@ -62,7 +64,7 @@ export default function AdminDashboard() {
 
  const fetchDashboardData = useCallback(async () => {
  try {
- const response = await fetchWithAuth('/api/admin/dashboard')
+ const response = await fetchWithCookie('/api/admin/dashboard')
 
  const data = await response.json()
 
@@ -244,7 +246,9 @@ export default function AdminDashboard() {
  {/* AI 任务卡片：紧凑布局 */}
  <Link
  href="/admin/ai-monitor"
- className="card-static p-4 group hover:border-primary/40 transition-colors cursor-pointer block"
+ className={`card-static p-4 group transition-colors block ${
+   AI_FEATURE_DISABLED ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/40 cursor-pointer'
+ }`}
  >
  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
  <div className="flex items-center gap-3">
@@ -253,7 +257,10 @@ export default function AdminDashboard() {
  <Bot className="w-5 h-5 text-primary" />
  </div>
  <div>
- <p className="text-sm font-semibold text-foreground">AI 任务（今日）</p>
+ <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+ AI 任务（今日）
+ {AI_FEATURE_DISABLED && <AiDisabledBadge />}
+ </p>
  <p className="text-xs text-muted-foreground">Token 消耗：{(stats?.aiToday?.totalTokens || 0).toLocaleString()}</p>
  </div>
  </div>
@@ -290,7 +297,9 @@ export default function AdminDashboard() {
  {/* Phase 6 Task 35.4: 今日 AI 成本卡片 */}
  <Link
  href="/admin/ai-monitor"
- className="card-static p-4 group hover:border-primary/40 transition-colors cursor-pointer block"
+ className={`card-static p-4 group transition-colors block ${
+   AI_FEATURE_DISABLED ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/40 cursor-pointer'
+ }`}
  >
  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
  <div className="flex items-center gap-3">
@@ -299,7 +308,10 @@ export default function AdminDashboard() {
  <DollarSign className="w-5 h-5 text-success" />
  </div>
  <div>
- <p className="text-sm font-semibold text-foreground">AI 成本统计</p>
+ <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+ AI 成本统计
+ {AI_FEATURE_DISABLED && <AiDisabledBadge />}
+ </p>
  <p className="text-xs text-muted-foreground">
  今日 {(stats?.aiCost?.todayTaskCount || 0)} 个任务 · 本月 {(stats?.aiCost?.monthTaskCount || 0)} 个任务
  </p>
@@ -356,14 +368,19 @@ export default function AdminDashboard() {
 
  <Link
  href="/admin/ai"
- className="card p-3 group hover:border-primary/40 transition-colors cursor-pointer flex items-center gap-2.5"
+ className={`card p-3 group transition-colors flex items-center gap-2.5 ${
+   AI_FEATURE_DISABLED ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/40 cursor-pointer'
+ }`}
  >
  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
  style={{ background: 'rgba(139, 92, 246, 0.1)' }}>
  <Sparkles className="w-4 h-4 text-primary" />
  </div>
  <div className="min-w-0">
- <p className="text-sm font-semibold text-foreground">AI 出题</p>
+ <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+ AI 出题
+ {AI_FEATURE_DISABLED && <AiDisabledBadge />}
+ </p>
  <p className="text-xs text-muted-foreground truncate">智能生成题目</p>
  </div>
  </Link>

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { Clock, Database, BookOpen, TrendingUp, ArrowLeft, Play, Target, AlertCircle } from 'lucide-react'
 import { getDifficultyColor } from '@/lib/status'
 
@@ -49,7 +49,7 @@ export default function ClassProblemDetailPage() {
  const fetchProblem = async () => {
  try {
  setLoading(true)
- const response = await fetchWithAuth(`/api/classes/${params.id}/problems/${params.problemId}`)
+ const response = await fetchWithCookie(`/api/classes/${params.id}/problems/${params.problemId}`)
 
  const data = await response.json()
 

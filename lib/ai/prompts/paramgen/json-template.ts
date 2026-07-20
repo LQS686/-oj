@@ -8,12 +8,19 @@
  * 3. **关键** count >= 1 始终输出 JSON 数组（[{...}, {...}]），避免 count > 1 时双道题被塞进同一对象
  *    导致重复 key、JSON.parse 只保留最后一个值
  * 4. 不使用任何注释（块注释 / 行注释 都不是合法 JSON）
- * 5. test_cases 展示 3 个示例对象，让 AI 明白每条结构；实际生成时由 AI 自行填满 15 组
+ * 5. test_cases 展示 3 个示例对象，让 AI 明白每条结构；实际生成时数量不设上下限，由覆盖度决定（必须覆盖 10 个维度的至少 8 个，凑数量无效）
  */
 
 /**
  * 单道题的 JSON 结构
  * ⚠️ 必须与 GeneratedProblem / saveProblem 读取的字段保持 1:1
+ *
+ * 业务决策（2026-07）：
+ * 1. test_cases 中**移除** output 占位符，只保留 input——AI 只生成 input，
+ *    output 由后端编译运行 solution_cpp 生成（C++ 标程是题目唯一权威解答）
+ * 2. samples 的 output 改为空字符串占位（""），同样由后端 C++ 标程运行生成；
+ *    samples 必须是简单、小规模、有教学意义的输入（如 n≤5），便于用户阅读理解
+ * 3. test_cases 前 2 组应优先安排小数据 case 供 samples 复制（前 2 组会被复制为 samples）
  */
 export const SINGLE_PROBLEM_TEMPLATE = `{
   "title": "<4-10字中文题目名>",
@@ -22,13 +29,13 @@ export const SINGLE_PROBLEM_TEMPLATE = `{
   "output": "<输出格式说明，中文>",
   "samples": [
     {
-      "input": "<样例1输入字符串>",
-      "output": "<样例1输出字符串>",
+      "input": "<样例1输入字符串，必须是简单小规模数据如 n≤5，便于用户阅读理解>",
+      "output": "",
       "explanation": "<样例1解释，用中文，1-2 句话>"
     },
     {
-      "input": "<样例2输入字符串>",
-      "output": "<样例2输出字符串>",
+      "input": "<样例2输入字符串，必须是简单小规模数据如 n≤5，便于用户阅读理解>",
+      "output": "",
       "explanation": "<样例2解释，用中文，1-2 句话>"
     }
   ],
@@ -38,12 +45,12 @@ export const SINGLE_PROBLEM_TEMPLATE = `{
   "time_limit": <1000 或 1500 或 2000 或 3000 或 5000 整数毫秒>,
   "memory_limit": <64 或 128 或 256 或 512 或 1024 整数MB>,
   "test_cases": [
-    {"input": "<测试1输入>", "output": "<测试1输出>"},
-    {"input": "<测试2输入>", "output": "<测试2输出>"},
-    {"input": "<测试3输入>", "output": "<测试3输出>"}
+    {"input": "<测试1输入，前 2 组应优先安排小数据 case 供 samples 复制>"},
+    {"input": "<测试2输入，前 2 组应优先安排小数据 case 供 samples 复制>"},
+    {"input": "<测试3输入>"}
   ],
-  "solution_cpp": "<完整可编译的 C++17 标程，以 #include <bits/stdc++.h> 开头，变量命名清晰>",
-  "solution_python": "<完整可运行的 Python3 标程，可使用 sys.stdin.read() 加速>",
+  "solution_cpp": "<完整可编译的 C++17 标程，以 #include <bits/stdc++.h> 开头，变量命名清晰；题目的标准解答 + output 生成工具，写入 problem.stdCode，题解参考代码段使用，必须可独立编译运行，且与题目逻辑严格一致>",
+  "solution_python": "<可选；完整可运行的 Python3 标程；AI 主动生成则保留，后端不使用；C++ 标程是题目唯一权威解答>",
   "solution_article": "<5 段式 markdown 题解，使用 H2 ## 分隔：思路分析 / 算法描述 / 复杂度分析 / 参考代码 / 关键点说明；字符串内可能含双引号 / 反引号 / 换行，必须用 \\\" 和 \\n 转义>"
 }`
 

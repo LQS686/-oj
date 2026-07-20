@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ArrowLeft, Plus, X, Save, Loader2, FileText, Sparkles } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
@@ -107,7 +107,7 @@ export default function CreateProblemPage() {
  setError('')
 
  try {
- const response = await fetchWithAuth('/api/admin/problems', {
+ const response = await fetchWithCookie('/api/admin/problems', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({

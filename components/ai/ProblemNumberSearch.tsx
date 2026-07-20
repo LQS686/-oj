@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Search, Loader2, AlertCircle, X, FileText } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 
 /** 题目精简信息（搜索结果） */
@@ -100,7 +100,7 @@ export function ProblemNumberSearch({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetchWithAuth(
+        const res = await fetchWithCookie(
           `/api/admin/problems?q=${encodeURIComponent(q)}&page=1&pageSize=20`
         )
         const data = await res.json()
@@ -145,7 +145,7 @@ export function ProblemNumberSearch({
     setLoadingDetail(true)
     setError('')
     try {
-      const res = await fetchWithAuth(`/api/admin/problems/${id}`)
+      const res = await fetchWithCookie(`/api/admin/problems/${id}`)
       const data = await res.json()
       if (data.success && data.data) {
         const p = data.data

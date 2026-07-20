@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Globe, Lock, Check, Megaphone, X } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 
 const defaultForm = () => ({
   name: '',
@@ -74,7 +74,7 @@ export default function CreateClassModal({
 
     try {
       setLoading(true)
-      const response = await fetchWithAuth('/api/classes', {
+      const response = await fetchWithCookie('/api/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -412,9 +412,11 @@ app.prepare().then(async () => {
     // 动态导入避免在 dotenv 加载前初始化 prisma/redis（这些模块在加载时读取环境变量）
     Promise.all([
       import('./lib/judge/queue'),
+      import('./lib/judge/worker'),
       import('./lib/redis'),
       import('./lib/prisma'),
-    ]).then(([{ judgeQueue }, { getRedisClient }, { prisma }]) => {
+      import('./lib/mongodb/client'),
+    ]).then(([{ judgeQueue }, { disposeWorker }, { getRedisClient }, { prisma }, { closeMongoClient }]) => {
       const tasks: Promise<void>[] = [
         // 1. 停止接收新请求，等待 in-flight 请求结束
         new Promise<void>((resolve) => {
@@ -442,7 +444,16 @@ app.prepare().then(async () => {
             logger.error('释放评测队列失败', e)
           }
         }),
-        // 4. 关闭 Redis 连接
+        // 4. 释放评测 Worker 定时器（statsInterval / cleanupInterval）
+        Promise.resolve().then(() => {
+          try {
+            disposeWorker()
+            logger.info('评测 Worker 定时器已清理')
+          } catch (e) {
+            logger.error('清理评测 Worker 定时器失败', e)
+          }
+        }),
+        // 5. 关闭 Redis 连接
         Promise.resolve().then(async () => {
           try {
             await getRedisClient().quit()
@@ -451,7 +462,15 @@ app.prepare().then(async () => {
             logger.error('关闭 Redis 失败', e)
           }
         }),
-        // 5. 断开 Prisma 数据库连接
+        // 6. 关闭原生 MongoDB 客户端（submission-direct / assignment-direct 等使用）
+        Promise.resolve().then(async () => {
+          try {
+            await closeMongoClient()
+          } catch (e) {
+            logger.error('关闭 MongoDB 客户端失败', e)
+          }
+        }),
+        // 7. 断开 Prisma 数据库连接
         Promise.resolve().then(async () => {
           try {
             await prisma.$disconnect()

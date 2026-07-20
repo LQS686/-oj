@@ -20,9 +20,28 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   // 修复 P1：补充限流白名单（之前大量写接口无显式限流）
   '/api/submissions': { maxRequests: 20, windowMs: 60000 },
   '/api/solutions': { maxRequests: 10, windowMs: 60000 },
-  '/api/comments': { maxRequests: 30, windowMs: 60000 },
   '/api/classes': { maxRequests: 20, windowMs: 60000 },
-  '/api/contests/join': { maxRequests: 10, windowMs: 60000 },
+}
+
+/**
+ * P3 修复：带动态路径段的限流规则使用正则匹配。
+ *  - 删除原 '/api/comments'（无此路由）
+ *  - 实际路由为 /api/contests/[id]/register（报名），不是 /api/contests/[id]/join
+ */
+const REGEX_RATE_LIMITS: { pattern: RegExp; config: { maxRequests: number; windowMs: number } }[] = [
+  { pattern: /^\/api\/contests\/[^/]+\/register$/, config: { maxRequests: 10, windowMs: 60000 } },
+]
+
+/**
+ * 查找匹配的限流配置：先精确匹配，未命中再走正则规则。
+ */
+function findRateLimitConfig(pathname: string): { maxRequests: number; windowMs: number } {
+  const exact = API_RATE_LIMITS[pathname]
+  if (exact) return exact
+  for (const rule of REGEX_RATE_LIMITS) {
+    if (rule.pattern.test(pathname)) return rule.config
+  }
+  return { maxRequests: 100, windowMs: 60000 }
 }
 
 /**
@@ -101,7 +120,7 @@ export async function middleware(request: NextRequest) {
       )
     }
 
-    const baseConfig = API_RATE_LIMITS[pathname] || { maxRequests: 100, windowMs: 60000 }
+    const baseConfig = findRateLimitConfig(pathname)
 
     const ip = getClientIP(request)
     // unknown IP 施加更严格限流（默认值的 50%），防止无代理头请求共用桶被滥用

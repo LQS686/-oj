@@ -11,6 +11,9 @@ import {
   TEST_CASE_COVERAGE_REQUIREMENT,
 } from '../shared/json-output-spec';
 import { SOLUTION_STRUCTURE_SPEC, SOLUTION_CODE_SPEC } from '../shared/solution-structure';
+// Phase 6 Task 4 / 5 / 7.4：题目无歧义 + 高质量约束 + 避免雷同
+import { PROBLEM_CLARITY_SPEC, PROBLEM_QUALITY_SPEC } from '../shared/problem-constraint';
+import { renderDuplicateAvoidanceSpec } from '../shared/duplicate-avoidance';
 
 export class ParamGenPromptGenerator implements PromptGenerator {
   generate(context: ParamGenContext): PromptResult {
@@ -18,7 +21,7 @@ export class ParamGenPromptGenerator implements PromptGenerator {
       throw new Error('Invalid context mode for ParamGenPromptGenerator');
     }
 
-    const { type, difficulty, topic, additionalInfo } = context;
+    const { type, difficulty, topic, additionalInfo, avoidDuplicateWith } = context;
     // 业务决策（2026-06）：单次 AI 调用固定生成 1 道题，count 变量已废弃
     // ParamGen 创作题：保留一定随机性以激发灵感
     // 注：原 0.8 过高，JSON 严格输出场景下 0.5 配合 retry 降温度更稳定
@@ -32,6 +35,9 @@ export class ParamGenPromptGenerator implements PromptGenerator {
     const memMax = profile?.memoryLimitRange?.[1] ?? 256
     const timeLimit = Math.round((timeMin + timeMax) / 2)
     const memoryLimit = Math.round((memMin + memMax) / 2)
+
+    // Phase 6 Task 7.4：avoidDuplicateWith 非空时引用 DUPLICATE_AVOIDANCE_SPEC 提示 AI 避开雷同
+    const duplicateAvoidanceSpec = renderDuplicateAvoidanceSpec(avoidDuplicateWith || [])
 
     // Task 40.4：组合共享段构建 system prompt（行为不变，仅结构复用）
     const systemPrompt = `你是一位资深的算法竞赛 JSON 填空机器人。
@@ -49,6 +55,11 @@ ${JSON_OUTPUT_SPEC}
 
 ${TEST_CASE_COVERAGE_REQUIREMENT}
 
+${PROBLEM_CLARITY_SPEC}
+
+${PROBLEM_QUALITY_SPEC}
+${duplicateAvoidanceSpec ? `\n${duplicateAvoidanceSpec}` : ''}
+
 # 字段填充指引
 - 算法主题（来自用户 topic 数组）：决定题目考察的算法 / 数据结构 / 编程语法，是出题核心
   - "基础语法"类（变量 / if / 循环 / 数组基础 / 函数 / 递归入门 等）：用于入门档，**不需要**涉及高级算法；只需用 C++/Python 基础语法就能解决
@@ -56,8 +67,8 @@ ${TEST_CASE_COVERAGE_REQUIREMENT}
 - 附加要求（来自用户 additionalInfo）：仅作为题目背景故事 / 元素融入 description / samples 的叙事层，**不得**改变算法核心、数据范围、输入输出格式
 - title：4-10 字中文题目名
 - description：Markdown 格式，简体中文，含背景 / 要求 / 约束；如用户给了附加要求，将背景故事 / 元素自然地写入 description 的背景段
-- samples：至少 2 组，explanation 用中文
-- test_cases：至少 15 组，每组 { "input": "...", "output": "..." }
+- samples：至少 2 组，explanation 用中文；samples 必须是简单、小规模、有教学意义的输入（如 n≤5），便于用户阅读理解；test_cases 前 2 组应优先安排小数据 case 供 samples 复制
+- test_cases：数量不设上下限，由覆盖度决定——必须覆盖 10 个维度（最小值 / 最大值 / 边界 / 反例 / 随机 / 全相同 / 单调 / 极端比例 / 倒数边界 / 随机压力）的至少 8 个；覆盖判定基于 input 中真实数据特征（如检测 n=1、大数字、连续相同 token、严格递增序列、接近上限的次边界值等），凑数量无效；只要覆盖达标，组数越少越好。每组只生成 { "input": "..." }（**不要**生成 output 字段——output 由后端编译运行 solution_cpp 生成）
 - tags：**2-4 个**中文标签字符串数组；标签必须能精确定位本题用到的算法 / 数据结构 / 思路，参考用户选择的主题（如"动态规划 + 背包"应出 ["动态规划", "背包", "时间优化"] 这种具体标签，而非 ["动态规划", "算法"] 这种通用词）；**禁止**用难度词（"入门" / "普及" / "提高" / "NOI" 等）做标签
 - hint：1-2 句数据范围提示
 - time_limit / memory_limit：本次出题对应档位「${difficulty}」的推荐值为 time_limit=${timeLimit}ms / memory_limit=${memoryLimit}MB（模板中已预填，请勿随意修改以避免与档位不匹配）

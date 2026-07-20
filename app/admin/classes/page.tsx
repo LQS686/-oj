@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, type Column } from '@/components/admin'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { Plus, Search, Eye, EyeOff, Trash2 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -39,7 +39,7 @@ export default function AdminClassesPage() {
  const fetchClasses = async () => {
  try {
  setLoading(true)
- const response = await fetchWithAuth('/api/admin/classes')
+ const response = await fetchWithCookie('/api/admin/classes')
 
  if (response.status === 403) {
  setError('需要管理员权限')
@@ -63,7 +63,7 @@ export default function AdminClassesPage() {
 
  const handleToggleVisibility = async (classId: string, currentVisibility: boolean) => {
  try {
- const response = await fetchWithAuth(`/api/admin/classes/${classId}`, {
+ const response = await fetchWithCookie(`/api/admin/classes/${classId}`, {
  method: 'PATCH',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ isPublic: !currentVisibility })
@@ -84,7 +84,7 @@ export default function AdminClassesPage() {
  if (!selectedClass) return
 
  try {
- const response = await fetchWithAuth(`/api/admin/classes/${selectedClass.id}`, {
+ const response = await fetchWithCookie(`/api/admin/classes/${selectedClass.id}`, {
  method: 'DELETE'
  })
 
@@ -111,7 +111,7 @@ export default function AdminClassesPage() {
 
  setSaving(true)
  try {
- const response = await fetchWithAuth(`/api/admin/classes/${selectedClass.id}`, {
+ const response = await fetchWithCookie(`/api/admin/classes/${selectedClass.id}`, {
  method: 'PATCH',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ name: editName, description: editDescription })

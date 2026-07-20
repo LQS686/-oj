@@ -10,7 +10,6 @@ import type { ResultState } from './types'
 import { join } from 'path'
 import { logger } from '@/lib/logger'
 import { emitJudgeProgress } from '@/lib/websocket/server'
-import { SubmissionStatus } from '@/lib/constants/submission-status'
 
 // 单测点执行+比较（单次运行，不含重测）
 async function runOnce(
@@ -114,7 +113,8 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
       const compileState = compileResult.compileState
       const stateLabel = COMPILE_STATE_MESSAGES[compileState] || ''
       const detail = compileResult.error || '编译错误'
-      const stderrInfo = compileResult.stderr ? `\n${compileResult.stderr.substring(0, 500)}` : ''
+      // 项目约束：编译 stderr 必须截断到 2000 字符以防止日志溢出
+      const stderrInfo = compileResult.stderr ? `\n${compileResult.stderr.substring(0, 2000)}` : ''
       const message = stateLabel ? `${stateLabel}: ${detail}${stderrInfo}` : `${detail}${stderrInfo}`
       return {
         ...result,

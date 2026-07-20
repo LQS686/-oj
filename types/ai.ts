@@ -76,6 +76,8 @@ export interface AiTask {
 /**
  * AI 出题结果（generate 模式）
  * 字段对齐后端 lib/ai/prompts/core/types.ts GeneratedProblem（snake_case）
+ *
+ * spec 第 2.1/6.6/6.7 节：C++ 标程是唯一权威解答，不再生成 / 不再展示 Python 标程。
  */
 export interface AiGenerationResultProblem {
   title?: string
@@ -91,12 +93,14 @@ export interface AiGenerationResultProblem {
   time_limit?: number
   /** 内存限制（MB） */
   memory_limit?: number
-  /** C++17 标程 */
+  /** C++17 标程（题目唯一权威解答 + output 生成工具） */
   solution_cpp?: string
-  /** Python3 标程（基于 C++ 标程功能等价翻译） */
-  solution_python?: string
   /** 5 段式 markdown 题解（思路分析 / 算法描述 / 复杂度分析 / 参考代码 / 关键点说明） */
   solution_article?: string
+  /** spec 第 7.4 节：综合质量评分（0-100，5 维度各 0-20）。后端 parametric.ts 回填 */
+  qualityScore?: number
+  /** spec 第 7.5 节：题目相似度评分（0-1，>0.95 视为重复题）。后端 parametric.ts 回填 */
+  similarityScore?: number
 }
 
 /**
@@ -139,16 +143,18 @@ export interface AiGenerationResult {
   previewProblems?: AiGenerationResultProblem[]
   /** Phase 6 Task 27: 是否为预览状态 */
   isPreview?: boolean
-  /** Phase 6 Task 31: 题解质量评分（综合分 0-5） */
+  /** spec 第 7.4 节：综合质量评分（0-100，5 维度各 0-20）。>=80 pass / 60-80 warn / <60 FAILED
+   * 旧版 0-5 评分已废弃；新版每道题的评分优先从 previewProblems[i].qualityScore 读取 */
   qualityScore?: number
-  /** Phase 6 Task 31: 题解质量评分明细（5 维度） */
+  /** Phase 6 Task 31: 题解质量评分明细（5 维度，旧版兼容字段） */
   qualityScores?: Record<string, number>
+  /** spec 第 7.5 节：题目相似度评分（0-1）。>0.95 FAILED / >0.8 warn。
+   *  每道题的评分优先从 previewProblems[i].similarityScore 读取 */
+  similarityScore?: number
   /** Phase 6 Task 34: 测试数据强度评分（0-100） */
   strengthScore?: number
   /** Phase 6 Task 35: 预估成本 */
   estimatedCost?: number
-  /** Phase 6: 标记是否含 Python 标程 */
-  hasPythonSolution?: boolean
 }
 
 /**

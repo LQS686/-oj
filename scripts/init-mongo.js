@@ -74,7 +74,6 @@ try {
   db.createCollection('Submission')
   db.createCollection('Contest')
   db.createCollection('Post')
-  db.createCollection('Comment')
   db.createCollection('Class')
   db.createCollection('ClassMember')
   db.createCollection('ClassAssignment')

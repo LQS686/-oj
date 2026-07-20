@@ -32,6 +32,11 @@ export interface GenerationParams {
   solutionCode?: string;
   solutionLanguage?: string;
 
+  // Optional: 题目实际 timeLimit / memoryLimit（用于 test_data 模式标程运行时与 judger 使用同一资源约束）
+  // 若未传入但提供了 targetProblemId，runSolutionValidation 会查库读取
+  timeLimit?: number;
+  memoryLimit?: number;
+
   // ✅ New: Specific Model ID to use
   modelId?: string;
 
@@ -51,6 +56,15 @@ export interface GenerationParams {
     stdCode?: string | null;
     stdLang?: string | null;
   };
+
+  /**
+   * Phase 6 Task 7.4: PRE-generation 候选相似题列表
+   *
+   * 在 enqueueAiGeneration 时根据 topic + difficulty 检索题库相同主题+难度的题目
+   * （最多 5 道），注入此字段。ParamGen / Similar generator 检测到非空时
+   * 引用 DUPLICATE_AVOIDANCE_SPEC 提示 AI 避开雷同；空时不引用。
+   */
+  avoidDuplicateWith?: Array<{ title: string; tags: string[] }>;
 
   // Phase 6: Test data incremental — 已覆盖/缺失维度
   coveredDimensions?: Array<{ id: string; name: string }>;
@@ -242,7 +256,8 @@ function mapToContext(params: GenerationParams): PromptContext {
             topic: params.topic || [],
             count: params.count || 1,
             additionalInfo: params.additionalInfo,
-            sourceProblem: params.sourceProblem
+            sourceProblem: params.sourceProblem,
+            avoidDuplicateWith: params.avoidDuplicateWith
         };
     }
     // 默认 ParamGen（AI 出题）
@@ -252,7 +267,8 @@ function mapToContext(params: GenerationParams): PromptContext {
         difficulty: params.difficulty || '入门',
         topic: params.topic || [],
         count: params.count || 1,
-        additionalInfo: params.additionalInfo
+        additionalInfo: params.additionalInfo,
+        avoidDuplicateWith: params.avoidDuplicateWith
     };
 }
 
@@ -361,7 +377,7 @@ export async function generateProblems(params: GenerationParams, userId?: string
     ],
     temperature: effectiveBaseTemperature,
     response_format: { type: 'json_object' as const },
-    // 出 1 道完整题（15 组测试数据 + 双解法）通常 4000-9000 tokens；
+    // 出 1 道完整题（测试数据由覆盖度决定 + C++ 标程）通常 4000-9000 tokens；
     // 出 2-3 道时叠加。thinking 模式下思维链会额外消耗大量 tokens，
     // 给到 32768 防止长响应被截断（buildChatParams 已保护此字段不被 config.params 覆盖）。
     // thinking 模式下思维链会额外消耗大量 tokens，放大 2 倍预算

@@ -269,14 +269,28 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
   }
 })
 
-// 启动时扫描 DB 中 status='Judging' 或 'Pending' 的 submission 重新入队（重启恢复）
-// 注：submitCode 创建提交时 status='Pending'，评测中仅在内存 JudgeResult 中为 'Judging'（不写 DB），
-// 评测完成后直接写最终状态（AC/WA/TLE...）。因此 Worker 崩溃后，DB 中残留的是 'Pending'（未开始）
-// 或 'Judging'（历史兼容）。两者都需恢复。
+// 启动时扫描 DB 中 status='PENDING'/'JUDGING'/'RUNNING' 的 submission 重新入队（重启恢复）
+// 注：submitCode 创建提交时 status='PENDING'，评测中仅在内存 JudgeResult 中为 'JUDGING'（不写 DB），
+// 评测完成后直接写最终状态（AC/WA/TLE...）。因此 Worker 崩溃后，DB 中残留的是 'PENDING'（未开始）
+// 或 'JUDGING'（历史兼容）。两者都需恢复。
+// 项目约束（Task 12.3）：recover 路径需接受 PENDING/JUDGING/RUNNING 作为合法起始状态，
+// 此处扫描时同时兼容历史字面量 'Pending'/'Judging'/'Running' 以防 DB 中存在旧数据。
 async function recoverPendingJobs() {
   try {
     const pendingSubmissions = await prisma.submission.findMany({
-      where: { status: { in: ['Judging', 'Pending'] } },
+      where: {
+        status: {
+          in: [
+            SubmissionStatus.PENDING,
+            SubmissionStatus.JUDGING,
+            SubmissionStatus.RUNNING,
+            // 历史大驼峰兼容
+            'Pending',
+            'Judging',
+            'Running',
+          ],
+        },
+      },
       include: { problem: { include: { testCases: true } } },
     })
     if (pendingSubmissions.length === 0) {

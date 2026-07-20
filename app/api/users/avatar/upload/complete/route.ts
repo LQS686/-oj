@@ -3,7 +3,7 @@
  */
 import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import { mergeChunks, isValidUploadId } from '@/lib/upload'
-import clientPromise from '@/lib/mongodb'
+import { getMongoClient } from '@/lib/mongodb/client'
 import { ObjectId } from 'mongodb'
 import { logger } from '@/lib/logger'
 import { assertAvatarUploadOwner, consumeAvatarUpload } from '@/lib/avatar-upload-registry'
@@ -36,7 +36,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   // P1-5：完成后清理注册表项（一次性会话）
   consumeAvatarUpload(uploadId!)
 
-  const client = await clientPromise
+  const client = await getMongoClient()
   const db = client.db()
 
   await db.collection('User').updateOne(

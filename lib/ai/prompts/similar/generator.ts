@@ -22,6 +22,9 @@ import {
   TEST_CASE_COVERAGE_REQUIREMENT,
 } from '../shared/json-output-spec'
 import { SOLUTION_STRUCTURE_SPEC, SOLUTION_CODE_SPEC } from '../shared/solution-structure'
+// Phase 6 Task 4 / 5 / 7.4：题目无歧义 + 高质量约束 + 避免雷同（与 ParamGen 同步）
+import { PROBLEM_CLARITY_SPEC, PROBLEM_QUALITY_SPEC } from '../shared/problem-constraint'
+import { renderDuplicateAvoidanceSpec } from '../shared/duplicate-avoidance'
 
 export class SimilarPromptGenerator implements PromptGenerator {
   generate(context: SimilarContext): PromptResult {
@@ -29,7 +32,7 @@ export class SimilarPromptGenerator implements PromptGenerator {
       throw new Error('Invalid context mode for SimilarPromptGenerator')
     }
 
-    const { type, difficulty, topic, additionalInfo, sourceProblem } = context
+    const { type, difficulty, topic, additionalInfo, sourceProblem, avoidDuplicateWith } = context
     const temperature = 0.5
 
     const profile = DIFFICULTY_PROFILES[difficulty as Difficulty]
@@ -39,6 +42,9 @@ export class SimilarPromptGenerator implements PromptGenerator {
     const memMax = profile?.memoryLimitRange?.[1] ?? 256
     const timeLimit = Math.round((timeMin + timeMax) / 2)
     const memoryLimit = Math.round((memMin + memMax) / 2)
+
+    // Phase 6 Task 7.4：avoidDuplicateWith 非空时引用 DUPLICATE_AVOIDANCE_SPEC 提示 AI 避开雷同
+    const duplicateAvoidanceSpec = renderDuplicateAvoidanceSpec(avoidDuplicateWith || [])
 
     const systemPrompt = `你是一位资深的算法竞赛 JSON 填空机器人，现在需要基于一道已有题目生成一道**相似变体题**。
 
@@ -51,7 +57,14 @@ ${JSON_OUTPUT_SPEC}
 3. 相似题要求：与原题**同主题、同难度档位、同算法核心**，但**不同背景故事 / 不同数据范围细节 / 不同输入输出格式细节**
 4. 禁止照抄原题：title / description / samples 必须完全重写，不能与原题雷同
 
+${PROBLEM_CLARITY_SPEC}
+
+${PROBLEM_QUALITY_SPEC}
+${duplicateAvoidanceSpec ? `\n${duplicateAvoidanceSpec}` : ''}
+
 # 字段填充指引
+- samples：至少 2 组，explanation 用中文；samples 必须是简单、小规模、有教学意义的输入（如 n≤5），便于用户阅读理解；test_cases 前 2 组应优先安排小数据 case 供 samples 复制
+- test_cases：数量不设上下限，由覆盖度决定——必须覆盖 10 个维度（最小值 / 最大值 / 边界 / 反例 / 随机 / 全相同 / 单调 / 极端比例 / 倒数边界 / 随机压力）的至少 8 个；覆盖判定基于 input 中真实数据特征（如检测 n=1、大数字、连续相同 token、严格递增序列、接近上限的次边界值等），凑数量无效；只要覆盖达标，组数越少越好。每组只生成 { "input": "..." }（**不要**生成 output 字段——output 由后端编译运行 solution_cpp 生成）
 ${SOLUTION_CODE_SPEC}
 ${SOLUTION_STRUCTURE_SPEC}
 

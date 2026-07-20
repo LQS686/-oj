@@ -8,10 +8,8 @@ interface ProblemDetailCardProps {
   problem: ProblemFullInfo
   /** 是否展示测试点区域（默认 true） */
   showTestCases?: boolean
-  /** C++ 标程（AI 生成题目可选） */
+  /** C++ 标程（AI 生成题目可选；spec 第 2.1 节：C++ 是唯一权威解答） */
   solutionCpp?: string
-  /** Python3 标程（AI 生成题目可选） */
-  solutionPython?: string
   /** 5 段式 markdown 题解（AI 生成题目可选） */
   solutionArticle?: string
   className?: string
@@ -29,13 +27,11 @@ export function ProblemDetailCard({
   problem,
   showTestCases = true,
   solutionCpp,
-  solutionPython,
   solutionArticle,
   className = '',
 }: ProblemDetailCardProps) {
   const [testCasesExpanded, setTestCasesExpanded] = useState(false)
   const [solutionCppExpanded, setSolutionCppExpanded] = useState(false)
-  const [solutionPythonExpanded, setSolutionPythonExpanded] = useState(false)
   const [solutionArticleExpanded, setSolutionArticleExpanded] = useState(false)
   const testCases = problem.testCases || []
 
@@ -219,7 +215,7 @@ export function ProblemDetailCard({
         </div>
       )}
 
-      {/* C++ 标程（默认折叠） */}
+      {/* C++ 标程（默认折叠，唯一权威标程） */}
       {solutionCpp && (
         <div>
           <button
@@ -234,26 +230,6 @@ export function ProblemDetailCard({
           {solutionCppExpanded && (
             <pre className="text-sm font-mono text-foreground whitespace-pre-wrap break-all bg-muted/40 rounded p-2 mt-2">
               {solutionCpp}
-            </pre>
-          )}
-        </div>
-      )}
-
-      {/* Python3 标程（默认折叠） */}
-      {solutionPython && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setSolutionPythonExpanded(prev => !prev)}
-            className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary w-full text-left"
-          >
-            {solutionPythonExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            <Code className="w-3.5 h-3.5 text-primary" />
-            Python3 标程（点击{solutionPythonExpanded ? '收起' : '展开'}）
-          </button>
-          {solutionPythonExpanded && (
-            <pre className="text-sm font-mono text-foreground whitespace-pre-wrap break-all bg-muted/40 rounded p-2 mt-2">
-              {solutionPython}
             </pre>
           )}
         </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Loader2,
   ListChecks,
@@ -38,6 +38,9 @@ interface AiTaskHistoryPanelProps {
   /** 外部传入的初始选中任务 ID（浮动任务卡片点击时由 AiWorkspaceShell 设置）。
    *  当外部传入新值时，组件会自动选中对应任务并切换到详情视图。 */
   initialSelectedId?: string | null
+  /** 结果版本号：入库/丢弃后递增，组件检测到变化后清除 detailCache 并重新拉取当前选中详情，
+   *  确保下次渲染 AiResultPanel 时拿到的 result.isPreview 等字段已是后端最新值。 */
+  resultVersion?: number
   /** 选中状态变化回调（null=返回列表视图，string=进入详情视图）。
    *  父组件 AiWorkspaceShell 用于动态调整左右两栏宽度。 */
   onSelectedChange?: (selectedId: string | null) => void
@@ -63,6 +66,7 @@ export function AiTaskHistoryPanel({
   onCommitPreview,
   onDiscardPreview,
   initialSelectedId,
+  resultVersion,
   onSelectedChange,
   className = '',
 }: AiTaskHistoryPanelProps) {
@@ -71,6 +75,8 @@ export function AiTaskHistoryPanel({
   const [detailCache, setDetailCache] = useState<Record<string, AiTask>>({})
   const [detailLoading, setDetailLoading] = useState<string | null>(null)
   const [retrying, setRetrying] = useState<string | null>(null)
+  // 上一次处理过的 resultVersion，用于检测变化
+  const lastResultVersionRef = useRef<number>(resultVersion ?? 0)
 
   // 分页状态：每页 15 条
   const PAGE_SIZE = 15
@@ -129,6 +135,32 @@ export function AiTaskHistoryPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSelectedId, tasks])
+
+  // 入库/丢弃后 resultVersion 递增：清除 detailCache 中所有缓存，
+  // 强制下次访问详情时重新拉取，确保 result.isPreview 等字段为后端最新值。
+  // 同时若当前在详情视图，立即触发重新拉取，让用户看到"已入库"状态。
+  useEffect(() => {
+    const v = resultVersion ?? 0
+    if (v === lastResultVersionRef.current) return
+    lastResultVersionRef.current = v
+    if (!selectedId) return
+    setDetailCache(prev => {
+      const next = { ...prev }
+      delete next[selectedId]
+      return next
+    })
+    if (onFetchDetail) {
+      setDetailLoading(selectedId)
+      onFetchDetail(selectedId)
+        .then(detail => {
+          if (detail) {
+            setDetailCache(prev => ({ ...prev, [selectedId]: detail }))
+          }
+        })
+        .finally(() => setDetailLoading(null))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultVersion])
 
   const handleBack = () => {
     setSelectedId(null)
@@ -397,6 +429,7 @@ function TaskDetailView({
               <AiResultPanel
                 result={result}
                 mode={resultMode}
+                taskStatus={task.status}
                 onCommitPreview={onCommitPreview}
                 onDiscardPreview={onDiscardPreview}
                 onViewInLibrary={problemId ? () => window.open(`/admin/problems/${problemId}/edit`, '_blank') : undefined}

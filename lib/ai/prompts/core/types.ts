@@ -84,7 +84,16 @@ export interface GeneratedProblem {
   hint?: string;
   time_limit?: number;
   memory_limit?: number;
+  /**
+   * C++17 标程（**必填**）——题目的标准解答 + output 生成工具，写入 problem.stdCode，
+   * 题解参考代码段使用，必须可独立编译运行，且与题目逻辑严格一致。
+   * C++ 标程是题目唯一权威解答，所有 test_cases.output 由后端编译运行此代码生成。
+   */
   solution_cpp?: string;
+  /**
+   * Python3 标程（**可选**）——AI 主动生成则保留，后端不使用；
+   * C++ 标程是题目唯一权威解答，Python 不再作为数据生成工具。
+   */
   solution_python?: string;
   // 5 段式 markdown 题解，与 solution-article-feature 规范一致（思路分析 / 算法描述 / 复杂度分析 / 参考代码 / 关键点说明）
   // 业务决策（2026-06）：单次 AI 调用同时返回题目 + 题解，避免后续再入队题解生成任务
@@ -102,6 +111,14 @@ export interface ParamGenContext extends BaseContext {
   topic: string[];
   count: number;
   additionalInfo?: string;
+  /**
+   * PRE-generation 候选相似题列表（Phase 6 Task 7.4）。
+   *
+   * 在 enqueueAiGeneration 时根据 topic + difficulty 检索题库相同主题+难度的题目
+   * （最多 5 道），注入此字段。ParamGen generator 检测到非空时引用
+   * DUPLICATE_AVOIDANCE_SPEC 提示 AI 避开雷同；空时不引用。
+   */
+  avoidDuplicateWith?: Array<{ title: string; tags: string[] }>;
 }
 
 export interface TestDataGenContext extends BaseContext {
@@ -167,6 +184,14 @@ export interface SimilarContext extends BaseContext {
     stdCode?: string | null;
     stdLang?: string | null;
   };
+  /**
+   * PRE-generation 候选相似题列表（Phase 6 Task 7.4）。
+   *
+   * 与 ParamGenContext.avoidDuplicateWith 语义一致——在 enqueueAiGeneration 时
+   * 根据 topic + difficulty 检索题库相同主题+难度的题目（最多 5 道），注入此字段。
+   * Similar generator 检测到非空时引用 DUPLICATE_AVOIDANCE_SPEC 提示 AI 避开雷同；空时不引用。
+   */
+  avoidDuplicateWith?: Array<{ title: string; tags: string[] }>;
 }
 
 /**

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import {
   Clock,
   CheckCircle2,
@@ -153,7 +153,7 @@ const [editOpen, setEditOpen] = useState(false)
  const fetchAssignment = async () => {
  try {
  setLoading(true)
- const response = await fetchWithAuth(`/api/classes/${params.id}/assignments/${params.assignmentId}`)
+ const response = await fetchWithCookie(`/api/classes/${params.id}/assignments/${params.assignmentId}`)
  const data = await response.json()
  if (data.success) {
  setAssignment(data.data.assignment || null)
@@ -171,7 +171,7 @@ const [editOpen, setEditOpen] = useState(false)
 
  const fetchClassMembers = async () => {
  try {
- const response = await fetchWithAuth(`/api/classes/${params.id}/members`)
+ const response = await fetchWithCookie(`/api/classes/${params.id}/members`)
  const data = await response.json()
  if (data.success) {
  const raw = data.data
@@ -371,7 +371,7 @@ const [editOpen, setEditOpen] = useState(false)
 
  try {
  const submitUrl = `/api/classes/${params.id}/assignments/${params.assignmentId}/submit`
- const response = await fetchWithAuth(submitUrl, {
+ const response = await fetchWithCookie(submitUrl, {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({
@@ -403,7 +403,7 @@ const [editOpen, setEditOpen] = useState(false)
    if (!confirm('确定要删除这个作业吗？此操作不可恢复，所有提交记录将被清除。')) return
    try {
      setLoading(true)
-     const response = await fetchWithAuth(
+     const response = await fetchWithCookie(
        `/api/classes/${params.id}/assignments/${params.assignmentId}`,
        { method: 'DELETE' }
      )

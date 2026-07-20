@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import { Users, Search, Plus, Calendar, TrendingUp, X, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
@@ -88,7 +88,7 @@ function ClassesPageContent() {
 
       const headers: any = {}
 
-      const response = await fetchWithAuth(`/api/classes?${params}`, { headers })
+      const response = await fetchWithCookie(`/api/classes?${params}`, { headers })
       const data = await response.json()
 
       if (data.success) {
@@ -156,7 +156,7 @@ function ClassesPageContent() {
     }
 
     try {
-      const response = await fetchWithAuth(`/api/classes/${classData.id}`)
+      const response = await fetchWithCookie(`/api/classes/${classData.id}`)
       const data = await response.json()
       
       if (data.success) {
@@ -396,7 +396,7 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
 
     try {
       setLoading(true)
-      const response = await fetchWithAuth(`/api/classes/${classData.id}/requests`, {
+      const response = await fetchWithCookie(`/api/classes/${classData.id}/requests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

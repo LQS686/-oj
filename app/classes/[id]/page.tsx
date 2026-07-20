@@ -21,7 +21,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import Link from 'next/link'
 import AssignmentOpenLink from '@/components/assignment/AssignmentOpenLink'
 import { ClassWorkspaceShell, PageLoading } from '@/components/common'
@@ -215,7 +215,7 @@ function ClassDetailContent() {
     const message = prompt('请输入申请理由（可选）:')
     if (message === null) return
     try {
-      const res = await fetchWithAuth(`/api/classes/${classId}/requests`, {
+      const res = await fetchWithCookie(`/api/classes/${classId}/requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message }),
@@ -231,7 +231,7 @@ function ClassDetailContent() {
     if (!confirm('确定要退出班级吗？')) return
     if (!user?.id) return
     try {
-      const res = await fetchWithAuth(`/api/classes/${classId}/members/${user.id}`, {
+      const res = await fetchWithCookie(`/api/classes/${classId}/members/${user.id}`, {
         method: 'DELETE',
       })
       const d = await res.json()
@@ -244,7 +244,7 @@ function ClassDetailContent() {
 
   const patchMemberRole = async (targetUserId: string, role: 'student' | 'assistant') => {
     try {
-      const res = await fetchWithAuth(`/api/classes/${classId}/members/${targetUserId}`, {
+      const res = await fetchWithCookie(`/api/classes/${classId}/members/${targetUserId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role }),
@@ -260,7 +260,7 @@ function ClassDetailContent() {
   const removeMember = async (targetUserId: string, name: string) => {
     if (!confirm(`确定移除「${name}」？`)) return
     try {
-      const res = await fetchWithAuth(`/api/classes/${classId}/members/${targetUserId}`, {
+      const res = await fetchWithCookie(`/api/classes/${classId}/members/${targetUserId}`, {
         method: 'DELETE',
       })
       const data = await res.json()

@@ -11,8 +11,10 @@ import {
   Sparkles,
   AlertCircle,
 } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
+import { AI_FEATURE_DISABLED } from '@/lib/ai/feature-flag'
+import { AiDisabledBadge } from '@/components/ai/AiDisabledNotice'
 
 interface ProblemAiPanelProps {
   /** 题目 ID */
@@ -84,7 +86,7 @@ export function ProblemAiPanel({
   ) => {
     updateState(kind, { loading: true, message: undefined })
     try {
-      const res = await fetchWithAuth(url, {
+      const res = await fetchWithCookie(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -181,7 +183,10 @@ export function ProblemAiPanel({
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-foreground">AI 操作</h3>
+          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+            AI 操作
+            {AI_FEATURE_DISABLED && <AiDisabledBadge />}
+          </h3>
           <p className="text-xs text-muted-foreground">
             一键触发该题目的 AI 辅助能力
           </p>
@@ -193,7 +198,7 @@ export function ProblemAiPanel({
         <button
           type="button"
           onClick={handleRegenerateSolution}
-          disabled={states.regenerate_solution.loading}
+          disabled={AI_FEATURE_DISABLED || states.regenerate_solution.loading}
           className="btn btn-primary w-full text-sm flex items-center justify-center gap-2"
           title="删除原 AI 官方题解并重新入队生成"
         >
@@ -211,7 +216,9 @@ export function ProblemAiPanel({
       <div>
         <Link
           href={`/admin/ai?tab=test_data&problemId=${encodeURIComponent(problemId)}`}
-          className="btn btn-ghost w-full text-sm flex items-center justify-center gap-2"
+          className={`btn btn-ghost w-full text-sm flex items-center justify-center gap-2 ${
+            AI_FEATURE_DISABLED ? 'pointer-events-none opacity-60' : ''
+          }`}
           title="跳转到 AI 工作区生成测试数据"
         >
           <FlaskConical className="w-4 h-4" />
@@ -224,7 +231,7 @@ export function ProblemAiPanel({
         <button
           type="button"
           onClick={handleAnalyze}
-          disabled={states.analyze.loading}
+          disabled={AI_FEATURE_DISABLED || states.analyze.loading}
           className="btn btn-ghost w-full text-sm flex items-center justify-center gap-2"
           title="AI 智能分析题目（标签 / 难度 / 质量 / 测试维度缺口）"
         >
@@ -244,7 +251,7 @@ export function ProblemAiPanel({
           <button
             type="button"
             onClick={handleSuggestMetadata}
-            disabled={states.suggest_metadata.loading}
+            disabled={AI_FEATURE_DISABLED || states.suggest_metadata.loading}
             className="btn btn-ghost w-full text-sm flex items-center justify-center gap-2"
             title="AI 建议标签 / 难度 / 提示 / 时空限制"
           >
@@ -264,7 +271,7 @@ export function ProblemAiPanel({
         <button
           type="button"
           onClick={handleSimilarProblem}
-          disabled={states.similar.loading}
+          disabled={AI_FEATURE_DISABLED || states.similar.loading}
           className="btn btn-ghost w-full text-sm flex items-center justify-center gap-2"
           title="基于本题生成一道相似变体题（同主题/同难度，不同背景）"
         >

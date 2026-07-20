@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   Loader2, AlertCircle, RefreshCw, Plus, Database,
 } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ProblemNumberSearch, type ProblemFullInfo } from './ProblemNumberSearch'
 import { ProblemDetailCard } from './ProblemDetailCard'
@@ -37,7 +37,7 @@ export function TestDataGenerationForm({
     }
     setSubmitting(true)
     try {
-      const res = await fetchWithAuth('/api/admin/ai/generate', {
+      const res = await fetchWithCookie('/api/admin/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

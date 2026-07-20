@@ -8,6 +8,13 @@ import {
 import { DIFFICULTIES } from '@/lib/constants'
 import { TOPICS } from '@/lib/ai/prompts/core/types'
 import { DIFFICULTY_PROFILES, type Difficulty } from '@/lib/ai/prompts/core/quality-gates'
+import {
+  getRecommendedDifficulties,
+  getTopicDifficultyMismatch,
+  formatMismatchReason,
+} from '@/lib/ai/topic-difficulty-matcher'
+import { detectTopicConflict } from '@/lib/ai/topic-conflict-detector'
+import { fetchWithCookie } from '@/lib/api/base'
 
 /**
  * 主题分组（仅用于 UI 排版，方便从 ~50 个主题里快速找到目标）
@@ -109,11 +116,70 @@ export function AiGenerationForm({
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [cooldown, setCooldown] = useState(0)
 
+  // PRE-generation 智能建议（Task 8 主题-难度匹配 / Task 9 主题冲突 / Task 10 难度分布）
+  const [recommendedDifficulties, setRecommendedDifficulties] = useState<Difficulty[]>([])
+  const [topicConflict, setTopicConflict] = useState<{
+    hasConflict: boolean
+    conflicts: Array<{ type: 'subset'; parent: string; child: string; reason: string }>
+  }>({ hasConflict: false, conflicts: [] })
+  const [difficultyMismatch, setDifficultyMismatch] = useState<{ mismatch: boolean; reason?: string }>({ mismatch: false })
+  const [difficultyStats, setDifficultyStats] = useState<{
+    recentCount: number
+    difficultyDistribution: Array<{ difficulty: string; count: number }>
+    recommendedDifficulty: Difficulty | null
+  } | null>(null)
+
   // 提交时把当前模型 ID 同步到 localStorage（与顶部 AiModelPicker 持久化保持一致）
   useEffect(() => {
     return () => {
       if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current)
     }
+  }, [])
+
+  /**
+   * 主题变化时计算推荐难度档位 + 主题间冲突（Task 8.2 / 9.3）
+   * topics 为空时清空建议状态，避免误报
+   */
+  useEffect(() => {
+    if (topics.length === 0) {
+      setRecommendedDifficulties([])
+      setTopicConflict({ hasConflict: false, conflicts: [] })
+      return
+    }
+    setRecommendedDifficulties(getRecommendedDifficulties(topics))
+    setTopicConflict(detectTopicConflict(topics))
+  }, [topics])
+
+  /**
+   * 主题或难度变化时检测主题-难度不匹配（Task 8.2）
+   * topics 为空时不调用，避免误报
+   */
+  useEffect(() => {
+    if (topics.length === 0) {
+      setDifficultyMismatch({ mismatch: false })
+      return
+    }
+    setDifficultyMismatch(getTopicDifficultyMismatch(topics, difficulty))
+  }, [topics, difficulty])
+
+  /**
+   * 组件 mount 时拉取近 7 天难度分布统计（Task 10.2）
+   * 静默失败：统计不可用时不影响表单主流程
+   */
+  useEffect(() => {
+    let cancelled = false
+    fetchWithCookie('/api/admin/ai/generate/suggestions')
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return
+        if (data?.success && data.data) {
+          setDifficultyStats(data.data)
+        }
+      })
+      .catch(() => {
+        // 静默忽略：统计拉取失败不阻塞表单使用
+      })
+    return () => { cancelled = true }
   }, [])
 
   const triggerCooldown = () => {
@@ -277,27 +343,91 @@ export function AiGenerationForm({
         </div>
       </div>
 
+      {/* 主题间冲突检测 warn 横幅（Task 9.3，仅提示不阻塞） */}
+      {topicConflict.hasConflict && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md p-3 text-sm space-y-1">
+          {topicConflict.conflicts.map((c, i) => (
+            <div key={`${c.parent}-${c.child}-${i}`} className="flex items-start gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>{c.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 难度选择 */}
       <div>
         <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-2">
           <Target className="w-3.5 h-3.5 text-muted-foreground" />
           目标难度
         </label>
+
+        {/* 难度分布均衡建议（Task 10.2，仅提示不阻塞） */}
+        {difficultyStats && (
+          <div className="mb-2 p-2.5 rounded-md bg-muted/50 border border-border text-xs text-muted-foreground space-y-1">
+            {difficultyStats.recentCount === 0 ? (
+              <div>近 7 天无生成记录，可自由选择难度</div>
+            ) : (
+              <>
+                <div>
+                  近 7 天已生成 <span className="font-mono tabular-nums">{difficultyStats.recentCount}</span> 道，分布：
+                  {difficultyStats.difficultyDistribution.length > 0 ? (
+                    difficultyStats.difficultyDistribution.map((d, i) => (
+                      <span key={d.difficulty}>
+                        {i > 0 && ' / '}
+                        {d.difficulty} <span className="font-mono tabular-nums">{d.count}</span>
+                      </span>
+                    ))
+                  ) : (
+                    <span>暂无</span>
+                  )}
+                </div>
+                {difficultyStats.recommendedDifficulty ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded">
+                      推荐补充：{difficultyStats.recommendedDifficulty}
+                    </span>
+                  </div>
+                ) : (
+                  <div>难度分布均衡，可自由选择</div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {DIFFICULTIES.map(d => {
             const active = difficulty === d
+            const hasRec = recommendedDifficulties.length > 0
+            const isRec = recommendedDifficulties.includes(d as Difficulty)
+            const tooltip = hasRec && !isRec
+              ? `当前主题更适合：${recommendedDifficulties.join(' / ')}`
+              : undefined
             return (
               <button
                 key={d}
                 type="button"
                 onClick={() => setDifficulty(d)}
-                className={`p-2.5 rounded-lg text-center text-sm transition-colors border ${
+                title={tooltip}
+                className={`p-2.5 rounded-lg text-center text-sm transition-colors border flex flex-col items-center justify-center gap-1 ${
                   active
                     ? 'bg-primary text-white border-primary'
-                    : 'bg-muted hover:bg-muted border-border text-muted-foreground hover:text-foreground'
+                    : isRec
+                      ? 'bg-muted hover:bg-muted border-green-500 text-foreground hover:text-foreground'
+                      : hasRec
+                        ? 'bg-muted hover:bg-muted border-border text-muted-foreground hover:text-foreground opacity-50'
+                        : 'bg-muted hover:bg-muted border-border text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {d}
+                {isRec && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    active ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
+                  }`}>
+                    推荐
+                  </span>
+                )}
+                <span>{d}</span>
               </button>
             )
           })}
@@ -311,6 +441,14 @@ export function AiGenerationForm({
             {getDifficultyHint(difficulty)}
           </div>
         </details>
+
+        {/* 主题-难度不匹配 warn 横幅（Task 8.2，仅提示不阻塞） */}
+        {difficultyMismatch.mismatch && difficultyMismatch.reason && (
+          <div className="mt-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md p-3 text-sm flex items-start gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+            <span>{formatMismatchReason(difficultyMismatch.reason)}</span>
+          </div>
+        )}
       </div>
 
       {/* 多选主题提示：多选即综合题 */}

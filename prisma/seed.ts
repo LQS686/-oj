@@ -40,7 +40,6 @@ async function main() {
     await db.collection('Contest').deleteMany({})
     await db.collection('ContestProblem').deleteMany({})
     await db.collection('ContestParticipant').deleteMany({})
-    await db.collection('Comment').deleteMany({})
     await db.collection('Training').deleteMany({})
     await db.collection('TrainingProblem').deleteMany({})
     await db.collection('Achievement').deleteMany({})

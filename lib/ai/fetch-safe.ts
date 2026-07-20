@@ -61,6 +61,10 @@ function isPrivateIpv6(ip: string): boolean {
   const lower = ip.toLowerCase()
   if (lower === '::1' || lower === '::') return true
   if (lower.startsWith('fe80') || lower.startsWith('fc') || lower.startsWith('fd')) return true
+  // IPv4-mapped IPv6 地址（如 ::ffff:127.0.0.1）可绕过纯 IPv4 校验，
+  // 提取内嵌 IPv4 后再用既有 IPv4 私有段判断
+  const v4Mapped = lower.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+  if (v4Mapped && isPrivateIpv4(v4Mapped[1])) return true
   return false
 }
 

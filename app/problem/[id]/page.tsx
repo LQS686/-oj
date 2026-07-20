@@ -28,7 +28,7 @@ import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canManageContent } from '@/lib/permissions'
 import { formatDateTime } from '@/lib/utils'
@@ -225,7 +225,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       if (fromAssignment && classId) {
         url = `/api/classes/${classId}/assignments/${fromAssignment}/submissions?problemId=${problemId}`
         
-        const response = await fetchWithAuth(url, { cache: 'no-store' })
+        const response = await fetchWithCookie(url, { cache: 'no-store' })
         const data = await response.json()
         
         if (data.success) {
@@ -493,7 +493,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         submitBody = { problemId, code, language }
       }
 
-      const response = await fetchWithAuth(submitUrl, {
+      const response = await fetchWithCookie(submitUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

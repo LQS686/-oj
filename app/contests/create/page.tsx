@@ -6,7 +6,7 @@ import { ArrowLeft, Search, Plus, Trash2, Save, AlertCircle } from 'lucide-react
 import { useUser } from '@/contexts/UserContext'
 import toast from 'react-hot-toast'
 import { canCreateContest } from '@/lib/permissions'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 
 interface Problem {
  id: string
@@ -144,7 +144,7 @@ export default function CreateContestPage() {
 
  const duration = Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000)
 
- const response = await fetchWithAuth('/api/contests', {
+ const response = await fetchWithCookie('/api/contests', {
  method: 'POST',
  headers: {
  'Content-Type': 'application/json',

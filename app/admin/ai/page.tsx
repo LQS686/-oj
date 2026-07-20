@@ -1,6 +1,8 @@
 'use client'
 
 import { AiWorkspaceShell } from '@/components/ai/AiWorkspaceShell'
+import { AiDisabledNotice } from '@/components/ai/AiDisabledNotice'
+import { AI_FEATURE_DISABLED } from '@/lib/ai/feature-flag'
 
 /**
  * /admin/ai - AI 工作区统一入口（Phase 4）
@@ -13,5 +15,8 @@ import { AiWorkspaceShell } from '@/components/ai/AiWorkspaceShell'
  * 顶部模型选择器、左侧能力 Tab 导航、右下角浮动任务列表均由 AiWorkspaceShell 渲染。
  */
 export default function AiWorkspacePage() {
+  if (AI_FEATURE_DISABLED) {
+    return <AiDisabledNotice />
+  }
   return <AiWorkspaceShell defaultTab="generate" />
 }

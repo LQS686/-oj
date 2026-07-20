@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Shield, AlertCircle, Info } from 'lucide-react'
 import type { ClassMember, ClassPermissions } from '@/types/models'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ClassWorkspaceShell, PageLoading } from '@/components/common'
 import { useClass } from '@/hooks/useClass'
@@ -81,7 +81,7 @@ export default function MemberPermissionsPage() {
 
   const fetchMemberInfo = async () => {
     try {
-      const response = await fetchWithAuth(`/api/classes/${classId}`)
+      const response = await fetchWithCookie(`/api/classes/${classId}`)
 
       if (response.status === 401) {
         router.push('/login')
@@ -131,7 +131,7 @@ export default function MemberPermissionsPage() {
     setSaving(true)
 
     try {
-      const response = await fetchWithAuth(
+      const response = await fetchWithCookie(
         `/api/classes/${classId}/members/${memberId}/permissions`,
         {
           method: 'PUT',

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import { DataTable, type Column } from '@/components/admin'
 import type { Notification } from '@/types/models'
@@ -34,7 +34,7 @@ export default function NotificationsPage() {
  params.append('unreadOnly', 'true')
  }
 
- const response = await fetchWithAuth(`/api/notifications?${params}`)
+ const response = await fetchWithCookie(`/api/notifications?${params}`)
 
  if (response.status === 401) {
  router.push('/login')
@@ -59,7 +59,7 @@ export default function NotificationsPage() {
 
  const markAsRead = async (notificationId: string) => {
  try {
- const response = await fetchWithAuth(`/api/notifications/${notificationId}`, {
+ const response = await fetchWithCookie(`/api/notifications/${notificationId}`, {
  method: 'PUT',
  })
 
@@ -75,7 +75,7 @@ export default function NotificationsPage() {
 
  const markAllAsRead = async () => {
  try {
- const response = await fetchWithAuth('/api/notifications/mark-all-read', {
+ const response = await fetchWithCookie('/api/notifications/mark-all-read', {
  method: 'POST',
  })
 
@@ -93,7 +93,7 @@ export default function NotificationsPage() {
  if (!confirm('确定删除这条通知吗?')) return
 
  try {
- const response = await fetchWithAuth(`/api/notifications/${notificationId}`, {
+ const response = await fetchWithCookie(`/api/notifications/${notificationId}`, {
  method: 'DELETE',
  })
 

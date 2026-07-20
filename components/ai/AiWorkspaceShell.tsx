@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Cpu, Loader2, Settings, Sparkles, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
-import { fetchWithAuth } from '@/lib/api/base'
+import toast from 'react-hot-toast'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { AiModelPicker } from './AiModelPicker'
 import { AiCapabilitiesNav } from './AiCapabilitiesNav'
@@ -15,7 +16,6 @@ import { AiGenerationForm, type AiGenerationSubmitParams } from './AiGenerationF
 import { AnalyzeForm } from './AnalyzeForm'
 import { SuggestMetadataForm } from './SuggestMetadataForm'
 import { SimilarProblemForm } from './SimilarProblemForm'
-import { AiTaskResultViewer } from './AiTaskResultViewer'
 import type { AiCapability, AiTask } from '@/types/ai'
 
 interface AiWorkspaceShellProps {
@@ -84,15 +84,11 @@ export function AiWorkspaceShell({
   const [tasksLoading, setTasksLoading] = useState(false)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // 每个 Tab 独立维护最近提交的 logId（用于 AiTaskResultViewer 轮询结果）
-  // 注：analyze / suggest_metadata Tab 由表单内部自管理轮询+结果展示
-  // （需要展示可编辑建议 + 一键入库 UI，AiTaskResultViewer 仅渲染只读结果，不能替代）
-  const [generateLogId, setGenerateLogId] = useState<string | null>(null)
-  const [similarLogId, setSimilarLogId] = useState<string | null>(null)
-  const [testDataLogId, setTestDataLogId] = useState<string | null>(null)
-
-  // history Tab：浮动任务卡片点击时传入的初始选中任务 ID
+  // 右栏侧栏选中任务 ID（提交 / 重试 / 历史卡片点击时设置）
+  // 提交成功后自动选中新建任务 → 右栏侧栏切换为详情视图，无需在工作区底部重复展示任务状态
   const [historySelectedId, setHistorySelectedId] = useState<string | null>(null)
+  // 入库 / 丢弃后递增的版本号，传给 AiWorkspaceSidebar 用于清除 detailCache 强制重拉
+  const [resultVersion, setResultVersion] = useState(0)
 
   // 右侧侧栏状态：'collapsed'（折叠）/ 'list'（列表视图）/ 'detail'（详情视图）
   // - 默认 'list'：侧栏以窄宽度显示历史记录列表
@@ -103,21 +99,20 @@ export function AiWorkspaceShell({
 
   // 出题表单提交中状态
   const [submittingGenerate, setSubmittingGenerate] = useState(false)
-  const [retryingGenerate, setRetryingGenerate] = useState(false)
 
-  /* ---------- generate Tab：提交 / 批量提交 / 重试 ---------- */
+  /* ---------- generate Tab：提交 ----------
+   * 提交后只刷新任务列表，进行中任务会出现在右栏顶部，不自动展开详情。
+   */
   const handleSubmitGenerate = async (params: AiGenerationSubmitParams) => {
     setSubmittingGenerate(true)
     try {
-      const res = await fetchWithAuth('/api/admin/ai/generate', {
+      const res = await fetchWithCookie('/api/admin/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
       })
       const data = await res.json()
       if (data.success) {
-        const logId = data.data?.logId || data.data?.id
-        if (logId) setGenerateLogId(logId)
         // 提交成功后立即刷新任务列表（启动列表轮询追踪新任务状态）
         fetchTasks()
       } else {
@@ -128,46 +123,47 @@ export function AiWorkspaceShell({
     }
   }
 
-  const handleRetryGenerate = async () => {
-    if (!generateLogId) return
-    setRetryingGenerate(true)
-    try {
-      const res = await fetchWithAuth('/api/admin/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ retryFromLogId: generateLogId }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        const logId = data.data?.logId || data.data?.id
-        if (logId) setGenerateLogId(logId)
-      }
-    } finally {
-      setRetryingGenerate(false)
-    }
-  }
-
-  /* ---------- 预览-确认操作（generate / similar 共用） ---------- */
+  /* ---------- 预览-确认操作（generate / similar 共用） ----------
+   * 入库 / 丢弃后：
+   * 1. toast 提示结果
+   * 2. 刷新任务列表（列表卡片的状态徽章会更新）
+   * 3. 递增 resultVersion → AiWorkspaceSidebar 内部清除该 taskId 的 detailCache，
+   *    下次进入详情会重新拉取，确保 isPreview/committedAt 已是后端最新状态
+   */
   const handleCommitPreview = async (logId: string) => {
-    await fetchWithAuth('/api/admin/ai/problems/commit', {
+    const res = await fetchWithCookie('/api/admin/ai/problems/commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ logId }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (!data.success) {
+      throw new Error(data.error || '入库失败')
+    }
+    toast.success(`入库成功（${data.data?.problemIds?.length || 0} 题）`)
+    setResultVersion(v => v + 1)
+    fetchTasks()
   }
   const handleDiscardPreview = async (logId: string) => {
-    await fetchWithAuth('/api/admin/ai/problems/discard', {
+    const res = await fetchWithCookie('/api/admin/ai/problems/discard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ logId }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (!data.success) {
+      throw new Error(data.error || '丢弃失败')
+    }
+    toast.success('已丢弃预览题目')
+    setResultVersion(v => v + 1)
+    fetchTasks()
   }
 
   /* ---------- 能力清单（一次性拉取，不依赖 activeTab，避免切换时重复请求） ---------- */
   const fetchCapabilities = useCallback(async () => {
     try {
       setCapabilitiesLoading(true)
-      const res = await fetchWithAuth('/api/admin/ai/capabilities')
+      const res = await fetchWithCookie('/api/admin/ai/capabilities')
       const data = await res.json()
       if (data.success) {
         const caps: AiCapability[] = Array.isArray(data.data) ? data.data : []
@@ -201,7 +197,7 @@ export function AiWorkspaceShell({
     try {
       setTasksLoading(true)
       // 按当前 Tab 对应的 mode 过滤，返回该功能的全部历史记录
-      const res = await fetchWithAuth(`/api/admin/ai/generate?mode=${activeMode}`)
+      const res = await fetchWithCookie(`/api/admin/ai/generate?mode=${activeMode}`)
       const data = await res.json()
       if (data.success) {
         const items: AiTask[] = Array.isArray(data.data) ? data.data : []
@@ -332,60 +328,33 @@ export function AiWorkspaceShell({
     setSidebarMode(prev => (prev === 'collapsed' ? 'list' : 'collapsed'))
   }
 
-  /* ---------- 按 activeTab 渲染对应表单 + 结果查看器 ---------- */
+  /* ---------- 按 activeTab 渲染对应表单 ----------
+   * 任务状态与结果展示统一由右栏 AiWorkspaceSidebar 负责，
+   * 工作区只渲染输入表单，避免重复展示 + 同一 logId 双重轮询。
+   * 提交成功后 selectTaskInSidebar() 自动展开右栏并选中新建任务。
+   */
   const renderTabContent = () => {
     switch (activeTab) {
       case 'generate':
         return (
-          <div className="space-y-6">
-            <AiGenerationForm
-              defaultModelId={modelId || undefined}
-              onSubmit={handleSubmitGenerate}
-              submitting={submittingGenerate}
-              onRetry={generateLogId ? handleRetryGenerate : undefined}
-              retrying={retryingGenerate}
-            />
-            <AiTaskResultViewer
-              logId={generateLogId}
-              mode="generate"
-              onCommitPreview={handleCommitPreview}
-              onDiscardPreview={handleDiscardPreview}
-              onRegenerate={handleRetryGenerate}
-            />
-          </div>
+          <AiGenerationForm
+            defaultModelId={modelId || undefined}
+            onSubmit={handleSubmitGenerate}
+            submitting={submittingGenerate}
+          />
         )
 
       case 'test_data':
         return (
-          <div className="space-y-6">
-            <TestDataGenerationForm
-              problemId={problemId || undefined}
-              modelId={modelId || undefined}
-              onEnqueued={setTestDataLogId}
-            />
-            <AiTaskResultViewer
-              logId={testDataLogId}
-              mode="test_data"
-              onRegenerate={async (logId) => {
-                // 测试数据重试：走 generate retry
-                const res = await fetchWithAuth('/api/admin/ai/generate', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ retryFromLogId: logId }),
-                })
-                const data = await res.json()
-                if (data.success) {
-                  const newLogId = data.data?.logId || data.data?.id
-                  if (newLogId) setTestDataLogId(newLogId)
-                }
-              }}
-            />
-          </div>
+          <TestDataGenerationForm
+            problemId={problemId || undefined}
+            modelId={modelId || undefined}
+            onEnqueued={() => fetchTasks()}
+          />
         )
 
       case 'analyze':
         // AnalyzeForm 自管理完整流程：题号搜索 → 提交 → 轮询 → 可编辑建议 + 一键入库
-        // 不再额外渲染 AiTaskResultViewer（会导致同一 logId 双重轮询 + 结果重复展示）
         return (
           <AnalyzeForm defaultProblemId={problemId || undefined} />
         )
@@ -398,30 +367,10 @@ export function AiWorkspaceShell({
 
       case 'similar':
         return (
-          <div className="space-y-6">
-            <SimilarProblemForm
-              defaultProblemId={problemId || undefined}
-              onEnqueued={setSimilarLogId}
-            />
-            <AiTaskResultViewer
-              logId={similarLogId}
-              mode="generate"
-              onCommitPreview={handleCommitPreview}
-              onDiscardPreview={handleDiscardPreview}
-              onRegenerate={async (logId) => {
-                const res = await fetchWithAuth('/api/admin/ai/generate', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ retryFromLogId: logId }),
-                })
-                const data = await res.json()
-                if (data.success) {
-                  const newLogId = data.data?.logId || data.data?.id
-                  if (newLogId) setSimilarLogId(newLogId)
-                }
-              }}
-            />
-          </div>
+          <SimilarProblemForm
+            defaultProblemId={problemId || undefined}
+            onEnqueued={() => fetchTasks()}
+          />
         )
 
       default:
@@ -558,12 +507,13 @@ export function AiWorkspaceShell({
                       tasks={tasks}
                       loading={tasksLoading}
                       initialSelectedId={historySelectedId}
+                      resultVersion={resultVersion}
                       onSelectedChange={handleSidebarSelectedChange}
                       onActiveTaskClick={handleTaskClick}
                       onFetchDetail={async (taskId) => {
                         // 详情按需拉取：调用单条 GET /api/admin/ai/generate?logId=xxx
                         try {
-                          const res = await fetchWithAuth(`/api/admin/ai/generate?logId=${taskId}`)
+                          const res = await fetchWithCookie(`/api/admin/ai/generate?logId=${taskId}`)
                           const data = await res.json()
                           if (data.success && data.data) {
                             return data.data as AiTask
@@ -574,7 +524,7 @@ export function AiWorkspaceShell({
                         return null
                       }}
                       onRetry={async (taskId) => {
-                        const res = await fetchWithAuth('/api/admin/ai/generate', {
+                        const res = await fetchWithCookie('/api/admin/ai/generate', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ retryFromLogId: taskId }),
@@ -587,8 +537,20 @@ export function AiWorkspaceShell({
                           throw new Error(data.error || '重试失败')
                         }
                       }}
-                      onCommitPreview={handleCommitPreview}
-                      onDiscardPreview={handleDiscardPreview}
+                      onCommitPreview={async (taskId) => {
+                        try {
+                          await handleCommitPreview(taskId)
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : '入库失败')
+                        }
+                      }}
+                      onDiscardPreview={async (taskId) => {
+                        try {
+                          await handleDiscardPreview(taskId)
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : '丢弃失败')
+                        }
+                      }}
                     />
                   </motion.div>
                 </AnimatePresence>

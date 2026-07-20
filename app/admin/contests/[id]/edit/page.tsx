@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { Trophy, ArrowLeft, Save, X } from 'lucide-react'
 import type { Problem } from '@/types/models'
@@ -31,7 +31,7 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
 
  const fetchContest = useCallback(async () => {
  try {
- const response = await fetchWithAuth(`/api/admin/contests/${id}`)
+ const response = await fetchWithCookie(`/api/admin/contests/${id}`)
 
  if (response.status === 403) {
  setError('需要管理员权限')
@@ -72,7 +72,7 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
  }
  setSearching(true)
  try {
- const response = await fetchWithAuth('/api/admin/problems')
+ const response = await fetchWithCookie('/api/admin/problems')
  const data = await response.json()
  if (data.success) {
    const payload = data.data
@@ -106,7 +106,7 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
  setError('')
 
  try {
- const response = await fetchWithAuth(`/api/admin/contests/${id}`, {
+ const response = await fetchWithCookie(`/api/admin/contests/${id}`, {
  method: 'PATCH',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({

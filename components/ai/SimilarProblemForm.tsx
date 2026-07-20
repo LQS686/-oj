@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Loader2, GitFork, AlertCircle } from 'lucide-react'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ProblemNumberSearch, type ProblemFullInfo } from './ProblemNumberSearch'
 import { ProblemDetailCard } from './ProblemDetailCard'
@@ -42,7 +42,7 @@ export function SimilarProblemForm({
     }
     setSubmitting(true)
     try {
-      const res = await fetchWithAuth('/api/admin/ai/similar', {
+      const res = await fetchWithCookie('/api/admin/ai/similar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ problemId: problem.id }),

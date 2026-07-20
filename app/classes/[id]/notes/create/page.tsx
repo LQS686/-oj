@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import { FileText, Tag, AlertCircle } from 'lucide-react'
 import { ClassWorkspaceShell } from '@/components/common'
 import { useClass } from '@/hooks/useClass'
@@ -45,7 +45,7 @@ export default function CreateNotePage() {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetchWithAuth(`/api/classes/${classId}`)
+        const res = await fetchWithCookie(`/api/classes/${classId}`)
         const data = await res.json()
         if (cancelled) return
         if (!data.success) {
@@ -84,7 +84,7 @@ export default function CreateNotePage() {
     try {
       setLoading(true)
 
-      const response = await fetchWithAuth(`/api/classes/${classId}/notes`, {
+      const response = await fetchWithCookie(`/api/classes/${classId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

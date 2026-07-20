@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { BookOpen, AlertCircle, X } from 'lucide-react'
-import { fetchWithAuth, fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
 
@@ -139,7 +139,7 @@ export default function CreateAssignmentModal({
 
     try {
       setLoading(true)
-      const response = await fetchWithAuth(`/api/classes/${classId}/assignments`, {
+      const response = await fetchWithCookie(`/api/classes/${classId}/assignments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

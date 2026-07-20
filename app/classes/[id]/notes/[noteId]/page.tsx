@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
-import { fetchWithAuth } from '@/lib/api/base'
+import { fetchWithCookie } from '@/lib/api/base'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { ArrowLeft, User, Calendar, Tag, Edit, Trash2, FileText, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
@@ -44,7 +44,7 @@ export default function NoteDetailPage() {
  const fetchNote = async () => {
  try {
  setLoading(true)
- const response = await fetchWithAuth(`/api/classes/${params.id}/notes/${params.noteId}`)
+ const response = await fetchWithCookie(`/api/classes/${params.id}/notes/${params.noteId}`)
 
  const data = await response.json()
 
@@ -64,7 +64,7 @@ export default function NoteDetailPage() {
  if (!confirm('确定要删除这篇笔记吗？此操作不可恢复！')) return
 
  try {
- const response = await fetchWithAuth(`/api/classes/${params.id}/notes/${params.noteId}`, {
+ const response = await fetchWithCookie(`/api/classes/${params.id}/notes/${params.noteId}`, {
  method: 'DELETE'
  })
 

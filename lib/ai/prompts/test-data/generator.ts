@@ -14,8 +14,9 @@ export class TestDataGenPromptGenerator implements PromptGenerator {
     const { title, description, inputDescription, outputDescription, count, hasSolution } = context;
     // TestDataGen：结构化数据生成，需要一定随机性以覆盖多样场景
     const temperature = 0.3;
-    // 用户传入 count 过低时自动上调到 15（保证覆盖度）
-    const finalCount = Math.max(count, 15);
+    // 数量不设硬性下限——尊重用户传入的 count，覆盖度判定基于 input 中真实数据特征
+    // 用户传入 count 仅作为参考下限，若 count 已能覆盖 10 个维度则严格匹配，否则 AI 自行扩展
+    const finalCount = Math.max(count, 1);
 
     const systemPrompt = `你是一位资深的算法测试数据生成器，专为编程竞赛题目生成高质量的 input / output 对。
 
@@ -24,7 +25,7 @@ export class TestDataGenPromptGenerator implements PromptGenerator {
 2. 边界覆盖 — 必须覆盖最小值、最大值、边界条件、特殊值、随机典型、全相同、严格单调、极端比例、倒数边界、随机压力 10 类
 3. 纯数据 — input / output 字符串中不能包含中文字符或注释
 4. 难度匹配 — 至少 1 组数据应接近数据范围上限（用于压力测试）
-5. 数量充分 — 默认 15 组起步（用户可指定更多），覆盖度优先于紧凑度`;
+5. 覆盖度优先 — 数量不设上下限，由覆盖 10 个维度的需要自行决定；覆盖判定基于 input 中真实数据特征，凑数量无效`;
 
     let outputRequirement: string
     let exampleJson: string
@@ -55,7 +56,7 @@ export class TestDataGenPromptGenerator implements PromptGenerator {
 }`
     }
 
-    const userPrompt = `请为以下题目生成 ${finalCount} 组测试数据${count < 15 ? `（用户请求 ${count} 组，但已自动上调到 15 组以保证覆盖度）` : ''}。
+    const userPrompt = `请为以下题目生成测试数据（数量不设上下限，由覆盖度决定）。
 
 【题目信息】
 标题：${title}
@@ -69,7 +70,7 @@ ${inputDescription}
 ${outputDescription}
 
 【要求】
-1. 生成 ${finalCount} 组测试数据${count >= 15 ? '（数量严格匹配）' : '（用户原要求' + count + '组，已上调至 15 组以保证覆盖度）'}
+1. 生成测试数据，数量由覆盖 10 个维度的需要自行决定（用户参考下限 ${count} 组，若不足以覆盖所有维度请自行扩展，若 ${count} 组已能覆盖则严格匹配）
 2. 必须覆盖以下 10 个维度的至少 9 个：
 ${renderTestCaseDimensions()}
 3. 严格遵循输入格式（行数、列数、字段顺序、值域）
@@ -93,7 +94,7 @@ ${JSON_OUTPUT_SPEC}`;
 
   generateThinkingPrompt(context: TestDataGenContext): string {
     const { title, description, inputDescription, outputDescription, count } = context;
-    return `你是一位资深的算法测试数据规划师，正在为以下题目规划 ${count} 组测试数据。
+    return `你是一位资深的算法测试数据规划师，正在为以下题目规划测试数据（用户参考下限 ${count} 组，实际数量由覆盖度决定）。
 
 题目：${title}
 描述：${description}
@@ -104,7 +105,7 @@ ${THINKING_STEP_FRAME}
 
 请输出：
 - 数据范围分析（每行/字段的合法值域）
-- ${count} 组测试数据的维度规划（仅列类别与意图，如"n=1 的最小值情形"、"n=10^5 压力测试"）
+- 测试数据的维度规划（仅列类别与意图，如"n=1 的最小值情形"、"n=10^5 压力测试"；用户参考下限 ${count} 组，若不足以覆盖 10 个维度请规划更多组）
 - 关键边界条件清单
 - 若有特殊数据格式（如浮点精度、负数、字符串），列出注意事项
 
