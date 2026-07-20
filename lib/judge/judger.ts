@@ -11,6 +11,98 @@ import { join } from 'path'
 import { logger } from '@/lib/logger'
 import { emitJudgeProgress } from '@/lib/websocket/server'
 
+/**
+ * 多段错误信息合并：参考 HOJ JudgeStrategy.mergeNonEmptyStrings。
+ * 每段先 trim + 截断到 maxLenPerSegment，再过滤空串，最后用 sep 连接。
+ * 避免单段过长遮蔽其他段信息（如编译 stderr 过长掩盖编译状态标签）。
+ */
+function mergeNonEmptyStrings(parts: Array<string | undefined | null>, sep = '\n', maxLenPerSegment = 2000): string {
+  const valid = parts
+    .map((p) => (typeof p === 'string' ? p.trim() : ''))
+    .map((p) => (p.length > maxLenPerSegment ? p.slice(0, maxLenPerSegment) : p))
+    .filter((p) => p.length > 0)
+  return valid.join(sep)
+}
+
+/**
+ * 格式化运行时错误消息，识别 UBSanitizer 输出并给出可读诊断。
+ *
+ * UBSanitizer（-fsanitize=undefined）在运行时检测到未定义行为时，向 stderr 输出：
+ *   "runtime error: <UB 类型描述>"
+ *
+ * 常见 UB 类型（gcc 文档：https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html）：
+ *   - "signed integer overflow"：有符号整数溢出（如 INT_MAX + 1）
+ *   - "division by zero"：除零
+ *   - "null pointer dereference"：空指针解引用
+ *   - "load of value ... which is not a valid value for type 'int'"
+ *     ：读取未初始化变量（藏数据题常见场景，如 int a; cout << a;）
+ *   - "index ... out of bounds"：数组越界
+ *   - "misaligned address"：内存对齐非法
+ *
+ * 当 UBSan 输出存在时，优先展示 UBSan 诊断（最直接的可读信息），
+ * 否则回退到 executor 提供的信号映射消息（如 SIGSEGV/段错误）。
+ *
+ * 项目约束：错误消息中 stderr 截断到 2000 字符（项目硬约束）
+ */
+function formatRuntimeErrorMessage(executorError: string | undefined, programOutput: string): string {
+  // 合并 executor 错误与程序输出（UBSan 可能输出到 stdout 而非 stderr）
+  const combined = [executorError, programOutput].filter(Boolean).join('\n')
+  if (!combined) return '运行时错误'
+
+  // 提取所有 "runtime error: ..." 行（UBSan 输出）
+  const ubSanPattern = /runtime error: (.+)/g
+  const ubMatches: string[] = []
+  let match: RegExpExecArray | null
+  while ((match = ubSanPattern.exec(combined)) !== null) {
+    ubMatches.push(match[1].trim())
+  }
+
+  if (ubMatches.length > 0) {
+    // 取第一条 UBSan 诊断作为主消息（避免多条 UB 重复展示）
+    const firstUb = ubMatches[0]
+    // 将 UBSan 原始文本映射为中文可读描述
+    const readable = mapUbSanToReadable(firstUb)
+    // 截断到 2000 字符（项目硬约束）
+    const truncated = readable.length > 2000 ? readable.slice(0, 2000) + '\n[已截断]' : readable
+    return `运行时错误（UBSanitizer 检测到未定义行为）: ${truncated}`
+  }
+
+  // 无 UBSan 输出：回退到 executor 提供的消息（已包含信号映射）
+  return executorError || '运行时错误'
+}
+
+/**
+ * 将 UBSanitizer 的英文 UB 描述映射为中文可读文本。
+ * 仅处理常见 UB 类型，未匹配的返回原文。
+ */
+function mapUbSanToReadable(ubMessage: string): string {
+  const msg = ubMessage.toLowerCase()
+  if (msg.includes('signed integer overflow')) {
+    return `有符号整数溢出（${ubMessage}）`
+  }
+  if (msg.includes('division by zero')) {
+    return `除零错误（${ubMessage}）`
+  }
+  if (msg.includes('null pointer') || msg.includes('null pointer dereference')) {
+    return `空指针解引用（${ubMessage}）`
+  }
+  if (msg.includes('load of value') && msg.includes('not a valid value')) {
+    // 藏数据题典型场景：int a; cout << a; 读取未初始化变量
+    return `读取了未初始化的变量（${ubMessage}）`
+  }
+  if (msg.includes('out of bounds') || msg.includes('index')) {
+    return `数组越界访问（${ubMessage}）`
+  }
+  if (msg.includes('misaligned')) {
+    return `内存对齐非法（${ubMessage}）`
+  }
+  if (msg.includes('shift')) {
+    return `移位操作非法（${ubMessage}）`
+  }
+  // 未匹配的 UB 类型，原样返回
+  return ubMessage
+}
+
 // 单测点执行+比较（单次运行，不含重测）
 async function runOnce(
   testCase: JudgeJob['testCases'][number],
@@ -34,13 +126,22 @@ async function runOnce(
     return { status: 'CSP', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '无法启动程序', outputCorrect: false, exceedsTimeLimit: false }
   }
   if (executeResult.timeout) {
-    return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出时间限制', outputCorrect: false, exceedsTimeLimit: false }
+    // 细化 TLE 消息：区分 CPU TLE 与墙钟 TLE（参考 HOJ/Hydro 的 clockLimit = 3 × cpuLimit 设计）
+    // executeResult.error 已包含详细原因（CPU 时间超限 / 墙钟超时）
+    const tleMsg = executeResult.error || '超出时间限制'
+    return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: tleMsg, outputCorrect: false, exceedsTimeLimit: false }
   }
   if (executeResult.memoryExceeded) {
-    return { status: 'MLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出内存限制', outputCorrect: false, exceedsTimeLimit: false }
+    return { status: 'MLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '超出内存限制', outputCorrect: false, exceedsTimeLimit: false }
   }
   if (executeResult.runtimeError) {
-    return { status: 'RE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '运行时错误', outputCorrect: false, exceedsTimeLimit: false }
+    // 识别 UBSanitizer 的 runtime error 输出，细化 RE 消息
+    // UBSan 在触发 UB 时向 stderr 输出形如 "runtime error: ..." 的诊断信息
+    // 常见 UB：signed integer overflow, division by zero, null pointer dereference,
+    //          load of value ... which is not a valid value for type 'int' (未初始化变量) 等
+    // 参考：https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
+    const reMsg = formatRuntimeErrorMessage(executeResult.error, executeResult.output)
+    return { status: 'RE', score: 0, time: executeResult.time, memory: executeResult.memory, message: reMsg, outputCorrect: false, exceedsTimeLimit: false }
   }
 
   // 程序正常完成，比较输出
@@ -114,8 +215,10 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
       const stateLabel = COMPILE_STATE_MESSAGES[compileState] || ''
       const detail = compileResult.error || '编译错误'
       // 项目约束：编译 stderr 必须截断到 2000 字符以防止日志溢出
-      const stderrInfo = compileResult.stderr ? `\n${compileResult.stderr.substring(0, 2000)}` : ''
-      const message = stateLabel ? `${stateLabel}: ${detail}${stderrInfo}` : `${detail}${stderrInfo}`
+      // 使用 mergeNonEmptyStrings 统一分段截断，避免单段过长遮蔽状态标签
+      const message = stateLabel
+        ? mergeNonEmptyStrings([`${stateLabel}: ${detail}`, compileResult.stderr])
+        : mergeNonEmptyStrings([detail, compileResult.stderr])
       return {
         ...result,
         status: 'CE',

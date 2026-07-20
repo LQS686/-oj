@@ -20,13 +20,16 @@ export interface AdminUpdateContestInput {
   isPublic?: boolean
   password?: string | null
   problems?: string[]
+  // 封榜机制字段
+  sealRankTime?: string | null
+  sealUnlocked?: boolean
 }
 
 export async function adminUpdateContest(
   contestId: string,
   body: AdminUpdateContestInput
 ) {
-  const { title, description, type, startTime, endTime, isPublic, password, problems } = body
+  const { title, description, type, startTime, endTime, isPublic, password, problems, sealRankTime, sealUnlocked } = body
 
   const updateData: any = {
     title,
@@ -48,6 +51,24 @@ export async function adminUpdateContest(
     updateData.duration = duration
   }
 
+  // 封榜时间：传 null/空字符串表示清除封榜
+  if (sealRankTime !== undefined) {
+    if (sealRankTime === null || sealRankTime === '') {
+      updateData.sealRankTime = null
+    } else {
+      const sealDate = new Date(sealRankTime)
+      if (!isNaN(sealDate.getTime())) {
+        // 封榜时间应在比赛时间范围内
+        updateData.sealRankTime = sealDate
+      }
+    }
+  }
+
+  // 管理员手动解冻
+  if (sealUnlocked !== undefined) {
+    updateData.sealUnlocked = !!sealUnlocked
+  }
+
   // 改为非事务处理以兼容 standalone MongoDB
   // 1. 更新基本信息
   await prisma.contest.update({ where: { id: contestId }, data: updateData })
@@ -67,6 +88,7 @@ export async function adminUpdateContest(
     }
   }
   cache.delete(CacheKeys.contest.byId(contestId))
+  cache.deleteByPrefix('contest:rank')
   return { message: '更新成功' }
 }
 
@@ -128,6 +150,8 @@ export interface AdminCreateContestInput {
   isPublic?: boolean
   password?: string | null
   problems?: string[]
+  // 封榜机制字段（创建时可选）
+  sealRankTime?: string | null
 }
 
 /** 管理员创建竞赛 */
@@ -141,6 +165,19 @@ export async function adminCreateContest(
   if (duration <= 0) {
     throw new ApiError('INVALID_TIME', '结束时间必须晚于开始时间', 400)
   }
+
+  // 封榜时间解析：空值/null 表示不封榜
+  let sealRankTime: Date | null = null
+  if (input.sealRankTime) {
+    const parsed = new Date(input.sealRankTime)
+    if (!isNaN(parsed.getTime())) {
+      // 封榜时间应在比赛时间范围内
+      if (parsed.getTime() > start.getTime() && parsed.getTime() < end.getTime()) {
+        sealRankTime = parsed
+      }
+    }
+  }
+
   return prisma.contest.create({
     data: {
       title: input.title,
@@ -152,6 +189,7 @@ export async function adminCreateContest(
       isPublic: input.isPublic || false,
       password: input.password || null,
       authorId,
+      sealRankTime,
       problems: {
         create: input.problems && Array.isArray(input.problems)
           ? input.problems.map((problemId, index) => ({

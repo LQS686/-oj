@@ -28,9 +28,10 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
     isPublic?: boolean
     password?: string
     problems?: string[]
+    sealRankTime?: string | null
   }>(req)
   const {
-    title, description, type, startTime, endTime, isPublic, password, problems,
+    title, description, type, startTime, endTime, isPublic, password, problems, sealRankTime,
   } = body
 
   if (!title || !description || !startTime || !endTime || !type) {
@@ -43,7 +44,7 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
     type: type!,
     startTime: startTime!,
     endTime: endTime!,
-    isPublic, password, problems,
+    isPublic, password, problems, sealRankTime,
   }, user.id)
 
   return ok(contest)

@@ -18,15 +18,18 @@ import {
   History,
   MessageSquare,
   ListChecks,
-  Edit3
+  Edit3,
+  BarChart3
 } from 'lucide-react'
-import { getStatusColor } from '@/lib/status'
+import { getStatusColor, getDifficultyColor } from '@/lib/status'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
+import ProblemStatsPanel from '@/components/problem/ProblemStatsPanel'
+import PretestPanel from '@/components/problem/PretestPanel'
 import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
@@ -35,6 +38,7 @@ import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import toast from 'react-hot-toast'
+import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -76,7 +80,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('cpp')
-  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions' | 'code'>('description')
+  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions' | 'stats' | 'code'>('description')
   const [submitting, setSubmitting] = useState(false)
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
   const [judgeStatus, setJudgeStatus] = useState<any>(null)
@@ -586,14 +590,26 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             {problem.problemNumber || problem.id}
           </span>
           <h1 className="text-xl font-bold text-foreground md:text-2xl">{problem.title}</h1>
-          <span className={`tag ${
-            problem.difficulty === '入门' ? 'tag-success' :
-            problem.difficulty === '普及-' || problem.difficulty === '普及' ? 'tag-info' :
-            problem.difficulty === '普及+' || problem.difficulty === '提高' ? 'tag-warning' :
-            'tag-error'
-          }`}>
+          <span className={`difficulty-tag ${getDifficultyColor(problem.difficulty)}`}>
             {problem.difficulty}
           </span>
+          {problem.tags && problem.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {problem.tags.slice(0, 4).map((tag: string) => (
+                <Link
+                  key={tag}
+                  href={`/problems?tag=${encodeURIComponent(tag)}`}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary-light transition-colors"
+                  title={`按标签 "${tag}" 筛选题库`}
+                >
+                  {tag}
+                </Link>
+              ))}
+              {problem.tags.length > 4 && (
+                <span className="text-xs text-muted-foreground">+{problem.tags.length - 4}</span>
+              )}
+            </div>
+          )}
           {canEditProblem && problem?.id && (
             <Link
               href={`/admin/problems/${problem.id}/edit`}
@@ -636,7 +652,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
               {[
                 { key: 'description', label: '题目描述', icon: BookOpen },
                 { key: 'solutions', label: '题解', icon: MessageSquare },
-                { key: 'submissions', label: '提交记录', icon: ListChecks }
+                { key: 'submissions', label: '提交记录', icon: ListChecks },
+                { key: 'stats', label: '统计', icon: BarChart3 }
               ]
                 .filter((tab) => !(isAssignmentContext && tab.key === 'solutions'))
                 .map((tab) => {
@@ -714,6 +731,18 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     />
                   </motion.div>
                 )}
+
+                {activeTab === 'stats' && (
+                  <motion.div
+                    key="stats"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ProblemStatsPanel problemId={problemId} />
+                  </motion.div>
+                )}
               </AnimatePresence>
             </div>
           </div>
@@ -751,15 +780,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                   </select>
                 </div>
 
-                <textarea
-                  id="code-editor"
+                <CodeEditor
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  maxLength={65536}
-                  className="w-full h-[280px] sm:h-[360px] lg:h-[420px] rounded-xl bg-muted text-foreground font-mono text-sm p-3 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors duration-300"
-                  spellCheck={false}
+                  onChange={setCode}
+                  language={language as CodeLanguage}
                   placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
-                  aria-label="代码编辑器"
+                  height="420px"
+                  maxLength={65536}
+                  onSubmit={handleSubmit}
                 />
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -787,6 +815,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     <span className="transition-colors duration-300 group-hover:text-primary-light">清空</span>
                   </button>
                 </div>
+
+                {/* 在线测试（样例）：在正式提交前用题目样例运行代码，不影响提交记录 */}
+                <PretestPanel
+                  problemId={problemId}
+                  code={code}
+                  language={language}
+                  disabled={!user || submitting}
+                />
               </div>
             </div>
           </div>
@@ -899,8 +935,9 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         judgeProgress={judgeProgress}
         result={lastResult as SubmissionResultData | null}
         onContinueSubmit={() => {
-          const textarea = document.querySelector('textarea');
-          textarea?.focus();
+          // CodeMirror 的可编辑元素是 .cm-content，外层容器标记了 data-testid
+          const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null;
+          cmContent?.focus();
           setShowResultModal(false);
           setJudgeStatus(null);
           setLastResult(null);
@@ -915,7 +952,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
       {/* 移动端底部 Tab Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           <button
             onClick={() => setActiveTab('description')}
             className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'description' ? 'text-primary' : 'text-muted-foreground'}`}
@@ -935,7 +972,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'submissions' ? 'text-primary' : 'text-muted-foreground'}`}
           >
             <History className="w-5 h-5" />
-            <span className="text-xs">提交记录</span>
+            <span className="text-xs">提交</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('stats')}
+            className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'stats' ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="text-xs">统计</span>
           </button>
         </div>
       </div>

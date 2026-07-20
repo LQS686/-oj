@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
-import { Plus, History } from 'lucide-react'
+import { Plus, History, Upload } from 'lucide-react'
 import { useProblemList } from './_hooks/useProblemList'
 import { useSourceChangeLogs } from './_hooks/useSourceChangeLogs'
 import { ProblemFilterBar } from './_components/ProblemFilterBar'
@@ -13,6 +13,7 @@ import { buildProblemColumns } from './_components/problemColumns'
 import { buildLogColumns } from './_components/logColumns'
 import { DeleteProblemModal } from './_components/DeleteProblemModal'
 import { BatchSourceModal } from './_components/BatchSourceModal'
+import { ImportProblemsModal } from './_components/ImportProblemsModal'
 import { filterProblems } from './_utils'
 import type { Problem, LogEntry, ActiveTab, BatchActionType } from './_types'
 
@@ -28,6 +29,7 @@ export default function AdminProblemsPage() {
   const [deletingProblem, setDeletingProblem] = useState<Problem | null>(null)
   const [showBatchSourceModal, setShowBatchSourceModal] = useState(false)
   const [batchSourceIds, setBatchSourceIds] = useState<string[]>([])
+  const [showImportModal, setShowImportModal] = useState(false)
   const [activeTab, setActiveTab] = useState<ActiveTab>('list')
 
   useEffect(() => {
@@ -130,13 +132,22 @@ export default function AdminProblemsPage() {
               来源日志
             </button>
           </div>
-          <button
-            onClick={() => router.push('/admin/problems/create')}
-            className="btn btn-primary flex items-center gap-2 ml-auto"
-          >
-            <Plus className="w-5 h-5" />
-            创建题目
-          </button>
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="btn btn-ghost flex items-center gap-2"
+            >
+              <Upload className="w-5 h-5" />
+              批量导入
+            </button>
+            <button
+              onClick={() => router.push('/admin/problems/create')}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              创建题目
+            </button>
+          </div>
         </div>
 
         {activeTab === 'list' && (
@@ -212,6 +223,13 @@ export default function AdminProblemsPage() {
             setBatchSourceIds([])
             fetchProblems()
           }}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportProblemsModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => fetchProblems()}
         />
       )}
     </>

@@ -12,21 +12,27 @@ import { enqueueSolutionForNewProblem } from '@/lib/ai/service'
  * GET /api/admin/problems - 获取题目列表（管理员）
  *
  * Query 参数：
- * - q: 关键字模糊匹配题号 / 标题（不区分大小写）
- * - page / pageSize: 分页参数（q 必须配合分页使用，避免一次性返回全表）
+ * - q: 关键字模糊匹配题号 / 标题 / 来源（不区分大小写）
+ * - tagIds / tags: 标签过滤，逗号分隔，多个标签为 OR（任一命中即返回）
+ * - page / pageSize: 分页参数（q / tagIds 必须配合分页使用，避免一次性返回全表）
  */
 export const GET = withApi.admin(async (req) => {
   const url = new URL(req.url)
   const q = url.searchParams.get('q') || undefined
   const pageStr = url.searchParams.get('page')
   const pageSizeStr = url.searchParams.get('pageSize')
+  const tagIdsParam = url.searchParams.get('tagIds') || url.searchParams.get('tags')
   const page = pageStr ? parseInt(pageStr, 10) : undefined
   const pageSize = pageSizeStr ? parseInt(pageSizeStr, 10) : undefined
-  // 模糊搜索时强制分页（默认 20 条），避免无限制返回
-  if (q && (!page || !pageSize)) {
-    return ok(await listAllProblemsForAdmin({ q, page: 1, pageSize: 20 }))
+  // tagIds 以逗号分隔（兼容 tags 参数名）
+  const tagIds = tagIdsParam
+    ? tagIdsParam.split(',').map(s => s.trim()).filter(Boolean)
+    : undefined
+  // 模糊搜索 / 标签过滤时强制分页（默认 20 条），避免无限制返回
+  if ((q || (tagIds && tagIds.length > 0)) && (!page || !pageSize)) {
+    return ok(await listAllProblemsForAdmin({ q, page: 1, pageSize: 20, tagIds }))
   }
-  return ok(await listAllProblemsForAdmin({ q, page, pageSize }))
+  return ok(await listAllProblemsForAdmin({ q, page, pageSize, tagIds }))
 })
 
 /**

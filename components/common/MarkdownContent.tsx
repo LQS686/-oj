@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
+import rehypeRaw from 'rehype-raw'
 import rehypeKatex from 'rehype-katex'
 import rehypeSanitize from 'rehype-sanitize'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -16,16 +17,16 @@ interface MarkdownContentProps {
  preprocessContent?: boolean
 }
 
-export default function MarkdownContent({ 
- content, 
+export default function MarkdownContent({
+ content,
  className = '',
  preprocessContent = false
 }: MarkdownContentProps) {
  const processedContent = useMemo(() => {
  if (!content) return ''
- 
+
  if (!preprocessContent) return content
- 
+
  let text = content
 
  const codeBlocks: string[] = []
@@ -47,7 +48,7 @@ export default function MarkdownContent({
  text = text.replace(/\$[^$\n]+\$/g, (match) => match)
 
  text = text.replace(/(\d+)\^(\d+)/g, '$$$1^{$2}$$')
- 
+
  text = text.replace(/\b([a-zA-Z])\^(\d)\b/g, '$$$1^{$2}$$')
  text = text.replace(/\b([a-zA-Z])\^([a-zA-Z])\b/g, '$$$1^{$2}$$')
 
@@ -63,7 +64,12 @@ export default function MarkdownContent({
  <div className={`markdown-body ${className}`}>
  <ReactMarkdown
  remarkPlugins={[remarkGfm, remarkMath]}
- rehypePlugins={[[rehypeSanitize, markdownSanitizeSchema], rehypeKatex]}
+ // rehype-raw：解析 markdown 中嵌入的 HTML 标签
+ //   用途：Hydro OJ 等导出的题面是 HTML 格式（<h2>/<p>/<pre> 等），
+ //         需 rehype-raw 才能正确渲染，否则会显示为原始标签文本。
+ //   顺序：rehype-raw 必须在 rehype-sanitize 之前，先解析再过滤。
+ //   安全：rehype-sanitize 配合 markdownSanitizeSchema 严格过滤危险标签/属性。
+ rehypePlugins={[[rehypeRaw, { allowDangerousProtocol: false }], [rehypeSanitize, markdownSanitizeSchema], rehypeKatex]}
  components={{
  code({className, children, ...props}: ComponentPropsWithoutRef<'code'> & ExtraProps) {
  const match = /language-(\w+)/.exec(className || '')

@@ -29,6 +29,7 @@ import { canManageContent } from '@/lib/permissions'
 import { isClassAdminApiRole, isClassStudentApiRole, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDateTime } from '@/lib/utils'
 import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
+import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -687,12 +688,13 @@ const [editOpen, setEditOpen] = useState(false)
  </select>
  </div>
 
- <textarea
+ <CodeEditor
  value={code}
- onChange={(e) => setCode(e.target.value)}
- className="w-full h-[320px] rounded-xl bg-muted text-foreground font-mono text-sm p-4 border border-border hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y transition-colors"
- spellCheck={false}
- placeholder="在此粘贴或输入代码..."
+ onChange={setCode}
+ language={language as CodeLanguage}
+ placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
+ height="320px"
+ onSubmit={handleSubmit}
  />
 
  <div className="min-h-[44px]" />
@@ -841,8 +843,9 @@ const [editOpen, setEditOpen] = useState(false)
  judgeProgress={judgeProgress}
  result={lastResult as SubmissionResultData | null}
  onContinueSubmit={() => {
- const textarea = document.querySelector('textarea');
- textarea?.focus();
+ // CodeMirror 的可编辑元素是 .cm-content，外层容器标记了 data-testid
+ const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null;
+ cmContent?.focus();
  setShowResultModal(false);
  setJudgeStatus(null);
  setLastResult(null);

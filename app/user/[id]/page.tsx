@@ -10,6 +10,8 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { motion, easeOut } from 'framer-motion'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
+import SubmissionHeatmap from '@/components/user/SubmissionHeatmap'
+import { Flame } from 'lucide-react'
 
 export default function UserProfilePage() {
  const params = useParams()
@@ -21,6 +23,7 @@ export default function UserProfilePage() {
  const [activityData, setActivityData] = useState<ActivityData[]>([])
  const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([])
  const [difficultyDistribution, setDifficultyDistribution] = useState<DifficultyDistribution[]>([])
+ const [yearActivity, setYearActivity] = useState<Record<string, number>>({})
 
  const profileTitle = user
    ? `${user.nickname || user.username} - 用户主页`
@@ -76,6 +79,7 @@ export default function UserProfilePage() {
  
  setRecentSubmissions(data.data.recentSubmissions || [])
  setDifficultyDistribution(data.data.difficultyDistribution || [])
+ setYearActivity(data.data.activity?.lastYear || {})
  }
  } catch (err) {
  console.error(err)
@@ -270,6 +274,17 @@ export default function UserProfilePage() {
  </AreaChart>
  </ResponsiveContainer>
  </div>
+ </motion.div>
+
+ {/* 提交日历热力图（参考 GitHub Contribution Graph + HOJ 用户活跃度） */}
+ <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-primary/5">
+ <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-foreground">
+ <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
+ <Flame className="w-5 h-5 text-accent" />
+ </div>
+ 提交日历 (近一年)
+ </h3>
+ <SubmissionHeatmap data={yearActivity} days={365} />
  </motion.div>
 
  <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-secondary/5">

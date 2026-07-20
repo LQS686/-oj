@@ -142,6 +142,8 @@ export async function updateContestWithProblems(
     isPublic?: boolean
     password?: string | null
     problemIds?: string[]
+    // 封榜时间：传 null 清除封榜，传 Date 设置封榜
+    sealRankTime?: Date | null
   }
 ) {
   const { problemIds, ...contestData } = data
@@ -164,6 +166,7 @@ export async function updateContestWithProblems(
     }
   }
   cache.delete(CacheKeys.contest.byId(contestId))
+  cache.deleteByPrefix('contest:rank')
   return updated
 }
 

@@ -128,7 +128,13 @@ export interface ListPublicProblemsResult {
   }
 }
 
-/** 公共题库列表（分页 + 关键字 + 难度 + tag 过滤） */
+/** 公共题库列表（分页 + 关键字 + 难度 + tag 过滤）
+ *
+ * 关键字搜索字段（参考 HOJ ProblemMapper.xml getProblemList）：
+ *   - title 模糊匹配（insensitive）
+ *   - problemNumber 模糊匹配（让用户可直接搜索 "P1001" 或 "1001"）
+ *   - source 模糊匹配（题目来源，如 "洛谷 P1001"、"Codeforces 1234A"）
+ */
 export async function listPublicProblems(filter: {
   page: number
   pageSize: number
@@ -141,7 +147,8 @@ export async function listPublicProblems(filter: {
   if (search) {
     where.OR = [
       { title: { contains: search, mode: 'insensitive' } },
-      { id: { contains: search } },
+      { problemNumber: { contains: search, mode: 'insensitive' } },
+      { source: { contains: search, mode: 'insensitive' } },
     ]
   }
   if (difficulty) where.difficulty = difficulty

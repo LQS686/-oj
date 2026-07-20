@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Users,
@@ -17,11 +17,29 @@ import { fetchWithCookie } from '@/lib/api/base'
 import type { HomeDashboardData } from '@/lib/home/dashboard'
 import { AnnouncementsGrid } from '@/app/_components/AnnouncementsGrid'
 import { StatusBadge } from '@/app/_components/StatusBadge'
+import { useAnnouncementSocket } from '@/hooks/useAnnouncementSocket'
+import toast from 'react-hot-toast'
 
 export function DashboardView() {
   const [data, setData] = useState<HomeDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const fetchDashboard = useCallback(async () => {
+    try {
+      setError('')
+      const res = await fetchWithCookie('/api/home/dashboard')
+      const json = await res.json()
+      if (!json.success && !json.ok) {
+        throw new Error(json.error || '加载失败')
+      }
+      setData(json.data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -45,6 +63,20 @@ export function DashboardView() {
       cancelled = true
     }
   }, [])
+
+  // 监听公告实时推送：新发布时弹 toast 提示并刷新首页公告区
+  useAnnouncementSocket({
+    enabled: true,
+    onUpdate: () => {
+      // 公告变更（更新/删除/撤回）静默刷新首页数据
+      void fetchDashboard()
+    },
+    onPublished: (event) => {
+      // 新公告：弹 toast 提示用户查看（toast 文案中带标题，用户可前往公告页查看）
+      const title = event.title || '点击公告页查看'
+      toast.success(`📢 新公告：${title}`, { duration: 5000 })
+    },
+  })
 
   if (loading) {
     return (

@@ -54,6 +54,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     isPublic?: boolean
     password?: string | null
     problemIds?: string[]
+    sealRankTime?: string | null
   }>(req)
 
   // 密码：null/空 -> null, 有值 -> bcrypt
@@ -63,6 +64,17 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
       hashedPassword = null
     } else {
       hashedPassword = await bcrypt.hash(body.password, 12)
+    }
+  }
+
+  // 封榜时间：null/空 -> null, 字符串 -> Date
+  let sealRankTime: Date | null | undefined
+  if (body.sealRankTime !== undefined) {
+    if (body.sealRankTime === null || body.sealRankTime === '') {
+      sealRankTime = null
+    } else {
+      const parsed = new Date(body.sealRankTime)
+      sealRankTime = isNaN(parsed.getTime()) ? null : parsed
     }
   }
 
@@ -76,6 +88,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     isPublic: body.isPublic,
     password: hashedPassword as any,
     problemIds: body.problemIds,
+    sealRankTime,
   })
 
   return ok({ ...updatedContest, message: '竞赛更新成功' })

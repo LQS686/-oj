@@ -3,6 +3,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { logger } from '@/lib/logger'
 
 const PUBLIC_LIST_TTL = 60_000
 
@@ -139,7 +140,7 @@ export async function createAnnouncement(input: {
   clearAnnouncementCache()
   const now = new Date()
   const published = input.isPublished ?? false
-  return prisma.systemAnnouncement.create({
+  const created = await prisma.systemAnnouncement.create({
     data: {
       title: input.title.trim(),
       content: input.content,
@@ -150,6 +151,24 @@ export async function createAnnouncement(input: {
       authorId: input.authorId,
     },
   })
+
+  // 实时推送：仅当公告已发布且在有效期内时推送 'published' 事件
+  if (
+    isPubliclyVisible(
+      created.isPublished,
+      created.publishedAt,
+      created.expiresAt,
+      now
+    )
+  ) {
+    void broadcastAnnouncementChange({
+      type: 'published',
+      id: created.id,
+      title: created.title,
+    })
+  }
+
+  return created
 }
 
 export async function updateAnnouncement(
@@ -175,7 +194,7 @@ export async function updateAnnouncement(
     publishedAt = null
   }
 
-  return prisma.systemAnnouncement.update({
+  const updated = await prisma.systemAnnouncement.update({
     where: { id },
     data: {
       ...(input.title !== undefined ? { title: input.title.trim() } : {}),
@@ -186,13 +205,92 @@ export async function updateAnnouncement(
       ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
     },
   })
+
+  // 实时推送：根据状态变化决定事件类型
+  const now = new Date()
+  const wasVisible = isPubliclyVisible(existing.isPublished, existing.publishedAt, existing.expiresAt, now)
+  const nowVisible = isPubliclyVisible(updated.isPublished, updated.publishedAt, updated.expiresAt, now)
+
+  if (!wasVisible && nowVisible) {
+    // 从不可见变为可见：等同于新发布
+    void broadcastAnnouncementChange({
+      type: 'published',
+      id: updated.id,
+      title: updated.title,
+    })
+  } else if (wasVisible && !nowVisible) {
+    // 从可见变为不可见：撤回
+    void broadcastAnnouncementChange({ type: 'unpublished', id: updated.id })
+  } else if (wasVisible && nowVisible) {
+    // 仍然可见，但内容可能变化：更新事件
+    void broadcastAnnouncementChange({ type: 'updated', id: updated.id })
+  }
+  // 不可见 → 不可见：不推送（用户感知不到变化）
+
+  return updated
 }
 
 export async function deleteAnnouncement(id: string) {
   clearAnnouncementCache()
+  // 先查询公告状态，删除后广播（删除已发布且可见的公告才需要通知前端刷新）
+  const existing = await prisma.systemAnnouncement.findUnique({ where: { id } })
   await prisma.systemAnnouncement.delete({ where: { id } })
+
+  if (existing) {
+    const now = new Date()
+    if (isPubliclyVisible(existing.isPublished, existing.publishedAt, existing.expiresAt, now)) {
+      void broadcastAnnouncementChange({ type: 'deleted', id })
+    }
+  }
 }
 
 function clearAnnouncementCache() {
   cache.deleteByPrefix('announcement:')
+}
+
+/**
+ * 公告变更类型（用于 WebSocket 推送，前端按类型决定是否弹 toast）
+ * - 'published'：新发布公告（已发布且在有效期内）→ 前端弹 toast 提示
+ * - 'updated'：公告更新（标题/内容/置顶/有效期等）→ 前端静默刷新列表
+ * - 'deleted'：公告删除 → 前端静默刷新列表
+ * - 'unpublished'：公告从已发布变为未发布 → 前端静默刷新列表
+ */
+export type AnnouncementChangeEvent =
+  | { type: 'published'; id: string; title: string }
+  | { type: 'unpublished'; id: string }
+  | { type: 'updated'; id: string }
+  | { type: 'deleted'; id: string }
+
+/**
+ * 广播公告变更事件到所有在线用户
+ *
+ * 实现要点：
+ *   - 复用 lib/websocket/server.broadcastMessage（房间隔离的 'broadcast:public'）
+ *   - 动态 import 避免循环依赖（service ←→ websocket server）
+ *   - WebSocket 服务可能未启动（如构建阶段），失败静默忽略
+ */
+async function broadcastAnnouncementChange(event: AnnouncementChangeEvent) {
+  try {
+    const { broadcastMessage } = await import('@/lib/websocket/server')
+    broadcastMessage('announcement:update', event)
+    logger.debug('公告事件已广播', { type: event.type, id: event.id })
+  } catch (err) {
+    // WebSocket 服务未启动或其它错误，不阻塞公告 CRUD
+    logger.debug('公告事件广播失败（WebSocket 可能未启动）', {
+      type: event.type,
+      id: event.id,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
+/** 判断公告是否对公开用户可见（已发布且在有效期内） */
+function isPubliclyVisible(
+  isPublished: boolean,
+  publishedAt: Date | null,
+  expiresAt: Date | null,
+  now: Date = new Date()
+): boolean {
+  if (!isPublished) return false
+  return isActive(now, publishedAt, expiresAt)
 }

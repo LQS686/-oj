@@ -396,8 +396,9 @@ export default function TrainingProblemDetailPage({
         judgeProgress={judgeProgress}
         result={lastResult as SubmissionResultData | null}
         onContinueSubmit={() => {
-          const textarea = document.querySelector('textarea')
-          textarea?.focus()
+          // CodeMirror 的可编辑元素是 .cm-content，外层容器标记了 data-testid
+          const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null
+          cmContent?.focus()
           setShowResultModal(false)
           setJudgeStatus(null)
           setLastResult(null)

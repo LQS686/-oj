@@ -88,6 +88,58 @@ function checkTz(): string | null {
 }
 
 /**
+ * 校验 JUDGE_* 关键评测变量。
+ * 项目约束：AI 服务操作使用事务，MongoDB 事务要求副本集（DATABASE_URL 含 replicaSet）。
+ * 这里仅在 warn 级别提示，不阻塞启动（开发环境可能使用单机 MongoDB）。
+ */
+function checkJudgeAndMongoReplica(): string[] {
+  const warnings: string[] = []
+
+  // 1) 评测相关变量：缺失时使用代码默认值，但显式提示便于排查
+  const judgeVars: Record<string, string> = {
+    JUDGE_MAX_CONCURRENT: '评测并发数（默认 1）',
+    JUDGE_JOB_TIMEOUT: '单次评测任务超时秒数（默认 300）',
+    JUDGE_COMPILE_TIMEOUT: '编译超时毫秒数（默认 20000）',
+    JUDGE_EXTRA_TIME_RATIO: '评测额外时间比例（默认 0.1）',
+    JUDGE_REJUDGE_TIMES: '临界 TLE 重测次数（默认 1）',
+  }
+  for (const [k, desc] of Object.entries(judgeVars)) {
+    if (process.env[k] === undefined) {
+      // 仅在 production 提示，dev 环境使用默认值即可
+      if (process.env.NODE_ENV === 'production') {
+        warnings.push(`${k} 未设置，使用代码默认值（${desc}）`)
+      }
+    }
+  }
+
+  // 2) AI 服务相关变量
+  const aiVars: Record<string, string> = {
+    AI_JOB_TIMEOUT_MS: 'AI 生成任务超时毫秒数（默认 300000）',
+    AI_SOLUTION_TIMEOUT_MS: 'AI 题解生成超时毫秒数（默认 180000）',
+    AI_SOLUTION_MAX_CONCURRENT: 'AI 题解生成最大并发数（默认 2）',
+  }
+  for (const [k, desc] of Object.entries(aiVars)) {
+    if (process.env[k] === undefined && process.env.NODE_ENV === 'production') {
+      warnings.push(`${k} 未设置，使用代码默认值（${desc}）`)
+    }
+  }
+
+  // 3) MongoDB 副本集检测：项目硬约束要求 AI 服务使用事务，
+  //    MongoDB 事务仅支持副本集（或分片集群）。生产环境缺失 replicaSet 会导致事务失败。
+  const dbUrl = process.env.DATABASE_URL || ''
+  if (dbUrl && process.env.NODE_ENV === 'production') {
+    if (!/replicaSet\s*=/.test(dbUrl)) {
+      warnings.push(
+        'DATABASE_URL 未包含 replicaSet 参数。AI 服务事务操作将失败。' +
+        '请在 MongoDB 连接字符串中追加 ?replicaSet=rs0'
+      )
+    }
+  }
+
+  return warnings
+}
+
+/**
  * 执行完整环境变量校验。
  * - 缺关键变量：抛出 Error（含修复指引）
  * - 缺非关键变量：logger.warn
@@ -128,6 +180,9 @@ export function validateEnvironment(): EnvironmentCheckResult {
   // TZ：生产环境建议设置，确保日期时间处理一致
   const tzErr = checkTz()
   if (tzErr) warnings.push(tzErr)
+
+  // JUDGE_* / AI_* / MongoDB 副本集校验（仅生产环境 warn，dev 环境使用默认值）
+  warnings.push(...checkJudgeAndMongoReplica())
 
   if (warnings.length > 0) {
     for (const w of warnings) {

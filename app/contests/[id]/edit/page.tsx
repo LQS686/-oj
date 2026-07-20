@@ -23,6 +23,7 @@ export default function EditContestPage() {
  const [endTime, setEndTime] = useState('')
  const [isPublic, setIsPublic] = useState(true)
  const [password, setPassword] = useState('')
+ const [sealRankTime, setSealRankTime] = useState('')
 
  const [contestProblems, setContestProblems] = useState<Problem[]>([])
  const [searchQuery, setSearchQuery] = useState('')
@@ -49,6 +50,9 @@ export default function EditContestPage() {
  setEndTime(new Date(contest.endTime).toISOString().slice(0, 16))
  setIsPublic(contest.isPublic)
  setPassword(contest.password || '')
+ setSealRankTime(contest.sealRankTime
+ ? new Date(contest.sealRankTime).toISOString().slice(0, 16)
+ : '')
 
  const problemsRes = await fetchWithCookie(`/api/contests/${id}/problems`)
  const problemsData = await problemsRes.json()
@@ -183,6 +187,7 @@ export default function EditContestPage() {
  duration,
  isPublic,
  password: isPublic ? undefined : password,
+ sealRankTime: sealRankTime || null,
  problemIds: contestProblems.map(p => p.id)
  })
  })
@@ -316,6 +321,21 @@ export default function EditContestPage() {
  onChange={(e) => setEndTime(e.target.value)}
  className="input w-full"
  />
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-foreground mb-1">
+ 封榜时间 (可选)
+ </label>
+ <input
+ type="datetime-local"
+ value={sealRankTime}
+ onChange={(e) => setSealRankTime(e.target.value)}
+ className="input w-full"
+ />
+ <p className="text-xs text-muted-foreground mt-1">
+ 到达此时刻后，普通用户看到的是封榜快照；管理员可绕过封榜查看实时数据。留空表示不封榜。
+ </p>
  </div>
  </div>
 

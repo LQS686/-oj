@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { ApiError } from '@/lib/api/withApi'
 import { DIFFICULTIES, isValidDifficulty, migrateDifficulty } from '@/lib/constants'
 import { clearProblemCache } from './admin'
+import { deleteTestCaseFiles } from './testcase'
+import { logger } from '@/lib/logger'
 
 /* ============================================================================
  * 管理员批量题目操作 / 导出 / 审核 / 重生成题解
@@ -50,6 +52,11 @@ export async function batchUpdateProblemDifficulty(problemIds: string[], difficu
 
 /**
  * 批量删除题目：级联删除 submissions / solutions / contestProblems / trainingProblems / testCases
+ *
+ * 参考 HOJ 外键级联 + Hydro 硬删 document+软删 storage 的策略：
+ *   - DB 记录硬删除
+ *   - 磁盘测试点文件同步清理（失败仅 warn，不阻塞）
+ *   - 缓存清理放在 DB 删除之后（LOGIC-09）
  */
 export async function batchDeleteProblems(problemIds: string[]) {
   // 回退已 AC 用户的 solvedCount
@@ -80,6 +87,17 @@ export async function batchDeleteProblems(problemIds: string[]) {
   await prisma.trainingProblem.deleteMany({ where: { problemId: { in: problemIds } } })
   await prisma.testCase.deleteMany({ where: { problemId: { in: problemIds } } })
   const result = await prisma.problem.deleteMany({ where: { id: { in: problemIds } } })
+
+  // 同步清理磁盘测试点文件（DB 已删，磁盘文件不再有用）
+  // 失败仅 warn，不阻塞批量删除流程
+  await Promise.allSettled(problemIds.map(id => deleteTestCaseFiles(id))).then(settled => {
+    const failed = settled.filter(r => r.status === 'rejected')
+    if (failed.length > 0) {
+      logger.warn(`[problem] 批量删除 ${failed.length}/${problemIds.length} 个题目的磁盘文件失败`)
+    }
+  })
+
+  // LOGIC-09: 先 DB 后清缓存
   problemIds.forEach(clearProblemCache)
   return result
 }

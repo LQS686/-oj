@@ -164,8 +164,11 @@ export const TESTCASE_UPLOAD_CONFIG = {
   MAX_FILE_SIZE: 50 * 1024 * 1024,
   MAX_UNZIP_SIZE: 100 * 1024 * 1024,
   MAX_TESTCASES: 50,
-  MAX_TIME_LIMIT: 10000,
-  MAX_MEMORY_LIMIT: 512,
+  // 与 lib/problem/admin.ts 的 createAdminProblem 校验范围对齐
+  //   原 MAX_TIME_LIMIT=10000 / MAX_MEMORY_LIMIT=512 与 admin 范围 1~30000ms / 1~1024MB 不一致，
+  //   导致上传测试点时可能被截断到 10000ms/512MB，而题目主表存的是 30000ms/1024MB。
+  MAX_TIME_LIMIT: 30000,
+  MAX_MEMORY_LIMIT: 1024,
   ALLOWED_EXTENSIONS: ['.in', '.out'],
   ALLOWED_MIME_TYPES: ['application/zip', 'application/x-zip-compressed'],
 }

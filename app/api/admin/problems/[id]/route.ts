@@ -28,28 +28,32 @@ export const GET = withApi.admin(async (_req, ctx) => {
 /**
  * PATCH /api/admin/problems/[id] - 更新题目（管理员）
  */
-export const PATCH = withApi.admin(async (req, ctx) => {
+export const PATCH = withApi.admin(async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
-  return ok(await updateAdminProblem(id, body))
+  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
+  return ok(await updateAdminProblem(id, body, { id: user.id, username: user.username, ip: ip ?? undefined }))
 })
 
 /**
  * PUT /api/admin/problems/[id] - 更新题目（管理员）
  */
-export const PUT = withApi.admin(async (req, ctx) => {
+export const PUT = withApi.admin(async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
-  return ok(await updateAdminProblem(id, body))
+  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
+  return ok(await updateAdminProblem(id, body, { id: user.id, username: user.username, ip: ip ?? undefined }))
 })
 
 /**
  * DELETE /api/admin/problems/[id] - 删除题目（管理员）
  */
-export const DELETE = withApi.admin(async (_req, ctx) => {
+export const DELETE = withApi.admin(async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
-  return ok(await deleteAdminProblem(id))
+  // 传入 operator 信息用于审计日志
+  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
+  return ok(await deleteAdminProblem(id, { id: user.id, username: user.username, ip: ip ?? undefined }))
 })

@@ -17,6 +17,7 @@ import { getUserFromRequest } from './lib/auth'
 import { ApiError } from './lib/api/withApi'
 import jwt from 'jsonwebtoken'
 import { validateEnvironment } from './lib/env'
+import { formatStartupBanner } from './lib/build-info'
 
 /** 单个分片大小上限：与 chunk 路由一致 */
 const MAX_CHUNK_SIZE = 2 * 1024 * 1024
@@ -316,6 +317,10 @@ const hostname = process.env.HOSTNAME || '0.0.0.0'
 const port = parseInt(process.env.PORT || '3000', 10)
 
 validateEnvironment()
+
+// 参考 Hydro loader.ts：启动时输出 git hash + Node 版本 + 内存信息，
+// 便于线上排查问题（日志聚合时可定位到具体 commit）。
+logger.info(formatStartupBanner())
 
 const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()

@@ -43,7 +43,17 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
   }
 
   const extraTime = computeExtraTime(timeLimit, extraTimeRatio)
-  const hardTimeoutMs = timeLimit + extraTime
+  // 墙钟超时（hard timeout）：参考 HOJ/Hydro 的 clockLimit = 3 × cpuLimit
+  // 1. timeLimit + extraTime 作为 CPU 时间窗口（用于精确判定 CPU TLE）
+  // 2. timeLimit * 3 作为墙钟窗口（用于强制杀死 sleep 型死循环、IO 阻塞等）
+  //    比例 3x 是 HOJ SandboxRun.java:353 和 Hydro sandbox.ts:104 的标准配置
+  // 取两者最大值，确保：
+  //   - CPU 满载死循环（while(1);）：在 cpuLimit 内被杀 → TLE
+  //   - Sleep 型死循环（while(1) sleep(1);）：在 wallClockLimit 内被杀 → TLE
+  //   - 正常 IO 阻塞程序：在 wallClockLimit 内完成，CPU 时间 < timeLimit → AC/WA
+  const cpuTimeLimitMs = timeLimit + extraTime
+  const wallClockLimitMs = Math.max(cpuTimeLimitMs, timeLimit * 3)
+  const hardTimeoutMs = wallClockLimitMs
 
   const tempDir = join(process.cwd(), 'temp', 'judge')
   const timestamp = Date.now()
@@ -136,13 +146,22 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           clearTimeout(timeoutId)
           endTime = Date.now()
           exitCode = code || 0
-          if (code !== 0 && !timeout) {
-            // 137 = 容器被 OOM Killer 杀死（SIGKILL by kernel），判定为 MLE
-            if (code === 137) {
-              memoryExceeded = true
-            } else {
-              runtimeError = true
-            }
+          // 状态判定优先级：TLE > MLE > RE（参考 HOJ DefaultJudge.java:54-81）
+          // timeout 标志由 setTimeout 设置，表示墙钟超时
+          if (timeout) {
+            // 已由墙钟超时定时器标记，保持 timeout = true（最终判 TLE）
+            // 不再覆盖为 MLE/RE，避免 sleep 型死循环被误判
+          } else if (code === 137) {
+            // 137 = SIGKILL，通常是 Docker OOM Killer 触发（容器内存超 memoryLimit）
+            // 参考 HOJ SandboxRun.java:140 与 Hydro signals.ts:9
+            memoryExceeded = true
+          } else if (code === 124 || code === 143) {
+            // 124 = GNU timeout 命令的默认 TLE 退出码
+            // 143 = SIGTERM（128+15），docker rm -f 默认信号
+            timeout = true
+          } else if (code !== 0) {
+            // 其它非零退出码：runtime error（段错误/浮点异常/abort 等）
+            runtimeError = true
           }
           resolve()
         })
@@ -213,6 +232,21 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
       if (peakMemoryKB === 0) {
         logger.debug(`Docker模式: 资源统计未采集到（/usr/bin/time 可能未安装或容器已被超时清理）`)
+      }
+
+      // Docker 模式 CPU TLE 二次判定（参考 HOJ DefaultJudge.java:57）
+      // 沙箱返回正常退出（exitCode=0），但 CPU 时间超过 timeLimit → 判 TLE
+      // 此判定在 /usr/bin/time 统计解析完成后进行，确保使用精确的 CPU 时间
+      if (!timeout && !memoryExceeded && !runtimeError && cpuTimeMs > timeLimit) {
+        logger.debug(`Docker模式 CPU TLE: cpuTime=${cpuTimeMs}ms > timeLimit=${timeLimit}ms`)
+        timeout = true
+        if (cpuTimeMs > cpuTimeLimitMs) {
+          // 超过 cpuTimeLimitMs（含 extraTime 窗口）→ 严格 TLE，不重测
+          exceedsTimeLimit = false
+        } else {
+          // 在 timeLimit ~ cpuTimeLimitMs 之间 → 临界 TLE，可由 judger 触发重测
+          exceedsTimeLimit = true
+        }
       }
     } else {
       const runInfo = getRunInfo(language, compiledPath)
@@ -413,19 +447,31 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
           // P1-3: runner.sh 的 ulimit -t CPU 超限会发 SIGXCPU(退出码 152)
           // 或 SIGKILL(137)，非 Docker 路径应视为 TLE 而非 RE
+          // 参考资源：HOJ SandboxRun.java:113-146 的信号映射表
           if (savedExitCode === 137 || savedExitCode === 152) {
             savedTimeout = true
           }
 
-          if (savedExitCode !== 0 && !savedTimeout) {
+          // 状态判定优先级：TLE > MLE > RE
+          // timeout 标志由墙钟超时定时器或内存轮询设置，优先级最高
+          if (!savedTimeout && !memoryExceeded && savedExitCode !== 0) {
             runtimeError = true
           }
 
           // exceedsTimeLimit: 程序正常完成（未被强制杀死），但 CPU 时间超过 timeLimit
-          // 此时 timeout 保持 false（程序在 timeLimit + extraTime 窗口内完成），
-          // 由 judger 决定是否触发重测
-          if (!savedForceKilled && !savedTimeout && cpuTimeMs > timeLimit) {
+          // 此时 timeout 保持 false（程序在 cpuTimeLimitMs 窗口内完成），
+          // 由 judger 决定是否触发重测（参考 Hydro default.ts:55 rerun 机制）
+          if (!savedForceKilled && !savedTimeout && !memoryExceeded && cpuTimeMs > timeLimit) {
             exceedsTimeLimit = true
+          }
+
+          // CPU TLE 精确判定：程序在墙钟窗口内完成，但 CPU 时间超过 cpuTimeLimitMs
+          // 这种情况通常是 CPU 满载死循环在 extraTime 窗口内被强制杀死，
+          // 或程序在 extraTime 窗口内自然结束但 CPU 时间已超限
+          // 参考 HOJ DefaultJudge.java:57 的二次 TLE 判定
+          if (!savedTimeout && !memoryExceeded && !runtimeError && cpuTimeMs > cpuTimeLimitMs) {
+            savedTimeout = true
+            timeout = true
           }
 
           resolve()
@@ -502,14 +548,41 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
     let detailedError = undefined
 
+    // 推断 TLE 触发类型：墙钟超时 vs CPU 超时
+    // - 墙钟超时：墙钟时间 > wallClockLimitMs（或被墙钟定时器杀死），CPU 时间通常远小于墙钟
+    // - CPU 超时：CPU 时间 > timeLimit，墙钟时间通常与 CPU 时间接近
+    let timeoutType: 'wall-clock' | 'cpu' | undefined
     if (timeout) {
-      detailedError = `Time Limit Exceeded (>${timeLimit}ms)`
+      const wallTimeMs = endTime - startTime
+      // 判定逻辑：
+      //   - 若 cpuTimeMs > timeLimit → CPU TLE（CPU 满载死循环或算法效率不足）
+      //   - 否则 → 墙钟 TLE（sleep 型死循环、IO 阻塞等，CPU 时间正常但墙钟超限）
+      // 参考 HOJ/Hydro：两者最终状态都是 TLE，但 timeoutType 用于错误消息细化
+      if (cpuTimeMs > timeLimit) {
+        timeoutType = 'cpu'
+      } else {
+        timeoutType = 'wall-clock'
+      }
+      void wallTimeMs // 仅用于调试，避免未使用警告
+    }
+
+    if (timeout) {
+      const wallTimeMs = Math.max(0, endTime - startTime)
+      if (timeoutType === 'cpu') {
+        detailedError = `Time Limit Exceeded (CPU 时间 ${cpuTimeMs}ms > 限制 ${timeLimit}ms)`
+      } else {
+        detailedError = `Time Limit Exceeded (墙钟时间 ${wallTimeMs}ms > 限制 ${wallClockLimitMs}ms，可能是 sleep 型死循环或 IO 阻塞)`
+      }
     } else if (memoryExceeded) {
       detailedError = `Memory Limit Exceeded (>${memoryLimit}MB)`
     } else if (runtimeError) {
+      // 参考 HOJ JudgeStrategy：退出码 ≥ 128 时映射到 Unix 信号，
+      // 让 RE 错误更可诊断（区分段错误/浮点异常/abort 等）。
+      const signalReason = formatRuntimeErrorByExitCode(exitCode)
       const errLines = error.split('\n')
-      const lastLine = errLines[errLines.length - 1] || errLines[errLines.length - 2] || 'Runtime Error'
-      detailedError = `Runtime Error: ${lastLine}`
+      const lastLine = errLines[errLines.length - 1] || errLines[errLines.length - 2] || ''
+      const reasonText = signalReason ? `${signalReason}` : 'Runtime Error'
+      detailedError = lastLine ? `${reasonText}: ${lastLine}` : reasonText
       if (error) detailedError += `\n${error.substring(0, 500)}`
     }
 
@@ -525,6 +598,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       cannotStart,
       cpuTime: cpuTimeMs,
       exceedsTimeLimit,
+      timeoutType,
     }
   } catch (err) {
     try {
@@ -537,4 +611,36 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
     throw new Error(`执行错误: ${err instanceof Error ? err.message : String(err)}`)
   }
+}
+
+/**
+ * Unix 信号映射表（参考 HOJ JudgeStrategy.parseTestLibErr 与 Linux signal.h）。
+ * 退出码 ≥ 128 时表示被信号终止（128 + signal），此处映射为可读文本。
+ * 仅用于诊断信息展示，不影响 SubmissionStatus 状态码（仍为 RE）。
+ */
+const EXIT_CODE_SIGNAL_MAP: Record<number, string> = {
+  134: 'Runtime Error (SIGABRT: 调用 abort()/assert 失败)',
+  135: 'Runtime Error (SIGBUS: 总线错误/内存对齐非法)',
+  136: 'Runtime Error (SIGFPE: 浮点异常/除零)',
+  137: 'Runtime Error (SIGKILL: 进程被强制终止)',
+  138: 'Runtime Error (SIGUSR1)',
+  139: 'Runtime Error (SIGSEGV: 段错误/非法内存访问)',
+  140: 'Runtime Error (SIGUSR2)',
+  141: 'Runtime Error (SIGPIPE: 向已关闭的管道写入)',
+  142: 'Runtime Error (SIGALRM: 定时器触发)',
+  143: 'Runtime Error (SIGTERM: 终止信号)',
+  152: 'Runtime Error (SIGXCPU: CPU 时间超限)',
+  153: 'Runtime Error (SIGXFSZ: 文件大小超限)',
+}
+
+/**
+ * 根据退出码返回可诊断的 RE 原因文本。
+ * 退出码 0 / 1-31（程序自行 exit）→ 返回空字符串（由调用方使用通用 Runtime Error）
+ * 退出码 ≥ 128（被信号终止）→ 返回信号映射文本
+ */
+function formatRuntimeErrorByExitCode(exitCode: number): string {
+  if (exitCode >= 128) {
+    return EXIT_CODE_SIGNAL_MAP[exitCode] || `Runtime Error (信号 ${exitCode - 128})`
+  }
+  return ''
 }

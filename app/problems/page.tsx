@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
 import {
   Search,
@@ -12,6 +13,7 @@ import {
   MoreHorizontal,
   ChevronDown,
   Tag,
+  Shuffle,
 } from 'lucide-react'
 import { getDifficultyColor } from '@/lib/status'
 import { useUser } from '@/contexts/UserContext'
@@ -28,10 +30,12 @@ interface Problem {
   totalSubmit: number
   totalAccepted: number
   tags: string[]
+  source?: string
 }
 
 export default function ProblemsPage() {
   const { user } = useUser()
+  const router = useRouter()
   const [problems, setProblems] = useState<Problem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -47,6 +51,7 @@ export default function ProblemsPage() {
   const [difficultyOpen, setDifficultyOpen] = useState(false)
   const [tagModalOpen, setTagModalOpen] = useState(false)
   const [tagSearch, setTagSearch] = useState('')
+  const [randomLoading, setRandomLoading] = useState(false)
 
   const difficultyRef = useRef<HTMLDivElement>(null)
   useClickOutside(difficultyRef, () => setDifficultyOpen(false))
@@ -148,6 +153,33 @@ export default function ProblemsPage() {
     setSelectedTags([])
   }
 
+  // 随机一题（参考 HOJ 题库 "随机一题" 按钮）
+  // 尊重当前筛选条件（search/difficulty/tag），从结果集中随机抽一题跳转
+  const handleRandomProblem = async () => {
+    try {
+      setRandomLoading(true)
+      const params = new URLSearchParams()
+      if (searchQuery) params.set('search', searchQuery)
+      // 多选难度/标签只取第一个作为随机筛选条件（API 单值）
+      if (selectedDifficulties.length > 0) params.set('difficulty', selectedDifficulties[0])
+      if (selectedTags.length > 0) params.set('tag', selectedTags[0])
+      const queryString = params.toString()
+      const url = `/api/problems/random${queryString ? `?${queryString}` : ''}`
+      const res = await fetchWithCookie(url)
+      const data = await res.json()
+      if (data.success && data.data) {
+        const target = data.data.problemNumber || data.data.id
+        router.push(`/problem/${target}`)
+      } else {
+        alert(data.error || '没有符合条件的题目')
+      }
+    } catch (err) {
+      alert('网络错误，请稍后重试')
+    } finally {
+      setRandomLoading(false)
+    }
+  }
+
   const toggleDifficulty = (d: string) => {
     setSelectedDifficulties((prev) =>
       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
@@ -181,12 +213,12 @@ export default function ProblemsPage() {
         : `标签 · ${selectedTags.length}`
 
   const problemListColumns = [
-    { span: 'col-span-1 text-center', label: 'Y/N' },
+    { span: 'col-span-1 text-center', label: '状态' },
     { span: 'col-span-1 text-center', label: '题号' },
     { span: 'col-span-4', label: '标题' },
-    { span: 'col-span-3', label: '标签' },
+    { span: 'col-span-2', label: '标签' },
     { span: 'col-span-1 text-center', label: '难度' },
-    { span: 'col-span-1 text-center', label: '正确' },
+    { span: 'col-span-2 text-center', label: 'AC 率' },
     { span: 'col-span-1 text-center', label: '' },
   ]
 
@@ -254,7 +286,9 @@ export default function ProblemsPage() {
                     loadingStatus ? (
                       <div className="w-4 h-4 rounded-full bg-muted animate-pulse"></div>
                     ) : isSolved ? (
-                      <Check className="w-5 h-5 text-secondary" />
+                      <Check className="w-5 h-5 text-secondary" aria-label="已通过" />
+                    ) : submitted ? (
+                      <X className="w-5 h-5 text-error" aria-label="已尝试未通过" />
                     ) : (
                       <div className="w-4 h-4"></div>
                     )
@@ -275,14 +309,14 @@ export default function ProblemsPage() {
                   </span>
                 </div>
 
-                <div className="col-span-3 flex items-center gap-1.5 flex-wrap">
-                  {problem.tags && problem.tags.slice(0, 3).map((tag) => (
+                <div className="col-span-2 flex items-center gap-1.5 flex-wrap">
+                  {problem.tags && problem.tags.slice(0, 2).map((tag) => (
                     <span key={tag} className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light transition-colors">
                       {tag}
                     </span>
                   ))}
-                  {problem.tags && problem.tags.length > 3 && (
-                    <span className="text-xs text-muted-foreground">+{problem.tags.length - 3}</span>
+                  {problem.tags && problem.tags.length > 2 && (
+                    <span className="text-xs text-muted-foreground">+{problem.tags.length - 2}</span>
                   )}
                 </div>
 
@@ -292,10 +326,37 @@ export default function ProblemsPage() {
                   </span>
                 </div>
 
-                <div className="col-span-1 flex items-center justify-center">
-                  <span className="text-sm text-muted-foreground font-medium">
-                    {problem.totalAccepted}
-                  </span>
+                <div className="col-span-2 flex items-center justify-center">
+                  {(() => {
+                    // AC 率进度条（参考 HOJ ProblemList.vue el-progress 分段色）
+                    // 0% 灰、1-39% 红、40-59% 橙、60-79% 蓝、80-100% 绿
+                    const total = problem.totalSubmit || 0
+                    const accepted = problem.totalAccepted || 0
+                    if (total === 0) {
+                      return <span className="text-xs text-muted-foreground/50">-</span>
+                    }
+                    const rate = Math.round((accepted / total) * 100)
+                    const colorClass =
+                      rate >= 80 ? 'bg-secondary' :
+                      rate >= 60 ? 'bg-primary' :
+                      rate >= 40 ? 'bg-accent' :
+                      rate >= 1  ? 'bg-error' :
+                                   'bg-muted'
+                    return (
+                      <div className="w-full max-w-[100px]">
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span className="font-mono tabular-nums">{rate}%</span>
+                          <span className="font-mono tabular-nums">{accepted}/{total}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full ${colorClass} rounded-full transition-all`}
+                            style={{ width: `${rate}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 <div className="col-span-1 flex items-center justify-center">
@@ -451,6 +512,17 @@ export default function ProblemsPage() {
                     <X className="w-4 h-4" />
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={handleRandomProblem}
+                  disabled={randomLoading}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium border border-primary/30 bg-primary/10 text-primary-light hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="随机跳转一道题目（尊重当前筛选条件）"
+                >
+                  <Shuffle className={`w-4 h-4 ${randomLoading ? 'animate-pulse' : ''}`} />
+                  <span className="hidden sm:inline">随机一题</span>
+                </button>
               </div>
             </div>
           </div>

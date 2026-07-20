@@ -22,14 +22,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect skip-cache flag
+        id: skip-cache
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // 检查最近 10 条 commit message 是否含 [skip-cache] 或 [clear-cache]
+            // 用于在依赖或构建出现诡异缓存问题时主动清理缓存
+            const commits = context.payload.commits || [context.payload.head_commit].filter(Boolean)
+            const messages = commits.map(c => c?.message || '').join('\n')
+            // PR 场景下 commits 可能为空，回退到 PR title/head commit
+            const prTitle = context.payload.pull_request?.title || ''
+            const combined = `${messages}\n${prTitle}`
+            const skip = /\[(skip-cache|clear-cache|no-cache)\]/i.test(combined)
+            core.setOutput('skip', skip ? 'true' : 'false')
+            if (skip) core.notice('检测到 skip-cache 标记，将主动清理 npm 与 Next.js 缓存')
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
+      - name: Clear npm cache (skip-cache only)
+        if: steps.skip-cache.outputs.skip == 'true'
+        run: npm cache clean --force
+
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+          # 缓存 key 绑定 lockfile 与 Next.js 配置文件，依赖变更时自动失效
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('next.config.*') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-
+
+      - name: Clear Next.js cache (skip-cache only)
+        if: steps.skip-cache.outputs.skip == 'true'
+        run: rm -rf .next/cache
 
       - name: Generate Prisma client
         run: npx prisma generate
@@ -38,6 +72,8 @@ jobs:
         run: npm run typecheck
 
       - name: ESLint
+        # 注：项目存在大量历史 no-explicit-any warn（约 890 处），暂不能直接 lint:ci
+        # 严格检查（--max-warnings=0）保留为本地 npm run lint:ci，待逐步清理后再启用
         run: npm run lint
 
       - name: Unit tests

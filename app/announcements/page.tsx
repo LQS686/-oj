@@ -1,16 +1,30 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Megaphone, Pin, ChevronRight } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 import { formatDate } from '@/lib/utils'
+import { useAnnouncementSocket } from '@/hooks/useAnnouncementSocket'
 
 export default function AnnouncementsListPage() {
   const [items, setItems] = useState<PublicAnnouncementItem[]>([])
   const [loading, setLoading] = useState(true)
+
+  const fetchAnnouncements = useCallback(() => {
+    fetchWithCookie('/api/announcements?limit=20')
+      .then((r) => r.json())
+      .then((json) => {
+        if ((json.success || json.ok) && json.data?.items) {
+          setItems(json.data.items)
+        }
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -28,6 +42,15 @@ export default function AnnouncementsListPage() {
       cancelled = true
     }
   }, [])
+
+  // 监听公告实时推送：管理员发布/更新/删除公告时自动刷新列表
+  useAnnouncementSocket({
+    enabled: true,
+    onUpdate: () => {
+      // 任意变更事件（published/updated/deleted/unpublished）都刷新列表
+      fetchAnnouncements()
+    },
+  })
 
   return (
     <EducationalPageShell

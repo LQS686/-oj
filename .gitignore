@@ -46,3 +46,7 @@ temp/
 
 # TRAE IDE local skills & configs
 /.trae/
+
+# reference resources (third-party source code & archives)
+/参考资源/
+*.zip

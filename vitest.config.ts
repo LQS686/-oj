@@ -17,5 +17,25 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     // api.test.ts 依赖外部已启动的 dev server（端口 3001），属集成测试，不在 CI 默认运行范围
     exclude: ['tests/api.test.ts', 'node_modules/**'],
+    coverage: {
+      // v8 provider 性能优于 istanbul，且与 Next.js 工具链兼容
+      provider: 'v8',
+      // text：本地控制台输出；lcov：供 CI（Codecov/Coveralls）消费
+      reporter: ['text', 'lcov'],
+      // 排除非业务代码与外部参考资源，避免覆盖率噪声
+      exclude: [
+        'node_modules/**',
+        '.next/**',
+        'dist/**',
+        'build/**',
+        'coverage/**',
+        '参考资源/**',
+        'scripts/**',
+        '**/*.config.ts',
+        '**/*.config.js',
+        'server.ts',
+        'prisma/**',
+      ],
+    },
   },
 })

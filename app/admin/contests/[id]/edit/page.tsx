@@ -21,7 +21,8 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
  startTime: '',
  endTime: '',
  isPublic: false,
- password: ''
+ password: '',
+ sealRankTime: ''
  })
 
  const [contestProblems, setContestProblems] = useState<Problem[]>([])
@@ -48,7 +49,10 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
  startTime: new Date(contest.startTime).toISOString().slice(0, 16),
  endTime: new Date(contest.endTime).toISOString().slice(0, 16),
  isPublic: contest.isPublic,
- password: contest.password || ''
+ password: contest.password || '',
+ sealRankTime: contest.sealRankTime
+ ? new Date(contest.sealRankTime).toISOString().slice(0, 16)
+ : ''
  })
  setContestProblems(contest.problems.map((p: { problem: Problem }) => p.problem))
  } else {
@@ -249,6 +253,21 @@ export default function EditContestPage({ params }: { params: Promise<{ id: stri
  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
  className="input"
  />
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-foreground mb-2">
+ 封榜时间 (可选)
+ </label>
+ <input
+ type="datetime-local"
+ value={formData.sealRankTime}
+ onChange={(e) => setFormData({ ...formData, sealRankTime: e.target.value })}
+ className="input"
+ />
+ <p className="text-xs text-muted-foreground mt-1">
+ 到达此时刻后，普通用户看到的是封榜快照；管理员可绕过封榜查看实时数据。留空表示不封榜。
+ </p>
  </div>
 
  <div>

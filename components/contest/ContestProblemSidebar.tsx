@@ -13,6 +13,7 @@ import { useContestProblemWorkspace } from '@/contexts/ContestProblemWorkspaceCo
 import { formatProblemDocumentTitle } from '@/lib/document-title'
 import ContestCountdownPanel from '@/components/contest/ContestCountdownPanel'
 import JudgeStatus from '@/components/submission/JudgeStatus'
+import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -145,12 +146,13 @@ export default function ContestProblemSidebar() {
             </select>
           </div>
 
-          <textarea
+          <CodeEditor
             value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="w-full h-[360px] rounded-xl bg-muted text-foreground font-mono text-sm p-3 border border-border focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
-            spellCheck={false}
-            placeholder="在此粘贴或输入代码..."
+            onChange={setCode}
+            language={language as CodeLanguage}
+            placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
+            height="360px"
+            onSubmit={submitCode}
           />
 
           <div className="flex flex-wrap items-center gap-2">

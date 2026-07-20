@@ -210,6 +210,12 @@ model Contest {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
+  // 封榜机制（参考 HOJ sealRank + Hydro lockAt）
+  // sealRankTime: 封榜时刻，比赛进行到此时刻后，普通用户看不到实时排名
+  // sealUnlocked: 管理员手动解冻标志，比赛结束后管理员可解冻
+  sealRankTime  DateTime?
+  sealUnlocked  Boolean   @default(false)
+
   problems    ContestProblem[]
   submissions Submission[]
   participants ContestParticipant[]
