@@ -6,19 +6,17 @@
  *   2. format=dsoj：导出 DSOJ 标准题包 ZIP
  *
  * 查询参数：
- *   - source：来源过滤（all / MANUAL_CREATED / AI_ASSISTED / AI_GENERATED），CSV 模式用
  *   - format：导出格式（dsoj 触发题包 ZIP 导出）
- *   - ids：题目 ID 列表（逗号分隔，dsoj 模式用，与 source 二选一）
+ *   - ids：题目 ID 列表（逗号分隔，dsoj 模式用）
  *   - includeStdCode：是否包含标程（true/false，默认 true，dsoj 模式用）
  *   - includeTestCases：是否包含测试用例（true/false，默认 true，dsoj 模式用）
  */
-import { withApi, throw400 } from '@/lib/api/withApi'
-import { listProblemsForExport } from '@/lib/problem/service'
+import { withApi } from '@/lib/api/withApi'
 import { exportDsojPack } from '@/lib/problem/export/dsoj-exporter'
+import { prisma } from '@/lib/prisma'
 
 export const GET = withApi.admin(async (req, _ctx) => {
   const { searchParams } = new URL(req.url)
-  const source = searchParams.get('source') || 'all'
   const format = searchParams.get('format') || ''
 
   // DSOJ 标准题包导出
@@ -28,22 +26,11 @@ export const GET = withApi.admin(async (req, _ctx) => {
       ? idsParam.split(',').map(s => s.trim()).filter(Boolean)
       : undefined
 
-    // 来源映射：URL 参数 → 数据库 aiStatus
-    let sourceFilter: 'all' | 'MANUAL_CREATED' | 'AI_ASSISTED' | 'AI_GENERATED' = 'all'
-    if (!problemIds && source !== 'all') {
-      if (source === 'MANUAL_CREATED' || source === 'AI_ASSISTED' || source === 'AI_GENERATED') {
-        sourceFilter = source
-      } else {
-        throw400('INVALID_SOURCE', `无效的来源: ${source}`)
-      }
-    }
-
     const includeStdCode = searchParams.get('includeStdCode') !== 'false'
     const includeTestCases = searchParams.get('includeTestCases') !== 'false'
 
     const zipBuffer = await exportDsojPack({
       problemIds,
-      source: sourceFilter,
       includeStdCode,
       includeTestCases,
       packSource: 'DSOJ Admin Export',
@@ -60,14 +47,25 @@ export const GET = withApi.admin(async (req, _ctx) => {
   }
 
   // 默认：CSV 报表导出（保持原行为）
-  const problems = await listProblemsForExport(source)
+  const problems = await prisma.problem.findMany({
+    select: {
+      id: true,
+      title: true,
+      source: true,
+      createdAt: true,
+      updatedAt: true,
+      totalSubmit: true,
+      totalAccepted: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  })
 
   // Generate CSV
   const headers = ['ID', 'Title', 'Source', 'Created At', 'Updated At', 'Submissions', 'Accepted']
   const rows = problems.map((p: any) => [
     p.id,
     p.title,
-    p.aiStatus,
+    p.source || '',
     p.createdAt.toISOString(),
     p.updatedAt.toISOString(),
     p.totalSubmit,
@@ -83,7 +81,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
   return new Response(csvContent, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="problems_report_${source}_${new Date().toISOString().split('T')[0]}.csv"`,
+      'Content-Disposition': `attachment; filename="problems_report_${new Date().toISOString().split('T')[0]}.csv"`,
     },
   })
 })

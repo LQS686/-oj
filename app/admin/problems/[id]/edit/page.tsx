@@ -12,7 +12,6 @@ import {
  Edit,
  Eye,
  Trash2,
- Sparkles,
  Clock,
  Code2,
  AlertCircle,
@@ -20,7 +19,6 @@ import {
 } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
 import { formatRelativeTime } from '@/lib/utils'
-import { ProblemAiPanel } from '@/components/ai/ProblemAiPanel'
 
 interface Sample {
  input: string
@@ -29,20 +27,18 @@ interface Sample {
 }
 
 interface AdminSolutionItem {
- id: string
- title: string
- codeLanguage: string | null
- views: number
- isOfficial: boolean
- isAiGenerated: boolean
- sourceType: string
- createdAt: string
- author: {
- id: string
- username: string
- nickname: string | null
- avatar: string | null
- }
+  id: string
+  title: string
+  codeLanguage: string | null
+  views: number
+  isOfficial: boolean
+  createdAt: string
+  author: {
+    id: string
+    username: string
+    nickname: string | null
+    avatar: string | null
+  }
 }
 
 export default function EditProblemPage() {
@@ -72,9 +68,6 @@ export default function EditProblemPage() {
  const [source, setSource] = useState('')
 
  const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '', explanation: '' }])
-
- // 题目是否为 AI 生成（用于 ProblemAiPanel 决定是否显示"建议元数据"按钮）
- const [isAiGenerated, setIsAiGenerated] = useState(false)
 
  // 题解管理
  const [solutions, setSolutions] = useState<AdminSolutionItem[]>([])
@@ -106,7 +99,6 @@ export default function EditProblemPage() {
  if (data.success) {
  const problem = data.data
  setProblemNumber(problem.problemNumber || '')
- setIsAiGenerated(Boolean(problem.isAiGenerated))
  setTitle(problem.title || '')
  setDescription(problem.description || '')
  setInput(problem.input || '')
@@ -671,7 +663,7 @@ export default function EditProblemPage() {
  题解管理（{solutions.length}）
  </h2>
  <p className="text-xs text-muted-foreground">
- 管理该题下的所有题解（AI 题解可使用下方 AI 操作面板重新生成）
+ 管理该题下的所有题解
  </p>
  </div>
  </div>
@@ -731,9 +723,6 @@ export default function EditProblemPage() {
  key={s.id}
  className="rounded-xl bg-card border border-border p-4 hover:border-primary/50 hover:shadow-md transition-all relative overflow-hidden"
  >
- {s.isAiGenerated && (
- <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-purple-500 to-purple-700" />
- )}
  <div className="flex items-start gap-3 flex-wrap">
  <div className="flex items-start gap-3 flex-1 min-w-0">
  <div className="avatar avatar-md flex-shrink-0">
@@ -756,12 +745,6 @@ export default function EditProblemPage() {
  <h3 className="text-sm font-semibold text-foreground line-clamp-1">
  {s.title}
  </h3>
- {s.isAiGenerated && (
- <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-purple-500 to-purple-700 text-white">
- <Sparkles className="w-3 h-3" />
- AI 生成
- </span>
- )}
  {s.isOfficial && (
  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-amber-400 to-yellow-500 text-amber-950">
  标程
@@ -820,21 +803,6 @@ export default function EditProblemPage() {
  </div>
  )}
  </section>
-
- {/*
-   题目 AI 操作面板（Phase 4）
-   - 重新生成题解（替代原内嵌按钮 + startSolutionPolling 状态机）
-   - 跳转测试数据生成 / 智能分析 / 建议元数据
-   任务入队后的进度展示由 AiWorkspaceShell 右下角任务列表统一处理。
- */}
- <ProblemAiPanel
-   problemId={problemId}
-   isAiGenerated={isAiGenerated}
-   onTaskEnqueued={() => {
-     // AI 题解重新生成入队后刷新题解列表，便于稍后看到新生成的题解
-     fetchSolutions()
-   }}
- />
- </div>
+    </div>
  )
 }

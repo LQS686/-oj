@@ -15,8 +15,6 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/auth/forgot-password': { maxRequests: 3, windowMs: 300000 },
   // 高频轮询接口：navbar 30s 轮询 + AdminLayout 30s 轮询，放宽至 200/min
   '/api/notifications': { maxRequests: 200, windowMs: 60000 },
-  // AI 生成日志轮询：2s 间隔，单任务 30 次/min，多任务并发可能更高
-  '/api/admin/ai/generate': { maxRequests: 200, windowMs: 60000 },
   // 修复 P1：补充限流白名单（之前大量写接口无显式限流）
   '/api/submissions': { maxRequests: 20, windowMs: 60000 },
   '/api/solutions': { maxRequests: 10, windowMs: 60000 },

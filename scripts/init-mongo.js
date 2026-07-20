@@ -79,9 +79,6 @@ try {
   db.createCollection('ClassAssignment')
   db.createCollection('ClassAssignmentSubmission')
   db.createCollection('SystemSettings')
-  db.createCollection('AiGenerationLog')
-  db.createCollection('AiModelConfig')
-  db.createCollection('AiProvider')
   print('[SUCCESS] 数据库集合创建成功')
 } catch (error) {
   print(`[ERROR] 创建集合失败: ${error}`)

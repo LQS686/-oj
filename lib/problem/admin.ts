@@ -70,8 +70,6 @@ export async function listAllProblemsForAdmin(opts?: {
         totalAccepted: true,
         createdAt: true,
         updatedAt: true,
-        isAiGenerated: true,
-        aiStatus: true,
       },
     }),
     prisma.problem.count({ where }),

@@ -53,12 +53,6 @@ model User {
   // 头像历史
   avatarHistory AvatarHistory[]
 
-  // AI生成记录
-  aiGenerations AiGenerationLog[]
-
-  // AI 偏好
-  aiPreferences UserAiPreference[]
-
   // 题单
   authoredTrainings    Training[]           @relation("TrainingAuthor")
   trainingEnrollments  TrainingEnrollment[]
@@ -111,11 +105,6 @@ model Problem {
   author        User        @relation(fields: [authorId], references: [id])
   classId       String?     @db.ObjectId // 关联班级ID (如果是班级私有题目)
   
-  // AI生成相关字段
-  isAiGenerated Boolean     @default(false)
-  aiStatus      String      @default("MANUAL_CREATED") // MANUAL_CREATED, AI_ASSISTED, AI_GENERATED
-  aiPrompt      String?     // 生成该题目的原始提示词
-
   // 标程（用于验证数据）
   stdCode       String?
   stdLang       String?
@@ -448,8 +437,7 @@ model Solution {
   qualityScore  Float?    // 题解质量评分（0-5，由 scoreSolutionQuality 写入）
   views         Int       @default(0)
   isOfficial    Boolean   @default(false)            // 是否标程题解（置顶展示）
-  isAiGenerated Boolean   @default(false)            // 是否 AI 生成
-  sourceType    String    @default("USER")           // USER / OFFICIAL / AI_OFFICIAL
+  sourceType    String    @default("USER")           // USER / OFFICIAL
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -610,129 +598,6 @@ model AuditLog {
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
-}
-
-// AI 出题记录
-model AiGenerationLog {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String   @db.ObjectId
-  user        User     @relation(fields: [userId], references: [id])
-  // PENDING / PROCESSING / COMPLETED / FAILED / DISCARDED
-  // - DISCARDED：预览-确认工作流中用户丢弃的预览任务
-  // - 使用 String 而非 enum：MongoDB 不依赖 DB 层枚举约束
-  status      String
-  params      Json     // 请求参数：类型、难度、知识点等（含 mode / batchId / parentLogId / promptHash 等）
-  result      Json?    // 生成的题目数据（数组）
-  error       String?  // 错误信息
-  tokensUsed  Int      @default(0)
-  // 预估成本（tokensUsed * model.pricePerMillionTokens / 1_000_000）
-  // 注：MongoDB connector 不支持 Decimal 类型，使用 Float?（精度足够用于成本估算）
-  estimatedCost Float?
-  // 父任务 ID，串联任务链（出题 → 题解、出题失败 → 诊断、批量出题关联）
-  parentLogId String?  @db.ObjectId
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([userId])
-  @@index([createdAt])
-  @@index([status, createdAt])
-  @@index([parentLogId])
-}
-
-// AI模型配置（全局思考模型设置存储，被 AiProvider/AiModel 的混合配置方案使用）
-// 新模型选择走 AiProvider+AiModel，但 thinking 相关设置仍依赖此表存储
-model AiModelConfig {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String?  @db.ObjectId // 关联用户，为空则为全局配置
-  scope             String   @default("GLOBAL") // GLOBAL, USER
-  
-  // 生成模型配置
-  provider          String   // openai, deepseek, anthropic, google, custom
-  model             String   // e.g. gpt-4, deepseek-v4-flash
-  apiKey            String   // Encrypted
-  baseUrl           String?  // Optional custom base URL
-  
-  // 思考模型配置
-  enableThinking    Boolean  @default(false)
-  thinkingProvider  String?
-  thinkingModel     String?
-  thinkingApiKey    String?  // Encrypted
-  thinkingBaseUrl   String?
-  thinkingLevel     Int      @default(3) // 1-5
-  
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([userId])
-  @@index([scope])
-}
-
-// AI Provider 配置（供管理后台维护外部 AI 服务商）
-model AiProvider {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  name        String    // e.g. "DeepSeek"
-  slug        String    @unique // e.g. "deepseek"
-  baseUrl     String?
-  apiKey      String?   // 加密存储，可选（部分 provider 可能无需鉴权）
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  models      AiModel[]
-}
-
-// AI 模型定义
-model AiModel {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
-  name        String     // 展示名 e.g. "DeepSeek V4 Flash"
-  model       String     // API 模型字符串 e.g. "deepseek-v4-flash"
-  providerId  String     @db.ObjectId
-  provider    AiProvider @relation(fields: [providerId], references: [id])
-  type        String     // "generation" | "thinking"
-
-  // 模型调用参数
-  maxTokens   Int        @default(2048)
-  temperature Float      @default(0.7)
-  timeout     Int        @default(60000) // ms
-
-  // 高级参数（topP / frequencyPenalty / presencePenalty / responseFormat / stop / thinking / reasoning_effort）
-  // DeepSeek v4 模型使用 { thinking: { type: "enabled" }, reasoning_effort: "high" } 控制思考模式
-  params      Json       @default("{}")
-
-  // 每百万 tokens 单价（用于估算任务成本，null = 未配置则不估算）
-  // 注：MongoDB connector 不支持 Decimal 类型，使用 Float?（精度足够用于成本估算）
-  pricePerMillionTokens Float?
-
-  // 模型健康度（null / 'healthy' / 'degraded' / 'down'，默认 null 视为 healthy）
-  // - degraded：连续 3 次 API 错误
-  // - down：连续 5 次 API 错误
-  // - 由队列 executeJob 失败时更新，管理端可手动 reset
-  healthStatus       String?
-  lastHealthCheckAt  DateTime?
-
-  isActive    Boolean    @default(true)
-
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  preferences UserAiPreference[]
-}
-
-// 用户 AI 模型偏好
-model UserAiPreference {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String   @db.ObjectId
-  user        User     @relation(fields: [userId], references: [id])
-  modelId     String   @db.ObjectId
-  model       AiModel  @relation(fields: [modelId], references: [id])
-  
-  count       Int      @default(1)
-  lastUsed    DateTime @default(now())
-  isDefault   Boolean  @default(false)
-  
-  @@unique([userId, modelId])
-  @@index([userId, lastUsed])
 }
 
 model VerificationLog {

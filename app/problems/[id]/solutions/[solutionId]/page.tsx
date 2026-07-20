@@ -31,7 +31,6 @@ interface SolutionDetail {
  code: string | null
  views: number
  isOfficial: boolean
- isAiGenerated: boolean
  sourceType: string
  createdAt: string
  updatedAt: string
@@ -259,12 +258,6 @@ export default function SolutionDetailPage() {
  {/* 元信息卡片 */}
  <div className="card-static rounded-lg p-6 md:p-8 mb-6">
  <div className="flex items-start gap-3 mb-5 flex-wrap">
- {solution.isAiGenerated && (
- <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500 to-purple-700 text-white shadow-md shadow-purple-500/30">
- <span aria-hidden="true">🤖</span>
- <span>AI 生成</span>
- </span>
- )}
  {solution.isOfficial && (
  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-400 to-yellow-500 text-amber-950 shadow-md shadow-amber-500/30">
  <span aria-hidden="true">⭐</span>

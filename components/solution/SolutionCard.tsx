@@ -13,7 +13,6 @@ export interface SolutionListItem {
  createdAt: string
  views: number
  codeLanguage: string
- isAiGenerated: boolean
  isOfficial: boolean
 }
 
@@ -50,7 +49,6 @@ export default function SolutionCard({ solution, onClick }: SolutionCardProps) {
  createdAt,
  views,
  codeLanguage,
- isAiGenerated,
  isOfficial,
  } = solution
 
@@ -92,12 +90,6 @@ export default function SolutionCard({ solution, onClick }: SolutionCardProps) {
 
  {/* 标题/摘要列：徽标 + 标题 + 语言 */}
  <div className="col-span-5 flex items-center gap-2 min-w-0">
- {isAiGenerated && (
- <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-600 text-white flex-shrink-0">
- <span aria-hidden="true">🤖</span>
- <span>AI</span>
- </span>
- )}
  <h3 className="text-sm font-semibold text-foreground line-clamp-1 group-hover:text-primary-light transition-colors flex-1 min-w-0">
  {title}
  </h3>

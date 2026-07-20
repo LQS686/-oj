@@ -1,24 +1,24 @@
 /**
- * lib/ai/fetch-safe.ts
+ * lib/security/safe-fetch.ts
  * SSRF-safe fetch 封装
  *
  * 用途：
- *   所有需要从服务端发起外部 HTTP 请求的地方（AI Provider / OAuth / Webhook），
+ *   所有需要从服务端发起外部 HTTP 请求的地方（如 Codeforces API 同步、OAuth、Webhook），
  *   必须通过 safeFetch 而非原生 fetch。
  *
  * 防护措施：
  *   1. URL 协议白名单：仅 http/https
  *   2. URL 格式校验：拒绝内网 IP / 元数据端点
- *   3. **DNS Rebinding 防御**：每次 fetch 前重新解析 + 校验
- *      —— lookup 后到 fetch 之间攻击者可能 rebind，所以**重新解析**确保当前仍合规。
- *   4. **强 IP 直连**：fetch 时通过自定义 lookup 把域名锁定到本次解析的 IP，
- *      避免 libcurl/undici 在 fetch 内重新解析（这是 DNS Rebinding 的真正窗口）。
+ *   3. DNS Rebinding 防御：每次 fetch 前重新解析 + 校验
+ *      —— lookup 后到 fetch 之间攻击者可能 rebind，所以重新解析确保当前仍合规
+ *   4. 强 IP 直连：fetch 时通过自定义 lookup 把域名锁定到本次解析的 IP，
+ *      避免 libcurl/undici 在 fetch 内重新解析（这是 DNS Rebinding 的真正窗口）
  *
  * 已知局限：
  *   - Node 18+ 的 fetch 走 undici，undici 不支持自定义 lookup。
- *     因此本实现改为直接调用 `http.request`/`https.request`，
+ *     因此本实现改为直接调用 http.request/https.request，
  *     牺牲一些 fetch 高级特性（如 HTTP/2 streaming）换取 SSRF 安全。
- *   - 如未来要使用 undici 高级特性，可改用 `node-fetch` + `agent: { lookup }` 方案。
+ *   - 如未来要使用 undici 高级特性，可改用 node-fetch + agent: { lookup } 方案。
  *
  * 引入依赖：本文件只使用 Node.js 内置 http/https 模块，零运行时依赖。
  */
@@ -26,8 +26,6 @@
 import * as http from 'http'
 import * as https from 'https'
 import { URL } from 'url'
-import { validateAiBaseUrlDns } from './providers-dns'
-import { validateAiBaseUrl } from './providers'
 
 interface SafeFetchOptions {
   method?: string
@@ -39,8 +37,7 @@ interface SafeFetchOptions {
 }
 
 /**
- * 判断 IPv4 是否为私有/保留地址。
- * 与 providers-dns.ts 中 isPrivateIp 保持一致（避免重复维护）。
+ * 判断 IPv4 是否为私有/保留地址
  */
 function isPrivateIpv4(ip: string): boolean {
   const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
@@ -74,6 +71,35 @@ function isPrivateIp(ip: string): boolean {
 }
 
 /**
+ * 基础 URL 校验：协议白名单 + 拒绝内网 IP 字面量
+ */
+function validateBaseUrl(url: string): void {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    throw new Error(`URL 格式错误: ${url}`)
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error(`不允许的协议: ${parsed.protocol}（仅支持 http/https）`)
+  }
+
+  const host = parsed.hostname
+  // IPv6 字面量 [::1]
+  if (host.startsWith('[') && host.endsWith(']')) {
+    const v6 = host.slice(1, -1)
+    if (isPrivateIpv6(v6)) {
+      throw new Error(`目标主机为内网地址: ${host}`)
+    }
+    return
+  }
+  if (host && isPrivateIp(host)) {
+    throw new Error(`目标主机为内网地址: ${host}`)
+  }
+}
+
+/**
  * SSRF-safe fetch
  *
  * 与原生 fetch 差异：
@@ -93,30 +119,14 @@ export async function safeFetch(
   json<T = unknown>(): Promise<T>
 }> {
   // 1) URL 格式校验（拒绝内网 IP / 危险协议）
-  //    与 providers.ts 的 validateAiBaseUrl 共用同一套校验逻辑（保持一致）
-  validateAiBaseUrl(url)
+  validateBaseUrl(url)
 
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    throw new Error(`URL 格式错误: ${url}`)
-  }
-
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error(`不允许的协议: ${parsed.protocol}（仅支持 http/https）`)
-  }
-
+  const parsed = new URL(url)
   const host = parsed.hostname
   const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80')
 
-  // 2) 同步校验：URL 本身是否含内网 IP（覆盖直接写 IP 的场景）
-  if (host && !host.startsWith('[') && isPrivateIp(host)) {
-    throw new Error(`目标主机为内网地址: ${host}`)
-  }
-
-  // 3) DNS 重新解析 + 校验（防 Rebinding）
-  //    实际请求通过 IP 直连（自定义 lookup），进一步把 re-resolve 窗口压到 0。
+  // 2) DNS 重新解析 + 校验（防 Rebinding）
+  //    实际请求通过 IP 直连（自定义 lookup），进一步把 re-resolve 窗口压到 0
   const dns = await import('dns')
   let addresses: { address: string; family: number }[]
   try {
@@ -130,15 +140,15 @@ export async function safeFetch(
     }
   }
 
-  // 4) **强 IP 直连**：把域名锁定为第一个 IPv4 解析结果
-  //    —— 攻击者若在 lookup 后 rebind，本请求仍发往首次解析的 IP。
+  // 3) 强 IP 直连：把域名锁定为第一个 IPv4 解析结果
+  //    —— 攻击者若在 lookup 后 rebind，本请求仍发往首次解析的 IP
   const ipv4 = addresses.find((a) => a.family === 4)
   const targetAddress = ipv4?.address || addresses[0]?.address
   if (!targetAddress) {
     throw new Error(`域名 ${host} 无可用解析结果`)
   }
 
-  // 5) 构造请求（替换 hostname 为 IP，原始 host 写入 Host header）
+  // 4) 构造请求（替换 hostname 为 IP，原始 host 写入 Host header）
   const requestOptions: http.RequestOptions = {
     host: targetAddress,
     port,
@@ -203,6 +213,3 @@ export const ssrf = {
   isPrivateIpv4,
   isPrivateIpv6,
 }
-
-// 重新导出 DNS 校验函数，避免上层重复 import
-export { validateAiBaseUrl, validateAiBaseUrlDns }

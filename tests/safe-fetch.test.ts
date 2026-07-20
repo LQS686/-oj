@@ -3,7 +3,7 @@
  * safeFetch SSRF 防护单元测试（P0：DNS Rebinding + 内网穿透防护）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { safeFetch, ssrf } from '../lib/ai/fetch-safe'
+import { safeFetch, ssrf } from '../lib/security/safe-fetch'
 
 // mock node http/https，让测试不真的发请求
 const { mockHttpRequest, mockHttpsRequest } = vi.hoisted(() => ({
@@ -123,23 +123,23 @@ describe('safeFetch - SSRF 防护', () => {
   })
 
   it('应允许公网请求通过（https）', async () => {
-    mockHttpResponse(200, '{"data":[{"id":"gpt-4"}]}', { 'content-type': 'application/json' })
-    const res = await safeFetch('https://api.openai.com/v1/models', {
+    mockHttpResponse(200, '{"data":[{"id":"cf-round-1"}]}', { 'content-type': 'application/json' })
+    const res = await safeFetch('https://codeforces.com/api/contest.list', {
       headers: { Authorization: 'Bearer test' },
     })
     expect(res.status).toBe(200)
     expect(res.ok).toBe(true)
     const json = await res.json<{ data: { id: string }[] }>()
-    expect(json.data[0].id).toBe('gpt-4')
+    expect(json.data[0].id).toBe('cf-round-1')
   })
 
   it('应保留原始 Host 头（SNI/CDN 必需）', async () => {
     mockHttpResponse(200, '')
-    await safeFetch('https://api.openai.com/v1/models')
+    await safeFetch('https://codeforces.com/api/contest.list')
     const reqOpts = mockHttpsRequest.mock.calls[0][0]
     // host 应该是 IP（直连），但 Host header 保留原始域名
     expect(reqOpts.host).toBe('1.2.3.4')
-    expect(reqOpts.headers.Host).toBe('api.openai.com')
+    expect(reqOpts.headers.Host).toBe('codeforces.com')
   })
 
   it('应使用 https.request 当协议为 https:', async () => {

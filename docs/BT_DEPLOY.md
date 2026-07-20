@@ -382,7 +382,7 @@ FRONTEND_URL=http://example.com
 
 **这是 2026-07-16 多日宕机的根因，切勿再次移除！**
 
-Next.js standalone 模式只追踪构建图里的依赖，**不会追踪自定义 server.ts 动态 import 的模块**（dotenv、socket.io、ioredis、jsonwebtoken、openai、mongodb、bcryptjs、adm-zip、katex、nodemailer 等）。移除 `npm install --omit=dev` 会导致这些生产依赖全部缺失，server.ts 启动即崩溃。
+Next.js standalone 模式只追踪构建图里的依赖，**不会追踪自定义 server.ts 动态 import 的模块**（dotenv、socket.io、ioredis、jsonwebtoken、mongodb、bcryptjs、adm-zip、katex、nodemailer 等）。移除 `npm install --omit=dev` 会导致这些生产依赖全部缺失，server.ts 启动即崩溃。
 
 - **必须保留**：`RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts`
 - **不要为了省磁盘空间而移除它**：如需节省磁盘，用 `docker builder prune -af` 清理构建缓存

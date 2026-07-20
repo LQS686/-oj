@@ -17,7 +17,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=mongodb://${MONGO_APP_USER:-ojuser}:${MONGO_APP_PASSWORD:?err}@mongo:27017/oj_platform?authSource=oj_platform&replicaSet=rs0
       - JWT_SECRET=${JWT_SECRET:?err}
-      - AI_CONFIG_ENCRYPTION_KEY=${AI_CONFIG_ENCRYPTION_KEY:?err}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?err}
       - USE_DOCKER=false
       - FRONTEND_URL=${FRONTEND_URL:-https://dsoj.run}
       # FORCE_SECURE_COOKIE 必须传递给容器：

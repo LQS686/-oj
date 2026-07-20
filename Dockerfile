@@ -103,7 +103,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_m
 
 # 安装生产依赖
 # 关键：standalone 模式只追踪 Next.js 构建图里的依赖，但 server.ts 动态 import 了
-# 很多模块（dotenv、socket.io、ioredis、jsonwebtoken、openai、mongodb、bcryptjs、adm-zip、
+# 很多模块（dotenv、socket.io、ioredis、jsonwebtoken、mongodb、bcryptjs、adm-zip、
 # katex、nodemailer 等），这些可能没被完全追踪。必须运行 npm install --omit=dev 确保所有
 # 生产依赖都装上。tsx 现在在 dependencies 中（之前在 devDependencies），也会被装上。
 # BuildKit 缓存 /root/.npm，复用 builder 阶段已下载的 npm 包

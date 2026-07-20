@@ -42,9 +42,6 @@ export interface Problem {
   totalAccepted: number
   authorId: string
   classId: string | null
-  isAiGenerated: boolean
-  aiStatus: string
-  aiPrompt: string | null
   stdCode: string | null
   stdLang: string | null
   createdAt: string

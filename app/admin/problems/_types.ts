@@ -24,8 +24,6 @@ export interface Problem {
   totalSubmit: number
   totalAccepted: number
   createdAt: string
-  isAiGenerated?: boolean
-  aiStatus: string
 }
 
 export interface LogEntry {
@@ -44,9 +42,6 @@ export interface LogEntry {
 }
 
 export type ActiveTab = 'list' | 'logs'
-
-/** 题目来源标记（批量修改来源弹窗使用） */
-export type ProblemSource = 'MANUAL_CREATED' | 'AI_ASSISTED' | 'AI_GENERATED'
 
 /** 批量动作类型 */
 export type BatchActionType = 'publish' | 'unpublish' | 'delete' | 'contest'

@@ -90,7 +90,6 @@ const SOLUTION_LIST_SELECT = {
   codeLanguage: true,
   views: true,
   isOfficial: true,
-  isAiGenerated: true,
   sourceType: true,
   createdAt: true,
   author: {
@@ -207,7 +206,6 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
       codeLanguage: input.codeLanguage ?? null,
       code: input.code ?? null,
       isOfficial: false,
-      isAiGenerated: false,
       sourceType: 'USER',
     },
     include: {

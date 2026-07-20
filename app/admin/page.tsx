@@ -15,16 +15,11 @@ import {
   XCircle,
   Clock,
   ArrowRight,
-  Bot,
   Plus,
   Trophy,
-  Sparkles,
-  UserPlus,
-  DollarSign
+  UserPlus
 } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
-import { AI_FEATURE_DISABLED } from '@/lib/ai/feature-flag'
-import { AiDisabledBadge } from '@/components/ai/AiDisabledNotice'
 
 interface DashboardStats {
  totalUsers: number
@@ -34,26 +29,12 @@ interface DashboardStats {
  userGrowth: number
  submissionGrowth: number
  recentSubmissions: Array<{
- id: string
- user: { username: string }
- problem: { title: string }
- status: string
- submittedAt: string
+  id: string
+  user: { username: string }
+  problem: { title: string }
+  status: string
+  submittedAt: string
  }>
- aiToday: {
- pending: number
- processing: number
- completed: number
- failed: number
- totalTokens: number
- }
- /** Phase 6 Task 35.4: AI 成本聚合（今日 / 本月） */
- aiCost?: {
- todayCost: number
- monthCost: number
- todayTaskCount: number
- monthTaskCount: number
- }
 }
 
 export default function AdminDashboard() {
@@ -243,98 +224,6 @@ export default function AdminDashboard() {
  </div>
  </div>
 
- {/* AI 任务卡片：紧凑布局 */}
- <Link
- href="/admin/ai-monitor"
- className={`card-static p-4 group transition-colors block ${
-   AI_FEATURE_DISABLED ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/40 cursor-pointer'
- }`}
- >
- <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
- style={{ background: 'rgba(139, 92, 246, 0.1)' }}>
- <Bot className="w-5 h-5 text-primary" />
- </div>
- <div>
- <p className="text-sm font-semibold text-foreground flex items-center gap-2">
- AI 任务（今日）
- {AI_FEATURE_DISABLED && <AiDisabledBadge />}
- </p>
- <p className="text-xs text-muted-foreground">Token 消耗：{(stats?.aiToday?.totalTokens || 0).toLocaleString()}</p>
- </div>
- </div>
- <div className="flex items-center gap-2">
- <span className="text-2xl font-bold text-foreground">
- {(stats?.aiToday?.pending || 0) +
- (stats?.aiToday?.processing || 0) +
- (stats?.aiToday?.completed || 0) +
- (stats?.aiToday?.failed || 0)}
- </span>
- <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
- </div>
- </div>
- <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
- <div className="text-center rounded-lg bg-primary/5 py-2">
- <p className="text-[11px] text-muted-foreground mb-0.5">待处理</p>
- <p className="text-lg font-bold text-primary-light">{stats?.aiToday?.pending || 0}</p>
- </div>
- <div className="text-center rounded-lg bg-accent/5 py-2">
- <p className="text-[11px] text-muted-foreground mb-0.5">处理中</p>
- <p className="text-lg font-bold text-accent-light">{stats?.aiToday?.processing || 0}</p>
- </div>
- <div className="text-center rounded-lg bg-secondary/5 py-2">
- <p className="text-[11px] text-muted-foreground mb-0.5">已完成</p>
- <p className="text-lg font-bold text-secondary-light">{stats?.aiToday?.completed || 0}</p>
- </div>
- <div className="text-center rounded-lg bg-error/5 py-2">
- <p className="text-[11px] text-muted-foreground mb-0.5">失败</p>
- <p className="text-lg font-bold text-error">{stats?.aiToday?.failed || 0}</p>
- </div>
- </div>
- </Link>
-
- {/* Phase 6 Task 35.4: 今日 AI 成本卡片 */}
- <Link
- href="/admin/ai-monitor"
- className={`card-static p-4 group transition-colors block ${
-   AI_FEATURE_DISABLED ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/40 cursor-pointer'
- }`}
- >
- <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
- style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
- <DollarSign className="w-5 h-5 text-success" />
- </div>
- <div>
- <p className="text-sm font-semibold text-foreground flex items-center gap-2">
- AI 成本统计
- {AI_FEATURE_DISABLED && <AiDisabledBadge />}
- </p>
- <p className="text-xs text-muted-foreground">
- 今日 {(stats?.aiCost?.todayTaskCount || 0)} 个任务 · 本月 {(stats?.aiCost?.monthTaskCount || 0)} 个任务
- </p>
- </div>
- </div>
- <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
- </div>
- <div className="grid grid-cols-2 gap-2">
- <div className="text-center rounded-lg bg-success/5 py-2.5">
- <p className="text-[11px] text-muted-foreground mb-0.5">今日成本</p>
- <p className="text-xl font-bold text-success">
- ¥{(stats?.aiCost?.todayCost || 0).toFixed(4)}
- </p>
- </div>
- <div className="text-center rounded-lg bg-primary/5 py-2.5">
- <p className="text-[11px] text-muted-foreground mb-0.5">本月累计</p>
- <p className="text-xl font-bold text-primary">
- ¥{(stats?.aiCost?.monthCost || 0).toFixed(4)}
- </p>
- </div>
- </div>
- </Link>
-
  {/* 快捷操作：紧凑布局 */}
  <div className="space-y-3">
  <h3 className="text-base font-bold text-foreground">快捷操作</h3>
@@ -363,25 +252,6 @@ export default function AdminDashboard() {
  <div className="min-w-0">
  <p className="text-sm font-semibold text-foreground">创建竞赛</p>
  <p className="text-xs text-muted-foreground truncate">发起一场竞赛</p>
- </div>
- </Link>
-
- <Link
- href="/admin/ai"
- className={`card p-3 group transition-colors flex items-center gap-2.5 ${
-   AI_FEATURE_DISABLED ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/40 cursor-pointer'
- }`}
- >
- <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
- style={{ background: 'rgba(139, 92, 246, 0.1)' }}>
- <Sparkles className="w-4 h-4 text-primary" />
- </div>
- <div className="min-w-0">
- <p className="text-sm font-semibold text-foreground flex items-center gap-2">
- AI 出题
- {AI_FEATURE_DISABLED && <AiDisabledBadge />}
- </p>
- <p className="text-xs text-muted-foreground truncate">智能生成题目</p>
  </div>
  </Link>
 

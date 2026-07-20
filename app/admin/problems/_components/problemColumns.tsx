@@ -35,12 +35,6 @@ export function buildProblemColumns({
             </span>
           )}
           <span className="text-foreground font-medium">{problem.title}</span>
-          {(problem.aiStatus === 'AI_ASSISTED' || problem.aiStatus === 'ASSISTED') && (
-            <span className="tag tag-info text-[10px] px-1.5 py-0.5">AI辅助</span>
-          )}
-          {(problem.aiStatus === 'AI_GENERATED' || problem.aiStatus === 'GENERATED') && (
-            <span className="tag tag-primary text-[10px] px-1.5 py-0.5">AI出题</span>
-          )}
         </div>
       ),
     },
@@ -81,15 +75,6 @@ export function buildProblemColumns({
         if (isPublic) return <span className="tag tag-success">公开</span>
         if (value === 'contest') return <span className="tag tag-info">竞赛</span>
         return <span className="tag">隐藏</span>
-      },
-    },
-    {
-      key: 'aiStatus',
-      label: '来源',
-      render: (value) => {
-        if (value === 'AI_ASSISTED' || value === 'ASSISTED') return <span className="tag tag-info">AI辅助</span>
-        if (value === 'AI_GENERATED' || value === 'GENERATED') return <span className="tag tag-primary">AI出题</span>
-        return <span className="text-muted-foreground">人工</span>
       },
     },
     {

@@ -7,24 +7,15 @@ import { DIFFICULTIES } from '@/lib/constants'
 import { getDifficultyColor } from '@/lib/status'
 import { getDifficultyLabel } from '../_utils'
 
-const AI_STATUS_TABS = [
-  { id: 'all', label: '全部' },
-  { id: 'manual', label: '人工' },
-  { id: 'assisted', label: 'AI辅助' },
-  { id: 'generated', label: 'AI出题' }
-]
-
 interface ProblemFilterBarProps {
   searchQuery: string
   onSearchChange: (value: string) => void
   difficultyFilter: string
   onDifficultyFilterChange: (value: string) => void
-  aiStatusFilter: string
-  onAiStatusFilterChange: (value: string) => void
 }
 
 /**
- * 题目列表筛选栏：搜索框 + AI 来源分段控件 + 难度下拉（单选）。
+ * 题目列表筛选栏：搜索框 + 难度下拉（单选）。
  *
  * 难度下拉的展开/收起与外部点击关闭由本组件内部管理。
  */
@@ -33,8 +24,6 @@ export function ProblemFilterBar({
   onSearchChange,
   difficultyFilter,
   onDifficultyFilterChange,
-  aiStatusFilter,
-  onAiStatusFilterChange,
 }: ProblemFilterBarProps) {
   const [difficultyOpen, setDifficultyOpen] = useState(false)
   const difficultyRef = useRef<HTMLDivElement>(null)
@@ -51,8 +40,7 @@ export function ProblemFilterBar({
 
   const activeCount =
     (searchQuery ? 1 : 0) +
-    (difficultyFilter !== 'all' ? 1 : 0) +
-    (aiStatusFilter !== 'all' ? 1 : 0)
+    (difficultyFilter !== 'all' ? 1 : 0)
 
   return (
     <FilterBar activeCount={activeCount}>
@@ -70,23 +58,6 @@ export function ProblemFilterBar({
       </div>
 
       <div className="flex gap-2 flex-wrap items-center">
-        {/* AI 来源筛选 */}
-        <div className="flex gap-0.5 p-0.5 rounded-lg bg-muted">
-          {AI_STATUS_TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => onAiStatusFilterChange(tab.id)}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                aiStatusFilter === tab.id
-                  ? 'bg-primary text-white'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
         {/* 难度筛选：下拉单选，全站统一 8 级体系 */}
         <div className="relative" ref={difficultyRef}>
           <button

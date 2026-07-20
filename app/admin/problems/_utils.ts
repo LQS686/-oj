@@ -4,15 +4,13 @@ import type { Problem } from './_types'
 export interface ProblemFilters {
   searchQuery: string
   difficultyFilter: string
-  aiStatusFilter: string
 }
 
 /**
- * 按搜索词 / 难度 / AI 来源筛选题目。
- * 与原 page.tsx 内联实现保持一致（含 AI 状态多别名兼容）。
+ * 按搜索词 / 难度筛选题目。
  */
 export function filterProblems(problems: Problem[], filters: ProblemFilters): Problem[] {
-  const { searchQuery, difficultyFilter, aiStatusFilter } = filters
+  const { searchQuery, difficultyFilter } = filters
   const q = searchQuery.toLowerCase()
 
   return problems.filter(p => {
@@ -20,16 +18,7 @@ export function filterProblems(problems: Problem[], filters: ProblemFilters): Pr
       (p.problemNumber && p.problemNumber.toLowerCase().includes(q))
     const matchesDifficulty = difficultyFilter === 'all' || p.difficulty === difficultyFilter
 
-    let matchesAi = true
-    if (aiStatusFilter === 'manual') {
-      matchesAi = !p.aiStatus || p.aiStatus === 'MANUAL_CREATED' || p.aiStatus === 'NONE'
-    } else if (aiStatusFilter === 'assisted') {
-      matchesAi = p.aiStatus === 'AI_ASSISTED' || p.aiStatus === 'ASSISTED'
-    } else if (aiStatusFilter === 'generated') {
-      matchesAi = p.aiStatus === 'AI_GENERATED' || p.aiStatus === 'GENERATED'
-    }
-
-    return matchesSearch && matchesDifficulty && matchesAi
+    return matchesSearch && matchesDifficulty
   })
 }
 

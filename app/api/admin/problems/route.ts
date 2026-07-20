@@ -6,7 +6,6 @@
  */
 import { withApi, ok, readJson } from '@/lib/api/withApi'
 import { listAllProblemsForAdmin, createAdminProblem } from '@/lib/problem/service'
-import { enqueueSolutionForNewProblem } from '@/lib/ai/service'
 
 /**
  * GET /api/admin/problems - 获取题目列表（管理员）
@@ -41,12 +40,5 @@ export const GET = withApi.admin(async (req) => {
 export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const body = await readJson<Record<string, any>>(req)
   const problem = await createAdminProblem(body, user.id)
-
-  // 入队 AI 题解生成（不阻塞题目创建响应，AI 模块异常不影响题目落库）
-  try {
-    const { logId } = await enqueueSolutionForNewProblem(problem.id, '', '', user.id)
-    return ok({ problem, message: '题目创建成功', solutionGenerationStatus: 'queued', solutionLogId: logId })
-  } catch (aiError) {
-    return ok({ problem, message: '题目创建成功', solutionGenerationStatus: 'failed' })
-  }
+  return ok({ problem, message: '题目创建成功' })
 })

@@ -69,7 +69,7 @@ NODE_ENV=production
 PORT=3000
 DATABASE_URL=mongodb://ojuser:${PASS}@mongo:27017/oj_platform?authSource=oj_platform&replicaSet=rs0
 JWT_SECRET=$(openssl rand -base64 32 | tr -d '+/=' | head -c 43)
-AI_CONFIG_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '+/=' | head -c 43)
+ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '+/=' | head -c 43)
 REDIS_URL=redis://:${PASS}@redis:6379
 FRONTEND_URL=${FRONTEND_URL}
 NEXT_PUBLIC_API_URL=${FRONTEND_URL}
@@ -83,9 +83,6 @@ JUDGE_EXTRA_TIME_RATIO=0.1
 JUDGE_REJUDGE_TIMES=1
 JUDGE_MAX_CONCURRENT=1
 LOG_LEVEL=info
-AI_JOB_TIMEOUT_MS=300000
-AI_SOLUTION_TIMEOUT_MS=180000
-AI_SOLUTION_MAX_CONCURRENT=2
 MONGO_ROOT_USER=admin
 MONGO_ROOT_PASSWORD=${PASS}
 MONGO_APP_USER=ojuser

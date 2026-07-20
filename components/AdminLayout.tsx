@@ -17,21 +17,16 @@ import {
   X,
   Trophy,
   GraduationCap,
-  Sparkles,
   Bell,
   Megaphone,
   ChevronDown,
-  Cpu,
   BookOpen,
-  Activity,
   UserCircle
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import type { Notification } from '@/types/models'
 import { getRoleLabel } from '@/lib/permissions'
-import { AI_FEATURE_DISABLED } from '@/lib/ai/feature-flag'
-import { AiDisabledBadge } from '@/components/ai/AiDisabledNotice'
 
 interface AdminMenuItem {
   icon: React.ComponentType<{ className?: string }>
@@ -39,24 +34,13 @@ interface AdminMenuItem {
   href: string
   /** 仅 SYSTEM_ADMIN 可见 */
   systemAdminOnly?: boolean
-  /** 标记为 AI 功能入口（用于下架时显示"功能异常"徽章） */
-  isAiFeature?: boolean
 }
 
 interface AdminLayoutProps {
   children: React.ReactNode
 }
 
-const menuGroups: { label: string; items: AdminMenuItem[]; isAiGroup?: boolean }[] = [
-  {
-    label: 'AI 助手',
-    isAiGroup: true,
-    items: [
-      { icon: Sparkles, label: 'AI 工作区', href: '/admin/ai', isAiFeature: true },
-      { icon: Cpu, label: 'AI 模型管理', href: '/admin/ai-models', isAiFeature: true },
-      { icon: Activity, label: 'AI 任务监控', href: '/admin/ai-monitor', systemAdminOnly: true, isAiFeature: true },
-    ]
-  },
+const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
   {
     label: '内容管理',
     items: [
@@ -274,16 +258,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   }`}>
                     <p className="px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
                       {group.label}
-                      {group.isAiGroup && AI_FEATURE_DISABLED && (
-                        <AiDisabledBadge />
-                      )}
                     </p>
                   </div>
                   {group.items.map((item) => {
                     const Icon = item.icon
                     const isActive = pathname === item.href ||
                                    (item.href !== '/admin' && pathname.startsWith(item.href + '/'))
-                    const itemDisabled = item.isAiFeature && AI_FEATURE_DISABLED
 
                     return (
                       <Link
@@ -294,14 +274,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         className={`flex items-center py-3 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group ${
                           sidebarOpen ? 'px-4 gap-3' : 'justify-center px-2 gap-0'
                         } ${
-                          itemDisabled
-                            ? 'text-muted-foreground/60 cursor-not-allowed hover:bg-transparent'
-                            : isActive
-                              ? 'bg-primary text-white'
-                              : 'text-foreground hover:bg-muted'
+                          isActive
+                            ? 'bg-primary text-white'
+                            : 'text-foreground hover:bg-muted'
                         }`}
                       >
-                        <Icon className={`w-5 h-5 flex-shrink-0 ${itemDisabled ? 'opacity-50' : ''}`} />
+                        <Icon className="w-5 h-5 flex-shrink-0" />
                         <span className={`font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                           sidebarOpen ? 'opacity-100 max-w-[180px]' : 'opacity-0 max-w-0'
                         }`}>

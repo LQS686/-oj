@@ -28,9 +28,9 @@ function normalizeKey(keyStr: string): Buffer {
   if (raw.length === 32) return raw
 
   throw new Error(
-    `AI_CONFIG_ENCRYPTION_KEY 长度不正确（得到 ${raw.length} 字节，需要 32 字节）。\n` +
+    `ENCRYPTION_KEY 长度不正确（得到 ${raw.length} 字节，需要 32 字节）。\n` +
     `请重新生成：node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"\n` +
-    `然后把输出填入 .env 的 AI_CONFIG_ENCRYPTION_KEY 并重启服务。`
+    `然后把输出填入 .env 的 ENCRYPTION_KEY 并重启服务。`
   )
 }
 
@@ -41,10 +41,10 @@ function normalizeKey(keyStr: string): Buffer {
  */
 function getEncryptionKey(): Buffer {
   if (ENCRYPTION_KEY) return ENCRYPTION_KEY
-  const keyStr = process.env.AI_CONFIG_ENCRYPTION_KEY
+  const keyStr = process.env.ENCRYPTION_KEY
   if (!keyStr) {
     throw new Error(
-      'AI_CONFIG_ENCRYPTION_KEY 环境变量未设置！请在 .env 文件中配置 32 字节密钥。\n' +
+      'ENCRYPTION_KEY 环境变量未设置！请在 .env 文件中配置 32 字节密钥。\n' +
       '生成方式: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"'
     )
   }
@@ -58,7 +58,7 @@ function getEncryptionKey(): Buffer {
  */
 function tryGetEncryptionKey(): Buffer | null {
   if (ENCRYPTION_KEY) return ENCRYPTION_KEY
-  const keyStr = process.env.AI_CONFIG_ENCRYPTION_KEY
+  const keyStr = process.env.ENCRYPTION_KEY
   if (!keyStr) {
     return null
   }
@@ -91,7 +91,7 @@ export function decrypt(text: string): string {
   }
   const key = tryGetEncryptionKey()
   if (!key) {
-    throw new Error('AI_CONFIG_ENCRYPTION_KEY missing')
+    throw new Error('ENCRYPTION_KEY missing')
   }
   const iv = Buffer.from(textParts.shift()!, 'hex')
   const encryptedText = Buffer.from(textParts.join(':'), 'hex')

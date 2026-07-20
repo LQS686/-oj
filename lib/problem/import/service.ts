@@ -160,7 +160,6 @@ async function createOne(
       realPrecision: problem.realPrecision ?? 3,
       isPublic: options.visibility === 'public',
       visibility: options.visibility,
-      aiStatus: 'MANUAL_CREATED',
       stdCode: problem.stdCode || null,
       stdLang: problem.stdLang || null,
       author: { connect: { id: options.authorId } },

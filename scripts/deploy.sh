@@ -23,7 +23,7 @@ GIT_REPO="https://gitee.com/carefree-old-man/dashan-oj.git"
 MONGO_PASS=$(head -c 24 /dev/urandom | base64 | tr -d '+/=' | head -c 24)
 REDIS_PASS=$(head -c 24 /dev/urandom | base64 | tr -d '+/=' | head -c 24)
 JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '+/=' | head -c 43)
-AI_KEY=$(head -c 32 /dev/urandom | base64 | tr -d '+/=' | head -c 43)
+ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64 | tr -d '+/=' | head -c 43)
 
 # --------------- 系统检测 ---------------
 detect_os() {
@@ -130,7 +130,7 @@ NODE_ENV=production
 PORT=3000
 DATABASE_URL=mongodb://ojuser:${MONGO_PASS}@mongo:27017/oj_platform?authSource=oj_platform&replicaSet=rs0
 JWT_SECRET=${JWT_SECRET}
-AI_CONFIG_ENCRYPTION_KEY=${AI_KEY}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
 REDIS_URL=redis://:${REDIS_PASS}@redis:6379
 
@@ -148,10 +148,6 @@ JUDGE_REJUDGE_TIMES=1
 JUDGE_MAX_CONCURRENT=1
 
 LOG_LEVEL=info
-
-AI_JOB_TIMEOUT_MS=300000
-AI_SOLUTION_TIMEOUT_MS=180000
-AI_SOLUTION_MAX_CONCURRENT=2
 
 MONGO_ROOT_USER=admin
 MONGO_ROOT_PASSWORD=${MONGO_PASS}

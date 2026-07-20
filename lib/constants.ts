@@ -2,7 +2,7 @@
  * 难度体系（对齐洛谷 8 档权威定义）
  * 参考：https://help.luogu.com.cn/manual/luogu/problem/difficulty
  *
- * 这是全站唯一的难度真相源——所有业务校验、AI prompt、前端表单
+ * 这是全站唯一的难度真相源——所有业务校验、前端表单
  * 必须从本文件导入 DIFFICULTIES / Difficulty / isValidDifficulty，
  * 不得在其他文件硬编码难度列表。
  */

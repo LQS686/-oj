@@ -32,8 +32,6 @@ import { logger } from '@/lib/logger'
 export interface DsojExportOptions {
   /** 题目 ID 列表（与 filter 二选一） */
   problemIds?: string[]
-  /** 来源过滤（与 problemIds 二选一） */
-  source?: 'all' | 'MANUAL_CREATED' | 'AI_ASSISTED' | 'AI_GENERATED'
   /** 是否导出标程代码（默认 true） */
   includeStdCode?: boolean
   /** 是否导出测试用例（默认 true，强烈建议保持 true） */
@@ -59,8 +57,6 @@ async function loadProblemsForExport(options: DsojExportOptions) {
   const where: any = {}
   if (options.problemIds && options.problemIds.length > 0) {
     where.id = { in: options.problemIds }
-  } else if (options.source && options.source !== 'all') {
-    where.aiStatus = options.source
   }
 
   const problems = await prisma.problem.findMany({
@@ -309,7 +305,7 @@ function serializeOneProblem(
 export async function exportDsojPack(options: DsojExportOptions): Promise<Buffer> {
   logger.info('开始导出 DSOJ 题包', {
     problemIds: options.problemIds?.length,
-    source: options.source,
+    packSource: options.packSource,
   })
 
   // 1. 加载题目数据

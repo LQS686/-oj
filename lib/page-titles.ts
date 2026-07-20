@@ -14,8 +14,6 @@ const RULES: TitleRule[] = [
   { test: /^\/admin\/problems\/[^/]+\/testcases$/, title: '测试用例 - 题目管理' },
   { test: /^\/admin\/problems\/[^/]+\/edit$/, title: '编辑题目' },
   { test: /^\/admin\/problems\/create$/, title: '创建题目' },
-  { test: /^\/admin\/problems\/review$/, title: '题目审核' },
-  { test: /^\/admin\/problems\/source$/, title: '题目来源' },
   { test: /^\/admin\/problems$/, title: '题目管理' },
   { test: /^\/admin\/contests\/[^/]+\/edit$/, title: '编辑竞赛' },
   { test: /^\/admin\/contests\/create$/, title: '创建竞赛' },
@@ -32,8 +30,6 @@ const RULES: TitleRule[] = [
   { test: /^\/admin\/settings$/, title: '系统设置' },
   { test: /^\/admin\/roles$/, title: '角色管理' },
   { test: /^\/admin\/permissions$/, title: '权限管理' },
-  { test: /^\/admin\/ai-models$/, title: 'AI 模型' },
-  { test: /^\/admin\/ai-generation$/, title: 'AI 出题' },
   { test: /^\/admin$/, title: '管理后台' },
 
   // 竞赛

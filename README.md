@@ -13,7 +13,7 @@
 ### 核心功能
 
 - **用户认证系统** — JWT + httpOnly Cookie 统一认证（token 不再落 localStorage），密码 bcrypt 加密，tokenVersion 吊销机制
-- **题目管理** — 题目列表、详情展示（KaTeX 数学公式渲染）、统计分析、AI 辅助出题
+- **题目管理** — 题目列表、详情展示（KaTeX 数学公式渲染）、统计分析
 - **题库筛选** — 内嵌搜索栏；难度下拉多选；标签弹窗多选（OR 匹配）
 - **代码提交** — 支持 C++ (C++17)、C (C11)、Java (Java 17)、Python (Python 3.10)、JavaScript (Node.js 18)
 - **自动评测** — 实时编译执行判定，WebSocket 推送评测进度，支持时间/内存限制
@@ -44,7 +44,6 @@
 - **竞赛模式** — ACM/OI 赛制，实时榜单，赛题管理
 - **训练题单** — 官方 / 竞赛真题 / 我的收藏分类（个人创建已移除，仅管理员可创建）
 - **社区讨论** — 题解评论、帖子发布
-- **AI 工作台** — 4 大功能 tab（智能出题 / 题目分析 / 元数据建议 / 测试数据生成）；AI 任务队列（拆分为 service/queue 多文件架构）；难度系统统一为洛谷 8 级标准（入门/普及-/普及/普及+/提高/提高+/省选/NOI）
 - **响应式设计** — 移动端 Drawer 抽屉菜单适配
 - **Docker 部署** — 一键部署，MongoDB 副本集 + Redis 缓存 + Nginx 反代
 
@@ -92,11 +91,11 @@ NODE_ENV=development
 PORT=3000
 FRONTEND_URL=http://localhost:3000
 
-# 可选（评测/AI 队列）
+# 可选（评测队列）
 REDIS_URL=redis://localhost:6379
 
-# 可选（AI 配置加密；未配置时降级为不加密，仅开发环境允许）
-AI_CONFIG_ENCRYPTION_KEY=your-32-char-hex-key
+# 可选（敏感配置加密；未配置时降级为不加密，仅开发环境允许）
+ENCRYPTION_KEY=your-32-char-hex-key
 ```
 
 > ⚠️ **重要**：本项目**无任何默认账户**（包括管理员/测试用户）。
@@ -165,12 +164,10 @@ docker-compose logs -f app
 ### 关键安全措施
 
 - **JWT 安全** — httpOnly + Secure + SameSite Cookie，tokenVersion 吊销，payload 仅含 userId/email/username/role
-- **SSRF 防护** — `validateAiBaseUrl()` 阻止 AI 服务商 baseUrl 指向内网/元数据端点（`lib/ai/providers.ts`）
 - **文件上传** — `detectImageMime()` 魔数校验（JPEG/PNG/GIF/WebP），拒绝伪造扩展名（`lib/upload.ts`）
 - **命令注入防护** — `execSync` 调用前对 pid 做 `Number.isFinite` 校验（`lib/judge/executor.ts`）
 - **加密安全** — 安全关键随机值使用 `crypto.randomBytes`（题目编号、临时密码等），禁用 `Math.random`
 - **权限白名单** — 班级成员权限更新走 `ALLOWED_PERMISSION_KEYS` 过滤（`lib/class/service.ts`）
-- **事务原子性** — AI 服务关键操作用 `prisma.$transaction` 包裹
 - **类型安全** — 85 处 `(ctx as any).params` 已全部清理为类型安全的 `ctx.params`
 
 ## 项目结构
@@ -179,7 +176,7 @@ docker-compose logs -f app
 dashan-oj/
 ├── app/                          # Next.js App Router
 │   ├── api/                      # API 路由（100 个 route.ts，150 个方法）
-│   │   ├── admin/                # 管理后台 API（含 ai/classes/contests/problems/users）
+│   │   ├── admin/                # 管理后台 API（含 classes/contests/problems/users）
 │   │   ├── auth/                 # 认证（login/logout/register/me/forgot-password）
 │   │   ├── classes/[id]/         # 班级（成员/作业/笔记/题目/直邀）
 │   │   ├── problems/             # 题目列表与详情
@@ -201,11 +198,10 @@ dashan-oj/
 │   ├── api/                      # withApi（统一封装）、handler（鉴权缓存）、response、validation
 │   ├── auth/                     # 认证服务（JWT、httpOnly Cookie、tokenVersion）
 │   ├── permissions.ts            # 4 级角色权限单一来源（canAccessAdmin 等）
-│   ├── ai/                       # AI 出题/题解/模型发现（含 SSRF 防护）
 │   ├── judge/                    # 评测机（Docker 沙箱 + Windows 告警）
 │   ├── class/、problem/、submission/、contest/、training/、solution/
 │   ├── cache.ts                  # 业务层缓存
-│   ├── crypto.ts                 # AI 配置加密
+│   ├── crypto.ts                 # 通用加密（SMTP 授权码等敏感配置）
 │   ├── upload.ts                 # 文件上传 + 魔数校验
 │   └── prisma.ts
 ├── prisma/schema.prisma          # 38 个模型；已移除 Points* 与 ClassInvite
@@ -233,7 +229,7 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 
 ## 更新日志
 
-### 2026/07（班级作业审查优化 + AI 工作台重构 + UI 规范化）
+### 2026/07（班级作业审查优化 + UI 规范化）
 
 - **班级作业三态模型** — 统一 `upcoming`/`active`/`ended` 状态判定（`getAssignmentStatus`），前后端一致；`allowLateSubmission` 字段控制 ended 状态是否接受逾期提交
 - **作业计时解耦** — `isFirstAcInAssignment`（查 `ClassAssignmentSubmission` 表）替代 `isFirstAcGlobal` 触发 `finalizeTiming`；学生先在题库 AC 后在作业中 AC 仍可正确记录用时
@@ -243,19 +239,16 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 - **isLate 自动重算** — 修改 `endTime` 后自动调用 `recalculateLateFlags` 重算所有提交的 isLate 标记
 - **API 守卫** — 提交频率限制（10s/429）、语言白名单（cpp/c/python）、代码长度校验、`/submissions` 权限漏洞修复（非管理员强制 userId=self）
 - **前端状态守卫** — 未开始/已结束（不允许逾期）时提交按钮禁用 + 状态横幅；ProblemTimer `assignmentEndedRef` 边界控制
-- **AI 工作台重构** — `lib/ai/service.ts` 拆分为 8 个文件、`lib/ai/queue.ts` 拆分为 10 个文件；新增 4 个功能 tab（智能出题/题目分析/元数据建议/测试数据生成）与 `AiTaskResultViewer` 轮询组件
 - **难度系统统一** — 全站对齐洛谷 8 级标准（入门/普及-/普及/普及+/提高/提高+/省选/NOI），`getDifficultyColor` 单一来源
 - **题单功能调整** — 移除个人题单创建（仅管理员可创建），恢复"我的收藏"分类（`joinedOnly` 过滤）
 - **后台 UI 规范化** — 移除重复页面标题（H1）；统一操作工具栏（左描述右按钮）；FilterBar 合并搜索框与操作按钮
 - **REMOVED 提交状态** — 作业移除题目时孤儿提交标记为 `removed`（终态，不再计入统计但保留记录）
-- **stale 任务重置** — 服务启动时 `resetStaleTasksOnStartup` 将遗留 PENDING/PROCESSING 任务标记为 FAILED
 
 ### 2026/07（安全加固与冗余清理）
 
 - **邀请码废除** — 移除 `ClassInvite` 模型与全部邀请码相关 API/页面，班级加入改用用户名直邀
 - **认证统一** — JWT token 全部走 httpOnly Cookie，前端不再读写 localStorage；`UserContext`、`useSubmissionSocket`、批量注册 XHR 等全部清理
 - **4 级角色体系** — 标准化为 `SYSTEM_ADMIN` / `ADMIN` / `TEACHER` / `STUDENT`；`lib/permissions.ts` 为单一来源；9 个路由文件的 `isAdmin(user)` 改为 `canAccessAdmin(user)`
-- **SSRF 防护** — `validateAiBaseUrl()` 阻止 AI 服务商 baseUrl 指向内网/元数据端点（IPv4 私有段、IPv6 内网、localhost、非 http(s) 协议）
 - **文件上传安全** — `detectImageMime()` 魔数校验（JPEG/PNG/GIF/WebP），拒绝伪造扩展名
 - **命令注入防护** — `execSync` 调用前对 pid 做 `Number.isFinite` 校验
 - **加密安全** — 题目编号、临时密码等安全关键随机值改用 `crypto.randomBytes`

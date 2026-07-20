@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
-import { logger } from '@/lib/logger'
-import { ArrowLeft, Plus, X, Save, Loader2, FileText, Sparkles } from 'lucide-react'
+import { ArrowLeft, Plus, X, Save, Loader2, FileText } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
 
 interface Sample {
@@ -13,21 +12,8 @@ interface Sample {
  explanation?: string
 }
 
-interface AIGeneratedData {
- title: string
- description: string
- difficulty: string
- tags: string[]
- inputFormat: string
- outputFormat: string
- samples: Sample[]
- hints: string[]
-}
-
 export default function CreateProblemPage() {
  const router = useRouter()
- const searchParams = useSearchParams()
- const aiData = searchParams.get('ai')
 
  const [submitting, setSubmitting] = useState(false)
  const [error, setError] = useState('')
@@ -50,26 +36,6 @@ export default function CreateProblemPage() {
  const [source, setSource] = useState('')
 
  const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '', explanation: '' }])
-
- useEffect(() => {
- if (aiData) {
- try {
- const data: AIGeneratedData = JSON.parse(decodeURIComponent(aiData))
- setTitle(data.title)
- setDescription(data.description)
- setDifficulty(data.difficulty)
- setTags(data.tags || [])
- setInput(data.inputFormat || '')
- setOutput(data.outputFormat || '')
- setHint(data.hints?.join('\n') || '')
- if (data.samples && data.samples.length > 0) {
- setSamples(data.samples)
- }
- } catch (e) {
- logger.error('解析 AI 数据失败', e)
- }
- }
- }, [aiData])
 
  const handleAddTag = () => {
  if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -127,7 +93,6 @@ export default function CreateProblemPage() {
  realPrecision: comparisonMode === 'real-number' ? realPrecision : 3,
  isPublic: visibility === 'public',
  visibility,
- aiStatus: aiData ? 'AI_ASSISTED' : 'MANUAL_CREATED'
  })
  })
 
@@ -164,12 +129,6 @@ export default function CreateProblemPage() {
  <p className="text-sm text-muted-foreground">添加新的编程题目</p>
  </div>
  </div>
- {aiData && (
- <span className="tag tag-primary flex items-center gap-1 ml-2">
- <Sparkles className="w-3 h-3" />
- AI 辅助
- </span>
- )}
  </div>
 
  {error && (

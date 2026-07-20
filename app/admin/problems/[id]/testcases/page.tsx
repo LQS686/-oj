@@ -2,14 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import Link from 'next/link'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { ArrowLeft, Upload, X, Plus, Sparkles, Loader2, Save, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
+import { ArrowLeft, Upload, X, Plus, Loader2, Save, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase-scoring'
 import { formatDateTime } from '@/lib/utils'
-import { AI_FEATURE_DISABLED } from '@/lib/ai/feature-flag'
-import { AiDisabledBadge } from '@/components/ai/AiDisabledNotice'
 
 interface TestCase {
   input: string
@@ -337,17 +334,6 @@ export default function ProblemTestCasesPage() {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <Link
-            href={`/admin/ai?tab=test_data&problemId=${encodeURIComponent(problemId)}`}
-            className={`btn btn-ghost text-sm flex items-center gap-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 ${
-              AI_FEATURE_DISABLED ? 'pointer-events-none opacity-60' : ''
-            }`}
-            title="跳转到 AI 工作区生成测试数据"
-          >
-            <Sparkles className="w-4 h-4" />
-            AI 生成测试数据
-            {AI_FEATURE_DISABLED && <AiDisabledBadge />}
-          </Link>
           <button
             onClick={() => setShowLogsModal(true)}
             className="btn btn-ghost text-sm flex items-center gap-2"
@@ -399,8 +385,8 @@ export default function ProblemTestCasesPage() {
             <Upload className="w-5 h-5 text-primary-light" />
             批量上传
           </h3>
-          <div 
-            className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-muted transition-colors cursor-pointer" 
+          <div
+            className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-muted transition-colors cursor-pointer"
             onClick={() => fileInputRef.current?.click()}
           >
             <input
@@ -430,27 +416,6 @@ export default function ProblemTestCasesPage() {
               {uploadResult.count !== undefined && ` (共 ${uploadResult.count} 个)`}
             </div>
           )}
-        </div>
-
-        <div className="card p-6">
-          <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-400" />
-            AI 智能生成
-            {AI_FEATURE_DISABLED && <AiDisabledBadge />}
-          </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            根据题目描述和标程自动生成高强度测试数据。
-          </p>
-          <Link
-            href={`/admin/ai?tab=test_data&problemId=${encodeURIComponent(problemId)}`}
-            className={`btn btn-ghost w-full flex items-center justify-center gap-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 ${
-              AI_FEATURE_DISABLED ? 'pointer-events-none opacity-60' : ''
-            }`}
-            title="跳转到 AI 工作区生成测试数据"
-          >
-            <Sparkles className="w-4 h-4" />
-            跳转 AI 工作区生成
-          </Link>
         </div>
       </div>
 

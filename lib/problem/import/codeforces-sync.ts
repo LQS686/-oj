@@ -8,10 +8,10 @@
  * 注意：CF API 只提供题目元数据（题号、标题、tags、rating），不提供题面内容。
  * 导入后题面字段会写入"参见 CF 原题链接"的占位，管理员可后续手动补充。
  *
- * 安全：使用 safeFetch（SSRF 防护），与 AI 服务调用同一套网络出口策略。
+ * 安全：使用 safeFetch（SSRF 防护），统一网络出口策略。
  */
 import { ApiError } from '@/lib/api/withApi'
-import { safeFetch } from '@/lib/ai/fetch-safe'
+import { safeFetch } from '@/lib/security/safe-fetch'
 import { logger } from '@/lib/logger'
 import type { ImportedProblem } from './types'
 

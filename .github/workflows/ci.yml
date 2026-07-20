@@ -11,7 +11,7 @@ env:
   # CI 环境默认最小配置环境变量，仅用于通过 typecheck/lint/test
   JWT_SECRET: ci_jwt_secret_at_least_32_characters_long_for_test
   DATABASE_URL: mongodb://localhost:27017/ci?replicaSet=rs0
-  AI_CONFIG_ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   NODE_ENV: test
 
 jobs:
