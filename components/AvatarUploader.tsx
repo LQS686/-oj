@@ -5,6 +5,7 @@ import { Camera, Upload, X, Check, AlertCircle, History, Trash2, Loader2 } from 
 import Image from 'next/image'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface UploadHistory {
  id: string
@@ -14,13 +15,14 @@ interface UploadHistory {
  createdAt: string
 }
 
-export default function AvatarUploader({ 
- currentAvatar, 
- onAvatarUpdate 
-}: { 
+export default function AvatarUploader({
+ currentAvatar,
+ onAvatarUpdate
+}: {
  currentAvatar?: string | null
  onAvatarUpdate: (url: string) => void
 }) {
+ const dialog = useDialog()
  const [file, setFile] = useState<File | null>(null)
  const [preview, setPreview] = useState<string | null>(null)
  const [uploading, setUploading] = useState(false)
@@ -235,8 +237,16 @@ export default function AvatarUploader({
  const handleHistoryDelete = async (e: React.MouseEvent, historyItem: UploadHistory) => {
   // 阻止冒泡，避免触发卡片的选择头像逻辑
   e.stopPropagation()
-  // 浏览器原生确认：删除不可恢复（含上传文件）
-  if (!window.confirm('确定删除该历史头像？删除后将同步移除已上传的图片文件，且不可恢复。')) return
+  // 模态框确认：删除不可恢复（含上传文件）
+  const ok = await dialog.confirm({
+    title: '删除历史头像',
+    message: '确定删除该历史头像？删除后将同步移除已上传的图片文件，且不可恢复。',
+    tone: 'warning',
+    confirmText: '删除',
+    confirmVariant: 'destructive',
+    cancelText: '取消',
+  })
+  if (!ok) return
 
   setDeletingId(historyItem.id)
   try {

@@ -41,6 +41,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   const body = await readJson<{
     title?: string
     description?: string
+    background?: string
     input?: string
     output?: string
     samples?: any
@@ -97,6 +98,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     const problem = await createProblemWithTestcases({
       title: problemTitle,
       description: body.description!,
+      background: body.background,
       input: body.input || '',
       output: body.output || '',
       samples: body.samples || [],

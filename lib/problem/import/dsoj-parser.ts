@@ -31,10 +31,11 @@
  *   │   ├── <slug>/            # 题目目录（任意合法目录名）
  *   │   │   ├── problem.yaml   # 题目元信息（必需）
  *   │   │   ├── description.md # 题目描述（markdown，必需）
+ *   │   │   ├── background.md # 题目背景（markdown，可选）
  *   │   │   ├── input.md       # 输入格式（可选）
  *   │   │   ├── output.md      # 输出格式（可选）
  *   │   │   ├── hint.md        # 提示（可选）
- *   │   │   ├── samples/       # 展示样例（可选，1.in/1.out/1.explanation.md）
+ *   │   │   ├── samples/       # 展示样例（可选，1.in/1.out）
  *   │   │   ├── testcases/     # 完整测试点（必需，1.in/1.out/1.score）
  *   │   │   ├── config.yaml    # 测试配置覆盖（可选）
  *   │   │   ├── std.cpp        # 标准代码（可选，支持 .cpp/.c/.py）
@@ -43,11 +44,10 @@
  *
  * 优先级：config.yaml > problem.yaml > 默认值
  *
- * 安全：使用 isSafeZipEntryName 防 Zip Slip；所有路径校验严格
+ * 安全：isStrictSafePath 防 Zip Slip（绝对路径 / .. 穿越 / 盘符 / 控制字符）
  */
 import AdmZip from 'adm-zip'
 import { ApiError } from '@/lib/api/withApi'
-import { isSafeZipEntryName } from '../testcase'
 import { isValidDifficulty, migrateDifficulty } from '@/lib/constants'
 import type { ImportedProblem, ImportedTestCase } from './types'
 
@@ -186,26 +186,31 @@ function parseDsojYaml(text: string): DsojYamlValue {
  * ========================================================================== */
 
 /**
- * 严格校验 ZIP entry 路径安全性
- *   - 拒绝绝对路径（/开头）
- *   - 拒绝 .. 路径穿越
- *   - 拒绝 Windows 盘符（C:\）
- *   - 拒绝控制字符
+ * 严格校验 ZIP entry 完整路径安全性（允许 / 作为路径分隔符）
+ *
+ * 与 testcase.ts 的 isSafeZipEntryName 区别：
+ *   - isSafeZipEntryName 用于**单文件名**校验，禁止任何路径分隔符（/、\）
+ *   - isStrictSafePath 用于**完整路径**校验，允许 / 但禁止 .. 穿越、绝对路径、盘符等
+ *
+ * 因此不能复用 isSafeZipEntryName，否则含 / 的合法相对路径（如
+ * "problems/0001-a-plus-b/description.md"）会被误判为不安全。
  */
 function isStrictSafePath(path: string): boolean {
-  if (!path) return false
-  // 统一分隔符检查
+  if (!path || typeof path !== 'string') return false
+  if (path.length > 512) return false
+  // 统一分隔符检查（\ → /）
   const normalized = path.replace(/\\/g, '/')
-  // 拒绝绝对路径
+  // 拒绝绝对路径（/ 开头）
   if (normalized.startsWith('/')) return false
-  // 拒绝 .. 路径穿越
-  if (normalized.includes('../') || normalized.includes('/..') || normalized === '..') return false
-  // 拒绝 Windows 盘符
-  if (/^[a-zA-Z]:/.test(normalized)) return false
-  // 拒绝控制字符
+  // 拒绝 Windows 盘符（C:\ 开头）
+  if (/^[a-zA-Z]:\//.test(normalized)) return false
+  // 拒绝 .. 路径穿越（任意段为 ..）
+  if (normalized === '..' || normalized.includes('../') || normalized.includes('/..')) return false
+  // 拒绝控制字符（含 NUL）
   if (/[\x00-\x1f]/.test(normalized)) return false
-  // 复用项目的 isSafeZipEntryName 做最终判定
-  return isSafeZipEntryName(normalized)
+  // 拒绝 Unicode 路径分隔符（U+2028 / U+2029 / 全角斜杠）
+  if (/[\u2028\u2029\uFF0F\uFF3C]/.test(normalized)) return false
+  return true
 }
 
 /**
@@ -378,18 +383,17 @@ function extractTestcases(
  *
  * 文件名约定：
  *   - 1.in / 1.out               第 1 组样例输入/输出
- *   - 1.explanation.md           第 1 组样例解释（markdown，可选）
  *
  * 返回按编号排序的样例列表
  */
 function extractSamples(
   zip: AdmZip,
   samplesDir: string
-): Array<{ input: string; output: string; explanation?: string }> {
+): Array<{ input: string; output: string }> {
   const all = zip.getEntries()
   const prefix = samplesDir
 
-  const groups = new Map<number, { input?: string; output?: string; explanation?: string }>()
+  const groups = new Map<number, { input?: string; output?: string }>()
 
   for (const entry of all) {
     if (entry.isDirectory) continue
@@ -398,8 +402,8 @@ function extractSamples(
     if (filename.includes('/')) continue
     if (!isStrictSafePath(filename)) continue
 
-    // 1.in / 1.out / 1.explanation.md
-    const m = filename.match(/^(\d+)\.(in|out|ans|explanation\.md)$/i)
+    // 1.in / 1.out
+    const m = filename.match(/^(\d+)\.(in|out|ans)$/i)
     if (!m) continue
     const num = parseInt(m[1], 10)
     if (!Number.isFinite(num) || num <= 0) continue
@@ -412,12 +416,10 @@ function extractSamples(
       group.input = readEntryText(entry)
     } else if (ext === 'out' || ext === 'ans') {
       group.output = readEntryText(entry)
-    } else if (ext === 'explanation.md') {
-      group.explanation = readEntryText(entry)
     }
   }
 
-  const result: Array<{ input: string; output: string; explanation?: string }> = []
+  const result: Array<{ input: string; output: string }> = []
   const sortedNums = Array.from(groups.keys()).sort((a, b) => a - b)
   for (const num of sortedNums) {
     const g = groups.get(num)!
@@ -425,7 +427,6 @@ function extractSamples(
     result.push({
       input: g.input ?? '',
       output: g.output ?? '',
-      explanation: g.explanation,
     })
   }
   return result
@@ -559,6 +560,9 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
       400
     )
   }
+  const background = readEntryText(
+    findFileUnderProblemDir(zip, problemDir, ['background.md'])
+  ) || undefined
   const input = readEntryText(
     findFileUnderProblemDir(zip, problemDir, ['input.md'])
   )
@@ -592,7 +596,7 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
 
   // 8. 提取展示样例
   const samplesDir = findSubdirUnderProblemDir(zip, problemDir, SAMPLES_DIR_NAMES)
-  let samples: Array<{ input: string; output: string; explanation?: string }> = []
+  let samples: Array<{ input: string; output: string }> = []
   if (samplesDir) {
     samples = extractSamples(zip, samplesDir)
   }
@@ -675,6 +679,7 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
   return {
     title,
     description,
+    background,
     input,
     output,
     samples,

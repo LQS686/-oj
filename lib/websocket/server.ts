@@ -16,7 +16,11 @@ let staleConnectionCleanupTimer: ReturnType<typeof setInterval> | null = null
 
 const MAX_MESSAGE_SIZE = 1 * 1024 * 1024
 const RATE_LIMIT_WINDOW = 60 * 1000
-const RATE_LIMIT_MAX_CONNECTIONS = 10
+// 开发环境放宽连接限流：Next.js HMR / Turbopack 每次保存都触发客户端重连，
+// 加上多个 socket hook（useSubmissionSocket / useNotificationSocket / useAnnouncementSocket）
+// 各自建立独立连接，10次/分钟会频繁触发"连接过于频繁"误报。
+// 生产环境保持 10 次/分钟严格限流，防御恶意客户端。
+const RATE_LIMIT_MAX_CONNECTIONS = process.env.NODE_ENV === 'development' ? 100 : 10
 const MAX_HEARTBEATS_PER_MINUTE = 30
 
 const ALLOWED_EVENT_TYPES = [
@@ -302,10 +306,17 @@ export function initWebSocketServer(httpServer: HTTPServer) {
   staleConnectionCleanupTimer = setInterval(() => {
     const now = Date.now()
     const timeoutThreshold = 5 * 60 * 1000 // 5分钟超时
-    
+
     for (const [socketId, clientInfo] of connectedClients.entries()) {
       if (now - clientInfo.connectedAt > timeoutThreshold) {
         logger.warn(`⚠️  清理超时连接: ${socketId}`)
+        // 必须显式 disconnect socket，否则 socket 仍存活并留在 user:{userId} 房间，
+        // 后续重连时 connectedClients.get(socket.id) 返回 undefined，
+        // join 处理把 client 视为未认证并拒绝加入，导致 submission:update 永久丢失。
+        const targetSocket = io?.sockets.sockets.get(socketId)
+        if (targetSocket) {
+          targetSocket.disconnect(true)
+        }
         connectedClients.delete(socketId)
       }
     }

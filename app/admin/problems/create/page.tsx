@@ -5,18 +5,18 @@ import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { ArrowLeft, Plus, X, Save, Loader2, FileText } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface Sample {
  input: string
  output: string
- explanation?: string
 }
 
 export default function CreateProblemPage() {
  const router = useRouter()
+ const dialog = useDialog()
 
  const [submitting, setSubmitting] = useState(false)
- const [error, setError] = useState('')
 
  const [problemNumber, setProblemNumber] = useState('')
  const [title, setTitle] = useState('')
@@ -29,13 +29,14 @@ export default function CreateProblemPage() {
  const [realPrecision, setRealPrecision] = useState(3)
  const [visibility, setVisibility] = useState('private')
 
+ const [background, setBackground] = useState('')
  const [description, setDescription] = useState('')
  const [input, setInput] = useState('')
  const [output, setOutput] = useState('')
  const [hint, setHint] = useState('')
  const [source, setSource] = useState('')
 
- const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '', explanation: '' }])
+ const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '' }])
 
  const handleAddTag = () => {
  if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -49,28 +50,60 @@ export default function CreateProblemPage() {
  }
 
  const handleAddSample = () => {
- setSamples([...samples, { input: '', output: '', explanation: '' }])
+ setSamples([...samples, { input: '', output: '' }])
  }
 
  const handleRemoveSample = (index: number) => {
  setSamples(samples.filter((_, i) => i !== index))
  }
 
+ const hasUnsavedChanges = () =>
+   title.trim() ||
+   description.trim() ||
+   background.trim() ||
+   input.trim() ||
+   output.trim() ||
+   hint.trim() ||
+   source.trim() ||
+   problemNumber.trim() ||
+   tags.length > 0 ||
+   samples.some(s => s.input.trim() || s.output.trim())
+
+ const handleCancel = async () => {
+   if (hasUnsavedChanges()) {
+     const ok = await dialog.confirm({
+       title: '放弃创建？',
+       message: '当前表单内容尚未保存，确认离开将丢失所有填写内容。',
+       tone: 'warning',
+       confirmText: '放弃',
+       cancelText: '继续编辑',
+       confirmVariant: 'destructive',
+     })
+     if (!ok) return
+   }
+   router.back()
+ }
+
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault()
- 
+
  if (!title.trim()) {
- setError('请填写题目标题')
+ await dialog.alert({
+ tone: 'warning',
+ message: '请填写题目标题',
+ })
  return
  }
 
  if (!description.trim()) {
- setError('请填写题目描述')
+ await dialog.alert({
+ tone: 'warning',
+ message: '请填写题目描述',
+ })
  return
  }
 
  setSubmitting(true)
- setError('')
 
  try {
  const response = await fetchWithCookie('/api/admin/problems', {
@@ -80,6 +113,7 @@ export default function CreateProblemPage() {
  problemNumber: problemNumber.trim() || null,
  title: title.trim(),
  description,
+ background,
  input,
  output,
  samples: samples.filter(s => s.input || s.output),
@@ -99,12 +133,25 @@ export default function CreateProblemPage() {
  const data = await response.json()
 
  if (data.success) {
+ await dialog.alert({
+ tone: 'success',
+ title: '创建成功',
+ message: `题目《${title.trim()}》已创建`,
+ confirmText: '返回列表',
+ })
  router.push('/admin/problems')
  } else {
- setError(data.error || '创建失败')
+ const msg = data.error?.message || data.error || '创建失败'
+ await dialog.alert({
+ tone: 'error',
+ message: typeof msg === 'string' ? msg : '创建失败',
+ })
  }
  } catch (err) {
- setError('网络错误')
+ await dialog.alert({
+ tone: 'error',
+ message: '网络错误，请稍后重试',
+ })
  } finally {
  setSubmitting(false)
  }
@@ -130,12 +177,6 @@ export default function CreateProblemPage() {
  </div>
  </div>
  </div>
-
- {error && (
- <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg">
- {error}
- </div>
- )}
 
  <form onSubmit={handleSubmit} className="space-y-6">
  <div className="card p-6 space-y-4">
@@ -316,7 +357,20 @@ export default function CreateProblemPage() {
 
  <div className="card p-6 space-y-4">
  <h2 className="text-lg font-bold text-foreground mb-4">题目描述</h2>
- 
+
+ <div>
+ <label className="block text-sm font-medium text-foreground mb-2">
+ 题目背景 <span className="text-muted-foreground">(可选)</span>
+ </label>
+ <textarea
+ value={background}
+ onChange={(e) => setBackground(e.target.value)}
+ rows={3}
+ placeholder="题目背景内容（markdown 格式，可选）"
+ className="input font-mono text-sm"
+ />
+ </div>
+
  <div>
  <label className="block text-sm font-medium text-foreground mb-2">
  题目描述 <span className="text-error">*</span>
@@ -431,19 +485,6 @@ export default function CreateProblemPage() {
  />
  </div>
  </div>
- <div>
- <label className="block text-sm font-medium text-muted-foreground mb-2">说明（可选）</label>
- <input
- type="text"
- value={sample.explanation || ''}
- onChange={(e) => {
- const newSamples = [...samples]
- newSamples[idx].explanation = e.target.value
- setSamples(newSamples)
- }}
- className="input text-sm"
- />
- </div>
  </div>
  ))}
  </div>
@@ -451,7 +492,7 @@ export default function CreateProblemPage() {
  <div className="flex gap-4">
  <button
  type="button"
- onClick={() => router.back()}
+ onClick={handleCancel}
  className="btn btn-ghost flex-1"
  >
  取消

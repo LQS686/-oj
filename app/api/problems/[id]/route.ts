@@ -24,6 +24,7 @@ export const GET = withApi.public(async (req, ctx) => {
     id: p.id,
     title: p.title,
     description: p.description,
+    background: p.background,
     input: p.input,
     output: p.output,
     samples: p.samples || [],

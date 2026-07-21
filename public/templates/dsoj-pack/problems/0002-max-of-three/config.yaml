@@ -1,0 +1,11 @@
+# 此文件可选，用于覆盖 problem.yaml 中的评测配置。
+# 字段优先级：config.yaml > problem.yaml > 默认值
+#
+# 此处演示：本题不使用默认的 1000ms 时间限制，
+# 而是放宽到 2000ms，并启用实数比较模式（精度 6 位）。
+# （注：A+B 题目其实不需要这些覆盖，此处仅作演示）
+#
+# time_limit: 2000
+# memory_limit: 512
+# comparison_mode: real-number
+# real_precision: 6

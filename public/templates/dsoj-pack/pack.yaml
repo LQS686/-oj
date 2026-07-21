@@ -1,0 +1,11 @@
+format: dsoj-pack
+version: "1.0"
+created_at: 2026-07-20T00:00:00Z
+source: DSOJ 公开下载模板
+description: |
+  DSOJ 公开可下载的标准题包模板。
+  本模板通过 /templates/dsoj-pack/... URL 公开访问，管理员可直接下载 ZIP 后
+  通过管理后台批量导入功能上传。format 字段必须为 "dsoj-pack"，
+  version 字段当前支持 "1.0"。pack.yaml 仅用于标识格式和记录来源，
+  题目本身的所有信息都在 problems/<slug>/problem.yaml 中。
+problem_count: 2

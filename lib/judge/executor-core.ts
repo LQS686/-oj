@@ -103,6 +103,15 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       const wrappedCmd = `if command -v /usr/bin/time >/dev/null 2>&1; then /usr/bin/time -v sh -c '${escapedInner}' 2> /tmp/time_stats.txt; else sh -c '${escapedInner}'; fi; exit $?`
 
       // 移除 --rm，改为手动管理，以便在 exit 后 docker cp 读取 stats 文件
+      // Sanitizer 运行时选项（与 runner.sh 保持一致，仅对启用 sanitizer 的二进制生效）：
+      //   - halt_on_error=1 + abort_on_error=1：第一个错误立即 abort() → 退出码 134 → RE
+      //   - detect_leaks=0：禁用 leak detection（OJ 不关心泄漏，开销大）
+      //   - print_stacktrace=0：避免 stderr 污染选手输出文件
+      //   - allocator_may_return_null=1：malloc 失败返回 NULL 而非 crash（容错）
+      const sanitizerEnv = [
+        '-e', 'ASAN_OPTIONS=halt_on_error=1:abort_on_error=1:detect_leaks=0:print_stacktrace=0:allocator_may_return_null=1',
+        '-e', 'UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_stacktrace=0',
+      ]
       const dockerRunCommand = [
         'run', '--name', containerId,
         '--memory', `${memoryLimit}m`,
@@ -117,6 +126,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         '--user', 'nobody',
         '--pids-limit', '100',
         '--ulimit', 'nofile=1024:1024',
+        ...sanitizerEnv,
         baseImage,
         'bash', '-c',
         wrappedCmd

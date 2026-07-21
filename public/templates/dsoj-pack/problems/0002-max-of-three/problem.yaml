@@ -1,0 +1,12 @@
+title: 三个数中的最大值
+problem_number: P1002
+difficulty: 普及-
+tags:
+  - 模拟
+  - 条件判断
+source: DSOJ 模板
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: default
+real_precision: 3

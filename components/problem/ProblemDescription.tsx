@@ -1,14 +1,10 @@
 import { useState } from 'react'
 import MarkdownRenderer from '../common/MarkdownRenderer'
-import { FileCode, FileInput, FileOutput, Lightbulb, Tag, Copy, Check, ArrowUp } from 'lucide-react'
+import { FileCode, FileInput, FileOutput, Lightbulb, Tag, Copy, Check, ArrowUp, BookOpen } from 'lucide-react'
 import type { Problem } from '@/types/models'
 
-interface ProblemWithExplanation extends Problem {
-  samples: Array<{ input: string; output: string; explanation?: string }>
-}
-
 interface ProblemDescriptionProps {
-  problem: ProblemWithExplanation
+  problem: Problem
   /** 竞赛等场景：弱化区块标题、不重复标签区 */
   compact?: boolean
   hideTags?: boolean
@@ -43,6 +39,23 @@ export default function ProblemDescription({
 
  return (
  <div className={compact ? 'space-y-6 relative' : 'space-y-8 relative'}>
+ {problem.background && (
+ <section className="animate-fadeIn">
+ {!compact && (
+ <div className="flex items-center gap-2.5 mb-4">
+ <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+ <BookOpen className="w-4 h-4 text-primary-light" />
+ </div>
+ <h3 className="text-lg font-bold text-foreground">题目背景</h3>
+ </div>
+ )}
+ {compact && <h3 className="text-sm font-semibold text-foreground mb-2">题目背景</h3>}
+ <div className="prose prose-slate max-w-none">
+ <MarkdownRenderer content={problem.background} />
+ </div>
+ </section>
+ )}
+
  <section className="animate-fadeIn">
  {!compact && (
  <div className="flex items-center gap-2.5 mb-4">
@@ -148,14 +161,6 @@ export default function ProblemDescription({
  </div>
  </div>
  </div>
- {sample.explanation && (
- <div className="mt-3 text-sm text-muted-foreground bg-accent/5 p-4 rounded-xl border border-accent/20 hover:border-accent/30 transition-colors duration-300">
- <span className="font-semibold text-accent">说明：</span>
- <div className="prose prose-slate max-w-none text-muted-foreground mt-2">
- <MarkdownRenderer content={sample.explanation} />
- </div>
- </div>
- )}
  </div>
  ))
  ) : (

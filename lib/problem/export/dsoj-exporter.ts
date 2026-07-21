@@ -9,7 +9,7 @@
  *   dsoj-pack.zip
  *   ├── pack.yaml
  *   └── problems/
- *       ├── <problemNumber-or-id>/
+ *       ├── <题号>/             # 如 P1001
  *       │   ├── problem.yaml
  *       │   ├── description.md
  *       │   ├── input.md
@@ -125,37 +125,18 @@ function quoteIfNeeded(s: string): string {
  * ========================================================================== */
 
 /**
- * 生成题目目录名：优先使用 problemNumber，否则使用 id
- *   - 有 problemNumber（如 "P1001"）：去掉 P 前缀 + slug → "001-a-plus-b"
- *   - 无 problemNumber：使用 id 的前 8 位 + slug → "abc12345-a-plus-b"
- *
- * 目录名规则：小写字母 + 数字 + 短横线，便于排序
+ * 生成题目目录名：直接使用题号
+ *   - 有 problemNumber（如 "P1001"）：直接用题号 → "P1001"
+ *   - 无 problemNumber：使用 id 的前 8 位 → "abc12345"
  */
 function makeProblemDirName(problem: {
   problemNumber: string | null
   id: string
-  title: string
 }): string {
-  // 生成 slug：标题转小写、非字母数字转短横线、去重复短横线
-  const slug = (problem.title || 'untitled')
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40) || 'untitled'
-
-  let prefix: string
   if (problem.problemNumber) {
-    // P1001 → 001，去 P 前缀
-    prefix = problem.problemNumber.replace(/^[A-Za-z]+/, '')
-    // 前补零到 4 位，确保排序正确
-    prefix = prefix.padStart(4, '0')
-  } else {
-    // 用 id 前 8 位
-    prefix = problem.id.slice(0, 8).toLowerCase()
+    return problem.problemNumber
   }
-  return `${prefix}-${slug}`
+  return problem.id.slice(0, 8).toLowerCase()
 }
 
 /* ============================================================================
@@ -198,6 +179,14 @@ function serializeOneProblem(
     content: Buffer.from(problem.description || '', 'utf-8'),
   })
 
+  // 2.5 background.md（可选，题目背景 markdown）
+  if (problem.background && problem.background.trim()) {
+    files.push({
+      path: base + 'background.md',
+      content: Buffer.from(problem.background, 'utf-8'),
+    })
+  }
+
   // 3. input.md / output.md（非空才导出）
   if (problem.input && problem.input.trim()) {
     files.push({
@@ -233,12 +222,6 @@ function serializeOneProblem(
         files.push({
           path: `${base}samples/${num}.out`,
           content: Buffer.from(sample.output, 'utf-8'),
-        })
-      }
-      if (typeof sample.explanation === 'string' && sample.explanation.trim()) {
-        files.push({
-          path: `${base}samples/${num}.explanation.md`,
-          content: Buffer.from(sample.explanation, 'utf-8'),
         })
       }
     })
@@ -342,16 +325,16 @@ dsoj-pack.zip
 ├── pack.yaml              # 本文件（包元信息）
 ├── README.md              # 本说明文件
 └── problems/
-    ├── <编号-slug>/
+    ├── <题号>/               # 如 P1001
     │   ├── problem.yaml   # 题目元信息
     │   ├── description.md # 题目描述
+    │   ├── background.md  # 题目背景（可选）
     │   ├── input.md       # 输入格式（可选）
     │   ├── output.md      # 输出格式（可选）
     │   ├── hint.md        # 提示（可选）
     │   ├── samples/       # 展示样例
     │   │   ├── 1.in
-    │   │   ├── 1.out
-    │   │   └── 1.explanation.md
+    │   │   └── 1.out
     │   ├── testcases/     # 完整测试点
     │   │   ├── 1.in
     │   │   ├── 1.out
@@ -369,7 +352,7 @@ dsoj-pack.zip
 |------|------|------|------|
 | title | string | 是 | 题目标题 |
 | problem_number | string | 否 | 题号（如 P1001），留空自动分配 |
-| difficulty | string | 是 | 难度（入门/简单/中等/较难/困难/挑战/炼狱/神级） |
+| difficulty | string | 是 | 难度（入门/普及-/普及/普及+/提高/提高+/省选/NOI） |
 | tags | string[] | 否 | 标签列表 |
 | source | string | 否 | 题目来源 |
 | visibility | string | 否 | 可见性（public/private/contest），默认 private |

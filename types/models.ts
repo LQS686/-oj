@@ -25,6 +25,7 @@ export interface Problem {
   problemNumber: string | null
   title: string
   description: string
+  background: string | null
   input: string
   output: string
   samples: Array<{ input: string; output: string }>

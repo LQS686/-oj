@@ -10,6 +10,7 @@ export interface Problem {
   problemNumber: string | null
   title: string
   description?: string
+  background?: string | null
   input?: string
   output?: string
   samples?: { input: string; output: string }[]
@@ -24,6 +25,14 @@ export interface Problem {
   totalSubmit: number
   totalAccepted: number
   createdAt: string
+  /** 标程代码（用于"有标程/无标程"筛选维度），后端 listAllProblemsForAdmin 已返回 */
+  stdCode?: string | null
+  /** 标程语言（cpp/c/python），与 stdCode 配套 */
+  stdLang?: string | null
+  /** 各关联实体的数量统计（Prisma _count） */
+  _count?: {
+    testCases?: number
+  }
 }
 
 export interface LogEntry {

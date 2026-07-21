@@ -39,6 +39,14 @@ interface UseSubmissionSocketOptions {
   onSubmissionUpdate?: (data: SubmissionUpdate) => void
   onJudgeProgress?: (data: JudgeProgress) => void
   onNotification?: (data: Notification) => void
+  /**
+   * socket 首次连接或重连成功后触发（emit('join') 之后调用）。
+   *
+   * 用途：页面切换时旧 socket 已断、新 socket 尚未 join 房间，期间后端推送的
+   * submission:update 会被静默丢弃。在此回调中触发一次 fetchSubmission，
+   * 可从 DB 读到最新状态（worker 的 DB 写入在 emit 之前），消除空窗期事件丢失。
+   */
+  onConnected?: () => void
   enabled?: boolean
 }
 
@@ -47,6 +55,7 @@ export function useSubmissionSocket({
   onSubmissionUpdate,
   onJudgeProgress,
   onNotification,
+  onConnected,
   enabled = true,
 }: UseSubmissionSocketOptions) {
   const socketRef = useRef<Socket | null>(null)
@@ -57,6 +66,7 @@ export function useSubmissionSocket({
     onSubmissionUpdate,
     onJudgeProgress,
     onNotification,
+    onConnected,
   })
 
   // 更新回调引用
@@ -65,8 +75,9 @@ export function useSubmissionSocket({
       onSubmissionUpdate,
       onJudgeProgress,
       onNotification,
+      onConnected,
     }
-  }, [onSubmissionUpdate, onJudgeProgress, onNotification])
+  }, [onSubmissionUpdate, onJudgeProgress, onNotification, onConnected])
 
   useEffect(() => {
     // 如果禁用或没有 userId，不连接
@@ -115,6 +126,9 @@ export function useSubmissionSocket({
 
       // 加入用户房间
       socket.emit('join', userId)
+      // 触发一次重拉，消除"页面切换瞬间事件被静默丢弃"的空窗期
+      // worker.ts 的 DB 写入在 emit 之前，所以重拉能从 DB 读到最新状态
+      callbacksRef.current.onConnected?.()
     })
 
     // 确认加入房间
@@ -133,6 +147,8 @@ export function useSubmissionSocket({
       logger.debug(`WebSocket 重连成功 (尝试 ${attemptNumber} 次)`)
       setIsConnected(true)
       socket.emit('join', userId)
+      // 重连后同样触发重拉，覆盖断连期间丢失的所有事件
+      callbacksRef.current.onConnected?.()
     })
 
     // 提交状态更新

@@ -35,6 +35,7 @@ export function isObjectIdLike(s: string) {
 export interface CreateProblemInput {
   title: string
   description: string
+  background?: string
   input: string
   output: string
   samples?: any
@@ -57,6 +58,7 @@ export async function createProblemWithTestcases(input: CreateProblemInput) {
     data: {
       title: input.title,
       description: input.description,
+      background: input.background,
       input: input.input,
       output: input.output,
       samples: input.samples || [],

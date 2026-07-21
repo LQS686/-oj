@@ -160,8 +160,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    // 等 API 返回真实内部 id 后再读写 localStorage
+    // 用 problem.id（ObjectId）而非 URL 中的 problemId（可能是题号 P1001），
+    // 这样删除题目重建后 ObjectId 变化，旧草稿自动失效，不会看到"幽灵代码"
+    if (!problem?.id) return
 
-    const codeKey = getStorageKey(problemId, classId, fromAssignment)
+    const codeKey = getStorageKey(problem.id, classId, fromAssignment)
     const savedCode = localStorage.getItem(codeKey)
     if (savedCode) {
       setCode(savedCode)
@@ -169,14 +173,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       setCode('')
     }
 
-    const langKey = getLanguageStorageKey(problemId, classId, fromAssignment)
+    const langKey = getLanguageStorageKey(problem.id, classId, fromAssignment)
     const savedLang = localStorage.getItem(langKey)
     if (savedLang && languageOptions.some(l => l.value === savedLang)) {
       setLanguage(savedLang)
     } else {
       setLanguage('cpp')
     }
-  }, [problemId, classId, fromAssignment])
+  }, [problem?.id, classId, fromAssignment])
 
   useEffect(() => {
     if (isAssignmentContext && activeTab === 'solutions') {
@@ -185,18 +189,19 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   }, [isAssignmentContext, activeTab])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !code) return
-
-    const codeKey = getStorageKey(problemId, classId, fromAssignment)
+    if (typeof window === 'undefined' || !problem?.id) return
+    // 允许写入空字符串：用户点"清空"按钮后 code 变为 ''，
+    // 同步把 localStorage 草稿也清掉，避免下次刷新又读回来
+    const codeKey = getStorageKey(problem.id, classId, fromAssignment)
     localStorage.setItem(codeKey, code)
-  }, [code, problemId, classId, fromAssignment])
+  }, [code, problem?.id, classId, fromAssignment])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !problem?.id) return
 
-    const langKey = getLanguageStorageKey(problemId, classId, fromAssignment)
+    const langKey = getLanguageStorageKey(problem.id, classId, fromAssignment)
     localStorage.setItem(langKey, language)
-  }, [language, problemId, classId, fromAssignment])
+  }, [language, problem?.id, classId, fromAssignment])
 
   // 桌面端（>= 1024px）不允许停留在 'code' tab，避免左栏内容为空
   useEffect(() => {

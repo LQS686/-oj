@@ -12,11 +12,14 @@ import {
   X,
   Globe,
   Sparkles,
+  Download,
+  FileText,
+  Package,
 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { DIFFICULTIES } from '@/lib/constants'
 
-type Format = 'fps' | 'hydro' | 'syzoj' | 'csv' | 'codeforces'
+type Format = 'dsoj' | 'fps' | 'hydro' | 'syzoj' | 'csv' | 'codeforces'
 
 interface ResultItem {
   status: 'created' | 'skipped' | 'failed'
@@ -46,6 +49,13 @@ const FORMAT_OPTIONS: {
   accept: string
   icon: typeof FileCode
 }[] = [
+  {
+    id: 'dsoj',
+    label: 'DSOJ',
+    desc: 'DSOJ 自主可控标准题包（ZIP，含 problem.yaml + testcases/）',
+    accept: '.zip',
+    icon: Package,
+  },
   {
     id: 'fps',
     label: 'FPS',
@@ -90,7 +100,7 @@ const FORMAT_OPTIONS: {
  * 提交后展示每题导入结果（成功 / 跳过 / 失败）。
  */
 export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalProps) {
-  const [format, setFormat] = useState<Format>('fps')
+  const [format, setFormat] = useState<Format>('dsoj')
   const [file, setFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -199,7 +209,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
             <div>
               <h3 className="text-lg font-bold text-foreground">批量导入题库</h3>
               <p className="text-xs text-muted-foreground">
-                支持 FPS / Hydro / SYZOJ / CSV / Codeforces
+                支持 DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces
               </p>
             </div>
           </div>
@@ -284,6 +294,31 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* DSOJ 模板下载 */}
+          {format === 'dsoj' && (
+            <div className="flex items-center gap-3 text-sm px-1">
+              <a
+                href="/templates/dsoj-pack/dsoj-pack-template.zip"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary-dark transition-colors flex items-center gap-1"
+              >
+                <Download className="w-4 h-4" />
+                下载模板
+              </a>
+              <span className="text-border">|</span>
+              <a
+                href="/templates/dsoj-pack/README.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <FileText className="w-4 h-4" />
+                查看格式说明
+              </a>
             </div>
           )}
 

@@ -56,6 +56,7 @@ function normalizeImportedProblem(
     memoryLimit: Number.isFinite(raw.memoryLimit) && raw.memoryLimit > 0 ? raw.memoryLimit : 128,
     samples: Array.isArray(raw.samples) ? raw.samples : [],
     testCases: Array.isArray(raw.testCases) ? raw.testCases : [],
+    background: raw.background?.trim() || undefined,
     hint: raw.hint || undefined,
     source: raw.source || undefined,
     stdCode: raw.stdCode || undefined,
@@ -70,6 +71,17 @@ function normalizeImportedProblem(
 async function findExistingByTitle(title: string) {
   return prisma.problem.findFirst({
     where: { title },
+    select: { id: true, problemNumber: true, title: true },
+  })
+}
+
+/**
+ * 检查题号冲突：按 problemNumber 查找已有题目
+ * - 返回 null 表示无冲突
+ */
+async function findExistingByProblemNumber(problemNumber: string) {
+  return prisma.problem.findUnique({
+    where: { problemNumber },
     select: { id: true, problemNumber: true, title: true },
   })
 }
@@ -147,6 +159,7 @@ async function createOne(
       problemNumber: finalProblemNumber,
       title: problem.title,
       description: problem.description,
+      background: problem.background || null,
       input: problem.input || '',
       output: problem.output || '',
       samples: problem.samples as any,
@@ -210,6 +223,7 @@ async function overwriteOne(
       data: {
         title: problem.title,
         description: problem.description,
+        background: problem.background || null,
         input: problem.input || '',
         output: problem.output || '',
         samples: problem.samples as any,
@@ -250,19 +264,51 @@ export async function importOneProblem(
   try {
     const problem = normalizeImportedProblem(raw, options)
 
-    // 检查重名（duplicate 策略跳过此检查）
+    // 去重检查（duplicate 策略跳过此检查，允许完全重复创建）
     if (options.onDuplicate !== 'duplicate') {
-      const existing = await findExistingByTitle(problem.title)
+      // 同时按 problemNumber 和 title 检查，任一命中即按策略处理
+      // 优先 problemNumber（唯一键），其次 title
+      const existingByNumber = problem.problemNumber
+        ? await findExistingByProblemNumber(problem.problemNumber)
+        : null
+
+      // 题号冲突时，必须比对题目名称：
+      //   - 名称一致 → 同一题目重复导入，按 onDuplicate 策略处理（skip/overwrite）
+      //   - 名称不一致 → 极可能是不同题目但题号冲突（如不同来源都用了 P1001），
+      //     直接 skip 会误判为重复，直接 overwrite 会丢失原题数据，都不可接受。
+      //     标记为 failed，提示用户手动确认后处理（重命名题号或删除旧题）。
+      if (existingByNumber) {
+        const existingTitle = (existingByNumber.title || '').trim()
+        const importedTitle = (problem.title || '').trim()
+        if (existingTitle !== importedTitle) {
+          return {
+            status: 'failed',
+            title: importedTitle,
+            externalId,
+            reason:
+              `题号 ${existingByNumber.problemNumber} 已存在但题目名称不一致，` +
+              `请确认是否为同一题目（已有: "${existingTitle}"，导入: "${importedTitle}"）`,
+          }
+        }
+      }
+
+      const existing = existingByNumber ?? (await findExistingByTitle(problem.title))
+
       if (existing) {
+        // 构造清晰的"已存在"原因
+        const reason = existingByNumber
+          ? `题号 ${existingByNumber.problemNumber} 已存在`
+          : `已存在同名题目（${existing.problemNumber}）`
+
         if (options.onDuplicate === 'skip') {
           return {
             status: 'skipped',
             title: problem.title,
             externalId,
-            reason: `已存在同名题目（${existing.problemNumber}）`,
+            reason,
           }
         }
-        // overwrite
+        // overwrite：保留原 id 和 problemNumber，覆盖其他字段
         await overwriteOne(existing.id, problem, options)
         return {
           status: 'created',

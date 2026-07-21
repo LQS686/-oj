@@ -1,0 +1,12 @@
+# DSOJ 标准题包模板说明
+
+本文件夹是 DSOJ 自主可控的标准化题包格式模板。
+
+## 快速使用
+
+1. 复制本文件夹到任意位置
+2. 在 `problems/` 下按 `编号-slug/` 格式创建题目目录
+3. 每个题目目录至少包含 `problem.yaml` + `description.md` + `testcases/`
+4. 将整个文件夹打包为 ZIP 后通过管理后台上传
+
+详细字段说明见 [README.md](./README.md)

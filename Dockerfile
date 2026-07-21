@@ -52,6 +52,8 @@ WORKDIR /app
 
 # 使用清华 TUNA 镜像源 + BuildKit 缓存
 # 关键：apk add 是构建中最慢的步骤（gcc/g++ 等大包 ~100MB+），缓存后下次 build 秒级完成
+# libasan / libubsan：按竞赛 OJ 标准（Codeforces / AtCoder）默认启用 ASan+UBSan 检测
+#   数组越界 / use-after-free / UB，需对应运行时库。Alpine gcc 默认不附带，需显式安装。
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
     apk add --no-cache \
@@ -61,6 +63,8 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     make \
     g++ \
     gcc \
+    libasan \
+    libubsan \
     musl-dev \
     wget \
     curl

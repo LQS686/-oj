@@ -30,11 +30,13 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     const arrayBuffer = await req.arrayBuffer()
     const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i)
     if (!boundaryMatch) {
-      throw new Error('INVALID_BOUNDARY')
+      throw400('INVALID_BOUNDARY', 'multipart boundary 缺失')
+      return // unreachable, throw400 throws
     }
     const boundaryValue: string = boundaryMatch[1] || boundaryMatch[2] || ''
     if (!boundaryValue) {
-      throw new Error('INVALID_BOUNDARY_VALUE')
+      throw400('INVALID_BOUNDARY_VALUE', 'multipart boundary 值为空')
+      return // unreachable, throw400 throws
     }
     const boundary = `--${boundaryValue}`
     const body = Buffer.from(arrayBuffer)

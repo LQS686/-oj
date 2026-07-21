@@ -1,0 +1,12 @@
+title: A+B Problem
+problem_number: P1001
+difficulty: 入门
+tags:
+  - 入门
+  - 模拟
+source: DSOJ 模板
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: default
+real_precision: 3

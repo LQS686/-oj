@@ -35,6 +35,8 @@ export interface ImportedProblem {
   problemNumber?: string
   title: string
   description: string
+  /** 题目背景（markdown，可选） */
+  background?: string
   input: string
   output: string
   samples: ImportedSample[]

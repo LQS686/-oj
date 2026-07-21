@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { Problem } from '../_types'
@@ -10,6 +10,7 @@ import type { Problem } from '../_types'
  *
  * - fetchProblems: 拉取列表；首次加载走 initialLoading，后续刷新走 loading
  * - toggleVisibility: 行内切换可见性，乐观更新本地 state（public → private → contest → public 循环）
+ * - allTags / allSources: 从已加载题目数据聚合的标签集合与来源集合，供筛选下拉使用
  *
  * 403 时设置错误并跳转 /403，与原实现保持一致。
  */
@@ -78,9 +79,42 @@ export function useProblemList() {
     }
   }, [])
 
+  // 聚合所有标签（去重 + 按拼音/字母排序），供筛选下拉使用
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>()
+    for (const p of problems) {
+      if (Array.isArray(p.tags)) {
+        for (const t of p.tags) {
+          if (t) tagSet.add(t)
+        }
+      }
+    }
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
+  }, [problems])
+
+  // 聚合所有来源（去重 + 过滤空值 + 排序），供筛选下拉使用
+  const allSources = useMemo(() => {
+    const sourceSet = new Set<string>()
+    for (const p of problems) {
+      if (p.source && p.source.trim()) {
+        sourceSet.add(p.source.trim())
+      }
+    }
+    return Array.from(sourceSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
+  }, [problems])
+
   useEffect(() => {
     fetchProblems(true)
   }, [fetchProblems])
 
-  return { problems, loading, initialLoading, error, fetchProblems, toggleVisibility }
+  return {
+    problems,
+    loading,
+    initialLoading,
+    error,
+    fetchProblems,
+    toggleVisibility,
+    allTags,
+    allSources,
+  }
 }

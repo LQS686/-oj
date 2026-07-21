@@ -34,26 +34,63 @@ export interface CompileResult {
 //   - 引入 -fsanitize=undefined -fno-sanitize-recover=all 支持藏数据题
 //     （UB 在运行时检测，而非编译时；触发即 RE，而非"使用垃圾值"通过）
 //
-// JUDGE_ENABLE_UBSAN 环境变量控制是否启用 UBSanitizer：
+// JUDGE_ENABLE_UBSAN 环境变量控制是否启用 UBSanitizer（-fsanitize=undefined）：
 //   - 'true'：强制启用（需确保环境提供 libubsan，Linux gcc 默认静态链接）
 //   - 'false'：强制禁用
-//   - 未设置：自动判断 —— 仅在 Linux + Docker 模式下启用（生产环境）
+//   - 未设置：自动判断 —— 仅在 Linux 下启用（生产容器环境）
 //
 // 不在 Windows 本地模式默认启用的原因：
 //   MinGW 默认不提供 libubsan（-lubsan: No such file or directory），
-//   学员/开发者在 Windows 本地编译会失败。UBSan 仅在生产 Docker 镜像
-//   （基于 gcc 官方镜像，含 libubsan）下启用。
+//   学员/开发者在 Windows 本地编译会失败。UBSan 仅在 Linux 环境
+//   （Docker 容器内或 Linux 宿主）下启用。
 //
 // 启用后：
 //   - 编译时加 -fsanitize=undefined -fno-sanitize-recover=all
-//   - 运行时需链接 libubsan（gcc 默认静态链接，Docker 镜像需安装 libubsan）
+//   - 运行时需链接 libubsan（gcc 默认静态链接，Alpine 需 apk add libubsan）
 //   - UBSanitizer 有 2-3x 内存开销，需相应调大 memoryLimit
 const ENABLE_UBSAN = (() => {
   const flag = process.env.JUDGE_ENABLE_UBSAN
   if (flag === 'true') return true
   if (flag === 'false') return false
-  // 默认：仅 Linux + Docker 模式启用（生产环境）
-  return process.platform === 'linux' && process.env.USE_DOCKER === 'true'
+  // 默认：Linux 环境启用（生产容器 / Linux 宿主）
+  // 不依赖 USE_DOCKER：容器内模式（USE_DOCKER=false）仍是 Linux 环境，应启用
+  return process.platform === 'linux'
+})()
+
+// JUDGE_ENABLE_ASAN 环境变量控制是否启用 AddressSanitizer（-fsanitize=address）：
+//   - 'true'：强制启用（需 libasan，Linux gcc 默认提供）
+//   - 'false'：强制禁用
+//   - 未设置：自动判断 —— 仅在 Linux 下启用（生产容器环境）
+//
+// 启用后：
+//   - 编译时加 -fsanitize=address -fno-sanitize-recover=all
+//   - 检测：堆/栈数组越界、use-after-free、栈缓冲区溢出（UBSan 检测不到的场景）
+//   - 与 UBSan 可同时启用（-fsanitize=address,undefined）
+//   - 内存开销：评测时实际内存 = 题目 memoryLimit × 2-3，需相应调大 memoryLimit
+//   - 性能开销：2-5x 减速
+//
+// 按竞赛 OJ 标准（Codeforces / AtCoder）默认开启 ASan+UBSan：
+//   - Codeforces 在编译参数中加 -fsanitize=address,undefined
+//   - AtCoder 同样默认启用 ASan+UBSan
+//   - 这是检测"数组越界""use-after-free"等 UB 的最严格方案
+// 教学型 OJ（HOJ/Hydro/洛谷）默认不开 sanitizer，依赖测试数据判 WA；
+// 本项目作为教学+竞赛混合场景，按竞赛标准默认开启 ASan 以严格检测数组越界。
+//
+// 不在 Windows 本地模式默认启用的原因：
+//   MinGW 默认不提供 libasan，学员/开发者在 Windows 本地编译会失败。
+//   ASan 仅在 Linux 环境（Docker 容器内或 Linux 宿主）下启用。
+//   Windows 本地模式仍受 -ftrivial-auto-var-init=pattern + -fstack-protector-all
+//   + -D_FORTIFY_SOURCE=2 兜底，未初始化/栈溢出/libc 越界仍可检测。
+//
+// 注意：ASan 启用后题目默认 memoryLimit=128MB 可能不足以容纳 ASan 自身开销，
+//   建议对启用 ASan 的题目把 memoryLimit 调至 256MB+。
+const ENABLE_ASAN = (() => {
+  const flag = process.env.JUDGE_ENABLE_ASAN
+  if (flag === 'true') return true
+  if (flag === 'false') return false
+  // 默认：Linux 环境启用（生产容器 / Linux 宿主，对齐竞赛 OJ 标准）
+  // 不依赖 USE_DOCKER：容器内模式（USE_DOCKER=false）仍是 Linux 环境，应启用
+  return process.platform === 'linux'
 })()
 
 const languageConfigs: Record<string, {
@@ -91,19 +128,54 @@ const languageConfigs: Record<string, {
  *   - -fmax-errors=3：编译错误上限，避免超长错误日志（参考 HOJ SPJ 配置）
  *   - -DONLINE_JUDGE：标准 OJ 标志位，题目代码可据此调整行为（如禁用 assert）
  *
- * UBSanitizer 参数（ENABLE_UBSAN=true 时启用，用于检测藏数据题）：
- *   - -fsanitize=undefined：启用未定义行为检测
- *     覆盖：有符号整数溢出、整数转换溢出、除零、空指针解引用、
- *     未对齐访问、返回值忽略、变量未初始化读取（部分场景）等
- *   - -fno-sanitize-recover=all：UB 触发时立即终止进程（退出码非0 → RE），
- *     而非仅打印警告继续执行（默认行为）
- *   - -fno-omit-frame-pointer：保留帧指针，便于 sanitizer 定位栈
+ * 脏数据兜底参数（始终启用，无/极低运行时开销）：
+ *   - -ftrivial-auto-var-init=pattern：把所有未显式初始化的栈变量初始化为
+ *     pattern 字节填充值。GCC 12+ 用 0xFE 填充（int -> 0xFEFEFEFE），
+ *     Clang 用 0xAA 填充（int -> 0xAAAAAAAA）。这样：
+ *       1. 脏数据代码（int c; c+=a; c+=b;）的 c 不会是随机值，
+ *          而是稳定的 0xFEFEFEFE + a + b（gcc），几乎必然判 WA（不再靠运气 AC）
+ *       2. 合法代码（已初始化变量）不受影响
+ *       3. 即使未启用 UBSan（Windows 本地模式），也能稳定检测这类 UB
+ *     这是 gcc 下检测未初始化读取 UB 的最有效方案，比 UBSan 的未初始化
+ *     检测更可靠。完整检测需 Clang 的 -fsanitize=memory，当前项目用 gcc 不适用。
+ *     需要 gcc 12+，Alpine 3.18+ / Debian 12+ 的 gcc 均已支持。
+ *     实测：MinGW gcc 13+ 也支持，Windows 本地模式同样生效。
+ *   - -fwrapv：有符号整数溢出定义为回绕（二补码），避免优化器把
+ *     "依赖有符号溢出的 UB 代码"优化成不可预期的结果。让溢出行为可预测。
+ *   - -fstack-protector-all：为所有函数插入栈 canary（即使函数无栈缓冲区）。
+ *     当栈缓冲区溢出（如 char buf[8]; buf[16]=0 越界写）破坏 canary 时，
+ *     程序在函数返回前 __stack_chk_fail abort → 退出码 134 → RE。
+ *     性能开销极低（~1-3%），覆盖 gcc 默认 -fstack-protector-strong 之外的
+ *     含栈数组的小函数。注意：栈 canary 只在"函数返回时"检测，运行中越界
+ *     读写在到达 return 前仍可能产生 UB —— 真正的运行时越界检测需 ASan。
+ *   - -D_FORTIFY_SOURCE=2：编译期+运行期检测常见 libc 缓冲区溢出
+ *     （memcpy/strcpy/sprintf/memmove 等）。_FORTIFY_SOURCE=2 在 -O2 下生效，
+ *     覆盖"已知目标缓冲区大小"的场景。开销极低。需 glibc，Alpine musl libc
+ *     也支持（ musl 1.2.0+ 通过 _FORTIFY_SOURCE 宏启用）。仅检测 libc 函数，
+ *     不检测数组下标越界 —— 那种场景由 ASan 兜底。
  *
- * 重要：-fsanitize=undefined 不能检测所有未初始化读取（如 int a; cout<<a;），
+ * Sanitizer 参数（按需启用，运行时检测藏数据题与数组越界）：
+ *   - -fsanitize=undefined：UBSan，覆盖有符号整数溢出、整数转换溢出、
+ *     除零、空指针解引用、未对齐访问、返回值忽略、变量未初始化读取（部分场景）
+ *   - -fsanitize=address：ASan，检测堆/栈数组越界、use-after-free、
+ *     栈缓冲区溢出（UBSan 检测不到的场景）。是 OJ 检测"数组越界"的标准方案
+ *   - -fno-sanitize-recover=all：触发即终止进程（退出码非0 → RE）
+ *   - -fno-omit-frame-pointer：保留帧指针，便于 sanitizer 定位栈
+ *   - 两者可同时启用（-fsanitize=address,undefined），但内存/性能开销叠加
+ *
+ * 重要：-fsanitize=undefined 不能可靠检测所有未初始化读取（如 int a; cout<<a;），
  *   只能检测"a 被使用但从未赋值"的部分场景。完整未初始化检测需
  *   -fsanitize=memory（仅 Clang 支持），当前项目使用 gcc 不适用。
  *   但 UBSan 已能覆盖大部分藏数据题的 UB 场景（溢出/除零/空指针等）。
- *   UBSan 检测不到的场景（如部分未初始化读取）依赖测试数据判 WA。
+ *   未初始化读取的兜底检测由 -ftrivial-auto-var-init=pattern 完成（见上），
+ *   让脏数据代码稳定判 WA 而非靠运气 AC。
+ *
+ * 数组越界检测策略：
+ *   1. 栈数组越界写破坏 canary → -fstack-protector-all 在函数返回时判 RE（默认开启）
+ *   2. 栈/堆数组越界读写 → ASan 在访问时立即判 RE（需 JUDGE_ENABLE_ASAN=true）
+ *   3. libc 函数越界 → _FORTIFY_SOURCE=2 在调用时判 RE（默认开启）
+ *   生产环境对数组越界有严格要求的题目，可在 docker-compose 设 JUDGE_ENABLE_ASAN=true。
+ *   ASan 有 2-5x 性能开销，且内存需调大 memoryLimit × 2-3，故默认不启用。
  */
 function buildCompileArgs(
   compiler: 'g++' | 'gcc',
@@ -117,11 +189,36 @@ function buildCompileArgs(
     '-w',
     '-fmax-errors=3',
     '-DONLINE_JUDGE',
+    // 脏数据兜底：未初始化栈变量使用 0xAA pattern，让 UB 代码稳定判 WA
+    // 详见函数头注释
+    '-ftrivial-auto-var-init=pattern',
+    // 有符号整数溢出行为定义为回绕，让溢出代码可预测
+    '-fwrapv',
+    // 栈 canary：栈缓冲区溢出破坏 canary 时函数返回前 abort → RE
+    '-fstack-protector-all',
+    // libc 缓冲区溢出检测（memcpy/strcpy 等），运行期触发即 RE
+    '-D_FORTIFY_SOURCE=2',
   ]
 
-  if (ENABLE_UBSAN) {
+  // Sanitizer 组合：ASan + UBSan 可同时启用（-fsanitize=address,undefined）
+  // - 单独 UBSan：检测 UB（默认开启，Linux+Docker 环境）
+  // - 单独 ASan：检测数组越界（需 JUDGE_ENABLE_ASAN=true，性能开销大）
+  // - 两者同时：覆盖最全，但内存/性能开销叠加
+  if (ENABLE_UBSAN && ENABLE_ASAN) {
+    args.push(
+      '-fsanitize=address,undefined',
+      '-fno-sanitize-recover=all',
+      '-fno-omit-frame-pointer'
+    )
+  } else if (ENABLE_UBSAN) {
     args.push(
       '-fsanitize=undefined',
+      '-fno-sanitize-recover=all',
+      '-fno-omit-frame-pointer'
+    )
+  } else if (ENABLE_ASAN) {
+    args.push(
+      '-fsanitize=address',
       '-fno-sanitize-recover=all',
       '-fno-omit-frame-pointer'
     )
@@ -253,8 +350,11 @@ export async function compileCode(code: string, language: string): Promise<Compi
       // 必须使用 process.cwd() 构建路径，否则 runner.sh 找不到导致编译失败。
       const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
       // runner.sh 后接：内存MB CPU秒 栈MB 命令 参数...
-      // UBSanitizer 编译时需更大内存（默认 512MB，UBSan 静态链接开销 ~50MB）
-      const compileMemMb = ENABLE_UBSAN ? '768' : '512'
+      // UBSanitizer / ASan 编译时需更大内存：
+      //   - UBSan 静态链接开销 ~50MB
+      //   - ASan 编译时插桩开销 ~100-200MB
+      // 默认 512MB，启用任一 sanitizer 提升至 768MB
+      const compileMemMb = (ENABLE_UBSAN || ENABLE_ASAN) ? '768' : '512'
       const compiler = language === 'c' ? 'gcc' : 'g++'
       const std = language === 'c' ? 'c11' : 'c++17'
       // 编译参数（不含 compiler 名称，由 runner.sh 单独传）

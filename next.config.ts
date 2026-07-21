@@ -29,7 +29,21 @@ const nextConfig: NextConfig = {
       // 当前保留 'unsafe-inline' 仅用于 Next.js 内联引导脚本（删除会破坏 SSR 引导）。
       "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "img-src 'self' data: blob: http://localhost:* https://*.googleusercontent.com",
+      // img-src 白名单：允许常见 OJ 题库图床（洛谷/Codeforces/AtCoder/Hydro/牛客等）加载题目图片
+      // 题面常含跨域图片资源，白名单需覆盖主流图床域名，否则 CSP 会静默拦截图片加载
+      "img-src 'self' data: blob: http://localhost:* " +
+        "https://*.googleusercontent.com " + // Google 头像
+        "https://cdn.luogu.com.cn https://*.cdn.luogu.com.cn " + // 洛谷图床
+        "https://codeforces.com https://*.codeforces.com " + // Codeforces
+        "https://atcoder.jp https://*.atcoder.jp " + // AtCoder
+        "https://*.hydro.org.cn " + // Hydro OJ
+        "https://*.nowcoder.com https://*.nosdn.net " + // 牛客
+        "https://img-blog.csdnimg.cn https://*.csdnimg.cn " + // CSDN 图床（部分题面引用）
+        "https://i.loli.net https://*.i.loli.net " + // sm.ms 图床
+        "https://githubusercontent.com https://raw.githubusercontent.com https://*.githubusercontent.com " + // GitHub
+        "https://pic.leetcode-cn.com https://*.leetcode-cn.com " + // 力扣
+        "https://*.oi-wiki.org " + // OI-Wiki
+        "https://bing.com https://*.bing.com", // 必应图片
       "connect-src 'self' http://localhost:* ws://localhost:* https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net",
       "font-src 'self' data: https://fonts.gstatic.com",
       "object-src 'none'",

@@ -42,6 +42,8 @@ export interface DataTableProps<T> {
   idKey: string
   onRowClick?: (row: T) => void
   mobileCardRenderer?: (row: T) => ReactNode
+  // 选中行变化回调，将内部 selectedRows 同步给父组件
+  onSelectionChange?: (ids: string[]) => void
 }
 
 interface SortConfig {
@@ -115,7 +117,8 @@ export default function DataTable<T>({
   pagination,
   idKey,
   onRowClick,
-  mobileCardRenderer
+  mobileCardRenderer,
+  onSelectionChange
 }: DataTableProps<T>) {
   const isMobile = useIsMobile()
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -123,6 +126,11 @@ export default function DataTable<T>({
     direction: null,
   })
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
+
+  // 选中行变化时同步给父组件（如导出弹窗需要拿到选中 ID）
+  useEffect(() => {
+    onSelectionChange?.(Array.from(selectedRows))
+  }, [selectedRows, onSelectionChange])
 
   const handleSort = (key: string) => {
     if (sortConfig.key === key) {

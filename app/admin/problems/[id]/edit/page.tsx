@@ -14,16 +14,15 @@ import {
  Trash2,
  Clock,
  Code2,
- AlertCircle,
  MessageSquare
 } from 'lucide-react'
 import { DIFFICULTIES } from '@/lib/constants'
 import { formatRelativeTime } from '@/lib/utils'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface Sample {
  input: string
  output: string
- explanation?: string
 }
 
 interface AdminSolutionItem {
@@ -45,10 +44,10 @@ export default function EditProblemPage() {
  const router = useRouter()
  const params = useParams()
  const problemId = params.id as string
+ const dialog = useDialog()
 
  const [loading, setLoading] = useState(true)
  const [submitting, setSubmitting] = useState(false)
- const [error, setError] = useState('')
 
  const [problemNumber, setProblemNumber] = useState('')
  const [title, setTitle] = useState('')
@@ -61,25 +60,23 @@ export default function EditProblemPage() {
  const [realPrecision, setRealPrecision] = useState(3)
  const [visibility, setVisibility] = useState('public')
 
+ const [background, setBackground] = useState('')
  const [description, setDescription] = useState('')
  const [input, setInput] = useState('')
  const [output, setOutput] = useState('')
  const [hint, setHint] = useState('')
  const [source, setSource] = useState('')
 
- const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '', explanation: '' }])
+ const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '' }])
 
  // 题解管理
  const [solutions, setSolutions] = useState<AdminSolutionItem[]>([])
  const [solutionsLoading, setSolutionsLoading] = useState(true)
- const [solutionsError, setSolutionsError] = useState('')
  const [deletingSolutionId, setDeletingSolutionId] = useState<string | null>(null)
- const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
  const fetchProblemData = useCallback(async () => {
  try {
  setLoading(true)
- setError('')
  const response = await fetchWithCookie(`/api/admin/problems/${problemId}`)
 
  if (!response.ok) {
@@ -101,6 +98,7 @@ export default function EditProblemPage() {
  setProblemNumber(problem.problemNumber || '')
  setTitle(problem.title || '')
  setDescription(problem.description || '')
+ setBackground(problem.background || '')
  setInput(problem.input || '')
  setOutput(problem.output || '')
  setHint(problem.hint || '')
@@ -115,17 +113,27 @@ export default function EditProblemPage() {
  setSamples(
  Array.isArray(problem.samples) && problem.samples.length > 0
  ? problem.samples
- : [{ input: '', output: '', explanation: '' }]
+ : [{ input: '', output: '' }]
  )
  } else {
- setError(data.error?.message || data.message || '获取题目数据失败')
+ const msg = data.error?.message || data.message || '获取题目数据失败'
+ await dialog.alert({
+ tone: 'error',
+ message: typeof msg === 'string' ? msg : '获取题目数据失败',
+ })
+ router.back()
  }
  } catch (err: any) {
- setError(err?.message || '网络错误，请稍后重试')
+ const msg = err?.message || '网络错误，请稍后重试'
+ await dialog.alert({
+ tone: 'error',
+ message: typeof msg === 'string' ? msg : '网络错误，请稍后重试',
+ })
+ router.back()
  } finally {
  setLoading(false)
  }
- }, [problemId])
+ }, [problemId, dialog, router])
 
  useEffect(() => {
  fetchProblemData()
@@ -134,7 +142,6 @@ export default function EditProblemPage() {
  const fetchSolutions = useCallback(async () => {
  try {
  setSolutionsLoading(true)
- setSolutionsError('')
  const response = await fetchWithCookie(
  `/api/solutions?problemId=${problemId}&pageSize=100`
  )
@@ -152,14 +159,21 @@ export default function EditProblemPage() {
  : []
  setSolutions(list as AdminSolutionItem[])
  } else {
- setSolutionsError(data.error || '获取题解列表失败')
+ const msg = data.error || '获取题解列表失败'
+ await dialog.alert({
+ tone: 'error',
+ message: typeof msg === 'string' ? msg : '获取题解列表失败',
+ })
  }
  } catch (err: any) {
- setSolutionsError(err?.message || '网络错误')
+ await dialog.alert({
+ tone: 'error',
+ message: err?.message || '网络错误',
+ })
  } finally {
  setSolutionsLoading(false)
  }
- }, [problemId])
+ }, [problemId, dialog])
 
  useEffect(() => {
  fetchSolutions()
@@ -170,7 +184,14 @@ export default function EditProblemPage() {
  }
 
  const handleDeleteSolution = async (solutionId: string) => {
- const ok = window.confirm('确定要删除此题解吗？此操作不可撤销。')
+ const ok = await dialog.confirm({
+ title: '删除题解',
+ message: '确定要删除此题解吗？此操作不可撤销。',
+ tone: 'warning',
+ confirmText: '删除',
+ confirmVariant: 'destructive',
+ cancelText: '取消',
+ })
  if (!ok) return
  try {
  setDeletingSolutionId(solutionId)
@@ -179,19 +200,26 @@ export default function EditProblemPage() {
  })
  const data = await response.json().catch(() => null)
  if (response.ok && data?.success) {
- setActionMessage({ type: 'success', text: '题解已删除' })
  setSolutions((prev) => prev.filter((s) => s.id !== solutionId))
+ await dialog.alert({
+ tone: 'success',
+ title: '删除成功',
+ message: '题解已删除',
+ })
  } else {
- setActionMessage({
- type: 'error',
- text: data?.error || '删除题解失败'
+ const msg = data?.error || '删除题解失败'
+ await dialog.alert({
+ tone: 'error',
+ message: typeof msg === 'string' ? msg : '删除题解失败',
  })
  }
  } catch (err: any) {
- setActionMessage({ type: 'error', text: err?.message || '网络错误' })
+ await dialog.alert({
+ tone: 'error',
+ message: err?.message || '网络错误',
+ })
  } finally {
  setDeletingSolutionId(null)
- setTimeout(() => setActionMessage(null), 3000)
  }
  }
 
@@ -207,7 +235,7 @@ export default function EditProblemPage() {
  }
 
  const handleAddSample = () => {
- setSamples([...samples, { input: '', output: '', explanation: '' }])
+ setSamples([...samples, { input: '', output: '' }])
  }
 
  const handleRemoveSample = (index: number) => {
@@ -216,19 +244,24 @@ export default function EditProblemPage() {
 
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault()
- 
+
  if (!title.trim()) {
- setError('请填写题目标题')
+ await dialog.alert({
+ tone: 'warning',
+ message: '请填写题目标题',
+ })
  return
  }
 
  if (!description.trim()) {
- setError('请填写题目描述')
+ await dialog.alert({
+ tone: 'warning',
+ message: '请填写题目描述',
+ })
  return
  }
 
  setSubmitting(true)
- setError('')
 
  try {
  const response = await fetchWithCookie(`/api/admin/problems/${problemId}`, {
@@ -238,6 +271,7 @@ export default function EditProblemPage() {
  problemNumber: problemNumber.trim() || null,
  title: title.trim(),
  description,
+ background,
  input,
  output,
  samples: samples.filter(s => s.input || s.output),
@@ -257,12 +291,25 @@ export default function EditProblemPage() {
  const data = await response.json()
 
  if (data.success) {
+ await dialog.alert({
+ tone: 'success',
+ title: '更新成功',
+ message: `题目《${title.trim()}》已更新`,
+ confirmText: '返回列表',
+ })
  router.push('/admin/problems')
  } else {
- setError(data.error?.message || data.error || '更新失败')
+ const msg = data.error?.message || data.error || '更新失败'
+ await dialog.alert({
+ tone: 'error',
+ message: typeof msg === 'string' ? msg : '更新失败',
+ })
  }
  } catch (err: any) {
- setError(err?.message || '网络错误，请稍后重试')
+ await dialog.alert({
+ tone: 'error',
+ message: err?.message || '网络错误，请稍后重试',
+ })
  } finally {
  setSubmitting(false)
  }
@@ -299,13 +346,6 @@ export default function EditProblemPage() {
  </div>
  </div>
  </div>
-
- {error && (
- <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg flex items-center gap-2">
- <AlertCircle className="w-5 h-5 flex-shrink-0" />
- <span>{error}</span>
- </div>
- )}
 
  <form onSubmit={handleSubmit} className="space-y-6">
  <div className="card p-6 space-y-4">
@@ -486,7 +526,20 @@ export default function EditProblemPage() {
 
  <div className="card p-6 space-y-4">
  <h2 className="text-lg font-bold text-foreground mb-4">题目描述</h2>
- 
+
+ <div>
+ <label className="block text-sm font-medium text-foreground mb-2">
+ 题目背景 <span className="text-muted-foreground">(可选)</span>
+ </label>
+ <textarea
+ value={background}
+ onChange={(e) => setBackground(e.target.value)}
+ rows={3}
+ placeholder="题目背景内容（markdown 格式，可选）"
+ className="input font-mono text-sm"
+ />
+ </div>
+
  <div>
  <label className="block text-sm font-medium text-foreground mb-2">
  题目描述 <span className="text-error">*</span>
@@ -601,19 +654,6 @@ export default function EditProblemPage() {
  />
  </div>
  </div>
- <div>
- <label className="block text-sm font-medium text-muted-foreground mb-2">说明（可选）</label>
- <input
- type="text"
- value={sample.explanation || ''}
- onChange={(e) => {
- const newSamples = [...samples]
- newSamples[idx].explanation = e.target.value
- setSamples(newSamples)
- }}
- className="input text-sm"
- />
- </div>
  </div>
  ))}
  </div>
@@ -669,18 +709,6 @@ export default function EditProblemPage() {
  </div>
  </div>
 
- {actionMessage && (
- <div
- className={`px-4 py-3 rounded-lg text-sm border ${
- actionMessage.type === 'success'
- ? 'bg-success/10 border-success/30 text-success'
- : 'bg-error/10 border-error/30 text-error'
- }`}
- >
- {actionMessage.text}
- </div>
- )}
-
  {solutionsLoading && (
  <div className="space-y-3" aria-busy="true" aria-live="polite">
  {[0, 1, 2].map((i) => (
@@ -700,14 +728,7 @@ export default function EditProblemPage() {
  </div>
  )}
 
- {!solutionsLoading && solutionsError && (
- <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg flex items-center gap-2">
- <AlertCircle className="w-4 h-4" />
- <span>{solutionsError}</span>
- </div>
- )}
-
- {!solutionsLoading && !solutionsError && solutions.length === 0 && (
+ {!solutionsLoading && solutions.length === 0 && (
  <div className="text-center py-12 rounded-lg bg-muted border border-border">
  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
  <MessageSquare className="w-7 h-7 text-muted-foreground" />
@@ -716,7 +737,7 @@ export default function EditProblemPage() {
  </div>
  )}
 
- {!solutionsLoading && !solutionsError && solutions.length > 0 && (
+ {!solutionsLoading && solutions.length > 0 && (
  <div className="space-y-3">
  {solutions.map((s) => (
  <div

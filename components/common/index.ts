@@ -15,3 +15,14 @@ export {
 } from './ListGridCard'
 export { ClassWorkspaceShell } from './ClassWorkspaceShell'
 export type { ClassWorkspaceShellProps, ClassNavItem } from './ClassWorkspaceShell'
+
+// 公共模态框组件
+export { default as Modal } from './Modal'
+export type { ModalProps, ModalSize } from './Modal'
+export { DialogProvider, useDialog } from './DialogProvider'
+export type {
+  DialogApi,
+  DialogTone,
+  AlertOptions,
+  ConfirmOptions,
+} from './DialogProvider'
