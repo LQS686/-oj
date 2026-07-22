@@ -20,6 +20,7 @@ import { useUser } from '@/contexts/UserContext'
 import { logger } from '@/lib/logger'
 import { fetchWithCookie } from '@/lib/api/base'
 import { canManageContent } from '@/lib/permissions'
+import { PageContainer } from '@/components/layout'
 
 // 评测机减负（2026-07）：移除 java/javascript/go/rust，仅保留 C/C++/Python
 const CODE_LANGUAGES: { value: string; label: string }[] = [
@@ -314,7 +315,7 @@ export default function EditSolutionPage() {
 
  return (
  <div className="min-h-screen py-8">
- <div className="container mx-auto px-4 max-w-5xl">
+ <PageContainer variant="standard">
  {/* 面包屑 */}
  <nav
  aria-label="面包屑导航"
@@ -568,7 +569,7 @@ export default function EditSolutionPage() {
  </div>
  </form>
  </div>
- </div>
+ </PageContainer>
  </div>
  )
 }

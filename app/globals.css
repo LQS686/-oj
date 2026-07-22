@@ -183,6 +183,11 @@
   --color-difficulty-medium-hard: var(--difficulty-medium-hard);
   --color-difficulty-hard: var(--difficulty-hard);
   --color-difficulty-expert: var(--difficulty-expert);
+
+  /* 语义化页面宽度 token（Tailwind v4 自动生成 max-w-page-full / max-w-page-standard / max-w-page-form 工具类） */
+  --max-w-page-full: 80rem;       /* 1280px：多栏工作台、列表、详情等宽内容页面 */
+  --max-w-page-standard: 64rem;  /* 1024px：题解、设置、笔记、用户主页等标准阅读页面 */
+  --max-w-page-form: 56rem;      /* 896px：表单、创建、编辑等窄表单页面 */
 }
 
 * {

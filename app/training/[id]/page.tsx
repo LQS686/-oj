@@ -28,6 +28,7 @@ import { ProgressCircle } from '@/components/training/ProgressCircle'
 import type { TrainingDetail, TrainingProblemStatus } from '@/lib/training/types'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { formatDate } from '@/lib/utils'
+import { PageContainer } from '@/components/layout'
 
 interface User {
  id: string
@@ -246,7 +247,7 @@ export default function TrainingDetailPage() {
 
  return (
  <div className="min-h-screen">
- <div className="container mx-auto px-4 py-6">
+ <PageContainer className="py-6">
  {/* 面包屑（洛谷风格） */}
  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
  <Link href="/training" className="hover:text-foreground">
@@ -537,7 +538,7 @@ export default function TrainingDetailPage() {
  )}
  </div>
  </div>
- </div>
+ </PageContainer>
  </div>
  )
 }

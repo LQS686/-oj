@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { 
  Calendar, 
@@ -17,7 +17,7 @@ import {
  ChevronLeft,
  ChevronRight,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { canCreateContest } from '@/lib/permissions'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -30,7 +30,10 @@ import {
   LIST_GRID_CARD_FOOTER,
   LIST_GRID_CARD_MIDDLE,
   listGridCardLinkClass,
+  PageLoading,
 } from '@/components/common'
+
+import CreateContestModal from '@/components/contest/CreateContestModal'
 
 interface Contest {
  id: string
@@ -117,8 +120,9 @@ function getTimeRemaining(startTime: string): string {
  return `${minutes}分钟`
 }
 
-export default function ContestsPage() {
+function ContestsPageContent() {
  const router = useRouter()
+ const searchParams = useSearchParams()
  const { user } = useUser()
  const [contests, setContests] = useState<Contest[]>([])
  const [loading, setLoading] = useState(true)
@@ -127,6 +131,7 @@ export default function ContestsPage() {
  const [keyword, setKeyword] = useState('')
  const [page, setPage] = useState(1)
  const [totalPages, setTotalPages] = useState(1)
+ const [createOpen, setCreateOpen] = useState(false)
 
  // 是否可创建竞赛（SYSTEM_ADMIN / ADMIN / TEACHER）
  const canCreate = canCreateContest(user)
@@ -134,6 +139,13 @@ export default function ContestsPage() {
  useEffect(() => {
  fetchContests()
  }, [activeTab, page])
+
+ useEffect(() => {
+ if (searchParams.get('create') === '1' && user && canCreate) {
+ setCreateOpen(true)
+ router.replace('/contests', { scroll: false })
+ }
+ }, [searchParams, user, router, canCreate])
 
  const fetchContests = async () => {
  try {
@@ -176,7 +188,7 @@ export default function ContestsPage() {
  }
 
  const handleCreateContest = () => {
- router.push('/contests/create')
+ setCreateOpen(true)
  }
 
   const renderContent = () => {
@@ -358,6 +370,22 @@ export default function ContestsPage() {
       }
     >
       {renderContent()}
+      <CreateContestModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => {
+          setPage(1)
+          fetchContests()
+        }}
+      />
     </EducationalPageShell>
+  )
+}
+
+export default function ContestsPage() {
+  return (
+    <Suspense fallback={<PageLoading label="加载中..." />}>
+      <ContestsPageContent />
+    </Suspense>
   )
 }

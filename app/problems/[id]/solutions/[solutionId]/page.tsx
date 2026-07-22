@@ -20,6 +20,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { formatRelativeTime } from '@/lib/utils'
 import { canManageContent } from '@/lib/permissions'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
+import { PageContainer } from '@/components/layout'
 
 interface SolutionDetail {
  id: string
@@ -223,7 +224,7 @@ export default function SolutionDetailPage() {
 
  return (
  <div className="min-h-screen pb-8">
- <div className="container mx-auto px-4 pt-6 max-w-5xl">
+ <PageContainer variant="standard" className="pt-6">
  {/* 面包屑 */}
  <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-4 flex-wrap">
  <Link href="/problems" className="hover:text-primary-light transition-colors">
@@ -387,7 +388,7 @@ export default function SolutionDetailPage() {
  <span>返回题目</span>
  </button>
  </div>
- </div>
+ </PageContainer>
 
  {/* 删除确认弹窗 */}
  {showDeleteConfirm && (

@@ -25,6 +25,7 @@ import { ProfileSection } from './_components/ProfileSection'
 import { AccountSection } from './_components/AccountSection'
 import { NotificationsSection } from './_components/NotificationsSection'
 import { PreferencesSection } from './_components/PreferencesSection'
+import { PageContainer } from '@/components/layout'
 
 export default function SettingsPage() {
   const { user: contextUser, setUser } = useUser()
@@ -251,7 +252,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <PageContainer variant="standard" className="py-8">
         <SettingsHeader />
         <MessageBanner message={message} />
 
@@ -310,7 +311,7 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </PageContainer>
     </div>
   )
 }

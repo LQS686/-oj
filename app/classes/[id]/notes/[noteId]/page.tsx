@@ -8,6 +8,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { ArrowLeft, User, Calendar, Tag, Edit, Trash2, FileText, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { PageContainer } from '@/components/layout'
 
 interface Note {
  id: string
@@ -118,7 +119,7 @@ export default function NoteDetailPage() {
 
  return (
  <div className="min-h-screen">
- <div className="container mx-auto px-4 py-8 max-w-4xl">
+ <PageContainer variant="form" className="py-8">
  <Link
  href={`/classes/${params.id}`}
  className="flex items-center gap-2 text-muted-foreground hover:text-primary-light mb-6 transition-colors group"
@@ -220,7 +221,7 @@ export default function NoteDetailPage() {
  返回班级
  </button>
  </div>
- </div>
+ </PageContainer>
  </div>
  )
 }

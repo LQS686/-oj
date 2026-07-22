@@ -7,6 +7,7 @@ import Link from 'next/link'
 import io from 'socket.io-client'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
+import { PageContainer } from '@/components/layout'
 
 interface UserRanking {
  id: string
@@ -358,7 +359,7 @@ export default function RankPage() {
  exit={{ y: 100 }}
  className="fixed bottom-0 left-0 right-0 card-static border-t border-border z-40"
  >
- <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+ <PageContainer className="py-3 flex items-center justify-between">
  <div className="flex items-center gap-4">
  <span className="text-muted-foreground text-sm">我的当前排名</span>
  <div className="flex items-center gap-2">
@@ -377,7 +378,7 @@ export default function RankPage() {
  <ChevronUp className="w-4 h-4" />
  回到顶部
  </button>
- </div>
+ </PageContainer>
  </motion.div>
  )}
  </AnimatePresence>

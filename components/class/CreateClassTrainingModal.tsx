@@ -9,8 +9,9 @@
  * - 创建后跳转题单详情页 /training/[id]（题单详情页支持班级私有题单）
  */
 import { useEffect, useState, useCallback } from 'react'
-import { ListChecks, AlertCircle, X } from 'lucide-react'
+import { ListChecks, AlertCircle } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { CreateModalShell } from '@/components/common'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
 
@@ -74,19 +75,6 @@ export default function CreateClassTrainingModal({
     void fetchProblems()
   }, [open, resetForm, fetchProblems])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
-    }
-  }, [open, onClose])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -129,97 +117,79 @@ export default function CreateClassTrainingModal({
     }
   }
 
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-[110] flex items-center justify-center overflow-hidden bg-black/60 p-4 sm:p-6"
-      onClick={onClose}
-      role="presentation"
+    <CreateModalShell
+      open={open}
+      onClose={onClose}
+      title="创建班级题单"
+      icon={ListChecks}
+      labelledById="create-class-training-title"
     >
-      <div
-        className="card-static rounded-xl w-full max-w-2xl h-[min(780px,calc(100dvh-2rem))] flex flex-col shadow-xl border border-border overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-class-training-title"
+      <form
+        onSubmit={handleSubmit}
+        className="grid flex-1 min-h-0 overflow-hidden grid-rows-[auto_minmax(0,1fr)_auto_auto]"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <h2 id="create-class-training-title" className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <ListChecks className="w-5 h-5 text-primary-light" />
-            创建班级题单
-          </h2>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:bg-muted" aria-label="关闭">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="grid flex-1 min-h-0 overflow-hidden grid-rows-[auto_minmax(0,1fr)_auto_auto]"
-        >
-          <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60 min-h-0">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                题单标题 <span className="text-error">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="例如：图论基础练习"
-                className="input w-full"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                题单描述 <span className="text-error">*</span>
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="描述题单的学习目标、推荐顺序等"
-                rows={3}
-                className="input w-full resize-none"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col min-h-0 overflow-hidden px-5 py-3">
-            <label className="block text-sm font-medium text-foreground mb-2 shrink-0">
-              按题号添加题目 <span className="text-error">*</span>
+        <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60 min-h-0">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              题单标题 <span className="text-error">*</span>
             </label>
-            <AssignmentProblemPicker
-              orderedIds={selectedProblems}
-              onChange={setSelectedProblems}
-              problems={problems}
-              problemsLoading={problemsLoading}
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="例如：图论基础练习"
+              className="input w-full"
+              required
             />
           </div>
 
-          <div className="shrink-0 px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex gap-2 text-xs text-muted-foreground">
-              <AlertCircle className="w-4 h-4 shrink-0 text-primary mt-0.5" />
-              <span>班级题单仅班级成员可见；创建后可在题单详情页继续添加/调整题目。</span>
-            </div>
-            {error && (
-              <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">{error}</div>
-            )}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              题单描述 <span className="text-error">*</span>
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="描述题单的学习目标、推荐顺序等"
+              rows={3}
+              className="input w-full resize-none"
+              required
+            />
           </div>
+        </div>
 
-          <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
-            <button type="submit" disabled={loading || problemsLoading} className="btn btn-primary flex-1">
-              {loading ? '创建中...' : '创建题单'}
-            </button>
-            <button type="button" onClick={onClose} className="btn btn-ghost">
-              取消
-            </button>
+        <div className="flex flex-col min-h-0 overflow-hidden px-5 py-3">
+          <label className="block text-sm font-medium text-foreground mb-2 shrink-0">
+            按题号添加题目 <span className="text-error">*</span>
+          </label>
+          <AssignmentProblemPicker
+            orderedIds={selectedProblems}
+            onChange={setSelectedProblems}
+            problems={problems}
+            problemsLoading={problemsLoading}
+          />
+        </div>
+
+        <div className="shrink-0 px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
+          <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="w-4 h-4 shrink-0 text-primary mt-0.5" />
+            <span>班级题单仅班级成员可见；创建后可在题单详情页继续添加/调整题目。</span>
           </div>
-        </form>
-      </div>
-    </div>
+          {error && (
+            <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">{error}</div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
+          <button type="submit" disabled={loading || problemsLoading} className="btn btn-primary flex-1">
+            {loading ? '创建中...' : '创建题单'}
+          </button>
+          <button type="button" onClick={onClose} className="btn btn-ghost">
+            取消
+          </button>
+        </div>
+      </form>
+    </CreateModalShell>
   )
 }

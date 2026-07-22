@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import {
@@ -15,11 +15,18 @@ import {
   Send,
   AlertCircle,
   FileCode,
+  BookOpen,
+  ListChecks,
+  History,
+  Code as CodeIcon,
 } from 'lucide-react'
 import StudentCompletionTable from '@/components/StudentCompletionTable'
 import ProblemDescription from '@/components/problem/ProblemDescription'
-import ProblemTimer from '@/components/class/ProblemTimer'
-import { getDifficultyColor } from '@/lib/status'
+import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
+import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
+import AssignmentProblemProgressList from '@/components/class/AssignmentProblemProgressList'
+import SubmissionList from '@/components/problem/SubmissionList'
+import ProblemStatsPanel from '@/components/problem/ProblemStatsPanel'
 import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useClass } from '@/hooks/useClass'
@@ -30,14 +37,13 @@ import { isClassAdminApiRole, isClassStudentApiRole, normalizeClassRoleToApi } f
 import { formatDateTime } from '@/lib/utils'
 import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
+import { PageContainer } from '@/components/layout'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
  { value: 'c', label: 'C', version: 'C11' },
  { value: 'python', label: 'Python', version: 'Python 3.10' },
 ]
-
-const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 interface Problem {
  id: string
@@ -67,6 +73,12 @@ interface Submission {
  submittedAt: string
  /** 作业维度做题用时（毫秒），仅 AC 时有意义 */
  timeElapsedMs?: number
+ // 提交详情字段（SubmissionList 渲染所需，后端按需返回）
+ language?: string
+ time?: number
+ memory?: number
+ passedTests?: number
+ totalTests?: number
 }
 
 interface ClassMember {
@@ -95,9 +107,11 @@ export default function AssignmentDetailPage() {
 const [editOpen, setEditOpen] = useState(false)
  const [canManage, setCanManage] = useState(false)
 
- // 初始 tab 由 ?tab= 参数控制（默认 problems）；学生访问 completion 时回退到 problems
- const initialTab = searchParams.get('tab') === 'completion' ? 'completion' : 'problems'
- const [activeTab, setActiveTab] = useState<'problems' | 'completion'>(initialTab)
+ // 顶层视图切换：题目作答 / 完成情况统计（管理员）
+ const initialViewTab = searchParams.get('tab') === 'completion' ? 'completion' : 'problems'
+ const [viewTab, setViewTab] = useState<'problems' | 'completion'>(initialViewTab)
+ // 中栏 Tab：与题库页一致（不含题解，作业场景）
+ const [problemTab, setProblemTab] = useState<'description' | 'submissions' | 'stats' | 'code'>('description')
  const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
  const [problemDetail, setProblemDetail] = useState<any>(null)
  const [problemLoading, setProblemLoading] = useState(false)
@@ -202,11 +216,22 @@ const [editOpen, setEditOpen] = useState(false)
  }, [])
 
  useEffect(() => {
- if (assignment?.problems?.length && activeTab === 'problems') {
+ if (assignment?.problems?.length && viewTab === 'problems') {
  const targetIndex = Math.min(selectedProblemIndex, assignment.problems.length - 1)
  fetchProblemDetail(assignment.problems[targetIndex].id)
  }
- }, [selectedProblemIndex, assignment?.problems, activeTab, fetchProblemDetail])
+ }, [selectedProblemIndex, assignment?.problems, viewTab, fetchProblemDetail])
+
+ // 桌面端（>= 1024px）不允许停留在 'code' tab，避免左栏内容为空
+ useEffect(() => {
+ const handleResize = () => {
+ if (window.innerWidth >= 1024 && problemTab === 'code') {
+ setProblemTab('description')
+ }
+ }
+ window.addEventListener('resize', handleResize)
+ return () => window.removeEventListener('resize', handleResize)
+ }, [problemTab])
 
  useEffect(() => {
  // 清理本作业历史草稿（localStorage 不支持 glob，需遍历 keys 匹配前缀）
@@ -421,14 +446,6 @@ const [editOpen, setEditOpen] = useState(false)
    }
  }
 
- const getProblemStatus = (problemId: string) => {
- const problemSubs = submissions.filter(s => s.problemId === problemId)
- if (problemSubs.length === 0) return null
- return problemSubs.reduce((best, current) =>
- (current.score || 0) > (best.score || 0) ? current : best
- )
- }
-
  const getStatusConfig = (status: string) => {
  switch (status) {
  case 'active': return { label: '进行中', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' }
@@ -468,7 +485,6 @@ const [editOpen, setEditOpen] = useState(false)
 
  const statusConfig = getStatusConfig(assignment.status)
  const selectedProblem = assignment.problems?.[selectedProblemIndex]
- const selectedProblemStatus = selectedProblem ? getProblemStatus(selectedProblem.id) : null
 
  const tabs = [
  { key: 'problems' as const, label: '题目', icon: FileText },
@@ -478,8 +494,8 @@ const [editOpen, setEditOpen] = useState(false)
  ]
 
  return (
- <div className="min-h-screen bg-background">
- <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+ <div className="min-h-screen bg-background pb-20 lg:pb-6">
+ <PageContainer className="py-6">
  <div className="bg-card rounded-xl border border-border overflow-hidden mb-4 shadow-sm">
  <div className="px-5 py-4 border-b border-border">
  <div className="flex items-start justify-between gap-3">
@@ -535,145 +551,186 @@ const [editOpen, setEditOpen] = useState(false)
  <span className="font-medium text-foreground">{submissions.filter(s => s.status === 'AC').length}/{assignment.problems?.length || 0}</span>
  </div>
  </div>
- </div>
 
- <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
- <div className="flex border-b border-border">
+ {/* 顶层视图切换 Tab：题目作答 / 完成情况统计（管理员） */}
+ <div className="px-5 py-2 flex items-center gap-1 border-b border-border">
  {tabs.map((tab) => {
  const Icon = tab.icon
  return (
  <button
  key={tab.key}
- onClick={() => setActiveTab(tab.key)}
- className={`flex items-center gap-2 px-5 py-3 font-medium text-sm transition-all relative ${
- activeTab === tab.key
+ onClick={() => {
+ setViewTab(tab.key)
+ const tabParams = new URLSearchParams(searchParams.toString())
+ tabParams.set('tab', tab.key)
+ router.replace(`${window.location.pathname}?${tabParams.toString()}`, { scroll: false })
+ }}
+ className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+ viewTab === tab.key
+ ? 'bg-primary/10 text-primary-light'
+ : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+ }`}
+ >
+ <Icon className="w-4 h-4" />
+ {tab.label}
+ </button>
+ )
+ })}
+ </div>
+ </div>
+
+ {viewTab === 'problems' && (
+ <ProblemWorkspaceShell
+ codeMode={problemTab === 'code'}
+ leftSelector={
+ <AssignmentProblemProgressList
+ problems={assignment.problems || []}
+ submissions={submissions}
+ selectedIndex={selectedProblemIndex}
+ onSelect={(index) => {
+ setSelectedProblemIndex(index)
+ setProblemTab('description')
+ }}
+ classId={classId}
+ assignmentId={params.assignmentId as string}
+ assignmentEndTime={assignment.endTime}
+ />
+ }
+ leftHeader={
+ <>
+ {[
+ { key: 'description' as const, label: '题目描述', icon: BookOpen },
+ { key: 'submissions' as const, label: '提交记录', icon: ListChecks },
+ { key: 'stats' as const, label: '统计', icon: BarChart3 },
+ ].map((tab) => {
+ const Icon = tab.icon
+ const isActive = problemTab === tab.key
+ return (
+ <button
+ key={tab.key}
+ onClick={() => setProblemTab(tab.key)}
+ className={`flex items-center gap-2 px-5 py-3.5 font-medium transition-all duration-300 relative cursor-pointer group whitespace-nowrap ${
+ isActive
  ? 'text-primary-light'
  : 'text-muted-foreground hover:text-foreground'
  }`}
  >
- <Icon className={`w-4 h-4`} />
- {tab.label}
- {activeTab === tab.key && (
- <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
- )}
- </button>
- )
- })}
- </div>
-
- <div className="p-5">
- {activeTab === 'problems' && (
- <div className="space-y-4">
- {assignment.problems && assignment.problems.length > 0 ? (
- <>
- <div className="flex flex-wrap items-center gap-2">
- {assignment.problems.map((problem, index) => {
- const status = getProblemStatus(problem.id)
- const isActive = index === selectedProblemIndex
- const letter = LETTERS[index]
- return (
- <button
- key={problem.id}
- onClick={() => setSelectedProblemIndex(index)}
- className={`relative w-10 h-10 rounded-lg font-mono font-bold text-sm transition-all duration-200 border ${
- isActive
- ? 'bg-primary text-white border-primary shadow-md scale-105'
- : status?.status === 'AC'
- ? 'bg-secondary/10 text-secondary border-secondary/30 hover:border-secondary/50'
- : status
- ? 'bg-warning/10 text-warning border-warning/30 hover:border-warning/50'
- : 'bg-muted text-muted-foreground border-border hover:border-primary/30 hover:text-foreground'
- }`}
- title={`${letter}. ${problem.title}`}
- >
- {letter}
- {status?.status === 'AC' && (
- <span className="absolute -top-1 -right-1 w-3 h-3 bg-secondary rounded-full border-[1.5px] border-white dark:border-card" />
- )}
- </button>
- )
- })}
- </div>
-
- <div className="border border-border rounded-xl overflow-hidden">
- <div className="px-4 py-3 bg-muted border-b border-border flex items-center justify-between">
- <div className="flex items-center gap-3 min-w-0">
- <span className="shrink-0 w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center font-mono text-sm font-bold text-primary-light">
- {LETTERS[selectedProblemIndex]}
- </span>
- <h2 className="font-semibold text-foreground truncate">{selectedProblem?.title}</h2>
- {selectedProblem && (
- <span className={`shrink-0 px-1.5 py-0.5 rounded text-[11px] font-medium border ${getDifficultyColor(selectedProblem.difficulty)}`}>
- {selectedProblem.difficulty}
- </span>
- )}
- </div>
- <div className="flex items-center gap-3 shrink-0 ml-4">
- {selectedProblemStatus ? (
- selectedProblemStatus.status === 'AC' ? (
- <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-secondary/15 text-secondary">
- <CheckCircle2 className="w-3 h-3" /> 通过 ({selectedProblemStatus.score}分)
- </span>
- ) : (
- <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-accent">
- {selectedProblemStatus.score}分
- </span>
- )
- ) : (
- <span className="text-xs text-muted-foreground/60">未提交</span>
- )}
- {selectedProblem && (
- <ProblemTimer
- key={`${assignment?.id}-${selectedProblem.id}`}
- classId={classId}
- assignmentId={params.assignmentId as string}
- problemId={selectedProblem.id}
- acHint={selectedProblemStatus?.status === 'AC'}
- assignmentEndTime={assignment.endTime}
+ {isActive && (
+ <motion.div
+ layoutId="assignment-problem-tab-indicator"
+ className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
+ transition={{ type: 'spring', stiffness: 500, damping: 30 }}
  />
  )}
- </div>
- </div>
-
- <div className="divide-y divide-border/60">
+ <Icon className={`w-4 h-4 transition-transform duration-300 ${isActive ? 'rotate-3' : ''}`} />
+ {tab.label}
+ </button>
+ )
+ })}
+ </>
+ }
+ leftPanel={
+ <AnimatePresence mode="wait">
+ {problemTab === 'description' && (
+ <motion.div
+ key="description"
+ initial={{ opacity: 0, y: 10 }}
+ animate={{ opacity: 1, y: 0 }}
+ exit={{ opacity: 0, y: -10 }}
+ transition={{ duration: 0.2 }}
+ >
  {problemLoading ? (
  <div className="p-12 text-center">
  <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
  <span className="text-sm text-muted-foreground">加载题目内容...</span>
  </div>
  ) : problemDetail ? (
- <>
- <div className="p-5">
  <ProblemDescription problem={problemDetail} />
+ ) : (
+ <div className="p-12 text-center text-sm text-muted-foreground">题目内容加载失败</div>
+ )}
+ </motion.div>
+ )}
+
+ {problemTab === 'submissions' && (
+ <motion.div
+ key="submissions"
+ initial={{ opacity: 0, y: 10 }}
+ animate={{ opacity: 1, y: 0 }}
+ exit={{ opacity: 0, y: -10 }}
+ transition={{ duration: 0.2 }}
+ >
+ <SubmissionList
+ submissions={submissions.filter((s) => s.problemId === selectedProblem?.id) as any}
+ loading={false}
+ error={null}
+ user={user}
+ fromAssignment={params.assignmentId as string}
+ classId={classId}
+ onSelect={() => {}}
+ />
+ </motion.div>
+ )}
+
+ {problemTab === 'stats' && problemDetail && (
+ <motion.div
+ key="stats"
+ initial={{ opacity: 0, y: 10 }}
+ animate={{ opacity: 1, y: 0 }}
+ exit={{ opacity: 0, y: -10 }}
+ transition={{ duration: 0.2 }}
+ >
+ <ProblemStatsPanel problemId={problemDetail.id || problemDetail._id} />
+ </motion.div>
+ )}
+ </AnimatePresence>
+ }
+ metaHeader={
+ problemDetail ? (
+ <ProblemMetaHeader
+ timeLimit={problemDetail.timeLimit}
+ memoryLimit={problemDetail.memoryLimit}
+ tags={problemDetail.tags}
+ difficulty={problemDetail.difficulty}
+ />
+ ) : null
+ }
+ rightHeader={
+ <>
+ <CodeIcon className="w-4 h-4 text-primary-light" />
+ <h3 className="font-medium text-foreground">提交代码</h3>
+ </>
+ }
+ rightPanel={
+ <>
+ {/* 作业状态守卫提示 */}
+ {!user && (
+ <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
+ <AlertCircle className="w-4 h-4 shrink-0" />
+ 请先登录后再提交代码
  </div>
+ )}
+ {user && assignment.status === 'upcoming' && (
+ <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm flex items-center gap-2">
+ <AlertCircle className="w-4 h-4 shrink-0" />
+ 作业尚未开始，{assignment.startTime ? `将在 ${formatDateTime(assignment.startTime)} 开放提交` : '暂不可提交'}
+ </div>
+ )}
+ {user && assignment.status === 'ended' && !assignment.allowLateSubmission && (
+ <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm flex items-center gap-2">
+ <AlertCircle className="w-4 h-4 shrink-0" />
+ 作业已结束，不再接受新提交
+ </div>
+ )}
+ {user && assignment.status === 'ended' && assignment.allowLateSubmission && (
+ <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
+ <AlertCircle className="w-4 h-4 shrink-0" />
+ 作业已结束（允许逾期提交，分数会被标记为逾期）
+ </div>
+ )}
 
- <div className="px-5 pb-5 space-y-3">
-{!user && (
-  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
-    <AlertCircle className="w-4 h-4 shrink-0" />
-    请先登录后再提交代码
-  </div>
-)}
-{user && assignment.status === 'upcoming' && (
-  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm flex items-center gap-2">
-    <AlertCircle className="w-4 h-4 shrink-0" />
-    作业尚未开始，{assignment.startTime ? `将在 ${formatDateTime(assignment.startTime)} 开放提交` : '暂不可提交'}
-  </div>
-)}
-{user && assignment.status === 'ended' && !assignment.allowLateSubmission && (
-  <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm flex items-center gap-2">
-    <AlertCircle className="w-4 h-4 shrink-0" />
-    作业已结束，不再接受新提交
-  </div>
-)}
-{user && assignment.status === 'ended' && assignment.allowLateSubmission && (
-  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
-    <AlertCircle className="w-4 h-4 shrink-0" />
-    作业已结束（允许逾期提交，分数会被标记为逾期）
-  </div>
-)}
-
-<div className="flex items-center justify-between gap-4">
+ {/* 语言选择 */}
+ <div className="flex items-center justify-between gap-4">
  <label className="text-sm font-medium text-foreground whitespace-nowrap">语言</label>
  <select
  value={language}
@@ -688,6 +745,7 @@ const [editOpen, setEditOpen] = useState(false)
  </select>
  </div>
 
+ {/* 代码编辑器 */}
  <CodeEditor
  value={code}
  onChange={setCode}
@@ -697,9 +755,7 @@ const [editOpen, setEditOpen] = useState(false)
  onSubmit={handleSubmit}
  />
 
- <div className="min-h-[44px]" />
-
-
+ {/* 提交按钮 */}
  <div className="flex items-center gap-3 pt-1">
  <button
  onClick={handleSubmit}
@@ -745,30 +801,52 @@ const [editOpen, setEditOpen] = useState(false)
  </>
  )}
  </button>
- <button
- onClick={() => setCode('')}
- className="btn-ghost btn cursor-pointer"
- >
+ <button onClick={() => setCode('')} className="btn-ghost btn cursor-pointer">
  清空
  </button>
  </div>
- </div>
  </>
- ) : (
- <div className="p-12 text-center text-sm text-muted-foreground">
- 题目内容加载失败
- </div>
+ }
+ />
  )}
+
+ {/* 移动端底部 Tab Bar：与题库页一致，支持题面/代码/提交/统计切换 */}
+ {viewTab === 'problems' && (
+ <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">
+ <div className="grid grid-cols-4">
+ <button
+ onClick={() => setProblemTab('description')}
+ className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'description' ? 'text-primary' : 'text-muted-foreground'}`}
+ >
+ <FileText className="w-5 h-5" />
+ <span className="text-xs">题面</span>
+ </button>
+ <button
+ onClick={() => setProblemTab('code')}
+ className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'code' ? 'text-primary' : 'text-muted-foreground'}`}
+ >
+ <CodeIcon className="w-5 h-5" />
+ <span className="text-xs">代码</span>
+ </button>
+ <button
+ onClick={() => setProblemTab('submissions')}
+ className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'submissions' ? 'text-primary' : 'text-muted-foreground'}`}
+ >
+ <History className="w-5 h-5" />
+ <span className="text-xs">提交</span>
+ </button>
+ <button
+ onClick={() => setProblemTab('stats')}
+ className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'stats' ? 'text-primary' : 'text-muted-foreground'}`}
+ >
+ <BarChart3 className="w-5 h-5" />
+ <span className="text-xs">统计</span>
+ </button>
  </div>
- </div>
- </>
- ) : (
- <div className="py-16 text-center text-sm text-muted-foreground">暂无题目</div>
- )}
  </div>
  )}
 
- {activeTab === 'completion' && isAdminOrOwner && (
+ {viewTab === 'completion' && isAdminOrOwner && (
  <StudentCompletionTable
  students={(Array.isArray(classMembers) ? classMembers : [])
  .filter((m) => isClassStudentApiRole(m.role))
@@ -816,14 +894,13 @@ const [editOpen, setEditOpen] = useState(false)
  allSubmissions={allSubmissions}
  onProblemClick={(index) => {
  setSelectedProblemIndex(index)
- setActiveTab('problems')
+ setViewTab('problems')
+ setProblemTab('description')
  setCode('')
  }}
  />
  )}
- </div>
- </div>
- </div>
+ </PageContainer>
  <EditAssignmentModal
  classId={classId}
  assignmentId={params.assignmentId as string}

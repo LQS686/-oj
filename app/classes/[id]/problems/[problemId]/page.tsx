@@ -7,6 +7,7 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { Clock, Database, BookOpen, TrendingUp, ArrowLeft, Play, Target, AlertCircle } from 'lucide-react'
 import { getDifficultyColor } from '@/lib/status'
+import { PageContainer } from '@/components/layout'
 
 interface ClassProblem {
  id: string
@@ -100,7 +101,7 @@ export default function ClassProblemDetailPage() {
 
  return (
  <div className="min-h-screen">
- <div className="container mx-auto px-4 py-8 max-w-6xl">
+ <PageContainer variant="standard" className="py-8">
  <Link
  href={`/classes/${params.id}`}
  className="flex items-center gap-2 text-muted-foreground hover:text-primary-light mb-6 transition-colors group"
@@ -236,7 +237,7 @@ export default function ClassProblemDetailPage() {
  返回班级
  </button>
  </div>
- </div>
+ </PageContainer>
  </div>
  )
 }

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Clock, FileText, List, BarChart2, Info, Play, Timer, CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { formatDateTimeShort } from '@/lib/utils'
+import { PageContainer } from '@/components/layout'
 
 interface Contest {
   id: string
@@ -125,7 +126,7 @@ export default function ContestHeader({
 
   return (
     <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-14 z-30">
-      <div className="container mx-auto px-4">
+      <PageContainer>
         {/* 主信息：单行优先，窄屏自动换行 */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 min-h-[52px]">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -180,7 +181,7 @@ export default function ContestHeader({
             )
           })}
         </nav>
-      </div>
+      </PageContainer>
     </header>
   )
 }

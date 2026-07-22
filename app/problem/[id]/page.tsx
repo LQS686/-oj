@@ -11,8 +11,6 @@ import {
   XCircle,
   Code as CodeIcon,
   CheckCircle2,
-  Timer,
-  MemoryStick,
   FileCode,
   FileText,
   History,
@@ -21,12 +19,13 @@ import {
   Edit3,
   BarChart3
 } from 'lucide-react'
-import { getStatusColor, getDifficultyColor } from '@/lib/status'
+import { getStatusColor } from '@/lib/status'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
+import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import ProblemStatsPanel from '@/components/problem/ProblemStatsPanel'
@@ -40,6 +39,7 @@ import Link from 'next/link'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import toast from 'react-hot-toast'
 import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
+import { PageContainer } from '@/components/layout'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -590,32 +590,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
   return (
     <div className="min-h-screen pb-20 lg:pb-8">
-      <div className="container mx-auto px-4 pt-6">
+      <PageContainer className="pt-6">
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <span className="font-mono text-sm font-bold text-primary-light bg-primary/10 px-3 py-1 rounded-lg">
             {problem.problemNumber || problem.id}
           </span>
           <h1 className="text-xl font-bold text-foreground md:text-2xl">{problem.title}</h1>
-          <span className={`difficulty-tag ${getDifficultyColor(problem.difficulty)}`}>
-            {problem.difficulty}
-          </span>
-          {problem.tags && problem.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {problem.tags.slice(0, 4).map((tag: string) => (
-                <Link
-                  key={tag}
-                  href={`/problems?tag=${encodeURIComponent(tag)}`}
-                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary-light transition-colors"
-                  title={`按标签 "${tag}" 筛选题库`}
-                >
-                  {tag}
-                </Link>
-              ))}
-              {problem.tags.length > 4 && (
-                <span className="text-xs text-muted-foreground">+{problem.tags.length - 4}</span>
-              )}
-            </div>
-          )}
           {canEditProblem && problem?.id && (
             <Link
               href={`/admin/problems/${problem.id}/edit`}
@@ -626,15 +606,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-4 mb-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <Timer className="w-4 h-4 transition-transform duration-300" />
-            <span>时间限制: {problem.timeLimit}ms</span>
-          </div>
-          <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <MemoryStick className="w-4 h-4 transition-transform duration-300" />
-            <span>内存限制: {problem.memoryLimit}MB</span>
-          </div>
+        <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
             <CheckCircle2 className="w-4 h-4 text-green-400 transition-transform duration-300" />
             <span>通过率 {acceptRate}%</span>
@@ -653,6 +625,14 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
         <ProblemWorkspaceShell
           codeMode={activeTab === 'code'}
+          metaHeader={
+            <ProblemMetaHeader
+              timeLimit={problem.timeLimit}
+              memoryLimit={problem.memoryLimit}
+              tags={problem.tags}
+              difficulty={problem.difficulty}
+            />
+          }
           leftHeader={
             <>
               {[
@@ -830,7 +810,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             </>
           }
         />
-      </div>
+      </PageContainer>
 
       {selectedSubmission && (
         <div

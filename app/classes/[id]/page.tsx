@@ -30,6 +30,8 @@ import ClassManageInlinePanel from '@/components/class/ClassManageInlinePanel'
 import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
 import CreateClassTrainingModal from '@/components/class/CreateClassTrainingModal'
+import CreateNoteModal from '@/components/class/CreateNoteModal'
+import CreateClassProblemModal from '@/components/class/CreateClassProblemModal'
 import { classRoleDisplayLabel, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDate } from '@/lib/utils'
 
@@ -126,6 +128,8 @@ function ClassDetailContent() {
   const [editAssignmentOpen, setEditAssignmentOpen] = useState(false)
   const [editAssignmentId, setEditAssignmentId] = useState<string | null>(null)
   const [createTrainingOpen, setCreateTrainingOpen] = useState(false)
+  const [createNoteOpen, setCreateNoteOpen] = useState(false)
+  const [createProblemOpen, setCreateProblemOpen] = useState(false)
 
   useDocumentTitle(classData?.name)
 
@@ -203,6 +207,14 @@ function ClassDetailContent() {
     if (editId) {
       setEditAssignmentId(editId)
       setEditAssignmentOpen(true)
+      router.replace(`/classes/${classId}`, { scroll: false })
+    }
+    if (searchParams.get('createNote') === '1') {
+      setCreateNoteOpen(true)
+      router.replace(`/classes/${classId}`, { scroll: false })
+    }
+    if (searchParams.get('createProblem') === '1') {
+      setCreateProblemOpen(true)
       router.replace(`/classes/${classId}`, { scroll: false })
     }
   }, [searchParams, classId, router])
@@ -540,12 +552,13 @@ function ClassDetailContent() {
                     <BookOpen className="w-4 h-4" /> 笔记
                   </h2>
                   {user && isClassAdmin && (
-                    <Link
-                      href={`/classes/${classId}/notes/create`}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary-light"
+                    <button
+                      type="button"
+                      onClick={() => setCreateNoteOpen(true)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary-light hover:underline"
                     >
                       <Plus className="w-3.5 h-3.5" /> 创建
-                    </Link>
+                    </button>
                   )}
                 </div>
                 <div className="p-4">
@@ -726,6 +739,23 @@ function ClassDetailContent() {
           void fetchClassDetail()
           // 创建后跳转到题单详情页继续编辑
           router.push(`/training/${trainingId}`)
+        }}
+      />
+      <CreateNoteModal
+        classId={classId}
+        open={createNoteOpen}
+        onClose={() => setCreateNoteOpen(false)}
+        onCreated={() => {
+          void fetchNotes()
+          void fetchClassDetail()
+        }}
+      />
+      <CreateClassProblemModal
+        classId={classId}
+        open={createProblemOpen}
+        onClose={() => setCreateProblemOpen(false)}
+        onCreated={() => {
+          void fetchClassDetail()
         }}
       />
     </ClassWorkspaceShell>

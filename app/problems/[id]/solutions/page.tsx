@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
  Lock,
@@ -16,6 +16,9 @@ import { logger } from '@/lib/logger'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
+import { PageContainer } from '@/components/layout'
+import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
+import { PageLoading } from '@/components/common'
 
 type PermissionReason =
  | 'ADMIN'
@@ -53,12 +56,13 @@ interface ProblemSummary {
  problemNumber?: string
 }
 
-export default function SolutionsListPage() {
+function SolutionsListPageContent() {
  const params = useParams()
  const router = useRouter()
  const { user } = useUser()
 
  const pid = (params?.id as string) || ''
+ const searchParams = useSearchParams()
 
  const [problem, setProblem] = useState<ProblemSummary | null>(null)
  const [permission, setPermission] = useState<PermissionResult | null>(null)
@@ -68,12 +72,20 @@ export default function SolutionsListPage() {
  const [solutions, setSolutions] = useState<SolutionListItem[]>([])
  const [solutionsLoading, setSolutionsLoading] = useState(false)
  const [solutionsError, setSolutionsError] = useState<string | null>(null)
+ const [createOpen, setCreateOpen] = useState(false)
 
  useEffect(() => {
  if (!pid) return
  fetchProblem()
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [pid])
+
+ useEffect(() => {
+ if (searchParams.get('create') === '1') {
+ setCreateOpen(true)
+ router.replace(`/problems/${pid}/solutions`, { scroll: false })
+ }
+ }, [searchParams, router, pid])
 
  useEffect(() => {
  if (!pid) return
@@ -186,7 +198,7 @@ export default function SolutionsListPage() {
  router.push('/login')
  return
  }
- router.push(`/problems/${pid}/solutions/new`)
+ setCreateOpen(true)
  }
 
  const handleSolutionClick = (solutionId: string) => {
@@ -195,7 +207,7 @@ export default function SolutionsListPage() {
 
  return (
  <div className="min-h-screen pb-8">
- <div className="container mx-auto px-4 pt-6 max-w-5xl">
+ <PageContainer variant="standard" className="pt-6">
  {/* 面包屑 */}
  <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-4 flex-wrap">
  <Link href="/problems" className="hover:text-primary-light transition-colors">
@@ -348,7 +360,42 @@ export default function SolutionsListPage() {
  )}
  </div>
  )}
+ <CreateSolutionModal
+ open={createOpen}
+ onClose={() => setCreateOpen(false)}
+ problemId={pid}
+ onCreated={() => {
+ // 刷新题解列表
+ if (permission?.allowed) {
+ setSolutionsLoading(true)
+ fetchWithCookie(`/api/solutions?problemId=${pid}`)
+ .then(res => res.json())
+ .then(data => {
+ if (data.success) {
+ const list = Array.isArray(data.data?.items)
+ ? data.data.items
+ : Array.isArray(data.data?.solutions)
+ ? data.data.solutions
+ : Array.isArray(data.data)
+ ? data.data
+ : []
+ setSolutions(list as SolutionListItem[])
+ }
+ })
+ .catch(() => {})
+ .finally(() => setSolutionsLoading(false))
+ }
+ }}
+ />
+ </PageContainer>
  </div>
- </div>
+ )
+}
+
+export default function SolutionsListPage() {
+ return (
+ <Suspense fallback={<PageLoading label="加载中..." />}>
+ <SolutionsListPageContent />
+ </Suspense>
  )
 }

@@ -22,6 +22,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 import { AnnouncementsGrid } from '@/app/_components/AnnouncementsGrid'
 import { SectionHeader } from '@/app/_components/SectionHeader'
+import { PageContainer } from '@/components/layout'
 
 /* ---------- non-logged-in feature cards ---------- */
 
@@ -119,7 +120,7 @@ export function GuestView() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-primary/10 dark:bg-primary/15 rounded-full blur-[80px] opacity-60" />
         </div>
 
-        <div className="container mx-auto px-4">
+        <PageContainer>
           <div className="text-center max-w-3xl mx-auto">
             {/* 胶囊徽章 */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary text-xs md:text-sm font-semibold mb-6 animate-fadeIn border border-primary/15">
@@ -171,18 +172,18 @@ export function GuestView() {
               </div>
             </div>
           </div>
-        </div>
+        </PageContainer>
       </section>
 
       {/* ============ 公告（紧凑） ============ */}
       {announcements.length > 0 && (
-        <section className="container mx-auto px-4">
+        <PageContainer as="section">
           <AnnouncementsGrid items={announcements} />
-        </section>
+        </PageContainer>
       )}
 
       {/* ============ 攀登路线 ============ */}
-      <section className="container mx-auto px-4">
+      <PageContainer as="section">
         <SectionHeader
           eyebrow="攀登路线"
           eyebrowIcon={Compass}
@@ -233,10 +234,10 @@ export function GuestView() {
             })}
           </div>
         </div>
-      </section>
+      </PageContainer>
 
       {/* ============ 核心能力 ============ */}
-      <section className="container mx-auto px-4">
+      <PageContainer as="section">
         <SectionHeader
           eyebrow="核心能力"
           eyebrowIcon={Target}
@@ -259,10 +260,10 @@ export function GuestView() {
             )
           })}
         </div>
-      </section>
+      </PageContainer>
 
       {/* ============ CTA ============ */}
-      <section className="container mx-auto px-4">
+      <PageContainer as="section">
         <div className="card-static rounded-3xl p-8 md:p-12 lg:p-16 text-center max-w-4xl mx-auto relative overflow-hidden">
           {/* 背景山形装饰：放大、更可见 */}
           <div className="absolute inset-0 -z-10 opacity-[0.04] dark:opacity-[0.07]">
@@ -297,7 +298,7 @@ export function GuestView() {
             </Link>
           </div>
         </div>
-      </section>
+      </PageContainer>
     </div>
   )
 }

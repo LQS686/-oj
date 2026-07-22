@@ -6,6 +6,7 @@ import { ArrowLeft, Search, Plus, Trash2, Save, AlertCircle, Trophy } from 'luci
 import type { Problem } from '@/types/models'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
+import { PageContainer } from '@/components/layout'
 
 export default function EditContestPage() {
  const router = useRouter()
@@ -219,7 +220,7 @@ export default function EditContestPage() {
 
  return (
  <div className="min-h-screen py-8">
- <div className="container mx-auto px-4 max-w-4xl">
+ <PageContainer variant="form">
  <button
  onClick={() => router.back()}
  className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
@@ -504,7 +505,7 @@ export default function EditContestPage() {
  </button>
  </div>
  </form>
- </div>
+ </PageContainer>
  </div>
  )
 }

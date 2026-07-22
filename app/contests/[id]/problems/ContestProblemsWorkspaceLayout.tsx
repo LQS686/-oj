@@ -10,6 +10,7 @@ import {
 import ContestProblemSidebar from '@/components/contest/ContestProblemSidebar'
 import ContestProblemMainHeader from '@/components/contest/ContestProblemMainHeader'
 import { fetchWithCookie } from '@/lib/api/base'
+import { PageContainer } from '@/components/layout'
 
 export default function ContestProblemsWorkspaceLayout({
   children,
@@ -64,15 +65,15 @@ export default function ContestProblemsWorkspaceLayout({
 
   if (loadError) {
     return (
-      <div className="container mx-auto px-4 py-12 text-center text-error">{loadError}</div>
+      <PageContainer className="py-12 text-center text-error">{loadError}</PageContainer>
     )
   }
 
   if (!contest || initialProblems === null) {
     return (
-      <div className="container mx-auto px-4 py-24 flex justify-center">
+      <PageContainer className="py-24 flex justify-center">
         <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
+      </PageContainer>
     )
   }
 
@@ -82,13 +83,13 @@ export default function ContestProblemsWorkspaceLayout({
       contest={contest}
       initialProblems={initialProblems}
     >
-      <div className="container mx-auto px-4 py-4 pb-8">
+      <PageContainer className="py-4 pb-8">
         <ContestProblemMainHeader />
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
           <div className="min-w-0">{children}</div>
           <ContestProblemSidebar />
         </div>
-      </div>
+      </PageContainer>
     </ContestProblemWorkspaceProvider>
   )
 }

@@ -45,6 +45,12 @@ export interface ProblemTimerProps {
   /** 父组件可选：传入作业结束时间，超过此时间后不再启动/恢复计时（仍展示已累计用时） */
   assignmentEndTime?: string | Date | null
   className?: string
+  /**
+   * 父组件可选：是否为当前选中题（被动展示模式）。
+   * - true（默认）：完整计时逻辑（start/pause/visibility/heartbeat/tick）
+   * - false：仅 fetchProgress 一次用于展示累计用时，不启动计时、不监听 visibility、不心跳、不 tick
+   */
+  active?: boolean
 }
 
 /**
@@ -73,6 +79,7 @@ export default function ProblemTimer({
   acHint,
   assignmentEndTime,
   className,
+  active = true,
 }: ProblemTimerProps) {
   const [progress, setProgress] = useState<ProblemTimerProgress | null>(null)
   const [displayMs, setDisplayMs] = useState<number>(0)
@@ -83,6 +90,14 @@ export default function ProblemTimer({
   const isCompletedRef = useRef(false)
   const baseUrlRef = useRef('')
   const assignmentEndedRef = useRef(false)
+  // active 镜像：供卸载 / visibilitychange 等只读最新值的 effect 使用
+  const activeRef = useRef(true)
+  // 标记 active 切换 effect 是否为首次挂载（首次由 init effect 处理）
+  const firstRunRef = useRef(true)
+
+  useEffect(() => {
+    activeRef.current = active
+  }, [active])
 
   useEffect(() => {
     baseUrlRef.current = `/api/classes/${classId}/assignments/${assignmentId}/problems/${problemId}/timing`
@@ -165,9 +180,12 @@ export default function ProblemTimer({
     const init = async () => {
       await fetchProgress()
       if (cancelled) return
-      // 若已完成则不启动
-      // 若作业已结束（assignmentEndedRef.current === true）也不启动 —— 后端会拒绝 start/resume
-      if (!isCompletedRef.current && !assignmentEndedRef.current) {
+      // 仅当 active 时才 start；非选中题（被动展示）只 fetchProgress 一次
+      if (
+        activeRef.current &&
+        !isCompletedRef.current &&
+        !assignmentEndedRef.current
+      ) {
         await callTiming('start')
       }
     }
@@ -182,6 +200,8 @@ export default function ProblemTimer({
   // 卸载：暂停计时（仅当未完成时）
   useEffect(() => {
     return () => {
+      // 非选中题（被动展示）从未启动计时，无需 pause
+      if (!activeRef.current) return
       if (!isCompletedRef.current) {
         // 使用 sendBeacon 提高页面卸载时的送达率
         try {
@@ -207,6 +227,8 @@ export default function ProblemTimer({
   useEffect(() => {
     const handleVisibility = () => {
       if (typeof document === 'undefined') return
+      // 非选中题不参与 visibility 联动（被动展示模式）
+      if (!activeRef.current) return
       if (document.hidden) {
         if (!isCompletedRef.current) {
           void callTiming('pause')
@@ -231,7 +253,7 @@ export default function ProblemTimer({
 
   // 30 秒心跳：GET 同步累计用时（也用于感知后端 finalizeTiming 完成）
   useEffect(() => {
-    if (isCompleted) return
+    if (isCompleted || !active) return
     const id = setInterval(() => {
       if (!isCompletedRef.current) {
         void fetchProgress()
@@ -239,11 +261,11 @@ export default function ProblemTimer({
     }, HEARTBEAT_INTERVAL_MS)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCompleted])
+  }, [isCompleted, active])
 
   // 1 秒 tick：本地累加显示（仅当计时中且未完成时）
   useEffect(() => {
-    if (isCompleted || !progress) return
+    if (isCompleted || !progress || !active) return
     // 仅在计时中（未暂停）时累加
     if (progress.isPaused) return
     if (!progress.lastResumedAt) return
@@ -253,7 +275,31 @@ export default function ProblemTimer({
       setDisplayMs((progress.timeElapsedMs ?? 0) + delta)
     }, TICK_INTERVAL_MS)
     return () => clearInterval(id)
-  }, [isCompleted, progress])
+  }, [isCompleted, progress, active])
+
+  // active 切换：处理 false → true（恢复计时）与 true → false（暂停）
+  // 首次挂载由上面的 init effect 处理，这里跳过，避免重复 start
+  useEffect(() => {
+    if (firstRunRef.current) {
+      firstRunRef.current = false
+      return
+    }
+    if (active) {
+      // false → true：刷新进度并恢复计时
+      void (async () => {
+        await fetchProgress()
+        if (!isCompletedRef.current && !assignmentEndedRef.current) {
+          await callTiming('start')
+        }
+      })()
+    } else {
+      // true → false：暂停计时（保留 displayMs 不变，由后续 effect 清理 interval）
+      if (!isCompletedRef.current) {
+        void callTiming('pause')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
 
   // 父组件传入 acHint → 主动刷新一次 progress，及时感知后端 finalizeTiming 结果
   useEffect(() => {

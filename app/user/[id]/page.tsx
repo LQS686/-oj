@@ -12,6 +12,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
 import SubmissionHeatmap from '@/components/user/SubmissionHeatmap'
 import { Flame } from 'lucide-react'
+import { PageContainer } from '@/components/layout'
 
 export default function UserProfilePage() {
  const params = useParams()
@@ -142,7 +143,7 @@ export default function UserProfilePage() {
 
  return (
  <div className="min-h-screen">
- <div className="container mx-auto px-4 py-10">
+ <PageContainer className="py-10">
  <motion.div 
  variants={containerVariants}
  initial="hidden"
@@ -410,7 +411,7 @@ export default function UserProfilePage() {
  )}
  </div>
  </motion.div>
- </div>
+ </PageContainer>
  </div>
  )
 }

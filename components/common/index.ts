@@ -18,6 +18,8 @@ export type { ClassWorkspaceShellProps, ClassNavItem } from './ClassWorkspaceShe
 
 // 公共模态框组件
 export { default as Modal } from './Modal'
+export { default as CreateModalShell } from './CreateModalShell'
+export type { CreateModalShellProps } from './CreateModalShell'
 export type { ModalProps, ModalSize } from './Modal'
 export { DialogProvider, useDialog } from './DialogProvider'
 export type {

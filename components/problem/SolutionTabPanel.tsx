@@ -14,6 +14,7 @@ import { logger } from '@/lib/logger'
 import { useUser } from '@/contexts/UserContext'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
 import { fetchWithCookie } from '@/lib/api/base'
+import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
 
 /**
  * Phase 6 Task 32.4: 语言 Tab 优先级排序
@@ -106,6 +107,7 @@ export default function SolutionTabPanel({
 
  // Phase 6 Task 32.4: 语言筛选 tab（'all' = 全部，'cpp' / 'python' / ... = 按语言过滤）
  const [languageFilter, setLanguageFilter] = useState<string>('all')
+ const [createOpen, setCreateOpen] = useState(false)
 
  useEffect(() => {
  let cancelled = false
@@ -215,7 +217,7 @@ export default function SolutionTabPanel({
  router.push('/login')
  return
  }
- router.push(`/problems/${problemId}/solutions/new`)
+ setCreateOpen(true)
  }
 
  const handleSolutionClick = (solutionId: string) => {
@@ -423,6 +425,11 @@ export default function SolutionTabPanel({
  ))}
  </div>
  )}
+ <CreateSolutionModal
+ open={createOpen}
+ onClose={() => setCreateOpen(false)}
+ problemId={problemId}
+ />
  </div>
  )
 }

@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { BookOpen, AlertCircle, X } from 'lucide-react'
+import { BookOpen, AlertCircle } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { CreateModalShell } from '@/components/common'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
 
@@ -89,19 +90,6 @@ export default function CreateAssignmentModal({
     void fetchProblems()
   }, [open, resetForm, fetchProblems])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
-    }
-  }, [open, onClose])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -164,123 +152,105 @@ export default function CreateAssignmentModal({
     }
   }
 
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-[110] flex items-center justify-center overflow-hidden bg-black/60 p-4 sm:p-6"
-      onClick={onClose}
-      role="presentation"
+    <CreateModalShell
+      open={open}
+      onClose={onClose}
+      title="创建作业"
+      icon={BookOpen}
+      labelledById="create-assignment-title"
     >
-      <div
-        className="card-static rounded-xl w-full max-w-2xl h-[80vh] flex flex-col shadow-xl border border-border overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-assignment-title"
+      <form
+        onSubmit={handleSubmit}
+        className="flex-1 min-h-0 overflow-y-auto flex flex-col"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <h2 id="create-assignment-title" className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-primary-light" />
-            创建作业
-          </h2>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:bg-muted" aria-label="关闭">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form
-            onSubmit={handleSubmit}
-            className="flex-1 min-h-0 overflow-y-auto flex flex-col"
-          >
-          <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                作业标题 <span className="text-error">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="例如：第一周练习作业"
-                className="input w-full"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">作业描述</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="描述作业要求和注意事项"
-                rows={2}
-                className="input w-full resize-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  开始时间 <span className="text-error">*</span>
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="input w-full"
-                  required
-                />
-                <p className="text-xs text-muted-foreground mt-1">到达此时间后学生可提交</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  截止时间 <span className="text-error">*</span>
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="input w-full"
-                  required
-                />
-                <p className="text-xs text-muted-foreground mt-1">超过此时间为逾期提交</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 py-3">
-            <label className="block text-sm font-medium text-foreground mb-2 shrink-0">
-              按题号添加题目 <span className="text-error">*</span>
+        <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              作业标题 <span className="text-error">*</span>
             </label>
-            <AssignmentProblemPicker
-              orderedIds={selectedProblems}
-              onChange={setSelectedProblems}
-              problems={problems}
-              problemsLoading={problemsLoading}
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="例如：第一周练习作业"
+              className="input w-full"
+              required
             />
           </div>
 
-          <div className="px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex gap-2 text-xs text-muted-foreground">
-              <AlertCircle className="w-4 h-4 shrink-0 text-primary mt-0.5" />
-              <span>仅支持按题号添加；成员按下方列表顺序做题。</span>
-            </div>
-            {error && (
-              <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">{error}</div>
-            )}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">作业描述</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="描述作业要求和注意事项"
+              rows={2}
+              className="input w-full resize-none"
+            />
           </div>
 
-          <div className="flex gap-3 px-5 py-4 border-t border-border">
-            <button type="submit" disabled={loading || problemsLoading} className="btn btn-primary flex-1">
-              {loading ? '创建中...' : '创建作业'}
-            </button>
-            <button type="button" onClick={onClose} className="btn btn-ghost">
-              取消
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                开始时间 <span className="text-error">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                className="input w-full"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">到达此时间后学生可提交</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                截止时间 <span className="text-error">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.endTime}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                className="input w-full"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">超过此时间为逾期提交</p>
+            </div>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <div className="px-5 py-3">
+          <label className="block text-sm font-medium text-foreground mb-2 shrink-0">
+            按题号添加题目 <span className="text-error">*</span>
+          </label>
+          <AssignmentProblemPicker
+            orderedIds={selectedProblems}
+            onChange={setSelectedProblems}
+            problems={problems}
+            problemsLoading={problemsLoading}
+          />
+        </div>
+
+        <div className="px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
+          <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="w-4 h-4 shrink-0 text-primary mt-0.5" />
+            <span>仅支持按题号添加；成员按下方列表顺序做题。</span>
+          </div>
+          {error && (
+            <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">{error}</div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-5 py-4 border-t border-border">
+          <button type="submit" disabled={loading || problemsLoading} className="btn btn-primary flex-1">
+            {loading ? '创建中...' : '创建作业'}
+          </button>
+          <button type="button" onClick={onClose} className="btn btn-ghost">
+            取消
+          </button>
+        </div>
+      </form>
+    </CreateModalShell>
   )
 }

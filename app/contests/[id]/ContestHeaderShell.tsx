@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
 import ContestHeader from './ContestHeader'
+import { PageContainer } from '@/components/layout'
 
 interface Contest {
   id: string
@@ -28,7 +29,11 @@ export default function ContestHeaderShell({
   return (
     <div className="min-h-screen bg-background">
       {!hideHeader && <ContestHeader contest={contest} canViewDetails={canViewDetails} />}
-      <div className={hideHeader ? '' : 'container mx-auto px-4 py-6'}>{children}</div>
+      {hideHeader ? (
+        <>{children}</>
+      ) : (
+        <PageContainer className="py-6">{children}</PageContainer>
+      )}
     </div>
   )
 }

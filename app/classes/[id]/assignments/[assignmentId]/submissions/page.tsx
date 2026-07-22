@@ -10,6 +10,7 @@ import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } fro
 import { formatDateTime } from '@/lib/utils'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
 import type { Assignment } from '@/types/models'
+import { PageContainer } from '@/components/layout'
 
 interface Submission {
  id: string
@@ -319,7 +320,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
 
  return (
  <div className="min-h-screen">
- <div className="container mx-auto px-4 py-8">
+ <PageContainer className="py-8">
  <button
  onClick={() => {
  // 返回作业详情页的题目 tab（作业详情页支持 ?tab=problems 或 ?tab=completion）
@@ -523,7 +524,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  </div>
  )}
  </div>
- </div>
+ </PageContainer>
 
  {showCodeModal && selectedSubmission && (
  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4">

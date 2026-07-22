@@ -10,6 +10,7 @@ import {
 import TrainingProblemSidebar from '@/components/training/TrainingProblemSidebar'
 import TrainingProblemMainHeader from '@/components/training/TrainingProblemMainHeader'
 import { fetchWithCookie } from '@/lib/api/base'
+import { PageContainer } from '@/components/layout'
 
 export default function TrainingProblemsWorkspaceLayout({
   children,
@@ -58,15 +59,15 @@ export default function TrainingProblemsWorkspaceLayout({
 
   if (loadError) {
     return (
-      <div className="container mx-auto px-4 py-12 text-center text-error">{loadError}</div>
+      <PageContainer className="py-12 text-center text-error">{loadError}</PageContainer>
     )
   }
 
   if (!training || initialProblems === null) {
     return (
-      <div className="container mx-auto px-4 py-24 flex justify-center">
+      <PageContainer className="py-24 flex justify-center">
         <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
+      </PageContainer>
     )
   }
 
@@ -76,13 +77,13 @@ export default function TrainingProblemsWorkspaceLayout({
       training={training}
       initialProblems={initialProblems}
     >
-      <div className="container mx-auto px-4 py-4 pb-8">
+      <PageContainer className="py-4 pb-8">
         <TrainingProblemMainHeader />
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
           <div className="min-w-0">{children}</div>
           <TrainingProblemSidebar />
         </div>
-      </div>
+      </PageContainer>
     </TrainingProblemWorkspaceProvider>
   )
 }
