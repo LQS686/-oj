@@ -26,6 +26,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import ProblemDescription from '@/components/problem/ProblemDescription'
+import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import ProblemStatsPanel from '@/components/problem/ProblemStatsPanel'
@@ -650,15 +651,15 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
-          {/* 左栏：题面 / 题解 / 提交记录（原 tab + 内容） */}
-          <div className={`card-static rounded-lg overflow-hidden ${activeTab === 'code' ? 'hidden lg:block' : ''}`}>
-            <div className="flex border-b border-border overflow-x-auto">
+        <ProblemWorkspaceShell
+          codeMode={activeTab === 'code'}
+          leftHeader={
+            <>
               {[
                 { key: 'description', label: '题目描述', icon: BookOpen },
                 { key: 'solutions', label: '题解', icon: MessageSquare },
                 { key: 'submissions', label: '提交记录', icon: ListChecks },
-                { key: 'stats', label: '统计', icon: BarChart3 }
+                { key: 'stats', label: '统计', icon: BarChart3 },
               ]
                 .filter((tab) => !(isAssignmentContext && tab.key === 'solutions'))
                 .map((tab) => {
@@ -686,152 +687,149 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     </button>
                   )
                 })}
-            </div>
+            </>
+          }
+          leftPanel={
+            <AnimatePresence mode="wait">
+              {activeTab === 'description' && (
+                <motion.div
+                  key="description"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ProblemDescription problem={problem} />
+                </motion.div>
+              )}
 
-            <div className="p-6">
-              <AnimatePresence mode="wait">
-                {activeTab === 'description' && (
-                  <motion.div
-                    key="description"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <ProblemDescription problem={problem} />
-                  </motion.div>
-                )}
+              {activeTab === 'solutions' && (
+                <motion.div
+                  key="solutions"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <SolutionTabPanel
+                    problemId={problemId}
+                    isAssignmentContext={isAssignmentContext}
+                  />
+                </motion.div>
+              )}
 
-                {activeTab === 'solutions' && (
-                  <motion.div
-                    key="solutions"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <SolutionTabPanel
-                      problemId={problemId}
-                      isAssignmentContext={isAssignmentContext}
-                    />
-                  </motion.div>
-                )}
+              {activeTab === 'submissions' && (
+                <motion.div
+                  key="submissions"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <SubmissionList
+                    submissions={submissions}
+                    loading={submissionsLoading}
+                    error={null}
+                    user={user}
+                    fromAssignment={fromAssignment}
+                    classId={classId}
+                    onSelect={(sub) => setSelectedSubmission(sub)}
+                  />
+                </motion.div>
+              )}
 
-                {activeTab === 'submissions' && (
-                  <motion.div
-                    key="submissions"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <SubmissionList
-                      submissions={submissions}
-                      loading={submissionsLoading}
-                      error={null}
-                      user={user}
-                      fromAssignment={fromAssignment}
-                      classId={classId}
-                      onSelect={(sub) => setSelectedSubmission(sub)}
-                    />
-                  </motion.div>
-                )}
-
-                {activeTab === 'stats' && (
-                  <motion.div
-                    key="stats"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <ProblemStatsPanel problemId={problemId} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-
-          {/* 右栏：提交代码（宽屏 sticky，窄屏堆叠在左栏下方） */}
-          <div className={`lg:sticky lg:top-4 ${activeTab !== 'code' ? 'hidden lg:block' : ''}`}>
-            <div className="card-static rounded-lg overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border bg-muted">
-                <CodeIcon className="w-4 h-4 text-primary-light" />
-                <h3 className="font-medium text-foreground">提交代码</h3>
-              </div>
-              <div className="p-4 space-y-3">
-                {!user && (
-                  <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-accent-light hover:bg-yellow-500/15 hover:border-yellow-500/30 transition-all duration-300">
-                    <div className="flex items-center gap-2 text-sm">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>请先登录后再提交代码</span>
-                    </div>
+              {activeTab === 'stats' && (
+                <motion.div
+                  key="stats"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ProblemStatsPanel problemId={problemId} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          }
+          rightHeader={
+            <>
+              <CodeIcon className="w-4 h-4 text-primary-light" />
+              <h3 className="font-medium text-foreground">提交代码</h3>
+            </>
+          }
+          rightPanel={
+            <>
+              {!user && (
+                <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-accent-light hover:bg-yellow-500/15 hover:border-yellow-500/30 transition-all duration-300">
+                  <div className="flex items-center gap-2 text-sm">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>请先登录后再提交代码</span>
                   </div>
-                )}
-
-                <div className="flex items-center justify-between gap-2">
-                  <label htmlFor="language-select" className="text-sm font-medium text-foreground">语言</label>
-                  <select
-                    id="language-select"
-                    value={language}
-                    onChange={(e) => handleLanguageChange(e.target.value)}
-                    className="input w-auto min-w-[140px] py-1.5 text-sm hover:border-primary/30 transition-colors duration-300"
-                  >
-                    {languageOptions.map((lang) => (
-                      <option key={lang.value} value={lang.value} className="bg-muted text-foreground">
-                        {lang.label} ({lang.version})
-                      </option>
-                    ))}
-                  </select>
                 </div>
+              )}
 
-                <CodeEditor
-                  value={code}
-                  onChange={setCode}
-                  language={language as CodeLanguage}
-                  placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
-                  height="420px"
-                  maxLength={65536}
-                  onSubmit={handleSubmit}
-                />
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting || !user}
-                    className="btn-primary btn flex-1 cursor-pointer group"
-                  >
-                    {submitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        评测中...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" />
-                        提交
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={handleClearCode}
-                    className="btn-ghost btn cursor-pointer group"
-                  >
-                    <span className="transition-colors duration-300 group-hover:text-primary-light">清空</span>
-                  </button>
-                </div>
-
-                {/* 在线测试（样例）：在正式提交前用题目样例运行代码，不影响提交记录 */}
-                <PretestPanel
-                  problemId={problemId}
-                  code={code}
-                  language={language}
-                  disabled={!user || submitting}
-                />
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="language-select" className="text-sm font-medium text-foreground">语言</label>
+                <select
+                  id="language-select"
+                  value={language}
+                  onChange={(e) => handleLanguageChange(e.target.value)}
+                  className="input w-auto min-w-[140px] py-1.5 text-sm hover:border-primary/30 transition-colors duration-300"
+                >
+                  {languageOptions.map((lang) => (
+                    <option key={lang.value} value={lang.value} className="bg-muted text-foreground">
+                      {lang.label} ({lang.version})
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-          </div>
-        </div>
+
+              <CodeEditor
+                value={code}
+                onChange={setCode}
+                language={language as CodeLanguage}
+                placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
+                height="420px"
+                maxLength={65536}
+                onSubmit={handleSubmit}
+              />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || !user}
+                  className="btn-primary btn flex-1 cursor-pointer group"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      评测中...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" />
+                      提交
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleClearCode}
+                  className="btn-ghost btn cursor-pointer group"
+                >
+                  <span className="transition-colors duration-300 group-hover:text-primary-light">清空</span>
+                </button>
+              </div>
+
+              {/* 在线测试（样例）：在正式提交前用题目样例运行代码，不影响提交记录 */}
+              <PretestPanel
+                problemId={problemId}
+                code={code}
+                language={language}
+                disabled={!user || submitting}
+              />
+            </>
+          }
+        />
       </div>
 
       {selectedSubmission && (

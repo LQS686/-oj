@@ -372,7 +372,7 @@ export default function ContestProblemDetailPage({
         </div>
       )}
 
-      <div className="card-static rounded-lg overflow-hidden">
+      <div className="card-flat rounded-lg overflow-hidden">
         <div className="flex border-b border-border overflow-x-auto">
           {[
             { key: 'description', label: '题目描述', icon: BookOpen },
