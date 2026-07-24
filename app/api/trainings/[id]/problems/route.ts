@@ -19,12 +19,12 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
-  // 权限：作者或管理员
+  // 权限：作者或管理员；班级作用域题单已下线，与 PUT/DELETE 一致对 classId 返回 404
   const found = await prisma.training.findUnique({
     where: { id },
-    select: { authorId: true },
+    select: { authorId: true, classId: true },
   })
-  if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
+  if (!found || found.classId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
   if (!canAccessAdmin(u) && found.authorId !== user.id) {
     throw403('只有作者或管理员可以修改题目')

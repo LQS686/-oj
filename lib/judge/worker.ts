@@ -14,6 +14,7 @@ import {
 } from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
 import { cache } from '@/lib/cache'
+import { CacheKeys } from '@/lib/constants/cache-keys'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { finalizeTiming } from '@/lib/gamification/timing'
 
@@ -45,7 +46,8 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
 
     // 失效提交详情缓存 + 题目状态统计缓存（状态变化后读旧缓存会拿到陈旧数据）
     cache.delete(`submission:byId:${result.submissionId}`)
-    cache.delete(`problem:statusCounts:${submission.problemId}`)
+    cache.delete(CacheKeys.problem.statusCounts(submission.problemId))
+    cache.delete(CacheKeys.problem.stats(submission.problemId))
 
     // 如果AC，更新题目通过数
     // 标记首次 AC（提升作用域，供后续作业计时使用）

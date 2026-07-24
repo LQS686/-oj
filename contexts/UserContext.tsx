@@ -48,9 +48,19 @@ function generateTabId(): string {
   return `tab_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-export function UserProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isInitialized, setIsInitialized] = useState(false)
+export function UserProvider({
+  children,
+  initialUser = null,
+}: {
+  children: ReactNode
+  /** 服务端从 cookie 解析的会话用户；有值时可在首屏直接渲染已登录导航 */
+  initialUser?: User | null
+}) {
+  const [user, setUser] = useState<User | null>(initialUser)
+  // Layout 已通过 getServerSessionUser 注入结果（用户或 null），首屏即可判定；
+  // 客户端校验只补全资料，不以网络失败清掉 SSR 会话。
+  const [isInitialized, setIsInitialized] = useState(true)
+  const initialUserRef = useRef(initialUser)
   const tabIdRef = useRef<string>('')
 
   // 初始化标签页 ID
@@ -65,24 +75,38 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const userData = await authApi.getCurrentUser()
       setUser(userData)
     } catch (error) {
-      logger.debug('刷新用户信息失败', { error: error instanceof Error ? error.message : String(error) })
-      setUser(null)
+      const code = error && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: string }).code)
+        : undefined
+      // 仅在明确未授权时清空；网络错误保留现有会话，避免误登出
+      if (code === 'UNAUTHORIZED') {
+        setUser(null)
+      } else {
+        logger.debug('刷新用户信息失败', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
   }, [])
 
-  // 初始化：校验当前登录态
+  // 客户端校验：补全资料 / 纠正过期 token；不因网络抖动清掉 SSR 会话
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      setIsInitialized(true)
-      return
-    }
+    if (typeof window === 'undefined') return
 
     const verifyUser = async () => {
       try {
         const userData = await authApi.getCurrentUser()
         setUser(userData)
-      } catch {
-        setUser(null)
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error
+          ? String((error as { code?: string }).code)
+          : undefined
+        if (code === 'UNAUTHORIZED') {
+          setUser(null)
+        } else if (!initialUserRef.current) {
+          setUser(null)
+        }
+        // 有 SSR 用户且非 401：保留 initialUser，避免短暂 Guest 闪烁
       } finally {
         setIsInitialized(true)
       }

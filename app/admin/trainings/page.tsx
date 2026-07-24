@@ -4,16 +4,18 @@
  * app/admin/trainings/page.tsx
  * 管理后台 - 题单管理列表
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { DataTable, FilterBar, type Column } from '@/components/admin'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import {
   Plus, Search, Edit, Trash2, Eye, Filter, AlertCircle, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
+import { PageLoading } from '@/components/common'
+import AdminCreateTrainingModal from '@/components/admin/AdminCreateTrainingModal'
 
 interface AdminTraining {
  id: string
@@ -32,8 +34,9 @@ interface AdminTraining {
  category: { id: string; name: string } | null
 }
 
-export default function AdminTrainingsPage() {
+function AdminTrainingsPageContent() {
  const router = useRouter()
+ const searchParams = useSearchParams()
  const [items, setItems] = useState<AdminTraining[]>([])
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState<string | null>(null)
@@ -43,6 +46,14 @@ export default function AdminTrainingsPage() {
  const [keyword, setKeyword] = useState('')
  const [statusFilter, setStatusFilter] = useState('')
  const [pageSize, setPageSize] = useState(20)
+ const [createOpen, setCreateOpen] = useState(false)
+
+ useEffect(() => {
+ if (searchParams.get('create') === '1') {
+ setCreateOpen(true)
+ router.replace('/admin/trainings', { scroll: false })
+ }
+ }, [searchParams, router])
 
  const fetchItems = useCallback(async () => {
  try {
@@ -198,7 +209,7 @@ export default function AdminTrainingsPage() {
  ]
 
  return (
- <div className="space-y-6">
+ <AdminPageShell width="list" className="space-y-6">
  {/* 筛选 + 操作按钮合并到同一行 */}
  <FilterBar activeCount={(keyword ? 1 : 0) + (statusFilter ? 1 : 0)}>
  <div className="flex-1 relative">
@@ -225,10 +236,10 @@ export default function AdminTrainingsPage() {
  <Link href="/admin/trainings/categories" className="btn-ghost btn">
  分类管理
  </Link>
- <Link href="/admin/trainings/create" className="btn-primary btn">
+ <button onClick={() => setCreateOpen(true)} className="btn-primary btn">
  <Plus className="w-4 h-4" />
  新建题单
- </Link>
+ </button>
  </div>
  </FilterBar>
 
@@ -258,6 +269,20 @@ export default function AdminTrainingsPage() {
  } : undefined}
  />
  )}
- </div>
+
+ <AdminCreateTrainingModal
+ open={createOpen}
+ onClose={() => setCreateOpen(false)}
+ onCreated={fetchItems}
+ />
+ </AdminPageShell>
+ )
+}
+
+export default function AdminTrainingsPage() {
+ return (
+ <Suspense fallback={<PageLoading />}>
+ <AdminTrainingsPageContent />
+ </Suspense>
  )
 }

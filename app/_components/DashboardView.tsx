@@ -80,8 +80,8 @@ export function DashboardView() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
         <span className="text-sm">加载学习数据…</span>
       </div>
     )
@@ -89,9 +89,9 @@ export function DashboardView() {
 
   if (error || !data) {
     return (
-      <div className="card-static rounded-xl p-10 text-center">
-        <p className="text-error mb-4">{error || '暂无数据'}</p>
-        <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
+      <div className="card-static rounded-xl p-6 text-center">
+        <p className="text-error mb-3 text-sm">{error || '暂无数据'}</p>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => window.location.reload()}>
           重试
         </button>
       </div>
@@ -200,12 +200,12 @@ export function DashboardView() {
         {recentAssignments.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">暂无班级作业，加入班级后可在此查看</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 animate-stagger-in">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-3 animate-stagger-in">
             {recentAssignments.map((item) => (
               <Link
                 key={item.id}
                 href={`/classes/${item.classId}/assignments/${item.id}`}
-                className="card-static rounded-xl p-5 block hover:border-primary/30 transition-colors"
+                className="card-static rounded-xl p-4 block hover:border-primary/30 transition-colors"
               >
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-foreground truncate flex-1 mr-2">{item.title}</h3>
@@ -237,12 +237,12 @@ export function DashboardView() {
         {upcomingContests.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">暂无即将开始的公开竞赛</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 animate-stagger-in">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-3 animate-stagger-in">
             {upcomingContests.map((item) => (
               <Link
                 key={item.id}
                 href={`/contests/${item.id}`}
-                className="card-static rounded-xl p-5 block hover:border-primary/30 transition-colors"
+                className="card-static rounded-xl p-4 block hover:border-primary/30 transition-colors"
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">

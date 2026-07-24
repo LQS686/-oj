@@ -27,6 +27,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import type { Notification } from '@/types/models'
 import { getRoleLabel } from '@/lib/permissions'
+import { loginPath } from '@/lib/navigation'
 
 interface AdminMenuItem {
   icon: React.ComponentType<{ className?: string }>
@@ -180,10 +181,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         method: 'POST',
       })
       logout()
-      router.push('/login')
+      router.push(loginPath())
     } catch (error) {
       logger.error('登出失败', error)
-      router.push('/login')
+      router.push(loginPath())
     }
   }
 
@@ -465,7 +466,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
         </header>
 
-        <div className="p-4 md:p-6 lg:p-8 bg-background" style={{ minHeight: 'calc(100vh - 73px)' }}>
+        <div className="w-full p-4 md:p-6 lg:p-8 bg-background min-h-[calc(100vh-4.5rem)]">
           {children}
         </div>
       </main>

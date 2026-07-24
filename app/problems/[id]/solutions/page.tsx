@@ -19,6 +19,7 @@ import SolutionCard, { type SolutionListItem } from '@/components/solution/Solut
 import { PageContainer } from '@/components/layout'
 import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
 import { PageLoading } from '@/components/common'
+import { loginPath } from '@/lib/navigation'
 
 type PermissionReason =
  | 'ADMIN'
@@ -195,7 +196,7 @@ function SolutionsListPageContent() {
 
  const handleWriteSolution = () => {
  if (!user) {
- router.push('/login')
+ router.push(loginPath())
  return
  }
  setCreateOpen(true)

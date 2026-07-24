@@ -24,9 +24,7 @@ const nextConfig: NextConfig = {
   async headers() {
     const cspDirectives = [
       "default-src 'self'",
-      // 修复 P0：'unsafe-eval' 限定为 'wasm-unsafe-eval'，配合 Monaco Editor WebAssembly；
-      // 'unsafe-inline' 改用 nonce 注入（next.config 已配 nonceMiddleware，生产替换）；
-      // 当前保留 'unsafe-inline' 仅用于 Next.js 内联引导脚本（删除会破坏 SSR 引导）。
+      // 'wasm-unsafe-eval'：允许 WASM；'unsafe-inline' 保留给 Next.js 内联引导脚本（删除会破坏 SSR）。
       "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // img-src 白名单：允许常见 OJ 题库图床（洛谷/Codeforces/AtCoder/Hydro/牛客等）加载题目图片

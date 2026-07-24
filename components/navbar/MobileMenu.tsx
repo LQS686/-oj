@@ -77,8 +77,7 @@ export default function MobileMenu() {
  const handleLogout = async () => {
  setIsMenuOpen(false)
  await contextLogout()
- router.push('/')
- router.refresh()
+ router.replace('/')
  }
 
  return (
@@ -94,7 +93,8 @@ export default function MobileMenu() {
  <AnimatePresence>
  {isMenuOpen && (
  <motion.div
-   className="fixed inset-0 z-[200] lg:hidden"
+   className="fixed inset-0 lg:hidden"
+   style={{ zIndex: 'var(--z-drawer)' }}
    initial="hidden"
    animate="visible"
    exit="hidden"
@@ -123,7 +123,10 @@ export default function MobileMenu() {
      <div className="px-3 py-4 space-y-1">
        {navLinks.map((link, i) => {
          const Icon = link.icon
-         const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+         const isActive =
+           pathname === link.href ||
+           pathname.startsWith(link.href + '/') ||
+           (link.href === '/problems' && pathname.startsWith('/problem/'))
          return (
            <motion.div
              key={link.href}

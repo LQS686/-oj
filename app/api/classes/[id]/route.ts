@@ -24,6 +24,7 @@ import {
 } from '@/lib/class/service'
 import { isObjectId } from '@/lib/api/validation'
 import { getUserFromRequest } from '@/lib/auth'
+import { normalizeClassRoleToApi } from '@/lib/class/roles'
 
 /**
  * GET /api/classes/[id]
@@ -50,7 +51,7 @@ export const GET = withApi.public(async (req, ctx) => {
 
   // 角色 + 活跃度 + 搜索 + 排序
   let members = safeDetail.members
-  if (q.role) members = members.filter((m) => m.role === q.role)
+  if (q.role) members = members.filter((m) => normalizeClassRoleToApi(m.role) === q.role)
   if (q.active) {
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - 30)

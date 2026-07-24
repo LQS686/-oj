@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { DataTable, FilterBar, type Column } from '@/components/admin'
+import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
 import { Search, User, FileText, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
@@ -204,7 +204,7 @@ export default function AdminSubmissionsPage() {
  }
 
  return (
- <div className="space-y-6">
+ <AdminPageShell width="list" className="space-y-6">
  <FilterBar activeCount={(searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
@@ -282,6 +282,6 @@ export default function AdminSubmissionsPage() {
  }
  }}
  />
- </div>
+ </AdminPageShell>
  )
 }

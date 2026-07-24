@@ -4,7 +4,7 @@
  * GET  公开：分类列表
  * POST 鉴权：仅管理员可创建
  */
-import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { listCategories, createCategory } from '@/lib/training/service'
 import { canAccessAdmin } from '@/lib/permissions'
 
@@ -15,7 +15,7 @@ export const GET = withApi.public(async () => {
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
   if (!canAccessAdmin(user)) {
-    throw400('FORBIDDEN', '需要管理员权限')
+    throw403('需要管理员权限')
   }
   const body = await readJson<{ name: string; description?: string; orderIndex?: number }>(req)
   if (!body.name) throw400('VALIDATION', '缺少 name')

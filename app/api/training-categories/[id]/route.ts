@@ -4,7 +4,7 @@
  * PUT    鉴权：仅管理员
  * DELETE 鉴权：仅管理员
  */
-import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { updateCategory, deleteCategory } from '@/lib/training/service'
 import { isObjectId } from '@/lib/api/validation'
 import { prisma } from '@/lib/prisma'
@@ -12,7 +12,7 @@ import { canAccessAdmin } from '@/lib/permissions'
 
 export const PUT = withApi.auth(async (req, ctx, { user }) => {
   if (!canAccessAdmin(user)) {
-    throw400('FORBIDDEN', '需要管理员权限')
+    throw403('需要管理员权限')
   }
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的分类ID')
@@ -23,7 +23,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 
 export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   if (!canAccessAdmin(user)) {
-    throw400('FORBIDDEN', '需要管理员权限')
+    throw403('需要管理员权限')
   }
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的分类ID')
@@ -31,7 +31,7 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   // 防御性：若有题单引用则禁止删除
   const used = await prisma.training.count({ where: { categoryId: id } })
   if (used > 0) {
-    throw404('该分类仍有 ' + used + ' 个题单引用，无法删除')
+    throw400('IN_USE', `该分类仍有 ${used} 个题单引用，无法删除`)
   }
   await deleteCategory(id)
   return ok({ id })

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
+import { AdminPageShell } from '@/components/admin'
 import { Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
@@ -145,15 +146,15 @@ export default function AdminAnnouncementsPage() {
   }
 
   return (
-      <div className="p-6 max-w-5xl mx-auto">
-        <div className="flex justify-end mb-6">
+      <AdminPageShell width="form" className="space-y-6">
+        <div className="flex justify-end">
           <button type="button" className="btn btn-primary" onClick={openCreate}>
             <Plus className="w-4 h-4" />
             新建公告
           </button>
         </div>
 
-        {error && <p className="text-error mb-4">{error}</p>}
+        {error && <p className="text-error">{error}</p>}
 
         {loading ? (
           <p className="text-muted-foreground">加载中…</p>
@@ -299,6 +300,6 @@ export default function AdminAnnouncementsPage() {
             </div>
           </div>
         )}
-      </div>
+      </AdminPageShell>
   )
 }

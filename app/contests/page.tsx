@@ -25,11 +25,13 @@ import { formatDateTimeShort } from '@/lib/utils'
 import {
   EducationalPageShell,
   LIST_GRID_CLASS,
+  LIST_GRID_SKELETON_CLASS,
   LIST_GRID_CARD_META_ROW,
   LIST_GRID_CARD_TITLE,
   LIST_GRID_CARD_FOOTER,
   LIST_GRID_CARD_MIDDLE,
   listGridCardLinkClass,
+  ListEmptyState,
   PageLoading,
 } from '@/components/common'
 
@@ -194,9 +196,9 @@ function ContestsPageContent() {
   const renderContent = () => {
     if (loading) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={LIST_GRID_SKELETON_CLASS}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="card rounded-lg p-5 border border-border animate-pulse">
+            <div key={i} className="card rounded-lg p-4 border border-border animate-pulse h-[9.5rem]">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-4 h-4 rounded bg-muted" />
                 <div className="w-16 h-5 rounded-full bg-muted" />
@@ -214,36 +216,34 @@ function ContestsPageContent() {
 
     if (error) {
       return (
-        <div className="card-static rounded-lg p-12 text-center max-w-md mx-auto border border-border">
-          <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8 text-error" />
-          </div>
-          <p className="text-error mb-6">{error}</p>
-          <button onClick={fetchContests} className="btn-primary btn">
-            重试
-          </button>
-        </div>
+        <ListEmptyState
+          icon={AlertCircle}
+          tone="error"
+          title={error}
+          action={
+            <button onClick={fetchContests} className="btn-primary btn btn-sm">
+              重试
+            </button>
+          }
+        />
       )
     }
 
     if (contests.length === 0) {
       return (
-        <div className="card-static rounded-lg p-16 text-center border border-border animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
-            <Trophy className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <div className="text-foreground text-xl font-semibold mb-2">暂无竞赛</div>
-          <div className="text-muted-foreground mb-6">当前筛选条件下没有竞赛</div>
-          {activeTab === 'all' && (
-            <button 
-              onClick={handleCreateContest}
-              className="btn-primary btn px-8 py-4 rounded-lg"
-            >
-              <Plus className="w-5 h-5" />
-              创建第一个竞赛
-            </button>
-          )}
-        </div>
+        <ListEmptyState
+          icon={Trophy}
+          title="暂无竞赛"
+          description="当前筛选条件下没有竞赛"
+          action={
+            activeTab === 'all' ? (
+              <button onClick={handleCreateContest} className="btn-primary btn btn-sm">
+                <Plus className="w-4 h-4" />
+                创建竞赛
+              </button>
+            ) : undefined
+          }
+        />
       )
     }
 

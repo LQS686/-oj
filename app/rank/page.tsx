@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Trophy, TrendingUp, Minus, RefreshCw, AlertCircle, ChevronUp, Crown, Medal, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import io from 'socket.io-client'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { EducationalPageShell, ListEmptyState } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import { PageContainer } from '@/components/layout'
 
@@ -258,7 +258,7 @@ export default function RankPage() {
 
  <div 
  ref={containerRef}
- className="flex-1 card-static rounded-b-xl overflow-y-auto custom-scrollbar min-h-[500px] max-h-[600px]"
+ className="flex-1 card-static rounded-b-xl overflow-y-auto custom-scrollbar max-h-[calc(100vh-14rem)]"
  >
  {rankings.map((user, index) => {
  const isTop3 = user.position <= 3
@@ -276,7 +276,7 @@ export default function RankPage() {
  </div>
  
  <div className="flex-1 flex items-center gap-3 min-w-0">
- <Link href={`/profile/${user.id}`} className="flex items-center gap-3 flex-1 min-w-0 group">
+ <Link href={`/user/${user.id}`} className="flex items-center gap-3 flex-1 min-w-0 group">
  <div className="relative transition-transform duration-200 group-hover:scale-110">
  {user.avatar ? (
  <img
@@ -339,12 +339,8 @@ export default function RankPage() {
  </div>
 
  {rankings.length === 0 && !loading && (
-  <div className="card-static rounded-xl p-16 text-center mt-6 animate-fadeIn">
-  <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6">
-  <Trophy className="w-8 h-8 text-accent" />
-  </div>
-  <div className="text-foreground text-xl font-semibold mb-2">暂无排名数据</div>
-  <div className="text-muted-foreground">还没有用户上榜</div>
+  <div className="mt-4">
+    <ListEmptyState icon={Trophy} title="暂无排名数据" description="还没有用户上榜" />
   </div>
    )}
    </div>

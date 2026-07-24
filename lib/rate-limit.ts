@@ -1,6 +1,7 @@
 import type { NextRequest} from 'next/server';
 import { NextResponse } from 'next/server';
 import { logger } from './logger';
+import { isRedisConfigured } from './redis';
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -75,85 +76,89 @@ class MemoryStore implements RateLimitStore {
 
 const memoryStore = new MemoryStore();
 
-class RedisStore implements RateLimitStore {
-  private redis: any = null;
-  private useRedis = false;
-  private initPromise: Promise<void> | null = null;
+/**
+ * Redis 限流：仅在 REDIS_URL 配置时启用；用 INCR + PEXPIRE 做跨实例原子计数。
+ * 未配置或连接失败时返回 null，由调用方回退内存。
+ */
+class RedisRateLimiter {
+  private redis: import('ioredis').default | null = null;
+  private ready = false;
+  private initPromise: Promise<boolean> | null = null;
 
-  constructor() {
-    this.initPromise = this.initRedis();
-  }
+  private async ensureReady(): Promise<boolean> {
+    if (!isRedisConfigured()) return false;
+    if (this.ready && this.redis) return true;
+    if (this.initPromise) return this.initPromise;
 
-  private async initRedis() {
-    try {
-      const { default: Redis } = await import('ioredis');
-      const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-      this.redis = new Redis(redisUrl, { maxRetriesPerRequest: 3, lazyConnect: true });
-      await this.redis.ping();
-      this.useRedis = true;
-    } catch (error) {
-      // fail-open：Redis 不可用时降级到内存存储，不影响限流功能本身
-      logger.warn('[rate-limit] Redis 不可用，降级为内存存储', { error: error instanceof Error ? error.message : String(error) });
-      this.useRedis = false;
-    }
-  }
-
-  private async ensureReady(): Promise<void> {
-    if (this.initPromise) {
-      await this.initPromise;
-      this.initPromise = null;
-    }
-  }
-
-  async get(key: string): Promise<RateLimitEntry | undefined> {
-    await this.ensureReady();
-    if (!this.useRedis || !this.redis) return undefined;
-
-    try {
-      const data = await this.redis.get(`ratelimit:${key}`);
-      if (!data) return undefined;
-
-      const entry = JSON.parse(data);
-      if (entry.resetTime < Date.now()) {
-        await this.redis.del(`ratelimit:${key}`);
-        return undefined;
+    this.initPromise = (async () => {
+      try {
+        const { getRedisClient } = await import('./redis');
+        const client = getRedisClient();
+        await client.ping();
+        this.redis = client;
+        this.ready = true;
+        return true;
+      } catch (error) {
+        logger.warn('[rate-limit] Redis 不可用，降级为内存存储', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        this.redis = null;
+        this.ready = false;
+        return false;
+      } finally {
+        this.initPromise = null;
       }
-      return entry;
-    } catch (error) {
-      logger.warn('[rate-limit] Redis get 失败', { error: error instanceof Error ? error.message : String(error) });
-      return undefined;
-    }
+    })();
+
+    return this.initPromise;
   }
 
-  async set(key: string, entry: RateLimitEntry): Promise<void> {
-    await this.ensureReady();
-    if (!this.useRedis || !this.redis) return;
+  /**
+   * @returns RateLimitResult 或 null（表示应回退内存）
+   */
+  async check(
+    key: string,
+    config: RateLimitConfig
+  ): Promise<RateLimitResult | null> {
+    if (!(await this.ensureReady()) || !this.redis) return null;
 
+    const redisKey = `ratelimit:${key}`;
     try {
-      const ttl = Math.ceil((entry.resetTime - Date.now()) / 1000);
-      await this.redis.setex(`ratelimit:${key}`, ttl, JSON.stringify(entry));
+      const count = await this.redis.incr(redisKey);
+      if (count === 1) {
+        await this.redis.pexpire(redisKey, config.windowMs);
+      }
+      let pttl = await this.redis.pttl(redisKey);
+      // 极端竞态：key 无 TTL 时补上
+      if (pttl < 0) {
+        await this.redis.pexpire(redisKey, config.windowMs);
+        pttl = config.windowMs;
+      }
+
+      const resetTime = Date.now() + (pttl > 0 ? pttl : config.windowMs);
+      const remaining = Math.max(0, config.maxRequests - count);
+      const success = count <= config.maxRequests;
+      const result: RateLimitResult = {
+        success,
+        limit: config.maxRequests,
+        remaining,
+        resetTime,
+      };
+      if (!success) {
+        result.retryAfter = Math.ceil((resetTime - Date.now()) / 1000);
+      }
+      return result;
     } catch (error) {
-      logger.warn('[rate-limit] Redis set 失败', { error: error instanceof Error ? error.message : String(error) });
+      logger.warn('[rate-limit] Redis 计数失败，回退内存', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      this.ready = false;
+      return null;
     }
-  }
-
-  async delete(key: string): Promise<void> {
-    await this.ensureReady();
-    if (!this.useRedis || !this.redis) return;
-
-    try {
-      await this.redis.del(`ratelimit:${key}`);
-    } catch (error) {
-      logger.warn('[rate-limit] Redis delete 失败', { error: error instanceof Error ? error.message : String(error) });
-    }
-  }
-
-  async cleanup(): Promise<void> {
-    await this.ensureReady();
   }
 }
 
-const redisStore = new RedisStore();
+const redisRateLimiter = new RedisRateLimiter();
 
 const defaultConfig: RateLimitConfig = {
   maxRequests: 100,
@@ -169,56 +174,47 @@ interface RateLimitResult {
   retryAfter?: number;
 }
 
-async function checkRateLimit(
-  identifier: string,
-  config: RateLimitConfig = defaultConfig
-): Promise<RateLimitResult> {
-  const key = `${config.keyPrefix || 'default'}:${identifier}`;
+function checkMemoryRateLimit(
+  key: string,
+  config: RateLimitConfig
+): RateLimitResult {
   const now = Date.now();
-  const resetTime = now + config.windowMs;
-
-  let entry: RateLimitEntry | undefined;
-
-  try {
-    entry = await redisStore.get(key);
-  } catch (error) {
-    logger.warn('[rate-limit] 读取 Redis 计数失败，回退内存', { error: error instanceof Error ? error.message : String(error) });
-  }
-
-  if (!entry) {
-    entry = memoryStore.get(key);
-  }
-
+  let entry = memoryStore.get(key);
   let count = 1;
+  let resetTime = now + config.windowMs;
+
   if (entry && entry.resetTime > now) {
     count = entry.count + 1;
+    resetTime = entry.resetTime;
   }
 
   const remaining = Math.max(0, config.maxRequests - count);
   const success = count <= config.maxRequests;
-
-  const newEntry: RateLimitEntry = { count, resetTime };
-
-  memoryStore.set(key, newEntry);
-  try {
-    await redisStore.set(key, newEntry);
-  } catch (error) {
-    logger.warn('[rate-limit] 写入 Redis 计数失败', { error: error instanceof Error ? error.message : String(error) });
-  }
+  memoryStore.set(key, { count, resetTime });
 
   const result: RateLimitResult = {
     success,
     limit: config.maxRequests,
     remaining,
-    resetTime
+    resetTime,
   };
-
   if (!success) {
-    const retryAfterMs = entry ? entry.resetTime - now : config.windowMs;
-    result.retryAfter = Math.ceil(retryAfterMs / 1000);
+    result.retryAfter = Math.ceil((resetTime - now) / 1000);
   }
-
   return result;
+}
+
+async function checkRateLimit(
+  identifier: string,
+  config: RateLimitConfig = defaultConfig
+): Promise<RateLimitResult> {
+  const key = `${config.keyPrefix || 'default'}:${identifier}`;
+
+  // Redis 优先（多实例一致）；未配置或失败则单机内存
+  const redisResult = await redisRateLimiter.check(key, config);
+  if (redisResult) return redisResult;
+
+  return checkMemoryRateLimit(key, config);
 }
 
 export interface RateLimitOptions {
@@ -308,7 +304,7 @@ function getClientIP(request: NextRequest): string {
   }
 
   // Next.js / Node.js 运行时提供的连接远端地址
-  const socketIP = (request as any).ip;
+  const socketIP = (request as { ip?: string }).ip;
   if (socketIP && typeof socketIP === 'string') {
     return socketIP;
   }
@@ -317,27 +313,33 @@ function getClientIP(request: NextRequest): string {
 }
 
 export function createRateLimiter(options: RateLimitOptions = {}) {
-  const limiter = rateLimit(options);
-  
+  const config: RateLimitConfig = {
+    maxRequests: options.maxRequests || defaultConfig.maxRequests,
+    windowMs: options.windowMs || defaultConfig.windowMs,
+    keyPrefix: 'api',
+  };
+
   return async (request: NextRequest): Promise<{ allowed: boolean; headers?: Headers }> => {
-    const response = await limiter(request);
-    
-    if (response) {
-      return { allowed: false };
+    if (options.skip?.(request)) {
+      return { allowed: true };
     }
-    
-    const ip = options.keyGenerator ? options.keyGenerator(request) : getClientIP(request);
-    const result = await checkRateLimit(ip, {
-      maxRequests: options.maxRequests || defaultConfig.maxRequests,
-      windowMs: options.windowMs || defaultConfig.windowMs
-    });
-    
+
+    const identifier = options.keyGenerator
+      ? options.keyGenerator(request)
+      : getClientIP(request);
+
+    // 只计数一次（旧实现先走 rateLimit 再 checkRateLimit，会双倍扣减额度）
+    const result = await checkRateLimit(identifier, config);
+
     const headers = new Headers();
     headers.set('X-RateLimit-Limit', result.limit.toString());
     headers.set('X-RateLimit-Remaining', result.remaining.toString());
     headers.set('X-RateLimit-Reset', result.resetTime.toString());
-    
-    return { allowed: true, headers };
+    if (!result.success && result.retryAfter) {
+      headers.set('Retry-After', result.retryAfter.toString());
+    }
+
+    return { allowed: result.success, headers };
   };
 }
 

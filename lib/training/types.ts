@@ -84,8 +84,6 @@ export interface TrainingCreateInput {
   tags?: string[]
   cover?: string
   problemIds?: string[]
-  /** 班级私有题单：所属班级 ID（不为空时仅班级成员可见，公开列表不显示） */
-  classId?: string
 }
 
 /** 题单更新参数 */

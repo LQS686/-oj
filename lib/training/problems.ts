@@ -27,7 +27,6 @@ export async function createTrainingWithProblems(input: TrainingCreateInput) {
       categoryId: rest.categoryId || null,
       tags: rest.tags || [],
       cover: rest.cover || null,
-      ...(rest.classId ? { classId: rest.classId } : {}),
     },
   })
   if (problemIds && problemIds.length > 0) {

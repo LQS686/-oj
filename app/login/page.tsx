@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff, Sparkles, AlertCircle } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
+import { resolveLoginRedirect } from '@/lib/navigation'
+import { GuestAuthShell } from '@/components/common'
 
-export default function LoginPage() {
+ export default function LoginPage() {
  const router = useRouter()
  const { login } = useUser()
- const { settings } = useSettings()
  const [showPassword, setShowPassword] = useState(false)
  const [rememberMe, setRememberMe] = useState(false)
  const [formData, setFormData] = useState({
@@ -29,8 +29,7 @@ export default function LoginPage() {
  try {
  const result = await authApi.login(formData.username, formData.password, rememberMe)
  login(result.user, result.token)
- const returnUrl = new URLSearchParams(window.location.search).get('returnUrl')
- router.replace(returnUrl || '/')
+ router.replace(resolveLoginRedirect())
  } catch (err: any) {
  setError(err.message || '登录失败')
  } finally {
@@ -39,27 +38,7 @@ export default function LoginPage() {
  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-10">
-          <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-md ring-1 ring-border/40">
-              <img
-                src="/logos/dsojlogo.png"
-                alt="大山 OJ Logo"
-                width={56}
-                height={56}
-                className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
-              />
-            </div>
-            <div className="text-left">
-              <span className="text-2xl font-extrabold text-foreground">{settings.siteName}</span>
-              <p className="text-xs text-muted-foreground">{settings.siteDescription}</p>
-            </div>
-          </Link>
-          <p className="text-muted-foreground mt-6 text-lg">欢迎回来，继续你的编程之旅</p>
-        </div>
-
+    <GuestAuthShell subtitle="欢迎回来，继续你的编程之旅">
         <div className="card-static rounded-lg p-6 md:p-10 shadow-2xl transition-all duration-300 animate-modal-in">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
@@ -177,7 +156,6 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </GuestAuthShell>
   )
 }

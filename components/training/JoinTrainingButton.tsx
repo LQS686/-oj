@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2, LogIn, Play, UserPlus, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
+import { loginPath } from '@/lib/navigation'
 
 interface JoinTrainingButtonProps {
  trainingId: string
@@ -41,7 +42,7 @@ export function JoinTrainingButton({
 
  const handleJoin = async () => {
  if (!isLoggedIn) {
- router.push(`/login?redirect=/training/${trainingId}`)
+ router.push(loginPath(`/training/${trainingId}`))
  return
  }
  if (joiningRef.current) return

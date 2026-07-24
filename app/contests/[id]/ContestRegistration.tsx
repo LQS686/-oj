@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, UserCheck, AlertCircle, LogIn, Play } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useUser } from '@/contexts/UserContext'
+import { loginPath } from '@/lib/navigation'
 
 interface Contest {
  id: string
@@ -17,19 +19,20 @@ interface Contest {
 
 export default function ContestRegistration({ contest }: { contest: Contest }) {
  const router = useRouter()
+ const { user, isLoading: authLoading } = useUser()
  const [loading, setLoading] = useState(true)
  const [isRegistered, setIsRegistered] = useState(false)
  const [password, setPassword] = useState('')
  const [error, setError] = useState('')
  const [registering, setRegistering] = useState(false)
- const [isLoggedIn, setIsLoggedIn] = useState(false)
+ const isLoggedIn = !!user
  const [now, setNow] = useState(new Date())
 
  useEffect(() => {
  checkStatus()
  const timer = setInterval(() => setNow(new Date()), 1000)
  return () => clearInterval(timer)
- }, [])
+ }, [contest.id])
 
  const checkStatus = async () => {
  try {
@@ -39,8 +42,6 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
  
  if (data.success) {
   setIsRegistered(!!data.data.isRegistered)
-  const authRes = await fetchWithCookie('/api/auth/me')
- setIsLoggedIn(authRes.ok)
  }
  } catch (err) {
  console.error('Check status failed', err)
@@ -77,7 +78,7 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
  }
  }
 
- if (loading) {
+ if (loading || authLoading) {
  return <div className="card rounded-lg p-6">
  <div className="skeleton h-32 rounded-xl"></div>
  </div>
@@ -92,7 +93,7 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
  <h3 className="text-lg font-semibold text-foreground mb-2">请先登录</h3>
  <p className="text-muted-foreground mb-6">登录后即可报名参加竞赛</p>
  <button
- onClick={() => router.push(`/login?redirect=/contests/${contest.id}`)}
+ onClick={() => router.push(loginPath(`/contests/${contest.id}`))}
  className="btn btn-primary w-full"
  >
  <LogIn className="w-4 h-4" />

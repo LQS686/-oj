@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { DataTable, FilterBar, type Column } from '@/components/admin'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
 import { Plus, Search, Eye, EyeOff, Trash2 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { PageLoading } from '@/components/common'
+import AdminCreateClassModal from '@/components/admin/AdminCreateClassModal'
 
 interface Class {
  id: string
@@ -19,8 +21,9 @@ interface Class {
  }
 }
 
-export default function AdminClassesPage() {
+function AdminClassesPageContent() {
  const router = useRouter()
+ const searchParams = useSearchParams()
  const [classes, setClasses] = useState<Class[]>([])
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
@@ -31,10 +34,18 @@ export default function AdminClassesPage() {
  const [editName, setEditName] = useState('')
  const [editDescription, setEditDescription] = useState('')
  const [saving, setSaving] = useState(false)
+ const [createOpen, setCreateOpen] = useState(false)
 
  useEffect(() => {
  fetchClasses()
  }, [])
+
+ useEffect(() => {
+ if (searchParams.get('create') === '1') {
+ setCreateOpen(true)
+ router.replace('/admin/classes', { scroll: false })
+ }
+ }, [searchParams, router])
 
  const fetchClasses = async () => {
  try {
@@ -240,7 +251,7 @@ export default function AdminClassesPage() {
  }
 
 return (<>
- <div className="space-y-6">
+ <AdminPageShell width="list" className="space-y-6">
  <FilterBar activeCount={searchQuery ? 1 : 0}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
@@ -255,7 +266,7 @@ return (<>
  </div>
  </div>
  <button
- onClick={() => router.push('/admin/classes/create')}
+ onClick={() => setCreateOpen(true)}
  className="btn btn-primary flex items-center gap-2 ml-auto"
  >
  <Plus className="w-5 h-5" />
@@ -294,7 +305,7 @@ return (<>
  setShowEditModal(true)
  }}
  />
- </div>
+ </AdminPageShell>
 
  {showEditModal && selectedClass && (
  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
@@ -371,5 +382,19 @@ return (<>
  </div>
  </div>
  )}
+
+ <AdminCreateClassModal
+ open={createOpen}
+ onClose={() => setCreateOpen(false)}
+ onCreated={fetchClasses}
+ />
  </>)
+}
+
+export default function AdminClassesPage() {
+ return (
+ <Suspense fallback={<PageLoading />}>
+ <AdminClassesPageContent />
+ </Suspense>
+ )
 }

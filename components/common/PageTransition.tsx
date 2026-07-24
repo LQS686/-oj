@@ -1,48 +1,7 @@
-'use client'
-
-import { usePathname } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
-
+/**
+ * 根布局内容透传。
+ * 路由切换反馈由 NavigationProgress 顶栏进度条承担，避免旧页冻结与双重淡入。
+ */
 export default function PageTransition({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
-  const [displayChildren, setDisplayChildren] = useState(children)
-  const [transitionStage, setTransitionStage] = useState<'visible' | 'fading'>('visible')
-  const prevPathname = useRef(pathname)
-
-  const isAdminRoute = pathname.startsWith('/admin')
-
-  useEffect(() => {
-    if (pathname !== prevPathname.current) {
-      prevPathname.current = pathname
-      if (!isAdminRoute) {
-        setTransitionStage('fading')
-      }
-    }
-  }, [pathname, isAdminRoute])
-
-  useEffect(() => {
-    if (transitionStage === 'fading') {
-      const t = setTimeout(() => {
-        setDisplayChildren(children)
-        setTransitionStage('visible')
-      }, 120)
-      return () => clearTimeout(t)
-    }
-  }, [transitionStage, children])
-
-  if (isAdminRoute) {
-    return <>{children}</>
-  }
-
-  return (
-    <div
-      style={{
-        opacity: transitionStage === 'fading' ? 0 : 1,
-        transition: 'opacity 120ms ease-in-out',
-        willChange: 'opacity',
-      }}
-    >
-      {displayChildren}
-    </div>
-  )
+  return <>{children}</>
 }

@@ -143,19 +143,19 @@ export default function UserProfilePage() {
 
  return (
  <div className="min-h-screen">
- <PageContainer className="py-10">
+ <PageContainer variant="standard" className="py-6">
  <motion.div 
  variants={containerVariants}
  initial="hidden"
  animate="visible"
- className="grid lg:grid-cols-3 gap-7"
+ className="grid lg:grid-cols-3 gap-5"
  >
- <div className="lg:col-span-1 space-y-7">
- <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-primary/5">
+ <div className="lg:col-span-1 space-y-5">
+ <motion.div variants={itemVariants} className="card-static rounded-lg p-5 border border-primary/5">
  <div className="text-center">
  <div 
- className="w-28 h-28 rounded-lg mx-auto mb-6 flex items-center justify-center text-white text-4xl font-bold overflow-hidden shadow-xl"
- style={{ backgroundColor: user.color || '#6366F1', boxShadow: `0 0 40px ${user.color || '#6366F1'}50` }}
+ className="w-20 h-20 rounded-lg mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold overflow-hidden shadow-lg"
+ style={{ backgroundColor: user.color || '#6366F1', boxShadow: `0 0 28px ${user.color || '#6366F1'}40` }}
  >
  {user.avatar ? (
  <img src={user.avatar} alt={user.username} className="w-full h-full object-cover" />
@@ -163,52 +163,52 @@ export default function UserProfilePage() {
  user.username?.charAt(0).toUpperCase() || '?'
  )}
  </div>
- <h2 className="text-3xl font-bold mb-2" style={{ color: user.color || undefined }}>
+ <h2 className="text-2xl font-bold mb-1" style={{ color: user.color || undefined }}>
  {user.nickname || user.username}
  </h2>
- <p className="text-muted-foreground mb-4 text-base">@{user.username}</p>
- <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
+ <p className="text-muted-foreground mb-3 text-sm">@{user.username}</p>
+ <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
  {user.rank && (
  <span 
- className="tag font-semibold text-sm px-4 py-1.5" 
+ className="tag font-semibold text-xs px-3 py-1" 
  style={{ backgroundColor: (user.color || '#6366F1') + '15', color: user.color || undefined, borderColor: (user.color || '#6366F1') + '40' }}
  >
  {user.rank}
  </span>
  )}
- <span className="tag tag-primary text-sm px-4 py-1.5">
+ <span className="tag tag-primary text-xs px-3 py-1">
  Rating: {user.rating}
  </span>
  </div>
  {user.bio && (
- <p className="text-muted-foreground text-base mb-6 leading-relaxed">{user.bio}</p>
+ <p className="text-muted-foreground text-sm mb-4 leading-relaxed">{user.bio}</p>
  )}
  </div>
 
- <div className="border-t border-border pt-6 space-y-4">
- <div className="flex items-center gap-3 text-sm text-muted-foreground">
- <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
- <Calendar className="w-4.5 h-4.5 text-primary-light" />
+ <div className="border-t border-border pt-4 space-y-3">
+ <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+ <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+ <Calendar className="w-3.5 h-3.5 text-primary-light" />
  </div>
  <span className="font-medium">加入于 {formatDate(user.createdAt)}</span>
  </div>
  </div>
  </motion.div>
 
- <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-primary/5">
- <h3 className="text-xl font-bold mb-6 text-foreground">统计数据</h3>
- <div className="space-y-4">
- <div className="flex items-center justify-between p-4 rounded-lg bg-muted/25 hover:bg-muted transition-all">
- <span className="text-muted-foreground font-medium">解决题目</span>
- <span className="font-bold text-xl text-secondary-light">{user.acceptedSubmissions || 0}</span>
+ <motion.div variants={itemVariants} className="card-static rounded-lg p-5 border border-primary/5">
+ <h3 className="text-base font-bold mb-3 text-foreground">统计数据</h3>
+ <div className="space-y-2">
+ <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/25 hover:bg-muted transition-all">
+ <span className="text-muted-foreground text-sm font-medium">解决题目</span>
+ <span className="font-bold text-lg text-secondary-light">{user.acceptedSubmissions || 0}</span>
  </div>
- <div className="flex items-center justify-between p-4 rounded-lg bg-muted/25 hover:bg-muted transition-all">
- <span className="text-muted-foreground font-medium">总提交</span>
- <span className="font-bold text-xl text-primary-light">{user._count?.submissions || 0}</span>
+ <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/25 hover:bg-muted transition-all">
+ <span className="text-muted-foreground text-sm font-medium">总提交</span>
+ <span className="font-bold text-lg text-primary-light">{user._count?.submissions || 0}</span>
  </div>
- <div className="flex items-center justify-between p-4 rounded-lg bg-muted/25 hover:bg-muted transition-all">
- <span className="text-muted-foreground font-medium">通过率</span>
- <span className="font-bold text-xl text-info">
+ <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/25 hover:bg-muted transition-all">
+ <span className="text-muted-foreground text-sm font-medium">通过率</span>
+ <span className="font-bold text-lg text-info">
  {(user._count?.submissions ?? 0) > 0 
  ? ((user.acceptedSubmissions / (user._count?.submissions ?? 1)) * 100).toFixed(1)
  : 0}%

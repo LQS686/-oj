@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -26,9 +27,12 @@ import { AccountSection } from './_components/AccountSection'
 import { NotificationsSection } from './_components/NotificationsSection'
 import { PreferencesSection } from './_components/PreferencesSection'
 import { PageContainer } from '@/components/layout'
+import { PageLoading } from '@/components/common'
+import { loginPath } from '@/lib/navigation'
 
 export default function SettingsPage() {
-  const { user: contextUser, setUser } = useUser()
+  const { user: contextUser, setUser, isLoading: authLoading } = useUser()
+  const router = useRouter()
   const [user, setUserLocal] = useState<SettingsUser | null>(null)
   const [activeTab, setActiveTab] = useState<SettingsTabId>('profile')
   const [loading, setLoading] = useState(false)
@@ -91,6 +95,13 @@ export default function SettingsPage() {
       }))
     }
   }, [contextUser])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!contextUser) {
+      router.replace(loginPath('/settings'))
+    }
+  }, [authLoading, contextUser, router])
 
   const handleProfileSubmit = async () => {
     setLoading(true)
@@ -250,9 +261,13 @@ export default function SettingsPage() {
     showMessage('success', '头像更新成功')
   }
 
+  if (authLoading || !contextUser) {
+    return <PageLoading label="加载设置中..." />
+  }
+
   return (
     <div className="min-h-screen">
-      <PageContainer variant="standard" className="py-8">
+      <PageContainer variant="standard" className="py-4 md:py-6">
         <SettingsHeader />
         <MessageBanner message={message} />
 

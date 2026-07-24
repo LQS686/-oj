@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
+import { AdminPageShell } from '@/components/admin'
 
 interface TrainingProblem {
  id: string
@@ -312,7 +313,7 @@ export default function EditTrainingPage() {
  if (!training) return null
 
  return (
- <div className="max-w-5xl mx-auto space-y-5">
+ <AdminPageShell width="wide" className="space-y-5">
  {/* 顶部导航 */}
  <div className="flex items-center justify-between gap-3">
  <div className="flex items-center gap-3 min-w-0">
@@ -651,6 +652,6 @@ export default function EditTrainingPage() {
  </ul>
  )}
  </div>
- </div>
+ </AdminPageShell>
  )
 }

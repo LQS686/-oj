@@ -20,6 +20,7 @@ import ProblemDescription from '@/components/problem/ProblemDescription'
 import SubmissionList from '@/components/problem/SubmissionList'
 import { useContestProblemWorkspace } from '@/contexts/ContestProblemWorkspaceContext'
 import type { Problem } from '@/types/models'
+import { loginPath } from '@/lib/navigation'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -233,7 +234,7 @@ export default function ContestProblemDetailPage({
   useEffect(() => {
     registerSubmitHandler(async () => {
       if (!user) {
-        router.push(`/login?redirect=/contests/${contestId}/problems/${problemId}`)
+        router.push(loginPath(`/contests/${contestId}/problems/${problemId}`))
         return
       }
       if (!code.trim()) {

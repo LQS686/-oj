@@ -13,13 +13,16 @@ import CreateClassModal from '@/components/class/CreateClassModal'
 import {
   EducationalPageShell,
   PageLoading,
+  ListEmptyState,
   LIST_GRID_CLASS,
+  LIST_GRID_SKELETON_CLASS,
   LIST_GRID_CARD_META_ROW,
   LIST_GRID_CARD_TITLE,
   LIST_GRID_CARD_MIDDLE,
   LIST_GRID_CARD_FOOTER,
   listGridCardLinkClass,
 } from '@/components/common'
+import { loginPath } from '@/lib/navigation'
 
 interface Class {
   id: string
@@ -106,7 +109,7 @@ function ClassesPageContent() {
       setLoading(false)
       setInitialLoading(false)
     }
-  }, [page, searchQuery, showMyClasses, user])
+  }, [page, searchQuery, showMyClasses])
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -246,9 +249,9 @@ function ClassesPageContent() {
       }
     >
         {initialLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className={LIST_GRID_SKELETON_CLASS}>
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="card rounded-lg p-5 border border-border animate-pulse">
+              <div key={i} className="card rounded-lg p-4 border border-border animate-pulse h-[9.5rem]">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-lg bg-muted" />
                   <div className="flex-1">
@@ -262,27 +265,23 @@ function ClassesPageContent() {
             ))}
           </div>
         ) : classes.length === 0 ? (
-          <div className="card-static rounded-lg p-16 text-center border border-border animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
-              <Users className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <div className="text-foreground text-xl font-semibold mb-2">
-              {showMyClasses ? '你还没有加入任何班级' : '暂无班级'}
-            </div>
-            <div className="text-muted-foreground mb-6">
-              {showMyClasses ? '加入一个班级开始协作学习吧' : '成为第一个创建班级的人'}
-            </div>
-            {user && !showMyClasses && canCreate && (
-              <button
-                type="button"
-                onClick={() => setCreateClassOpen(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-white font-medium shadow-md hover:shadow-lg transition-all"
-              >
-                <Plus className="w-5 h-5" />
-                创建第一个班级
-              </button>
-            )}
-          </div>
+          <ListEmptyState
+            icon={Users}
+            title={showMyClasses ? '你还没有加入任何班级' : '暂无班级'}
+            description={showMyClasses ? '加入一个班级开始协作学习吧' : '成为第一个创建班级的人'}
+            action={
+              user && !showMyClasses && canCreate ? (
+                <button
+                  type="button"
+                  onClick={() => setCreateClassOpen(true)}
+                  className="btn-primary btn btn-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  创建班级
+                </button>
+              ) : undefined
+            }
+          />
         ) : (
           <div className="animate-fadeIn">
             {loading && (
@@ -385,7 +384,7 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
 
   const handleJoinClass = async () => {
     if (!user) {
-      router.push('/login')
+      router.push(loginPath())
       return
     }
 

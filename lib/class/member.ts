@@ -45,6 +45,7 @@ export async function listClassMembers(
       where.OR = [
         { lastActiveAt: { lt: thirtyDaysAgo } },
         { lastActiveAt: null },
+        { lastActiveAt: { isSet: false } },
       ]
     }
   }

@@ -7,7 +7,8 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { Clock, Database, BookOpen, TrendingUp, ArrowLeft, Play, Target, AlertCircle } from 'lucide-react'
 import { getDifficultyColor } from '@/lib/status'
-import { PageContainer } from '@/components/layout'
+import { ClassWorkspaceShell, PageLoading } from '@/components/common'
+import { loginPath } from '@/lib/navigation'
 
 interface ClassProblem {
  id: string
@@ -34,18 +35,19 @@ interface ClassProblem {
 export default function ClassProblemDetailPage() {
  const params = useParams()
  const router = useRouter()
- const { user } = useUser()
+ const { user, isLoading: authLoading } = useUser()
  const [problem, setProblem] = useState<ClassProblem | null>(null)
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
 
  useEffect(() => {
+ if (authLoading) return
  if (!user) {
- router.push('/login')
+ router.push(loginPath())
  return
  }
  fetchProblem()
- }, [user, params.id, params.problemId])
+ }, [user, authLoading, params.id, params.problemId])
 
  const fetchProblem = async () => {
  try {
@@ -68,22 +70,16 @@ export default function ClassProblemDetailPage() {
 
  if (loading) {
  return (
- <div className="min-h-screen flex items-center justify-center">
- <div className="text-center">
- <div className="relative w-16 h-16 mx-auto mb-6">
- <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
- <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
- </div>
- <p className="text-muted-foreground text-lg">加载题目中...</p>
- </div>
- </div>
+ <ClassWorkspaceShell classId={params.id as string} title="题目" icon={BookOpen} width="standard">
+ <PageLoading label="加载题目中..." />
+ </ClassWorkspaceShell>
  )
  }
 
  if (error || !problem) {
  return (
- <div className="min-h-screen flex items-center justify-center">
- <div className="text-center card-static rounded-lg p-12 max-w-md">
+ <ClassWorkspaceShell classId={params.id as string} title="题目" icon={BookOpen} width="standard">
+ <div className="text-center card-static rounded-lg p-12">
  <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
  <AlertCircle className="w-8 h-8 text-error" />
  </div>
@@ -95,16 +91,17 @@ export default function ClassProblemDetailPage() {
  返回班级
  </button>
  </div>
- </div>
+ </ClassWorkspaceShell>
  )
  }
 
+ const classId = params.id as string
+
  return (
- <div className="min-h-screen">
- <PageContainer variant="standard" className="py-8">
+ <ClassWorkspaceShell classId={classId} title={problem.title} icon={BookOpen} width="standard">
  <Link
- href={`/classes/${params.id}`}
- className="flex items-center gap-2 text-muted-foreground hover:text-primary-light mb-6 transition-colors group"
+ href={`/classes/${classId}`}
+ className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary-light mb-4 transition-colors group"
  >
  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
  返回班级
@@ -117,7 +114,7 @@ export default function ClassProblemDetailPage() {
  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
  <BookOpen className="w-5 h-5 text-white" />
  </div>
- <h1 className="text-2xl font-bold text-foreground">{problem.title}</h1>
+ <h1 className="text-2xl font-bold text-foreground hidden sm:block">{problem.title}</h1>
  </div>
  <div className="flex items-center gap-3 flex-wrap">
  <span className={`tag border ${getDifficultyColor(problem.difficulty)}`}>
@@ -231,13 +228,12 @@ export default function ClassProblemDetailPage() {
  开始答题
  </button>
  <button
- onClick={() => router.push(`/classes/${params.id}`)}
+ onClick={() => router.push(`/classes/${classId}`)}
  className="btn btn-ghost"
  >
  返回班级
  </button>
  </div>
- </PageContainer>
- </div>
+ </ClassWorkspaceShell>
  )
 }

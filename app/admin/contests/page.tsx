@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { DataTable, FilterBar, type Column } from '@/components/admin'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
+import { PageLoading } from '@/components/common'
+import AdminCreateContestModal from '@/components/admin/AdminCreateContestModal'
 import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
 interface Contest {
@@ -21,8 +23,9 @@ interface Contest {
  }
 }
 
-export default function AdminContestsPage() {
+function AdminContestsPageContent() {
  const router = useRouter()
+ const searchParams = useSearchParams()
  const [contests, setContests] = useState<Contest[]>([])
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
@@ -30,6 +33,15 @@ export default function AdminContestsPage() {
  const [statusFilter, setStatusFilter] = useState('all')
  const [selectedContest, setSelectedContest] = useState<Contest | null>(null)
  const [showDeleteModal, setShowDeleteModal] = useState(false)
+ const [createOpen, setCreateOpen] = useState(false)
+
+ // 支持 ?create=1 自动打开创建弹窗（外部跳转入口）
+ useEffect(() => {
+ if (searchParams.get('create') === '1') {
+ setCreateOpen(true)
+ router.replace('/admin/contests', { scroll: false })
+ }
+ }, [searchParams, router])
 
  const fetchContests = useCallback(async () => {
  try {
@@ -252,7 +264,7 @@ export default function AdminContestsPage() {
 
  return (
  <>
- <div className="space-y-6">
+ <AdminPageShell width="list" className="space-y-6">
  <FilterBar activeCount={(searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)}>
  <div className="flex-1 min-w-[200px]">
  <div className="relative">
@@ -277,7 +289,7 @@ export default function AdminContestsPage() {
  <option value="ENDED">已结束</option>
  </select>
  <button
- onClick={() => router.push('/admin/contests/create')}
+ onClick={() => setCreateOpen(true)}
  className="btn btn-primary flex items-center gap-2 ml-auto"
  >
  <Plus className="w-5 h-5" />
@@ -317,7 +329,7 @@ export default function AdminContestsPage() {
  emptyMessage={searchQuery || statusFilter !== 'all' ? '没有找到匹配的竞赛' : '暂无竞赛'}
  onRowClick={(row) => router.push(`/admin/contests/${row.id}/edit`)}
  />
- </div>
+ </AdminPageShell>
 
  {showDeleteModal && selectedContest && (
  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
@@ -347,6 +359,20 @@ export default function AdminContestsPage() {
  </div>
  </div>
  )}
+
+ <AdminCreateContestModal
+ open={createOpen}
+ onClose={() => setCreateOpen(false)}
+ onCreated={() => fetchContests()}
+ />
  </>
+ )
+}
+
+export default function AdminContestsPage() {
+ return (
+ <Suspense fallback={<PageLoading label="加载中..." />}>
+ <AdminContestsPageContent />
+ </Suspense>
  )
 }

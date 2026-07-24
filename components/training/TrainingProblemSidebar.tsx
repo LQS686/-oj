@@ -41,7 +41,7 @@ export default function TrainingProblemSidebar() {
   } = ws
 
   return (
-    <div className="lg:sticky lg:top-4 space-y-3">
+    <div className="lg:sticky lg:top-[72px] space-y-3">
       {trainingProblems.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {trainingProblems.map((tp, index) => {

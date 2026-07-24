@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { DataTable } from '@/components/admin'
+import { DataTable, AdminPageShell } from '@/components/admin'
 import { useUser } from '@/contexts/UserContext'
 import { isSystemAdmin } from '@/lib/permissions'
 import { useUserList } from './_hooks/useUserList'
@@ -88,7 +88,7 @@ export default function AdminUsersPage() {
 
   return (
     <>
-      <div className="space-y-6">
+      <AdminPageShell width="list" className="space-y-6">
         <StatsCards users={users} />
 
         <FilterToolbar
@@ -116,7 +116,7 @@ export default function AdminUsersPage() {
           ]}
           mobileCardRenderer={mobileCardRenderer}
         />
-      </div>
+      </AdminPageShell>
 
       {editTarget && (
         <EditUserModal

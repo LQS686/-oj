@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { useUser } from '@/contexts/UserContext'
+import { EducationalPageShell, PageLoading, ListEmptyState } from '@/components/common'
 import { DataTable, type Column } from '@/components/admin'
 import type { Notification } from '@/types/models'
 import { formatDate } from '@/lib/utils'
+import { loginPath } from '@/lib/navigation'
 
 export default function NotificationsPage() {
  const router = useRouter()
+ const { user, isLoading: authLoading } = useUser()
  const [notifications, setNotifications] = useState<Notification[]>([])
  const [unreadCount, setUnreadCount] = useState(0)
  const [loading, setLoading] = useState(true)
@@ -19,8 +22,13 @@ export default function NotificationsPage() {
  const [totalPages, setTotalPages] = useState(1)
 
  useEffect(() => {
+ if (authLoading) return
+ if (!user) {
+ router.replace(loginPath('/notifications'))
+ return
+ }
  fetchNotifications()
- }, [filter, page])
+ }, [filter, page, user, authLoading])
 
  const fetchNotifications = async () => {
  setLoading(true)
@@ -37,7 +45,7 @@ export default function NotificationsPage() {
  const response = await fetchWithCookie(`/api/notifications?${params}`)
 
  if (response.status === 401) {
- router.push('/login')
+ router.push(loginPath('/notifications'))
  return
  }
 
@@ -147,6 +155,10 @@ export default function NotificationsPage() {
 
  const showSkeleton = loading && notifications.length === 0
 
+ if (authLoading || !user) {
+ return <PageLoading label="加载通知中..." />
+ }
+
  const columns: Column<Notification>[] = [
   {
    key: 'type',
@@ -225,7 +237,6 @@ export default function NotificationsPage() {
 
   return (
   <EducationalPageShell
-  width="narrow"
   title="通知中心"
   description={unreadCount > 0 ? `您有 ${unreadCount} 条未读通知` : '所有通知已读'}
   icon={Bell}
@@ -283,17 +294,11 @@ export default function NotificationsPage() {
  ))}
  </div>
  ) : notifications.length === 0 ? (
- <div className="card-static rounded-lg p-16 text-center">
- <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
- <Bell className="w-8 h-8 text-muted-foreground" />
- </div>
- <div className="text-foreground text-xl font-semibold mb-2">
- {filter === 'unread' ? '没有未读通知' : '暂无通知'}
- </div>
- <div className="text-muted-foreground">
- {filter === 'unread' ? '所有通知都已阅读' : '新的通知会显示在这里'}
- </div>
- </div>
+ <ListEmptyState
+ icon={Bell}
+ title={filter === 'unread' ? '没有未读通知' : '暂无通知'}
+ description={filter === 'unread' ? '所有通知都已阅读' : '新的通知会显示在这里'}
+ />
  ) : (
   <div className="animate-fadeIn">
   <DataTable

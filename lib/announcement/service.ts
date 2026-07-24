@@ -48,8 +48,20 @@ export async function listPublicAnnouncements(limit = 8): Promise<PublicAnnounce
       where: {
         isPublished: true,
         AND: [
-          { OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
-          { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
+          {
+            OR: [
+              { publishedAt: null },
+              { publishedAt: { isSet: false } },
+              { publishedAt: { lte: now } },
+            ],
+          },
+          {
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { isSet: false } },
+              { expiresAt: { gte: now } },
+            ],
+          },
         ],
       },
       orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }, { createdAt: 'desc' }],
@@ -86,8 +98,20 @@ export async function getPublicAnnouncementById(id: string): Promise<PublicAnnou
       id,
       isPublished: true,
       AND: [
-        { OR: [{ publishedAt: null }, { publishedAt: { lte: now } }] },
-        { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
+        {
+          OR: [
+            { publishedAt: null },
+            { publishedAt: { isSet: false } },
+            { publishedAt: { lte: now } },
+          ],
+        },
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { isSet: false } },
+            { expiresAt: { gte: now } },
+          ],
+        },
       ],
     },
     include: {

@@ -26,7 +26,7 @@ import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import AssignmentProblemProgressList from '@/components/class/AssignmentProblemProgressList'
 import SubmissionList from '@/components/problem/SubmissionList'
-import ProblemStatsPanel from '@/components/problem/ProblemStatsPanel'
+import PretestPanel from '@/components/problem/PretestPanel'
 import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useClass } from '@/hooks/useClass'
@@ -38,6 +38,7 @@ import { formatDateTime } from '@/lib/utils'
 import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { PageContainer } from '@/components/layout'
+import { loginPath } from '@/lib/navigation'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -111,7 +112,7 @@ const [editOpen, setEditOpen] = useState(false)
  const initialViewTab = searchParams.get('tab') === 'completion' ? 'completion' : 'problems'
  const [viewTab, setViewTab] = useState<'problems' | 'completion'>(initialViewTab)
  // 中栏 Tab：与题库页一致（不含题解，作业场景）
- const [problemTab, setProblemTab] = useState<'description' | 'submissions' | 'stats' | 'code'>('description')
+ const [problemTab, setProblemTab] = useState<'description' | 'submissions' | 'code'>('description')
  const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
  const [problemDetail, setProblemDetail] = useState<any>(null)
  const [problemLoading, setProblemLoading] = useState(false)
@@ -376,7 +377,7 @@ const [editOpen, setEditOpen] = useState(false)
 
  const handleSubmit = async () => {
  if (!user) {
- router.push('/login')
+ router.push(loginPath())
  return
  }
  if (!code.trim() || code.trim().length < 10) return
@@ -495,67 +496,66 @@ const [editOpen, setEditOpen] = useState(false)
 
  return (
  <div className="min-h-screen bg-background pb-20 lg:pb-6">
- <PageContainer className="py-6">
- <div className="bg-card rounded-xl border border-border overflow-hidden mb-4 shadow-sm">
- <div className="px-5 py-4 border-b border-border">
- <div className="flex items-start justify-between gap-3">
- <div className="flex items-center gap-3 min-w-0">
- <h1 className="text-xl font-bold text-foreground truncate">{assignment.title}</h1>
+ <PageContainer variant="workspace" className="py-4">
+ {/* 作业信息：单卡压缩，把首屏留给做题区 */}
+ <div className="bg-card rounded-xl border border-border overflow-hidden mb-3 shadow-sm">
+ <div className="px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+ <div className="flex items-center gap-2 min-w-0 flex-1">
+ <h1 className="text-lg font-bold text-foreground truncate">{assignment.title}</h1>
  <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${statusConfig.color}`}>
  {statusConfig.label}
  </span>
  </div>
+
+ <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+ <span className="inline-flex items-center gap-1">
+ <Clock className="w-3.5 h-3.5" />
+ <span className="tabular-nums">
+ {formatDateTime(assignment.startTime)}
+ <span className="mx-1 text-border">–</span>
+ {formatDateTime(assignment.endTime)}
+ </span>
+ </span>
+ <span className="inline-flex items-center gap-1">
+ <FileCode className="w-3.5 h-3.5" />
+ 题目 {assignment.problems?.length || 0}
+ </span>
+ <span className="inline-flex items-center gap-1">
+ <CheckCircle2 className="w-3.5 h-3.5 text-secondary-light" />
+ 完成 {submissions.filter(s => s.status === 'AC').length}/{assignment.problems?.length || 0}
+ </span>
+ </div>
+
  {isAdminOrOwner && (
- <div className="flex items-center gap-2 shrink-0">
+ <div className="flex items-center gap-1.5 shrink-0">
  <button
  type="button"
  onClick={() => setEditOpen(true)}
- className="btn btn-ghost btn-sm border border-border inline-flex items-center gap-1.5"
+ className="btn btn-ghost btn-sm border border-border inline-flex items-center gap-1 h-8 px-2.5"
  >
- <Edit className="w-4 h-4" /> 编辑
+ <Edit className="w-3.5 h-3.5" /> 编辑
  </button>
  <button
  type="button"
  onClick={handleDeleteAssignment}
- className="btn btn-ghost btn-sm border border-error/30 text-error inline-flex items-center gap-1.5 hover:bg-error/10"
+ className="btn btn-ghost btn-sm border border-error/30 text-error inline-flex items-center gap-1 h-8 px-2.5 hover:bg-error/10"
  >
- <Trash2 className="w-4 h-4" /> 删除
+ <Trash2 className="w-3.5 h-3.5" /> 删除
  </button>
  </div>
  )}
  </div>
+
  {assignment.description && (
- <p className="mt-2 text-sm text-muted-foreground">{assignment.description}</p>
+ <p className="px-4 pb-2.5 text-sm text-muted-foreground line-clamp-2">
+ {assignment.description}
+ </p>
  )}
- </div>
 
- <div className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm border-b border-border">
- <div className="flex items-center gap-1.5">
- <Clock className="w-3.5 h-3.5 text-muted-foreground" />
- <span className="text-muted-foreground">开始</span>
- <span className="font-medium text-foreground">{formatDateTime(assignment.startTime)}</span>
- </div>
- <div className="flex items-center gap-1.5">
- <Clock className="w-3.5 h-3.5 text-muted-foreground" />
- <span className="text-muted-foreground">截止</span>
- <span className="font-medium text-foreground">{formatDateTime(assignment.endTime)}</span>
- </div>
- <div className="flex items-center gap-1.5">
- <FileCode className="w-3.5 h-3.5 text-muted-foreground" />
- <span className="text-muted-foreground">题目数</span>
- <span className="font-medium text-foreground">{assignment.problems?.length || 0}</span>
- </div>
- <div className="flex items-center gap-1.5">
- <CheckCircle2 className="w-3.5 h-3.5 text-secondary-light" />
- <span className="text-muted-foreground">已完成</span>
- <span className="font-medium text-foreground">{submissions.filter(s => s.status === 'AC').length}/{assignment.problems?.length || 0}</span>
- </div>
- </div>
-
- {/* 顶层视图切换 Tab：题目作答 / 完成情况统计（管理员） */}
- <div className="px-5 py-2 flex items-center gap-1 border-b border-border">
+ <div className="px-2 flex items-center gap-0.5 border-t border-border">
  {tabs.map((tab) => {
  const Icon = tab.icon
+ const isActive = viewTab === tab.key
  return (
  <button
  key={tab.key}
@@ -565,13 +565,20 @@ const [editOpen, setEditOpen] = useState(false)
  tabParams.set('tab', tab.key)
  router.replace(`${window.location.pathname}?${tabParams.toString()}`, { scroll: false })
  }}
- className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
- viewTab === tab.key
- ? 'bg-primary/10 text-primary-light'
- : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+ className={`relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+ isActive
+ ? 'text-primary-light'
+ : 'text-muted-foreground hover:text-foreground'
  }`}
  >
- <Icon className="w-4 h-4" />
+ {isActive && (
+ <motion.div
+ layoutId="assignment-view-tab-indicator"
+ className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full"
+ transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+ />
+ )}
+ <Icon className="w-3.5 h-3.5" />
  {tab.label}
  </button>
  )
@@ -581,6 +588,7 @@ const [editOpen, setEditOpen] = useState(false)
 
  {viewTab === 'problems' && (
  <ProblemWorkspaceShell
+ dense
  codeMode={problemTab === 'code'}
  leftSelector={
  <AssignmentProblemProgressList
@@ -598,10 +606,19 @@ const [editOpen, setEditOpen] = useState(false)
  }
  leftHeader={
  <>
+ {selectedProblem && (
+ <div className="hidden lg:flex items-center gap-2 px-4 py-2.5 border-r border-border min-w-0 max-w-[40%] shrink">
+ <span className="shrink-0 w-6 h-6 rounded-md bg-primary/10 text-primary-light font-mono text-xs font-bold flex items-center justify-center">
+ {String.fromCharCode(65 + selectedProblemIndex)}
+ </span>
+ <span className="truncate text-sm font-medium text-foreground" title={selectedProblem.title}>
+ {selectedProblem.title}
+ </span>
+ </div>
+ )}
  {[
  { key: 'description' as const, label: '题目描述', icon: BookOpen },
  { key: 'submissions' as const, label: '提交记录', icon: ListChecks },
- { key: 'stats' as const, label: '统计', icon: BarChart3 },
  ].map((tab) => {
  const Icon = tab.icon
  const isActive = problemTab === tab.key
@@ -609,7 +626,7 @@ const [editOpen, setEditOpen] = useState(false)
  <button
  key={tab.key}
  onClick={() => setProblemTab(tab.key)}
- className={`flex items-center gap-2 px-5 py-3.5 font-medium transition-all duration-300 relative cursor-pointer group whitespace-nowrap ${
+ className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all duration-300 relative cursor-pointer group whitespace-nowrap ${
  isActive
  ? 'text-primary-light'
  : 'text-muted-foreground hover:text-foreground'
@@ -622,7 +639,7 @@ const [editOpen, setEditOpen] = useState(false)
  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
  />
  )}
- <Icon className={`w-4 h-4 transition-transform duration-300 ${isActive ? 'rotate-3' : ''}`} />
+ <Icon className={`w-3.5 h-3.5 transition-transform duration-300 ${isActive ? 'rotate-3' : ''}`} />
  {tab.label}
  </button>
  )
@@ -634,20 +651,20 @@ const [editOpen, setEditOpen] = useState(false)
  {problemTab === 'description' && (
  <motion.div
  key="description"
- initial={{ opacity: 0, y: 10 }}
+ initial={{ opacity: 0, y: 8 }}
  animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -10 }}
- transition={{ duration: 0.2 }}
+ exit={{ opacity: 0, y: -8 }}
+ transition={{ duration: 0.18 }}
  >
  {problemLoading ? (
- <div className="p-12 text-center">
+ <div className="p-10 text-center">
  <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
  <span className="text-sm text-muted-foreground">加载题目内容...</span>
  </div>
  ) : problemDetail ? (
  <ProblemDescription problem={problemDetail} />
  ) : (
- <div className="p-12 text-center text-sm text-muted-foreground">题目内容加载失败</div>
+ <div className="p-10 text-center text-sm text-muted-foreground">题目内容加载失败</div>
  )}
  </motion.div>
  )}
@@ -655,10 +672,10 @@ const [editOpen, setEditOpen] = useState(false)
  {problemTab === 'submissions' && (
  <motion.div
  key="submissions"
- initial={{ opacity: 0, y: 10 }}
+ initial={{ opacity: 0, y: 8 }}
  animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -10 }}
- transition={{ duration: 0.2 }}
+ exit={{ opacity: 0, y: -8 }}
+ transition={{ duration: 0.18 }}
  >
  <SubmissionList
  submissions={submissions.filter((s) => s.problemId === selectedProblem?.id) as any}
@@ -669,18 +686,6 @@ const [editOpen, setEditOpen] = useState(false)
  classId={classId}
  onSelect={() => {}}
  />
- </motion.div>
- )}
-
- {problemTab === 'stats' && problemDetail && (
- <motion.div
- key="stats"
- initial={{ opacity: 0, y: 10 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -10 }}
- transition={{ duration: 0.2 }}
- >
- <ProblemStatsPanel problemId={problemDetail.id || problemDetail._id} />
  </motion.div>
  )}
  </AnimatePresence>
@@ -698,44 +703,42 @@ const [editOpen, setEditOpen] = useState(false)
  rightHeader={
  <>
  <CodeIcon className="w-4 h-4 text-primary-light" />
- <h3 className="font-medium text-foreground">提交代码</h3>
+ <h3 className="text-sm font-medium text-foreground">提交代码</h3>
  </>
  }
  rightPanel={
  <>
- {/* 作业状态守卫提示 */}
  {!user && (
- <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
- <AlertCircle className="w-4 h-4 shrink-0" />
+ <div className="p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-xs flex items-center gap-2">
+ <AlertCircle className="w-3.5 h-3.5 shrink-0" />
  请先登录后再提交代码
  </div>
  )}
  {user && assignment.status === 'upcoming' && (
- <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm flex items-center gap-2">
- <AlertCircle className="w-4 h-4 shrink-0" />
+ <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs flex items-center gap-2">
+ <AlertCircle className="w-3.5 h-3.5 shrink-0" />
  作业尚未开始，{assignment.startTime ? `将在 ${formatDateTime(assignment.startTime)} 开放提交` : '暂不可提交'}
  </div>
  )}
  {user && assignment.status === 'ended' && !assignment.allowLateSubmission && (
- <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm flex items-center gap-2">
- <AlertCircle className="w-4 h-4 shrink-0" />
+ <div className="p-2.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs flex items-center gap-2">
+ <AlertCircle className="w-3.5 h-3.5 shrink-0" />
  作业已结束，不再接受新提交
  </div>
  )}
  {user && assignment.status === 'ended' && assignment.allowLateSubmission && (
- <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-sm flex items-center gap-2">
- <AlertCircle className="w-4 h-4 shrink-0" />
+ <div className="p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-xs flex items-center gap-2">
+ <AlertCircle className="w-3.5 h-3.5 shrink-0" />
  作业已结束（允许逾期提交，分数会被标记为逾期）
  </div>
  )}
 
- {/* 语言选择 */}
- <div className="flex items-center justify-between gap-4">
- <label className="text-sm font-medium text-foreground whitespace-nowrap">语言</label>
+ <div className="flex items-center justify-between gap-3">
+ <label className="text-xs font-medium text-foreground whitespace-nowrap">语言</label>
  <select
  value={language}
  onChange={(e) => setLanguage(e.target.value)}
- className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+ className="px-2.5 py-1 rounded-md border border-border bg-background text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
  >
  {languageOptions.map((lang) => (
  <option key={lang.value} value={lang.value}>
@@ -745,18 +748,16 @@ const [editOpen, setEditOpen] = useState(false)
  </select>
  </div>
 
- {/* 代码编辑器 */}
  <CodeEditor
  value={code}
  onChange={setCode}
  language={language as CodeLanguage}
  placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
- height="320px"
+ height="min(28rem, calc(100vh - 22rem))"
  onSubmit={handleSubmit}
  />
 
- {/* 提交按钮 */}
- <div className="flex items-center gap-3 pt-1">
+ <div className="flex items-center gap-2 pt-0.5">
  <button
  onClick={handleSubmit}
  disabled={submitting || submitCooldown || !user || assignment.status === 'upcoming' || (assignment.status === 'ended' && !assignment.allowLateSubmission)}
@@ -767,7 +768,7 @@ const [editOpen, setEditOpen] = useState(false)
  submitting ? '正在评测中...' :
  submitCooldown ? '请稍后再试' : ''
  }
- className="btn-primary btn flex-1 max-w-xs"
+ className="btn-primary btn flex-1 max-w-xs h-9 text-sm"
  >
  {submitting ? (
  <>
@@ -801,19 +802,28 @@ const [editOpen, setEditOpen] = useState(false)
  </>
  )}
  </button>
- <button onClick={() => setCode('')} className="btn-ghost btn cursor-pointer">
+ <button onClick={() => setCode('')} className="btn-ghost btn cursor-pointer h-9 text-sm">
  清空
  </button>
  </div>
+
+ {(problemDetail?.id || problemDetail?._id || selectedProblem?.id) && (
+ <PretestPanel
+ problemId={String(problemDetail?.id || problemDetail?._id || selectedProblem?.id)}
+ code={code}
+ language={language}
+ disabled={!user || submitting}
+ />
+ )}
  </>
  }
  />
  )}
 
- {/* 移动端底部 Tab Bar：与题库页一致，支持题面/代码/提交/统计切换 */}
+ {/* 移动端底部 Tab Bar：题面 / 代码 / 提交 */}
  {viewTab === 'problems' && (
  <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">
- <div className="grid grid-cols-4">
+ <div className="grid grid-cols-3">
  <button
  onClick={() => setProblemTab('description')}
  className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'description' ? 'text-primary' : 'text-muted-foreground'}`}
@@ -834,13 +844,6 @@ const [editOpen, setEditOpen] = useState(false)
  >
  <History className="w-5 h-5" />
  <span className="text-xs">提交</span>
- </button>
- <button
- onClick={() => setProblemTab('stats')}
- className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'stats' ? 'text-primary' : 'text-muted-foreground'}`}
- >
- <BarChart3 className="w-5 h-5" />
- <span className="text-xs">统计</span>
  </button>
  </div>
  </div>

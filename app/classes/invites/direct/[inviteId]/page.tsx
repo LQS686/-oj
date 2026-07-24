@@ -8,6 +8,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { Mail, Users, Check, X, Clock, Calendar, AlertCircle, UserCheck } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import { formatDateTime } from '@/lib/utils'
+import { loginPath } from '@/lib/navigation'
 
 interface InviteDetail {
   invite: {
@@ -35,7 +36,7 @@ interface InviteDetail {
 export default function DirectInviteDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { user } = useUser()
+  const { user, isLoading: authLoading } = useUser()
   const inviteId = params.inviteId as string
 
   const [inviteDetail, setInviteDetail] = useState<InviteDetail | null>(null)
@@ -44,12 +45,13 @@ export default function DirectInviteDetailPage() {
   const [processing, setProcessing] = useState(false)
 
   useEffect(() => {
+    if (authLoading) return
     if (!user) {
-      router.push('/login')
+      router.push(loginPath())
       return
     }
     fetchInviteDetail()
-  }, [user, inviteId])
+  }, [user, authLoading, inviteId])
 
   const fetchInviteDetail = async () => {
     try {

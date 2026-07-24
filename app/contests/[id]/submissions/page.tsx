@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { formatDateTime } from '@/lib/utils'
+import { loginPath } from '@/lib/navigation'
 
 interface Submission {
  id: string
@@ -42,8 +43,7 @@ export default function ContestSubmissionsPage() {
  useEffect(() => {
  if (userLoading) return
  if (!user) {
-   const redirect = encodeURIComponent(`/contests/${params.id}/submissions`)
-   router.replace(`/login?redirect=${redirect}`)
+   router.replace(loginPath(`/contests/${params.id}/submissions`))
  }
  }, [userLoading, user, params.id, router])
 

@@ -34,8 +34,9 @@ const Navbar = () => {
           ? 'border-border/60 bg-background-secondary/80 backdrop-blur-xl shadow-sm'
           : 'border-border bg-background-secondary'
       }`}
+      style={{ zIndex: 'var(--z-navbar)' }}
     >
-      <div className="container mx-auto px-4">
+      <div className="w-full max-w-page-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           <Logo />
 

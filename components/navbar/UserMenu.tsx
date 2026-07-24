@@ -17,6 +17,7 @@ import { canAccessAdmin, getRoleLabel } from '@/lib/permissions'
 import { useNotificationSocket } from '@/hooks/useNotificationSocket'
 import { notificationApi } from '@/lib/api'
 import { logger } from '@/lib/logger'
+import { loginPath } from '@/lib/navigation'
 import Image from 'next/image'
 import Dropdown from '../common/Dropdown'
 
@@ -24,7 +25,7 @@ export default function UserMenu() {
  const router = useRouter()
  const [unreadCount, setUnreadCount] = useState(0)
  const [avatarError, setAvatarError] = useState(false)
- const { user, logout: contextLogout } = useUser()
+ const { user, isLoading, logout: contextLogout } = useUser()
 
  const canAccessAdminUser = canAccessAdmin(user)
 
@@ -105,14 +106,23 @@ export default function UserMenu() {
 
  const handleLogout = useCallback(async () => {
  await contextLogout()
- router.push('/')
- router.refresh()
+ router.replace('/')
  }, [contextLogout, router])
+
+ if (isLoading) {
+ return (
+ <div className="flex items-center gap-2" aria-hidden="true">
+ <div className="hidden sm:block h-9 w-14 rounded-lg bg-muted/60 animate-pulse" />
+ <div className="h-9 w-20 rounded-lg bg-muted/60 animate-pulse" />
+ <div className="h-9 w-9 rounded-full bg-muted/60 animate-pulse" />
+ </div>
+ )
+ }
 
  if (!user) {
  return (
  <>
- <Link href="/login" className="btn-ghost btn group">
+ <Link href={loginPath()} className="btn-ghost btn group">
  <span className="group-hover:text-primary-light transition-colors duration-300">登录</span>
  </Link>
  <Link href="/register" className="btn-primary btn group">

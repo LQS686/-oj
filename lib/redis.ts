@@ -3,8 +3,16 @@ import { logger } from './logger'
 
 let redisClient: Redis | null = null
 
+/**
+ * 是否显式配置了 REDIS_URL（多实例 cache / rate-limit 的前提）。
+ * 未配置时业务层应走内存降级，避免隐式连 localhost。
+ */
+export function isRedisConfigured(): boolean {
+  return Boolean(process.env.REDIS_URL?.trim())
+}
+
 function getRedisUrl(): string {
-  const url = process.env.REDIS_URL
+  const url = process.env.REDIS_URL?.trim()
   if (!url) {
     // 构建阶段跳过（next build 时 NEXT_PHASE=phase-production-build）
     if (process.env.NEXT_PHASE === 'phase-production-build') {

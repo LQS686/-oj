@@ -14,6 +14,7 @@
  */
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useUser } from '@/contexts/UserContext'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
@@ -28,14 +29,7 @@ import { ProgressCircle } from '@/components/training/ProgressCircle'
 import type { TrainingDetail, TrainingProblemStatus } from '@/lib/training/types'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { formatDate } from '@/lib/utils'
-import { PageContainer } from '@/components/layout'
-
-interface User {
- id: string
- username: string
- nickname: string | null
- avatar: string | null
-}
+import { EducationalPageShell } from '@/components/common'
 
 type Tab = 'intro' | 'problems'
 
@@ -69,12 +63,12 @@ function formatCount(n: number): string {
 export default function TrainingDetailPage() {
  const params = useParams<{ id: string }>()
  const trainingId = params?.id ?? ''
+ const { user } = useUser()
 
  const [training, setTraining] = useState<TrainingDetail | null>(null)
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState<string | null>(null)
  const [notFound, setNotFound] = useState(false)
- const [user, setUser] = useState<User | null>(null)
  const [activeTab, setActiveTab] = useState<Tab>('intro')
  const [judgeStatus, setJudgeStatus] = useState<{ problemId: string; status: string } | null>(null)
  const pollingRef = useRef<NodeJS.Timeout | null>(null)
@@ -108,16 +102,6 @@ export default function TrainingDetailPage() {
  setLoading(false)
  }
  }, [trainingId])
-
- useEffect(() => {
- fetchWithCookie('/api/auth/me', { cache: 'no-store' })
- .then(r => r.ok ? r.json() : null)
- .then(data => {
- if (data?.success && data.data) setUser(data.data as User)
- else setUser(null)
- })
- .catch(() => setUser(null))
- }, [])
 
  useEffect(() => { fetchDetail() }, [fetchDetail])
 
@@ -246,8 +230,7 @@ export default function TrainingDetailPage() {
  const totalProblems = training.problems.length
 
  return (
- <div className="min-h-screen">
- <PageContainer className="py-6">
+ <EducationalPageShell title={training.title} icon={BookOpen}>
  {/* 面包屑（洛谷风格） */}
  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
  <Link href="/training" className="hover:text-foreground">
@@ -258,13 +241,13 @@ export default function TrainingDetailPage() {
  </div>
 
  {/* 标题 + Tabs + 右上角元信息（洛谷风格） */}
- <div className="card-static p-6 mb-6">
- <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
+ <div className="card-static p-4 mb-4">
+ <h1 className="text-xl md:text-2xl font-bold text-foreground mb-3">
  {training.title}
  </h1>
- <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+ <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
  {/* Tabs */}
- <div className="flex items-center gap-6 border-b border-border md:border-b-0">
+ <div className="flex items-center gap-5 border-b border-border md:border-b-0">
  <button
  onClick={() => setActiveTab('intro')}
  className={`pb-2 md:pb-0 text-sm font-medium border-b-2 transition-colors ${
@@ -287,20 +270,20 @@ export default function TrainingDetailPage() {
  </button>
  </div>
  {/* 右上角：题数 + 收藏人数 */}
- <div className="flex items-center gap-6 text-right">
+ <div className="flex items-center gap-5 text-right">
  <div>
  <div className="text-xs text-muted-foreground">题数</div>
- <div className="text-lg font-semibold text-foreground">{totalProblems}</div>
+ <div className="text-base font-semibold text-foreground">{totalProblems}</div>
  </div>
  <div>
  <div className="text-xs text-muted-foreground">收藏人数</div>
- <div className="text-lg font-semibold text-foreground">{formatCount(training.joinCount)}</div>
+ <div className="text-base font-semibold text-foreground">{formatCount(training.joinCount)}</div>
  </div>
  </div>
  </div>
  </div>
 
- <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+ <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-4">
  {/* 主内容区 */}
  <div>
  {activeTab === 'intro' ? (
@@ -538,7 +521,6 @@ export default function TrainingDetailPage() {
  )}
  </div>
  </div>
- </PageContainer>
- </div>
+ </EducationalPageShell>
  )
 }

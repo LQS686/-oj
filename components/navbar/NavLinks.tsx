@@ -59,7 +59,10 @@ export default function NavLinks() {
       )}
       {navLinks.map((link) => {
         const Icon = link.icon
-        const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+        const isActive =
+          pathname === link.href ||
+          pathname.startsWith(link.href + '/') ||
+          (link.href === '/problems' && pathname.startsWith('/problem/'))
         return (
           <Link
             key={link.href}

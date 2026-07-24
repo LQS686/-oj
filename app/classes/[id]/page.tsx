@@ -6,7 +6,6 @@ import {
   Users,
   BookOpen,
   FileText,
-  ListChecks,
   UserPlus,
   LogOut,
   Megaphone,
@@ -29,11 +28,12 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import ClassManageInlinePanel from '@/components/class/ClassManageInlinePanel'
 import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
-import CreateClassTrainingModal from '@/components/class/CreateClassTrainingModal'
 import CreateNoteModal from '@/components/class/CreateNoteModal'
+import ViewNoteModal, { type ClassNoteDetail } from '@/components/class/ViewNoteModal'
 import CreateClassProblemModal from '@/components/class/CreateClassProblemModal'
 import { classRoleDisplayLabel, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDate } from '@/lib/utils'
+import { loginPath } from '@/lib/navigation'
 
 interface Assignment {
   id: string
@@ -60,20 +60,6 @@ interface Note {
   content: string
   author: { nickname?: string; username?: string }
   createdAt: string
-}
-
-interface ClassTraining {
-  id: string
-  title: string
-  description: string
-  problemCount: number
-  joinCount: number
-  createdAt: string
-  userProgress?: {
-    solvedCount: number
-    progressPercentage: number
-    isJoined: boolean
-  }
 }
 
 interface ClassMemberRow {
@@ -119,16 +105,15 @@ function ClassDetailContent() {
   const [error, setError] = useState('')
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [notes, setNotes] = useState<Note[]>([])
-  const [trainings, setTrainings] = useState<ClassTraining[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
   const [notesLoading, setNotesLoading] = useState(false)
-  const [trainingsLoading, setTrainingsLoading] = useState(false)
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'upcoming' | 'active' | 'ended'>('all')
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false)
   const [editAssignmentOpen, setEditAssignmentOpen] = useState(false)
   const [editAssignmentId, setEditAssignmentId] = useState<string | null>(null)
-  const [createTrainingOpen, setCreateTrainingOpen] = useState(false)
   const [createNoteOpen, setCreateNoteOpen] = useState(false)
+  const [viewNoteId, setViewNoteId] = useState<string | null>(null)
+  const [editNote, setEditNote] = useState<ClassNoteDetail | null>(null)
   const [createProblemOpen, setCreateProblemOpen] = useState(false)
 
   useDocumentTitle(classData?.name)
@@ -173,19 +158,6 @@ function ClassDetailContent() {
     }
   }, [classId])
 
-  const fetchTrainings = useCallback(async () => {
-    try {
-      setTrainingsLoading(true)
-      const response = await fetchWithCookie(`/api/classes/${classId}/trainings?limit=20`)
-      const data = await response.json()
-      if (data.success) setTrainings(data.data?.items || [])
-    } catch {
-      /* ignore */
-    } finally {
-      setTrainingsLoading(false)
-    }
-  }, [classId])
-
   useEffect(() => {
     void fetchClassDetail()
   }, [fetchClassDetail])
@@ -194,9 +166,8 @@ function ClassDetailContent() {
     if (!isManageTab) {
       void fetchAssignments()
       void fetchNotes()
-      void fetchTrainings()
     }
-  }, [classId, isManageTab, fetchAssignments, fetchNotes, fetchTrainings])
+  }, [classId, isManageTab, fetchAssignments, fetchNotes])
 
   useEffect(() => {
     if (searchParams.get('createAssignment') === '1') {
@@ -213,6 +184,11 @@ function ClassDetailContent() {
       setCreateNoteOpen(true)
       router.replace(`/classes/${classId}`, { scroll: false })
     }
+    const noteId = searchParams.get('note')
+    if (noteId) {
+      setViewNoteId(noteId)
+      router.replace(`/classes/${classId}`, { scroll: false })
+    }
     if (searchParams.get('createProblem') === '1') {
       setCreateProblemOpen(true)
       router.replace(`/classes/${classId}`, { scroll: false })
@@ -221,7 +197,7 @@ function ClassDetailContent() {
 
   const handleJoinClass = async () => {
     if (!user) {
-      router.push('/login')
+      router.push(loginPath())
       return
     }
     const message = prompt('请输入申请理由（可选）:')
@@ -383,325 +359,286 @@ function ClassDetailContent() {
           </div>
         )
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 items-start">
-          <div className="space-y-4 min-w-0">
-            <div className="card-static rounded-xl border border-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-                <Megaphone className="w-4 h-4 text-primary-light" />
-                <h2 className="text-sm font-semibold text-foreground">班级公告</h2>
-              </div>
-              <div className="p-4 text-sm text-muted-foreground min-h-[4rem]">
-                {classData.announcement?.trim() ? (
-                  <p className="text-foreground whitespace-pre-wrap">{classData.announcement}</p>
-                ) : (
-                  '暂无公告'
+        <div className="space-y-3">
+          {/* 公告：空态单行，有内容时再展开，避免空卡片占高 */}
+          <div className="rounded-xl border border-border bg-card px-3.5 py-2.5 flex items-start gap-2.5">
+            <Megaphone className="w-4 h-4 text-primary-light shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs font-semibold text-foreground shrink-0">班级公告</span>
+                {!classData.announcement?.trim() && (
+                  <span className="text-xs text-muted-foreground">暂无公告</span>
                 )}
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {/* 作业 */}
-              <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    <FileText className="w-4 h-4" /> 作业
-                  </h2>
-                  {user && isClassAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => setCreateAssignmentOpen(true)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary-light hover:underline"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> 创建
-                    </button>
-                  )}
-                </div>
-                <div className="p-4">
-                  <div className="flex gap-1.5 mb-3 flex-wrap">
-                    {(['all', 'upcoming', 'active', 'ended'] as const).map((f) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setAssignmentFilter(f)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium ${
-                          assignmentFilter === f ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {f === 'all' ? '全部' : f === 'upcoming' ? '未开始' : f === 'active' ? '进行中' : '已结束'}
-                      </button>
-                    ))}
-                  </div>
-                  {assignmentsLoading ? (
-                    <p className="text-center py-8 text-sm text-muted-foreground">加载中…</p>
-                  ) : filteredAssignments.length === 0 ? (
-                    <p className="text-center py-8 text-sm text-muted-foreground">暂无作业</p>
-                  ) : (
-                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                      {filteredAssignments.map((a) => {
-                        const status = getAssignmentStatus(a.startTime, a.endTime || a.deadline)
-                        const statusInfo = status === 'upcoming'
-                          ? { text: '未开始', cls: 'text-blue-400 bg-blue-500/10' }
-                          : status === 'active'
-                          ? { text: '进行中', cls: 'text-secondary bg-secondary/10' }
-                          : { text: '已结束', cls: 'text-muted-foreground bg-muted' }
-                        return (
-                          <div
-                            key={a.id}
-                            className="group relative p-3 rounded-lg border border-border hover:border-primary/30 text-sm"
-                          >
-                            <AssignmentOpenLink
-                              href={`/classes/${classId}/assignments/${a.id}`}
-                              assignmentTitle={a.title}
-                              classLabel={classData.name}
-                              className="block pr-8"
-                            >
-                              <div className="flex items-center gap-1.5 mb-1">
-                                <span className="font-medium truncate">{a.title}</span>
-                                <span className={`text-[11px] px-1.5 py-0.5 rounded-full shrink-0 ${statusInfo.cls}`}>
-                                  {statusInfo.text}
-                                </span>
-                              </div>
-                              <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-2">
-                                <span className="inline-flex items-center gap-0.5">
-                                  <Clock className="w-3 h-3" />
-                                  {fmt(a.startTime)} ~ {fmt(a.deadline)}
-                                </span>
-                                <span>{a.problemCount || 0} 题</span>
-                              </div>
-                            </AssignmentOpenLink>
-                            {isClassAdmin && (
-                              <button
-                                type="button"
-                                title="编辑作业"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setEditAssignmentId(a.id)
-                                  setEditAssignmentOpen(true)
-                                }}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 题单（中间栏）：班级私有题单 */}
-              <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    <ListChecks className="w-4 h-4" /> 题单
-                  </h2>
-                  {user && isClassAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => setCreateTrainingOpen(true)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary-light hover:underline"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> 创建
-                    </button>
-                  )}
-                </div>
-                <div className="p-4">
-                  {trainingsLoading ? (
-                    <p className="text-center py-8 text-sm text-muted-foreground">加载中…</p>
-                  ) : trainings.length === 0 ? (
-                    <p className="text-center py-8 text-sm text-muted-foreground">暂无题单</p>
-                  ) : (
-                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                      {trainings.map((t) => {
-                        const progress = t.userProgress?.progressPercentage ?? 0
-                        return (
-                          <Link
-                            key={t.id}
-                            href={`/training/${t.id}`}
-                            className="group block p-3 rounded-lg border border-border hover:border-primary/30 text-sm transition-colors"
-                          >
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <span className="font-medium truncate flex-1">{t.title}</span>
-                              {t.userProgress?.isJoined && (
-                                <span className="text-[11px] px-1.5 py-0.5 rounded-full shrink-0 text-secondary bg-secondary/10">
-                                  {progress}%
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-2">
-                              <span>{t.problemCount || 0} 题</span>
-                              <span>{t.joinCount || 0} 人加入</span>
-                              {t.userProgress?.solvedCount !== undefined && (
-                                <span>已解 {t.userProgress.solvedCount}</span>
-                              )}
-                            </div>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 笔记 */}
-              <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    <BookOpen className="w-4 h-4" /> 笔记
-                  </h2>
-                  {user && isClassAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => setCreateNoteOpen(true)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary-light hover:underline"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> 创建
-                    </button>
-                  )}
-                </div>
-                <div className="p-4">
-                  {notesLoading ? (
-                    <p className="text-center py-8 text-sm text-muted-foreground">加载中…</p>
-                  ) : notes.length === 0 ? (
-                    <p className="text-center py-8 text-sm text-muted-foreground">暂无笔记</p>
-                  ) : (
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {notes.map((n) => (
-                        <Link
-                          key={n.id}
-                          href={`/classes/${classId}/notes/${n.id}`}
-                          className="block p-3 rounded-lg border border-border hover:border-primary/30 text-sm"
-                        >
-                          <h3 className="font-medium line-clamp-1">{n.title}</h3>
-                          <p className="text-[11px] text-muted-foreground mt-1">
-                            {n.author?.nickname || n.author?.username || '匿名'} ·{' '}
-                            {formatDate(n.createdAt)}
-                          </p>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="card-static rounded-xl border border-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Users className="w-4 h-4" /> 班级成员
-                </h2>
-                <span className="text-xs text-muted-foreground">{classData.members.length} 人</span>
-              </div>
-              <div className="p-3 max-h-72 overflow-y-auto space-y-1">
-                {sortedMembers.map((m) => {
-                  const showAdminActions =
-                    isClassAdmin && m.userId !== user?.id && canManageTarget(m.role, operatorRole)
-                  return (
-                    <div
-                      key={m.id}
-                      className="flex flex-wrap items-center gap-2 p-2 rounded-lg hover:bg-muted/50 text-sm"
-                    >
-                      {m.avatar ? (
-                        <img src={m.avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-                          <User className="w-4 h-4 text-primary" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">
-                          {m.nickname || m.username}
-                          {m.role === 'owner' && (
-                            <Crown className="w-3.5 h-3.5 inline ml-1 text-amber-500" />
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {roleLabel(m.role)}
-                          {m.joinedAt ? (
-                            <span className="text-muted-foreground/80">
-                              {' '}
-                              · 加入{' '}
-                              {formatDate(m.joinedAt)}
-                            </span>
-                          ) : null}
-                        </p>
-                      </div>
-                      {showAdminActions && m.role !== 'owner' && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          <select
-                            className="input py-1 text-xs w-[5.5rem]"
-                            value={m.role === 'assistant' ? 'assistant' : 'student'}
-                            disabled={m.role === 'owner'}
-                            onChange={(e) =>
-                              patchMemberRole(m.userId, e.target.value as 'student' | 'assistant')
-                            }
-                          >
-                            <option value="student">学生</option>
-                            <option value="assistant">老师</option>
-                          </select>
-                          {canManageTarget(m.role, operatorRole) && (
-                            <button
-                              type="button"
-                              className="p-1.5 text-error hover:bg-error/10 rounded"
-                              title="移除成员"
-                              onClick={() => removeMember(m.userId, m.nickname || m.username)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+              {classData.announcement?.trim() ? (
+                <p className="mt-1 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                  {classData.announcement}
+                </p>
+              ) : null}
             </div>
           </div>
 
-          <aside className="card-static rounded-xl border border-border p-4 space-y-4 lg:sticky lg:top-4">
-            <h2 className="text-sm font-semibold text-foreground border-b border-border pb-2">
-              班级详情
-            </h2>
-            <dl className="space-y-3 text-sm">
-              <div>
-                <dt className="text-muted-foreground text-xs mb-0.5">管理员</dt>
-                <dd className="text-foreground font-medium">
-                  {ownerMember?.nickname || ownerMember?.username || '—'}
-                </dd>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_14rem] gap-3 items-start">
+            <div className="space-y-3 min-w-0">
+              {/* 作业优先加宽，笔记次之；去掉无效的 3 列空位 */}
+              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-3">
+                {/* 作业 */}
+                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col min-h-0">
+                  <div className="px-3.5 py-2.5 border-b border-border flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      <FileText className="w-4 h-4" /> 作业
+                      <span className="text-xs font-normal text-muted-foreground">
+                        ({assignments.length})
+                      </span>
+                    </h2>
+                    {user && isClassAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setCreateAssignmentOpen(true)}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary-light hover:underline"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> 创建
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-3 flex-1">
+                    <div className="flex gap-1 mb-2.5 flex-wrap">
+                      {(['all', 'upcoming', 'active', 'ended'] as const).map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setAssignmentFilter(f)}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
+                            assignmentFilter === f
+                              ? 'bg-primary text-white'
+                              : 'bg-muted text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {f === 'all' ? '全部' : f === 'upcoming' ? '未开始' : f === 'active' ? '进行中' : '已结束'}
+                        </button>
+                      ))}
+                    </div>
+                    {assignmentsLoading ? (
+                      <p className="text-center py-6 text-sm text-muted-foreground">加载中…</p>
+                    ) : filteredAssignments.length === 0 ? (
+                      <p className="text-center py-6 text-sm text-muted-foreground">暂无作业</p>
+                    ) : (
+                      <div className="space-y-1 max-h-[22rem] overflow-y-auto">
+                        {filteredAssignments.map((a) => {
+                          const status = getAssignmentStatus(a.startTime, a.endTime || a.deadline)
+                          const statusInfo =
+                            status === 'upcoming'
+                              ? { text: '未开始', cls: 'text-blue-400 bg-blue-500/10' }
+                              : status === 'active'
+                                ? { text: '进行中', cls: 'text-secondary bg-secondary/10' }
+                                : { text: '已结束', cls: 'text-muted-foreground bg-muted' }
+                          return (
+                            <div
+                              key={a.id}
+                              className="group relative px-2.5 py-2 rounded-lg border border-border hover:border-primary/30 text-sm transition-colors"
+                            >
+                              <AssignmentOpenLink
+                                href={`/classes/${classId}/assignments/${a.id}`}
+                                assignmentTitle={a.title}
+                                classLabel={classData.name}
+                                className="block pr-8"
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="font-medium truncate">{a.title}</span>
+                                  <span
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${statusInfo.cls}`}
+                                  >
+                                    {statusInfo.text}
+                                  </span>
+                                </div>
+                                <div className="mt-0.5 text-[11px] text-muted-foreground flex flex-wrap gap-x-2.5">
+                                  <span className="inline-flex items-center gap-0.5">
+                                    <Clock className="w-3 h-3" />
+                                    {fmt(a.startTime)} – {fmt(a.deadline)}
+                                  </span>
+                                  <span>{a.problemCount || 0} 题</span>
+                                </div>
+                              </AssignmentOpenLink>
+                              {isClassAdmin && (
+                                <button
+                                  type="button"
+                                  title="编辑作业"
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditAssignmentId(a.id)
+                                    setEditAssignmentOpen(true)
+                                  }}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 笔记 */}
+                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col min-h-0">
+                  <div className="px-3.5 py-2.5 border-b border-border flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      <BookOpen className="w-4 h-4" /> 笔记
+                      <span className="text-xs font-normal text-muted-foreground">({notes.length})</span>
+                    </h2>
+                    {user && isClassAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setCreateNoteOpen(true)}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary-light hover:underline"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> 创建
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-3 flex-1">
+                    {notesLoading ? (
+                      <p className="text-center py-6 text-sm text-muted-foreground">加载中…</p>
+                    ) : notes.length === 0 ? (
+                      <p className="text-center py-6 text-sm text-muted-foreground">暂无笔记</p>
+                    ) : (
+                      <div className="space-y-1 max-h-[22rem] overflow-y-auto">
+                        {notes.map((n) => (
+                          <button
+                            key={n.id}
+                            type="button"
+                            onClick={() => setViewNoteId(n.id)}
+                            className="w-full text-left px-2.5 py-2 rounded-lg border border-border hover:border-primary/30 text-sm transition-colors"
+                          >
+                            <h3 className="font-medium line-clamp-1">{n.title}</h3>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {n.author?.nickname || n.author?.username || '匿名'} ·{' '}
+                              {formatDate(n.createdAt)}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div>
-                <dt className="text-muted-foreground text-xs mb-0.5">公开度</dt>
-                <dd className="text-foreground inline-flex items-center gap-1">
-                  {classData.isPublic ? (
-                    <>
-                      <Globe className="w-3.5 h-3.5 text-secondary" /> 公开班级
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-3.5 h-3.5" /> 私有班级
-                    </>
-                  )}
-                </dd>
+
+              {/* 成员：宽屏双列，行高收紧 */}
+              <div className="card-static rounded-xl border border-border overflow-hidden">
+                <div className="px-3.5 py-2.5 border-b border-border flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <Users className="w-4 h-4" /> 班级成员
+                  </h2>
+                  <span className="text-xs text-muted-foreground">{classData.members.length} 人</span>
+                </div>
+                <div className="p-2 max-h-64 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-0.5">
+                  {sortedMembers.map((m) => {
+                    const showAdminActions =
+                      isClassAdmin && m.userId !== user?.id && canManageTarget(m.role, operatorRole)
+                    return (
+                      <div
+                        key={m.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50 text-sm"
+                      >
+                        {m.avatar ? (
+                          <img src={m.avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                            <User className="w-3.5 h-3.5 text-primary" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground truncate text-[13px] leading-tight">
+                            {m.nickname || m.username}
+                            {m.role === 'owner' && (
+                              <Crown className="w-3 h-3 inline ml-1 text-amber-500 align-text-top" />
+                            )}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {roleLabel(m.role)}
+                            {m.joinedAt ? ` · ${formatDate(m.joinedAt)}` : null}
+                          </p>
+                        </div>
+                        {showAdminActions && m.role !== 'owner' && (
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <select
+                              className="input py-0.5 px-1 text-[11px] w-[4.5rem] h-7"
+                              value={m.role === 'assistant' ? 'assistant' : 'student'}
+                              disabled={m.role === 'owner'}
+                              onChange={(e) =>
+                                patchMemberRole(m.userId, e.target.value as 'student' | 'assistant')
+                              }
+                            >
+                              <option value="student">学生</option>
+                              <option value="assistant">助教</option>
+                            </select>
+                            {canManageTarget(m.role, operatorRole) && (
+                              <button
+                                type="button"
+                                className="p-1 text-error hover:bg-error/10 rounded"
+                                title="移除成员"
+                                onClick={() => removeMember(m.userId, m.nickname || m.username)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              <div>
-                <dt className="text-muted-foreground text-xs mb-0.5">学生数量</dt>
-                <dd className="text-foreground font-medium">{studentCount}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs mb-0.5">老师数量</dt>
-                <dd className="text-foreground font-medium">{teacherCount}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs mb-0.5">创建时间</dt>
-                <dd className="text-foreground inline-flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                  {formatDate(classData.createdAt)}
-                </dd>
-              </div>
-            </dl>
-          </aside>
+            </div>
+
+            {/* 侧栏：左右对齐的紧凑元信息 */}
+            <aside className="rounded-xl border border-border bg-card p-3 space-y-3 lg:sticky lg:top-[72px]">
+              <h2 className="text-xs font-semibold text-foreground tracking-wide">班级详情</h2>
+              {classData.description?.trim() ? (
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">
+                  {classData.description}
+                </p>
+              ) : null}
+              <dl className="space-y-2 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground shrink-0">班主任</dt>
+                  <dd className="text-foreground font-medium truncate text-right">
+                    {ownerMember?.nickname || ownerMember?.username || '—'}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground shrink-0">公开度</dt>
+                  <dd className="text-foreground inline-flex items-center gap-1">
+                    {classData.isPublic ? (
+                      <>
+                        <Globe className="w-3 h-3 text-secondary" /> 公开
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3 h-3" /> 私有
+                      </>
+                    )}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground">学生</dt>
+                  <dd className="text-foreground font-medium tabular-nums">{studentCount}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground">助教</dt>
+                  <dd className="text-foreground font-medium tabular-nums">{teacherCount}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
+                  <dt className="text-muted-foreground inline-flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> 创建
+                  </dt>
+                  <dd className="text-foreground tabular-nums">{formatDate(classData.createdAt)}</dd>
+                </div>
+              </dl>
+            </aside>
+          </div>
         </div>
       )}
       <CreateAssignmentModal
@@ -730,24 +667,37 @@ function ClassDetailContent() {
           void fetchClassDetail()
         }}
       />
-      <CreateClassTrainingModal
-        classId={classId}
-        open={createTrainingOpen}
-        onClose={() => setCreateTrainingOpen(false)}
-        onCreated={(trainingId) => {
-          void fetchTrainings()
-          void fetchClassDetail()
-          // 创建后跳转到题单详情页继续编辑
-          router.push(`/training/${trainingId}`)
-        }}
-      />
       <CreateNoteModal
         classId={classId}
-        open={createNoteOpen}
-        onClose={() => setCreateNoteOpen(false)}
+        open={createNoteOpen || !!editNote}
+        editNote={editNote}
+        onClose={() => {
+          setCreateNoteOpen(false)
+          setEditNote(null)
+        }}
         onCreated={() => {
           void fetchNotes()
           void fetchClassDetail()
+        }}
+        onSaved={() => {
+          void fetchNotes()
+          void fetchClassDetail()
+          if (editNote) setViewNoteId(editNote.id)
+        }}
+      />
+      <ViewNoteModal
+        classId={classId}
+        noteId={viewNoteId}
+        open={!!viewNoteId}
+        currentUserId={user?.id}
+        onClose={() => setViewNoteId(null)}
+        onDeleted={() => {
+          void fetchNotes()
+          void fetchClassDetail()
+        }}
+        onEdit={(note) => {
+          setViewNoteId(null)
+          setEditNote(note)
         }}
       />
       <CreateClassProblemModal

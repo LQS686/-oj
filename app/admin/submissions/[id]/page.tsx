@@ -18,6 +18,7 @@ import {
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText, getDifficultyColor } from '@/lib/status'
 import { fetchWithCookie } from '@/lib/api/base'
+import { AdminPageShell } from '@/components/admin'
 
 interface TestResult {
   testId: string
@@ -319,7 +320,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
     : 0
 
   return (
-    <div className="space-y-6">
+    <AdminPageShell width="wide" className="space-y-6">
       {/* 顶部导航 */}
       <div className="flex items-center gap-3 flex-wrap">
         <Link
@@ -599,6 +600,6 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
           </div>
         </div>
       </div>
-    </div>
+    </AdminPageShell>
   )
 }

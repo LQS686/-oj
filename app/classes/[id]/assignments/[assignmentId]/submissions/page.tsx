@@ -10,7 +10,7 @@ import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } fro
 import { formatDateTime } from '@/lib/utils'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
 import type { Assignment } from '@/types/models'
-import { PageContainer } from '@/components/layout'
+import { ClassWorkspaceShell } from '@/components/common'
 
 interface Submission {
  id: string
@@ -319,8 +319,11 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  }
 
  return (
- <div className="min-h-screen">
- <PageContainer className="py-8">
+ <ClassWorkspaceShell
+ classId={classId}
+ title={assignment?.title ? `${assignment.title} · 提交` : '提交记录'}
+ icon={Code}
+ >
  <button
  onClick={() => {
  // 返回作业详情页的题目 tab（作业详情页支持 ?tab=problems 或 ?tab=completion）
@@ -328,21 +331,21 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  const returnTab = isFromLeaderboard ? 'completion' : 'problems'
  router.push(`/classes/${classId}/assignments/${assignmentId}?tab=${returnTab}`)
  }}
- className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
+ className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
  >
  <ArrowLeft className="w-4 h-4" />
  返回作业详情
  </button>
 
  <div className="card p-6 mb-6">
- <h1 className="text-3xl font-bold text-foreground mb-2">
+ <h1 className="text-xl md:text-2xl font-bold text-foreground mb-2 hidden sm:block">
  {isFromLeaderboard && targetUser && targetProblem ? (
  `${assignment?.title} - ${targetProblem.title}(${targetProblem.problemNumber}) - ${targetUser.nickname || targetUser.username}的提交记录`
  ) : (
  `${assignment?.title} - 提交记录`
  )}
  </h1>
- <p className="text-muted-foreground">
+ <p className="text-muted-foreground text-sm">
  {isFromLeaderboard && targetUser ? (
  `查看 ${targetUser.nickname || targetUser.username} 在 ${targetProblem?.title} 题目上的所有提交`
  ) : (
@@ -524,7 +527,6 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  </div>
  )}
  </div>
- </PageContainer>
 
  {showCodeModal && selectedSubmission && (
  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4">
@@ -555,6 +557,6 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  </div>
  </div>
  )}
- </div>
+ </ClassWorkspaceShell>
  )
 }

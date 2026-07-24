@@ -69,7 +69,8 @@ export async function notifyAdminsAboutJoinRequest(
   className: string
 ) {
   const adminMembers = await prisma.classMember.findMany({
-    where: { classId, role: { in: ['owner', 'admin', 'assistant'] } },
+    // 含历史 role=admin，与 dbRolesMatchingApiFilter('assistant') 一致
+    where: { classId, role: { in: ['owner', 'assistant', 'admin'] } },
   })
   const notifications = adminMembers.map((member: any) => ({
     userId: member.userId,
@@ -129,7 +130,7 @@ export interface DecideJoinRequestInput {
 }
 
 /**
- * 校验班级加入申请：班级存在性、申请存在性、操作者权限（owner / admin）
+ * 校验班级加入申请：班级存在性、申请存在性、操作者权限（owner / assistant）
  */
 export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
   const classRecord = await prisma.class.findUnique({ where: { id: input.classId } })

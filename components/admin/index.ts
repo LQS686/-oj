@@ -1,3 +1,5 @@
 export { default as DataTable } from './DataTable'
 export type { Column, DataTableProps } from './DataTable'
 export { default as FilterBar } from './FilterBar'
+export { AdminPageShell } from './AdminPageShell'
+export type { AdminPageWidth } from './AdminPageShell'

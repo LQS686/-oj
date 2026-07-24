@@ -184,10 +184,23 @@
   --color-difficulty-hard: var(--difficulty-hard);
   --color-difficulty-expert: var(--difficulty-expert);
 
-  /* 语义化页面宽度 token（Tailwind v4 自动生成 max-w-page-full / max-w-page-standard / max-w-page-form 工具类） */
-  --max-w-page-full: 80rem;       /* 1280px：多栏工作台、列表、详情等宽内容页面 */
-  --max-w-page-standard: 64rem;  /* 1024px：题解、设置、笔记、用户主页等标准阅读页面 */
-  --max-w-page-form: 56rem;      /* 896px：表单、创建、编辑等窄表单页面 */
+  /* 语义化页面宽度 token
+   * Tailwind v4 命名空间是 --max-width-*（生成 max-w-*），不是 --max-w-* */
+  --max-width-page-full: 80rem;       /* 1280px：多栏工作台、列表、详情等宽内容页面 */
+  --max-width-page-workspace: 90rem; /* 1440px：作业/做题三栏工作台 */
+  --max-width-page-standard: 64rem;  /* 1024px：题解、设置、笔记、用户主页等标准阅读页面 */
+  --max-width-page-form: 56rem;      /* 896px：表单、创建、编辑等窄表单页面 */
+
+  /* 层叠层级（约定）：sticky < dock < dropdown < navbar < overlay < modal < drawer < toast */
+  --navbar-height: 3.5rem; /* 56px，与 Navbar h-14 / body padding-top 对齐 */
+  --z-sticky: 30;
+  --z-dock: 40;
+  --z-dropdown: 50;
+  --z-navbar: 100;
+  --z-overlay: 110;
+  --z-modal: 120;
+  --z-drawer: 130;
+  --z-toast: 1000;
 }
 
 * {
@@ -206,7 +219,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   min-height: 100vh;
-  padding-top: 56px;
+  padding-top: var(--navbar-height);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

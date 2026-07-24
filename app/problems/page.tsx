@@ -20,7 +20,7 @@ import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useClickOutside } from '@/hooks/useClickOutside'
-import { EducationalPageShell, DenseListShell, denseListRowClass } from '@/components/common'
+import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState } from '@/components/common'
 
 interface Problem {
   id: string
@@ -246,18 +246,18 @@ export default function ProblemsPage() {
 
     if (filteredProblems.length === 0) {
       return (
-        <div className="card-static rounded-lg p-12 text-center animate-fadeIn">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
-            <Search className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <div className="text-foreground text-xl font-semibold mb-2">没有找到符合条件的题目</div>
-          <div className="text-muted-foreground mb-6">尝试调整筛选条件或搜索关键词</div>
-          {hasFilters && (
-            <button onClick={clearFilters} className="btn btn-primary">
-              清除筛选
-            </button>
-          )}
-        </div>
+        <ListEmptyState
+          icon={Search}
+          title="没有找到符合条件的题目"
+          description="尝试调整筛选条件或搜索关键词"
+          action={
+            hasFilters ? (
+              <button onClick={clearFilters} className="btn btn-primary btn-sm">
+                清除筛选
+              </button>
+            ) : undefined
+          }
+        />
       )
     }
 

@@ -59,14 +59,16 @@ export default function TrainingProblemsWorkspaceLayout({
 
   if (loadError) {
     return (
-      <PageContainer className="py-12 text-center text-error">{loadError}</PageContainer>
+      <PageContainer variant="workspace" className="py-4 text-center text-error text-sm">
+        {loadError}
+      </PageContainer>
     )
   }
 
   if (!training || initialProblems === null) {
     return (
-      <PageContainer className="py-24 flex justify-center">
-        <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <PageContainer variant="workspace" className="py-8 flex justify-center">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </PageContainer>
     )
   }
@@ -77,9 +79,9 @@ export default function TrainingProblemsWorkspaceLayout({
       training={training}
       initialProblems={initialProblems}
     >
-      <PageContainer className="py-4 pb-8">
+      <PageContainer variant="workspace" className="py-4 pb-6">
         <TrainingProblemMainHeader />
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)] gap-3 items-start">
           <div className="min-w-0">{children}</div>
           <TrainingProblemSidebar />
         </div>

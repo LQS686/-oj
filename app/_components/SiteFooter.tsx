@@ -6,7 +6,7 @@ import { PageContainer } from '@/components/layout'
 export function SiteFooter({ siteName, siteDescription }: { siteName: string; siteDescription: string }) {
   return (
     <footer className="mt-auto border-t border-border bg-muted/20">
-      <PageContainer>
+      <PageContainer variant="full">
         {/* 上区：品牌 + 导航 + 友情链接 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 py-8">
           {/* 品牌区 */}

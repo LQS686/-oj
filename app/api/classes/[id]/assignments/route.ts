@@ -9,25 +9,21 @@ import {
   readJson,
   readQuery,
   throw400,
-  throw403,
   throw404,
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
-  assertClassAdmin,
   getClassById,
-  getCurrentClassMember,
   listClassAssignmentsWithStats,
   validateAssignmentProblems,
 } from '@/lib/class/service'
 import { createClassAssignment } from '@/lib/class/assignment'
 
-export const GET = withApi.auth(async (req, ctx, { user }) => {
+export const GET = withApi.classRole(
+  ['owner', 'assistant', 'student'],
+  async (req, ctx) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
-
-  const member = await getCurrentClassMember(id, user.id)
-  if (!member) throw403('只有班级成员可以查看作业')
 
   const q = readQuery<{ page?: string; pageSize?: string; status?: 'upcoming' | 'active' | 'ongoing' | 'ended' }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)
@@ -41,11 +37,9 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
   return ok(result)
 })
 
-export const POST = withApi.auth(async (req, ctx, { user }) => {
+export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
-
-  await assertClassAdmin(id, user.id, '只有管理员可以创建作业')
 
   const body = await readJson<{
     title?: string

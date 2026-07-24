@@ -32,9 +32,6 @@ export interface AssignmentProblemProgressListProps {
   assignmentEndTime?: string
 }
 
-/**
- * 获取某题的最高分提交
- */
 function getProblemStatus(
   problemId: string,
   submissions: Submission[]
@@ -46,6 +43,9 @@ function getProblemStatus(
   )
 }
 
+/**
+ * 作业题号轨：桌面竖排窄栏，移动端横滑，把宽度留给题面与编辑器。
+ */
 export default function AssignmentProblemProgressList({
   problems,
   submissions,
@@ -64,23 +64,32 @@ export default function AssignmentProblemProgressList({
   }
 
   return (
-    <div className="flex flex-col gap-1 p-2 max-h-[calc(100vh-100px)] overflow-y-auto">
+    <div
+      className="flex lg:flex-col gap-1.5 p-2 overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto lg:max-h-[calc(100vh-11rem)]"
+      role="listbox"
+      aria-label="作业题目列表"
+    >
       {problems.map((problem, index) => {
         const isSelected = index === selectedIndex
         const status = getProblemStatus(problem.id, submissions)
+        const letter = LETTERS[index] ?? String(index + 1)
 
         return (
           <button
             key={problem.id}
+            type="button"
+            role="option"
+            aria-selected={isSelected}
+            title={problem.title}
             onClick={() => onSelect(index)}
-            className={`flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-colors w-full ${
-              isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
+            className={`flex flex-col items-center gap-1 shrink-0 w-[3.5rem] lg:w-full px-1 py-2 rounded-lg transition-colors ${
+              isSelected ? 'bg-primary/10 ring-1 ring-primary/25' : 'hover:bg-muted/60'
             }`}
           >
             <span
-              className={`relative w-9 h-9 rounded-lg font-mono font-bold text-sm flex items-center justify-center shrink-0 border ${
+              className={`relative w-8 h-8 rounded-md font-mono font-bold text-sm flex items-center justify-center border transition-colors ${
                 isSelected
-                  ? 'bg-primary text-white border-primary shadow-md'
+                  ? 'bg-primary text-white border-primary shadow-sm'
                   : status?.status === 'AC'
                     ? 'bg-secondary/10 text-secondary border-secondary/30'
                     : status
@@ -88,42 +97,35 @@ export default function AssignmentProblemProgressList({
                       : 'bg-muted text-muted-foreground border-border'
               }`}
             >
-              {LETTERS[index]}
+              {letter}
               {status?.status === 'AC' && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-secondary rounded-full border-[1.5px] border-white dark:border-card" />
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-secondary rounded-full border border-white dark:border-card" />
               )}
             </span>
 
-            <div className="flex flex-col items-start min-w-[3rem] shrink-0">
-              {status ? (
-                <span
-                  className={`text-xs font-semibold tabular-nums ${
-                    status.status === 'AC'
-                      ? 'text-secondary'
-                      : status.score > 0
-                        ? 'text-accent'
-                        : 'text-muted-foreground'
-                  }`}
-                >
-                  {status.score}分
-                </span>
-              ) : (
-                <span className="text-xs text-muted-foreground/60">—</span>
-              )}
-            </div>
+            <span
+              className={`text-[10px] font-semibold tabular-nums leading-none ${
+                status?.status === 'AC'
+                  ? 'text-secondary'
+                  : status && status.score > 0
+                    ? 'text-accent'
+                    : 'text-muted-foreground/70'
+              }`}
+            >
+              {status ? `${status.score}分` : '—'}
+            </span>
 
-            <div className="flex-1 min-w-0">
-              <ProblemTimer
-                key={`${assignmentId}-${problem.id}`}
-                classId={classId}
-                assignmentId={assignmentId}
-                problemId={problem.id}
-                acHint={status?.status === 'AC'}
-                assignmentEndTime={assignmentEndTime}
-                active={isSelected}
-                className="!px-1.5 !py-0.5 !text-[10px]"
-              />
-            </div>
+            <ProblemTimer
+              key={`${assignmentId}-${problem.id}`}
+              classId={classId}
+              assignmentId={assignmentId}
+              problemId={problem.id}
+              acHint={status?.status === 'AC'}
+              assignmentEndTime={assignmentEndTime}
+              active={isSelected}
+              compact
+              className="!px-1 !py-0 !text-[9px] !gap-0.5 max-w-full justify-center"
+            />
           </button>
         )
       })}

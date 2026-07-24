@@ -9,6 +9,17 @@ import type {
   TrainingCategoryType,
 } from './types'
 
+/**
+ * 排除班级私有题单。
+ * MongoDB/Prisma：单独的 `classId: null` 匹配不到「字段未写入」的文档，
+ * 会导致公开题单被全部滤空。
+ */
+function whereNotClassScoped(): { OR: Array<Record<string, unknown>> } {
+  return {
+    OR: [{ classId: null }, { classId: { isSet: false } }],
+  }
+}
+
 /* ============================================================================
  * 高级查询：公开列表（带分类/标签/作者/题目计数/用户进度）
  * ========================================================================== */
@@ -27,32 +38,37 @@ export async function listPublicTrainingsAdvanced(
     joinedOnly?: boolean
   }
 ): Promise<PaginatedResponse<TrainingListItem>> {
-  // 公开题单：isPublic + published + 非班级私有（classId 为空）
+  // 公开题单：isPublic + published + 非班级私有
   // 登录用户：额外可看到自己创建的私有/草稿题单（仍排除班级私有）
-  const baseScope: any = filter.userId
+  const visibility: Record<string, unknown> = filter.userId
     ? {
         OR: [
-          { isPublic: true, status: 'published', classId: null },
-          { authorId: filter.userId, classId: null },
+          { isPublic: true, status: 'published' },
+          { authorId: filter.userId },
         ],
       }
-    : { isPublic: true, status: 'published', classId: null }
+    : { isPublic: true, status: 'published' }
 
-  // joinedOnly：限定为当前用户加入的题单（仍排除班级私有，因为班级题单走班级 API）
+  const baseScope: Record<string, unknown> = {
+    AND: [visibility, whereNotClassScoped()],
+  }
+
+  // joinedOnly：限定为当前用户加入的题单（仍排除班级私有）
   if (filter.joinedOnly && filter.userId) {
     const joinedIds = await prisma.trainingEnrollment.findMany({
       where: { userId: filter.userId },
       select: { trainingId: true },
     })
-    const joinedTrainingIds = joinedIds.map((e: any) => e.trainingId)
-    // 仅保留非班级私有的题单
+    const joinedTrainingIds = joinedIds.map((e: { trainingId: string }) => e.trainingId)
     const visibleJoined = await prisma.training.findMany({
-      where: { id: { in: joinedTrainingIds }, classId: null },
+      where: {
+        AND: [{ id: { in: joinedTrainingIds } }, whereNotClassScoped()],
+      },
       select: { id: true },
     })
-    baseScope.id = { in: visibleJoined.map((t: any) => t.id) }
+    baseScope.id = { in: visibleJoined.map((t: { id: string }) => t.id) }
   }
-  const extra: any[] = []
+  const extra: Record<string, unknown>[] = []
   if (filter.keyword) {
     extra.push({
       OR: [
@@ -67,7 +83,11 @@ export async function listPublicTrainingsAdvanced(
   // 兼容老数据：'official' 过滤同时匹配 categoryType='official' 和 categoryType=null
   if (filter.categoryType === 'official') {
     extra.push({
-      OR: [{ categoryType: 'official' }, { categoryType: null }],
+      OR: [
+        { categoryType: 'official' },
+        { categoryType: null },
+        { categoryType: { isSet: false } },
+      ],
     })
   } else if (filter.categoryType === 'contest') {
     extra.push({ categoryType: 'contest' })
@@ -75,13 +95,12 @@ export async function listPublicTrainingsAdvanced(
   if (filter.isRecommended === true) {
     extra.push({ isRecommended: true })
   }
-  const where: any = extra.length > 0
-    ? { AND: [baseScope, ...extra] }
-    : baseScope
+  const where: Record<string, unknown> =
+    extra.length > 0 ? { AND: [baseScope, ...extra] } : baseScope
 
   const [trainings, total] = await Promise.all([
     prisma.training.findMany({
-      where,
+      where: where as any,
       skip: (page - 1) * limit,
       take: limit,
       orderBy: [{ isRecommended: 'desc' }, { createdAt: 'desc' }],
@@ -91,48 +110,54 @@ export async function listPublicTrainingsAdvanced(
         category: { select: { id: true, name: true } },
       },
     }),
-    prisma.training.count({ where }),
+    prisma.training.count({ where: where as any }),
   ])
 
   // 批量拉取当前用户在这些题单上的进度
-  const progressMap = new Map<string, { solvedCount: number; attemptedCount: number; isJoined: boolean }>()
+  const progressMap = new Map<
+    string,
+    { solvedCount: number; attemptedCount: number; isJoined: boolean }
+  >()
   if (filter.userId && trainings.length > 0) {
-    const trainingIds = trainings.map((t: any) => t.id)
+    const trainingIds = trainings.map((t: { id: string }) => t.id)
     const enrollments = await prisma.trainingEnrollment.findMany({
       where: { userId: filter.userId, trainingId: { in: trainingIds } },
       select: { trainingId: true },
     })
-    const enrolledSet = new Set(enrollments.map((e: any) => e.trainingId))
+    const enrolledSet = new Set(enrollments.map((e: { trainingId: string }) => e.trainingId))
 
     const allProblems = await prisma.trainingProblem.findMany({
       where: { trainingId: { in: trainingIds } },
       select: { id: true, trainingId: true, problemId: true },
     })
-    const problemIds = [...new Set(allProblems.map((p: any) => p.problemId))]
-    const submissions = problemIds.length > 0 ? await prisma.submission.findMany({
-      where: { userId: filter.userId, problemId: { in: problemIds } },
-      select: { problemId: true, status: true },
-    }) : []
-    const acSet = new Set(submissions.filter((s: any) => s.status === 'AC').map((s: any) => s.problemId))
-    const attSet = new Set(submissions.map((s: any) => s.problemId))
+    const problemIds = [...new Set(allProblems.map((p: { problemId: string }) => p.problemId))]
+    const submissions =
+      problemIds.length > 0
+        ? await prisma.submission.findMany({
+            where: { userId: filter.userId, problemId: { in: problemIds } },
+            select: { problemId: true, status: true },
+          })
+        : []
+    const acSet = new Set(
+      submissions.filter((s: { status: string }) => s.status === 'AC').map((s: { problemId: string }) => s.problemId)
+    )
+    const attSet = new Set(submissions.map((s: { problemId: string }) => s.problemId))
 
     for (const t of trainings) {
-      const tProblems = allProblems.filter((p: any) => p.trainingId === t.id)
-      const total = tProblems.length
-      const solvedCount = tProblems.filter((p: any) => acSet.has(p.problemId)).length
-      const attemptedCount = tProblems.filter((p: any) => attSet.has(p.problemId)).length
+      const tProblems = allProblems.filter((p: { trainingId: string }) => p.trainingId === t.id)
+      const solvedCount = tProblems.filter((p: { problemId: string }) => acSet.has(p.problemId)).length
+      const attemptedCount = tProblems.filter((p: { problemId: string }) => attSet.has(p.problemId)).length
       progressMap.set(t.id, {
         solvedCount,
         attemptedCount,
         isJoined: enrolledSet.has(t.id),
       })
-      void total
     }
   }
 
   const items: TrainingListItem[] = trainings.map((t: any) => {
     const p = progressMap.get(t.id)
-    const total = t._count.problems
+    const problemTotal = t._count.problems
     return {
       id: t.id,
       title: t.title,
@@ -146,7 +171,7 @@ export async function listPublicTrainingsAdvanced(
       cover: t.cover,
       joinCount: t.joinCount,
       viewCount: t.viewCount,
-      problemCount: total,
+      problemCount: problemTotal,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
       author: t.author,
@@ -155,7 +180,8 @@ export async function listPublicTrainingsAdvanced(
         ? {
             solvedCount: p.solvedCount,
             attemptedCount: p.attemptedCount,
-            progressPercentage: total > 0 ? Math.round((p.solvedCount / total) * 100) : 0,
+            progressPercentage:
+              problemTotal > 0 ? Math.round((p.solvedCount / problemTotal) * 100) : 0,
             isJoined: p.isJoined,
           }
         : { solvedCount: 0, attemptedCount: 0, progressPercentage: 0, isJoined: false },

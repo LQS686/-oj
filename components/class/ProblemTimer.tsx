@@ -51,6 +51,8 @@ export interface ProblemTimerProps {
    * - false：仅 fetchProgress 一次用于展示累计用时，不启动计时、不监听 visibility、不心跳、不 tick
    */
   active?: boolean
+  /** 窄栏模式：仅图标 + 时长，省略中文前缀 */
+  compact?: boolean
 }
 
 /**
@@ -80,6 +82,7 @@ export default function ProblemTimer({
   assignmentEndTime,
   className,
   active = true,
+  compact = false,
 }: ProblemTimerProps) {
   const [progress, setProgress] = useState<ProblemTimerProgress | null>(null)
   const [displayMs, setDisplayMs] = useState<number>(0)
@@ -314,9 +317,10 @@ export default function ProblemTimer({
     return (
       <span
         className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-muted-foreground bg-muted/50 border border-border ${className || ''}`}
+        title="计时加载中"
       >
         <Clock className="w-3 h-3 animate-pulse" />
-        计时加载中
+        {!compact && '计时加载中'}
       </span>
     )
   }
@@ -328,7 +332,7 @@ export default function ProblemTimer({
         title="首次 AC 用时"
       >
         <CheckCircle2 className="w-3 h-3" />
-        用时 {formatDurationMs(displayMs)}
+        {compact ? formatDurationMs(displayMs) : `用时 ${formatDurationMs(displayMs)}`}
       </span>
     )
   }
@@ -341,7 +345,7 @@ export default function ProblemTimer({
         title="作业已结束（未 AC，仅保留累计用时）"
       >
         <PauseCircle className="w-3 h-3" />
-        累计 {formatDurationMs(displayMs)}
+        {compact ? formatDurationMs(displayMs) : `累计 ${formatDurationMs(displayMs)}`}
       </span>
     )
   }
@@ -362,8 +366,9 @@ export default function ProblemTimer({
       ) : (
         <Clock className="w-3 h-3" />
       )}
-      {isPaused ? '已暂停 ' : '计时 '}
-      {formatDurationMs(displayMs)}
+      {compact
+        ? formatDurationMs(displayMs)
+        : `${isPaused ? '已暂停 ' : '计时 '}${formatDurationMs(displayMs)}`}
     </span>
   )
 }

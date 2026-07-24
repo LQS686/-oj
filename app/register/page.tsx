@@ -5,13 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, XCircle, User, Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
-import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
+import { GuestAuthShell } from '@/components/common'
 
-export default function RegisterPage() {
+ export default function RegisterPage() {
  const router = useRouter()
  const { login } = useUser()
- const { settings } = useSettings()
  const [showPassword, setShowPassword] = useState(false)
  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
  const [formData, setFormData] = useState({
@@ -90,27 +89,7 @@ export default function RegisterPage() {
  const strengthColor = getStrengthColor()
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-10">
-          <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-md ring-1 ring-border/40">
-              <img
-                src="/logos/dsojlogo.png"
-                alt="大山 OJ Logo"
-                width={56}
-                height={56}
-                className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
-              />
-            </div>
-            <div className="text-left">
-              <span className="text-2xl font-extrabold text-foreground">{settings.siteName}</span>
-              <p className="text-xs text-muted-foreground">{settings.siteDescription}</p>
-            </div>
-          </Link>
-          <p className="text-muted-foreground mt-6 text-lg">加入我们，开启编程之旅</p>
-        </div>
-
+    <GuestAuthShell subtitle="加入我们，开启编程之旅">
         <div className="card-static rounded-lg p-6 md:p-10 shadow-2xl transition-all duration-300 animate-modal-in">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
@@ -308,7 +287,6 @@ export default function RegisterPage() {
             </Link>
           </div>
         </div>
-      </div>
-    </div>
+    </GuestAuthShell>
   )
 }

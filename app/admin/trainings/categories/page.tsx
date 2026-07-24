@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { DataTable, type Column } from '@/components/admin'
+import { DataTable, AdminPageShell, type Column } from '@/components/admin'
 import {
   ArrowLeft, Plus, Edit, Trash2, X, Save, AlertCircle, RefreshCw
 } from 'lucide-react'
@@ -215,7 +215,7 @@ export default function TrainingCategoriesPage() {
  ]
 
  return (
- <div className="space-y-6 max-w-3xl">
+ <AdminPageShell width="form" className="space-y-6">
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-3">
  <Link href="/admin/trainings" className="text-muted-foreground hover:text-foreground">
@@ -285,6 +285,6 @@ export default function TrainingCategoriesPage() {
  emptyMessage="暂无分类"
  />
  )}
- </div>
+ </AdminPageShell>
  )
 }

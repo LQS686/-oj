@@ -41,7 +41,7 @@
 
 ### 其他功能
 
-- **代码编辑器** — 集成 Monaco Editor，支持 C++/C/Java/Python/JavaScript 等多语言高亮与自动补全
+- **代码编辑器** — 集成 CodeMirror 6，支持 C++/C/Java/Python/JavaScript 等多语言高亮与自动补全
 - **题目预测试** — 提交前自定义测试用例快速验证（`/api/problems/[id]/pretest` + `PretestPanel`）
 - **题目统计** — 提交分布、AC 率、难度通过率等多维统计（`/api/problems/[id]/stats` + `ProblemStatsPanel`）
 - **随机一题** — 训练模式推荐题目（`/api/problems/random`）
@@ -139,10 +139,10 @@ docker-compose logs -f app
 ### 后端
 
 - **API**: Next.js API Routes，`withApi` 统一封装鉴权 + JSON 解析 + 异常处理（5 种模式：public / auth / admin / systemAdmin / class）
-- **数据库**: MongoDB Replica Set + Prisma ORM（38 个模型）
+- **数据库**: MongoDB Replica Set + Prisma ORM（30 个模型；MongoDB 用 `db push` 同步 schema，无 SQL 式 migrate）
 - **认证**: JWT + httpOnly Cookie 统一模式（token 不再落 localStorage），tokenVersion 吊销机制
-- **缓存**: 分层缓存 — `lib/api/handler.ts` 进程级用户缓存（60s TTL，鉴权层）/ `lib/cache.ts` 业务层缓存
-- **安全**: 4 级 RBAC 权限、SSRF 防护、魔数校验上传、execSync 命令注入防护、CSRF + 限流中间件
+- **缓存**: 分层缓存 — `lib/api/handler.ts` 进程级用户缓存（60s TTL，鉴权层）/ `lib/cache.ts` 业务层（`REDIS_URL` 时 Redis 优先 + 内存 L1）
+- **安全**: 4 级 RBAC 权限、SSRF 防护、魔数校验上传、execSync 命令注入防护、CSRF + 限流中间件（`REDIS_URL` 时跨实例原子限流）
 
 ### 评测系统
 
@@ -211,7 +211,7 @@ dashan-oj/
 │   ├── crypto.ts                 # 通用加密（SMTP 授权码等敏感配置）
 │   ├── upload.ts                 # 文件上传 + 魔数校验
 │   └── prisma.ts
-├── prisma/schema.prisma          # 38 个模型；已移除 Points* 与 ClassInvite
+├── prisma/schema.prisma          # 30 个模型；已移除 Points* 与 ClassInvite
 ├── hooks/、contexts/             # UserContext、SettingsContext、SWR Provider
 ├── tests/                        # vitest 测试
 ├── scripts/                      # 部署与维护脚本
@@ -231,14 +231,14 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 ### 缓存分层
 
 - **鉴权层** — `lib/api/handler.ts` 的 `userCache` Map（60s TTL，LRU 10000 条），仅缓存 role/tokenVersion
-- **业务层** — `lib/cache.ts`（基于内存 + 可选 Redis），缓存题目、竞赛、用户统计等
+- **业务层** — `lib/cache.ts`（`REDIS_URL` 时 Redis 优先 + 内存 L1；未配置则纯内存），缓存题目、竞赛、用户统计等
 - **清理入口** — `lib/user/service.ts` 的 `clearUserCache` 统一调用 `clearAuthUserCache`（鉴权层）+ 业务缓存
 
 ## 更新日志
 
 ### 2026/07（题目功能扩展 + AI 模块下线）
 
-- **代码编辑器** — 新增 [components/code-editor/CodeEditor.tsx](file:///e:/桌面/dsoj/components/code-editor/CodeEditor.tsx)，基于 Monaco Editor，支持多语言高亮与自动补全
+- **代码编辑器** — 新增 [components/code-editor/CodeEditor.tsx](file:///e:/桌面/dsoj/components/code-editor/CodeEditor.tsx)，基于 CodeMirror 6，支持多语言高亮与自动补全
 - **题目预测试** — [app/api/problems/[id]/pretest/route.ts](file:///e:/桌面/dsoj/app/api/problems/%5Bid%5D/pretest/route.ts) + [components/problem/PretestPanel.tsx](file:///e:/桌面/dsoj/components/problem/PretestPanel.tsx)，提交前自定义测试用例验证
 - **题目统计** — [app/api/problems/[id]/stats/route.ts](file:///e:/桌面/dsoj/app/api/problems/%5Bid%5D/stats/route.ts) + [ProblemStatsPanel](file:///e:/桌面/dsoj/components/problem/ProblemStatsPanel.tsx)
 - **随机一题** — [app/api/problems/random/route.ts](file:///e:/桌面/dsoj/app/api/problems/random/route.ts) 为训练/刷题模式推荐题目

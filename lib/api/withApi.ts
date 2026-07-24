@@ -225,7 +225,7 @@ export const withApi = {
     allowedRoles: Array<'owner' | 'assistant' | 'student'>,
     handler: (req: NextRequest, ctx: ApiContext, context: ClassContext) => Promise<Response | unknown> | Response | unknown
   ) {
-    return async (req: NextRequest, ctx: ApiContext) => {
+    return async (req: NextRequest, ctx: any) => {
       return safeCall(async () => {
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()

@@ -315,7 +315,7 @@ export default function EditSolutionPage() {
 
  return (
  <div className="min-h-screen py-8">
- <PageContainer variant="standard">
+ <PageContainer variant="form">
  {/* 面包屑 */}
  <nav
  aria-label="面包屑导航"

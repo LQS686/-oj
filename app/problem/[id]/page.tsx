@@ -40,6 +40,7 @@ import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import toast from 'react-hot-toast'
 import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { PageContainer } from '@/components/layout'
+import { loginPath } from '@/lib/navigation'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -472,7 +473,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
   const handleSubmit = async () => {
     if (!user) {
-      router.push('/login')
+      router.push(loginPath())
       return
     }
 
@@ -590,7 +591,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
   return (
     <div className="min-h-screen pb-20 lg:pb-8">
-      <PageContainer className="pt-6">
+      <PageContainer variant="workspace" className="pt-4 pb-6">
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <span className="font-mono text-sm font-bold text-primary-light bg-primary/10 px-3 py-1 rounded-lg">
             {problem.problemNumber || problem.id}

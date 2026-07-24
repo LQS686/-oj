@@ -9,6 +9,9 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { ClassWorkspaceShell, PageLoading } from '@/components/common'
 import { useClass } from '@/hooks/useClass'
+import { useUser } from '@/contexts/UserContext'
+import { classRoleDisplayLabel, isClassAdminRole } from '@/lib/class/roles'
+import { loginPath } from '@/lib/navigation'
 
 type Permissions = ClassPermissions
 
@@ -39,7 +42,7 @@ const permissionDescriptions: Record<keyof Permissions, { title: string; descrip
   },
   canManageMembers: {
     title: '管理成员',
-    description: '允许成员管理其他成员的权限（仅管理员）',
+    description: '允许成员管理其他成员的权限（仅班主任/助教）',
   },
   canViewStats: {
     title: '查看统计',
@@ -48,9 +51,7 @@ const permissionDescriptions: Record<keyof Permissions, { title: string; descrip
 }
 
 function roleLabel(role?: string) {
-  if (role === 'owner') return '所有者'
-  if (role === 'assistant') return '管理员'
-  return '普通成员'
+  return classRoleDisplayLabel(role)
 }
 
 export default function MemberPermissionsPage() {
@@ -59,6 +60,7 @@ export default function MemberPermissionsPage() {
   const classId = params.id as string
   const memberId = params.memberId as string
   const { classData } = useClass(classId)
+  const { user } = useUser()
 
   const [permissions, setPermissions] = useState<Permissions>({
     canViewProblems: true,
@@ -77,20 +79,22 @@ export default function MemberPermissionsPage() {
 
   useEffect(() => {
     fetchMemberInfo()
-  }, [classId, memberId])
+  }, [classId, memberId, user?.id])
 
   const fetchMemberInfo = async () => {
     try {
       const response = await fetchWithCookie(`/api/classes/${classId}`)
 
       if (response.status === 401) {
-        router.push('/login')
+        // 保持 loading，避免跳转前闪「权限不足」
+        router.push(loginPath())
         return
       }
 
       if (response.ok) {
         const data = await response.json()
-        const member = data.data.members?.find((m: ClassMember) => m.id === memberId)
+        const members: ClassMember[] = data.data.members || []
+        const member = members.find((m) => m.userId === memberId)
 
         if (member) {
           setMemberInfo(member)
@@ -99,19 +103,19 @@ export default function MemberPermissionsPage() {
           }
         }
 
-        const currentMember = data.data.members?.find(
-          (m: ClassMember) => m.userId === data.data.currentUserId
-        )
+        const currentMember = user?.id
+          ? members.find((m) => m.userId === user.id)
+          : undefined
         if (currentMember) {
           setCurrentUserRole(currentMember.role)
         }
       } else {
         alert('获取成员信息失败')
       }
+      setLoading(false)
     } catch (error) {
       console.error('获取成员信息失败:', error)
       alert('获取成员信息失败')
-    } finally {
       setLoading(false)
     }
   }
@@ -141,7 +145,7 @@ export default function MemberPermissionsPage() {
       )
 
       if (response.status === 401) {
-        router.push('/login')
+        router.push(loginPath())
         return
       }
 
@@ -164,7 +168,7 @@ export default function MemberPermissionsPage() {
     return <PageLoading label="加载权限配置中..." />
   }
 
-  if (currentUserRole !== 'assistant' && currentUserRole !== 'owner') {
+  if (!isClassAdminRole(currentUserRole)) {
     return (
       <ClassWorkspaceShell
         classId={classId}
@@ -200,7 +204,6 @@ export default function MemberPermissionsPage() {
       title="配置成员权限"
       description={`${memberName} · ${roleLabel(memberInfo.role)}`}
       icon={Shield}
-      width="narrow"
       actions={
         <Link href={`/classes/${classId}/members`} className="btn btn-ghost btn-sm">
           成员列表
@@ -210,8 +213,8 @@ export default function MemberPermissionsPage() {
       <div className="rounded-lg border border-border bg-muted/30 p-4 mb-4 flex gap-3">
         <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <ul className="text-sm text-muted-foreground space-y-1">
-          <li>所有者拥有所有权限，无法修改</li>
-          <li>管理员权限由所有者分配</li>
+          <li>班主任拥有所有权限，无法修改</li>
+          <li>助教权限由班主任分配</li>
           <li>修改权限后将立即生效</li>
         </ul>
       </div>
@@ -240,7 +243,7 @@ export default function MemberPermissionsPage() {
                     <h3 className="text-sm font-medium text-foreground">{permission.title}</h3>
                     {isDisabled && (
                       <span className="tag text-xs">
-                        {memberInfo.role === 'owner' ? '所有者默认拥有' : '管理员默认拥有'}
+                        {memberInfo.role === 'owner' ? '班主任默认拥有' : '助教默认拥有'}
                       </span>
                     )}
                   </div>
@@ -287,7 +290,7 @@ export default function MemberPermissionsPage() {
       </div>
 
       {memberInfo.role === 'owner' && (
-        <p className="mt-3 text-center text-sm text-muted-foreground">所有者拥有所有权限，无法修改</p>
+        <p className="mt-3 text-center text-sm text-muted-foreground">班主任拥有所有权限，无法修改</p>
       )}
     </ClassWorkspaceShell>
   )

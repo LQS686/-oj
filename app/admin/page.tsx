@@ -20,6 +20,9 @@ import {
   UserPlus
 } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import AdminCreateProblemModal from '@/components/admin/AdminCreateProblemModal'
+import AdminCreateContestModal from '@/components/admin/AdminCreateContestModal'
+import { AdminPageShell } from '@/components/admin'
 
 interface DashboardStats {
  totalUsers: number
@@ -42,6 +45,8 @@ export default function AdminDashboard() {
  const [loading, setLoading] = useState(true)
  const [stats, setStats] = useState<DashboardStats | null>(null)
  const [error, setError] = useState('')
+ const [createProblemOpen, setCreateProblemOpen] = useState(false)
+ const [createContestOpen, setCreateContestOpen] = useState(false)
 
  const fetchDashboardData = useCallback(async () => {
  try {
@@ -161,7 +166,7 @@ export default function AdminDashboard() {
  ]
 
  return (
- <div className="space-y-5">
+ <AdminPageShell width="list" className="space-y-5">
  {/* 统计卡片：紧凑布局 */}
  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
  <div className="card p-4 group">
@@ -228,8 +233,8 @@ export default function AdminDashboard() {
  <div className="space-y-3">
  <h3 className="text-base font-bold text-foreground">快捷操作</h3>
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
- <Link
- href="/admin/problems/create"
+ <button
+ onClick={() => setCreateProblemOpen(true)}
  className="card p-3 group hover:border-primary/40 transition-colors cursor-pointer flex items-center gap-2.5"
  >
  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
@@ -240,10 +245,10 @@ export default function AdminDashboard() {
  <p className="text-sm font-semibold text-foreground">创建题目</p>
  <p className="text-xs text-muted-foreground truncate">新增编程题目</p>
  </div>
- </Link>
+ </button>
 
- <Link
- href="/admin/contests/create"
+ <button
+ onClick={() => setCreateContestOpen(true)}
  className="card p-3 group hover:border-primary/40 transition-colors cursor-pointer flex items-center gap-2.5"
  >
  <div className="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
@@ -253,7 +258,7 @@ export default function AdminDashboard() {
  <p className="text-sm font-semibold text-foreground">创建竞赛</p>
  <p className="text-xs text-muted-foreground truncate">发起一场竞赛</p>
  </div>
- </Link>
+ </button>
 
  <Link
  href="/admin/users"
@@ -289,6 +294,21 @@ export default function AdminDashboard() {
  onRowClick={(row) => router.push(`/admin/submissions/${row.id}`)}
  />
  </div>
- </div>
+
+ <AdminCreateProblemModal
+ open={createProblemOpen}
+ onClose={() => setCreateProblemOpen(false)}
+ onCreated={() => {
+ fetchDashboardData()
+ }}
+ />
+ <AdminCreateContestModal
+ open={createContestOpen}
+ onClose={() => setCreateContestOpen(false)}
+ onCreated={() => {
+ fetchDashboardData()
+ }}
+ />
+ </AdminPageShell>
  )
 }

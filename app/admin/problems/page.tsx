@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import { DataTable } from '@/components/admin'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { DataTable, AdminPageShell } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
+import { PageLoading } from '@/components/common'
+import AdminCreateProblemModal from '@/components/admin/AdminCreateProblemModal'
 import { Download, Plus, Upload } from 'lucide-react'
 import { useProblemList } from './_hooks/useProblemList'
 import { ProblemFilterBar } from './_components/ProblemFilterBar'
@@ -22,8 +24,9 @@ import {
 } from './_utils'
 import type { Problem, BatchActionType } from './_types'
 
-export default function AdminProblemsPage() {
+function AdminProblemsPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const {
     problems,
     loading,
@@ -34,6 +37,16 @@ export default function AdminProblemsPage() {
     allTags,
     allSources,
   } = useProblemList()
+
+  const [createOpen, setCreateOpen] = useState(false)
+
+  // 支持 ?create=1 自动打开创建弹窗（外部跳转入口）
+  useEffect(() => {
+    if (searchParams.get('create') === '1') {
+      setCreateOpen(true)
+      router.replace('/admin/problems', { scroll: false })
+    }
+  }, [searchParams, router])
 
   // 筛选条件：初始值从 URL query string 恢复（支持分享 / 刷新保留筛选状态）
   const [filters, setFilters] = useState<ProblemFilters>(() => {
@@ -156,7 +169,7 @@ export default function AdminProblemsPage() {
 
   return (
     <>
-      <div className="space-y-6">
+      <AdminPageShell width="list" className="space-y-6">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2 ml-auto">
             <button
@@ -174,7 +187,7 @@ export default function AdminProblemsPage() {
               批量导入
             </button>
             <button
-              onClick={() => router.push('/admin/problems/create')}
+              onClick={() => setCreateOpen(true)}
               className="btn btn-primary flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
@@ -203,7 +216,7 @@ export default function AdminProblemsPage() {
           onRowClick={(row) => router.push(`/admin/problems/${row.id}/edit`)}
           onSelectionChange={setSelectedIds}
         />
-      </div>
+      </AdminPageShell>
 
       {showDeleteModal && deletingProblem && (
         <DeleteProblemModal
@@ -234,6 +247,20 @@ export default function AdminProblemsPage() {
           totalCount={problems.length}
         />
       )}
+
+      <AdminCreateProblemModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => fetchProblems()}
+      />
     </>
+  )
+}
+
+export default function AdminProblemsPage() {
+  return (
+    <Suspense fallback={<PageLoading label="加载中..." />}>
+      <AdminProblemsPageContent />
+    </Suspense>
   )
 }

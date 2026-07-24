@@ -8,7 +8,9 @@ import { Toaster } from "react-hot-toast"
 import DocumentTitleProvider from "@/components/DocumentTitleProvider"
 import { SITE_TITLE_SUFFIX } from "@/lib/document-title"
 import PageTransition from "@/components/common/PageTransition"
+import NavigationProgress from "@/components/common/NavigationProgress"
 import { DialogProvider } from "@/components/common/DialogProvider"
+import { getServerSessionUser } from "@/lib/auth/server-session"
 
 export const metadata: Metadata = {
   title: `首页 - ${SITE_TITLE_SUFFIX}`,
@@ -40,11 +42,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const initialUser = await getServerSessionUser()
+
   return (
     <html lang="zh-CN">
       <head>
@@ -58,14 +62,19 @@ export default function RootLayout({
       <body className="antialiased">
         <SwrProvider>
           <SettingsProvider>
-            <UserProvider>
+            <UserProvider initialUser={initialUser}>
               <DialogProvider>
                 <DocumentTitleProvider />
+                <NavigationProgress />
                 <Navbar />
                 <PageTransition>{children}</PageTransition>
               </DialogProvider>
               <Toaster
                 position="top-right"
+                containerStyle={{
+                  top: 'calc(var(--navbar-height) + 0.75rem)',
+                  zIndex: 'var(--z-toast)',
+                }}
                 toastOptions={{
                   duration: 3000,
                   style: {

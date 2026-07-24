@@ -6,13 +6,15 @@ import { trimAll, escapeHtml, removeNullBytes } from '@/lib/sanitize'
 import { validateRequired } from '@/lib/api/validation'
 import { errorMonitor } from '@/lib/error-monitor'
 import type { LoginResponse } from '@/lib/api/auth'
-import { getRedisClient } from '@/lib/redis'
+import { getRedisClient, isRedisConfigured } from '@/lib/redis'
 
 const MAX_LOGIN_ATTEMPTS = 5
 const LOCKOUT_DURATION_SEC = 15 * 60
 
 async function checkAccountLockout(usernameOrEmail: string): Promise<void> {
   const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
+  // 未配置 REDIS_URL 时不连 localhost，避免无效连接噪声
+  if (!isRedisConfigured()) return
   try {
     const client = getRedisClient()
     const attempts = await client.get(key)
@@ -31,6 +33,7 @@ async function checkAccountLockout(usernameOrEmail: string): Promise<void> {
 }
 
 async function recordLoginFailure(usernameOrEmail: string): Promise<void> {
+  if (!isRedisConfigured()) return
   const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
   try {
     const client = getRedisClient()
@@ -44,6 +47,7 @@ async function recordLoginFailure(usernameOrEmail: string): Promise<void> {
 }
 
 async function clearLoginAttempts(usernameOrEmail: string): Promise<void> {
+  if (!isRedisConfigured()) return
   const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
   try {
     const client = getRedisClient()

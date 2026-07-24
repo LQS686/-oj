@@ -463,7 +463,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="min-h-screen bg-background">
-      <PageContainer className="py-8">
+      <PageContainer className="py-4 md:py-6">
         <button
           onClick={() => router.back()}
           className="nav-link mb-6"

@@ -2,6 +2,9 @@
  * 班级笔记管理
  * - GET  /api/classes/[id]/notes  笔记列表
  * - POST /api/classes/[id]/notes  创建笔记
+ *
+ * GET：公开班任意登录用户可读；私有班需成员（classRole 全角色）。
+ * POST：仅 owner / assistant。
  */
 import {
   withApi,
@@ -14,7 +17,6 @@ import {
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
-  assertClassAdmin,
   getClassById,
   getCurrentClassMember,
   listClassNotesPaged,
@@ -46,7 +48,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
   return ok(result)
 })
 
-export const POST = withApi.auth(async (req, ctx, { user }) => {
+export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
@@ -57,8 +59,6 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     tags?: string[]
   }>(req)
   if (!body.title || !body.content) throw400('MISSING_FIELDS', '请提供标题和内容')
-
-  await assertClassAdmin(id, user.id, '只有管理员或老师可以发布笔记')
 
   const created = await createClassNoteSimple(id, user.id, {
     title: body.title!,

@@ -101,7 +101,14 @@ export async function middleware(request: NextRequest) {
   // /api/admin/* 由 API 路由的 withApi.admin 处理，此处不拦截。
   if (pathname.startsWith('/admin') && !pathname.startsWith('/api/')) {
     const payload = getUserFromRequest(request)
-    if (!payload || !canAccessAdmin({ role: payload.role })) {
+    if (!payload) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      const redirect = NextResponse.redirect(loginUrl)
+      redirect.headers.set('x-request-id', requestId)
+      return redirect
+    }
+    if (!canAccessAdmin({ role: payload.role })) {
       const redirect = NextResponse.redirect(new URL('/403', request.url))
       redirect.headers.set('x-request-id', requestId)
       return redirect

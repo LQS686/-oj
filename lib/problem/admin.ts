@@ -310,6 +310,7 @@ export async function createAdminProblem(
 export function clearProblemCache(problemId: string) {
   cache.delete(CacheKeys.problem.byId(problemId))
   cache.delete(CacheKeys.problem.statusCounts(problemId))
+  cache.delete(CacheKeys.problem.stats(problemId))
   cache.deleteByPrefix('problem:tags')
 }
 

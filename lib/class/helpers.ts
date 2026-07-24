@@ -9,6 +9,7 @@ import {
   normalizeClassRoleToApi,
   isClassAdminApiRole,
   isClassAdminRole,
+  isClassOwnerRole,
 } from '@/lib/class/roles'
 import { ApiError } from '@/lib/api/withApi'
 
@@ -44,6 +45,17 @@ export async function assertClassAdmin(classId: string, userId: string, failMsg:
     where: { classId_userId: { classId, userId } },
   })
   if (!member || !isClassAdminApiRole(member.role)) {
+    throw new ApiError('FORBIDDEN', failMsg, 403)
+  }
+  return member
+}
+
+/** 校验当前用户是否是班级 owner */
+export async function assertClassOwner(classId: string, userId: string, failMsg: string) {
+  const member = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+  if (!member || !isClassOwnerRole(member.role)) {
     throw new ApiError('FORBIDDEN', failMsg, 403)
   }
   return member

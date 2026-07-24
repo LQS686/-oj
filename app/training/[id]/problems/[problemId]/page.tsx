@@ -19,6 +19,7 @@ import SubmissionResultModal, { type SubmissionResultData } from '@/components/s
 import { useTrainingProblemWorkspace } from '@/contexts/TrainingProblemWorkspaceContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { Problem } from '@/types/models'
+import { loginPath } from '@/lib/navigation'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -248,7 +249,7 @@ export default function TrainingProblemDetailPage({
   useEffect(() => {
     registerSubmitHandler(async () => {
       if (!user) {
-        router.push(`/login?redirect=/training/${trainingId}/problems/${problemId}`)
+        router.push(loginPath(`/training/${trainingId}/problems/${problemId}`))
         return
       }
       if (!code.trim()) {

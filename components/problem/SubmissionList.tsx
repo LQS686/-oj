@@ -5,6 +5,7 @@ import { getStatusConfig } from '@/lib/status'
 import { formatDateTime } from '@/lib/utils'
 import type { Submission } from '@/types/models'
 import type { UserData } from '@/lib/api/auth'
+import { loginPath } from '@/lib/navigation'
 
 interface SubmissionListProps {
  submissions: Submission[]
@@ -62,7 +63,7 @@ export default function SubmissionList({
  <div className="space-y-3">
  <p className="text-muted-foreground">请登录后查看提交记录</p>
  <Link
- href={`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname + window.location.search : '')}`}
+ href={loginPath()}
  className="btn btn-primary btn-sm inline-flex items-center gap-2"
  >
  <LogIn className="w-4 h-4" />

@@ -15,6 +15,7 @@ import { useUser } from '@/contexts/UserContext'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
 import { fetchWithCookie } from '@/lib/api/base'
 import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
+import { loginPath } from '@/lib/navigation'
 
 /**
  * Phase 6 Task 32.4: 语言 Tab 优先级排序
@@ -214,7 +215,7 @@ export default function SolutionTabPanel({
  onRequireLogin()
  return
  }
- router.push('/login')
+ router.push(loginPath())
  return
  }
  setCreateOpen(true)

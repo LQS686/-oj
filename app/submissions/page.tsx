@@ -9,6 +9,7 @@ import { getStatusText } from '@/lib/status'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { EducationalPageShell, PageLoading } from '@/components/common'
+import { loginPath } from '@/lib/navigation'
 
 interface Submission {
  id: string
@@ -56,7 +57,7 @@ function SubmissionsContent() {
  useEffect(() => {
  if (userLoading) return
  if (requiresAuth && !user) {
-   router.replace('/login?redirect=' + encodeURIComponent('/submissions?' + searchParams.toString()))
+   router.replace(loginPath('/submissions?' + searchParams.toString()))
  }
  }, [userLoading, user, requiresAuth, router, searchParams])
 
@@ -224,29 +225,29 @@ function SubmissionsContent() {
  <table className="w-full">
  <thead className="bg-muted border-b border-border">
  <tr>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">提交ID</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">题目</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">用户</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">状态</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">分数</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">语言</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">用时·内存</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">提交时间</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">操作</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">提交ID</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">题目</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">用户</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">状态</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">分数</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">语言</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">用时·内存</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">提交时间</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">操作</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-border">
  {Array.from({ length: 5 }).map((_, i) => (
  <tr key={i} className="animate-pulse">
- <td className="px-6 py-4"><div className="h-4 w-16 rounded bg-muted" /></td>
- <td className="px-6 py-4"><div className="h-4 w-32 rounded bg-muted" /></td>
- <td className="px-6 py-4"><div className="h-4 w-20 rounded bg-muted" /></td>
- <td className="px-6 py-4"><div className="h-5 w-14 rounded-full bg-muted" /></td>
- <td className="px-6 py-4"><div className="h-4 w-8 rounded bg-muted" /></td>
- <td className="px-6 py-4"><div className="h-4 w-12 rounded bg-muted" /></td>
- <td className="px-6 py-4"><div className="h-4 w-20 rounded bg-muted" /></td>
- <td className="px-6 py-4"><div className="h-4 w-24 rounded bg-muted" /></td>
- <td className="px-6 py-4"><div className="h-4 w-10 rounded bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-4 w-16 rounded bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-4 w-32 rounded bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-4 w-20 rounded bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-5 w-14 rounded-full bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-4 w-8 rounded bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-4 w-12 rounded bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-4 w-20 rounded bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-4 w-24 rounded bg-muted" /></td>
+ <td className="px-4 py-2.5"><div className="h-4 w-10 rounded bg-muted" /></td>
  </tr>
  ))}
  </tbody>
@@ -259,21 +260,21 @@ function SubmissionsContent() {
  <table className="w-full">
  <thead className="bg-muted border-b border-border">
  <tr>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">提交ID</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">题目</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">用户</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">状态</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">分数</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">语言</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">用时·内存</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">提交时间</th>
- <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">操作</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">提交ID</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">题目</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">用户</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">状态</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">分数</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">语言</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">用时·内存</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">提交时间</th>
+ <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">操作</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-border">
  {submissions.length === 0 ? (
  <tr>
- <td colSpan={9} className="px-6 py-16 text-center">
+ <td colSpan={9} className="px-4 py-8 text-center">
  <div className="text-center">
  <FileText className="w-16 h-16 mx-auto mb-4 text-muted-foreground/20" />
  <p className="text-lg font-medium text-foreground mb-2">没有找到提交记录</p>
@@ -286,12 +287,12 @@ function SubmissionsContent() {
  ) : (
  submissions.map((submission) => (
  <tr key={submission.id} className="hover:bg-muted transition-colors">
- <td className="px-6 py-4">
+ <td className="px-4 py-2.5">
  <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
  {submission.id.substring(0, 8)}...
  </code>
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-2.5">
  <Link
  href={`/problem/${submission.problem.id}`}
  className="text-primary-light hover:text-primary transition-colors"
@@ -299,7 +300,7 @@ function SubmissionsContent() {
  {submission.problem.title}
  </Link>
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-2.5">
  <Link
  href={`/user/${submission.user.id}`}
  className="text-foreground hover:text-primary-light transition-colors flex items-center gap-1"
@@ -308,29 +309,29 @@ function SubmissionsContent() {
  {submission.user.nickname || submission.user.username}
  </Link>
  </td>
-  <td className="px-6 py-4" title={getStatusText(submission.status)}>
+  <td className="px-4 py-2.5" title={getStatusText(submission.status)}>
  {getStatusBadge(submission.status)}
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-2.5">
  <span className="font-mono font-semibold text-foreground">{submission.score}</span>
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-2.5">
  <span className="tag">
  {submission.language}
  </span>
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-2.5">
  <span className="font-mono text-sm text-foreground">
  {formatTime(submission.time)} · {formatMemory(submission.memory)}
  </span>
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-2.5">
  <span className="text-sm text-muted-foreground flex items-center gap-1">
  <Calendar className="w-3 h-3" />
  {formatDateTime(submission.submittedAt)}
  </span>
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-2.5">
  {assignmentId ? (
  <button
  onClick={() => setSelectedSubmission(submission)}
@@ -359,7 +360,7 @@ function SubmissionsContent() {
  </div>
 
  {totalPages > 1 && (
- <div className="px-6 py-4 border-t border-border flex justify-center items-center gap-4">
+ <div className="px-4 py-2.5 border-t border-border flex justify-center items-center gap-4">
  <button
  onClick={() => setPage(page - 1)}
  disabled={page === 1}
@@ -391,7 +392,7 @@ function SubmissionsContent() {
  className="card-static rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
  onClick={(e) => e.stopPropagation()}
  >
- <div className="px-6 py-4 border-b border-border bg-muted flex items-center justify-between">
+ <div className="px-4 py-2.5 border-b border-border bg-muted flex items-center justify-between">
  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
  <FileText className="w-5 h-5 text-primary" />
  提交详情

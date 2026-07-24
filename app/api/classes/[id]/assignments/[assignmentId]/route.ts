@@ -15,6 +15,7 @@ import {
 import { isObjectId } from '@/lib/api/validation'
 import {
   assertClassAdmin,
+  assertClassOwner,
   buildClassAssignmentDetail,
   deleteClassAssignment,
   getCurrentClassMember,
@@ -58,6 +59,6 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   if (!isObjectId(id) || !isObjectId(assignmentId)) {
     throw400('INVALID_ID', '无效的ID')
   }
-  await assertClassAdmin(id, user.id, '只有管理员可以删除作业')
+  await assertClassOwner(id, user.id, '只有班级创建者可以删除作业')
   return ok(await deleteClassAssignment(id, assignmentId, user.id))
 })

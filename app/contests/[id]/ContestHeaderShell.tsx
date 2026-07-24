@@ -32,7 +32,7 @@ export default function ContestHeaderShell({
       {hideHeader ? (
         <>{children}</>
       ) : (
-        <PageContainer className="py-6">{children}</PageContainer>
+        <PageContainer variant="full" className="py-6">{children}</PageContainer>
       )}
     </div>
   )

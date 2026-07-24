@@ -47,8 +47,8 @@ export async function listClassAssignmentsWithStats(
     // 用 AND 显式排除 upcoming（startTime <= now 或 startTime 为 null）
     // 用 OR 显式包含 null endTime（兼容旧数据）
     where.AND = [
-      { OR: [{ startTime: { lte: now } }, { startTime: null }] },
-      { OR: [{ endTime: { gte: now } }, { endTime: null }] },
+      { OR: [{ startTime: { lte: now } }, { startTime: null }, { startTime: { isSet: false } }] },
+      { OR: [{ endTime: { gte: now } }, { endTime: null }, { endTime: { isSet: false } }] },
     ]
   } else if (filter.status === 'ended') {
     // null endTime 不归入 ended

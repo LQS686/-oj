@@ -83,7 +83,8 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center overflow-hidden bg-black/60 p-4 sm:p-6 animate-fadeIn"
+      className="fixed inset-0 flex items-center justify-center overflow-hidden bg-black/60 p-4 sm:p-6 animate-fadeIn"
+      style={{ zIndex: 'var(--z-modal)' }}
       onClick={closeOnOverlayClick ? onClose : undefined}
       role="presentation"
     >

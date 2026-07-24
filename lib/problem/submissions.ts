@@ -25,7 +25,12 @@ export async function listProblemSubmissionsMerged(
 
   const page = filter.page ?? 1
   const limit = filter.pageSize ?? 20
-  const submissionWhere: any = { problemId: problem.id }
+  // 作业提交会同时写入 Submission（带 assignmentSubmissionId）与 ClassAssignmentSubmission。
+  // 合并时排除已关联作业的 Submission，避免同一提交出现两次、total 翻倍。
+  const submissionWhere: any = {
+    problemId: problem.id,
+    OR: [{ assignmentSubmissionId: null }, { assignmentSubmissionId: { isSet: false } }],
+  }
   if (filter.userId) submissionWhere.userId = filter.userId
 
   // Fetch at most page*limit from each table to bound memory (no full table scan)

@@ -44,6 +44,7 @@ mockRedis.ttl.mockResolvedValue(900)
 
 vi.mock('@/lib/redis', () => ({
   getRedisClient: () => mockRedis,
+  isRedisConfigured: () => true,
 }))
 
 // 隔离 bcrypt：固定返回 true / false

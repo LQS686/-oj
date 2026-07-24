@@ -19,6 +19,7 @@ import {
 import { DIFFICULTIES } from '@/lib/constants'
 import { formatRelativeTime } from '@/lib/utils'
 import { useDialog } from '@/components/common/DialogProvider'
+import { AdminPageShell } from '@/components/admin'
 
 interface Sample {
  input: string
@@ -327,7 +328,7 @@ export default function EditProblemPage() {
  }
 
  return (
- <div className="max-w-5xl mx-auto space-y-6">
+ <AdminPageShell width="wide" className="space-y-6">
  <div className="flex items-center gap-4">
  <button
  onClick={() => router.back()}
@@ -824,6 +825,6 @@ export default function EditProblemPage() {
  </div>
  )}
  </section>
-    </div>
+    </AdminPageShell>
  )
 }

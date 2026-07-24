@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
+import { AdminPageShell } from '@/components/admin'
 import { Save, Mail, Shield, Globe, Send } from 'lucide-react'
 import type { SystemSettings } from '@/lib/settings'
 
@@ -140,7 +141,7 @@ export default function AdminSettingsPage() {
  }
 
  return (
- <div className="space-y-6">
+ <AdminPageShell width="wide" className="space-y-6">
  {error && !error.includes('权限') && (
  <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg">
  {error}
@@ -413,6 +414,6 @@ export default function AdminSettingsPage() {
  )}
  </button>
  </div>
- </div>
+ </AdminPageShell>
  )
 }

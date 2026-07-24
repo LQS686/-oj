@@ -18,6 +18,8 @@ export const CacheKeys = {
     listPrefix: () => 'problem:list',
     tags: () => 'problem:tags',
     statusCounts: (id: string) => `problem:statusCounts:${id}`,
+    /** 与 cache.get('problem:stats', [id]) 生成的键一致 */
+    stats: (id: string) => `problem:stats:${id}`,
   },
   contest: {
     byId: (id: string) => `contest:byId:${id}`,

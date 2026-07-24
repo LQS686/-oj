@@ -4,14 +4,12 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import type { LucideIcon } from 'lucide-react'
-import { EducationalPageShell } from './EducationalPageShell'
+import { EducationalPageShell, type EducationalPageWidth } from './EducationalPageShell'
 
 export interface ClassNavItem {
   href: string
   label: string
-  /** 精确匹配或前缀匹配（默认前缀，首页仅精确） */
   match?: 'exact' | 'prefix'
-  /** 与 href 同时匹配 searchParams tab（如 manage） */
   tab?: string
 }
 
@@ -26,8 +24,8 @@ export interface ClassWorkspaceShellProps {
   navItems?: ClassNavItem[]
   toolbar?: ReactNode
   children: ReactNode
-  width?: 'default' | 'narrow' | 'full'
-  /** 默认不显示返回班级列表 */
+  /** 默认 workspace（1440px），与班级概览一致 */
+  width?: EducationalPageWidth
   showBack?: boolean
 }
 
@@ -38,8 +36,7 @@ export const classOverviewNav = (classId: string): ClassNavItem[] => [
 
 function isNavActive(pathname: string, classId: string, tab: string | null, item: ClassNavItem): boolean {
   const base = `/classes/${classId}`
-  const onClassHome =
-    pathname === base || pathname === `${base}/`
+  const onClassHome = pathname === base || pathname === `${base}/`
   if (!onClassHome) return false
   if (item.tab === 'manage') return tab === 'manage'
   return tab !== 'manage'
@@ -47,7 +44,7 @@ function isNavActive(pathname: string, classId: string, tab: string | null, item
 
 export function ClassWorkspaceShell({
   classId,
-  className: classTitle,
+  className: _classTitle,
   title,
   description,
   icon,
@@ -56,7 +53,7 @@ export function ClassWorkspaceShell({
   navItems,
   toolbar,
   children,
-  width = 'default',
+  width = 'workspace',
   showBack = false,
 }: ClassWorkspaceShellProps) {
   const pathname = usePathname()
@@ -65,10 +62,7 @@ export function ClassWorkspaceShell({
   const items = navItems ?? classOverviewNav(classId)
 
   const nav = (
-    <nav
-      className="flex gap-1 border-b border-border"
-      aria-label="班级功能导航"
-    >
+    <nav className="flex gap-1 border-b border-border" aria-label="班级功能导航">
       {items.map((item) => {
         const active = isNavActive(pathname, classId, tab, item)
         const href =
@@ -77,6 +71,8 @@ export function ClassWorkspaceShell({
           <Link
             key={item.label}
             href={href}
+            scroll={false}
+            prefetch
             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               active
                 ? 'border-primary text-primary'
@@ -90,13 +86,6 @@ export function ClassWorkspaceShell({
     </nav>
   )
 
-  const combinedToolbar = (
-    <div className="space-y-4">
-      {nav}
-      {toolbar}
-    </div>
-  )
-
   return (
     <EducationalPageShell
       title={title}
@@ -106,7 +95,12 @@ export function ClassWorkspaceShell({
       actions={actions}
       backHref={showBack ? '/classes' : undefined}
       backLabel="返回班级列表"
-      toolbar={combinedToolbar}
+      toolbar={
+        <div className="space-y-3">
+          {nav}
+          {toolbar}
+        </div>
+      }
       width={width}
     >
       {children}

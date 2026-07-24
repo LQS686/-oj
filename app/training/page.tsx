@@ -14,11 +14,12 @@
  */
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useUser } from '@/contexts/UserContext'
 import { BookOpen, AlertCircle, RefreshCw, Bookmark, ChevronLeft, ChevronRight } from 'lucide-react'
 import TrainingCard from '@/components/training/TrainingCard'
 import SourceFilterCards, { type TrainingSource } from '@/components/training/SourceFilterCards'
 import type { TrainingListItem } from '@/lib/training/types'
-import { EducationalPageShell, LIST_GRID_CLASS } from '@/components/common'
+import { EducationalPageShell, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, ListEmptyState } from '@/components/common'
 
 const SOURCE_LABELS: Record<TrainingSource, string> = {
   all: '全部题单',
@@ -28,6 +29,7 @@ const SOURCE_LABELS: Record<TrainingSource, string> = {
 }
 
 export default function TrainingListPage() {
+  const { user } = useUser()
   const [trainings, setTrainings] = useState<TrainingListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +37,7 @@ export default function TrainingListPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [source, setSource] = useState<TrainingSource>('official')
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const isLoggedIn = !!user
   const isFirstLoad = useRef(true)
 
   const fetchTrainings = useCallback(async (signal?: AbortSignal) => {
@@ -87,18 +89,6 @@ export default function TrainingListPage() {
     }
   }, [page, source])
 
-  // 拉取当前用户登录状态
-  useEffect(() => {
-    fetchWithCookie('/api/auth/me', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        setIsLoggedIn(data?.success && data.data ? true : false)
-      })
-      .catch(() => {
-        setIsLoggedIn(false)
-      })
-  }, [])
-
   // 切换 source/page 时拉取，AbortController 取消旧请求
   useEffect(() => {
     const ac = new AbortController()
@@ -116,7 +106,11 @@ export default function TrainingListPage() {
       title="训练题单"
       icon={BookOpen}
       toolbar={
-        <SourceFilterCards active={source} onChange={handleSourceChange} isLoggedIn={isLoggedIn} />
+        <SourceFilterCards
+          active={source}
+          onChange={handleSourceChange}
+          isLoggedIn={isLoggedIn}
+        />
       }
     >
         <div className="mb-4 flex items-center justify-between gap-3 border-b border-border pb-3">
@@ -137,9 +131,9 @@ export default function TrainingListPage() {
 
         {/* 列表 */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className={LIST_GRID_SKELETON_CLASS}>
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="card rounded-lg p-5 border border-border animate-pulse">
+              <div key={i} className="card rounded-lg p-4 border border-border animate-pulse h-[9.5rem]">
                 <div className="h-4 w-3/4 rounded bg-muted mb-3" />
                 <div className="h-3 w-1/2 rounded bg-muted mb-2" />
                 <div className="h-3 w-1/3 rounded bg-muted" />
@@ -147,35 +141,30 @@ export default function TrainingListPage() {
             ))}
           </div>
         ) : error ? (
-          <div className="card-static rounded-lg p-12 text-center max-w-md mx-auto animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
-              <AlertCircle className="w-8 h-8 text-error" />
-            </div>
-            <div className="text-foreground text-xl font-semibold mb-2">加载失败</div>
-            <p className="text-muted-foreground mb-6">{error}</p>
-            <button onClick={() => fetchTrainings()} className="btn-primary btn">
-              <RefreshCw className="w-4 h-4" />
-              重试
-            </button>
-          </div>
+          <ListEmptyState
+            icon={AlertCircle}
+            tone="error"
+            title="加载失败"
+            description={error}
+            action={
+              <button onClick={() => fetchTrainings()} className="btn-primary btn btn-sm">
+                <RefreshCw className="w-4 h-4" />
+                重试
+              </button>
+            }
+          />
         ) : trainings.length === 0 ? (
-          <div className="card-static rounded-lg p-16 text-center animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
-              {source === 'mine'
-                ? <Bookmark className="w-8 h-8 text-muted-foreground" />
-                : <BookOpen className="w-8 h-8 text-muted-foreground" />}
-            </div>
-            <div className="text-foreground text-xl font-semibold mb-2">
-              {source === 'mine' ? '还没有收藏的题单' : '暂无题单'}
-            </div>
-            <div className="text-muted-foreground">
-              {source === 'mine'
+          <ListEmptyState
+            icon={source === 'mine' ? Bookmark : BookOpen}
+            title={source === 'mine' ? '还没有收藏的题单' : '暂无题单'}
+            description={
+              source === 'mine'
                 ? isLoggedIn
-                  ? '去"官方题单"或"竞赛真题"逛逛，加入感兴趣的题单即可收藏'
+                  ? '去「官方题单」或「竞赛真题」逛逛，加入感兴趣的题单即可收藏'
                   : '登录后即可查看收藏的题单'
-                : '当前分类下还没有题单'}
-            </div>
-          </div>
+                : '当前分类下还没有题单'
+            }
+          />
         ) : (
           <div className={`${LIST_GRID_CLASS} animate-fadeIn`}>
             {trainings.map((t) => (

@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger'
 import { ArrowLeft, Upload, X, Plus, Loader2, Save, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase-scoring'
 import { formatDateTime } from '@/lib/utils'
+import { AdminPageShell } from '@/components/admin'
 
 interface TestCase {
   input: string
@@ -306,7 +307,7 @@ export default function ProblemTestCasesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <AdminPageShell width="wide" className="space-y-6">
       <div className="card p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button
@@ -676,6 +677,6 @@ export default function ProblemTestCasesPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   )
 }

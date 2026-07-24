@@ -23,7 +23,8 @@ export function byIdKey(id: string): string {
   return `training:byId:${id}`
 }
 export function enrollmentKey(userId: string, trainingId: string): string {
-  return `training:enrollment:${userId}:${trainingId}`
+  // 必须与 cache.get('training:enrollment:check', [trainingId, userId]) 生成的 key 一致
+  return `training:enrollment:check:${trainingId}:${userId}`
 }
 export function userEnrollmentsKey(userId: string): string {
   return `training:enrollments:${userId}`

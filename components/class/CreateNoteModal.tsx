@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { FileText, Tag, AlertCircle } from 'lucide-react'
 import { CreateModalShell } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
+import type { ClassNoteDetail } from './ViewNoteModal'
 
 const CATEGORIES = ['General', '算法', '数据结构', '动态规划', '图论', '字符串', '数学', '其他']
 
@@ -19,22 +19,36 @@ export default function CreateNoteModal({
   open,
   onClose,
   onCreated,
+  onSaved,
   classId,
+  editNote,
 }: {
   open: boolean
   onClose: () => void
   onCreated?: () => void
+  onSaved?: () => void
   classId: string
+  /** 传入则进入编辑模式 */
+  editNote?: ClassNoteDetail | null
 }) {
-  const router = useRouter()
+  const isEdit = !!editNote
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState(defaultForm)
 
   const resetForm = useCallback(() => {
-    setFormData(defaultForm())
+    if (editNote) {
+      setFormData({
+        title: editNote.title,
+        content: editNote.content,
+        category: editNote.category || 'General',
+        tags: (editNote.tags || []).join(', '),
+      })
+    } else {
+      setFormData(defaultForm())
+    }
     setError('')
-  }, [])
+  }, [editNote])
 
   useEffect(() => {
     if (!open) return
@@ -54,28 +68,38 @@ export default function CreateNoteModal({
       return
     }
 
+    const payload = {
+      title: formData.title.trim(),
+      content: formData.content,
+      category: formData.category,
+      tags: formData.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
+    }
+
     try {
       setLoading(true)
-      const response = await fetchWithCookie(`/api/classes/${classId}/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formData.title,
-          content: formData.content,
-          category: formData.category,
-          tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
-        }),
-      })
+      const response = await fetchWithCookie(
+        isEdit
+          ? `/api/classes/${classId}/notes/${editNote!.id}`
+          : `/api/classes/${classId}/notes`,
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      )
       const data = await response.json()
       if (data.success) {
-        onCreated?.()
+        if (isEdit) onSaved?.()
+        else onCreated?.()
         onClose()
-        router.push(`/classes/${classId}/notes`)
       } else {
-        setError(data.error || '创建失败')
+        setError(data.error || (isEdit ? '保存失败' : '创建失败'))
       }
     } catch {
-      setError('创建失败，请重试')
+      setError(isEdit ? '保存失败，请重试' : '创建失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -85,9 +109,9 @@ export default function CreateNoteModal({
     <CreateModalShell
       open={open}
       onClose={onClose}
-      title="创建笔记"
+      title={isEdit ? '编辑笔记' : '创建笔记'}
       icon={FileText}
-      labelledById="create-note-title"
+      labelledById={isEdit ? 'edit-note-title' : 'create-note-title'}
     >
       <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
@@ -98,7 +122,6 @@ export default function CreateNoteModal({
             </div>
           )}
 
-          {/* 标题 */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
               笔记标题 <span className="text-error">*</span>
@@ -115,7 +138,6 @@ export default function CreateNoteModal({
             <p className="mt-1 text-xs text-muted-foreground">{formData.title.length} / 100</p>
           </div>
 
-          {/* 分类 + 标签 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">分类</label>
@@ -124,8 +146,10 @@ export default function CreateNoteModal({
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="input w-full"
               >
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
                 ))}
               </select>
             </div>
@@ -141,11 +165,9 @@ export default function CreateNoteModal({
                 />
                 <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">例如：贪心算法, 基础题</p>
             </div>
           </div>
 
-          {/* 内容 */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
               笔记内容 <span className="text-error">*</span>
@@ -154,44 +176,17 @@ export default function CreateNoteModal({
               value={formData.content}
               onChange={(e) => setFormData({ ...formData, content: e.target.value })}
               placeholder="支持 Markdown…"
-              rows={16}
+              rows={12}
               className="input w-full font-mono text-sm resize-y"
               required
             />
             <p className="mt-1 text-xs text-muted-foreground">{formData.content.length} 字符</p>
           </div>
-
-          {/* Markdown 提示 */}
-          <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <div className="flex items-start gap-2">
-              <FileText className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium text-foreground mb-2">Markdown 提示</p>
-                <p>
-                  <code className="bg-muted px-1 rounded text-xs"># 标题</code>、
-                  <code className="bg-muted px-1 rounded text-xs">**粗体**</code>、
-                  <code className="bg-muted px-1 rounded text-xs">`代码`</code>、代码块用三个反引号
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 提示信息 */}
-          <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-                <li>笔记创建后班级成员可查看</li>
-                <li>仅作者可编辑、删除</li>
-                <li>建议使用清晰标题与标签便于搜索</li>
-              </ul>
-            </div>
-          </div>
         </div>
 
         <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
           <button type="submit" disabled={loading} className="btn btn-primary flex-1">
-            {loading ? '创建中…' : '创建笔记'}
+            {loading ? (isEdit ? '保存中…' : '创建中…') : isEdit ? '保存' : '创建笔记'}
           </button>
           <button type="button" onClick={onClose} className="btn btn-ghost">
             取消
