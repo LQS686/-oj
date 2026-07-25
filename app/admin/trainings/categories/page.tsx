@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface Category {
  id: string
@@ -22,6 +23,7 @@ interface Category {
 }
 
 export default function TrainingCategoriesPage() {
+ const dialog = useDialog()
  const [items, setItems] = useState<Category[]>([])
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState<string | null>(null)
@@ -113,7 +115,12 @@ export default function TrainingCategoriesPage() {
  toast.error(`该分类仍有 ${used} 个题单，无法删除`)
  return
  }
- if (!confirm(`确定删除分类「${name}」？`)) return
+ if (!await dialog.confirm({
+  message: `确定删除分类「${name}」？`,
+  tone: 'warning',
+  confirmText: '删除',
+  confirmVariant: 'destructive',
+ })) return
  try {
  const res = await fetchWithCookie(`/api/training-categories/${id}`, {
  method: 'DELETE',

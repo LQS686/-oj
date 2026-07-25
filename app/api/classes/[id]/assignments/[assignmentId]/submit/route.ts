@@ -43,6 +43,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   return ok(
     {
       submissionId: result.submissionId!,
+      assignmentSubmissionId: result.assignmentSubmissionId!,
       data: result.submission!,
       message: result.isLate
         ? '代码已提交（逾期），正在评测中...'

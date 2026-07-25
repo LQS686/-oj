@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -15,6 +15,7 @@ import type {
 import {
   EMAIL_REGEX,
   INITIAL_EMAIL_CHANGE,
+  isSettingsTabId,
   persistUserToStorage,
   type SettingsTabId,
 } from './_utils'
@@ -24,17 +25,19 @@ import { MessageBanner } from './_components/MessageBanner'
 import { SettingsTabs } from './_components/SettingsTabs'
 import { ProfileSection } from './_components/ProfileSection'
 import { AccountSection } from './_components/AccountSection'
-import { NotificationsSection } from './_components/NotificationsSection'
 import { PreferencesSection } from './_components/PreferencesSection'
-import { PageContainer } from '@/components/layout'
-import { PageLoading } from '@/components/common'
+import { EducationalPageShell, PageLoading } from '@/components/common'
 import { loginPath } from '@/lib/navigation'
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const { user: contextUser, setUser, isLoading: authLoading } = useUser()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUserLocal] = useState<SettingsUser | null>(null)
-  const [activeTab, setActiveTab] = useState<SettingsTabId>('profile')
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(() => {
+    const tab = searchParams.get('tab')
+    return isSettingsTabId(tab) ? tab : 'profile'
+  })
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<SettingsMessage | null>(null)
 
@@ -55,7 +58,6 @@ export default function SettingsPage() {
     emailPassword: false,
   })
 
-  // 邮箱验证码倒计时定时器、消息提示定时器的引用，用于卸载时清理
   const emailCountdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const messageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -68,10 +70,14 @@ export default function SettingsPage() {
     }, 3000)
   }
 
-  const { preferences, loading: preferencesLoading, updateNotification, updateEditor, save: savePreferences } =
-    usePreferences({ enabled: !!contextUser, showMessage })
+  const {
+    preferences,
+    loading: preferencesLoading,
+    updateNotification,
+    updateDefaultCodeLanguage,
+    save: savePreferences,
+  } = usePreferences({ enabled: !!contextUser, showMessage })
 
-  // 组件卸载时清理所有定时器，避免 setState 操作已卸载组件
   useEffect(() => {
     return () => {
       if (emailCountdownTimerRef.current) {
@@ -86,9 +92,19 @@ export default function SettingsPage() {
   }, [])
 
   useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (isSettingsTabId(tab)) setActiveTab(tab)
+  }, [searchParams])
+
+  const handleTabChange = (tab: SettingsTabId) => {
+    setActiveTab(tab)
+    router.replace(tab === 'profile' ? '/settings' : `/settings?tab=${tab}`, { scroll: false })
+  }
+
+  useEffect(() => {
     if (contextUser) {
       setUserLocal(contextUser)
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         nickname: contextUser.nickname || '',
         bio: contextUser.bio || '',
@@ -104,16 +120,21 @@ export default function SettingsPage() {
   }, [authLoading, contextUser, router])
 
   const handleProfileSubmit = async () => {
+    const nickname = formData.nickname.trim()
+    if (nickname.length > 32) {
+      showMessage('error', '昵称不能超过 32 个字符')
+      return
+    }
     setLoading(true)
     try {
       const response = await fetchWithCookie('/api/users/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname: formData.nickname, bio: formData.bio }),
+        body: JSON.stringify({ nickname, bio: formData.bio }),
       })
       const data = await response.json()
       if (data.success) {
-        showMessage('success', '资料更新成功')
+        showMessage('success', '资料已更新')
         const updatedUser = { ...user, ...data.data } as SettingsUser
         setUserLocal(updatedUser)
         setUser(updatedUser)
@@ -121,7 +142,7 @@ export default function SettingsPage() {
       } else {
         showMessage('error', data.error || '更新失败')
       }
-    } catch (error) {
+    } catch {
       showMessage('error', '网络错误')
     } finally {
       setLoading(false)
@@ -138,7 +159,7 @@ export default function SettingsPage() {
       return
     }
     if (formData.newPassword.length < 6) {
-      showMessage('error', '密码长度至少为6位')
+      showMessage('error', '密码长度至少为 6 位')
       return
     }
 
@@ -154,12 +175,17 @@ export default function SettingsPage() {
       })
       const data = await response.json()
       if (data.success) {
-        showMessage('success', '密码修改成功')
-        setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }))
+        showMessage('success', '密码已更新')
+        setFormData((prev) => ({
+          ...prev,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        }))
       } else {
         showMessage('error', data.error || '修改失败')
       }
-    } catch (error) {
+    } catch {
       showMessage('error', '网络错误')
     } finally {
       setLoading(false)
@@ -180,7 +206,7 @@ export default function SettingsPage() {
       return
     }
 
-    setEmailChange(prev => ({ ...prev, loading: true }))
+    setEmailChange((prev) => ({ ...prev, loading: true }))
     try {
       const response = await fetchWithCookie('/api/users/profile/email', {
         method: 'POST',
@@ -193,11 +219,11 @@ export default function SettingsPage() {
       const data = await response.json()
       if (data.success) {
         showMessage('success', '验证码已发送至新邮箱')
-        setEmailChange(prev => ({ ...prev, step: 'verify', loading: false, countdown: 60 }))
+        setEmailChange((prev) => ({ ...prev, step: 'verify', loading: false, countdown: 60 }))
 
         if (emailCountdownTimerRef.current) clearInterval(emailCountdownTimerRef.current)
         emailCountdownTimerRef.current = setInterval(() => {
-          setEmailChange(prev => {
+          setEmailChange((prev) => {
             if (prev.countdown <= 1) {
               if (emailCountdownTimerRef.current) {
                 clearInterval(emailCountdownTimerRef.current)
@@ -210,11 +236,11 @@ export default function SettingsPage() {
         }, 1000)
       } else {
         showMessage('error', data.error || '发送验证码失败')
-        setEmailChange(prev => ({ ...prev, loading: false }))
+        setEmailChange((prev) => ({ ...prev, loading: false }))
       }
-    } catch (error) {
+    } catch {
       showMessage('error', '网络错误')
-      setEmailChange(prev => ({ ...prev, loading: false }))
+      setEmailChange((prev) => ({ ...prev, loading: false }))
     }
   }
 
@@ -224,7 +250,7 @@ export default function SettingsPage() {
       return
     }
 
-    setEmailChange(prev => ({ ...prev, loading: true }))
+    setEmailChange((prev) => ({ ...prev, loading: true }))
     try {
       const response = await fetchWithCookie('/api/users/profile/email', {
         method: 'PATCH',
@@ -233,7 +259,7 @@ export default function SettingsPage() {
       })
       const data = await response.json()
       if (data.success) {
-        showMessage('success', '邮箱更改成功')
+        showMessage('success', '邮箱已更新')
         const updatedUser = { ...user, email: data.newEmail } as SettingsUser
         setUserLocal(updatedUser)
         setUser(updatedUser)
@@ -241,11 +267,11 @@ export default function SettingsPage() {
         setEmailChange(INITIAL_EMAIL_CHANGE)
       } else {
         showMessage('error', data.error || '邮箱更改失败')
-        setEmailChange(prev => ({ ...prev, loading: false }))
+        setEmailChange((prev) => ({ ...prev, loading: false }))
       }
-    } catch (error) {
+    } catch {
       showMessage('error', '网络错误')
-      setEmailChange(prev => ({ ...prev, loading: false }))
+      setEmailChange((prev) => ({ ...prev, loading: false }))
     }
   }
 
@@ -258,7 +284,7 @@ export default function SettingsPage() {
     setUserLocal(updatedUser)
     setUser(updatedUser)
     persistUserToStorage(updatedUser)
-    showMessage('success', '头像更新成功')
+    showMessage('success', '头像已更新')
   }
 
   if (authLoading || !contextUser) {
@@ -266,67 +292,68 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen">
-      <PageContainer variant="standard" className="py-4 md:py-6">
-        <SettingsHeader />
-        <MessageBanner message={message} />
+    <EducationalPageShell title="个人设置" width="standard">
+      <SettingsHeader />
+      <MessageBanner message={message} />
 
-        <div className="grid lg:grid-cols-4 gap-6">
-          <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* 单一卡片：侧栏 + 内容，避免多层卡片嵌套 */}
+      <div className="card-static overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-[11.5rem_minmax(0,1fr)]">
+          <div className="lg:border-r border-border p-3 lg:p-4 lg:bg-muted/20">
+            <SettingsTabs activeTab={activeTab} onTabChange={handleTabChange} />
+          </div>
 
-          <div className="lg:col-span-3">
-            <div className="card-static p-6">
-              <AnimatePresence mode="wait">
-                {activeTab === 'profile' && (
-                  <ProfileSection
-                    user={user}
-                    formData={formData}
-                    loading={loading}
-                    onFormDataChange={setFormData}
-                    onAvatarUpdate={handleAvatarUpdate}
-                    onSubmit={handleProfileSubmit}
-                  />
-                )}
+          <div className="p-5 md:p-6 min-w-0">
+            <AnimatePresence mode="wait">
+              {activeTab === 'profile' && (
+                <ProfileSection
+                  user={user}
+                  formData={formData}
+                  loading={loading}
+                  onFormDataChange={setFormData}
+                  onAvatarUpdate={handleAvatarUpdate}
+                  onSubmit={handleProfileSubmit}
+                />
+              )}
 
-                {activeTab === 'account' && (
-                  <AccountSection
-                    user={user}
-                    formData={formData}
-                    emailChange={emailChange}
-                    showPasswords={showPasswords}
-                    loading={loading}
-                    onFormDataChange={setFormData}
-                    onEmailChange={setEmailChange}
-                    onShowPasswordsChange={setShowPasswords}
-                    onSendVerificationCode={handleSendVerificationCode}
-                    onConfirmEmailChange={handleConfirmEmailChange}
-                    onCancelEmailChange={handleCancelEmailChange}
-                    onPasswordChange={handlePasswordChange}
-                  />
-                )}
+              {activeTab === 'account' && (
+                <AccountSection
+                  user={user}
+                  formData={formData}
+                  emailChange={emailChange}
+                  showPasswords={showPasswords}
+                  loading={loading}
+                  onFormDataChange={setFormData}
+                  onEmailChange={setEmailChange}
+                  onShowPasswordsChange={setShowPasswords}
+                  onSendVerificationCode={handleSendVerificationCode}
+                  onConfirmEmailChange={handleConfirmEmailChange}
+                  onCancelEmailChange={handleCancelEmailChange}
+                  onPasswordChange={handlePasswordChange}
+                />
+              )}
 
-                {activeTab === 'notifications' && (
-                  <NotificationsSection
-                    preferences={preferences}
-                    loading={preferencesLoading}
-                    onNotificationChange={updateNotification}
-                    onSave={savePreferences}
-                  />
-                )}
-
-                {activeTab === 'preferences' && (
-                  <PreferencesSection
-                    preferences={preferences}
-                    loading={preferencesLoading}
-                    onEditorChange={updateEditor}
-                    onSave={savePreferences}
-                  />
-                )}
-              </AnimatePresence>
-            </div>
+              {activeTab === 'preferences' && (
+                <PreferencesSection
+                  preferences={preferences}
+                  loading={preferencesLoading}
+                  onNotificationChange={updateNotification}
+                  onDefaultCodeLanguageChange={updateDefaultCodeLanguage}
+                  onSave={savePreferences}
+                />
+              )}
+            </AnimatePresence>
           </div>
         </div>
-      </PageContainer>
-    </div>
+      </div>
+    </EducationalPageShell>
+  )
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<PageLoading label="加载设置中..." />}>
+      <SettingsPageContent />
+    </Suspense>
   )
 }

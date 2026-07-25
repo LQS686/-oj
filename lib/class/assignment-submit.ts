@@ -187,6 +187,7 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
   return {
     ok: true as const,
     submissionId: submission.id,
+    assignmentSubmissionId: assignmentSubmission.id,
     submission,
     isLate,
   }

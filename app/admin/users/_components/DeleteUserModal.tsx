@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 import type { User } from '../_utils'
 
 interface DeleteUserModalProps {
@@ -12,6 +13,7 @@ interface DeleteUserModalProps {
 
 /** 删除单个用户的确认对话框。 */
 export function DeleteUserModal({ user, onClose, onSuccess }: DeleteUserModalProps) {
+  const dialog = useDialog()
   const [deleting, setDeleting] = useState(false)
 
   const handleDelete = async () => {
@@ -25,10 +27,10 @@ export function DeleteUserModal({ user, onClose, onSuccess }: DeleteUserModalPro
       if (data.success) {
         onSuccess()
       } else {
-        alert(data.error || '删除失败')
+        await dialog.alert({ tone: 'error', message: data.error || '删除失败' })
       }
     } catch (err) {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setDeleting(false)
     }

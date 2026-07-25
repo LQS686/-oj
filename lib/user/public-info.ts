@@ -28,6 +28,7 @@ export async function getUserPublicInfo(userId: string) {
         rating: true,
         rank: true,
         color: true,
+        role: true,
         createdAt: true,
         _count: {
           select: {
@@ -365,14 +366,25 @@ export async function getUserPreferencesCollection(userId: string) {
  * 偏好白名单 + 字段校验
  */
 const ALLOWED_PREFERENCE_KEYS = [
-  'theme', 'language', 'fontSize', 'editorTheme', 'autoSave',
-  'tabSize', 'keyboardShortcuts', 'notifications', 'preferredLanguage', 'defaultTab',
+  'theme',
+  'language',
+  'fontSize',
+  'editorTheme',
+  'autoSave',
+  'tabSize',
+  'keyboardShortcuts',
+  'notifications',
+  'preferredLanguage',
+  'defaultTab',
+  /** 做题页默认编程语言：cpp / c / python */
+  'defaultCodeLanguage',
 ]
 const ALLOWED_THEMES = ['light', 'dark', 'system']
 const ALLOWED_LANGUAGES = ['zh-CN', 'en-US']
 const ALLOWED_FONT_SIZES = [12, 13, 14, 15, 16, 17, 18, 20, 22, 24]
 const ALLOWED_EDITOR_THEMES = ['vs-dark', 'vs-light', 'hc-black']
 const ALLOWED_TAB_SIZES = [2, 4, 8]
+const ALLOWED_CODE_LANGUAGES = ['cpp', 'c', 'python']
 
 function validatePreferenceValue(key: string, value: any): boolean {
   switch (key) {
@@ -395,6 +407,8 @@ function validatePreferenceValue(key: string, value: any): boolean {
       return typeof value === 'object' && value !== null
     case 'defaultTab':
       return typeof value === 'string' && value.length <= 50
+    case 'defaultCodeLanguage':
+      return typeof value === 'string' && ALLOWED_CODE_LANGUAGES.includes(value)
     default:
       return false
   }

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 import type { Problem } from '../_types'
 
 /**
@@ -16,6 +17,7 @@ import type { Problem } from '../_types'
  */
 export function useProblemList() {
   const router = useRouter()
+  const dialog = useDialog()
   const [problems, setProblems] = useState<Problem[]>([])
   const [loading, setLoading] = useState(true)
   const [initialLoading, setInitialLoading] = useState(true)
@@ -72,12 +74,12 @@ export function useProblemList() {
             : p
         ))
       } else {
-        alert(data.error || '操作失败')
+        await dialog.alert({ tone: 'error', message: data.error || '操作失败' })
       }
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     }
-  }, [])
+  }, [dialog])
 
   // 聚合所有标签（去重 + 按拼音/字母排序），供筛选下拉使用
   const allTags = useMemo(() => {

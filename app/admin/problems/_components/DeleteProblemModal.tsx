@@ -1,6 +1,7 @@
 'use client'
 
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 import type { Problem } from '../_types'
 
 interface DeleteProblemModalProps {
@@ -11,6 +12,8 @@ interface DeleteProblemModalProps {
 
 /** 删除单个题目的确认对话框。 */
 export function DeleteProblemModal({ problem, onClose, onSuccess }: DeleteProblemModalProps) {
+  const dialog = useDialog()
+
   const handleDelete = async () => {
     try {
       const response = await fetchWithCookie(`/api/admin/problems/${problem.id}`, {
@@ -21,10 +24,10 @@ export function DeleteProblemModal({ problem, onClose, onSuccess }: DeleteProble
       if (data.success) {
         onSuccess()
       } else {
-        alert(data.error || '删除失败')
+        await dialog.alert({ tone: 'error', message: data.error || '删除失败' })
       }
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     }
   }
 

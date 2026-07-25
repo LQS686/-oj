@@ -83,16 +83,27 @@ export async function updateSubmissionDirect(
     time?: number
     memory?: number
     passedTests?: number
-    message?: string
+    totalTests?: number
+    message?: string | null
     testResults?: any
-  }
+  },
+  options?: { forceStatus?: boolean }
 ) {
   return withRetry(async () => {
     const client = await getMongoClient()
     const db = client.db()
 
     const sanitized: Record<string, unknown> = {}
-    const allowedFields = ['status', 'score', 'time', 'memory', 'passedTests', 'message', 'testResults']
+    const allowedFields = [
+      'status',
+      'score',
+      'time',
+      'memory',
+      'passedTests',
+      'totalTests',
+      'message',
+      'testResults',
+    ]
     for (const key of allowedFields) {
       if (key in data && data[key as keyof typeof data] !== undefined) {
         sanitized[key] = data[key as keyof typeof data]
@@ -104,7 +115,8 @@ export async function updateSubmissionDirect(
     //   2) 通过 canTransition 校验合法转换
     //   3) 仅在 PENDING/JUDGING/RUNNING 状态下允许非合法转换（recover 场景）
     //      归一化后比较，兼容历史大驼峰写法（'Pending'/'Judging'）与枚举大写（'PENDING'/'JUDGING'）
-    if (typeof sanitized.status === 'string') {
+    //   4) forceStatus：管理员重测，允许终态 → PENDING
+    if (typeof sanitized.status === 'string' && !options?.forceStatus) {
       const current = await db.collection('Submission').findOne(
         { _id: new ObjectId(submissionId) },
         { projection: { status: 1 } }

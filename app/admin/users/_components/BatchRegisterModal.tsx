@@ -5,6 +5,7 @@ import {
   Upload, X, Plus, FileText, AlertCircle, CheckCircle, Loader2, Download,
 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 import type { BatchUser, BatchResult } from '../_utils'
 
 interface BatchRegisterModalProps {
@@ -25,6 +26,7 @@ export function BatchRegisterModal({
   onClose,
   onSuccess,
 }: BatchRegisterModalProps) {
+  const dialog = useDialog()
   const [activeTab, setActiveTab] = useState<'form' | 'csv'>('form')
 
   // 表单输入状态
@@ -69,18 +71,18 @@ export function BatchRegisterModal({
       }))
 
     if (validUsers.length === 0) {
-      alert('请至少填写一个用户名')
+      await dialog.alert({ tone: 'warning', message: '请至少填写一个用户名' })
       return
     }
 
     if (useUnifiedPassword && !unifiedPassword) {
-      alert('请输入统一密码')
+      await dialog.alert({ tone: 'warning', message: '请输入统一密码' })
       return
     }
 
     const usersWithoutPassword = validUsers.filter(u => !u.password)
     if (!useUnifiedPassword && usersWithoutPassword.length > 0) {
-      alert('请为所有用户填写密码，或使用统一密码功能')
+      await dialog.alert({ tone: 'warning', message: '请为所有用户填写密码，或使用统一密码功能' })
       return
     }
 
@@ -117,10 +119,10 @@ export function BatchRegisterModal({
         setBatchResults(newResults)
         onSuccess()
       } else {
-        alert(data.error || '批量注册失败')
+        await dialog.alert({ tone: 'error', message: data.error || '批量注册失败' })
       }
     } catch (err) {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setBatchRegistering(false)
     }
@@ -136,7 +138,7 @@ export function BatchRegisterModal({
     setIsDragging(false)
   }
 
-  const handleCsvDrop = (e: React.DragEvent) => {
+  const handleCsvDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
     const file = e.dataTransfer.files[0]
@@ -144,7 +146,7 @@ export function BatchRegisterModal({
       setCsvFile(file)
       setCsvResults([])
     } else {
-      alert('请上传 CSV 文件')
+      await dialog.alert({ tone: 'warning', message: '请上传 CSV 文件' })
     }
   }
 
@@ -175,7 +177,7 @@ export function BatchRegisterModal({
         }
       }
 
-      xhr.onload = () => {
+      xhr.onload = async () => {
         if (xhr.status === 200) {
           const data = JSON.parse(xhr.responseText)
           if (data.success && data.data) {
@@ -194,16 +196,16 @@ export function BatchRegisterModal({
             setCsvResults(newResults)
             onSuccess()
           } else {
-            alert(data.error || 'CSV 导入失败')
+            await dialog.alert({ tone: 'error', message: data.error || 'CSV 导入失败' })
           }
         } else {
-          alert('上传失败')
+          await dialog.alert({ tone: 'error', message: '上传失败' })
         }
         setCsvUploading(false)
       }
 
-      xhr.onerror = () => {
-        alert('网络错误')
+      xhr.onerror = async () => {
+        await dialog.alert({ tone: 'error', message: '网络错误' })
         setCsvUploading(false)
       }
 
@@ -212,7 +214,7 @@ export function BatchRegisterModal({
       xhr.withCredentials = true
       xhr.send(formData)
     } catch (err) {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
       setCsvUploading(false)
     }
   }

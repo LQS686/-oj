@@ -30,6 +30,9 @@ const COLORS = [
   '#f97316', '#84cc16',
 ]
 
+/** 同一提交只庆祝一次，避免短时重复提交/重渲染叠多层彩纸 */
+const celebratedTriggers = new Set<string>()
+
 /**
  * 轻量彩纸动画组件，纯 Canvas 实现，无第三方依赖。
  * 在 trigger 变化时触发一次动画，duration 后自动停止。
@@ -41,10 +44,20 @@ export default function Confetti({ trigger, duration = 3000, count = 120 }: Conf
   const startTimeRef = useRef<number>(0)
 
   useEffect(() => {
+    const key = String(trigger)
+    if (!key || celebratedTriggers.has(key)) return
+
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+
+    celebratedTriggers.add(key)
+    // 防止 Set 无限增长
+    if (celebratedTriggers.size > 200) {
+      const first = celebratedTriggers.values().next().value
+      if (first !== undefined) celebratedTriggers.delete(first)
+    }
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1

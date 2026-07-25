@@ -14,6 +14,7 @@ import {
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface TrainingProblem {
  id: string
@@ -53,6 +54,7 @@ const difficultyClass = (d: string) => {
 }
 
 export default function EditTrainingPage() {
+ const dialog = useDialog()
  const params = useParams<{ id: string }>()
  const router = useRouter()
  const id = params?.id || ''
@@ -210,7 +212,12 @@ export default function EditTrainingPage() {
  }
 
  const handleRemove = async (problemId: string) => {
- if (!confirm('确定从题单中移除该题目？')) return
+ if (!await dialog.confirm({
+  message: '确定从题单中移除该题目？',
+  tone: 'warning',
+  confirmText: '删除',
+  confirmVariant: 'destructive',
+ })) return
  const ok = await patchProblems({ action: 'remove', problemIds: [problemId] })
  if (ok) await fetchDetail()
  }
@@ -263,9 +270,12 @@ export default function EditTrainingPage() {
  setSavingProblems(false)
  }
 
- const discardChanges = () => {
+ const discardChanges = async () => {
  if (dirty.size === 0) return
- if (!confirm(`放弃 ${dirty.size} 项未保存的修改？`)) return
+ if (!await dialog.confirm({
+  message: `放弃 ${dirty.size} 项未保存的修改？`,
+  tone: 'warning',
+ })) return
  if (!training) return
  const scores: Record<string, number> = {}
  const reqs: Record<string, boolean> = {}

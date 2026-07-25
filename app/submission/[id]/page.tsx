@@ -3,7 +3,25 @@
 import { use, useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, FileCode, Clock, Database, User, Calendar, Code, CheckCircle, CheckCircle2, XCircle, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, History, Target, RefreshCw, Loader2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  Clock,
+  Database,
+  User,
+  Calendar,
+  Code,
+  CheckCircle,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  History,
+  Target,
+  Loader2,
+} from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText, getDifficultyColor } from '@/lib/status'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -11,6 +29,7 @@ import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { fetchWithCookie } from '@/lib/api/base'
 import { PageContainer } from '@/components/layout'
+import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
 
 interface TestResult {
   testId: string
@@ -56,7 +75,6 @@ interface SubmissionHistoryItem {
   language: string
 }
 
-// 终态：评测已结束的状态（不再轮询/订阅）
 const FINAL_STATUSES = new Set([
   'AC', 'Accepted',
   'WA', 'Wrong Answer',
@@ -76,102 +94,127 @@ function isFinalStatus(status: string | undefined | null): boolean {
   return FINAL_STATUSES.has(status)
 }
 
-function getTestStatusIcon(status: string) {
+function isPassStatus(status: string) {
+  return status === 'AC' || status === 'Accepted'
+}
+
+function isJudgingStatus(status: string) {
+  return ['Judging', 'Pending', 'Running', 'JUDGING', 'PENDING', 'RUNNING'].includes(status)
+}
+
+function toCodeLanguage(lang: string): CodeLanguage {
+  if (lang === 'c' || lang === 'python') return lang
+  return 'cpp'
+}
+
+function getTestStatusIcon(status: string, className = 'w-4 h-4') {
   switch (status) {
     case 'AC':
     case 'Accepted':
-      return <CheckCircle className="w-5 h-5 text-secondary" />
+      return <CheckCircle className={`${className} text-secondary`} />
     case 'WA':
     case 'Wrong Answer':
-      return <XCircle className="w-5 h-5 text-error" />
+      return <XCircle className={`${className} text-error`} />
     case 'TLE':
     case 'Time Limit Exceeded':
-      return <Clock className="w-5 h-5 text-accent" />
+      return <Clock className={`${className} text-accent`} />
     case 'MLE':
     case 'Memory Limit Exceeded':
-      return <Database className="w-5 h-5 text-info" />
+      return <Database className={`${className} text-info`} />
     case 'RE':
     case 'Runtime Error':
-      return <AlertTriangle className="w-5 h-5 text-warning" />
+      return <AlertTriangle className={`${className} text-warning`} />
     case 'CE':
     case 'Compile Error':
-      return <Code className="w-5 h-5 text-muted-foreground" />
-    case 'PE':
-    case 'Presentation Error':
-      return <AlertTriangle className="w-5 h-5 text-amber-600" />
-    case 'OLE':
-    case 'Output Limit Exceeded':
-      return <AlertTriangle className="w-5 h-5 text-amber-600" />
-    case 'CSP':
-      return <XCircle className="w-5 h-5 text-[var(--difficulty-hard)]" />
+      return <Code className={`${className} text-muted-foreground`} />
     case 'PC':
     case 'Partly Correct':
-      return <CheckCircle2 className="w-5 h-5 text-[var(--difficulty-medium)]" />
+      return <CheckCircle2 className={`${className} text-[var(--difficulty-medium)]`} />
     default:
-      return <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+      return <AlertTriangle className={`${className} text-muted-foreground`} />
   }
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const text = getStatusText(status)
+  if (isJudgingStatus(status)) {
+    return (
+      <span className="tag tag-info">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        {text}
+      </span>
+    )
+  }
+  if (isPassStatus(status)) {
+    return (
+      <span className="tag tag-success">
+        <CheckCircle className="w-3.5 h-3.5" />
+        {text}
+      </span>
+    )
+  }
+  if (status === 'WA' || status === 'Wrong Answer') {
+    return (
+      <span className="tag tag-error">
+        <XCircle className="w-3.5 h-3.5" />
+        {text}
+      </span>
+    )
+  }
+  return (
+    <span className="tag tag-warning">
+      <AlertTriangle className="w-3.5 h-3.5" />
+      {text}
+    </span>
+  )
+}
+
 function TestPointRow({ result, index }: { result: TestResult; index: number }) {
-  const isPass = result.status === 'AC' || result.status === 'Accepted'
-  const isJudgingTest = result.status === 'Judging' || result.status === 'Pending' || result.status === 'Running'
-  const [expanded, setExpanded] = useState(!isPass)
+  const isPass = isPassStatus(result.status)
+  const judging = isJudgingStatus(result.status)
   const hasMessage = !!result.message
+  const [expanded, setExpanded] = useState(!isPass && hasMessage)
 
   return (
     <div
-      className={`p-4 rounded-lg border transition-all ${
+      className={`rounded-lg border ${
         isPass
-          ? 'bg-secondary/5 border-secondary/20 hover:border-secondary/40'
-          : isJudgingTest
-          ? 'bg-muted border-border'
-          : 'bg-error/5 border-error/20 hover:border-error/40'
+          ? 'border-secondary/25 bg-secondary/5'
+          : judging
+            ? 'border-border bg-muted/40'
+            : 'border-error/25 bg-error/5'
       }`}
     >
-      <div
-        className="flex items-center justify-between cursor-pointer"
-        onClick={() => hasMessage && setExpanded(!expanded)}
+      <button
+        type="button"
+        className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left"
+        onClick={() => hasMessage && setExpanded((v) => !v)}
+        disabled={!hasMessage}
       >
-        <div className="flex items-center gap-3">
-          {isJudgingTest
-            ? <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
-            : getTestStatusIcon(result.status)}
-          <div>
-            <div className="font-semibold text-foreground">
-              测试点 #{index + 1}
-            </div>
-            <div className="text-sm text-muted-foreground">{getStatusText(result.status)}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-6 text-sm">
-          <div className="text-center">
-            <div className="text-muted-foreground">时间</div>
-            <div className="font-mono font-semibold text-foreground">
-              {isJudgingTest ? '-' : formatTime(result.time)}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-muted-foreground">内存</div>
-            <div className="font-mono font-semibold text-foreground">
-              {isJudgingTest ? '-' : formatMemory(result.memory)}
-            </div>
-          </div>
-          {hasMessage && (
-            <div className="text-muted-foreground">
-              {expanded ? (
-                <ChevronDown className="w-5 h-5" />
-              ) : (
-                <ChevronRight className="w-5 h-5" />
-              )}
-            </div>
+        <div className="flex items-center gap-2 min-w-0">
+          {judging ? (
+            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin shrink-0" />
+          ) : (
+            getTestStatusIcon(result.status)
           )}
+          <span className="text-sm font-medium text-foreground">#{index + 1}</span>
+          <span className="text-xs text-muted-foreground truncate">{getStatusText(result.status)}</span>
         </div>
-      </div>
+        <div className="flex items-center gap-3 text-xs font-mono tabular-nums text-muted-foreground shrink-0">
+          <span>{judging ? '—' : formatTime(result.time)}</span>
+          <span>{judging ? '—' : formatMemory(result.memory)}</span>
+          {hasMessage &&
+            (expanded ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5" />
+            ))}
+        </div>
+      </button>
       {expanded && result.message && (
-        <div className="mt-3 text-sm text-foreground bg-muted p-3 rounded border border-border">
-          <div className="font-medium text-foreground mb-1">错误信息:</div>
-          <pre className="whitespace-pre-wrap text-muted-foreground">{result.message}</pre>
-        </div>
+        <pre className="mx-3 mb-2.5 text-xs text-muted-foreground whitespace-pre-wrap bg-muted/80 border border-border rounded-md p-2 max-h-40 overflow-auto custom-scrollbar">
+          {result.message}
+        </pre>
       )}
     </div>
   )
@@ -187,9 +230,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const [submissionHistory, setSubmissionHistory] = useState<SubmissionHistoryItem[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [copied, setCopied] = useState(false)
-  // 实时刷新状态：用于展示"刷新中"小图标
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  // 防止与 socket 推送/轮询产生竞态
   const isRefreshingRef = useRef(false)
 
   const submissionTabTitle = submission?.problem?.title
@@ -199,10 +239,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       : undefined
   useDocumentTitle(submissionTabTitle)
 
-  const fetchSubmission = useCallback(async (showRefreshing = false) => {
+  const fetchSubmission = useCallback(async () => {
     if (isRefreshingRef.current) return
     isRefreshingRef.current = true
-    if (showRefreshing) setIsRefreshing(true)
     try {
       const response = await fetchWithCookie(`/api/submissions/${id}`)
       const data = await response.json()
@@ -210,7 +249,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       if (data.success) {
         setSubmission(data.data)
       } else {
-        // 404 分支：仅在首次加载（submission 仍为 null）时显示"不存在"
         if (response.status === 404) {
           setSubmission((prev) => {
             if (!prev) setError('提交记录不存在或已被删除。如果这是作业提交，请从作业页面查看详情。')
@@ -229,32 +267,24 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     } finally {
       setLoading(false)
       isRefreshingRef.current = false
-      if (showRefreshing) setIsRefreshing(false)
     }
   }, [id])
 
-  // 首次加载 + id 变化时拉取
   useEffect(() => {
     fetchSubmission()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // WebSocket 实时推送
   useSubmissionSocket({
     userId: user?.id || '',
     enabled: !!user,
     onConnected: () => {
-      // socket 连接/重连成功后立即拉一次，覆盖空窗期丢失的事件
-      // worker.ts 的 DB 写入在 emit 之前，重拉能读到最新状态
-      fetchSubmission(false)
+      fetchSubmission()
     },
     onSubmissionUpdate: (data) => {
       if (data.id !== id) return
-      // 局部更新：避免重新加载整条记录（保留代码等大字段）
       setSubmission((prev) => {
         if (!prev) return prev
-        // 终态守卫：已是终态时，拒绝被任何中间态覆盖
-        // 防止乱序到达的 judge:progress 或重发的 submission:update 把 AC 回退为 Judging
         if (isFinalStatus(prev.status) && !isFinalStatus(data.status)) {
           return prev
         }
@@ -267,9 +297,10 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
           passedTests: data.passedTests ?? prev.passedTests,
           totalTests: data.totalTests ?? prev.totalTests,
           message: data.message ?? prev.message,
-          testResults: Array.isArray(data.testResults) && data.testResults.length > 0
-            ? data.testResults
-            : prev.testResults,
+          testResults:
+            Array.isArray(data.testResults) && data.testResults.length > 0
+              ? data.testResults
+              : prev.testResults,
         }
       })
     },
@@ -277,7 +308,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       if (data.submissionId !== id) return
       setSubmission((prev) => {
         if (!prev) return prev
-        // 终态守卫：评测已结束时，忽略后续 judge:progress（可能乱序到达）
         if (isFinalStatus(prev.status)) return prev
         return {
           ...prev,
@@ -288,8 +318,6 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     },
   })
 
-  // 轮询兜底：非终态时每 3s 拉取一次（WebSocket 不可用时仍能更新）
-  // deps 仅依赖 status 字符串，避免 WS 乐观更新 setSubmission 触发 interval 反复重建。
   useEffect(() => {
     if (!submission) return
     if (isFinalStatus(submission.status)) return
@@ -297,7 +325,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     let intervalId: ReturnType<typeof setInterval> | null = null
     const start = () => {
       if (intervalId) return
-      intervalId = setInterval(() => fetchSubmission(true), 3000)
+      intervalId = setInterval(() => fetchSubmission(), 3000)
     }
     const stop = () => {
       if (intervalId) {
@@ -307,7 +335,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     }
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        fetchSubmission(true)
+        fetchSubmission()
         start()
       } else {
         stop()
@@ -325,7 +353,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
   useEffect(() => {
     if (submission) {
-      fetchSubmissionHistory()
+      void fetchSubmissionHistory()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submission?.id])
@@ -339,7 +367,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       const data = await response.json()
 
       if (data.success) {
-        setSubmissionHistory(Array.isArray(data.data.submissions) ? data.data.submissions.slice(0, 10) : [])
+        setSubmissionHistory(
+          Array.isArray(data.data.submissions) ? data.data.submissions.slice(0, 10) : []
+        )
       } else {
         setSubmissionHistory([])
       }
@@ -354,11 +384,11 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-6">
-            <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
-            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin"></div>
+          <div className="relative w-12 h-12 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
+            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin" />
           </div>
-          <p className="text-muted-foreground">加载中...</p>
+          <p className="text-sm text-muted-foreground">加载中…</p>
         </div>
       </div>
     )
@@ -367,16 +397,13 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   if (error || !submission) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-error/10 flex items-center justify-center">
-            <XCircle className="w-10 h-10 text-error" />
+        <div className="text-center px-4">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-error/10 flex items-center justify-center">
+            <XCircle className="w-7 h-7 text-error" />
           </div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">加载失败</h2>
-          <p className="text-muted-foreground mb-6 max-w-md">{error}</p>
-          <button
-            onClick={() => router.back()}
-            className="btn btn-primary"
-          >
+          <h2 className="text-lg font-bold text-foreground mb-2">加载失败</h2>
+          <p className="text-sm text-muted-foreground mb-6 max-w-md">{error}</p>
+          <button type="button" onClick={() => router.back()} className="btn btn-primary">
             返回
           </button>
         </div>
@@ -384,383 +411,241 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     )
   }
 
-  const getStatusBadge = (status: string) => {
-    const text = getStatusText(status)
-    const isSuccess = status === 'AC' || status === 'Accepted'
-    const isWrong = status === 'WA' || status === 'Wrong Answer'
-    const isJudging = status === 'Judging' || status === 'Pending' || status === 'Running'
-
-    if (isJudging) {
-      return (
-        <span className="tag tag-info text-base px-4 py-2">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          {text}
-        </span>
-      )
-    }
-    if (isSuccess) {
-      return (
-        <span className="tag tag-success text-base px-4 py-2">
-          <CheckCircle className="w-4 h-4" />
-          {text}
-        </span>
-      )
-    }
-    if (isWrong) {
-      return (
-        <span className="tag tag-error text-base px-4 py-2">
-          <XCircle className="w-4 h-4" />
-          {text}
-        </span>
-      )
-    }
-    return (
-      <span className="tag tag-warning text-base px-4 py-2">
-        <AlertTriangle className="w-4 h-4" />
-        {text}
-      </span>
-    )
-  }
-
   const handleCopyCode = async () => {
+    if (!submission.code) return
     await navigator.clipboard.writeText(submission.code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'AC':
-        return <CheckCircle className="w-4 h-4 text-secondary" />
-      case 'WA':
-        return <XCircle className="w-4 h-4 text-error" />
-      case 'TLE':
-        return <Clock className="w-4 h-4 text-accent" />
-      case 'MLE':
-        return <Database className="w-4 h-4 text-info" />
-      case 'RE':
-        return <AlertTriangle className="w-4 h-4 text-warning" />
-      case 'CE':
-        return <Code className="w-4 h-4 text-muted-foreground" />
-      case 'PE':
-      case 'Presentation Error':
-        return <AlertTriangle className="w-4 h-4 text-amber-600" />
-      case 'OLE':
-      case 'Output Limit Exceeded':
-        return <AlertTriangle className="w-4 h-4 text-amber-600" />
-      case 'CSP':
-        return <XCircle className="w-4 h-4 text-[var(--difficulty-hard)]" />
-      case 'PC':
-      case 'Partly Correct':
-        return <CheckCircle2 className="w-4 h-4 text-[var(--difficulty-medium)]" />
-      default:
-        return <Clock className="w-4 h-4 text-muted-foreground" />
-    }
-  }
-
-  const isAc = submission.status === 'AC' || submission.status === 'Accepted'
-  const statusCardBorder = isAc ? 'border-secondary/40 bg-secondary/5' : 'border-border'
+  const isAc = isPassStatus(submission.status)
+  const isCe = submission.status === 'CE' || submission.status === 'Compile Error'
+  const judging = isJudgingStatus(submission.status)
+  const problemHref = `/problem/${submission.problem.problemNumber || submission.problem.id}`
+  const codeLines = submission.code ? submission.code.split('\n').length : 0
+  const showTests =
+    judging || !!(submission.testResults && submission.testResults.length > 0)
 
   return (
     <div className="min-h-screen bg-background">
-      <PageContainer className="py-4 md:py-6">
-        <button
-          onClick={() => router.back()}
-          className="nav-link mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回提交列表
-        </button>
-
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-            <FileCode className="w-6 h-6 text-primary" />
-          </div>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-foreground section-title">提交详情</h1>
-            <p className="text-muted-foreground mt-1">
-              查看提交代码和评测结果
-              {!isFinalStatus(submission?.status) && (
-                <span className="ml-2 inline-flex items-center gap-1 text-primary">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  实时同步中
-                </span>
-              )}
-            </p>
-          </div>
+      <PageContainer variant="standard" className="py-5 md:py-6 pb-10">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <button
-            onClick={() => fetchSubmission(true)}
-            disabled={isRefreshing}
-            className="btn btn-outline text-sm py-2 px-3 flex items-center gap-2"
-            title="手动刷新"
+            type="button"
+            onClick={() => router.push('/submissions')}
+            className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            刷新
+            <ArrowLeft className="w-4 h-4" />
+            提交记录
           </button>
-        </div>
-
-        {/* 顶部状态条：单行紧凑展示，避免 4 卡片占用大量垂直空间 */}
-        <div className={`card-static p-4 mb-6 border ${statusCardBorder}`}>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            {/* 状态 */}
-            <div className="flex items-center gap-2">
-              {getStatusBadge(submission.status)}
-            </div>
-            <div className="h-8 w-px bg-border" />
-            {/* 分数 + 测试点 */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">分数</span>
-              <span className="text-2xl font-bold text-foreground">{submission.score}</span>
-              <span className="text-sm text-muted-foreground">
-                ({submission.passedTests}/{submission.totalTests} 测试点)
-              </span>
-            </div>
-            <div className="h-8 w-px bg-border" />
-            {/* 用时 */}
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">用时</span>
-              <span className="font-mono font-semibold text-foreground">{formatTime(submission.time)}</span>
-            </div>
-            <div className="h-8 w-px bg-border" />
-            {/* 内存 */}
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">内存</span>
-              <span className="font-mono font-semibold text-foreground">{formatMemory(submission.memory)}</span>
-            </div>
-            <div className="flex-1" />
-            {/* 题目 + 语言 + 时间：次要信息靠右 */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <Link
-                href={`/problem/${submission.problem.problemNumber || submission.problem.id}`}
-                className="text-primary-light hover:text-primary transition-colors"
-                title={submission.problem.title}
-              >
-                {submission.problem.title.length > 20
-                  ? `${submission.problem.title.slice(0, 20)}...`
-                  : submission.problem.title}
-              </Link>
-              <span className="tag">{submission.language}</span>
-              <span className="text-muted-foreground flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" />
-                {formatDateTime(submission.submittedAt)}
-              </span>
-            </div>
-          </div>
-
-          {/* 评测信息（仅在有 message 时显示） */}
-          {submission.message && (
-            <div className="mt-4 p-3 rounded-lg bg-accent/10 border border-accent/20">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
-                <div>
-                  <div className="text-sm font-medium text-accent">评测信息</div>
-                  <div className="text-sm text-accent/80 mt-1 whitespace-pre-wrap">{submission.message}</div>
-                </div>
-              </div>
-            </div>
+          <Link href={problemHref} className="btn btn-primary text-sm py-1.5 px-3 gap-1.5">
+            返回题目
+          </Link>
+          {judging && (
+            <span className="ml-auto inline-flex items-center gap-1.5 text-primary text-xs">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              评测中，结果会自动更新
+            </span>
           )}
         </div>
 
-        {/* 提交代码：前置显示，便于查阅 */}
-        <div className="card-static p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Code className="w-5 h-5 text-primary" />
-              提交代码
-            </h2>
-            <button
-              onClick={handleCopyCode}
-              className="btn btn-outline text-sm py-2"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  已复制
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  复制代码
-                </>
+        <header className="mb-4">
+          <div className="flex flex-wrap items-center gap-2.5 mb-2">
+            <h1 className="text-xl font-bold text-foreground min-w-0">
+              {submission.problem.problemNumber && (
+                <span className="font-mono text-muted-foreground mr-1.5 text-base">
+                  {submission.problem.problemNumber}
+                </span>
               )}
-            </button>
+              <Link href={problemHref} className="hover:text-primary transition-colors">
+                {submission.problem.title}
+              </Link>
+            </h1>
+            <StatusBadge status={submission.status} />
           </div>
-          <div className="rounded-xl overflow-hidden border border-border">
-            <div className="px-4 py-2 bg-muted text-muted-foreground text-sm border-b border-border flex items-center justify-between">
-              <span className="font-medium">{submission.language}</span>
-              <span className="text-xs">{submission.code.split('\n').length} 行</span>
-            </div>
-            <div className="overflow-x-auto custom-scrollbar max-h-96 overflow-y-auto">
-              <pre className="flex text-sm font-mono">
-                <div className="bg-muted/50 text-muted-foreground text-right py-4 px-3 select-none border-r border-border sticky left-0">
-                  {submission.code.split('\n').map((_, i) => (
-                    <div key={i}>{i + 1}</div>
-                  ))}
-                </div>
-                <code className="text-foreground py-4 px-4 block whitespace-pre">
-                  {submission.code}
-                </code>
-              </pre>
-            </div>
-          </div>
-        </div>
 
-        {/* 测试点详情 */}
-        {(!isFinalStatus(submission.status) || (submission.testResults && submission.testResults.length > 0)) && (
-          <div className="card-static p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Target className="w-5 h-5 text-primary" />
-                测试点详情
-                {!isFinalStatus(submission.status) && (
-                  <span className="ml-2 text-xs text-muted-foreground inline-flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    评测中
-                  </span>
-                )}
-              </h2>
-              {!isFinalStatus(submission.status) && (
-                <div className="text-sm text-muted-foreground">
-                  已完成 {submission.passedTests} / {submission.totalTests}
-                </div>
-              )}
-            </div>
-            <div className="space-y-3">
-              {submission.testResults && submission.testResults.length > 0 ? (
-                submission.testResults.map((result, index) => (
-                  <TestPointRow
-                    key={result.testId || `test-${index}`}
-                    result={result}
-                    index={index}
-                  />
-                ))
-              ) : (
-                !isFinalStatus(submission.status) && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                    正在执行测试用例...
-                  </div>
-                )
-              )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <User className="w-3.5 h-3.5" />
+              {submission.user.nickname || submission.user.username}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5" />
+              {formatDateTime(submission.submittedAt)}
+            </span>
+            <span className="tag">{submission.language}</span>
+            <span className={`tag ${getDifficultyColor(submission.problem.difficulty)}`}>
+              {submission.problem.difficulty}
+            </span>
+            <span className="hidden sm:inline text-border">·</span>
+            <span className="font-mono tabular-nums text-foreground">
+              {submission.score}
+              <span className="text-muted-foreground font-sans ml-1">
+                分 ({submission.passedTests}/{submission.totalTests})
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+              <Clock className="w-3.5 h-3.5" />
+              {formatTime(submission.time ?? 0)}
+            </span>
+            <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+              <Database className="w-3.5 h-3.5" />
+              {formatMemory(submission.memory ?? 0)}
+            </span>
+            <code className="text-xs bg-muted px-1.5 py-0.5 rounded" title={submission.id}>
+              {submission.id.slice(0, 8)}
+            </code>
+          </div>
+        </header>
+
+        {(submission.message || isCe) && (
+          <div
+            className={`mb-4 rounded-lg border p-3.5 flex gap-3 ${
+              isCe || !isAc
+                ? 'bg-error/5 border-error/25'
+                : 'bg-accent/10 border-accent/25'
+            }`}
+          >
+            <AlertTriangle
+              className={`w-5 h-5 shrink-0 mt-0.5 ${isCe || !isAc ? 'text-error' : 'text-accent'}`}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-foreground mb-1">
+                {isCe ? '编译信息' : '评测信息'}
+              </div>
+              <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words max-h-48 overflow-auto custom-scrollbar">
+                {submission.message || '（无详细信息）'}
+              </pre>
             </div>
           </div>
         )}
 
-        {/* 次要信息：提交历史 + 基本信息，并排两栏，折叠到底部 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="card-static p-6">
-            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-              <History className="w-5 h-5 text-accent" />
-              提交历史
-            </h2>
-            {historyLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="relative w-8 h-8">
-                  <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
-                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin"></div>
-                </div>
-              </div>
-            ) : submissionHistory.length === 0 ? (
-              <div className="text-center py-8">
-                <History className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-                <p className="text-muted-foreground text-sm">暂无提交历史</p>
-              </div>
+        <div
+          className={`grid grid-cols-1 gap-4 items-start ${
+            showTests ? 'lg:grid-cols-[minmax(0,1fr)_16rem]' : ''
+          }`}
+        >
+          <section className="card-static p-4 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Code className="w-4 h-4 text-primary" />
+                提交代码
+                <span className="text-xs font-normal text-muted-foreground">
+                  {submission.language} · {codeLines} 行
+                </span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => void handleCopyCode()}
+                className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+                disabled={!submission.code}
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    已复制
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    复制
+                  </>
+                )}
+              </button>
+            </div>
+            {submission.code ? (
+              <CodeEditor
+                value={submission.code}
+                onChange={() => {}}
+                language={toCodeLanguage(submission.language)}
+                readOnly
+                height="min(28rem, 60vh)"
+                className="hover:border-border focus-within:border-border focus-within:ring-0"
+              />
             ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                {submissionHistory.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={`/submission/${item.id}`}
-                    className={`block p-3 rounded-lg transition-all ${
-                      item.id === submission.id
-                        ? 'bg-primary/10 border border-primary/30'
-                        : 'hover:bg-muted border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(item.status)}
-                        <span className="font-medium text-foreground text-sm">
-                          {getStatusText(item.status)}
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDateTime(item.submittedAt)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>分数: {item.score}</span>
-                      <span>用时: {formatTime(item.time)}</span>
-                      <span>内存: {formatMemory(item.memory)}</span>
-                    </div>
-                  </Link>
-                ))}
+              <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
+                无代码内容（可能无权查看或已脱敏）
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="card-static p-6">
-            <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-              <Target className="w-5 h-5 text-secondary" />
-              基本信息
-            </h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">提交ID:</span>
-                <code className="text-sm bg-muted px-2 py-1 rounded text-foreground">
-                  {submission.id.substring(0, 8)}...
-                </code>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">题目:</span>
-                <Link
-                  href={`/problem/${submission.problem.problemNumber || submission.problem.id}`}
-                  className="text-primary-light hover:text-primary transition-colors truncate ml-2"
-                  title={submission.problem.title}
-                >
-                  {submission.problem.title}
-                </Link>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">难度:</span>
-                <span className={`tag ${getDifficultyColor(submission.problem.difficulty)}`}>
-                  {submission.problem.difficulty}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">用户:</span>
-                <Link
-                  href={`/user/${submission.user.id}`}
-                  className="text-foreground hover:text-primary-light transition-colors flex items-center gap-1"
-                >
-                  <User className="w-4 h-4" />
-                  {submission.user.nickname || submission.user.username}
-                </Link>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">语言:</span>
-                <span className="tag">{submission.language}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">提交时间:</span>
-                <span className="text-foreground flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  {formatDateTime(submission.submittedAt)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+          {(showTests || submissionHistory.length > 0 || historyLoading) && (
+            <aside className="space-y-4 min-w-0">
+              {showTests && (
+                <section className="card-static p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Target className="w-4 h-4 text-primary" />
+                      测试点
+                    </h2>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {submission.passedTests}/{submission.totalTests}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar">
+                    {submission.testResults && submission.testResults.length > 0 ? (
+                      submission.testResults.map((result, index) => (
+                        <TestPointRow
+                          key={result.testId || `test-${index}`}
+                          result={result}
+                          index={index}
+                        />
+                      ))
+                    ) : (
+                      <div className="py-8 text-center text-sm text-muted-foreground">
+                        <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                        正在执行…
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
 
-        <div className="mt-8 text-center">
-          <Link
-            href={`/problem/${submission.problem.problemNumber || submission.problem.id}`}
-            className="btn btn-primary"
-          >
-            返回题目页面
-          </Link>
+              <section className="card-static p-4">
+                <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <History className="w-4 h-4 text-accent" />
+                  本题近期提交
+                </h2>
+                {historyLoading ? (
+                  <div className="py-6 flex justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : submissionHistory.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">暂无其他提交</p>
+                ) : (
+                  <div className="space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
+                    {submissionHistory.map((item) => {
+                      const active = item.id === submission.id
+                      return (
+                        <Link
+                          key={item.id}
+                          href={`/submission/${item.id}`}
+                          className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+                            active
+                              ? 'bg-primary/10 border border-primary/25'
+                              : 'hover:bg-muted border border-transparent'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            {getTestStatusIcon(item.status, 'w-3.5 h-3.5')}
+                            <span className="truncate font-medium text-foreground">
+                              {getStatusText(item.status)}
+                            </span>
+                            <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                              {item.score}
+                            </span>
+                          </span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                            {formatDateTime(item.submittedAt)}
+                          </span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </section>
+            </aside>
+          )}
         </div>
       </PageContainer>
     </div>

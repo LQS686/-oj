@@ -20,7 +20,7 @@ import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useClickOutside } from '@/hooks/useClickOutside'
-import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState } from '@/components/common'
+import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState, useDialog } from '@/components/common'
 
 interface Problem {
   id: string
@@ -34,6 +34,7 @@ interface Problem {
 }
 
 export default function ProblemsPage() {
+  const dialog = useDialog()
   const { user } = useUser()
   const router = useRouter()
   const [problems, setProblems] = useState<Problem[]>([])
@@ -171,10 +172,10 @@ export default function ProblemsPage() {
         const target = data.data.problemNumber || data.data.id
         router.push(`/problem/${target}`)
       } else {
-        alert(data.error || '没有符合条件的题目')
+        await dialog.alert({ tone: 'error', message: data.error || '没有符合条件的题目' })
       }
     } catch (err) {
-      alert('网络错误，请稍后重试')
+      await dialog.alert({ tone: 'error', message: '网络错误，请稍后重试' })
     } finally {
       setRandomLoading(false)
     }

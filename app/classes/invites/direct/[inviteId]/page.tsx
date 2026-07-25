@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { Mail, Users, Check, X, Clock, Calendar, AlertCircle, UserCheck } from 'lucide-react'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { EducationalPageShell, PageLoading, useDialog } from '@/components/common'
 import { formatDateTime } from '@/lib/utils'
 import { loginPath } from '@/lib/navigation'
 
@@ -34,6 +34,7 @@ interface InviteDetail {
 }
 
 export default function DirectInviteDetailPage() {
+  const dialog = useDialog()
   const params = useParams()
   const router = useRouter()
   const { user, isLoading: authLoading } = useUser()
@@ -73,7 +74,8 @@ export default function DirectInviteDetailPage() {
   }
 
   const handleAccept = async () => {
-    if (!confirm('确定要接受此邀请吗？')) return
+    const ok = await dialog.confirm({ message: '确定要接受此邀请吗？' })
+    if (!ok) return
 
     try {
       setProcessing(true)
@@ -87,20 +89,21 @@ export default function DirectInviteDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('您已成功加入班级！')
+        await dialog.alert({ tone: 'success', message: '您已成功加入班级！' })
         router.push(`/classes/${data.data.classId}`)
       } else {
-        alert(data.error || '接受邀请失败')
+        await dialog.alert({ tone: 'error', message: data.error || '接受邀请失败' })
       }
     } catch {
-      alert('接受邀请失败')
+      await dialog.alert({ tone: 'error', message: '接受邀请失败' })
     } finally {
       setProcessing(false)
     }
   }
 
   const handleReject = async () => {
-    if (!confirm('确定要拒绝此邀请吗？')) return
+    const ok = await dialog.confirm({ message: '确定要拒绝此邀请吗？', tone: 'warning' })
+    if (!ok) return
 
     try {
       setProcessing(true)
@@ -114,13 +117,13 @@ export default function DirectInviteDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert('您已拒绝此邀请')
+        await dialog.alert({ tone: 'success', message: '您已拒绝此邀请' })
         router.push('/classes')
       } else {
-        alert(data.error || '拒绝邀请失败')
+        await dialog.alert({ tone: 'error', message: data.error || '拒绝邀请失败' })
       }
     } catch {
-      alert('拒绝邀请失败')
+      await dialog.alert({ tone: 'error', message: '拒绝邀请失败' })
     } finally {
       setProcessing(false)
     }

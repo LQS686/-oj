@@ -55,7 +55,7 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
   }
 
   logger.info('✅ 测试点解析成功')
-  // 返回解析结果
+  // 返回完整测试点内容（管理端编辑需要全文；勿截断为 preview）
   return ok({
     testCases: result.testCases?.map((tc) => ({
       number: tc.number,
@@ -63,8 +63,8 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
       outputFile: tc.outputFile,
       inputSize: tc.inputSize,
       outputSize: tc.outputSize,
-      inputPreview: tc.inputContent.substring(0, 200),
-      outputPreview: tc.outputContent.substring(0, 200),
+      input: tc.inputContent,
+      output: tc.outputContent,
     })),
     totalSize: result.totalSize,
     count: result.testCases?.length || 0,

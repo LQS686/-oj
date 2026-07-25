@@ -33,4 +33,5 @@ export type {
   DialogTone,
   AlertOptions,
   ConfirmOptions,
+  PromptOptions,
 } from './DialogProvider'

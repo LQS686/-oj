@@ -17,11 +17,15 @@ interface UploadHistory {
 
 export default function AvatarUploader({
  currentAvatar,
- onAvatarUpdate
+ onAvatarUpdate,
+ /** compact：设置页用的紧凑横条，避免占满半栏 */
+ variant = 'default',
 }: {
  currentAvatar?: string | null
  onAvatarUpdate: (url: string) => void
+ variant?: 'default' | 'compact'
 }) {
+ const isCompact = variant === 'compact'
  const dialog = useDialog()
  const [file, setFile] = useState<File | null>(null)
  const [preview, setPreview] = useState<string | null>(null)
@@ -268,36 +272,63 @@ export default function AvatarUploader({
 
  return (
  <div className="w-full">
- <div className="flex flex-col md:flex-row gap-6 items-start">
+ <div
+ className={
+ isCompact
+ ? 'flex flex-row gap-4 items-center'
+ : 'flex flex-col md:flex-row gap-6 items-start'
+ }
+ >
  {/* Preview Area */}
- <div className="relative group">
- <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 shadow-md bg-gray-50 flex items-center justify-center" role="img" aria-label={currentAvatar ? "当前头像" : "无头像"}>
+ <div className="relative group shrink-0">
+ <div
+ className={`${
+ isCompact ? 'w-20 h-20 border-2' : 'w-32 h-32 border-4'
+ } rounded-full overflow-hidden border-border shadow-sm bg-muted flex items-center justify-center`}
+ role="img"
+ aria-label={currentAvatar ? '当前头像' : '无头像'}
+ >
  {preview ? (
- <Image src={preview} alt="预览头像" width={128} height={128} className="object-cover w-full h-full" />
+ <Image
+ src={preview}
+ alt="预览头像"
+ width={isCompact ? 80 : 128}
+ height={isCompact ? 80 : 128}
+ className="object-cover w-full h-full"
+ />
  ) : currentAvatar ? (
- <Image src={currentAvatar} alt="当前头像" width={128} height={128} className="object-cover w-full h-full" loading="lazy" />
+ <Image
+ src={currentAvatar}
+ alt="当前头像"
+ width={isCompact ? 80 : 128}
+ height={isCompact ? 80 : 128}
+ className="object-cover w-full h-full"
+ loading="lazy"
+ />
  ) : (
- <div className="text-gray-300" aria-hidden="true">
- <Camera size={48} />
+ <div className="text-muted-foreground" aria-hidden="true">
+ <Camera size={isCompact ? 28 : 48} />
  </div>
  )}
  </div>
- 
+
  <button
  onClick={() => fileInputRef.current?.click()}
  onKeyDown={(e) => {
  if (e.key === 'Enter' || e.key === ' ') {
- e.preventDefault();
- fileInputRef.current?.click();
+ e.preventDefault()
+ fileInputRef.current?.click()
  }
  }}
- className="absolute bottom-0 right-0 bg-blue-600 text-white p-2.5 rounded-full hover:bg-blue-700 shadow-lg transition-transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+ className={`absolute bottom-0 right-0 bg-primary text-primary-foreground ${
+ isCompact ? 'p-1.5' : 'p-2.5'
+ } rounded-full hover:opacity-90 shadow-md transition-transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2`}
  title="选择图片"
  aria-label="选择头像图片"
  >
- <Camera size={18} />
+ <Camera size={isCompact ? 14 : 18} />
  </button>
- 
+
  <input
  ref={fileInputRef}
  type="file"
@@ -308,11 +339,13 @@ export default function AvatarUploader({
  </div>
 
  {/* Controls */}
- <div className="flex-1 space-y-4 w-full">
+ <div className={`flex-1 min-w-0 ${isCompact ? 'space-y-2' : 'space-y-4 w-full'}`}>
  <div>
- <h3 className="text-lg font-medium text-gray-900">头像设置</h3>
- <p className="text-sm text-gray-500 mt-1">
- 支持 JPG, PNG, GIF, WebP 格式，最大 5MB。
+ {!isCompact && <h3 className="text-lg font-medium text-foreground">头像设置</h3>}
+ <p className={`text-sm text-muted-foreground ${isCompact ? '' : 'mt-1'}`}>
+ {isCompact
+ ? '点击相机更换头像 · JPG / PNG / GIF / WebP，最大 5MB'
+ : '支持 JPG, PNG, GIF, WebP 格式，最大 5MB。'}
  </p>
  </div>
 
@@ -367,21 +400,21 @@ export default function AvatarUploader({
  </div>
  )}
 
- <div className="pt-2 border-t border-gray-100">
+ <div className={isCompact ? '' : 'pt-2 border-t border-border'}>
  <button
  onClick={() => setShowHistory(!showHistory)}
  onKeyDown={(e) => {
  if (e.key === 'Enter' || e.key === ' ') {
- e.preventDefault();
- setShowHistory(!showHistory);
+ e.preventDefault()
+ setShowHistory(!showHistory)
  }
  }}
- className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+ className="flex items-center gap-1.5 text-sm text-primary-light hover:underline focus:outline-none"
  aria-expanded={showHistory}
  aria-label={showHistory ? '隐藏历史记录' : '查看上传历史'}
  >
- <History size={16} />
- {showHistory ? '隐藏历史记录' : '查看上传历史'}
+ <History size={14} />
+ {showHistory ? '隐藏历史上传' : '查看上传历史'}
  </button>
  </div>
  </div>
@@ -389,8 +422,8 @@ export default function AvatarUploader({
 
  {/* History List */}
  {showHistory && (
- <div className="mt-6 animate-in fade-in slide-in-from-top-4 duration-300">
- <h4 className="text-sm font-medium text-gray-900 mb-3">历史头像</h4>
+ <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+ <h4 className="text-sm font-medium text-foreground mb-3">历史头像</h4>
  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
  {history.map((item) => (
  <div 

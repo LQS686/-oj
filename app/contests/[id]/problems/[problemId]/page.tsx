@@ -21,6 +21,7 @@ import SubmissionList from '@/components/problem/SubmissionList'
 import { useContestProblemWorkspace } from '@/contexts/ContestProblemWorkspaceContext'
 import type { Problem } from '@/types/models'
 import { loginPath } from '@/lib/navigation'
+import { isFinalSubmissionStatus } from '@/lib/constants/submission-status'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -37,6 +38,7 @@ export default function ContestProblemDetailPage({
   const [problem, setProblem] = useState<Problem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
 
   const {
     contestProblems,
@@ -148,7 +150,7 @@ export default function ContestProblemDetailPage({
     if (!Array.isArray(submissions) || submissions.length === 0) return
     const latest = submissions[0]
     const status = latest?.status
-    if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
+    if (isFinalSubmissionStatus(status)) {
       setSubmitting(false)
       setJudgeProgress(null)
       setSubmitResult({
@@ -182,8 +184,7 @@ export default function ContestProblemDetailPage({
         })
       }
 
-      const isFinal =
-        data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+      const isFinal = isFinalSubmissionStatus(data.status)
       if (isFinal) {
         setSubmitting(false)
         setJudgeProgress(null)
@@ -265,6 +266,26 @@ export default function ContestProblemDetailPage({
           })
           setCurrentSubmissionId(data.submissionId)
           setActiveTab('submissions')
+          setExpandedSubmissionId(data.submissionId)
+          setSubmissions((prev) => {
+            const list = Array.isArray(prev) ? prev : []
+            if (list.some((s) => s?.id === data.submissionId)) return list
+            return [
+              {
+                id: data.submissionId,
+                status: 'Pending',
+                score: 0,
+                time: 0,
+                memory: 0,
+                passedTests: 0,
+                totalTests: 0,
+                language,
+                code,
+                submittedAt: new Date().toISOString(),
+              },
+              ...list,
+            ]
+          })
           fetchSubmissions()
         } else {
           setSubmitResult({ type: 'error', text: data.error || '提交失败' })
@@ -407,9 +428,8 @@ export default function ContestProblemDetailPage({
               loading={submissionsLoading}
               error={null}
               user={user}
-              fromAssignment={null}
-              classId={null}
-              onSelect={() => {}}
+              expandedId={expandedSubmissionId}
+              onExpandedChange={setExpandedSubmissionId}
             />
           )}
         </div>

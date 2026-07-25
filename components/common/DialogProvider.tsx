@@ -4,7 +4,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import {
@@ -52,11 +54,34 @@ export interface ConfirmOptions {
   icon?: React.ReactNode
 }
 
+export interface PromptOptions {
+  /** 标题，默认"请输入" */
+  title?: string
+  /** 说明文字 */
+  message?: React.ReactNode
+  /** 输入框默认值 */
+  defaultValue?: string
+  /** 输入框占位符 */
+  placeholder?: string
+  /** 语气/图标，默认 info */
+  tone?: DialogTone
+  /** 确认按钮文字，默认"确定" */
+  confirmText?: string
+  /** 取消按钮文字，默认"取消" */
+  cancelText?: string
+  /** 是否允许空字符串提交，默认 true */
+  allowEmpty?: boolean
+  /** 自定义图标节点 */
+  icon?: React.ReactNode
+}
+
 export interface DialogApi {
   /** 弹出提示框，关闭时 resolve */
   alert(options: AlertOptions): Promise<void>
   /** 弹出确认框，确认返回 true，取消/关闭返回 false */
   confirm(options: ConfirmOptions): Promise<boolean>
+  /** 弹出输入框，确认返回字符串，取消/关闭返回 null */
+  prompt(options: PromptOptions): Promise<string | null>
 }
 
 type ButtonVariant = 'primary' | 'secondary' | 'destructive'
@@ -101,17 +126,20 @@ function DialogButton({
   children,
   onClick,
   autoFocus,
+  disabled,
 }: {
   variant?: ButtonVariant
   children: React.ReactNode
   onClick: () => void
   autoFocus?: boolean
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       autoFocus={autoFocus}
+      disabled={disabled}
       className={`${VARIANT_CLASS[variant]} flex-1`}
     >
       {children}
@@ -131,6 +159,11 @@ type DialogItem =
       kind: 'confirm'
       options: ConfirmOptions
       resolve: (value: boolean) => void
+    }
+  | {
+      kind: 'prompt'
+      options: PromptOptions
+      resolve: (value: string | null) => void
     }
 
 /* ----------------------------- Provider ----------------------------- */
@@ -160,17 +193,31 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
           push({ kind: 'confirm', options, resolve })
         })
       },
+      prompt(options: PromptOptions) {
+        return new Promise<string | null>((resolve) => {
+          push({ kind: 'prompt', options, resolve })
+        })
+      },
     }),
     [push]
   )
 
   const current = queue[0]
 
-  const closeCurrent = useCallback(
+  const closeAlertOrConfirm = useCallback(
     (result: boolean | void) => {
       if (!current) return
       if (current.kind === 'alert') current.resolve()
-      else current.resolve(result === true)
+      else if (current.kind === 'confirm') current.resolve(result === true)
+      pop()
+    },
+    [current, pop]
+  )
+
+  const closePrompt = useCallback(
+    (value: string | null) => {
+      if (!current || current.kind !== 'prompt') return
+      current.resolve(value)
       pop()
     },
     [current, pop]
@@ -179,10 +226,13 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   return (
     <DialogContext.Provider value={api}>
       {children}
-      {current && (
+      {current && current.kind === 'prompt' && (
+        <PromptDialog item={current} onClose={closePrompt} />
+      )}
+      {current && current.kind !== 'prompt' && (
         <ActiveDialog
           item={current}
-          onClose={(confirmed) => closeCurrent(confirmed)}
+          onClose={(confirmed) => closeAlertOrConfirm(confirmed)}
         />
       )}
     </DialogContext.Provider>
@@ -195,7 +245,7 @@ function ActiveDialog({
   item,
   onClose,
 }: {
-  item: DialogItem
+  item: Extract<DialogItem, { kind: 'alert' | 'confirm' }>
   onClose: (confirmed: boolean) => void
 }) {
   const isAlert = item.kind === 'alert'
@@ -209,8 +259,8 @@ function ActiveDialog({
     (isAlert
       ? inferVariantFromTone(tone)
       : tone === 'error' || tone === 'warning'
-      ? 'destructive'
-      : 'primary')
+        ? 'destructive'
+        : 'primary')
 
   const confirmText = options.confirmText ?? '确定'
   const cancelText = !isAlert
@@ -244,6 +294,80 @@ function ActiveDialog({
     >
       <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
         {options.message}
+      </div>
+    </Modal>
+  )
+}
+
+function PromptDialog({
+  item,
+  onClose,
+}: {
+  item: Extract<DialogItem, { kind: 'prompt' }>
+  onClose: (value: string | null) => void
+}) {
+  const options = item.options
+  const tone: DialogTone = options.tone ?? 'info'
+  const title = options.title ?? '请输入'
+  const Icon = TONE_ICON[tone]
+  const allowEmpty = options.allowEmpty !== false
+  const [value, setValue] = useState(options.defaultValue ?? '')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const t = window.setTimeout(() => inputRef.current?.focus(), 0)
+    return () => window.clearTimeout(t)
+  }, [])
+
+  const canSubmit = allowEmpty || value.trim().length > 0
+
+  const Footer = (
+    <>
+      <DialogButton variant="secondary" onClick={() => onClose(null)}>
+        {options.cancelText ?? '取消'}
+      </DialogButton>
+      <DialogButton
+        variant="primary"
+        disabled={!canSubmit}
+        onClick={() => onClose(value)}
+      >
+        {options.confirmText ?? '确定'}
+      </DialogButton>
+    </>
+  )
+
+  return (
+    <Modal
+      open
+      onClose={() => onClose(null)}
+      title={title}
+      icon={
+        options.icon ?? <Icon className={`w-5 h-5 ${TONE_ICON_CLASS[tone]}`} />
+      }
+      footer={Footer}
+      closeOnOverlayClick={false}
+      size="sm"
+    >
+      <div className="space-y-3">
+        {options.message != null && options.message !== '' && (
+          <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
+            {options.message}
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={options.placeholder}
+          className="input w-full"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && canSubmit) {
+              e.preventDefault()
+              onClose(value)
+            }
+          }}
+        />
       </div>
     </Modal>
   )

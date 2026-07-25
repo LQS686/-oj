@@ -17,6 +17,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { useDialog } from '@/components/common'
 
 type DirectInvite = {
   id: string
@@ -66,6 +67,7 @@ export default function ClassManageInlinePanel({
   currentUserId?: string
   onChanged?: () => void
 }) {
+  const dialog = useDialog()
   const router = useRouter()
   const [directInvites, setDirectInvites] = useState<DirectInvite[]>([])
   const [requests, setRequests] = useState<JoinRequest[]>([])
@@ -171,7 +173,9 @@ export default function ClassManageInlinePanel({
     if (data.success) {
       await loadMembershipData()
       onChanged?.()
-    } else alert(data.error || data.message || '操作失败')
+    } else {
+      await dialog.alert({ tone: 'error', message: data.error || data.message || '操作失败' })
+    }
   }
 
   const saveSettings = async () => {
@@ -208,13 +212,20 @@ export default function ClassManageInlinePanel({
   }
 
   const dissolveClass = async () => {
-    if (!confirm('确定解散班级？此操作不可恢复。')) return
+    const ok = await dialog.confirm({
+      message: '确定解散班级？此操作不可恢复。',
+      tone: 'warning',
+      confirmText: '删除',
+      confirmVariant: 'destructive',
+      cancelText: '取消',
+    })
+    if (!ok) return
     const res = await fetchWithCookie(`/api/classes/${classId}`, { method: 'DELETE' })
     const data = await res.json()
     if (data.success) {
       router.push('/classes')
     } else {
-      alert(data.error || data.message || '解散失败')
+      await dialog.alert({ tone: 'error', message: data.error || data.message || '解散失败' })
     }
   }
 

@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DataTable, AdminPageShell } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
-import { PageLoading } from '@/components/common'
-import AdminCreateProblemModal from '@/components/admin/AdminCreateProblemModal'
+import { PageLoading, useDialog } from '@/components/common'
 import { Download, Plus, Upload } from 'lucide-react'
 import { useProblemList } from './_hooks/useProblemList'
 import { ProblemFilterBar } from './_components/ProblemFilterBar'
@@ -25,6 +24,7 @@ import {
 import type { Problem, BatchActionType } from './_types'
 
 function AdminProblemsPageContent() {
+  const dialog = useDialog()
   const router = useRouter()
   const searchParams = useSearchParams()
   const {
@@ -38,16 +38,6 @@ function AdminProblemsPageContent() {
     allSources,
   } = useProblemList()
 
-  const [createOpen, setCreateOpen] = useState(false)
-
-  // 支持 ?create=1 自动打开创建弹窗（外部跳转入口）
-  useEffect(() => {
-    if (searchParams.get('create') === '1') {
-      setCreateOpen(true)
-      router.replace('/admin/problems', { scroll: false })
-    }
-  }, [searchParams, router])
-
   // 筛选条件：初始值从 URL query string 恢复（支持分享 / 刷新保留筛选状态）
   const [filters, setFilters] = useState<ProblemFilters>(() => {
     if (typeof window === 'undefined') return DEFAULT_FILTERS
@@ -55,6 +45,18 @@ function AdminProblemsPageContent() {
     const params = new URLSearchParams(window.location.search)
     return queryParamsToFilters(params)
   })
+
+  // 兼容旧链接 ?create=1 / ?edit=<id> → 全页编辑
+  useEffect(() => {
+    if (searchParams.get('create') === '1') {
+      router.replace('/admin/problems/create')
+      return
+    }
+    const editId = searchParams.get('edit')
+    if (editId) {
+      router.replace(`/admin/problems/${encodeURIComponent(editId)}/edit`)
+    }
+  }, [searchParams, router])
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingProblem, setDeletingProblem] = useState<Problem | null>(null)
@@ -75,6 +77,8 @@ function AdminProblemsPageContent() {
 
   // 筛选条件 URL 持久化：filters 变化时同步到 URL（用 replace 避免污染历史栈）
   useEffect(() => {
+    // 旧 deep-link 跳转中，避免把 ?create / ?edit 清掉
+    if (searchParams.get('create') === '1' || searchParams.get('edit')) return
     const params = filtersToQueryParams(filters)
     const queryString = new URLSearchParams(params).toString()
     const newUrl = queryString ? `?${queryString}` : '/admin/problems'
@@ -83,7 +87,7 @@ function AdminProblemsPageContent() {
     if (currentPath !== newUrl) {
       router.replace(newUrl, { scroll: false })
     }
-  }, [filters, router])
+  }, [filters, router, searchParams])
 
   const filteredProblems = useMemo(
     () => filterProblems(problems, filters),
@@ -92,7 +96,15 @@ function AdminProblemsPageContent() {
 
   const handleBatchAction = async (action: BatchActionType, selectedIds: string[]) => {
     if (selectedIds.length === 0) return
-    if (action === 'delete' && !confirm(`确定要删除选中的 ${selectedIds.length} 个题目吗？此操作无法撤销。`)) return
+    if (action === 'delete') {
+      const ok = await dialog.confirm({
+        message: `确定要删除选中的 ${selectedIds.length} 个题目吗？此操作无法撤销。`,
+        tone: 'warning',
+        confirmText: '删除',
+        confirmVariant: 'destructive',
+      })
+      if (!ok) return
+    }
 
     try {
       const response = await fetchWithCookie('/api/admin/problems/batch', {
@@ -115,10 +127,10 @@ function AdminProblemsPageContent() {
       if (data.success) {
         fetchProblems()
       } else {
-        alert('批量操作失败: ' + data.error)
+        await dialog.alert({ tone: 'error', message: '批量操作失败: ' + data.error })
       }
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     }
   }
 
@@ -187,7 +199,7 @@ function AdminProblemsPageContent() {
               批量导入
             </button>
             <button
-              onClick={() => setCreateOpen(true)}
+              onClick={() => router.push('/admin/problems/create')}
               className="btn btn-primary flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
@@ -247,12 +259,6 @@ function AdminProblemsPageContent() {
           totalCount={problems.length}
         />
       )}
-
-      <AdminCreateProblemModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={() => fetchProblems()}
-      />
     </>
   )
 }

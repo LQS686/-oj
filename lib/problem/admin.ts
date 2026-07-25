@@ -463,7 +463,14 @@ export async function updateAdminProblem(
           orderIndex: idx,
         })),
       })
-      await redistributeTestScores(id)
+      // 仅当总分不是 100 时兜底均分，避免覆盖用户手动设定的分数
+      const scoreSum = body.testCases.reduce(
+        (sum: number, tc: any) => sum + (Number(tc?.score) || 0),
+        0
+      )
+      if (scoreSum !== 100) {
+        await redistributeTestScores(id)
+      }
     }
   }
 

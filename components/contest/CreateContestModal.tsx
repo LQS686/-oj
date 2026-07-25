@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { Trophy, Plus, Search, Trash2, AlertCircle, Loader2 } from 'lucide-react'
+import { Trophy, Plus, Search, Trash2, AlertCircle, Loader2, Edit } from 'lucide-react'
 import { CreateModalShell } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface Problem {
   id: string
@@ -22,20 +22,29 @@ const defaultForm = () => ({
   endTime: '',
   isPublic: true,
   password: '',
+  sealRankTime: '',
 })
 
 export default function CreateContestModal({
   open,
   onClose,
   onCreated,
+  onSaved,
+  /** 传入则为编辑模式 */
+  contestId = null,
 }: {
   open: boolean
   onClose: () => void
   /** 创建成功并跳转前可选刷新列表 */
   onCreated?: () => void
+  onSaved?: () => void
+  contestId?: string | null
 }) {
-  const router = useRouter()
+  const dialog = useDialog()
+  const isEdit = !!contestId
+
   const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState(defaultForm)
 
@@ -53,12 +62,83 @@ export default function CreateContestModal({
     setSearchResults([])
     setBatchInput('')
     setError('')
+    setSubmitting(false)
+    setLoading(false)
+  }, [])
+
+  const applyContest = useCallback((contest: Record<string, unknown>, problems: Problem[]) => {
+    setFormData({
+      title: typeof contest.title === 'string' ? contest.title : '',
+      description: typeof contest.description === 'string' ? contest.description : '',
+      type: typeof contest.type === 'string' ? contest.type : 'OI',
+      startTime: contest.startTime
+        ? new Date(contest.startTime as string).toISOString().slice(0, 16)
+        : '',
+      endTime: contest.endTime
+        ? new Date(contest.endTime as string).toISOString().slice(0, 16)
+        : '',
+      isPublic: contest.isPublic !== false,
+      password: typeof contest.password === 'string' ? contest.password : '',
+      sealRankTime: contest.sealRankTime
+        ? new Date(contest.sealRankTime as string).toISOString().slice(0, 16)
+        : '',
+    })
+    setContestProblems(problems)
   }, [])
 
   useEffect(() => {
     if (!open) return
-    resetForm()
-  }, [open, resetForm])
+
+    if (!isEdit || !contestId) {
+      resetForm()
+      return
+    }
+
+    let cancelled = false
+    const load = async () => {
+      try {
+        setLoading(true)
+        const contestRes = await fetchWithCookie(`/api/contests/${contestId}`)
+        const contestData = await contestRes.json()
+        if (cancelled) return
+        if (!contestRes.ok || !contestData.success) {
+          const msg = contestData.error || '获取竞赛详情失败'
+          await dialog.alert({
+            tone: 'error',
+            message: typeof msg === 'string' ? msg : '获取竞赛详情失败',
+          })
+          onClose()
+          return
+        }
+
+        const problemsRes = await fetchWithCookie(`/api/contests/${contestId}/problems`)
+        const problemsData = await problemsRes.json()
+        if (cancelled) return
+
+        const problems: Problem[] = problemsData.success
+          ? (problemsData.data as Problem[]).map((p) => ({
+              id: p.id,
+              problemNumber: p.problemNumber,
+              title: p.title,
+              difficulty: p.difficulty,
+            }))
+          : []
+
+        applyContest(contestData.data, problems)
+      } catch {
+        if (!cancelled) {
+          await dialog.alert({ tone: 'error', message: '网络错误，请稍后重试' })
+          onClose()
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [open, isEdit, contestId, resetForm, applyContest, dialog, onClose])
 
   const searchProblems = async (query: string) => {
     if (!query) {
@@ -70,7 +150,6 @@ export default function CreateContestModal({
       const response = await fetchWithCookie(`/api/problems?search=${encodeURIComponent(query)}&limit=5`)
       const data = await response.json()
       if (data.success) {
-        // Filter out already added problems
         const filtered = (data.data.problems || []).filter((p: Problem) =>
           !contestProblems.find(cp => cp.id === p.id)
         )
@@ -98,7 +177,6 @@ export default function CreateContestModal({
 
     setSearching(true)
     try {
-      // Parse inputs: "P1001, 1002" -> ["P1001", "P1002"]
       const numbers = batchInput.split(/[,，\s\n]+/)
         .filter(s => s.trim())
         .map(s => s.trim().toUpperCase().startsWith('P') ? s.trim().toUpperCase() : `P${s.trim()}`)
@@ -114,14 +192,12 @@ export default function CreateContestModal({
         const foundNumbers = new Set(foundProblems.map(p => p.problemNumber))
         const notFound: string[] = []
 
-        // Check which were found
         numbers.forEach(num => {
           if (!foundNumbers.has(num)) {
             notFound.push(num)
           }
         })
 
-        // Add found problems if not already in list
         foundProblems.forEach(p => {
           if (!contestProblems.find(cp => cp.id === p.id)) {
             newProblems.push(p)
@@ -132,14 +208,35 @@ export default function CreateContestModal({
         setBatchInput('')
 
         if (notFound.length > 0) {
-          alert(`以下题目未找到或未公开: ${notFound.join(', ')}`)
+          await dialog.alert({
+            tone: 'warning',
+            message: `以下题目未找到或未公开: ${notFound.join(', ')}`,
+          })
         }
       }
     } catch (err) {
       logger.error('CreateContestModal handleBatchAdd failed', err)
-      alert('批量添加失败：网络错误')
+      await dialog.alert({ tone: 'error', message: '批量添加失败：网络错误' })
     } finally {
       setSearching(false)
+    }
+  }
+
+  const buildPayload = () => {
+    const duration = Math.floor(
+      (new Date(formData.endTime).getTime() - new Date(formData.startTime).getTime()) / 60000
+    )
+    return {
+      title: formData.title,
+      description: formData.description,
+      type: formData.type,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      duration,
+      isPublic: formData.isPublic,
+      password: formData.isPublic ? undefined : formData.password,
+      sealRankTime: formData.sealRankTime || null,
+      problemIds: contestProblems.map(p => p.id),
     }
   }
 
@@ -152,39 +249,33 @@ export default function CreateContestModal({
       return
     }
 
-    setLoading(true)
+    setSubmitting(true)
     try {
-      const duration = Math.floor((new Date(formData.endTime).getTime() - new Date(formData.startTime).getTime()) / 60000)
-
-      const response = await fetchWithCookie('/api/contests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          type: formData.type,
-          startTime: formData.startTime,
-          endTime: formData.endTime,
-          duration,
-          isPublic: formData.isPublic,
-          password: formData.isPublic ? undefined : formData.password,
-          problemIds: contestProblems.map(p => p.id),
-        }),
-      })
+      const response = await fetchWithCookie(
+        isEdit ? `/api/contests/${contestId}` : '/api/contests',
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildPayload()),
+        }
+      )
 
       const data = await response.json()
       if (data.success) {
-        onCreated?.()
+        if (isEdit) {
+          onSaved?.()
+        } else {
+          onCreated?.()
+        }
         onClose()
-        router.push('/contests')
       } else {
-        setError(data.error || '创建失败')
+        setError(data.error || (isEdit ? '更新失败' : '创建失败'))
       }
     } catch (err) {
       logger.error('CreateContestModal submit failed', err)
       setError('网络错误，请重试')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -192,13 +283,15 @@ export default function CreateContestModal({
     <CreateModalShell
       open={open}
       onClose={onClose}
-      title="创建竞赛"
-      icon={Trophy}
-      labelledById="create-contest-title"
+      title={isEdit ? '编辑竞赛' : '创建竞赛'}
+      icon={isEdit ? Edit : Trophy}
+      labelledById={isEdit ? 'edit-contest-title' : 'create-contest-title'}
     >
-      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {loading ? (
+        <div className="px-5 py-16 text-center text-sm text-muted-foreground">加载竞赛中…</div>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
-            {/* 错误提示 */}
             {error && (
               <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -206,7 +299,6 @@ export default function CreateContestModal({
               </div>
             )}
 
-            {/* 基础字段 */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 竞赛名称 <span className="text-error">*</span>
@@ -288,6 +380,21 @@ export default function CreateContestModal({
                   className="input w-full"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  封榜时间 (可选)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.sealRankTime}
+                  onChange={(e) => setFormData({ ...formData, sealRankTime: e.target.value })}
+                  className="input w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  到达此时刻后，普通用户看到的是封榜快照；管理员可绕过封榜查看实时数据。留空表示不封榜。
+                </p>
+              </div>
             </div>
 
             {!formData.isPublic && (
@@ -313,7 +420,6 @@ export default function CreateContestModal({
                 <span className="tag">已添加 {contestProblems.length} 题</span>
               </div>
 
-              {/* 批量添加 */}
               <div>
                 <label className="block text-sm font-bold text-primary-light mb-2">
                   批量添加题目
@@ -348,7 +454,6 @@ export default function CreateContestModal({
                 </p>
               </div>
 
-              {/* 搜索添加 */}
               <div className="relative">
                 <label className="block text-sm font-medium text-muted-foreground mb-2">
                   搜索添加题目
@@ -398,7 +503,6 @@ export default function CreateContestModal({
                 )}
               </div>
 
-              {/* 已添加题目列表 */}
               <div className="border border-border rounded-xl overflow-hidden">
                 {contestProblems.length === 0 ? (
                   <div className="py-10 text-center">
@@ -441,21 +545,22 @@ export default function CreateContestModal({
           </div>
 
           <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
-            <button type="submit" disabled={loading} className="btn btn-primary flex-1 flex items-center justify-center gap-2">
-              {loading ? (
+            <button type="submit" disabled={submitting} className="btn btn-primary flex-1 flex items-center justify-center gap-2">
+              {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  创建中…
+                  {isEdit ? '保存中…' : '创建中…'}
                 </>
               ) : (
-                '创建竞赛'
+                isEdit ? '保存' : '创建竞赛'
               )}
             </button>
             <button type="button" onClick={onClose} className="btn btn-ghost">
               取消
             </button>
           </div>
-      </form>
+        </form>
+      )}
     </CreateModalShell>
   )
 }

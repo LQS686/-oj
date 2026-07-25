@@ -50,28 +50,86 @@ export function readProcVmHwmKB(pid: number): number {
 }
 
 /**
- * Windows: 通过 tasklist 获取指定 PID 的当前工作集内存（KB）
- * 用于轮询采集峰值。失败返回 -1
- * 注：tasklist 返回的是当前 WorkingSet，非 PeakWorkingSet；
- * 通过轮询间隔内取最大值近似峰值。Windows 原生 PeakWorkingSet 需要 GetProcessMemoryInfo API，
- * 不引入原生依赖时此为最佳折中。
+ * 读取评测 wrapper 写出的整数统计文件（内存 KB / 时间 ms）
+ * Linux: /usr/bin/time；Windows: win-runner.exe GetProcessMemoryInfo / GetProcessTimes
+ */
+export function readStatFileInt(filePath: string): number {
+  try {
+    if (!filePath) return -1
+    const raw = readFileSync(filePath, 'utf-8').trim()
+    if (!raw) return -1
+    // 兼容 "1234" / "1234\n" / "Maximum RSS: 1234"
+    const match = raw.match(/(\d+)/)
+    if (!match) return -1
+    const n = parseInt(match[1], 10)
+    if (!Number.isFinite(n) || n < 0) return -1
+    return n
+  } catch {
+    return -1
+  }
+}
+
+/** @deprecated 使用 readStatFileInt；保留别名兼容 */
+export function readMemFileKB(memFilePath: string): number {
+  return readStatFileInt(memFilePath)
+}
+
+/** wrapper 写出的选手进程 CPU 时间（ms） */
+export function readTimeFileMs(timeFilePath: string): number {
+  return readStatFileInt(timeFilePath)
+}
+
+/**
+ * Windows: 通过 PowerShell 读取 PeakWorkingSet64（KB）
+ * PeakWorkingSet 是进程生命周期峰值，比 WorkingSet / tasklist 更适合 OJ 统计。
+ * 失败返回 -1
  */
 export function readWindowsProcessMemoryKB(pid: number): number {
   try {
-    // pid 来自 process.pid，始终为正整数；显式校验防止命令注入
     const safePid = Math.floor(pid)
     if (!Number.isFinite(safePid) || safePid <= 0) return -1
-    // P2 安全修复：改为 spawnSync 数组形式，避免命令拼接注入风险
-    const result = spawnSync('tasklist', ['/fi', `PID eq ${safePid}`, '/fo', 'csv', '/nh'], {
+
+    // PeakWorkingSet64 优先；进程刚退出时 Get-Process 可能失败，再回退 WorkingSet64
+    const script = [
+      `$p = Get-Process -Id ${safePid} -ErrorAction SilentlyContinue`,
+      'if ($null -eq $p) { exit 2 }',
+      '$peak = $p.PeakWorkingSet64',
+      'if ($peak -le 0) { $peak = $p.WorkingSet64 }',
+      '[int][math]::Round($peak / 1024)',
+    ].join('; ')
+
+    const result = spawnSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'ignore'],
+        timeout: 2000,
+        windowsHide: true,
+      }
+    )
+    if (result.status !== 0 || !result.stdout) {
+      // PowerShell 不可用时回退 tasklist（当前工作集，非峰值）
+      return readWindowsMemoryViaTasklist(safePid)
+    }
+    const mem = parseInt(String(result.stdout).trim(), 10)
+    if (Number.isNaN(mem) || mem < 0) return -1
+    return mem
+  } catch {
+    return -1
+  }
+}
+
+function readWindowsMemoryViaTasklist(pid: number): number {
+  try {
+    const result = spawnSync('tasklist', ['/fi', `PID eq ${pid}`, '/fo', 'csv', '/nh'], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'ignore'],
       timeout: 2000,
+      windowsHide: true,
     })
     if (result.status !== 0 || !result.stdout) return -1
-    const out = result.stdout
-    // 输出格式: "name","pid","session","sessionnum","mem"
-    // 例如: "node.exe","1234","Console","1","12,345 K"
-    const line = out.trim().split('\n')[0]
+    const line = result.stdout.trim().split('\n')[0]
     if (!line) return -1
     const cols = line.match(/"[^"]*"/g)
     if (!cols || cols.length < 5) return -1

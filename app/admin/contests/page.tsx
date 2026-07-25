@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
-import { PageLoading } from '@/components/common'
+import { PageLoading, useDialog } from '@/components/common'
 import AdminCreateContestModal from '@/components/admin/AdminCreateContestModal'
 import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
@@ -24,6 +24,7 @@ interface Contest {
 }
 
 function AdminContestsPageContent() {
+ const dialog = useDialog()
  const router = useRouter()
  const searchParams = useSearchParams()
  const [contests, setContests] = useState<Contest[]>([])
@@ -34,13 +35,25 @@ function AdminContestsPageContent() {
  const [selectedContest, setSelectedContest] = useState<Contest | null>(null)
  const [showDeleteModal, setShowDeleteModal] = useState(false)
  const [createOpen, setCreateOpen] = useState(false)
+ const [editContestId, setEditContestId] = useState<string | null>(() => {
+   if (typeof window === 'undefined') return null
+   return new URLSearchParams(window.location.search).get('edit')
+ })
 
- // 支持 ?create=1 自动打开创建弹窗（外部跳转入口）
+ // 支持 ?create=1 / ?edit=<id> 自动打开弹窗（外部跳转入口）
  useEffect(() => {
- if (searchParams.get('create') === '1') {
- setCreateOpen(true)
- router.replace('/admin/contests', { scroll: false })
- }
+   if (searchParams.get('create') === '1') {
+     setCreateOpen(true)
+     setEditContestId(null)
+   }
+   const editId = searchParams.get('edit')
+   if (editId) {
+     setEditContestId(editId)
+     setCreateOpen(false)
+   }
+   if (searchParams.get('create') === '1' || editId) {
+     router.replace('/admin/contests', { scroll: false })
+   }
  }, [searchParams, router])
 
  const fetchContests = useCallback(async () => {
@@ -84,10 +97,10 @@ function AdminContestsPageContent() {
  if (data.success) {
  fetchContests()
  } else {
- alert(data.error || '操作失败')
+ await dialog.alert({ tone: 'error', message: data.error || '操作失败' })
  }
  } catch {
- alert('网络错误')
+ await dialog.alert({ tone: 'error', message: '网络错误' })
  }
  }
 
@@ -105,10 +118,10 @@ function AdminContestsPageContent() {
  setSelectedContest(null)
  fetchContests()
  } else {
- alert(data.error || '删除失败')
+ await dialog.alert({ tone: 'error', message: data.error || '删除失败' })
  }
  } catch {
- alert('网络错误')
+ await dialog.alert({ tone: 'error', message: '网络错误' })
  }
  }
 
@@ -217,7 +230,7 @@ function AdminContestsPageContent() {
  <button
  onClick={(e) => {
  e.stopPropagation()
- router.push(`/admin/contests/${contest.id}/edit`)
+ setEditContestId(contest.id)
  }}
  className="p-2 text-primary hover:bg-primary/5 rounded-lg transition-colors"
  title="编辑"
@@ -327,7 +340,7 @@ function AdminContestsPageContent() {
  columns={columns}
  idKey="id"
  emptyMessage={searchQuery || statusFilter !== 'all' ? '没有找到匹配的竞赛' : '暂无竞赛'}
- onRowClick={(row) => router.push(`/admin/contests/${row.id}/edit`)}
+ onRowClick={(row) => setEditContestId(row.id)}
  />
  </AdminPageShell>
 
@@ -361,9 +374,14 @@ function AdminContestsPageContent() {
  )}
 
  <AdminCreateContestModal
- open={createOpen}
- onClose={() => setCreateOpen(false)}
+ open={createOpen || !!editContestId}
+ contestId={editContestId}
+ onClose={() => {
+ setCreateOpen(false)
+ setEditContestId(null)
+ }}
  onCreated={() => fetchContests()}
+ onSaved={() => fetchContests()}
  />
  </>
  )

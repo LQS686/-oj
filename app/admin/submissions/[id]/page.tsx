@@ -2,23 +2,40 @@
 
 /**
  * app/admin/submissions/[id]/page.tsx
- * 管理后台 - 提交详情（查看代码 / 评测结果 / 测试点详情）
- *
- * 复用前端 /api/submissions/[id] 接口；权限由 AdminLayout 统一拦截，
- * 同时保留与 admin/submissions/page.tsx 一致的 403 兜底处理。
+ * 管理后台 - 提交详情（代码 / 评测结果 / 测试点 / 重测）
  */
-import { use, useState, useEffect, useRef, useCallback } from 'react'
+import { use, useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, FileCode, Clock, Database, User, Calendar, Code,
-  CheckCircle, CheckCircle2, XCircle, AlertTriangle, Copy, Check,
-  ChevronDown, ChevronRight, Target, RefreshCw, Loader2, Info, Shield
+  ArrowLeft,
+  Clock,
+  Database,
+  User,
+  Calendar,
+  Code,
+  CheckCircle,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Target,
+  RefreshCw,
+  Loader2,
+  Info,
+  RotateCcw,
+  ExternalLink,
+  FileText,
 } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText, getDifficultyColor } from '@/lib/status'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
+import { PageLoading, useDialog } from '@/components/common'
+import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
 
 interface TestResult {
   testId: string
@@ -54,7 +71,6 @@ interface Submission {
   submittedAt: string
 }
 
-// 终态：评测已结束的状态（不再轮询）
 const FINAL_STATUSES = new Set([
   'AC', 'Accepted',
   'WA', 'Wrong Answer',
@@ -74,103 +90,159 @@ function isFinalStatus(status: string | undefined | null): boolean {
   return FINAL_STATUSES.has(status)
 }
 
+function isJudgingStatus(status: string): boolean {
+  return ['PENDING', 'JUDGING', 'RUNNING', 'Pending', 'Judging', 'Running'].includes(status)
+}
+
+function isPassStatus(status: string): boolean {
+  return status === 'AC' || status === 'Accepted'
+}
+
+function toCodeLanguage(lang: string): CodeLanguage {
+  if (lang === 'c' || lang === 'python') return lang
+  return 'cpp'
+}
+
 function getTestStatusIcon(status: string) {
   switch (status) {
     case 'AC':
     case 'Accepted':
-      return <CheckCircle className="w-5 h-5 text-secondary" />
+      return <CheckCircle className="w-4 h-4 text-secondary" />
     case 'WA':
     case 'Wrong Answer':
-      return <XCircle className="w-5 h-5 text-error" />
+      return <XCircle className="w-4 h-4 text-error" />
     case 'TLE':
     case 'Time Limit Exceeded':
-      return <Clock className="w-5 h-5 text-accent" />
+      return <Clock className="w-4 h-4 text-accent" />
     case 'MLE':
     case 'Memory Limit Exceeded':
-      return <Database className="w-5 h-5 text-info" />
+      return <Database className="w-4 h-4 text-info" />
     case 'RE':
     case 'Runtime Error':
-      return <AlertTriangle className="w-5 h-5 text-warning" />
+      return <AlertTriangle className="w-4 h-4 text-warning" />
     case 'CE':
     case 'Compile Error':
-      return <Code className="w-5 h-5 text-muted-foreground" />
-    case 'PE':
-    case 'Presentation Error':
-      return <AlertTriangle className="w-5 h-5 text-amber-600" />
-    case 'OLE':
-    case 'Output Limit Exceeded':
-      return <AlertTriangle className="w-5 h-5 text-amber-600" />
-    case 'CSP':
-      return <XCircle className="w-5 h-5 text-[var(--difficulty-hard)]" />
+      return <Code className="w-4 h-4 text-muted-foreground" />
     case 'PC':
     case 'Partly Correct':
-      return <CheckCircle2 className="w-5 h-5 text-[var(--difficulty-medium)]" />
+      return <CheckCircle2 className="w-4 h-4 text-[var(--difficulty-medium)]" />
     default:
-      return <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+      return <AlertTriangle className="w-4 h-4 text-muted-foreground" />
   }
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const text = getStatusText(status)
+  if (isJudgingStatus(status)) {
+    return (
+      <span className="tag tag-info">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        {text}
+      </span>
+    )
+  }
+  if (isPassStatus(status)) {
+    return (
+      <span className="tag tag-success">
+        <CheckCircle className="w-3.5 h-3.5" />
+        {text}
+      </span>
+    )
+  }
+  if (status === 'WA' || status === 'Wrong Answer') {
+    return (
+      <span className="tag tag-error">
+        <XCircle className="w-3.5 h-3.5" />
+        {text}
+      </span>
+    )
+  }
+  return (
+    <span className="tag tag-warning">
+      <AlertTriangle className="w-3.5 h-3.5" />
+      {text}
+    </span>
+  )
+}
+
 function TestPointRow({ result, index }: { result: TestResult; index: number }) {
-  const isPass = result.status === 'AC' || result.status === 'Accepted'
-  const isJudgingTest = result.status === 'Judging' || result.status === 'Pending' || result.status === 'Running'
-  const [expanded, setExpanded] = useState(!isPass)
+  const isPass = isPassStatus(result.status)
+  const judging = isJudgingStatus(result.status)
   const hasMessage = !!result.message
+  const [expanded, setExpanded] = useState(!isPass && hasMessage)
 
   return (
     <div
-      className={`p-4 rounded-lg border transition-all ${
+      className={`rounded-lg border transition-colors ${
         isPass
-          ? 'bg-secondary/5 border-secondary/20 hover:border-secondary/40'
-          : isJudgingTest
-          ? 'bg-muted border-border'
-          : 'bg-error/5 border-error/20 hover:border-error/40'
+          ? 'border-secondary/25 bg-secondary/5'
+          : judging
+            ? 'border-border bg-muted/40'
+            : 'border-error/25 bg-error/5'
       }`}
     >
-      <div
-        className="flex items-center justify-between cursor-pointer"
-        onClick={() => hasMessage && setExpanded(!expanded)}
+      <button
+        type="button"
+        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left"
+        onClick={() => hasMessage && setExpanded((v) => !v)}
+        disabled={!hasMessage}
       >
-        <div className="flex items-center gap-3">
-          {isJudgingTest
-            ? <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
-            : getTestStatusIcon(result.status)}
-          <div>
-            <div className="font-semibold text-foreground">
-              测试点 #{index + 1}
-            </div>
-            <div className="text-sm text-muted-foreground">{getStatusText(result.status)}</div>
+        <div className="flex items-center gap-2.5 min-w-0">
+          {judging ? (
+            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin shrink-0" />
+          ) : (
+            getTestStatusIcon(result.status)
+          )}
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-foreground">测试点 #{index + 1}</div>
+            <div className="text-xs text-muted-foreground truncate">{getStatusText(result.status)}</div>
           </div>
         </div>
-        <div className="flex items-center gap-6 text-sm">
-          <div className="text-center">
-            <div className="text-muted-foreground">时间</div>
-            <div className="font-mono font-semibold text-foreground">
-              {isJudgingTest ? '-' : formatTime(result.time)}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-muted-foreground">内存</div>
-            <div className="font-mono font-semibold text-foreground">
-              {isJudgingTest ? '-' : formatMemory(result.memory)}
-            </div>
-          </div>
+        <div className="flex items-center gap-4 text-xs shrink-0">
+          <span className="font-mono tabular-nums text-foreground">
+            {judging ? '—' : formatTime(result.time)}
+          </span>
+          <span className="font-mono tabular-nums text-muted-foreground">
+            {judging ? '—' : formatMemory(result.memory)}
+          </span>
           {hasMessage && (
-            <div className="text-muted-foreground">
-              {expanded ? (
-                <ChevronDown className="w-5 h-5" />
-              ) : (
-                <ChevronRight className="w-5 h-5" />
-              )}
-            </div>
+            expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />
           )}
         </div>
-      </div>
+      </button>
       {expanded && result.message && (
-        <div className="mt-3 text-sm text-foreground bg-muted p-3 rounded border border-border">
-          <div className="font-medium text-foreground mb-1">错误信息:</div>
-          <pre className="whitespace-pre-wrap text-muted-foreground">{result.message}</pre>
+        <div className="px-3 pb-3">
+          <pre className="text-xs text-muted-foreground whitespace-pre-wrap bg-muted/80 border border-border rounded-md p-2.5 max-h-48 overflow-auto custom-scrollbar">
+            {result.message}
+          </pre>
         </div>
       )}
+    </div>
+  )
+}
+
+function MetricCell({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string
+  value: ReactNode
+  hint?: string
+  accent?: boolean
+}) {
+  return (
+    <div className={`rounded-lg border p-3 ${accent ? 'border-secondary/35 bg-secondary/5' : 'border-border bg-card'}`}>
+      <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+        {label}
+        {hint && (
+          <span title={hint} className="inline-flex text-muted-foreground/70 cursor-help">
+            <Info className="w-3 h-3" />
+          </span>
+        )}
+      </div>
+      <div className="text-xl font-bold font-mono tabular-nums text-foreground leading-tight">{value}</div>
     </div>
   )
 }
@@ -178,12 +250,14 @@ function TestPointRow({ result, index }: { result: TestResult; index: number }) 
 export default function AdminSubmissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const dialog = useDialog()
   const [submission, setSubmission] = useState<Submission | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
+  const [copiedId, setCopiedId] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  // 防止轮询与手动刷新产生竞态
+  const [rejudging, setRejudging] = useState(false)
   const isRefreshingRef = useRef(false)
 
   const fetchSubmission = useCallback(async (showRefreshing = false) => {
@@ -196,6 +270,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
 
       if (data.success) {
         setSubmission(data.data)
+        setError('')
       } else {
         if (response.status === 403) {
           setError('需要管理员权限')
@@ -211,8 +286,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
           setError(data.error || '加载失败')
         }
       }
-    } catch (err) {
-      console.error('获取提交详情失败:', err)
+    } catch {
       setSubmission((prev) => {
         if (!prev) setError('网络错误，请稍后重试')
         return prev
@@ -224,87 +298,96 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
     }
   }, [id, router])
 
-  // 首次加载 + id 变化时拉取
   useEffect(() => {
-    fetchSubmission()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+    void fetchSubmission()
+  }, [fetchSubmission])
 
-  // 轮询兜底：非终态时每 3s 拉取一次
   useEffect(() => {
     if (!submission) return
     if (isFinalStatus(submission.status)) return
-
-    const intervalId = setInterval(() => fetchSubmission(true), 3000)
+    const intervalId = setInterval(() => void fetchSubmission(true), 3000)
     return () => clearInterval(intervalId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, submission?.status])
-
-  const getStatusBadge = (status: string) => {
-    const text = getStatusText(status)
-    const isSuccess = status === 'AC' || status === 'Accepted'
-    const isWrong = status === 'WA' || status === 'Wrong Answer'
-    const isJudging = status === 'Judging' || status === 'Pending' || status === 'Running'
-
-    if (isJudging) {
-      return (
-        <span className="tag tag-info text-base px-4 py-2">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          {text}
-        </span>
-      )
-    }
-    if (isSuccess) {
-      return (
-        <span className="tag tag-success text-base px-4 py-2">
-          <CheckCircle className="w-4 h-4" />
-          {text}
-        </span>
-      )
-    }
-    if (isWrong) {
-      return (
-        <span className="tag tag-error text-base px-4 py-2">
-          <XCircle className="w-4 h-4" />
-          {text}
-        </span>
-      )
-    }
-    return (
-      <span className="tag tag-warning text-base px-4 py-2">
-        <AlertTriangle className="w-4 h-4" />
-        {text}
-      </span>
-    )
-  }
+  }, [id, submission?.status, fetchSubmission])
 
   const handleCopyCode = async () => {
-    if (!submission) return
+    if (!submission?.code) return
     await navigator.clipboard.writeText(submission.code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopiedCode(true)
+    setTimeout(() => setCopiedCode(false), 2000)
+  }
+
+  const handleCopyId = async () => {
+    if (!submission) return
+    await navigator.clipboard.writeText(submission.id)
+    setCopiedId(true)
+    setTimeout(() => setCopiedId(false), 2000)
+  }
+
+  const handleRejudge = async () => {
+    if (!submission || rejudging) return
+    const ok = await dialog.confirm({
+      title: '重新评测',
+      message: '将使用当前代码与题目测试点重新入队评测，原结果会被覆盖。确定继续？',
+      tone: 'warning',
+      confirmText: '开始重测',
+      confirmVariant: 'destructive',
+    })
+    if (!ok) return
+
+    setRejudging(true)
+    try {
+      const response = await fetchWithCookie(`/api/admin/submissions/${id}/rejudge`, {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (!data.success) {
+        await dialog.alert({
+          title: '重测失败',
+          message: data.error || '无法重新评测',
+          tone: 'error',
+        })
+        return
+      }
+      setSubmission((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'PENDING',
+              score: 0,
+              time: 0,
+              memory: 0,
+              passedTests: 0,
+              totalTests: data.data?.totalTests ?? prev.totalTests,
+              message: undefined,
+              testResults: [],
+            }
+          : prev
+      )
+      void fetchSubmission(true)
+    } catch {
+      await dialog.alert({
+        title: '重测失败',
+        message: '网络错误，请稍后重试',
+        tone: 'error',
+      })
+    } finally {
+      setRejudging(false)
+    }
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">加载中...</p>
-        </div>
-      </div>
-    )
+    return <PageLoading label="加载提交详情..." />
   }
 
   if (error || !submission) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
-            <XCircle className="w-8 h-8 text-error" />
+          <div className="w-14 h-14 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-7 h-7 text-error" />
           </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">加载失败</h2>
-          <p className="text-muted-foreground mb-6 max-w-md">{error}</p>
+          <h2 className="text-lg font-bold text-foreground mb-2">加载失败</h2>
+          <p className="text-muted-foreground mb-6 max-w-md text-sm">{error}</p>
           <Link href="/admin/submissions" className="btn btn-primary">
             返回提交列表
           </Link>
@@ -313,292 +396,335 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
     )
   }
 
-  const isAc = submission.status === 'AC' || submission.status === 'Accepted'
-  const statusCardBorder = isAc ? 'border-secondary/40 bg-secondary/5' : 'border-border'
-  const passRate = submission.totalTests > 0
-    ? (submission.passedTests / submission.totalTests) * 100
-    : 0
+  const isAc = isPassStatus(submission.status)
+  const isCe = submission.status === 'CE' || submission.status === 'Compile Error'
+  const judging = isJudgingStatus(submission.status)
+  const passRate =
+    submission.totalTests > 0 ? (submission.passedTests / submission.totalTests) * 100 : 0
+  const failedCount = Math.max(0, submission.totalTests - submission.passedTests)
+  const codeLines = submission.code ? submission.code.split('\n').length : 0
+  const problemHref = `/problem/${submission.problem.problemNumber || submission.problem.id}`
 
   return (
-    <AdminPageShell width="wide" className="space-y-6">
-      {/* 顶部导航 */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Link
-          href="/admin/submissions"
-          className="p-1.5 -ml-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-          aria-label="返回提交列表"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}
-        >
-          <Shield className="w-5 h-5 text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-foreground">提交详情</h1>
-          <p className="text-sm text-muted-foreground">
-            查看提交代码和评测结果
-            {!isFinalStatus(submission.status) && (
-              <span className="ml-2 inline-flex items-center gap-1 text-primary">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                实时同步中
-              </span>
-            )}
-          </p>
-        </div>
-        <button
-          onClick={() => fetchSubmission(true)}
-          disabled={isRefreshing}
-          className="btn btn-outline text-sm py-2 px-3 flex items-center gap-2"
-          title="手动刷新"
-        >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          刷新
-        </button>
-      </div>
-
-      {/* 评测结果卡片 */}
-      <div className="card p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className={`rounded-xl border p-4 ${statusCardBorder}`}>
-            <div className="text-sm text-muted-foreground mb-2">状态</div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {getStatusBadge(submission.status)}
-            </div>
-            <div className="text-sm text-muted-foreground mt-2">{getStatusText(submission.status)}</div>
-          </div>
-          <div className={`rounded-xl border p-4 ${statusCardBorder}`}>
-            <div className="text-sm text-muted-foreground mb-2">分数</div>
-            <div className="text-3xl font-bold text-foreground">{submission.score}</div>
-            <div className="text-sm text-muted-foreground mt-1">
-              ({submission.passedTests}/{submission.totalTests} 测试点)
-            </div>
-          </div>
-          <div className={`rounded-xl border p-4 ${statusCardBorder}`}>
-            <div className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
-              用时
-              <span
-                className="inline-flex items-center text-muted-foreground/70 cursor-help"
-                title="总用时 = 所有测试点中最长的单点用时（NOI/ICPC 标准）"
-              >
-                <Info className="w-3.5 h-3.5" />
-              </span>
-            </div>
-            <div className="text-2xl font-mono text-foreground">{formatTime(submission.time)}</div>
-            <div className="w-full bg-muted rounded-full h-2 mt-2">
-              <div
-                className="h-2 rounded-full bg-primary transition-all"
-                style={{ width: `${Math.min((submission.time / 1000) * 10, 100)}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className={`rounded-xl border p-4 ${statusCardBorder}`}>
-            <div className="text-sm text-muted-foreground mb-2">内存</div>
-            <div className="text-2xl font-mono text-foreground">{formatMemory(submission.memory)}</div>
-            <div className="w-full bg-muted rounded-full h-2 mt-2">
-              <div
-                className="h-2 rounded-full bg-secondary transition-all"
-                style={{ width: `${Math.min((submission.memory / 10240) * 100, 100)}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-
-        {submission.message && (
-          <div className="mt-6 p-4 rounded-lg bg-accent/10 border border-accent/20">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="text-sm font-medium text-accent">评测信息</div>
-                <div className="text-sm text-accent/80 mt-1 whitespace-pre-wrap">{submission.message}</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 基本信息 + 测试点统计 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-6">
-          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-            <Target className="w-5 h-5 text-primary" />
-            基本信息
-          </h2>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">提交ID:</span>
-              <code className="text-sm bg-muted px-2 py-1 rounded text-foreground">
-                {submission.id.substring(0, 8)}...
-              </code>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">题目:</span>
-              <Link
-                href={`/problem/${submission.problem.problemNumber || submission.problem.id}`}
-                className="text-primary-light hover:text-primary transition-colors"
-              >
+    <AdminPageShell width="wide" className="space-y-5">
+      {/* 顶栏 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3 min-w-0">
+          <Link
+            href="/admin/submissions"
+            className="p-1.5 -ml-1.5 mt-0.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            aria-label="返回提交列表"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-xl font-bold text-foreground truncate">
+                {submission.problem.problemNumber && (
+                  <span className="font-mono text-muted-foreground mr-1.5 text-base">
+                    {submission.problem.problemNumber}
+                  </span>
+                )}
                 {submission.problem.title}
-              </Link>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">难度:</span>
-              <span className={`tag ${getDifficultyColor(submission.problem.difficulty)}`}>
-                {submission.problem.difficulty}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">用户:</span>
-              <Link
-                href={`/user/${submission.user.id}`}
-                className="text-foreground hover:text-primary-light transition-colors flex items-center gap-1"
-              >
-                <User className="w-4 h-4" />
-                {submission.user.nickname || submission.user.username}
-              </Link>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">语言:</span>
-              <span className="tag">{submission.language}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">提交时间:</span>
-              <span className="text-foreground flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                {formatDateTime(submission.submittedAt)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-6">
-          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-            <Target className="w-5 h-5 text-secondary" />
-            测试点统计
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                <span>通过率</span>
-                <span>{submission.passedTests} / {submission.totalTests}</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-3">
-                <div
-                  className={`h-3 rounded-full transition-all ${
-                    submission.totalTests > 0 && submission.passedTests === submission.totalTests
-                      ? 'bg-secondary'
-                      : submission.passedTests > 0
-                      ? 'bg-accent'
-                      : 'bg-error'
-                  }`}
-                  style={{ width: `${passRate}%` }}
-                ></div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-border">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-secondary">{submission.passedTests}</div>
-                <div className="text-xs text-muted-foreground">通过</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-error">
-                  {submission.totalTests - submission.passedTests}
-                </div>
-                <div className="text-xs text-muted-foreground">未通过</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{submission.totalTests}</div>
-                <div className="text-xs text-muted-foreground">总计</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 测试点详情 */}
-      {(!isFinalStatus(submission.status) || (submission.testResults && submission.testResults.length > 0)) && (
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Target className="w-5 h-5 text-primary" />
-              测试点详情
-              {!isFinalStatus(submission.status) && (
-                <span className="ml-2 text-xs text-muted-foreground inline-flex items-center gap-1">
+              </h1>
+              <StatusBadge status={submission.status} />
+              {judging && (
+                <span className="text-xs text-primary inline-flex items-center gap-1">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  评测中
+                  实时同步中
                 </span>
               )}
-            </h2>
-            {!isFinalStatus(submission.status) && (
-              <div className="text-sm text-muted-foreground">
-                已完成 {submission.passedTests} / {submission.totalTests}
-              </div>
-            )}
+            </div>
+            <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                <User className="w-3.5 h-3.5" />
+                {submission.user.nickname || submission.user.username}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                {formatDateTime(submission.submittedAt)}
+              </span>
+              <span className="tag">{submission.language}</span>
+            </p>
           </div>
-          <div className="space-y-3">
-            {submission.testResults && submission.testResults.length > 0 ? (
-              submission.testResults.map((result, index) => (
-                <TestPointRow
-                  key={result.testId || `test-${index}`}
-                  result={result}
-                  index={index}
-                />
-              ))
+        </div>
+        <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+          <button
+            type="button"
+            onClick={() => void fetchSubmission(true)}
+            disabled={isRefreshing}
+            className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            刷新
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleRejudge()}
+            disabled={rejudging || judging}
+            className="btn btn-outline text-sm py-1.5 px-3 gap-1.5 disabled:opacity-50"
+            title={judging ? '评测进行中' : '重新评测'}
+          >
+            {rejudging ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              !isFinalStatus(submission.status) && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                  正在执行测试用例...
-                </div>
-              )
+              <RotateCcw className="w-4 h-4" />
             )}
+            重测
+          </button>
+          <Link
+            href={`/submission/${submission.id}`}
+            className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+            target="_blank"
+          >
+            <ExternalLink className="w-4 h-4" />
+            前台页
+          </Link>
+        </div>
+      </div>
+
+      {/* 指标 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <MetricCell
+          label="分数"
+          value={
+            <>
+              {submission.score}
+              <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                ({submission.passedTests}/{submission.totalTests})
+              </span>
+            </>
+          }
+          accent={isAc}
+        />
+        <MetricCell
+          label="用时"
+          value={formatTime(submission.time ?? 0)}
+          hint="总用时 = 所有测试点中最长的单点用时"
+          accent={isAc}
+        />
+        <MetricCell label="内存" value={formatMemory(submission.memory ?? 0)} accent={isAc} />
+        <MetricCell
+          label="通过率"
+          value={`${submission.totalTests > 0 ? Math.round(passRate) : 0}%`}
+          accent={isAc}
+        />
+      </div>
+
+      {(submission.message || isCe) && (
+        <div
+          className={`rounded-lg border p-3.5 flex gap-3 ${
+            isCe || !isAc
+              ? 'bg-error/5 border-error/25'
+              : 'bg-accent/10 border-accent/25'
+          }`}
+        >
+          <AlertTriangle
+            className={`w-5 h-5 shrink-0 mt-0.5 ${isCe || !isAc ? 'text-error' : 'text-accent'}`}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-foreground mb-1">
+              {isCe ? '编译信息' : '评测信息'}
+            </div>
+            <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words max-h-56 overflow-auto custom-scrollbar">
+              {submission.message || '（无详细信息）'}
+            </pre>
           </div>
         </div>
       )}
 
-      {/* 提交代码 */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-            <Code className="w-5 h-5 text-primary" />
-            提交代码
-          </h2>
-          <button
-            onClick={handleCopyCode}
-            className="btn btn-outline text-sm py-2"
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4" />
-                已复制
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4" />
-                复制代码
-              </>
-            )}
-          </button>
-        </div>
-        <div className="rounded-xl overflow-hidden border border-border">
-          <div className="px-4 py-2 bg-muted text-muted-foreground text-sm border-b border-border flex items-center justify-between">
-            <span className="font-medium">{submission.language}</span>
-            <span className="text-xs">{submission.code.split('\n').length} 行</span>
-          </div>
-          <div className="overflow-x-auto custom-scrollbar max-h-96 overflow-y-auto">
-            <pre className="flex text-sm font-mono">
-              <div className="bg-muted/50 text-muted-foreground text-right py-4 px-3 select-none border-r border-border sticky left-0">
-                {submission.code.split('\n').map((_, i) => (
-                  <div key={i}>{i + 1}</div>
-                ))}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
+        {/* 左：元信息 + 测试点 */}
+        <div className="xl:col-span-2 space-y-5">
+          <section className="card p-4">
+            <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary" />
+              基本信息
+            </h2>
+            <dl className="space-y-2.5 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground shrink-0">提交 ID</dt>
+                <dd className="flex items-center gap-1.5 min-w-0">
+                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate" title={submission.id}>
+                    {submission.id}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyId()}
+                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                    title="复制完整 ID"
+                    aria-label="复制提交 ID"
+                  >
+                    {copiedId ? <Check className="w-3.5 h-3.5 text-secondary" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </dd>
               </div>
-              <code className="text-foreground py-4 px-4 block whitespace-pre">
-                {submission.code}
-              </code>
-            </pre>
-          </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">题目</dt>
+                <dd className="text-right">
+                  <Link href={problemHref} className="text-primary-light hover:text-primary">
+                    {submission.problem.title}
+                  </Link>
+                  {submission.problem.id && (
+                    <Link
+                      href={`/admin/problems/${submission.problem.id}/edit`}
+                      className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      编辑
+                    </Link>
+                  )}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">难度</dt>
+                <dd>
+                  <span className={`tag ${getDifficultyColor(submission.problem.difficulty)}`}>
+                    {submission.problem.difficulty}
+                  </span>
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">用户</dt>
+                <dd>
+                  <Link
+                    href={`/user/${submission.user.id}`}
+                    className="inline-flex items-center gap-1 hover:text-primary-light"
+                  >
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                    {submission.user.nickname || submission.user.username}
+                  </Link>
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">语言</dt>
+                <dd><span className="tag">{submission.language}</span></dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">提交时间</dt>
+                <dd className="font-mono text-xs tabular-nums">{formatDateTime(submission.submittedAt)}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="card p-4">
+            <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Target className="w-4 h-4 text-secondary" />
+              测试点统计
+            </h2>
+            <div className="mb-3">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                <span>通过率</span>
+                <span className="tabular-nums">
+                  {submission.passedTests} / {submission.totalTests}
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${
+                    submission.totalTests > 0 && submission.passedTests === submission.totalTests
+                      ? 'bg-secondary'
+                      : submission.passedTests > 0
+                        ? 'bg-accent'
+                        : 'bg-error'
+                  }`}
+                  style={{ width: `${passRate}%` }}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
+              <div className="text-center">
+                <div className="text-lg font-bold text-secondary tabular-nums">{submission.passedTests}</div>
+                <div className="text-[11px] text-muted-foreground">通过</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-error tabular-nums">{failedCount}</div>
+                <div className="text-[11px] text-muted-foreground">未通过</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-primary tabular-nums">{submission.totalTests}</div>
+                <div className="text-[11px] text-muted-foreground">总计</div>
+              </div>
+            </div>
+          </section>
+
+          {(judging || (submission.testResults && submission.testResults.length > 0)) && (
+            <section className="card p-4">
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Target className="w-4 h-4 text-primary" />
+                  测试点详情
+                </h2>
+                {judging && (
+                  <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    评测中
+                  </span>
+                )}
+              </div>
+              <div className="space-y-2 max-h-[28rem] overflow-y-auto custom-scrollbar pr-0.5">
+                {submission.testResults && submission.testResults.length > 0 ? (
+                  submission.testResults.map((result, index) => (
+                    <TestPointRow
+                      key={result.testId || `test-${index}`}
+                      result={result}
+                      index={index}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                    正在执行测试用例…
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
         </div>
+
+        {/* 右：代码（首屏可见） */}
+        <section className="xl:col-span-3 card p-4 flex flex-col min-h-[28rem]">
+          <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Code className="w-4 h-4 text-primary" />
+              提交代码
+              <span className="text-xs font-normal text-muted-foreground">
+                {submission.language} · {codeLines} 行
+              </span>
+            </h2>
+            <button
+              type="button"
+              onClick={() => void handleCopyCode()}
+              className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+              disabled={!submission.code}
+            >
+              {copiedCode ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  已复制
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  复制
+                </>
+              )}
+            </button>
+          </div>
+          {submission.code ? (
+            <CodeEditor
+              value={submission.code}
+              onChange={() => {}}
+              language={toCodeLanguage(submission.language)}
+              readOnly
+              height="480px"
+              className="hover:border-border focus-within:border-border focus-within:ring-0"
+            />
+          ) : (
+            <div className="flex-1 min-h-[12rem] flex items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+              无代码内容（可能已脱敏或不存在）
+            </div>
+          )}
+        </section>
       </div>
     </AdminPageShell>
   )

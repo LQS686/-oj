@@ -1,417 +1,425 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { User, Mail, Calendar, Trophy, Code, Target, TrendingUp, AlertCircle, Sparkles } from 'lucide-react'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import type { User as UserType, ActivityData, RecentSubmission, DifficultyDistribution } from '@/types/models'
+import {
+  Calendar,
+  Code,
+  Target,
+  TrendingUp,
+  AlertCircle,
+  Flame,
+  Settings,
+  ExternalLink,
+} from 'lucide-react'
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
+import type {
+  User as UserType,
+  ActivityData,
+  RecentSubmission,
+  DifficultyDistribution,
+} from '@/types/models'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
-import { motion, easeOut } from 'framer-motion'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
 import SubmissionHeatmap from '@/components/user/SubmissionHeatmap'
-import { Flame } from 'lucide-react'
-import { PageContainer } from '@/components/layout'
+import { EducationalPageShell, PageLoading } from '@/components/common'
+import { useUser } from '@/contexts/UserContext'
+import { getRoleLabel, getRoleColor } from '@/lib/permissions'
+
+function difficultyBarClass(diff: string): string {
+  if (diff.includes('入门')) return 'bg-success'
+  if (diff.includes('普及')) return 'bg-warning'
+  if (diff.includes('提高') || diff.includes('省选') || diff.includes('NOI')) return 'bg-error'
+  return 'bg-primary'
+}
+
+function statusTagClass(status: string): string {
+  if (status === 'AC' || status === 'Accepted') return 'tag-success'
+  if (status === 'WA' || status === 'Wrong Answer') return 'tag-error'
+  if (status === 'TLE' || status === 'Time Limit Exceeded') return 'tag-warning'
+  return 'tag'
+}
 
 export default function UserProfilePage() {
- const params = useParams()
- const id = params.id as string
- 
- const [user, setUser] = useState<UserType | null>(null)
- const [loading, setLoading] = useState(true)
- const [error, setError] = useState<string | null>(null)
- const [activityData, setActivityData] = useState<ActivityData[]>([])
- const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([])
- const [difficultyDistribution, setDifficultyDistribution] = useState<DifficultyDistribution[]>([])
- const [yearActivity, setYearActivity] = useState<Record<string, number>>({})
+  const params = useParams()
+  const id = params.id as string
+  const { user: me } = useUser()
 
- const profileTitle = user
-   ? `${user.nickname || user.username} - 用户主页`
-   : undefined
- useDocumentTitle(profileTitle)
+  const [user, setUser] = useState<UserType | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activityData, setActivityData] = useState<ActivityData[]>([])
+  const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([])
+  const [difficultyDistribution, setDifficultyDistribution] = useState<DifficultyDistribution[]>(
+    []
+  )
+  const [yearActivity, setYearActivity] = useState<Record<string, number>>({})
 
- useEffect(() => {
- fetchUserInfo()
- fetchUserStats()
- }, [id])
+  const isOwn = !!me && me.id === id
 
- const fetchUserInfo = async () => {
- try {
- const res = await fetchWithCookie(`/api/users/${id}/info`)
- const data = await res.json()
- if (data.success) {
- setUser(data.data)
- } else {
- setError(data.error)
- }
- } catch (err) {
- console.error(err)
- setError('加载用户信息失败')
- } finally {
- setLoading(false)
- }
- }
+  useDocumentTitle(user ? `${user.nickname || user.username} - 用户主页` : undefined)
 
- const fetchUserStats = async () => {
- try {
- const res = await fetchWithCookie(`/api/users/${id}/stats`)
- const data = await res.json()
- if (data.success) {
- const heatmapData = data.data.activity.lastWeek
- const chartData = Object.entries(heatmapData).map(([date, count]) => ({
- date,
- count: Number(count)
- })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
- 
- const filledData = []
- const today = new Date()
- for (let i = 6; i >= 0; i--) {
- const d = new Date(today)
- d.setDate(d.getDate() - i)
- const dateStr = d.toISOString().split('T')[0]
- const found = chartData.find(item => item.date === dateStr)
- filledData.push({
- date: dateStr.slice(5).replace('-', '/'),
- count: found ? found.count : 0
- })
- }
- setActivityData(filledData)
- 
- setRecentSubmissions(data.data.recentSubmissions || [])
- setDifficultyDistribution(data.data.difficultyDistribution || [])
- setYearActivity(data.data.activity?.lastYear || {})
- }
- } catch (err) {
- console.error(err)
- }
- }
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [infoRes, statsRes] = await Promise.all([
+          fetchWithCookie(`/api/users/${id}/info`),
+          fetchWithCookie(`/api/users/${id}/stats`),
+        ])
+        const infoData = await infoRes.json()
+        const statsData = await statsRes.json()
 
- if (loading) {
- return (
- <div className="min-h-screen flex items-center justify-center">
- <div className="text-center">
- <div className="relative w-20 h-20 mx-auto mb-8">
- <div className="absolute inset-0 rounded-full border-3 border-primary/15"></div>
- <div className="absolute inset-0 rounded-full border-3 border-primary border-t-transparent animate-spin"></div>
- </div>
- <p className="text-muted-foreground text-xl">加载用户信息中...</p>
- </div>
- </div>
- )
- }
+        if (cancelled) return
 
- if (error || !user) {
- return (
- <div className="min-h-screen flex items-center justify-center">
- <motion.div 
- initial={{ opacity: 0, y: 20 }}
- animate={{ opacity: 1, y: 0 }}
- className="card-static rounded-lg p-14 text-center max-w-md border border-error/10"
- >
- <div className="w-20 h-20 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-8">
- <AlertCircle className="w-10 h-10 text-error" />
- </div>
- <h1 className="text-2xl font-bold text-foreground mb-3">无法访问用户主页</h1>
- <p className="text-muted-foreground text-lg">{error || '用户不存在'}</p>
- </motion.div>
- </div>
- )
- }
+        if (!infoData.success) {
+          setError(infoData.error || '用户不存在')
+          setUser(null)
+          return
+        }
+        setUser(infoData.data)
 
- const containerVariants = {
- hidden: { opacity: 0 },
- visible: {
- opacity: 1,
- transition: {
- staggerChildren: 0.1
- }
- }
- }
+        if (statsData.success) {
+          const heatmapData = statsData.data.activity?.lastWeek || {}
+          const chartData = Object.entries(heatmapData).map(([date, count]) => ({
+            date,
+            count: Number(count),
+          }))
+          const filled: ActivityData[] = []
+          const today = new Date()
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(today)
+            d.setDate(d.getDate() - i)
+            const dateStr = d.toISOString().split('T')[0]
+            const found = chartData.find((item) => item.date === dateStr)
+            filled.push({
+              date: dateStr.slice(5).replace('-', '/'),
+              count: found ? found.count : 0,
+            })
+          }
+          setActivityData(filled)
+          setRecentSubmissions(statsData.data.recentSubmissions || [])
+          setDifficultyDistribution(statsData.data.difficultyDistribution || [])
+          setYearActivity(statsData.data.activity?.lastYear || {})
+        }
+      } catch {
+        if (!cancelled) setError('加载用户信息失败')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [id])
 
- const itemVariants = {
- hidden: { y: 20, opacity: 0 },
- visible: {
- y: 0,
- opacity: 1,
- transition: {
- duration: 0.4,
- ease: easeOut
- }
- }
- }
+  const weekTotal = useMemo(
+    () => activityData.reduce((sum, d) => sum + (d.count || 0), 0),
+    [activityData]
+  )
 
- return (
- <div className="min-h-screen">
- <PageContainer variant="standard" className="py-6">
- <motion.div 
- variants={containerVariants}
- initial="hidden"
- animate="visible"
- className="grid lg:grid-cols-3 gap-5"
- >
- <div className="lg:col-span-1 space-y-5">
- <motion.div variants={itemVariants} className="card-static rounded-lg p-5 border border-primary/5">
- <div className="text-center">
- <div 
- className="w-20 h-20 rounded-lg mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold overflow-hidden shadow-lg"
- style={{ backgroundColor: user.color || '#6366F1', boxShadow: `0 0 28px ${user.color || '#6366F1'}40` }}
- >
- {user.avatar ? (
- <img src={user.avatar} alt={user.username} className="w-full h-full object-cover" />
- ) : (
- user.username?.charAt(0).toUpperCase() || '?'
- )}
- </div>
- <h2 className="text-2xl font-bold mb-1" style={{ color: user.color || undefined }}>
- {user.nickname || user.username}
- </h2>
- <p className="text-muted-foreground mb-3 text-sm">@{user.username}</p>
- <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
- {user.rank && (
- <span 
- className="tag font-semibold text-xs px-3 py-1" 
- style={{ backgroundColor: (user.color || '#6366F1') + '15', color: user.color || undefined, borderColor: (user.color || '#6366F1') + '40' }}
- >
- {user.rank}
- </span>
- )}
- <span className="tag tag-primary text-xs px-3 py-1">
- Rating: {user.rating}
- </span>
- </div>
- {user.bio && (
- <p className="text-muted-foreground text-sm mb-4 leading-relaxed">{user.bio}</p>
- )}
- </div>
+  if (loading) {
+    return <PageLoading label="加载用户信息…" />
+  }
 
- <div className="border-t border-border pt-4 space-y-3">
- <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
- <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
- <Calendar className="w-3.5 h-3.5 text-primary-light" />
- </div>
- <span className="font-medium">加入于 {formatDate(user.createdAt)}</span>
- </div>
- </div>
- </motion.div>
+  if (error || !user) {
+    return (
+      <EducationalPageShell title="用户主页" width="standard">
+        <div className="card-static rounded-xl p-10 text-center max-w-md mx-auto">
+          <div className="w-14 h-14 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7 text-error" />
+          </div>
+          <h1 className="text-lg font-bold text-foreground mb-2">无法访问用户主页</h1>
+          <p className="text-muted-foreground text-sm">{error || '用户不存在'}</p>
+        </div>
+      </EducationalPageShell>
+    )
+  }
 
- <motion.div variants={itemVariants} className="card-static rounded-lg p-5 border border-primary/5">
- <h3 className="text-base font-bold mb-3 text-foreground">统计数据</h3>
- <div className="space-y-2">
- <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/25 hover:bg-muted transition-all">
- <span className="text-muted-foreground text-sm font-medium">解决题目</span>
- <span className="font-bold text-lg text-secondary-light">{user.acceptedSubmissions || 0}</span>
- </div>
- <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/25 hover:bg-muted transition-all">
- <span className="text-muted-foreground text-sm font-medium">总提交</span>
- <span className="font-bold text-lg text-primary-light">{user._count?.submissions || 0}</span>
- </div>
- <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/25 hover:bg-muted transition-all">
- <span className="text-muted-foreground text-sm font-medium">通过率</span>
- <span className="font-bold text-lg text-info">
- {(user._count?.submissions ?? 0) > 0 
- ? ((user.acceptedSubmissions / (user._count?.submissions ?? 1)) * 100).toFixed(1)
- : 0}%
- </span>
- </div>
- </div>
- </motion.div>
+  const solved = user.acceptedSubmissions || user.solvedCount || 0
+  const submits = user._count?.submissions || 0
+  const passRate = submits > 0 ? ((solved / submits) * 100).toFixed(1) : '0'
+  const accent = user.color || 'var(--primary)'
+  const displayName = user.nickname || user.username
 
- <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-accent/5">
- <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-foreground">
- <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
- <Trophy className="w-5 h-5 text-accent" />
- </div>
- 成就徽章
- </h3>
- <div className="grid grid-cols-3 gap-4">
- {['🏆', '🥇', '🥈', '🥉', '⭐', '🎯'].map((emoji, index) => (
- <div 
- key={index} 
- className="aspect-square bg-muted/25 rounded-lg flex items-center justify-center text-4xl hover:bg-muted transition-all cursor-pointer group relative"
- >
- {emoji}
- <div className="absolute bottom-full mb-3 hidden group-hover:block px-4 py-2 bg-background-secondary text-foreground text-sm rounded-xl whitespace-nowrap border border-border shadow-xl z-30">
- 示例徽章 {index + 1}
- </div>
- </div>
- ))}
- </div>
- </motion.div>
- </div>
+  return (
+    <EducationalPageShell title={displayName} width="default">
+      <div className="space-y-4">
+        {/* 身份头图 */}
+        <section className="card-static rounded-xl p-5 md:p-6">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 sm:items-start">
+            <div
+              className="w-20 h-20 rounded-2xl shrink-0 flex items-center justify-center text-white text-2xl font-bold overflow-hidden border border-border"
+              style={{ backgroundColor: user.color || undefined }}
+            >
+              {user.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.avatar} alt={displayName} className="w-full h-full object-cover" />
+              ) : (
+                (user.username?.charAt(0) || '?').toUpperCase()
+              )}
+            </div>
 
- <div className="lg:col-span-2 space-y-7">
- <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-primary/5">
- <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-foreground">
- <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
- <TrendingUp className="w-5 h-5 text-primary-light" />
- </div>
- 通过记录 (近7天)
- </h3>
- <div className="h-[220px] w-full">
- <ResponsiveContainer width="100%" height="100%">
- <AreaChart data={activityData}>
- <defs>
- <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
- <stop offset="5%" stopColor="#818CF8" stopOpacity={0.8}/>
- <stop offset="95%" stopColor="#818CF8" stopOpacity={0}/>
- </linearGradient>
- </defs>
- <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)" />
- <XAxis dataKey="date" axisLine={false} tickLine={false} stroke="#94A3B8" fontSize={13} />
- <YAxis axisLine={false} tickLine={false} allowDecimals={false} stroke="#94A3B8" fontSize={13} />
- <Tooltip 
- contentStyle={{ 
- borderRadius: '16px', 
- border: '1px solid rgba(148, 163, 184, 0.12)',
- boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
- backgroundColor: 'rgba(15, 23, 42, 0.98)',
- backdropFilter: 'blur(24px)',
- color: '#F8FAFC',
- padding: '12px 16px'
- }}
- />
- <Area type="monotone" dataKey="count" stroke="#818CF8" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" />
- </AreaChart>
- </ResponsiveContainer>
- </div>
- </motion.div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 gap-y-1.5">
+                <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">
+                  {displayName}
+                </h1>
+                {user.role && (
+                  <span className={`tag text-xs ${getRoleColor(user.role)}`}>
+                    {getRoleLabel(user.role)}
+                  </span>
+                )}
+                {user.rank && (
+                  <span
+                    className="tag text-xs font-medium"
+                    style={{
+                      backgroundColor: `${accent}18`,
+                      color: accent,
+                      borderColor: `${accent}40`,
+                    }}
+                  >
+                    {user.rank}
+                  </span>
+                )}
+                <span className="tag tag-primary text-xs">Rating {user.rating}</span>
+              </div>
 
- {/* 提交日历热力图（参考 GitHub Contribution Graph + HOJ 用户活跃度） */}
- <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-primary/5">
- <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-foreground">
- <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
- <Flame className="w-5 h-5 text-accent" />
- </div>
- 提交日历 (近一年)
- </h3>
- <SubmissionHeatmap data={yearActivity} days={365} />
- </motion.div>
+              <p className="text-sm text-muted-foreground font-mono mt-1">@{user.username}</p>
 
- <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-secondary/5">
- <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-foreground">
- <div className="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center">
- <Code className="w-5 h-5 text-secondary-light" />
- </div>
- 最近提交
- </h3>
- <div className="overflow-x-auto custom-scrollbar rounded-lg border border-border">
- <table className="w-full">
- <thead className="bg-muted/25">
- <tr>
- <th className="px-5 py-4 text-left text-sm font-semibold text-foreground">题目</th>
- <th className="px-5 py-4 text-left text-sm font-semibold text-foreground">状态</th>
- <th className="px-5 py-4 text-left text-sm font-semibold text-foreground">语言</th>
- <th className="px-5 py-4 text-left text-sm font-semibold text-foreground">时间</th>
- </tr>
- </thead>
- <tbody className="divide-y divide-border">
- {recentSubmissions.length > 0 ? (
- recentSubmissions.map((submission) => (
- <tr key={submission.id} className="hover:bg-muted/15 transition-colors">
- <td className="px-5 py-4">
- <Link href={`/problems/${submission.realProblemId}`} className="group flex items-center">
- <span className="text-primary-light font-semibold group-hover:underline">{submission.problemId}</span>
- <span className="text-muted-foreground ml-2 group-hover:text-foreground transition-colors">{submission.problemTitle}</span>
- </Link>
- </td>
- <td className="px-5 py-4">
- <span className={`tag text-xs font-semibold px-3 py-1.5 ${
- submission.status === 'AC' || submission.status === 'Accepted' ? 'tag-success' :
- submission.status === 'WA' || submission.status === 'Wrong Answer' ? 'tag-error' :
- submission.status === 'TLE' || submission.status === 'Time Limit Exceeded' ? 'tag-warning' :
- 'tag'
- }`}>
- {submission.status}
- </span>
- </td>
- <td className="px-5 py-4 text-muted-foreground text-sm font-medium">
- {submission.language}
- </td>
- <td className="px-5 py-4 text-muted-foreground text-sm font-medium">
- {submission.time}
- </td>
- </tr>
- ))
- ) : (
- <tr>
- <td colSpan={4} className="px-5 py-16 text-center">
- <div className="flex flex-col items-center gap-4">
- <div className="w-14 h-14 rounded-lg bg-muted/25 flex items-center justify-center">
- <Code className="w-7 h-7 text-muted-foreground" />
- </div>
- <p className="text-muted-foreground text-base">暂无提交记录</p>
- </div>
- </td>
- </tr>
- )}
- </tbody>
- </table>
- </div>
- </motion.div>
+              {user.bio?.trim() ? (
+                <p className="text-sm text-foreground/80 mt-3 leading-relaxed max-w-2xl">
+                  {user.bio}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-3">暂无简介</p>
+              )}
 
- {difficultyDistribution.length > 0 && (
- <motion.div variants={itemVariants} className="card-static rounded-lg p-8 border border-accent/5">
- <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-foreground">
- <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center">
- <Target className="w-5 h-5 text-accent-light" />
- </div>
- 题目难度分布 (已解决)
- </h3>
- <div className="space-y-5">
- {difficultyDistribution.map((item) => {
- const total = difficultyDistribution.reduce((acc, curr) => acc + curr.count, 0);
- const percentage = (item.count / total) * 100;
- 
- let bgClass = 'bg-muted';
- let textClass = 'text-muted-foreground';
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  加入于 {formatDate(user.createdAt)}
+                </span>
+                {isOwn && (
+                  <Link
+                    href="/settings"
+                    className="inline-flex items-center gap-1 text-primary-light hover:underline"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    编辑资料
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
 
- if (item.difficulty === '入门') {
- bgClass = 'bg-muted';
- textClass = 'text-muted-foreground';
- } else if (item.difficulty === '普及-') {
- bgClass = 'bg-secondary';
- textClass = 'text-secondary-light';
- } else if (item.difficulty === '普及') {
- bgClass = 'bg-primary';
- textClass = 'text-primary-light';
- } else if (item.difficulty === '普及+') {
- bgClass = 'bg-accent';
- textClass = 'text-accent-light';
- } else if (item.difficulty === '提高') {
- bgClass = 'bg-accent';
- textClass = 'text-accent-light';
- } else if (item.difficulty === '提高+') {
- bgClass = 'bg-error';
- textClass = 'text-error';
- } else {
- bgClass = 'bg-primary';
- textClass = 'text-primary-light';
- }
+          {/* 关键指标 */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5 pt-5 border-t border-border">
+            <StatCell label="解题" value={String(solved)} />
+            <StatCell label="提交" value={String(submits)} />
+            <StatCell label="通过率" value={`${passRate}%`} />
+            <StatCell label="近 7 天 AC" value={String(weekTotal)} />
+          </div>
+        </section>
 
- return (
- <div key={item.difficulty}>
- <div className="flex items-center justify-between mb-3">
- <span className={`text-sm font-semibold ${textClass}`}>{item.difficulty}</span>
- <span className="text-base font-bold text-foreground">{item.count}</span>
- </div>
- <div className="w-full bg-muted/25 rounded-full h-3 overflow-hidden">
- <div 
- className={`${bgClass} h-3 rounded-full transition-all duration-700`}
- style={{ 
- width: `${percentage}%`,
- }}
- ></div>
- </div>
- </div>
- );
- })}
- </div>
- </motion.div>
- )}
- </div>
- </motion.div>
- </PageContainer>
- </div>
- )
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_18rem] gap-4 items-start">
+          <div className="space-y-4 min-w-0">
+            {/* 热力图优先：比 7 日图信息密度更高 */}
+            <section className="card-static rounded-xl p-4 md:p-5">
+              <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Flame className="w-4 h-4 text-primary-light" />
+                提交日历
+                <span className="text-xs font-normal text-muted-foreground">近一年</span>
+              </h2>
+              <SubmissionHeatmap data={yearActivity} days={365} color={user.color || undefined} />
+            </section>
+
+            <section className="card-static rounded-xl p-4 md:p-5">
+              <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Code className="w-4 h-4 text-primary-light" />
+                最近提交
+              </h2>
+              {recentSubmissions.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">暂无提交记录</div>
+              ) : (
+                <div className="overflow-x-auto -mx-1">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-muted-foreground border-b border-border">
+                        <th className="text-left font-medium py-2 px-2">题目</th>
+                        <th className="text-left font-medium py-2 px-2 w-24">状态</th>
+                        <th className="text-left font-medium py-2 px-2 w-20">语言</th>
+                        <th className="text-right font-medium py-2 px-2 w-28">时间</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentSubmissions.map((submission) => (
+                        <tr
+                          key={submission.id}
+                          className="border-b border-border/60 last:border-0 hover:bg-muted/30"
+                        >
+                          <td className="py-2.5 px-2">
+                            <Link
+                              href={`/problems/${submission.realProblemId || submission.problemId}`}
+                              className="group inline-flex items-baseline gap-1.5 min-w-0 max-w-full"
+                            >
+                              <span className="font-mono text-xs text-primary-light shrink-0">
+                                {submission.problemId}
+                              </span>
+                              <span className="text-foreground group-hover:text-primary-light truncate">
+                                {submission.problemTitle}
+                              </span>
+                            </Link>
+                          </td>
+                          <td className="py-2.5 px-2">
+                            <span
+                              className={`tag text-[11px] ${statusTagClass(submission.status)}`}
+                            >
+                              {submission.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 text-muted-foreground text-xs">
+                            {submission.language}
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-xs text-muted-foreground whitespace-nowrap">
+                            {submission.time}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
+
+          <aside className="space-y-4 xl:sticky xl:top-20">
+            <section className="card-static rounded-xl p-4">
+              <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary-light" />
+                近 7 天通过
+              </h2>
+              <div className="h-[140px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={activityData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="profileAcFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="var(--border)"
+                    />
+                    <XAxis
+                      dataKey="date"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                      width={28}
+                      tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 10,
+                        border: '1px solid var(--border)',
+                        background: 'var(--card)',
+                        color: 'var(--foreground)',
+                        fontSize: 12,
+                      }}
+                      labelStyle={{ color: 'var(--muted-foreground)' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      name="通过"
+                      stroke="var(--primary)"
+                      strokeWidth={2}
+                      fill="url(#profileAcFill)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              {weekTotal === 0 && (
+                <p className="text-xs text-muted-foreground text-center mt-1">近一周暂无通过</p>
+              )}
+            </section>
+
+            {difficultyDistribution.length > 0 && (
+              <section className="card-static rounded-xl p-4">
+                <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-primary-light" />
+                  已解决难度
+                </h2>
+                <ul className="space-y-2.5">
+                  {difficultyDistribution.map((item) => {
+                    const total = difficultyDistribution.reduce((a, c) => a + c.count, 0) || 1
+                    const pct = (item.count / total) * 100
+                    return (
+                      <li key={item.difficulty}>
+                        <div className="flex items-center justify-between text-xs mb-1 gap-2">
+                          <span className="text-foreground truncate">{item.difficulty}</span>
+                          <span className="text-muted-foreground tabular-nums shrink-0">
+                            {item.count}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${difficultyBarClass(item.difficulty)}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            )}
+
+            {isOwn && (
+              <Link
+                href="/settings"
+                className="card-static rounded-xl p-3.5 flex items-center justify-between text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Settings className="w-4 h-4" />
+                  个人设置
+                </span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </aside>
+        </div>
+      </div>
+    </EducationalPageShell>
+  )
+}
+
+function StatCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/25 px-3 py-2.5 text-center">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="text-lg font-bold text-foreground tabular-nums mt-0.5">{value}</div>
+    </div>
+  )
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface BatchEditModalProps {
   /** 选中的用户 ID 集合（用于提交） */
@@ -19,6 +20,7 @@ export function BatchEditModal({
   onClose,
   onSuccess,
 }: BatchEditModalProps) {
+  const dialog = useDialog()
   const [batchEditRole, setBatchEditRole] = useState('STUDENT')
   const [operating, setOperating] = useState(false)
 
@@ -40,10 +42,10 @@ export function BatchEditModal({
       if (data.success) {
         onSuccess()
       } else {
-        alert(data.error || '批量修改失败')
+        await dialog.alert({ tone: 'error', message: data.error || '批量修改失败' })
       }
     } catch (err) {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setOperating(false)
     }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface BatchDeleteModalProps {
   /** 选中的用户 ID 集合（用于提交） */
@@ -17,6 +18,7 @@ export function BatchDeleteModal({
   onClose,
   onSuccess,
 }: BatchDeleteModalProps) {
+  const dialog = useDialog()
   const [operating, setOperating] = useState(false)
 
   const handleConfirm = async () => {
@@ -36,10 +38,10 @@ export function BatchDeleteModal({
       if (data.success) {
         onSuccess()
       } else {
-        alert(data.error || '批量删除失败')
+        await dialog.alert({ tone: 'error', message: data.error || '批量删除失败' })
       }
     } catch (err) {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setOperating(false)
     }

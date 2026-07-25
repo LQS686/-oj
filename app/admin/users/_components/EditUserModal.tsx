@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 import type { User } from '../_utils'
 
 interface EditUserModalProps {
@@ -16,6 +17,7 @@ interface EditUserModalProps {
  * 系统管理员可将用户提升为 ADMIN；普通管理员仅能选择 TEACHER/STUDENT。
  */
 export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess }: EditUserModalProps) {
+  const dialog = useDialog()
   const [editRole, setEditRole] = useState(user.role)
   const [saving, setSaving] = useState(false)
 
@@ -32,10 +34,10 @@ export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess 
       if (data.success) {
         onSuccess()
       } else {
-        alert(data.error || '更新失败')
+        await dialog.alert({ tone: 'error', message: data.error || '更新失败' })
       }
     } catch (err) {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setSaving(false)
     }

@@ -169,7 +169,7 @@ export const TESTCASE_UPLOAD_CONFIG = {
   //   导致上传测试点时可能被截断到 10000ms/512MB，而题目主表存的是 30000ms/1024MB。
   MAX_TIME_LIMIT: 30000,
   MAX_MEMORY_LIMIT: 1024,
-  ALLOWED_EXTENSIONS: ['.in', '.out'],
+  ALLOWED_EXTENSIONS: ['.in', '.out', '.input', '.output'],
   ALLOWED_MIME_TYPES: ['application/zip', 'application/x-zip-compressed'],
 }
 
@@ -191,12 +191,25 @@ export interface ValidationResult {
 }
 
 export function validateFileName(fileName: string): { valid: boolean; number?: number; type?: 'in' | 'out' } {
-  const ext = path.extname(fileName).toLowerCase()
-  if (ext !== '.in' && ext !== '.out') return { valid: false }
-  const nameWithoutExt = path.basename(fileName, ext)
+  const lower = fileName.toLowerCase()
+  // 支持 .in/.out 与 .input/.output
+  let type: 'in' | 'out' | undefined
+  let nameWithoutExt: string
+  if (lower.endsWith('.input')) {
+    type = 'in'
+    nameWithoutExt = fileName.slice(0, -('.input'.length))
+  } else if (lower.endsWith('.output')) {
+    type = 'out'
+    nameWithoutExt = fileName.slice(0, -('.output'.length))
+  } else {
+    const ext = path.extname(fileName).toLowerCase()
+    if (ext !== '.in' && ext !== '.out') return { valid: false }
+    type = ext === '.in' ? 'in' : 'out'
+    nameWithoutExt = path.basename(fileName, ext)
+  }
   const numberMatch = nameWithoutExt.match(/(\d+)/)
   if (!numberMatch) return { valid: false }
-  return { valid: true, number: parseInt(numberMatch[1], 10), type: ext === '.in' ? 'in' : 'out' }
+  return { valid: true, number: parseInt(numberMatch[1], 10), type }
 }
 
 export function validateLineEndings(content: string): boolean {

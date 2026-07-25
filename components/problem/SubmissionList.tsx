@@ -1,141 +1,622 @@
-import { Clock, MemoryStick, AlertCircle, CheckCircle2, LogIn } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+'use client'
+
+import { useEffect, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  Clock,
+  MemoryStick,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Timer,
+  AlertTriangle,
+  Loader2,
+  LogIn,
+  ChevronDown,
+  Code2,
+  Copy,
+  Check,
+} from 'lucide-react'
 import Link from 'next/link'
-import { getStatusConfig } from '@/lib/status'
-import { formatDateTime } from '@/lib/utils'
+import { getStatusConfig, getStatusText } from '@/lib/status'
+import { formatDateTime, formatTime, formatMemory } from '@/lib/utils'
+import { fetchWithCookie } from '@/lib/api/base'
 import type { Submission } from '@/types/models'
 import type { UserData } from '@/lib/api/auth'
 import { loginPath } from '@/lib/navigation'
+import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
+
+export type SubmissionListItem = Partial<Submission> & {
+  id: string
+  status: string
+  submittedAt: string
+  score?: number
+  language?: string
+  time?: number
+  memory?: number
+  passedTests?: number
+  totalTests?: number
+  message?: string | null
+  code?: string
+  testResults?: Array<{
+    testId?: string
+    status: string
+    time: number
+    memory: number
+    message?: string | null
+  }> | null
+}
 
 interface SubmissionListProps {
- submissions: Submission[]
- loading: boolean
- error: string | null
- user: UserData | null
- fromAssignment: string | null
- classId: string | null
- onSelect: (submission: Submission) => void
+  submissions: SubmissionListItem[]
+  loading: boolean
+  error: string | null
+  user: UserData | null
+  /** 当前展开的提交 ID；受控 */
+  expandedId?: string | null
+  onExpandedChange?: (id: string | null) => void
+}
+
+function toCodeLanguage(lang?: string): CodeLanguage {
+  if (lang === 'c' || lang === 'python') return lang
+  return 'cpp'
+}
+
+function isJudgingStatus(status: string) {
+  return ['Pending', 'Judging', 'Running', 'PENDING', 'JUDGING', 'RUNNING'].includes(status)
+}
+
+function isPassStatus(status: string) {
+  return status === 'AC' || status === 'Accepted'
+}
+
+function isCeStatus(status: string) {
+  return status === 'CE' || status === 'Compile Error'
+}
+
+function StatusIcon({ name, className }: { name: string; className?: string }) {
+  const cls = className || 'w-3.5 h-3.5'
+  switch (name) {
+    case 'check-circle-2':
+      return <CheckCircle2 className={cls} />
+    case 'x-circle':
+      return <XCircle className={cls} />
+    case 'timer':
+      return <Timer className={cls} />
+    case 'alert-triangle':
+      return <AlertTriangle className={cls} />
+    case 'loader-2':
+      return <Loader2 className={`${cls} animate-spin`} />
+    case 'alert-circle':
+    default:
+      return <AlertCircle className={cls} />
+  }
+}
+
+function shortStatus(status: string): string {
+  switch (status) {
+    case 'Accepted':
+      return 'AC'
+    case 'Wrong Answer':
+      return 'WA'
+    case 'Time Limit Exceeded':
+      return 'TLE'
+    case 'Memory Limit Exceeded':
+      return 'MLE'
+    case 'Runtime Error':
+      return 'RE'
+    case 'Compile Error':
+      return 'CE'
+    case 'System Error':
+      return 'SE'
+    case 'Presentation Error':
+      return 'PE'
+    case 'Output Limit Exceeded':
+      return 'OLE'
+    case 'Partly Correct':
+      return 'PC'
+    case 'Judging':
+    case 'Pending':
+    case 'Running':
+      return '...'
+    default:
+      return status.length > 4 ? status.slice(0, 4) : status
+  }
+}
+
+/** 洛谷风格测试点色块背景 */
+function testPointBlockClass(status: string): string {
+  switch (status) {
+    case 'AC':
+    case 'Accepted':
+      return 'bg-[var(--difficulty-easy)]'
+    case 'WA':
+    case 'Wrong Answer':
+      return 'bg-[var(--difficulty-hard)]'
+    case 'TLE':
+    case 'Time Limit Exceeded':
+      return 'bg-[var(--difficulty-medium)]'
+    case 'MLE':
+    case 'Memory Limit Exceeded':
+      return 'bg-[var(--info)]'
+    case 'RE':
+    case 'Runtime Error':
+      return 'bg-[var(--difficulty-expert)]'
+    case 'CE':
+    case 'Compile Error':
+      return 'bg-muted-foreground'
+    case 'PE':
+    case 'Presentation Error':
+    case 'OLE':
+    case 'Output Limit Exceeded':
+    case 'PC':
+    case 'Partly Correct':
+      return 'bg-[var(--accent)]'
+    case 'Pending':
+    case 'Judging':
+    case 'Running':
+      return 'bg-primary/70'
+    default:
+      return 'bg-muted-foreground'
+  }
+}
+
+function formatBlockUsage(time?: number, memory?: number): string {
+  const t = formatTime(time ?? 0)
+  const m = formatMemory(memory ?? 0)
+  return `${t}/${m}`
+}
+
+function testPointTooltipText(
+  result: NonNullable<SubmissionListItem['testResults']>[number],
+  index: number
+): string {
+  const statusText = getStatusText(result.status)
+  const lines: string[] = [`#${index + 1} ${statusText}`]
+  lines.push(formatBlockUsage(result.time, result.memory))
+  if (result.message && result.message.trim()) {
+    lines.push(result.message.trim())
+  }
+  return lines.join('\n')
+}
+
+function TestPointBlock({
+  result,
+  index,
+}: {
+  result: NonNullable<SubmissionListItem['testResults']>[number]
+  index: number
+}) {
+  const label = shortStatus(result.status)
+  const tip = testPointTooltipText(result, index)
+  const blockRef = useRef<HTMLDivElement>(null)
+  const [tipPos, setTipPos] = useState<{ left: number; top: number; place: 'above' | 'below' } | null>(
+    null
+  )
+
+  const showTip = () => {
+    const el = blockRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const placeAbove = rect.top > 120
+    setTipPos({
+      left: rect.left + rect.width / 2,
+      top: placeAbove ? rect.top - 6 : rect.bottom + 6,
+      place: placeAbove ? 'above' : 'below',
+    })
+  }
+
+  const hideTip = () => setTipPos(null)
+
+  useEffect(() => {
+    if (!tipPos) return
+    const update = () => showTip()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipPos != null])
+
+  return (
+    <div
+      ref={blockRef}
+      className="w-[4.25rem] shrink-0"
+      onMouseEnter={showTip}
+      onMouseLeave={hideTip}
+      onFocus={showTip}
+      onBlur={hideTip}
+    >
+      <div
+        tabIndex={0}
+        className={`w-[4.25rem] h-[4.25rem] rounded p-1 flex flex-col text-white shadow-sm cursor-default outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${testPointBlockClass(result.status)}`}
+        aria-label={tip}
+      >
+        <span className="text-[9px] font-medium opacity-90 leading-none">#{index + 1}</span>
+        <span className="flex-1 flex items-center justify-center text-sm font-bold tracking-wide">
+          {label}
+        </span>
+        <span className="text-[8px] opacity-90 tabular-nums leading-tight text-center truncate w-full">
+          {formatBlockUsage(result.time, result.memory)}
+        </span>
+      </div>
+      {tipPos &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            role="tooltip"
+            className="pointer-events-none fixed z-[200] w-max max-w-[min(18rem,80vw)] rounded px-2.5 py-1.5 text-left text-[11px] leading-snug text-white whitespace-pre-wrap break-words shadow-lg bg-[#333]/95 dark:bg-[#1a1a1a]/95"
+            style={{
+              left: tipPos.left,
+              top: tipPos.top,
+              transform:
+                tipPos.place === 'above' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+            }}
+          >
+            {tip}
+          </div>,
+          document.body
+        )}
+    </div>
+  )
+}
+
+function ExpandedDetail({
+  submission,
+  detail,
+  detailLoading,
+}: {
+  submission: SubmissionListItem
+  detail: SubmissionListItem | null
+  detailLoading: boolean
+}) {
+  const [copied, setCopied] = useState(false)
+  const data = detail || submission
+  const judging = isJudgingStatus(data.status)
+  const isAc = isPassStatus(data.status)
+  const isCe = isCeStatus(data.status)
+  const testResults = data.testResults || []
+  const showTests = judging || testResults.length > 0
+  const codeLines = data.code ? data.code.split('\n').length : 0
+  // 短代码完整展开；超过约 16 行后限制高度并滚动，避免撑满整页
+  const codeHeightPx = Math.min(Math.max(codeLines, 4) * 20 + 24, 320)
+  const codeHeight = `${codeHeightPx}px`
+
+  const handleCopy = async () => {
+    if (!data.code) return
+    try {
+      await navigator.clipboard.writeText(data.code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // ignore
+    }
+  }
+
+  if (detailLoading && !detail) {
+    return (
+      <div className="border-t border-border bg-muted/20 px-4 py-8 flex justify-center">
+        <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          加载详情…
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border-t border-border bg-muted/20 px-4 py-4 space-y-4">
+      {(data.message || isCe) && (
+        <div
+          className={`rounded-lg border p-3 flex gap-2.5 ${
+            isCe || !isAc
+              ? 'bg-error/5 border-error/25'
+              : 'bg-accent/10 border-accent/25'
+          }`}
+        >
+          <AlertTriangle
+            className={`w-4 h-4 shrink-0 mt-0.5 ${isCe || !isAc ? 'text-error' : 'text-accent'}`}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-foreground mb-1">
+              {isCe ? '编译信息' : '评测信息'}
+            </div>
+            <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+              {data.message || '（无详细信息）'}
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {showTests && (
+        <div>
+          <div className="text-sm font-medium text-foreground mb-2">测试点信息</div>
+          {testResults.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {testResults.map((r, i) => (
+                <TestPointBlock key={r.testId || `t-${i}`} result={r} index={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="py-6 text-center text-sm text-muted-foreground rounded-lg border border-dashed border-border">
+              <Loader2 className="w-4 h-4 animate-spin inline-block mr-1.5" />
+              评测进行中…
+            </div>
+          )}
+        </div>
+      )}
+
+      <div>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="text-sm font-medium text-foreground inline-flex items-center gap-1.5">
+            <Code2 className="w-4 h-4 text-primary" />
+            源代码
+            <span className="text-xs font-normal text-muted-foreground">
+              {data.language || '—'}
+              {data.code ? ` · ${codeLines} 行` : ''}
+            </span>
+          </div>
+          {data.code && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                void handleCopy()
+              }}
+              className="btn btn-outline text-xs py-1 px-2.5 gap-1"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  已复制
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  复制
+                </>
+              )}
+            </button>
+          )}
+        </div>
+        {data.code ? (
+          <CodeEditor
+            value={data.code}
+            onChange={() => {}}
+            language={toCodeLanguage(data.language)}
+            readOnly
+            height={codeHeight}
+            className="hover:border-border focus-within:border-border focus-within:ring-0"
+          />
+        ) : (
+          <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+            {detailLoading ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                加载代码…
+              </span>
+            ) : (
+              '无代码内容（可能无权查看或已脱敏）'
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default function SubmissionList({
- submissions,
- loading,
- error,
- user,
- fromAssignment,
- classId,
- onSelect
+  submissions,
+  loading,
+  error,
+  user,
+  expandedId = null,
+  onExpandedChange,
 }: SubmissionListProps) {
- const router = useRouter()
+  const [detailCache, setDetailCache] = useState<Record<string, SubmissionListItem>>({})
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
+  const expandedStatus = submissions.find((s) => s.id === expandedId)?.status
 
- if (loading) {
- return (
- <div className="text-center py-12">
- <div className="relative w-12 h-12 mx-auto mb-4">
- <div className="absolute inset-0 rounded-full border-2 border-primary/20"></div>
- <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
- </div>
- <p className="text-muted-foreground">加载中...</p>
- </div>
- )
- }
+  useEffect(() => {
+    if (!expandedId) return
 
- if (error) {
- return (
- <div className="text-center py-12">
- <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
- <AlertCircle className="w-6 h-6 text-error" />
- </div>
- <p className="text-error">{error}</p>
- </div>
- )
- }
+    let cancelled = false
+    setDetailLoadingId(expandedId)
+    void (async () => {
+      try {
+        const res = await fetchWithCookie(`/api/submissions/${expandedId}`)
+        const data = await res.json()
+        if (cancelled || !data.success) return
+        const listItem = submissions.find((s) => s.id === expandedId)
+        setDetailCache((prev) => ({
+          ...prev,
+          [expandedId]: {
+            ...listItem,
+            ...data.data,
+            id: expandedId,
+            status: listItem?.status || data.data.status,
+            score: listItem?.score ?? data.data.score,
+            time: listItem?.time ?? data.data.time,
+            memory: listItem?.memory ?? data.data.memory,
+            passedTests: listItem?.passedTests ?? data.data.passedTests,
+            totalTests: listItem?.totalTests ?? data.data.totalTests,
+            message: listItem?.message ?? data.data.message,
+            testResults:
+              listItem?.testResults && listItem.testResults.length > 0
+                ? listItem.testResults
+                : data.data.testResults,
+            code: data.data.code || listItem?.code,
+          },
+        }))
+      } catch {
+        // 忽略：展开区仍展示列表摘要
+      } finally {
+        if (!cancelled) setDetailLoadingId((id) => (id === expandedId ? null : id))
+      }
+    })()
 
- if (submissions.length === 0) {
- return (
- <div className="text-center py-12">
- <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
- <Clock className="w-6 h-6 text-muted-foreground" />
- </div>
- {user ? (
- <p className="text-muted-foreground">你还没有提交过这道题目</p>
- ) : (
- <div className="space-y-3">
- <p className="text-muted-foreground">请登录后查看提交记录</p>
- <Link
- href={loginPath()}
- className="btn btn-primary btn-sm inline-flex items-center gap-2"
- >
- <LogIn className="w-4 h-4" />
- 登录
- </Link>
- </div>
- )}
- </div>
- )
- }
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedId, expandedStatus])
 
+  useEffect(() => {
+    if (!expandedId) return
+    const listItem = submissions.find((s) => s.id === expandedId)
+    if (!listItem) return
+    setDetailCache((prev) => {
+      const cur = prev[expandedId]
+      if (!cur) {
+        return { ...prev, [expandedId]: { ...listItem } }
+      }
+      return {
+        ...prev,
+        [expandedId]: {
+          ...cur,
+          status: listItem.status,
+          score: listItem.score ?? cur.score,
+          time: listItem.time ?? cur.time,
+          memory: listItem.memory ?? cur.memory,
+          passedTests: listItem.passedTests ?? cur.passedTests,
+          totalTests: listItem.totalTests ?? cur.totalTests,
+          message: listItem.message ?? cur.message,
+          language: listItem.language ?? cur.language,
+          code: cur.code || listItem.code,
+          testResults:
+            listItem.testResults && listItem.testResults.length > 0
+              ? listItem.testResults
+              : cur.testResults,
+        },
+      }
+    })
+  }, [submissions, expandedId])
 
+  const toggle = (id: string) => {
+    onExpandedChange?.(expandedId === id ? null : id)
+  }
 
- return (
- <div className="card-static rounded-lg overflow-hidden">
- {submissions.map((sub) => {
- const statusConfig = getStatusConfig(sub.status)
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <div className="relative w-12 h-12 mx-auto mb-4">
+          <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
+          <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+        <p className="text-muted-foreground">加载中...</p>
+      </div>
+    )
+  }
 
- return (
- <div
- key={sub.id}
- className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-border hover:bg-primary/5 transition-colors cursor-pointer"
- onClick={() => {
- if (fromAssignment && classId) {
- onSelect(sub)
- } else {
- router.push(`/submission/${sub.id}`)
- }
- }}
- >
- {/* 状态 */}
- <div className="col-span-2 flex items-center">
- <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${statusConfig.className}`}>
- <span className={`${statusConfig.iconBg} p-0.5 rounded`}>
- {statusConfig.icon}
- </span>
- {sub.status}
- </span>
- </div>
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-6 h-6 text-error" />
+        </div>
+        <p className="text-error">{error}</p>
+      </div>
+    )
+  }
 
- {/* 详情：语言 + 分数 + 通过测试 */}
- <div className="col-span-5 flex items-center gap-4 text-sm text-muted-foreground">
- <span className="font-mono">{sub.language}</span>
- <div className="flex items-center gap-1.5">
- <span className="font-semibold text-foreground">{sub.score}</span>
- <span>分</span>
- </div>
- <div className="flex items-center gap-1.5">
- <CheckCircle2 className="w-4 h-4" />
- <span>{sub.passedTests}/{sub.totalTests}</span>
- </div>
- </div>
+  if (submissions.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+          <Clock className="w-6 h-6 text-muted-foreground" />
+        </div>
+        {user ? (
+          <p className="text-muted-foreground">你还没有提交过这道题目</p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-muted-foreground">请登录后查看提交记录</p>
+            <Link
+              href={loginPath()}
+              className="btn btn-primary btn-sm inline-flex items-center gap-2"
+            >
+              <LogIn className="w-4 h-4" />
+              登录
+            </Link>
+          </div>
+        )}
+      </div>
+    )
+  }
 
- {/* 耗时 + 内存 */}
- <div className="col-span-2 flex items-center gap-3 text-sm text-muted-foreground">
- <div className="flex items-center gap-1.5">
- <Clock className="w-4 h-4" />
- <span>{sub.time}ms</span>
- </div>
- <div className="flex items-center gap-1.5">
- <MemoryStick className="w-4 h-4" />
- <span>{sub.memory}KB</span>
- </div>
- </div>
+  return (
+    <div className="card-static rounded-lg divide-y divide-border">
+      {submissions.map((sub) => {
+        const statusConfig = getStatusConfig(sub.status)
+        const passed = sub.passedTests ?? 0
+        const total = sub.totalTests ?? 0
+        const expanded = expandedId === sub.id
 
- {/* 提交时间 */}
- <div className="col-span-3 flex items-center justify-end text-sm text-muted-foreground">
- {formatDateTime(sub.submittedAt)}
- </div>
- </div>
- )
- })}
- </div>
- )
+        return (
+          <div key={sub.id} className={expanded ? 'bg-primary/5' : ''}>
+            <button
+              type="button"
+              className="w-full grid grid-cols-12 gap-3 px-4 py-3 text-left hover:bg-primary/5 transition-colors"
+              onClick={() => toggle(sub.id)}
+              aria-expanded={expanded}
+            >
+              <div className="col-span-2 flex items-center gap-1.5 min-w-0">
+                <ChevronDown
+                  className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${
+                    expanded ? 'rotate-0' : '-rotate-90'
+                  }`}
+                />
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold border truncate ${statusConfig.className}`}
+                >
+                  <span className={`${statusConfig.iconBg} p-0.5 rounded shrink-0`}>
+                    <StatusIcon name={statusConfig.icon} />
+                  </span>
+                  {sub.status}
+                </span>
+              </div>
+
+              <div className="col-span-5 flex items-center gap-3 text-sm text-muted-foreground min-w-0">
+                <span className="font-mono shrink-0">{sub.language || '—'}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="font-semibold text-foreground">{sub.score ?? 0}</span>
+                  <span>分</span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span className="tabular-nums">
+                    {passed}/{total}
+                  </span>
+                </div>
+              </div>
+
+              <div className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-1 tabular-nums">
+                  <Clock className="w-3.5 h-3.5" />
+                  {sub.time ?? 0}ms
+                </span>
+                <span className="inline-flex items-center gap-1 tabular-nums">
+                  <MemoryStick className="w-3.5 h-3.5" />
+                  {sub.memory ?? 0}KB
+                </span>
+              </div>
+
+              <div className="col-span-3 flex items-center justify-end text-sm text-muted-foreground">
+                {formatDateTime(sub.submittedAt)}
+              </div>
+            </button>
+
+            {expanded && (
+              <ExpandedDetail
+                submission={sub}
+                detail={detailCache[sub.id] || null}
+                detailLoading={detailLoadingId === sub.id}
+              />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }

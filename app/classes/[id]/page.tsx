@@ -23,7 +23,7 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import Link from 'next/link'
 import AssignmentOpenLink from '@/components/assignment/AssignmentOpenLink'
-import { ClassWorkspaceShell, PageLoading } from '@/components/common'
+import { ClassWorkspaceShell, PageLoading, useDialog } from '@/components/common'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import ClassManageInlinePanel from '@/components/class/ClassManageInlinePanel'
 import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
@@ -91,6 +91,7 @@ function roleLabel(role: string) {
 }
 
 function ClassDetailContent() {
+  const dialog = useDialog()
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -200,7 +201,12 @@ function ClassDetailContent() {
       router.push(loginPath())
       return
     }
-    const message = prompt('请输入申请理由（可选）:')
+    const message = await dialog.prompt({
+      title: '申请加入班级',
+      message: '请输入申请理由（可选）',
+      placeholder: '选填',
+      allowEmpty: true,
+    })
     if (message === null) return
     try {
       const res = await fetchWithCookie(`/api/classes/${classId}/requests`, {
@@ -209,14 +215,19 @@ function ClassDetailContent() {
         body: JSON.stringify({ message }),
       })
       const d = await res.json()
-      alert(d.success ? '申请已提交，请等待管理员审批！' : d.error || '提交申请失败')
+      if (d.success) {
+        await dialog.alert({ tone: 'success', message: '申请已提交，请等待管理员审批！' })
+      } else {
+        await dialog.alert({ tone: 'error', message: d.error || '提交申请失败' })
+      }
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     }
   }
 
   const handleLeaveClass = async () => {
-    if (!confirm('确定要退出班级吗？')) return
+    const ok = await dialog.confirm({ message: '确定要退出班级吗？', tone: 'warning' })
+    if (!ok) return
     if (!user?.id) return
     try {
       const res = await fetchWithCookie(`/api/classes/${classId}/members/${user.id}`, {
@@ -224,9 +235,9 @@ function ClassDetailContent() {
       })
       const d = await res.json()
       if (d.success) router.push('/classes')
-      else alert(d.error || '退出失败')
+      else await dialog.alert({ tone: 'error', message: d.error || '退出失败' })
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     }
   }
 
@@ -239,23 +250,30 @@ function ClassDetailContent() {
       })
       const data = await res.json()
       if (data.success) void fetchClassDetail()
-      else alert(data.error || '更新角色失败')
+      else await dialog.alert({ tone: 'error', message: data.error || '更新角色失败' })
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     }
   }
 
   const removeMember = async (targetUserId: string, name: string) => {
-    if (!confirm(`确定移除「${name}」？`)) return
+    const ok = await dialog.confirm({
+      message: `确定移除「${name}」？`,
+      tone: 'warning',
+      confirmText: '删除',
+      confirmVariant: 'destructive',
+      cancelText: '取消',
+    })
+    if (!ok) return
     try {
       const res = await fetchWithCookie(`/api/classes/${classId}/members/${targetUserId}`, {
         method: 'DELETE',
       })
       const data = await res.json()
       if (data.success) void fetchClassDetail()
-      else alert(data.error || '移除失败')
+      else await dialog.alert({ tone: 'error', message: data.error || '移除失败' })
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     }
   }
 

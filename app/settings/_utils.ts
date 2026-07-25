@@ -1,44 +1,40 @@
-import { User, Lock, Bell, Globe } from 'lucide-react'
-import type { SettingsUser } from './_types'
+import { User, Lock, SlidersHorizontal } from 'lucide-react'
+import type { Preferences, SettingsUser } from './_types'
 
-/** 设置页左侧 Tab 定义 */
+/** 设置页左侧 Tab：资料 / 安全 / 偏好（通知+做题） */
 export const SETTINGS_TABS = [
-  { id: 'profile', label: '个人资料', icon: User, desc: '管理您的个人信息' },
-  { id: 'account', label: '账号安全', icon: Lock, desc: '密码与安全设置' },
-  { id: 'notifications', label: '通知设置', icon: Bell, desc: '通知偏好管理' },
-  { id: 'preferences', label: '偏好设置', icon: Globe, desc: '自定义您的体验' },
+  { id: 'profile', label: '个人资料', icon: User, desc: '头像、昵称与简介' },
+  { id: 'account', label: '账号安全', icon: Lock, desc: '邮箱与密码' },
+  { id: 'preferences', label: '偏好设置', icon: SlidersHorizontal, desc: '通知与做题偏好' },
 ] as const
 
 export type SettingsTabId = (typeof SETTINGS_TABS)[number]['id']
 
-/** 通知项配置：key 与 Preferences.notifications 字段对应 */
+export function isSettingsTabId(value: string | null): value is SettingsTabId {
+  return value === 'profile' || value === 'account' || value === 'preferences'
+}
+
+/** 通知项配置 */
 export const NOTIFICATION_ITEMS = [
-  { key: 'submissionComplete' as const, label: '提交评测完成', desc: '当代码评测完成时通知我' },
-  { key: 'contestReminder' as const, label: '竞赛提醒', desc: '竞赛开始前提醒我' },
-  { key: 'systemAnnouncement' as const, label: '系统公告', desc: '接收平台系统公告' },
+  { key: 'submissionComplete' as const, label: '提交评测完成', desc: '代码评测完成时发送站内通知' },
+  { key: 'contestReminder' as const, label: '竞赛提醒', desc: '竞赛开始前发送提醒' },
+  { key: 'systemAnnouncement' as const, label: '系统公告', desc: '接收平台公告类通知' },
 ]
 
-/** 默认编程语言选项 */
-export const LANGUAGE_OPTIONS = ['C++', 'C', 'Java', 'Python', 'JavaScript'] as const
-
-/** 编辑器主题选项 */
-export const THEME_OPTIONS = [
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-  { value: 'high-contrast', label: '高对比度' },
+/** 做题默认语言（与评测机一致） */
+export const CODE_LANGUAGE_OPTIONS = [
+  { value: 'cpp', label: 'C++' },
+  { value: 'c', label: 'C' },
+  { value: 'python', label: 'Python' },
 ] as const
 
-/** 偏好设置默认值 */
-export const DEFAULT_PREFERENCES = {
+export const DEFAULT_PREFERENCES: Preferences = {
   notifications: {
     submissionComplete: true,
     contestReminder: false,
     systemAnnouncement: true,
   },
-  editor: {
-    defaultLanguage: 'C++',
-    theme: 'light',
-  },
+  defaultCodeLanguage: 'cpp',
 }
 
 /** 邮箱更换流程的初始状态 */
@@ -51,12 +47,59 @@ export const INITIAL_EMAIL_CHANGE = {
   countdown: 0,
 }
 
-/** 邮箱正则：用于校验新邮箱格式 */
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const LEGACY_LANG_MAP: Record<string, string> = {
+  'C++': 'cpp',
+  'c++': 'cpp',
+  C: 'c',
+  Python: 'python',
+  python3: 'python',
+  Java: 'cpp',
+  JavaScript: 'cpp',
+}
+
+/** 将 API / 旧版偏好归一为当前 Preferences 结构 */
+export function normalizePreferences(raw: Record<string, unknown> | null | undefined): Preferences {
+  const base = structuredClone(DEFAULT_PREFERENCES)
+  if (!raw || typeof raw !== 'object') return base
+
+  const notifications = raw.notifications
+  if (notifications && typeof notifications === 'object') {
+    const n = notifications as Record<string, unknown>
+    if (typeof n.submissionComplete === 'boolean') {
+      base.notifications.submissionComplete = n.submissionComplete
+    }
+    if (typeof n.contestReminder === 'boolean') {
+      base.notifications.contestReminder = n.contestReminder
+    }
+    if (typeof n.systemAnnouncement === 'boolean') {
+      base.notifications.systemAnnouncement = n.systemAnnouncement
+    }
+  }
+
+  let codeLang =
+    typeof raw.defaultCodeLanguage === 'string' ? raw.defaultCodeLanguage : ''
+
+  // 兼容旧版 { editor: { defaultLanguage: 'C++' } }
+  if (!codeLang && raw.editor && typeof raw.editor === 'object') {
+    const editor = raw.editor as Record<string, unknown>
+    if (typeof editor.defaultLanguage === 'string') {
+      codeLang = editor.defaultLanguage
+    }
+  }
+
+  const mapped = LEGACY_LANG_MAP[codeLang] || codeLang
+  if (CODE_LANGUAGE_OPTIONS.some((o) => o.value === mapped)) {
+    base.defaultCodeLanguage = mapped
+  }
+
+  return base
+}
 
 /**
  * 将更新后的用户信息同步到 localStorage。
- * 修复 P0：不存 role 到 localStorage，防止 XSS 窃取越权。
+ * 不存 role，防止 XSS 窃取越权。
  */
 export function persistUserToStorage(user: SettingsUser | null) {
   if (!user) return

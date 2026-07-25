@@ -114,6 +114,7 @@ export interface TrainingProblemItem {
     tags: string[]
     totalSubmit: number
     totalAccepted: number
+    problemNumber?: string | null
   }
   // 用户态字段（仅详情页）
   status?: TrainingProblemStatus

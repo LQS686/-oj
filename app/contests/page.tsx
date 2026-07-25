@@ -134,6 +134,10 @@ function ContestsPageContent() {
  const [page, setPage] = useState(1)
  const [totalPages, setTotalPages] = useState(1)
  const [createOpen, setCreateOpen] = useState(false)
+ const [editContestId, setEditContestId] = useState<string | null>(() => {
+   if (typeof window === 'undefined') return null
+   return new URLSearchParams(window.location.search).get('edit')
+ })
 
  // 是否可创建竞赛（SYSTEM_ADMIN / ADMIN / TEACHER）
  const canCreate = canCreateContest(user)
@@ -143,10 +147,18 @@ function ContestsPageContent() {
  }, [activeTab, page])
 
  useEffect(() => {
- if (searchParams.get('create') === '1' && user && canCreate) {
- setCreateOpen(true)
- router.replace('/contests', { scroll: false })
- }
+   if (searchParams.get('create') === '1' && user && canCreate) {
+     setCreateOpen(true)
+     setEditContestId(null)
+   }
+   const editId = searchParams.get('edit')
+   if (editId && user && canCreate) {
+     setEditContestId(editId)
+     setCreateOpen(false)
+   }
+   if ((searchParams.get('create') === '1' || editId) && user && canCreate) {
+     router.replace('/contests', { scroll: false })
+   }
  }, [searchParams, user, router, canCreate])
 
  const fetchContests = async () => {
@@ -371,12 +383,17 @@ function ContestsPageContent() {
     >
       {renderContent()}
       <CreateContestModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        open={createOpen || !!editContestId}
+        contestId={editContestId}
+        onClose={() => {
+          setCreateOpen(false)
+          setEditContestId(null)
+        }}
         onCreated={() => {
           setPage(1)
           fetchContests()
         }}
+        onSaved={() => fetchContests()}
       />
     </EducationalPageShell>
   )

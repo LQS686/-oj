@@ -5,7 +5,7 @@ import { join } from 'path'
 import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 import type { ExecuteOptions, ExecuteResult } from './executor-types'
-import { computeExtraTime, readProcCpuTimeMs, readProcVmHwmKB, readWindowsProcessMemoryKB } from './process-stats'
+import { computeExtraTime, readProcCpuTimeMs, readProcVmHwmKB, readWindowsProcessMemoryKB, readMemFileKB, readTimeFileMs } from './process-stats'
 import {
   assertDockerJudgeEnabled,
   getRunInfo,
@@ -13,6 +13,7 @@ import {
   ensureDockerImage,
   getDockerRunCommand,
 } from './docker'
+import { ensureWinRunnerExe } from './win-runner-ensure'
 
 const USE_DOCKER = process.env.USE_DOCKER === 'true' || false
 
@@ -262,11 +263,17 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       const runInfo = getRunInfo(language, compiledPath)
       const isLinux = process.platform === 'linux'
       const isWindows = process.platform === 'win32'
+      const memFilePath = join(tempDir, `mem_${timestamp}_${randomId}.txt`)
+      const timeFilePath = join(tempDir, `time_${timestamp}_${randomId}.txt`)
+      // Windows：优先原生 win-runner.exe（GetProcessTimes + GetProcessMemoryInfo，对齐 LemonLime）
+      // 避免把 PowerShell 启动开销算进评测时间（此前会出现 ~500ms 虚高）
+      const useWinRunner = isWindows && ['cpp', 'c', 'python'].includes(language)
 
       // Linux 所有支持语言使用 runner.sh 设置硬资源限制
       // （RLIMIT_AS / RLIMIT_CPU / RLIMIT_STACK，参考 LemonLime watcher_unix.cpp）
       let command = runInfo.command
       let args = runInfo.args
+      const spawnEnv: NodeJS.ProcessEnv = { ...process.env }
       const useRunnerWrapper = isLinux && ['cpp', 'c', 'python'].includes(language)
       if (useRunnerWrapper) {
         // ESM 环境下 __dirname 不可靠，使用 process.cwd() 构建路径
@@ -287,14 +294,77 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         }
         command = 'bash'
         args = [runnerPath, memMb, cpuSec, stackMb, commandPath, ...runInfo.args]
+        // 供 runner.sh 内 /usr/bin/time 写出峰值 RSS（KB）与 CPU ms
+        spawnEnv.DSOJ_MEM_FILE = memFilePath
+        spawnEnv.DSOJ_TIME_FILE = timeFilePath
+      } else if (useWinRunner) {
+        let executablePath =
+          typeof runInfo.command === 'string' ? runInfo.command : ''
+        let executableArgs = [...(runInfo.args || [])]
+        if (language === 'cpp' || language === 'c') {
+          executablePath = compiledPath
+          executableArgs = []
+        } else if (language === 'python') {
+          executablePath = runInfo.command
+          executableArgs = [compiledPath]
+        }
+        if (!executablePath) {
+          throw new Error(`非法的 command 路径: ${runInfo.command}`)
+        }
+
+        const winExe = ensureWinRunnerExe()
+        if (winExe) {
+          command = winExe
+          args = [
+            '--exe', executablePath,
+            '--cwd', tempDir,
+            '--in', inputPath,
+            '--out', outputPath,
+            '--err', errorPath,
+            '--mem', memFilePath,
+            '--time', timeFilePath,
+            '--args', JSON.stringify(executableArgs),
+            '--memory-limit-mb', String(Math.max(1, Number(memoryLimit) || 256)),
+          ]
+        } else {
+          // 回退 PowerShell（仍写出 mem/time，但启动更慢）
+          const runnerPath = join(process.cwd(), 'lib', 'judge', 'win-runner.ps1')
+          command = 'powershell.exe'
+          args = [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            runnerPath,
+            '-Executable',
+            executablePath,
+            '-ArgumentList',
+            JSON.stringify(executableArgs),
+            '-WorkingDirectory',
+            tempDir,
+            '-InputFile',
+            inputPath,
+            '-OutputFile',
+            outputPath,
+            '-ErrorFile',
+            errorPath,
+            '-MemFile',
+            memFilePath,
+            '-TimeFile',
+            timeFilePath,
+          ]
+        }
       }
 
-      logger.debug(`执行命令`, { command, args, extraTime, hardTimeoutMs })
+      logger.debug(`执行命令`, { command, args, extraTime, hardTimeoutMs, useWinRunner })
 
       const childProcess = spawn(command, args, {
         cwd: tempDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        detached: false
+        stdio: useWinRunner ? 'ignore' : ['pipe', 'pipe', 'pipe'],
+        detached: false,
+        env: spawnEnv,
+        windowsHide: true,
       })
 
       const maxMemoryBytes = memoryLimit * 1024 * 1024
@@ -304,21 +374,16 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       let processKilled = false
       let forceKilled = false
 
-      if (childProcess.pid) {
-        // Linux: /proc 文件读取廉价（50ms 间隔）
-        // Windows: tasklist 调用较重（100ms 间隔）
-        // 注：Linux /proc/[pid]/stat 的 utime/stime 为累计值，VmHWM 已是峰值，
-        // 因此仅需保留最新读数即可，无需取 max；为容错仍取 max。
-        const pollIntervalMs = isLinux ? 50 : 100
-        monitorInterval = setInterval(() => {
+      // Windows win-runner 自身负责 PeakWorkingSet；轮询其 PowerShell 进程内存无意义。
+      // Linux 仍轮询作兜底（无 GNU time 时），并用于运行中 MLE 软杀。
+      if (childProcess.pid && !useWinRunner) {
+        const sampleOnce = () => {
           if (processKilled || !childProcess.pid) return
-
           if (isLinux) {
             const cpuMs = readProcCpuTimeMs(childProcess.pid)
             if (cpuMs > cpuTimeMs) cpuTimeMs = cpuMs
             const hwm = readProcVmHwmKB(childProcess.pid)
             if (hwm > peakMemoryKB) peakMemoryKB = hwm
-            // 软检测：内存超限则杀死（硬限制由 runner.sh 的 ulimit 兜底）
             if (hwm > 0 && hwm * 1024 > maxMemoryBytes) {
               logger.debug(`内存超过限制`, {
                 current: Math.round(hwm / 1024),
@@ -327,7 +392,6 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
               memoryExceeded = true
               processKilled = true
               forceKilled = true
-              // 内存超限杀进程后清除墙超时定时器，避免后续误设 timeout 标志覆盖 MLE
               if (timeoutId) clearTimeout(timeoutId)
               childProcess.kill('SIGKILL')
               if (monitorInterval) clearInterval(monitorInterval)
@@ -335,8 +399,6 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           } else if (isWindows) {
             const memKB = readWindowsProcessMemoryKB(childProcess.pid)
             if (memKB > peakMemoryKB) peakMemoryKB = memKB
-            // Windows 无原生 Job Object 限制（不引入 ffi-napi 依赖），
-            // 依赖轮询检测超限后杀死
             if (memKB > 0 && memKB * 1024 > maxMemoryBytes) {
               logger.debug(`内存超过限制`, {
                 current: Math.round(memKB / 1024),
@@ -345,11 +407,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
               memoryExceeded = true
               processKilled = true
               forceKilled = true
-              // 内存超限杀进程后清除墙超时定时器，避免后续误设 timeout 标志覆盖 MLE
               if (timeoutId) clearTimeout(timeoutId)
               try {
                 if (childProcess.pid && childProcess.pid > 0) {
-                  // P2 安全修复：改为 spawnSync 数组形式，避免命令拼接注入风险
                   spawnSync('taskkill', ['/F', '/T', '/PID', String(childProcess.pid)], { stdio: 'ignore' })
                 }
               } catch {
@@ -358,27 +418,33 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
               if (monitorInterval) clearInterval(monitorInterval)
             }
           }
-        }, pollIntervalMs)
+        }
+        // 立即采样一次，再高频轮询，尽量覆盖短时程序
+        sampleOnce()
+        const pollIntervalMs = isLinux ? 10 : 50
+        monitorInterval = setInterval(sampleOnce, pollIntervalMs)
       }
 
-      const { createReadStream, createWriteStream } = await import('fs')
-      const inputStream = createReadStream(inputPath)
+      if (!useWinRunner) {
+        const { createReadStream, createWriteStream } = await import('fs')
+        const inputStream = createReadStream(inputPath)
 
-      // 给 stdin 与输入流附加 error 处理器，防止选手程序提前退出时 EPIPE crash Worker
-      childProcess.stdin.on('error', (err) => {
-        logger.debug('stdin 写入错误（选手程序可能已退出）', { error: err.message })
-      })
-      inputStream.on('error', (err) => {
-        logger.debug('输入流读取错误', { error: err.message })
-      })
+        // 给 stdin 与输入流附加 error 处理器，防止选手程序提前退出时 EPIPE crash Worker
+        childProcess.stdin!.on('error', (err) => {
+          logger.debug('stdin 写入错误（选手程序可能已退出）', { error: err.message })
+        })
+        inputStream.on('error', (err) => {
+          logger.debug('输入流读取错误', { error: err.message })
+        })
 
-      inputStream.pipe(childProcess.stdin)
+        inputStream.pipe(childProcess.stdin!)
 
-      const outputStream = createWriteStream(outputPath)
-      const errorStream = createWriteStream(errorPath)
+        const outputStream = createWriteStream(outputPath)
+        const errorStream = createWriteStream(errorPath)
 
-      childProcess.stdout.pipe(outputStream)
-      childProcess.stderr.pipe(errorStream)
+        childProcess.stdout!.pipe(outputStream)
+        childProcess.stderr!.pipe(errorStream)
+      }
 
       // 在流管道搭建完毕、进程即将被等待退出时开始计时
       startTime = Date.now()
@@ -412,7 +478,6 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             if (isWindows) {
               try {
                 if (childProcess.pid && childProcess.pid > 0) {
-                  // P2 安全修复：改为 spawnSync 数组形式，避免命令拼接注入风险
                   spawnSync('taskkill', ['/F', '/T', '/PID', String(childProcess.pid)], { stdio: 'ignore' })
                 }
               } catch {
@@ -447,12 +512,28 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             if (finalHwm > peakMemoryKB) peakMemoryKB = finalHwm
           }
 
-          // Windows 平台无 CPU 时间采集 API（不引入原生依赖），回退为墙钟时间
-          if (!isLinux || cpuTimeMs <= 0) {
+          // wrapper 写出的峰值内存 / CPU 时间（Linux GNU time / Windows GetProcess*）优先合并
+          const fileMem = readMemFileKB(memFilePath)
+          if (fileMem > 0 && fileMem > peakMemoryKB) peakMemoryKB = fileMem
+          // time 文件存在且可读时采用（含 0），避免再被 wrapper 墙钟污染
+          const fileCpu = readTimeFileMs(timeFilePath)
+          if (fileCpu >= 0) {
+            if (fileCpu > cpuTimeMs) cpuTimeMs = fileCpu
+          }
+
+          // 退出后若峰值已超限，补判 MLE（Windows win-runner 无运行中软杀）
+          if (!memoryExceeded && peakMemoryKB > 0 && peakMemoryKB * 1024 > maxMemoryBytes) {
+            memoryExceeded = true
+            logger.debug(`退出后检测内存超限`, {
+              current: Math.round(peakMemoryKB / 1024),
+              limit: memoryLimit,
+            })
+          }
+
+          // 仅在完全采不到选手时间时，才回退墙钟（wrapper 自身开销会被算进去）
+          if (cpuTimeMs <= 0 && readTimeFileMs(timeFilePath) < 0) {
             cpuTimeMs = Math.max(0, endTime - startTime)
-            if (isWindows) {
-              logger.debug(`Windows平台: 使用墙钟时间作为 CPU 时间`)
-            }
+            logger.debug(`CPU 时间回退为墙钟`, { platform: process.platform, cpuTimeMs })
           }
 
           // P1-3: runner.sh 的 ulimit -t CPU 超限会发 SIGXCPU(退出码 152)
@@ -532,6 +613,17 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         if (existsSync(errorPath)) {
           error = await fs.readFile(errorPath, 'utf-8')
         }
+        // 再次合并 mem/time 文件（close 后文件应已刷盘）
+        const fileMem = readMemFileKB(memFilePath)
+        if (fileMem > 0 && fileMem > peakMemoryKB) peakMemoryKB = fileMem
+        const fileCpu = readTimeFileMs(timeFilePath)
+        if (fileCpu >= 0 && fileCpu > cpuTimeMs) cpuTimeMs = fileCpu
+        if (existsSync(memFilePath)) {
+          await unlink(memFilePath).catch(() => {})
+        }
+        if (existsSync(timeFilePath)) {
+          await unlink(timeFilePath).catch(() => {})
+        }
       } catch (err) {
         logger.error(`读取输出失败`, err)
       }
@@ -540,12 +632,17 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     // 兜底：极端异常时（startTime / endTime 未设置）使用当前时刻
     if (!startTime) startTime = Date.now()
     if (!endTime) endTime = Date.now()
-    const execTime = Math.max(0, endTime - startTime)
-    const preciseTime = Math.max(1, Math.round(execTime))
+    // 对外展示时间：优先选手进程 CPU 时间（与洛谷/HOJ/LemonLime 一致），墙钟仅作兜底
+    const preciseTime = Math.max(1, Math.round(cpuTimeMs > 0 ? cpuTimeMs : endTime - startTime))
+    if (cpuTimeMs <= 0) cpuTimeMs = preciseTime
 
     // 内存采集失败时返回 0（不再使用伪造回退值），并记录警告
     if (peakMemoryKB === 0 && !USE_DOCKER) {
-      logger.warn(`内存采集失败，记为 0`, { language, platform: process.platform })
+      logger.warn(`内存采集失败，记为 0`, {
+        language,
+        platform: process.platform,
+        useWinRunner: process.platform === 'win32' && ['cpp', 'c', 'python'].includes(language),
+      })
     }
 
     try {

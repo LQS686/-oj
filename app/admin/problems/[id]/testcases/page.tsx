@@ -1,39 +1,67 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
+import {
+  ArrowLeft,
+  Plus,
+  Loader2,
+  Save,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  Database,
+  Scale,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { ArrowLeft, Upload, X, Plus, Loader2, Save, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase-scoring'
-import { formatDateTime } from '@/lib/utils'
 import { AdminPageShell } from '@/components/admin'
+import { PageLoading, useDialog } from '@/components/common'
+import { ZipUploadPanel } from './_components/ZipUploadPanel'
+import { TestCaseCard, type EditableTestCase } from './_components/TestCaseCard'
+import { VerifyModal } from './_components/VerifyModal'
+import { LogsModal } from './_components/LogsModal'
 
-interface TestCase {
-  input: string
-  output: string
-  isSample: boolean
-  score: number
-  timeLimit?: number | null
-  memoryLimit?: number | null
+type TestCase = EditableTestCase
+
+function serializeCases(cases: TestCase[]): string {
+  return JSON.stringify(
+    cases.map((tc) => ({
+      input: tc.input,
+      output: tc.output,
+      isSample: tc.isSample,
+      score: tc.score,
+      timeLimit: tc.timeLimit ?? null,
+      memoryLimit: tc.memoryLimit ?? null,
+    }))
+  )
 }
 
 export default function ProblemTestCasesPage() {
+  const dialog = useDialog()
   const router = useRouter()
   const params = useParams()
   const problemId = params.id as string
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [uploadResult, setUploadResult] = useState<{ success: boolean; message: string; count?: number } | null>(null)
+  const [uploadResult, setUploadResult] = useState<{
+    success: boolean
+    message: string
+    count?: number
+  } | null>(null)
 
   const [problemTitle, setProblemTitle] = useState('')
-
   const [testCases, setTestCases] = useState<TestCase[]>([])
+  const [savedSnapshot, setSavedSnapshot] = useState('[]')
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({})
 
   const [showVerifyModal, setShowVerifyModal] = useState(false)
   const [verifying, setVerifying] = useState(false)
@@ -44,26 +72,35 @@ export default function ProblemTestCasesPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
 
-  // 成功提示 setTimeout 引用，用于卸载时清理
   const successMsgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 组件卸载时清理定时器，避免 setState 操作已卸载组件
+  const dirty = useMemo(
+    () => serializeCases(testCases) !== savedSnapshot,
+    [testCases, savedSnapshot]
+  )
+
+  const totalScore = useMemo(
+    () => testCases.reduce((sum, tc) => sum + (Number(tc.score) || 0), 0),
+    [testCases]
+  )
+
   useEffect(() => {
     return () => {
-      if (successMsgTimerRef.current) {
-        clearTimeout(successMsgTimerRef.current)
-        successMsgTimerRef.current = null
-      }
+      if (successMsgTimerRef.current) clearTimeout(successMsgTimerRef.current)
     }
   }, [])
 
   useEffect(() => {
-    if (showLogsModal) {
-      fetchLogs()
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirty) return
+      e.preventDefault()
+      e.returnValue = ''
     }
-  }, [showLogsModal])
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLogsLoading(true)
     try {
       const res = await fetchWithCookie(`/api/admin/problems/${problemId}/verification-logs`)
@@ -76,79 +113,118 @@ export default function ProblemTestCasesPage() {
     } finally {
       setLogsLoading(false)
     }
-  }
-
-  useEffect(() => {
-    fetchProblemData()
   }, [problemId])
 
-  const fetchProblemData = async () => {
+  useEffect(() => {
+    if (showLogsModal) void fetchLogs()
+  }, [showLogsModal, fetchLogs])
+
+  const applyCases = useCallback((cases: TestCase[], markSaved = false) => {
+    const normalized = cases
+    setTestCases(normalized)
+    setExpanded((prev) => {
+      const next: Record<number, boolean> = {}
+      normalized.forEach((_, i) => {
+        next[i] = prev[i] ?? normalized.length <= 4
+      })
+      return next
+    })
+    if (markSaved) setSavedSnapshot(serializeCases(normalized))
+  }, [])
+
+  const fetchProblemData = useCallback(async () => {
     try {
       setLoading(true)
+      setError('')
       const response = await fetchWithCookie(`/api/admin/problems/${problemId}`)
-
       if (!response.ok) throw new Error('Failed to fetch problem')
-
       const data = await response.json()
-      if (data.success) {
-        const problem = data.data
-        setProblemTitle(problem.title)
-
-        if (problem.stdCode) {
-          setSolutionCode(problem.stdCode)
-        }
-        if (problem.stdLang) {
-          setSolutionLanguage(problem.stdLang)
-        }
-
-        if (problem.testCases && problem.testCases.length > 0) {
-          const cases = problem.testCases.map((tc: any) => ({
-            input: tc.input,
-            output: tc.output,
-            isSample: tc.isSample,
-            score: tc.score,
-            timeLimit: tc.timeLimit ?? null,
-            memoryLimit: tc.memoryLimit ?? null
-          }))
-          setTestCases(cases)
-        }
-      } else {
+      if (!data.success) {
         setError(data.error || '获取题目数据失败')
+        return
       }
-    } catch (err) {
+      const problem = data.data
+      setProblemTitle(problem.title || '')
+      if (problem.stdCode) setSolutionCode(problem.stdCode)
+      if (problem.stdLang) setSolutionLanguage(problem.stdLang)
+
+      const cases: TestCase[] = (problem.testCases || []).map((tc: any) => ({
+        input: tc.input || '',
+        output: tc.output || '',
+        isSample: !!tc.isSample,
+        score: tc.score ?? 0,
+        timeLimit: tc.timeLimit ?? null,
+        memoryLimit: tc.memoryLimit ?? null,
+      }))
+      applyCases(cases, true)
+    } catch {
       setError('网络错误')
     } finally {
       setLoading(false)
     }
-  }
+  }, [problemId, applyCases])
+
+  useEffect(() => {
+    void fetchProblemData()
+  }, [fetchProblemData])
 
   const distributeScores = (cases: TestCase[]): TestCase[] => {
     if (cases.length === 0) return cases
-    // 使用统一的测试点分数组件，保证最终总分 = 100
     return ensureTotalScoreIs100(cases)
   }
 
+  const updateCase = (index: number, patch: Partial<TestCase>) => {
+    setTestCases((prev) => prev.map((tc, i) => (i === index ? { ...tc, ...patch } : tc)))
+  }
+
   const handleAddTestCase = () => {
-    const newCases = [...testCases, { input: '', output: '', isSample: false, score: 0, timeLimit: null, memoryLimit: null }]
-    setTestCases(distributeScores(newCases))
+    const next = distributeScores([
+      ...testCases,
+      { input: '', output: '', isSample: false, score: 0, timeLimit: null, memoryLimit: null },
+    ])
+    applyCases(next)
+    setExpanded((prev) => ({ ...prev, [next.length - 1]: true }))
   }
 
-  const handleRemoveTestCase = (index: number) => {
-    const newCases = testCases.filter((_, i) => i !== index)
-    setTestCases(distributeScores(newCases))
+  const handleRemoveTestCase = async (index: number) => {
+    const ok = await dialog.confirm({
+      message: `确定删除测试点 #${index + 1}？`,
+      tone: 'warning',
+      confirmText: '删除',
+      confirmVariant: 'destructive',
+    })
+    if (!ok) return
+    applyCases(distributeScores(testCases.filter((_, i) => i !== index)))
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleDuplicate = (index: number) => {
+    const copy = { ...testCases[index] }
+    const next = [...testCases]
+    next.splice(index + 1, 0, copy)
+    applyCases(distributeScores(next))
+    setExpanded((prev) => ({ ...prev, [index + 1]: true }))
+  }
 
-    if (!file.name.endsWith('.zip')) {
-      alert('只支持 ZIP 格式压缩包')
+  const handleMove = (index: number, dir: -1 | 1) => {
+    const target = index + dir
+    if (target < 0 || target >= testCases.length) return
+    const next = [...testCases]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setTestCases(next)
+    setExpanded((prev) => {
+      const a = prev[index] ?? false
+      const b = prev[target] ?? false
+      return { ...prev, [index]: b, [target]: a }
+    })
+  }
+
+  const handleFileUpload = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      await dialog.alert({ tone: 'warning', message: '只支持 ZIP 格式压缩包' })
       return
     }
-
     if (file.size > 50 * 1024 * 1024) {
-      alert('压缩包大小不能超过 50MB')
+      await dialog.alert({ tone: 'warning', message: '压缩包大小不能超过 50MB' })
       return
     }
 
@@ -159,63 +235,120 @@ export default function ProblemTestCasesPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-
       const response = await fetchWithCookie('/api/admin/testcases/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
       })
-
       const data = await response.json()
 
-      if (data.success) {
-        const uploaded = Array.isArray(data.data?.testCases)
-          ? data.data.testCases
-          : []
-        const newTestCases: TestCase[] = ensureTotalScoreIs100(
-          uploaded.map((tc: any) => ({
-            input: tc.inputPreview,
-            output: tc.outputPreview,
-            isSample: false,
-            score: 10
-          }))
-        )
-
-        if (testCases.length > 0 && !confirm('是否覆盖现有测试用例？点击取消将追加到现有列表。')) {
-          setTestCases(distributeScores([...testCases, ...newTestCases]))
-        } else {
-          setTestCases(distributeScores(newTestCases))
-        }
-
-        setUploadResult({
-          success: true,
-          message: data.message,
-          count: data.data.count
-        })
-      } else {
-        setUploadResult({
-          success: false,
-          message: data.error || '上传失败'
-        })
+      if (!data.success) {
+        setUploadResult({ success: false, message: data.error || '上传失败' })
         setError('测试点上传失败: ' + (data.error || '未知错误'))
+        return
       }
+
+      const uploaded = Array.isArray(data.data?.testCases) ? data.data.testCases : []
+      const newTestCases: TestCase[] = ensureTotalScoreIs100(
+        uploaded.map((tc: any) => ({
+          input: tc.input ?? tc.inputPreview ?? '',
+          output: tc.output ?? tc.outputPreview ?? '',
+          isSample: false,
+          score: 10,
+          timeLimit: null,
+          memoryLimit: null,
+        }))
+      )
+
+      if (testCases.length > 0) {
+        const replace = await dialog.confirm({
+          message: '是否覆盖现有测试用例？取消将追加到现有列表。',
+          confirmText: '覆盖',
+          cancelText: '追加',
+        })
+        applyCases(distributeScores(replace ? newTestCases : [...testCases, ...newTestCases]))
+      } else {
+        applyCases(distributeScores(newTestCases))
+      }
+
+      setUploadResult({
+        success: true,
+        message: data.data?.message || data.message || '解析成功',
+        count: data.data?.count,
+      })
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '网络错误'
-      setUploadResult({
-        success: false,
-        message: errorMessage
-      })
+      setUploadResult({ success: false, message: errorMessage })
       setError('上传请求失败: ' + errorMessage)
     } finally {
       setUploading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+    }
+  }
+
+  const handleSave = async (): Promise<boolean> => {
+    setSubmitting(true)
+    setError('')
+    setSuccessMsg('')
+
+    try {
+      if (totalScore !== 100 && testCases.length > 0) {
+        const ok = await dialog.confirm({
+          message: `当前测试点总分为 ${totalScore} 分，通常应为 100 分。是否继续保存？`,
+          tone: 'warning',
+        })
+        if (!ok) {
+          setSubmitting(false)
+          return false
+        }
       }
+
+      const response = await fetchWithCookie(`/api/admin/problems/${problemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testCases }),
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setSavedSnapshot(serializeCases(testCases))
+        setSuccessMsg('测试用例保存成功')
+        if (successMsgTimerRef.current) clearTimeout(successMsgTimerRef.current)
+        successMsgTimerRef.current = setTimeout(() => {
+          setSuccessMsg('')
+          successMsgTimerRef.current = null
+        }, 3000)
+        return true
+      }
+      setError(data.error || '保存失败')
+      return false
+    } catch {
+      setError('网络错误')
+      return false
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleVerifyWithSolution = async () => {
     if (!solutionCode.trim()) {
-      alert('请提供标程代码')
+      await dialog.alert({ tone: 'warning', message: '请提供标程代码' })
+      return
+    }
+
+    if (dirty) {
+      const saveFirst = await dialog.confirm({
+        title: '有未保存的修改',
+        message: '标程验证基于已保存的测试点输入。是否先保存再验证？',
+        tone: 'warning',
+        confirmText: '保存并验证',
+        cancelText: '取消',
+      })
+      if (!saveFirst) return
+      const saved = await handleSave()
+      if (!saved) return
+    }
+
+    if (testCases.length === 0) {
+      await dialog.alert({ tone: 'warning', message: '请先添加并保存测试点' })
       return
     }
 
@@ -229,19 +362,29 @@ export default function ProblemTestCasesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           solutionCode,
-          solutionLanguage
-        })
+          solutionLanguage,
+        }),
       })
-
       const data = await response.json()
 
-      if (data.success) {
-        setSuccessMsg(data.message)
-        setShowVerifyModal(false)
-        fetchProblemData()
-      } else {
+      if (!data.success) {
         setError(data.error || '验证失败')
+        return
       }
+
+      const result = data.data
+      if (!result?.verified) {
+        setError(
+          result?.compileError
+            ? `标程编译失败：${result.compileError}`
+            : result?.message || '验证失败'
+        )
+        return
+      }
+
+      setShowVerifyModal(false)
+      setSuccessMsg(result.message || '验证通过')
+      await fetchProblemData()
     } catch (err) {
       logger.error('Verify failed', err)
       setError('网络请求失败')
@@ -250,115 +393,108 @@ export default function ProblemTestCasesPage() {
     }
   }
 
-  const handleSave = async () => {
-    setSubmitting(true)
-    setError('')
-    setSuccessMsg('')
-
-    try {
-      const totalScore = testCases.reduce((sum, tc) => sum + (tc.score || 0), 0)
-      if (totalScore !== 100) {
-        if (!confirm(`当前测试点总分为 ${totalScore} 分，通常应为 100 分。是否继续保存？`)) {
-          setSubmitting(false)
-          return
-        }
-      }
-
-      const response = await fetchWithCookie(`/api/admin/problems/${problemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          testCases: testCases
-        })
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setSuccessMsg('测试用例保存成功！')
-        if (successMsgTimerRef.current) clearTimeout(successMsgTimerRef.current)
-        successMsgTimerRef.current = setTimeout(() => {
-          setSuccessMsg('')
-          successMsgTimerRef.current = null
-        }, 3000)
-      } else {
-        setError(data.error || '保存失败')
-      }
-    } catch (err) {
-      setError('网络错误')
-    } finally {
-      setSubmitting(false)
-    }
+  const expandAll = (value: boolean) => {
+    setExpanded(Object.fromEntries(testCases.map((_, i) => [i, value])))
   }
 
-  const autoDistributeScore = () => {
-    setTestCases(distributeScores(testCases))
+  const handleBack = async () => {
+    if (dirty) {
+      const ok = await dialog.confirm({
+        message: '有未保存的修改，确定离开？',
+        tone: 'warning',
+        confirmText: '离开',
+        confirmVariant: 'destructive',
+      })
+      if (!ok) return
+    }
+    router.push('/admin/problems')
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">加载题目数据...</p>
-        </div>
-      </div>
-    )
+    return <PageLoading label="加载测试数据…" />
   }
 
   return (
-    <AdminPageShell width="wide" className="space-y-6">
-      <div className="card p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+    <AdminPageShell width="wide" className="space-y-5">
+      {/* 顶栏 */}
+      <div className="card p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
           <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            type="button"
+            onClick={() => void handleBack()}
+            className="p-2 -ml-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            aria-label="返回"
           >
-            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}>
-              <Database className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-                测试数据管理
-                <span className="text-sm font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                  {problemTitle}
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-primary">
+            <Database className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-foreground flex flex-wrap items-center gap-2">
+              测试数据管理
+              <span className="text-sm font-normal text-muted-foreground truncate max-w-[16rem]">
+                {problemTitle}
+              </span>
+              {dirty && (
+                <span className="text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded">
+                  未保存
                 </span>
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                共 {testCases.length} 个测试点，总分 {testCases.reduce((a, b) => a + (b.score || 0), 0)} 分
-              </p>
-            </div>
+              )}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              共 {testCases.length} 个测试点 · 总分{' '}
+              <span
+                className={`font-mono tabular-nums font-semibold ${
+                  totalScore === 100 || testCases.length === 0
+                    ? 'text-secondary'
+                    : 'text-warning'
+                }`}
+              >
+                {totalScore}
+              </span>{' '}
+              分
+              <Link
+                href={`/admin/problems/${problemId}/edit`}
+                className="ml-2 text-primary-light hover:text-primary"
+              >
+                编辑题目
+              </Link>
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+
+        <div className="flex items-center gap-2 flex-wrap">
           <button
+            type="button"
             onClick={() => setShowLogsModal(true)}
-            className="btn btn-ghost text-sm flex items-center gap-2"
+            className="btn btn-ghost text-sm gap-1.5"
           >
             <Clock className="w-4 h-4" />
             日志
           </button>
           <button
+            type="button"
             onClick={() => setShowVerifyModal(true)}
-            className="btn btn-ghost text-sm flex items-center gap-2 text-indigo-400 hover:bg-indigo-500/20"
+            className="btn btn-ghost text-sm gap-1.5"
           >
             <CheckCircle className="w-4 h-4" />
             标程验证
           </button>
           <button
-            onClick={autoDistributeScore}
-            className="btn btn-ghost text-sm"
+            type="button"
+            onClick={() => setTestCases(distributeScores(testCases))}
+            className="btn btn-ghost text-sm gap-1.5"
+            disabled={testCases.length === 0}
           >
+            <Scale className="w-4 h-4" />
             自动均分
           </button>
           <button
-            onClick={handleSave}
-            disabled={submitting}
-            className="btn btn-primary flex items-center gap-2"
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={submitting || !dirty}
+            className="btn btn-primary gap-1.5 disabled:opacity-50"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             保存
@@ -367,316 +503,115 @@ export default function ProblemTestCasesPage() {
       </div>
 
       {error && (
-        <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg flex items-center gap-2">
-          <AlertCircle className="w-5 h-5" />
-          {error}
+        <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg flex items-start gap-2 text-sm">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <pre className="whitespace-pre-wrap break-words font-sans">{error}</pre>
         </div>
       )}
-
       {successMsg && (
-        <div className="bg-success/10 border border-success/30 text-success px-4 py-3 rounded-lg flex items-center gap-2">
-          <CheckCircle className="w-5 h-5" />
+        <div className="bg-success/10 border border-success/30 text-success px-4 py-3 rounded-lg flex items-center gap-2 text-sm">
+          <CheckCircle className="w-5 h-5 shrink-0" />
           {successMsg}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card p-6">
-          <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-            <Upload className="w-5 h-5 text-primary-light" />
-            批量上传
-          </h3>
-          <div
-            className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-muted transition-colors cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".zip"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <div className="flex flex-col items-center gap-2">
-              {uploading ? (
-                <Loader2 className="w-8 h-8 animate-spin text-primary-light" />
-              ) : (
-                <Upload className="w-8 h-8 text-muted-foreground" />
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <div className="xl:col-span-1 space-y-4">
+          <ZipUploadPanel
+            uploading={uploading}
+            result={uploadResult}
+            onUpload={handleFileUpload}
+          />
+          <section className="card p-4 text-sm text-muted-foreground space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">提示</h3>
+            <ul className="list-disc list-inside space-y-1 text-xs leading-relaxed">
+              <li>ZIP 内文件需成对，如 <code className="text-foreground">1.in</code> / <code className="text-foreground">1.out</code></li>
+              <li>总分建议为 100；可用「自动均分」快速分配</li>
+              <li>标程验证会覆盖输出并保存标程代码，请先保存输入</li>
+              <li>勾选「样例」的测试点会用于前台在线测试</li>
+            </ul>
+          </section>
+        </div>
+
+        <div className="xl:col-span-2 card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-foreground">测试点列表</h3>
+            <div className="flex items-center gap-1.5">
+              {testCases.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => expandAll(true)}
+                    className="btn btn-ghost text-xs py-1 px-2 gap-1"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                    全部展开
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => expandAll(false)}
+                    className="btn btn-ghost text-xs py-1 px-2 gap-1"
+                  >
+                    <ChevronUp className="w-3.5 h-3.5" />
+                    全部收起
+                  </button>
+                </>
               )}
-              <span className="text-sm font-medium text-muted-foreground">
-                {uploading ? '正在处理...' : '点击上传 ZIP 压缩包'}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                支持 .in/.out 或 .input/.output 文件配对
-              </span>
+              <button
+                type="button"
+                onClick={handleAddTestCase}
+                className="btn btn-ghost text-sm gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                添加测试点
+              </button>
             </div>
           </div>
-          {uploadResult && (
-            <div className={`mt-4 text-sm p-3 rounded-lg border ${uploadResult.success ? 'bg-success/10 border-success/30 text-success' : 'bg-error/10 border-error/30 text-error'}`}>
-              {uploadResult.message}
-              {uploadResult.count !== undefined && ` (共 ${uploadResult.count} 个)`}
-            </div>
-          )}
-        </div>
-      </div>
 
-      <div className="card overflow-hidden">
-        <div className="p-4 border-b border-border flex justify-between items-center">
-          <h3 className="font-bold text-foreground">测试点列表</h3>
-          <button
-            onClick={handleAddTestCase}
-            className="btn btn-ghost text-sm flex items-center gap-1"
-          >
-            <Plus className="w-4 h-4" />
-            添加测试点
-          </button>
-        </div>
-
-        <div className="divide-y divide-white/5">
           {testCases.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground">
-              暂无测试数据，请使用上方工具添加
+            <div className="p-12 text-center text-muted-foreground text-sm">
+              暂无测试数据，请上传 ZIP 或手动添加
             </div>
           ) : (
-            testCases.map((tc, idx) => (
-              <div key={idx} className="p-4 hover:bg-muted transition-colors group">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 pt-2 flex flex-col items-center gap-1">
-                    <span className="text-xs font-bold text-muted-foreground uppercase">Case</span>
-                    <span className="text-lg font-bold text-foreground">{idx + 1}</span>
-                  </div>
-
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <label className="text-xs font-bold text-muted-foreground uppercase">Input</label>
-                        <span className="text-xs text-muted-foreground">{tc.input.length} chars</span>
-                      </div>
-                      <textarea
-                        value={tc.input}
-                        onChange={(e) => {
-                          const newCases = [...testCases]
-                          newCases[idx].input = e.target.value
-                          setTestCases(newCases)
-                        }}
-                        rows={5}
-                        className="input font-mono text-xs resize-y"
-                        placeholder="输入数据..."
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <label className="text-xs font-bold text-muted-foreground uppercase">Output</label>
-                        <span className="text-xs text-muted-foreground">{tc.output.length} chars</span>
-                      </div>
-                      <textarea
-                        value={tc.output}
-                        onChange={(e) => {
-                          const newCases = [...testCases]
-                          newCases[idx].output = e.target.value
-                          setTestCases(newCases)
-                        }}
-                        rows={5}
-                        className="input font-mono text-xs resize-y"
-                        placeholder="预期输出..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="w-24 pt-2 flex flex-col gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-muted-foreground uppercase mb-1 text-center">Score</label>
-                      <input
-                        type="number"
-                        value={tc.score}
-                        onChange={(e) => {
-                          const newCases = [...testCases]
-                          newCases[idx].score = parseInt(e.target.value) || 0
-                          setTestCases(newCases)
-                        }}
-                        className="input text-sm text-center"
-                      />
-                    </div>
-                    <button
-                      onClick={() => handleRemoveTestCase(idx)}
-                      className="w-full py-1 text-xs text-error hover:bg-error/10 rounded-lg transition-colors"
-                    >
-                      删除
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-3 pl-0 sm:pl-16 flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">时间限制(ms)</label>
-                    <input
-                      type="number"
-                      value={tc.timeLimit ?? ''}
-                      onChange={(e) => {
-                        const newCases = [...testCases]
-                        const v = e.target.value
-                        const n = parseInt(v, 10)
-                        newCases[idx].timeLimit = v === '' || Number.isNaN(n) ? null : n
-                        setTestCases(newCases)
-                      }}
-                      placeholder="默认"
-                      min="100"
-                      max="30000"
-                      className="input w-24 text-sm"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">内存限制(MB)</label>
-                    <input
-                      type="number"
-                      value={tc.memoryLimit ?? ''}
-                      onChange={(e) => {
-                        const newCases = [...testCases]
-                        const v = e.target.value
-                        const n = parseInt(v, 10)
-                        newCases[idx].memoryLimit = v === '' || Number.isNaN(n) ? null : n
-                        setTestCases(newCases)
-                      }}
-                      placeholder="默认"
-                      min="32"
-                      max="1024"
-                      className="input w-24 text-sm"
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground">留空使用题目默认限制</span>
-                </div>
-              </div>
-            ))
+            <div>
+              {testCases.map((tc, idx) => (
+                <TestCaseCard
+                  key={idx}
+                  index={idx}
+                  total={testCases.length}
+                  tc={tc}
+                  expanded={!!expanded[idx]}
+                  onToggle={() =>
+                    setExpanded((prev) => ({ ...prev, [idx]: !prev[idx] }))
+                  }
+                  onChange={(patch) => updateCase(idx, patch)}
+                  onRemove={() => void handleRemoveTestCase(idx)}
+                  onDuplicate={() => handleDuplicate(idx)}
+                  onMove={(dir) => handleMove(idx, dir)}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      {showVerifyModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-          <div className="card p-6 max-w-2xl w-full mx-4">
-            <div className="flex justify-between items-center mb-6 border-b border-border pb-4">
-              <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-indigo-400" />
-                标程验证与输出纠正
-              </h3>
-              <button onClick={() => setShowVerifyModal(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <VerifyModal
+        open={showVerifyModal}
+        onClose={() => !verifying && setShowVerifyModal(false)}
+        verifying={verifying}
+        solutionCode={solutionCode}
+        solutionLanguage={solutionLanguage}
+        onCodeChange={setSolutionCode}
+        onLanguageChange={setSolutionLanguage}
+        onVerify={() => void handleVerifyWithSolution()}
+      />
 
-            <div className="space-y-5">
-              <div className="bg-indigo-500/10 p-4 rounded-lg text-sm text-indigo-300 border border-indigo-500/20">
-                <p className="font-medium mb-1">功能说明：</p>
-                <ul className="list-disc list-inside space-y-1 opacity-80">
-                  <li>系统将运行您提供的标程代码，对当前所有测试点的输入进行计算。</li>
-                  <li>所有测试点的<span className="font-bold">输出数据将被标程的运行结果覆盖</span>。</li>
-                </ul>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">标程语言</label>
-                <select
-                  value={solutionLanguage}
-                  onChange={(e) => setSolutionLanguage(e.target.value)}
-                  className="input"
-                >
-                  <option value="cpp">C++ (G++ 12)</option>
-                  <option value="python">Python 3.11</option>
-                  <option value="java">Java 17</option>
-                  <option value="c">C (GCC 12)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  标程代码 <span className="text-error">*</span>
-                </label>
-                <textarea
-                  value={solutionCode}
-                  onChange={(e) => setSolutionCode(e.target.value)}
-                  placeholder="// 粘贴正确的解题代码..."
-                  className="input min-h-[256px] font-mono text-sm resize-y"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="mt-8 flex justify-end gap-3">
-              <button
-                onClick={() => setShowVerifyModal(false)}
-                className="btn btn-ghost"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleVerifyWithSolution}
-                disabled={verifying}
-                className="btn btn-primary flex items-center gap-2"
-              >
-                {verifying ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    验证中...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    开始验证
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showLogsModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-          <div className="card p-6 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
-            <div className="flex justify-between items-center mb-4 border-b border-border pb-4">
-              <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
-                <Clock className="w-5 h-5 text-muted-foreground" />
-                验证日志
-              </h3>
-              <button onClick={() => setShowLogsModal(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto pr-2">
-              {logsLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : logs.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">暂无验证记录</div>
-              ) : (
-                <div className="space-y-4">
-                  {logs.map(log => (
-                    <div key={log.id} className={`p-4 rounded-lg border ${log.status === 'SUCCESS' ? 'bg-success/10 border-success/30' : 'bg-error/10 border-error/30'}`}>
-                      <div className="flex justify-between items-start mb-2">
-                        <span className={`text-sm font-bold ${log.status === 'SUCCESS' ? 'text-success' : 'text-error'}`}>
-                          {log.status === 'SUCCESS' ? '验证通过' : '验证失败'}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDateTime(log.createdAt)}
-                        </span>
-                      </div>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        <div>通过测试点: {log.details?.passed}</div>
-                        <div>失败测试点: {log.details?.failed}</div>
-                        {log.details?.fixedCount !== undefined && (
-                          <div>自动纠正: {log.details.fixedCount}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <LogsModal
+        open={showLogsModal}
+        onClose={() => setShowLogsModal(false)}
+        loading={logsLoading}
+        logs={logs}
+      />
     </AdminPageShell>
   )
 }

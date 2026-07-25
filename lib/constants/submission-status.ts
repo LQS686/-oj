@@ -225,3 +225,21 @@ export function canTransition(from: string, to: string): boolean {
   }
   return allowed.has(t)
 }
+
+const NON_FINAL_STATUSES = new Set<string>([
+  SubmissionStatus.PENDING,
+  SubmissionStatus.JUDGING,
+  SubmissionStatus.RUNNING,
+])
+
+/** 是否仍在评测流程中（兼容 PENDING / Pending 等历史写法） */
+export function isNonFinalSubmissionStatus(status: unknown): boolean {
+  if (typeof status !== 'string' || !status.trim()) return false
+  return NON_FINAL_STATUSES.has(normalizeStatus(status))
+}
+
+/** 是否已出终态结果 */
+export function isFinalSubmissionStatus(status: unknown): boolean {
+  if (typeof status !== 'string' || !status.trim()) return false
+  return !isNonFinalSubmissionStatus(status)
+}

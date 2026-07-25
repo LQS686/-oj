@@ -7,7 +7,7 @@
 import { withApi, ok, throw400, throw404 } from '@/lib/api/withApi'
 import { getSubmissionDetailOrClassAssignment } from '@/lib/submission/service'
 import { isObjectId } from '@/lib/api/validation'
-import { isSystemAdmin } from '@/lib/permissions'
+import { canAccessAdmin } from '@/lib/permissions'
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const { id } = ctx.params
@@ -15,7 +15,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const data = await getSubmissionDetailOrClassAssignment(id)
   if (!data) throw404('提交记录不存在')
   // 非提交者本人且非管理员：脱敏 code 字段
-  if (data.userId !== user.id && !isSystemAdmin(user)) {
+  if (data.userId !== user.id && !canAccessAdmin(user)) {
     const { code, ...rest } = data
     return ok(rest)
   }

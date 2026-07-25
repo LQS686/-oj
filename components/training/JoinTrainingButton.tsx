@@ -10,18 +10,21 @@
  * 3. catch + finally 中重置 isJoining
  * 4. disabled={isJoining} 防双击
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2, LogIn, Play, UserPlus, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
 import { loginPath } from '@/lib/navigation'
+import { useDialog } from '@/components/common'
 
 interface JoinTrainingButtonProps {
  trainingId: string
  initialJoined: boolean
  isLoggedIn: boolean
  solvedCount?: number
+ /** 已加入时「开始/继续学习」跳转目标（通常为下一道未完成题） */
+ startHref?: string
  onJoinedChange?: (joined: boolean) => void
  className?: string
 }
@@ -31,14 +34,20 @@ export function JoinTrainingButton({
  initialJoined,
  isLoggedIn,
  solvedCount = 0,
+ startHref,
  onJoinedChange,
  className = '',
 }: JoinTrainingButtonProps) {
+ const dialog = useDialog()
  const router = useRouter()
  const [joined, setJoined] = useState(initialJoined)
  const [isJoining, setIsJoining] = useState(false)
  // ref 用于 in-flight 检测，防止双击
  const joiningRef = useRef(false)
+
+ useEffect(() => {
+   setJoined(initialJoined)
+ }, [initialJoined])
 
  const handleJoin = async () => {
  if (!isLoggedIn) {
@@ -72,7 +81,8 @@ export function JoinTrainingButton({
 
  const handleLeave = async () => {
  if (joiningRef.current) return
- if (!confirm('确定要退出该题单吗？')) return
+ const ok = await dialog.confirm({ message: '确定要退出该题单吗？', tone: 'warning' })
+ if (!ok) return
  joiningRef.current = true
  setIsJoining(true)
  try {
@@ -115,8 +125,10 @@ export function JoinTrainingButton({
  return (
  <div className={`flex items-center gap-2 ${className}`}>
  <button
- onClick={() => router.push(`/training/${trainingId}#problems`)}
- className="btn-primary btn"
+ onClick={() =>
+ router.push(startHref || `/training/${trainingId}?tab=problems`)
+ }
+ className="btn-primary btn flex-1"
  >
  {solvedCount > 0 ? (
  <>

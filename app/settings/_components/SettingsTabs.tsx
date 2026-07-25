@@ -1,7 +1,6 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { ChevronRight } from 'lucide-react'
 import { SETTINGS_TABS, type SettingsTabId } from '../_utils'
 
 interface SettingsTabsProps {
@@ -9,50 +8,63 @@ interface SettingsTabsProps {
   onTabChange: (tab: SettingsTabId) => void
 }
 
-/** 设置页左侧 Tab 导航 */
+/** 设置页导航：桌面侧栏（无独立卡片）/ 移动端横向 Tab */
 export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
   return (
-    <div className="lg:col-span-1">
-      <div className="card-static p-3">
-        <nav className="space-y-1">
-          {SETTINGS_TABS.map(tab => {
+    <>
+      <div className="lg:hidden flex gap-1 overflow-x-auto pb-1 -mx-1 px-1 mb-1">
+        {SETTINGS_TABS.map((tab) => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onTabChange(tab.id)}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-primary/15 text-primary-light'
+                  : 'text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <nav className="hidden lg:block pr-1">
+        <ul className="space-y-0.5">
+          {SETTINGS_TABS.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
             return (
-              <button
-                key={tab.id}
-                onClick={() => onTabChange(tab.id)}
-                className={`relative w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${
-                  isActive
-                    ? 'text-primary-light'
-                    : 'text-muted-foreground hover:bg-primary/8 hover:text-foreground'
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="settings-tab-indicator"
-                    className="absolute inset-0 bg-primary/15 border border-primary/25 rounded-lg"
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center gap-3">
-                  <Icon
-                    className={`w-5 h-5 ${isActive ? 'text-primary-light' : 'group-hover:text-primary-light'}`}
-                  />
-                  <div className="text-left flex-1">
-                    <div className="font-medium text-sm">{tab.label}</div>
-                  </div>
-                  <ChevronRight
-                    className={`w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity ${
-                      isActive ? 'opacity-100' : ''
-                    }`}
-                  />
-                </span>
-              </button>
+              <li key={tab.id}>
+                <button
+                  type="button"
+                  onClick={() => onTabChange(tab.id)}
+                  className={`relative w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                    isActive
+                      ? 'text-primary-light'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                  }`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="settings-tab-indicator"
+                      className="absolute inset-0 bg-primary/10 rounded-lg"
+                      transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+                    />
+                  )}
+                  <Icon className="relative z-10 w-4 h-4 shrink-0" />
+                  <span className="relative z-10 text-sm font-medium">{tab.label}</span>
+                </button>
+              </li>
             )
           })}
-        </nav>
-      </div>
-    </div>
+        </ul>
+      </nav>
+    </>
   )
 }

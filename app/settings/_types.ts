@@ -7,16 +7,11 @@ export interface NotificationPreferences {
   systemAnnouncement: boolean
 }
 
-/** 编辑器偏好 */
-export interface EditorPreferences {
-  defaultLanguage: string
-  theme: string
-}
-
-/** 用户偏好设置（通知 + 编辑器） */
+/** 用户偏好（与 /api/users/preferences 白名单对齐） */
 export interface Preferences {
   notifications: NotificationPreferences
-  editor: EditorPreferences
+  /** 做题页默认语言：cpp / c / python */
+  defaultCodeLanguage: string
 }
 
 /** 表单数据：资料 + 密码修改 */

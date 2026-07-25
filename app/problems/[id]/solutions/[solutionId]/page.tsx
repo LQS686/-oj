@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
  ArrowLeft,
@@ -21,6 +21,8 @@ import { formatRelativeTime } from '@/lib/utils'
 import { canManageContent } from '@/lib/permissions'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { PageContainer } from '@/components/layout'
+import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
+import { PageLoading } from '@/components/common'
 
 interface SolutionDetail {
  id: string
@@ -70,9 +72,10 @@ function getAuthorInitial(name?: string): string {
  return name.charAt(0).toUpperCase()
 }
 
-export default function SolutionDetailPage() {
+function SolutionDetailPageContent() {
  const params = useParams()
  const router = useRouter()
+ const searchParams = useSearchParams()
  const { user } = useUser()
 
  const pid = (params?.id as string) || ''
@@ -86,6 +89,7 @@ export default function SolutionDetailPage() {
  const [deleting, setDeleting] = useState(false)
  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
  const [canEditPerm, setCanEditPerm] = useState(false)
+ const [editOpen, setEditOpen] = useState(false)
 
  useEffect(() => {
  if (!pid || !sid) return
@@ -93,6 +97,13 @@ export default function SolutionDetailPage() {
  fetchProblem()
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [pid, sid])
+
+ useEffect(() => {
+ if (searchParams.get('edit') === '1') {
+ setEditOpen(true)
+ router.replace(`/problems/${pid}/solutions/${sid}`, { scroll: false })
+ }
+ }, [searchParams, router, pid, sid])
 
  useEffect(() => {
  if (!user) {
@@ -324,7 +335,7 @@ export default function SolutionDetailPage() {
  {canEditOrDelete && (
  <>
  <button
- onClick={() => router.push(`/problems/${pid}/solutions/${solution.id}/edit`)}
+ onClick={() => setEditOpen(true)}
  className="btn-ghost btn flex items-center gap-2 group"
  aria-label="编辑"
  >
@@ -451,6 +462,24 @@ export default function SolutionDetailPage() {
  </div>
  </div>
  )}
+
+ <CreateSolutionModal
+ open={editOpen}
+ onClose={() => setEditOpen(false)}
+ problemId={pid}
+ solutionId={sid}
+ onSaved={() => {
+ void fetchSolution()
+ }}
+ />
  </div>
+ )
+}
+
+export default function SolutionDetailPage() {
+ return (
+ <Suspense fallback={<PageLoading label="加载中..." />}>
+ <SolutionDetailPageContent />
+ </Suspense>
  )
 }

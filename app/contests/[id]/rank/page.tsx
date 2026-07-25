@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { AlertCircle, Medal, RefreshCw, Download, Lock, Unlock } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface RankItem {
   rank: number
@@ -72,6 +73,7 @@ const REFRESH_INTERVALS = [
 ]
 
 export default function ContestRankPage() {
+  const dialog = useDialog()
   const params = useParams()
   const { user } = useUser()
   const [rankings, setRankings] = useState<RankItem[]>([])
@@ -120,7 +122,11 @@ export default function ContestRankPage() {
 
   // 管理员手动解冻封榜
   const handleUnseal = async () => {
-    if (!confirm('确认解冻封榜？解冻后所有用户将看到完整实时排名。')) return
+    const ok = await dialog.confirm({
+      message: '确认解冻封榜？解冻后所有用户将看到完整实时排名。',
+      tone: 'warning',
+    })
+    if (!ok) return
     setUnsealing(true)
     try {
       const res = await fetchWithCookie(`/api/admin/contests/${params.id}/unseal`, {
@@ -130,10 +136,10 @@ export default function ContestRankPage() {
       if (data.success) {
         await fetchRank(true)
       } else {
-        alert(data.error || '解冻失败')
+        await dialog.alert({ tone: 'error', message: data.error || '解冻失败' })
       }
     } catch (err) {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setUnsealing(false)
     }

@@ -14,7 +14,7 @@ import {
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
-import { PageLoading } from '@/components/common'
+import { PageLoading, useDialog } from '@/components/common'
 import AdminCreateTrainingModal from '@/components/admin/AdminCreateTrainingModal'
 
 interface AdminTraining {
@@ -35,6 +35,7 @@ interface AdminTraining {
 }
 
 function AdminTrainingsPageContent() {
+ const dialog = useDialog()
  const router = useRouter()
  const searchParams = useSearchParams()
  const [items, setItems] = useState<AdminTraining[]>([])
@@ -83,7 +84,12 @@ function AdminTrainingsPageContent() {
  useEffect(() => { fetchItems() }, [fetchItems])
 
  const handleDelete = async (id: string, title: string) => {
- if (!confirm(`确定删除题单「${title}」？此操作不可恢复。`)) return
+ if (!await dialog.confirm({
+  message: `确定删除题单「${title}」？此操作不可恢复。`,
+  tone: 'warning',
+  confirmText: '删除',
+  confirmVariant: 'destructive',
+ })) return
  try {
  const res = await fetchWithCookie(`/api/trainings/${id}`, {
  method: 'DELETE',

@@ -21,6 +21,7 @@ import {
   LIST_GRID_CARD_MIDDLE,
   LIST_GRID_CARD_FOOTER,
   listGridCardLinkClass,
+  useDialog,
 } from '@/components/common'
 import { loginPath } from '@/lib/navigation'
 
@@ -378,6 +379,7 @@ export default function ClassesPage() {
 }
 
 function ClassDetailModal({ classData, onClose, user, router }: { classData: Class, onClose: () => void, user: any, router: any }) {
+  const dialog = useDialog()
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -389,7 +391,7 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
     }
 
     if (!message.trim()) {
-      alert('请填写申请理由')
+      await dialog.alert({ tone: 'warning', message: '请填写申请理由' })
       return
     }
 
@@ -412,11 +414,11 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
           onClose()
         }, 2000)
       } else {
-        alert(data.error || '提交申请失败')
+        await dialog.alert({ tone: 'error', message: data.error || '提交申请失败' })
       }
     } catch (error) {
       logger.error('提交申请失败', error)
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setLoading(false)
     }

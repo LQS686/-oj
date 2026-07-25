@@ -6,6 +6,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
 import { Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { useDialog } from '@/components/common/DialogProvider'
 
 interface AnnouncementRow {
   id: string
@@ -28,6 +29,7 @@ const emptyForm = {
 }
 
 export default function AdminAnnouncementsPage() {
+  const dialog = useDialog()
   const router = useRouter()
   const [items, setItems] = useState<AnnouncementRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,7 +86,7 @@ export default function AdminAnnouncementsPage() {
 
   const handleSave = async () => {
     if (!form.title.trim() || !form.content.trim()) {
-      alert('请填写标题和内容')
+      await dialog.alert({ tone: 'warning', message: '请填写标题和内容' })
       return
     }
     setSaving(true)
@@ -107,10 +109,10 @@ export default function AdminAnnouncementsPage() {
         setModalOpen(false)
         load()
       } else {
-        alert(data.error || '保存失败')
+        await dialog.alert({ tone: 'error', message: data.error || '保存失败' })
       }
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setSaving(false)
     }
@@ -127,10 +129,10 @@ export default function AdminAnnouncementsPage() {
         setDeleteTarget(null)
         load()
       } else {
-        alert(data.error || '删除失败')
+        await dialog.alert({ tone: 'error', message: data.error || '删除失败' })
       }
     } catch {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     }
   }
 
@@ -142,7 +144,7 @@ export default function AdminAnnouncementsPage() {
     })
     const data = await res.json()
     if (data.success || data.ok) load()
-    else alert(data.error || '操作失败')
+    else await dialog.alert({ tone: 'error', message: data.error || '操作失败' })
   }
 
   return (

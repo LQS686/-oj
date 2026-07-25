@@ -7,7 +7,7 @@ import { Shield, AlertCircle, Info } from 'lucide-react'
 import type { ClassMember, ClassPermissions } from '@/types/models'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { ClassWorkspaceShell, PageLoading } from '@/components/common'
+import { ClassWorkspaceShell, PageLoading, useDialog } from '@/components/common'
 import { useClass } from '@/hooks/useClass'
 import { useUser } from '@/contexts/UserContext'
 import { classRoleDisplayLabel, isClassAdminRole } from '@/lib/class/roles'
@@ -55,6 +55,7 @@ function roleLabel(role?: string) {
 }
 
 export default function MemberPermissionsPage() {
+  const dialog = useDialog()
   const params = useParams()
   const router = useRouter()
   const classId = params.id as string
@@ -110,12 +111,12 @@ export default function MemberPermissionsPage() {
           setCurrentUserRole(currentMember.role)
         }
       } else {
-        alert('获取成员信息失败')
+        await dialog.alert({ tone: 'error', message: '获取成员信息失败' })
       }
       setLoading(false)
     } catch (error) {
       console.error('获取成员信息失败:', error)
-      alert('获取成员信息失败')
+      await dialog.alert({ tone: 'error', message: '获取成员信息失败' })
       setLoading(false)
     }
   }
@@ -128,7 +129,11 @@ export default function MemberPermissionsPage() {
   }
 
   const handleSavePermissions = async () => {
-    if (!confirm('确定要修改该成员的权限吗？')) {
+    const ok = await dialog.confirm({
+      message: '确定要修改该成员的权限吗？',
+      tone: 'warning',
+    })
+    if (!ok) {
       return
     }
 
@@ -150,15 +155,15 @@ export default function MemberPermissionsPage() {
       }
 
       if (response.ok) {
-        alert('权限更新成功！')
+        await dialog.alert({ tone: 'success', message: '权限更新成功！' })
         router.push(`/classes/${classId}/members`)
       } else {
         const data = await response.json()
-        alert(data.error || '权限更新失败')
+        await dialog.alert({ tone: 'error', message: data.error || '权限更新失败' })
       }
     } catch (error) {
       logger.error('权限更新失败', error)
-      alert('权限更新失败')
+      await dialog.alert({ tone: 'error', message: '权限更新失败' })
     } finally {
       setSaving(false)
     }

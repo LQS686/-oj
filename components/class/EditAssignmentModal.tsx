@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Pencil, AlertCircle, X, Trash2 } from 'lucide-react'
+import { Pencil, AlertCircle, Trash2 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { CreateModalShell, useDialog } from '@/components/common'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
 
@@ -56,6 +57,7 @@ export default function EditAssignmentModal({
   onSaved: () => void
   onDeleted?: () => void
 }) {
+  const dialog = useDialog()
   const [loading, setLoading] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
   const [error, setError] = useState('')
@@ -103,19 +105,6 @@ export default function EditAssignmentModal({
     if (!open || !assignmentId) return
     void loadAssignment()
   }, [open, assignmentId, loadAssignment])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
-    }
-  }, [open, onClose])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -173,7 +162,14 @@ export default function EditAssignmentModal({
 
   const handleDelete = async () => {
     if (!assignmentId) return
-    if (!confirm('确定要删除这个作业吗？此操作不可恢复。')) return
+    const ok = await dialog.confirm({
+      message: '确定要删除这个作业吗？此操作不可恢复。',
+      tone: 'warning',
+      confirmText: '删除',
+      confirmVariant: 'destructive',
+      cancelText: '取消',
+    })
+    if (!ok) return
     try {
       setLoading(true)
       const response = await fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`, {
@@ -193,38 +189,20 @@ export default function EditAssignmentModal({
     }
   }
 
-  if (!open || !assignmentId) return null
-
   return (
-    <div
-      className="fixed inset-0 z-[110] flex items-center justify-center overflow-hidden bg-black/60 p-4 sm:p-6"
-      onClick={onClose}
-      role="presentation"
+    <CreateModalShell
+      open={open && !!assignmentId}
+      onClose={onClose}
+      title="编辑作业"
+      icon={Pencil}
+      labelledById="edit-assignment-title"
     >
-      <div
-        className="card-static rounded-xl w-full max-w-2xl h-[80vh] flex flex-col shadow-xl border border-border overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="edit-assignment-title"
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <h2 id="edit-assignment-title" className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Pencil className="w-5 h-5 text-primary-light" />
-            编辑作业
-          </h2>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:bg-muted" aria-label="关闭">
-            <X className="w-5 h-5" />
-          </button>
+      {dataLoading ? (
+        <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm py-16">
+          加载中…
         </div>
-
-        {dataLoading ? (
-          <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">加载中…</div>
-        ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="flex-1 min-h-0 overflow-y-auto flex flex-col"
-          >
+      ) : (
+        <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto flex flex-col">
             <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60">
               {assignmentStatus && (
                 <div className={`rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${
@@ -325,21 +303,25 @@ export default function EditAssignmentModal({
               )}
             </div>
 
-            <div className="flex gap-3 px-5 py-4 border-t border-border">
-              <button type="submit" disabled={loading} className="btn btn-primary flex-1">
-                {loading ? '保存中...' : '保存修改'}
-              </button>
-              <button type="button" onClick={handleDelete} disabled={loading} className="btn btn-ghost text-error border border-error/20">
-                <Trash2 className="w-4 h-4 inline mr-1" />
-                删除
-              </button>
-              <button type="button" onClick={onClose} className="btn btn-ghost">
-                取消
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+          <div className="flex gap-3 px-5 py-4 border-t border-border">
+            <button type="submit" disabled={loading} className="btn btn-primary flex-1">
+              {loading ? '保存中...' : '保存修改'}
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={loading}
+              className="btn btn-ghost text-error border border-error/20"
+            >
+              <Trash2 className="w-4 h-4 inline mr-1" />
+              删除
+            </button>
+            <button type="button" onClick={onClose} className="btn btn-ghost">
+              取消
+            </button>
+          </div>
+        </form>
+      )}
+    </CreateModalShell>
   )
 }

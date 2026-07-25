@@ -6,9 +6,7 @@ import {
   BookOpen,
   Send,
   AlertCircle,
-  AlertTriangle,
   Wifi,
-  XCircle,
   Code as CodeIcon,
   CheckCircle2,
   FileCode,
@@ -19,7 +17,6 @@ import {
   Edit3,
   BarChart3
 } from 'lucide-react'
-import { getStatusColor } from '@/lib/status'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
@@ -34,13 +31,16 @@ import SubmissionResultModal, { SubmissionResultData } from '@/components/submis
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canManageContent } from '@/lib/permissions'
-import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import toast from 'react-hot-toast'
 import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { PageContainer } from '@/components/layout'
 import { loginPath } from '@/lib/navigation'
+import {
+  isFinalSubmissionStatus,
+  isNonFinalSubmissionStatus,
+} from '@/lib/constants/submission-status'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -96,7 +96,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   
   const [submissions, setSubmissions] = useState<any[]>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
-  const [selectedSubmission, setSelectedSubmission] = useState<any>(null)
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
 
   // 是否可编辑题目（SYSTEM_ADMIN / ADMIN / TEACHER）
   const canEditProblem = canManageContent(user)
@@ -179,9 +179,19 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     const savedLang = localStorage.getItem(langKey)
     if (savedLang && languageOptions.some(l => l.value === savedLang)) {
       setLanguage(savedLang)
-    } else {
-      setLanguage('cpp')
+      return
     }
+    // 无本题语言草稿时，回退到用户偏好中的默认语言
+    let fallback = 'cpp'
+    try {
+      const prefsRaw = localStorage.getItem('dsoj_default_code_language')
+      if (prefsRaw && languageOptions.some((l) => l.value === prefsRaw)) {
+        fallback = prefsRaw
+      }
+    } catch {
+      // ignore
+    }
+    setLanguage(fallback)
   }, [problem?.id, classId, fromAssignment])
 
   useEffect(() => {
@@ -227,6 +237,17 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     submittingRef.current = submitting
   }, [submitting])
+
+  // 每次点击提交递增；用于丢弃上一轮未完成请求/WS/轮询带回的过期结果
+  const submitEpochRef = useRef(0)
+  const showResultModalRef = useRef(false)
+  useEffect(() => {
+    showResultModalRef.current = showResultModal
+  }, [showResultModal])
+  const lastResultRef = useRef<SubmissionResultData | null>(null)
+  useEffect(() => {
+    lastResultRef.current = lastResult
+  }, [lastResult])
 
   const fetchSubmissions = async () => {
     try {
@@ -283,7 +304,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const hasNonFinalRef = useRef(false)
   useEffect(() => {
     hasNonFinalRef.current = submissions.some(
-      (s) => s?.status === 'Pending' || s?.status === 'Judging' || s?.status === 'Running'
+      (s) => isNonFinalSubmissionStatus(s?.status)
     )
   }, [submissions])
 
@@ -335,6 +356,19 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
+  const applyModalFinalResult = (result: SubmissionResultData) => {
+    // 必须严格匹配当前提交；提交请求飞行中 id 被清空，可避免沿用上一份 AC
+    if (!result.submissionId || result.submissionId !== currentSubmissionIdRef.current) return
+    if (!showResultModalRef.current && !submittingRef.current) return
+    const prev = lastResultRef.current
+    if (prev?.submissionId === result.submissionId && prev.status === result.status) return
+    submittingRef.current = false
+    setSubmitting(false)
+    setJudgeProgress(null)
+    lastResultRef.current = result
+    setLastResult(result)
+  }
+
   // 兜底：只要当前提交已经是终态，就把"评测中..."按钮重置回"提交"。
   // 解决 ref 跟 data.id 没对上、tab 切换、refetch 时机错位 等场景下
   // submitting 卡在 true 不下来的问题。
@@ -346,25 +380,74 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     const current = submissions.find((s) => s?.id === currentId)
     if (!current) return
     const status = current.status
-    if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
-      setSubmitting(false)
-      setJudgeProgress(null)
-      if (!lastResult || lastResult.status !== status) {
-        setLastResult({
-          submissionId: current.id,
-          status,
-          score: typeof current.score === 'number' ? current.score : 0,
-          time: typeof current.time === 'number' ? current.time : 0,
-          memory: typeof current.memory === 'number' ? current.memory : 0,
-          passedTests: typeof current.passedTests === 'number' ? current.passedTests : 0,
-          totalTests: typeof current.totalTests === 'number' ? current.totalTests : 0,
-          message: current.message ?? null,
-          testResults: Array.isArray(current.testResults) ? current.testResults : undefined,
-        })
-      }
+    if (isFinalSubmissionStatus(status)) {
+      applyModalFinalResult({
+        submissionId: current.id,
+        status,
+        score: typeof current.score === 'number' ? current.score : 0,
+        time: typeof current.time === 'number' ? current.time : 0,
+        memory: typeof current.memory === 'number' ? current.memory : 0,
+        passedTests: typeof current.passedTests === 'number' ? current.passedTests : 0,
+        totalTests: typeof current.totalTests === 'number' ? current.totalTests : 0,
+        message: current.message ?? null,
+        testResults: Array.isArray(current.testResults) ? current.testResults : undefined,
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissions, submitting])
+
+  // 评测弹窗兜底：WS 丢包时主动轮询当前提交详情，避免一直卡在「正在评测中」
+  useEffect(() => {
+    if (!submitting || !currentSubmissionId) return
+    const watchedId = currentSubmissionId
+    const epoch = submitEpochRef.current
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const res = await fetchWithCookie(`/api/submissions/${watchedId}`, {
+          cache: 'no-store',
+        })
+        const data = await res.json()
+        if (cancelled || epoch !== submitEpochRef.current) return
+        if (!data.success || !data.data) return
+        const sub = data.data
+        if (sub.id !== currentSubmissionIdRef.current) return
+        const status = sub.status as string
+        if (!status || isNonFinalSubmissionStatus(status)) {
+          if (typeof sub.passedTests === 'number' && typeof sub.totalTests === 'number') {
+            setJudgeProgress({
+              currentTest: sub.passedTests,
+              totalTests: sub.totalTests,
+            })
+          }
+          return
+        }
+        applyModalFinalResult({
+          submissionId: sub.id,
+          status,
+          score: typeof sub.score === 'number' ? sub.score : 0,
+          time: typeof sub.time === 'number' ? sub.time : 0,
+          memory: typeof sub.memory === 'number' ? sub.memory : 0,
+          passedTests: typeof sub.passedTests === 'number' ? sub.passedTests : 0,
+          totalTests: typeof sub.totalTests === 'number' ? sub.totalTests : 0,
+          message: sub.message ?? null,
+          testResults: Array.isArray(sub.testResults) ? sub.testResults : undefined,
+        })
+        void fetchSubmissions()
+      } catch {
+        // 忽略瞬时网络错误，下一轮继续
+      }
+    }
+
+    void tick()
+    const timer = setInterval(() => void tick(), 1500)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitting, currentSubmissionId])
 
   const { isConnected } = useSubmissionSocket({
     userId: user?.id || '',
@@ -381,7 +464,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           if (idx === -1) {
             // 列表里还没这条记录：可能是刚提交但还没拉过列表。
             // 若是终态事件，插入到列表头部；若是中间态，也插入以便轮询跟踪。
-            if (data.status && data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running') {
+            if (isFinalSubmissionStatus(data.status)) {
               return [
                 {
                   id: data.id,
@@ -410,39 +493,32 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             passedTests: typeof data.passedTests === 'number' ? data.passedTests : next[idx].passedTests,
             totalTests: typeof data.totalTests === 'number' ? data.totalTests : next[idx].totalTests,
             message: data.message ?? next[idx].message,
+            testResults:
+              Array.isArray(data.testResults) && data.testResults.length > 0
+                ? data.testResults
+                : next[idx].testResults,
           }
           return next
         })
       }
 
-      // 2) 判断是否是终态
-      const isFinal = data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+      // 仅接受「当前提交 id」；飞行中 id 为 null，不会误用上一份 AC
+      if (data.id !== currentSubmissionIdRef.current) return
 
-      // 3) 用 submitting 状态作为门控：提交后到收到终态之间，submitting 为 true。
-      //    不依赖 currentSubmissionIdRef（它通过 useEffect 异步同步，可能有时序问题）。
-      const isCurrentSubmission = submittingRef.current
-
-      // 4) 收到任何"终态"事件都重置"评测中..."按钮
+      const isFinal = isFinalSubmissionStatus(data.status)
       if (isFinal) {
-        setSubmitting(false)
-        setJudgeProgress(null)
-      }
-
-      // 5) 只在是当前提交时，才设置弹窗状态（避免其他提交事件触发弹窗）
-      if (isCurrentSubmission) {
-        if (isFinal) {
-          setLastResult({
-            submissionId: data.id,
-            status: data.status,
-            score: typeof data.score === 'number' ? data.score : 0,
-            time: typeof data.time === 'number' ? data.time : 0,
-            memory: typeof data.memory === 'number' ? data.memory : 0,
-            passedTests: typeof data.passedTests === 'number' ? data.passedTests : 0,
-            totalTests: typeof data.totalTests === 'number' ? data.totalTests : 0,
-            message: data.message ?? null,
-            testResults: Array.isArray(data.testResults) ? data.testResults : undefined,
-          })
-        }
+        applyModalFinalResult({
+          submissionId: data.id,
+          status: data.status,
+          score: typeof data.score === 'number' ? data.score : 0,
+          time: typeof data.time === 'number' ? data.time : 0,
+          memory: typeof data.memory === 'number' ? data.memory : 0,
+          passedTests: typeof data.passedTests === 'number' ? data.passedTests : 0,
+          totalTests: typeof data.totalTests === 'number' ? data.totalTests : 0,
+          message: data.message ?? null,
+          testResults: Array.isArray(data.testResults) ? data.testResults : undefined,
+        })
+      } else if (submittingRef.current || showResultModalRef.current) {
         setJudgeStatus({
           submissionId: data.id,
           status: data.status,
@@ -485,11 +561,17 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     // 防重复提交：用 ref 同步守卫，避免 React state 异步更新间隙双击绕过 disabled
     if (submittingRef.current) return
     submittingRef.current = true
+    const epoch = ++submitEpochRef.current
 
+    // 先清空上一轮提交 id，避免请求飞行期间 WS/列表仍按旧 id 弹出「恭喜通过」
+    currentSubmissionIdRef.current = null
+    setCurrentSubmissionId(null)
     setSubmitting(true)
     setJudgeStatus(null)
     setJudgeProgress(null)
+    lastResultRef.current = null
     setLastResult(null)
+    showResultModalRef.current = true
     setShowResultModal(true)
 
     try {
@@ -514,10 +596,37 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
       const data = await response.json()
 
+      if (epoch !== submitEpochRef.current) return
+
       if (data.success) {
-        currentSubmissionIdRef.current = data.submissionId
-        setCurrentSubmissionId(data.submissionId)
+        const payload = data.data || {}
+        const submissionId = payload.submissionId || data.submissionId
+        const listId =
+          payload.assignmentSubmissionId || submissionId
+        currentSubmissionIdRef.current = submissionId
+        setCurrentSubmissionId(submissionId)
         setActiveTab('submissions')
+        setExpandedSubmissionId(listId)
+        setSubmissions((prev) => {
+          const list = Array.isArray(prev) ? prev : []
+          if (list.some((s) => s?.id === listId)) return list
+          return [
+            {
+              id: listId,
+              status: 'Pending',
+              score: 0,
+              time: 0,
+              memory: 0,
+              passedTests: 0,
+              totalTests: 0,
+              language,
+              code,
+              submittedAt: new Date().toISOString(),
+            },
+            ...list,
+          ]
+        })
+        void fetchSubmissions()
       } else {
         submittingRef.current = false
         setSubmitting(false)
@@ -712,9 +821,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                     loading={submissionsLoading}
                     error={null}
                     user={user}
-                    fromAssignment={fromAssignment}
-                    classId={classId}
-                    onSelect={(sub) => setSelectedSubmission(sub)}
+                    expandedId={expandedSubmissionId}
+                    onExpandedChange={setExpandedSubmissionId}
                   />
                 </motion.div>
               )}
@@ -813,124 +921,36 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         />
       </PageContainer>
 
-      {selectedSubmission && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[110] animate-fadeIn"
-          onClick={() => setSelectedSubmission(null)}
-        >
-          <div
-            className="card-static rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl transition-all duration-300"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-foreground">提交详情</h3>
-              </div>
-              <button
-                onClick={() => setSelectedSubmission(null)}
-                className="p-2 rounded-lg hover:bg-muted/50 transition-colors duration-300 group"
-              >
-                <XCircle className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors duration-300" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] custom-scrollbar">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                <div className="card-static p-4">
-                  <p className="text-xs text-muted-foreground mb-1">语言</p>
-                  <p className="font-semibold text-foreground">{selectedSubmission.language}</p>
-                </div>
-                <div className="card-static p-4">
-                  <p className="text-xs text-muted-foreground mb-1">状态</p>
-                  <span className={`font-medium ${getStatusColor(selectedSubmission.status)}`}>
-                    {selectedSubmission.status}
-                  </span>
-                </div>
-                <div className="card-static p-4">
-                  <p className="text-xs text-muted-foreground mb-1">得分</p>
-                  <p className="font-semibold text-foreground">
-                    {selectedSubmission.score}
-                    {selectedSubmission.passedTests !== undefined && selectedSubmission.totalTests !== undefined && (
-                      <span className="text-sm text-muted-foreground ml-1">
-                        ({selectedSubmission.passedTests}/{selectedSubmission.totalTests})
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="card-static p-4">
-                  <p className="text-xs text-muted-foreground mb-1">耗时</p>
-                  <p className="font-semibold text-foreground">{selectedSubmission.time}ms</p>
-                </div>
-                <div className="card-static p-4">
-                  <p className="text-xs text-muted-foreground mb-1">内存</p>
-                  <p className="font-semibold text-foreground">
-                    {selectedSubmission.memory > 0
-                      ? `${(selectedSubmission.memory / 1024).toFixed(2)}MB`
-                      : '0MB'}
-                  </p>
-                </div>
-                <div className="card-static p-4">
-                  <p className="text-xs text-muted-foreground mb-1">提交时间</p>
-                  <p className="font-semibold text-foreground text-sm">
-                    {formatDateTime(selectedSubmission.submittedAt)}
-                  </p>
-                </div>
-              </div>
-
-              {selectedSubmission.code && (
-                <div className="mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <CodeIcon className="w-4 h-4 text-primary-light" />
-                    <h4 className="font-semibold text-foreground">代码</h4>
-                  </div>
-                  <div className="rounded-xl overflow-hidden border border-border">
-                    <div className="px-4 py-2 bg-muted text-muted-foreground text-sm border-b border-border">
-                      <span className="font-medium">{selectedSubmission.language}</span>
-                    </div>
-                    <pre className="bg-muted p-4 overflow-x-auto text-sm font-mono text-foreground">
-                      <code>{selectedSubmission.code}</code>
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              {selectedSubmission.message && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="w-4 h-4 text-error" />
-                    <h4 className="font-semibold text-foreground">错误信息</h4>
-                  </div>
-                  <div className="bg-error/10 border border-error/20 rounded-xl p-4">
-                    <pre className="text-sm text-error whitespace-pre-wrap">
-                      {selectedSubmission.message}
-                    </pre>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <SubmissionResultModal
         isOpen={showResultModal}
-        onClose={() => { setShowResultModal(false); setJudgeStatus(null); setLastResult(null); }}
+        onClose={() => {
+          showResultModalRef.current = false
+          setShowResultModal(false)
+          setJudgeStatus(null)
+          lastResultRef.current = null
+          setLastResult(null)
+        }}
         isJudging={submitting}
         judgeProgress={judgeProgress}
         result={lastResult as SubmissionResultData | null}
         onContinueSubmit={() => {
           // CodeMirror 的可编辑元素是 .cm-content，外层容器标记了 data-testid
-          const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null;
-          cmContent?.focus();
-          setShowResultModal(false);
-          setJudgeStatus(null);
-          setLastResult(null);
+          const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null
+          cmContent?.focus()
+          showResultModalRef.current = false
+          setShowResultModal(false)
+          setJudgeStatus(null)
+          lastResultRef.current = null
+          setLastResult(null)
         }}
         onViewDetail={(submissionId) => {
-          setShowResultModal(false);
-          setJudgeStatus(null);
-          setLastResult(null);
-          router.push(`/submission/${submissionId}`);
+          showResultModalRef.current = false
+          setShowResultModal(false)
+          setJudgeStatus(null)
+          lastResultRef.current = null
+          setLastResult(null)
+          setActiveTab('submissions')
+          setExpandedSubmissionId(submissionId)
         }}
       />
 

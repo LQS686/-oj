@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Calendar, Edit, FileText, Tag, Trash2, User, AlertCircle } from 'lucide-react'
-import { CreateModalShell } from '@/components/common'
+import { CreateModalShell, useDialog } from '@/components/common'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDateTime } from '@/lib/utils'
@@ -40,6 +40,7 @@ export default function ViewNoteModal({
   onDeleted?: () => void
   onEdit?: (note: ClassNoteDetail) => void
 }) {
+  const dialog = useDialog()
   const [note, setNote] = useState<ClassNoteDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -75,7 +76,15 @@ export default function ViewNoteModal({
   }, [open, noteId, load])
 
   const handleDelete = async () => {
-    if (!noteId || !confirm('确定要删除这篇笔记吗？此操作不可恢复！')) return
+    if (!noteId) return
+    const ok = await dialog.confirm({
+      message: '确定要删除这篇笔记吗？此操作不可恢复！',
+      tone: 'warning',
+      confirmText: '删除',
+      confirmVariant: 'destructive',
+      cancelText: '取消',
+    })
+    if (!ok) return
     try {
       setDeleting(true)
       const res = await fetchWithCookie(`/api/classes/${classId}/notes/${noteId}`, {
@@ -86,10 +95,10 @@ export default function ViewNoteModal({
         onDeleted?.()
         onClose()
       } else {
-        alert(data.error || '删除失败')
+        await dialog.alert({ tone: 'error', message: data.error || '删除失败' })
       }
     } catch {
-      alert('删除失败，请重试')
+      await dialog.alert({ tone: 'error', message: '删除失败，请重试' })
     } finally {
       setDeleting(false)
     }

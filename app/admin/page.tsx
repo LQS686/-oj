@@ -20,7 +20,6 @@ import {
   UserPlus
 } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
-import AdminCreateProblemModal from '@/components/admin/AdminCreateProblemModal'
 import AdminCreateContestModal from '@/components/admin/AdminCreateContestModal'
 import { AdminPageShell } from '@/components/admin'
 
@@ -45,7 +44,6 @@ export default function AdminDashboard() {
  const [loading, setLoading] = useState(true)
  const [stats, setStats] = useState<DashboardStats | null>(null)
  const [error, setError] = useState('')
- const [createProblemOpen, setCreateProblemOpen] = useState(false)
  const [createContestOpen, setCreateContestOpen] = useState(false)
 
  const fetchDashboardData = useCallback(async () => {
@@ -234,7 +232,7 @@ export default function AdminDashboard() {
  <h3 className="text-base font-bold text-foreground">快捷操作</h3>
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
  <button
- onClick={() => setCreateProblemOpen(true)}
+ onClick={() => router.push('/admin/problems/create')}
  className="card p-3 group hover:border-primary/40 transition-colors cursor-pointer flex items-center gap-2.5"
  >
  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
@@ -295,13 +293,6 @@ export default function AdminDashboard() {
  />
  </div>
 
- <AdminCreateProblemModal
- open={createProblemOpen}
- onClose={() => setCreateProblemOpen(false)}
- onCreated={() => {
- fetchDashboardData()
- }}
- />
  <AdminCreateContestModal
  open={createContestOpen}
  onClose={() => setCreateContestOpen(false)}

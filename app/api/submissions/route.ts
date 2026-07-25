@@ -22,6 +22,8 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
     problemId?: string
     userId?: string
     status?: string
+    language?: string
+    keyword?: string
   }>(req)
 
   let page = toInt(q.page, 'page', 1)
@@ -31,11 +33,9 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
   if (limit > 50) limit = 50
 
   // 权限校验：普通用户仅能查询自己的提交记录；
-  // 仅管理员（SYSTEM_ADMIN / ADMIN）可指定任意 userId 查询他人提交。
-  // 防止未登录用户通过 /api/submissions 直接读取全站提交列表。
+  // 仅管理员（SYSTEM_ADMIN / ADMIN）可指定任意 userId / keyword 查询全站。
   const isAdmin = canAccessAdmin(user)
   const effectiveUserId = isAdmin ? q.userId : user.id
-  // 普通用户请求他人提交时直接拒绝（防止越权）
   if (!isAdmin && q.userId && q.userId !== user.id) {
     throw403('只能查看自己的提交记录')
   }
@@ -44,8 +44,10 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
     problemId: q.problemId,
     userId: effectiveUserId,
     status: q.status,
+    language: q.language,
+    keyword: isAdmin ? q.keyword : undefined,
   })
-  return ok(data)
+  return ok({ ...data, isAdmin })
 })
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {

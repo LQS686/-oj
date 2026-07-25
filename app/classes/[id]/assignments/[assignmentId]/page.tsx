@@ -39,6 +39,11 @@ import SubmissionResultModal, { SubmissionResultData } from '@/components/submis
 import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { PageContainer } from '@/components/layout'
 import { loginPath } from '@/lib/navigation'
+import { useDialog } from '@/components/common'
+import {
+  isFinalSubmissionStatus,
+  isNonFinalSubmissionStatus,
+} from '@/lib/constants/submission-status'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -74,12 +79,14 @@ interface Submission {
  submittedAt: string
  /** 作业维度做题用时（毫秒），仅 AC 时有意义 */
  timeElapsedMs?: number
- // 提交详情字段（SubmissionList 渲染所需，后端按需返回）
  language?: string
  time?: number
  memory?: number
  passedTests?: number
  totalTests?: number
+ message?: string | null
+ code?: string
+ isLate?: boolean
 }
 
 interface ClassMember {
@@ -92,6 +99,7 @@ interface ClassMember {
 }
 
 export default function AssignmentDetailPage() {
+ const dialog = useDialog()
  const params = useParams()
  const classId = params.id as string
  const router = useRouter()
@@ -125,6 +133,7 @@ const [editOpen, setEditOpen] = useState(false)
  const [judgeProgress, setJudgeProgress] = useState<{ currentTest: number; totalTests: number } | null>(null)
  const [lastResult, setLastResult] = useState<SubmissionResultData | null>(null)
  const [showResultModal, setShowResultModal] = useState(false)
+ const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
  const [submitCooldown, setSubmitCooldown] = useState(false)
 
  // ref 跟踪 currentSubmissionId，避免回调闭包拿到陈旧值
@@ -138,6 +147,16 @@ const [editOpen, setEditOpen] = useState(false)
  useEffect(() => {
  submittingRef.current = submitting
  }, [submitting])
+
+ const submitEpochRef = useRef(0)
+ const showResultModalRef = useRef(false)
+ useEffect(() => {
+ showResultModalRef.current = showResultModal
+ }, [showResultModal])
+ const lastResultRef = useRef<SubmissionResultData | null>(null)
+ useEffect(() => {
+ lastResultRef.current = lastResult
+ }, [lastResult])
 
  useEffect(() => {
  fetchAssignment()
@@ -251,6 +270,20 @@ const [editOpen, setEditOpen] = useState(false)
  }
  }, [params.id, params.assignmentId])
 
+ const applyModalFinalResult = (result: SubmissionResultData, opts?: { clearCode?: boolean }) => {
+ if (!result.submissionId || result.submissionId !== currentSubmissionIdRef.current) return
+ if (!showResultModalRef.current && !submittingRef.current) return
+ const prev = lastResultRef.current
+ if (prev?.submissionId === result.submissionId && prev.status === result.status) return
+ submittingRef.current = false
+ setSubmitting(false)
+ setSubmitCooldown(false)
+ setJudgeProgress(null)
+ if (opts?.clearCode) setCode('')
+ lastResultRef.current = result
+ setLastResult(result)
+ }
+
  // 兜底：作业内部"我的提交状态"列表里只要当前提交是终态，就把按钮重置。
  // 解决 ref 没追上 / tab 切换 / 多提交 等场景下 submitting 卡在 true 的问题。
  useEffect(() => {
@@ -258,62 +291,91 @@ const [editOpen, setEditOpen] = useState(false)
  if (!Array.isArray(submissions) || submissions.length === 0) return
  const currentId = currentSubmissionIdRef.current
  if (!currentId) return
- const current = submissions.find((s) => s?.id === currentId)
+ const current = submissions.find((s) => s?.id === currentId || s?.id === expandedSubmissionId)
  if (!current) return
  const status = current.status
- if (status && status !== 'Pending' && status !== 'Judging' && status !== 'Running') {
- setSubmitting(false)
- setSubmitCooldown(false)
- setJudgeProgress(null)
- if (!lastResult || lastResult.status !== status) {
- setLastResult({
- submissionId: current.id,
+ if (isFinalSubmissionStatus(status)) {
+ applyModalFinalResult({
+ submissionId: currentId,
  status,
  score: typeof current.score === 'number' ? current.score : 0,
- time: 0,
- memory: 0,
- passedTests: 0,
- totalTests: 0,
+ time: typeof current.time === 'number' ? current.time : 0,
+ memory: typeof current.memory === 'number' ? current.memory : 0,
+ passedTests: typeof current.passedTests === 'number' ? current.passedTests : 0,
+ totalTests: typeof current.totalTests === 'number' ? current.totalTests : 0,
+ message: current.message ?? null,
+ testResults: Array.isArray((current as any).testResults) ? (current as any).testResults : undefined,
  })
  }
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [submissions, submitting, user?.id, expandedSubmissionId])
+
+ // 评测弹窗兜底轮询（WS 丢包 / 作业提交 ID 与列表 ID 不一致时）
+ useEffect(() => {
+ if (!submitting || !currentSubmissionId) return
+ const watchedId = currentSubmissionId
+ const epoch = submitEpochRef.current
+ let cancelled = false
+ const tick = async () => {
+ try {
+ const res = await fetchWithCookie(`/api/submissions/${watchedId}`, { cache: 'no-store' })
+ const data = await res.json()
+ if (cancelled || epoch !== submitEpochRef.current) return
+ if (!data.success || !data.data) return
+ const sub = data.data
+ if (sub.id !== currentSubmissionIdRef.current) return
+ const status = sub.status as string
+ if (!status || isNonFinalSubmissionStatus(status)) {
+ if (typeof sub.passedTests === 'number' && typeof sub.totalTests === 'number') {
+ setJudgeProgress({ currentTest: sub.passedTests, totalTests: sub.totalTests })
+ }
+ return
+ }
+ applyModalFinalResult({
+ submissionId: sub.id,
+ status,
+ score: typeof sub.score === 'number' ? sub.score : 0,
+ time: typeof sub.time === 'number' ? sub.time : 0,
+ memory: typeof sub.memory === 'number' ? sub.memory : 0,
+ passedTests: typeof sub.passedTests === 'number' ? sub.passedTests : 0,
+ totalTests: typeof sub.totalTests === 'number' ? sub.totalTests : 0,
+ message: sub.message ?? null,
+ testResults: Array.isArray(sub.testResults) ? sub.testResults : undefined,
+ })
+ void fetchAssignment()
+ } catch {
+ // ignore
+ }
+ }
+ void tick()
+ const timer = setInterval(() => void tick(), 1500)
+ return () => {
+ cancelled = true
+ clearInterval(timer)
  }
  // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [submissions, submitting, user?.id])
+ }, [submitting, currentSubmissionId])
 
  const { isConnected } = useSubmissionSocket({
  userId: user?.id || '',
  enabled: !!user,
  onSubmissionUpdate: (data) => {
- // 1) 判断是否是终态
- const isFinal = data.status !== 'Pending' && data.status !== 'Judging' && data.status !== 'Running'
+ const isFinal = isFinalSubmissionStatus(data.status)
+ const isCurrentSubmission = data.id === currentSubmissionIdRef.current
 
- // 2) 用 submitting 状态作为门控，不依赖 currentSubmissionIdRef
- const isCurrentSubmission = submittingRef.current
-
- // 3) 收到任何"终态"事件都直接重置 submitting / cooldown
- if (isFinal) {
- setSubmitting(false)
- setSubmitCooldown(false)
- setJudgeProgress(null)
- if (isCurrentSubmission) {
- setCode('')
- }
- }
-
- // 4) 只在是当前提交时，才设置弹窗状态（避免其他提交事件触发弹窗）
- if (isCurrentSubmission && isFinal) {
- setLastResult({
+ if (isFinal && isCurrentSubmission) {
+ applyModalFinalResult({
  submissionId: data.id,
  status: data.status,
  score: typeof data.score === 'number' ? data.score : (data.passedTests || 0) * 10,
- time: data.time,
- memory: data.memory,
+ time: data.time ?? 0,
+ memory: data.memory ?? 0,
  passedTests: data.passedTests || 0,
  totalTests: data.totalTests || 0,
  message: data.message,
  testResults: data.testResults,
  timeElapsedMs: data.timeElapsedMs,
- })
+ }, { clearCode: true })
  setJudgeStatus({
  submissionId: data.id,
  status: data.status,
@@ -339,7 +401,14 @@ const [editOpen, setEditOpen] = useState(false)
  problemId: currentProblemId,
  status: data.status,
  score: typeof data.score === 'number' ? data.score : 0,
- submittedAt: new Date().toISOString()
+ submittedAt: new Date().toISOString(),
+ language: data.language,
+ time: data.time ?? 0,
+ memory: data.memory ?? 0,
+ passedTests: data.passedTests || 0,
+ totalTests: data.totalTests || 0,
+ message: data.message,
+ testResults: Array.isArray(data.testResults) ? data.testResults : undefined,
  }
  ]
  })
@@ -388,12 +457,17 @@ const [editOpen, setEditOpen] = useState(false)
  // 防重复提交：用 ref 同步守卫，避免 React state 异步更新间隙双击绕过 disabled
  if (submittingRef.current || submitCooldown) return
  submittingRef.current = true
+ const epoch = ++submitEpochRef.current
 
+ currentSubmissionIdRef.current = null
+ setCurrentSubmissionId(null)
  setSubmitting(true)
  setSubmitCooldown(true)
  setJudgeStatus(null)
  setJudgeProgress(null)
+ lastResultRef.current = null
  setLastResult(null)
+ showResultModalRef.current = true
  setShowResultModal(true)
 
  try {
@@ -408,9 +482,38 @@ const [editOpen, setEditOpen] = useState(false)
  })
  })
  const data = await response.json()
+ if (epoch !== submitEpochRef.current) return
  if (data.success) {
- currentSubmissionIdRef.current = data.submissionId
- setCurrentSubmissionId(data.submissionId)
+ const payload = data.data || {}
+ const submissionId = payload.submissionId || data.submissionId
+ const listId = payload.assignmentSubmissionId || submissionId
+ currentSubmissionIdRef.current = submissionId
+ setCurrentSubmissionId(submissionId)
+ setProblemTab('submissions')
+ setExpandedSubmissionId(listId)
+ setSubmissions((prev) => {
+ const list = Array.isArray(prev) ? prev : []
+ if (list.some((s) => s?.id === listId)) return list
+ const problemId = assignment.problems[selectedProblemIndex].id
+ return [
+ {
+ id: listId,
+ userId: user.id,
+ problemId,
+ status: 'Pending',
+ score: 0,
+ time: 0,
+ memory: 0,
+ passedTests: 0,
+ totalTests: 0,
+ language,
+ code,
+ submittedAt: new Date().toISOString(),
+ },
+ ...list,
+ ]
+ })
+ void fetchAssignment()
  } else {
    submittingRef.current = false
    setSubmitting(false)
@@ -427,7 +530,14 @@ const [editOpen, setEditOpen] = useState(false)
 
  const handleDeleteAssignment = async () => {
    if (!assignment) return
-   if (!confirm('确定要删除这个作业吗？此操作不可恢复，所有提交记录将被清除。')) return
+   const ok = await dialog.confirm({
+     message: '确定要删除这个作业吗？此操作不可恢复，所有提交记录将被清除。',
+     tone: 'warning',
+     confirmText: '删除',
+     confirmVariant: 'destructive',
+     cancelText: '取消',
+   })
+   if (!ok) return
    try {
      setLoading(true)
      const response = await fetchWithCookie(
@@ -597,6 +707,7 @@ const [editOpen, setEditOpen] = useState(false)
  selectedIndex={selectedProblemIndex}
  onSelect={(index) => {
  setSelectedProblemIndex(index)
+ setExpandedSubmissionId(null)
  setProblemTab('description')
  }}
  classId={classId}
@@ -682,9 +793,8 @@ const [editOpen, setEditOpen] = useState(false)
  loading={false}
  error={null}
  user={user}
- fromAssignment={params.assignmentId as string}
- classId={classId}
- onSelect={() => {}}
+ expandedId={expandedSubmissionId}
+ onExpandedChange={setExpandedSubmissionId}
  />
  </motion.div>
  )}
@@ -897,6 +1007,7 @@ const [editOpen, setEditOpen] = useState(false)
  allSubmissions={allSubmissions}
  onProblemClick={(index) => {
  setSelectedProblemIndex(index)
+ setExpandedSubmissionId(null)
  setViewTab('problems')
  setProblemTab('description')
  setCode('')
@@ -918,23 +1029,34 @@ const [editOpen, setEditOpen] = useState(false)
  />
  <SubmissionResultModal
  isOpen={showResultModal}
- onClose={() => { setShowResultModal(false); setJudgeStatus(null); setLastResult(null); }}
+ onClose={() => {
+ showResultModalRef.current = false
+ setShowResultModal(false)
+ setJudgeStatus(null)
+ lastResultRef.current = null
+ setLastResult(null)
+ }}
  isJudging={submitting}
  judgeProgress={judgeProgress}
  result={lastResult as SubmissionResultData | null}
  onContinueSubmit={() => {
  // CodeMirror 的可编辑元素是 .cm-content，外层容器标记了 data-testid
- const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null;
- cmContent?.focus();
- setShowResultModal(false);
- setJudgeStatus(null);
- setLastResult(null);
+ const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null
+ cmContent?.focus()
+ showResultModalRef.current = false
+ setShowResultModal(false)
+ setJudgeStatus(null)
+ lastResultRef.current = null
+ setLastResult(null)
  }}
  onViewDetail={(submissionId) => {
- setShowResultModal(false);
- setJudgeStatus(null);
- setLastResult(null);
- router.push(`/submission/${submissionId}`);
+ showResultModalRef.current = false
+ setShowResultModal(false)
+ setJudgeStatus(null)
+ lastResultRef.current = null
+ setLastResult(null)
+ setProblemTab('submissions')
+ setExpandedSubmissionId(submissionId)
  }}
  />
  </div>

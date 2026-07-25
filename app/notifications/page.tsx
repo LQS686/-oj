@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
-import { EducationalPageShell, PageLoading, ListEmptyState } from '@/components/common'
+import { EducationalPageShell, PageLoading, ListEmptyState, useDialog } from '@/components/common'
 import { DataTable, type Column } from '@/components/admin'
 import type { Notification } from '@/types/models'
 import { formatDate } from '@/lib/utils'
 import { loginPath } from '@/lib/navigation'
 
 export default function NotificationsPage() {
+ const dialog = useDialog()
  const router = useRouter()
  const { user, isLoading: authLoading } = useUser()
  const [notifications, setNotifications] = useState<Notification[]>([])
@@ -98,7 +99,14 @@ export default function NotificationsPage() {
  }
 
  const deleteNotification = async (notificationId: string) => {
- if (!confirm('确定删除这条通知吗?')) return
+ const ok = await dialog.confirm({
+   message: '确定删除这条通知吗?',
+   tone: 'warning',
+   confirmText: '删除',
+   confirmVariant: 'destructive',
+   cancelText: '取消',
+ })
+ if (!ok) return
 
  try {
  const response = await fetchWithCookie(`/api/notifications/${notificationId}`, {

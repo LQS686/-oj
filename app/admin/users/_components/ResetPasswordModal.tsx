@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
+import { useDialog } from '@/components/common/DialogProvider'
 import type { User } from '../_utils'
 
 interface ResetPasswordModalProps {
@@ -14,16 +15,17 @@ interface ResetPasswordModalProps {
  * 密码长度至少 6 位。
  */
 export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
+  const dialog = useDialog()
   const [password, setPassword] = useState('')
   const [resetting, setResetting] = useState(false)
 
   const handleReset = async () => {
     if (!password) {
-      alert('请输入新密码')
+      await dialog.alert({ tone: 'warning', message: '请输入新密码' })
       return
     }
     if (password.length < 6) {
-      alert('密码长度至少为6位')
+      await dialog.alert({ tone: 'warning', message: '密码长度至少为6位' })
       return
     }
 
@@ -39,10 +41,10 @@ export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
       if (data.success) {
         onClose()
       } else {
-        alert(data.error || '重置失败')
+        await dialog.alert({ tone: 'error', message: data.error || '重置失败' })
       }
     } catch (err) {
-      alert('网络错误')
+      await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setResetting(false)
     }

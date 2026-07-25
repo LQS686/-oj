@@ -339,7 +339,7 @@ export default function SubmissionResultModal({
       : 0
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {isOpen && (
         <motion.div
           className="fixed inset-0 flex items-center justify-center z-[110] p-4"
@@ -565,7 +565,7 @@ export default function SubmissionResultModal({
                       className="btn btn-primary cursor-pointer flex items-center gap-1.5"
                     >
                       <Eye className="w-4 h-4" />
-                      查看详情
+                      展开记录
                     </button>
                   )}
                 </>
