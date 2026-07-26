@@ -26,7 +26,7 @@ export function parseAssignmentCreate(body: any) {
     title: required(body?.title, '作业标题'),
     description: optional(body?.description),
     problemIds: body?.problemIds || [],
-    deadline: body?.deadline ? new Date(body.deadline) : undefined,
+    endTime: body?.endTime ? new Date(body.endTime) : undefined,
   }
 }
 

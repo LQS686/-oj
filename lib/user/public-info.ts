@@ -7,6 +7,7 @@ import { getMongoClient } from '@/lib/mongodb-direct'
 import { ObjectId } from 'mongodb'
 import { AppError } from '@/lib/errors'
 import { clearUserCache } from './profile'
+import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 
 /* ============================================================================
  * 业务封装：原 /api/users/* 路由中的复杂逻辑
@@ -210,7 +211,10 @@ export async function getUserFullStats(userId: string) {
       memoryLimitExceeded: statusCount['MLE'] || 0,
       runtimeError: statusCount['RE'] || 0,
       compileError: statusCount['CE'] || 0,
-      pending: statusCount['Pending'] || 0,
+      pending: Object.entries(statusCount).reduce(
+        (sum, [status, n]) => (isNonFinalSubmissionStatus(status) ? sum + n : sum),
+        0
+      ),
       statusCount,
     },
     problems: {
@@ -353,17 +357,17 @@ export async function changeCurrentUserPassword(
 }
 
 /**
- * 读取用户偏好（UserPreferences 集合）
+ * 读取用户偏好（UserPreferences 集合），仅返回白名单内合法字段
  */
 export async function getUserPreferencesCollection(userId: string) {
   const client = await getMongoClient()
   const db = client.db()
   const doc = await db.collection('UserPreferences').findOne({ userId })
-  return (doc?.preferences as Record<string, any>) || {}
+  return sanitizePreferences((doc?.preferences as Record<string, unknown>) || {})
 }
 
 /**
- * 偏好白名单 + 字段校验
+ * 偏好白名单 + 字段校验（仅当前产品字段；不做历史别名映射）
  */
 const ALLOWED_PREFERENCE_KEYS = [
   'theme',
@@ -374,7 +378,6 @@ const ALLOWED_PREFERENCE_KEYS = [
   'tabSize',
   'keyboardShortcuts',
   'notifications',
-  'preferredLanguage',
   'defaultTab',
   /** 做题页默认编程语言：cpp / c / python */
   'defaultCodeLanguage',
@@ -386,12 +389,11 @@ const ALLOWED_EDITOR_THEMES = ['vs-dark', 'vs-light', 'hc-black']
 const ALLOWED_TAB_SIZES = [2, 4, 8]
 const ALLOWED_CODE_LANGUAGES = ['cpp', 'c', 'python']
 
-function validatePreferenceValue(key: string, value: any): boolean {
+function validatePreferenceValue(key: string, value: unknown): boolean {
   switch (key) {
     case 'theme':
       return typeof value === 'string' && ALLOWED_THEMES.includes(value)
     case 'language':
-    case 'preferredLanguage':
       return typeof value === 'string' && ALLOWED_LANGUAGES.includes(value)
     case 'fontSize':
       return typeof value === 'number' && ALLOWED_FONT_SIZES.includes(value)
@@ -402,9 +404,9 @@ function validatePreferenceValue(key: string, value: any): boolean {
     case 'tabSize':
       return typeof value === 'number' && ALLOWED_TAB_SIZES.includes(value)
     case 'keyboardShortcuts':
-      return typeof value === 'object' && value !== null
+      return typeof value === 'object' && value !== null && !Array.isArray(value)
     case 'notifications':
-      return typeof value === 'object' && value !== null
+      return typeof value === 'object' && value !== null && !Array.isArray(value)
     case 'defaultTab':
       return typeof value === 'string' && value.length <= 50
     case 'defaultCodeLanguage':
@@ -412,6 +414,17 @@ function validatePreferenceValue(key: string, value: any): boolean {
     default:
       return false
   }
+}
+
+/** 去掉未知/非法字段，保证读出即干净 */
+function sanitizePreferences(raw: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const key of ALLOWED_PREFERENCE_KEYS) {
+    if (!(key in raw)) continue
+    if (!validatePreferenceValue(key, raw[key])) continue
+    out[key] = raw[key]
+  }
+  return out
 }
 
 /**
@@ -424,8 +437,10 @@ export async function updateUserPreferencesCollection(userId: string, body: Reco
   const client = await getMongoClient()
   const db = client.db()
   const existing = await db.collection('UserPreferences').findOne({ userId })
-  const existingPrefs: Record<string, any> = (existing?.preferences as Record<string, any>) || {}
-  const updatedPrefs: Record<string, any> = { ...existingPrefs }
+  const existingPrefs = sanitizePreferences(
+    (existing?.preferences as Record<string, unknown>) || {}
+  )
+  const updatedPrefs: Record<string, unknown> = { ...existingPrefs }
   for (const key of Object.keys(body)) {
     if (!ALLOWED_PREFERENCE_KEYS.includes(key)) continue
     if (!validatePreferenceValue(key, body[key])) {

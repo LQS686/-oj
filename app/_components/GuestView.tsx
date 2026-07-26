@@ -90,7 +90,7 @@ export function GuestView() {
     fetchWithCookie('/api/announcements?limit=6')
       .then((r) => r.json())
       .then((json) => {
-        if (!cancelled && (json.success || json.ok) && json.data?.items) {
+        if (!cancelled && (json.success) && json.data?.items) {
           setAnnouncements(json.data.items)
         }
       })

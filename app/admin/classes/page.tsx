@@ -6,7 +6,7 @@ import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/
 import { fetchWithCookie } from '@/lib/api/base'
 import { Plus, Search, Eye, EyeOff, Trash2 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import { PageLoading, useDialog } from '@/components/common'
+import { PageLoading, useDialog, RouteSuspenseFallback } from '@/components/common'
 import AdminCreateClassModal from '@/components/admin/AdminCreateClassModal'
 
 interface Class {
@@ -330,7 +330,7 @@ function AdminClassesPageContent() {
 
 export default function AdminClassesPage() {
   return (
-    <Suspense fallback={<PageLoading />}>
+    <Suspense fallback={<RouteSuspenseFallback label="加载中" />}>
       <AdminClassesPageContent />
     </Suspense>
   )

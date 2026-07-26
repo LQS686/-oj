@@ -3,6 +3,7 @@
  * 竞赛题目列表（含个人提交状态 + 整体统计）
  */
 import { prisma } from '@/lib/prisma'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 
 /* ============================================================================
  * 竞赛题目列表（含个人提交状态 + 整体统计）原 /api/contests/[id]/problems
@@ -32,7 +33,7 @@ export async function listContestProblemsWithStatus(
   })
 
   const problemIds = contestProblems.map((cp: any) => cp.problemId)
-  const userSubmissionStatus: Record<string, 'Accepted' | 'Attempted' | null> = {}
+  const userSubmissionStatus: Record<string, 'AC' | 'Attempted' | null> = {}
   const contestStats: Record<string, { accepted: number; submitted: number }> = {}
 
   if (currentUserId) {
@@ -49,8 +50,8 @@ export async function listContestProblemsWithStatus(
     }
     for (const problemId of problemIds) {
       const statuses = problemSubmissionMap.get(problemId)
-      if (statuses?.has('Accepted')) {
-        userSubmissionStatus[problemId] = 'Accepted'
+      if (statuses?.has(SubmissionStatus.ACCEPTED)) {
+        userSubmissionStatus[problemId] = 'AC'
       } else if (statuses && statuses.size > 0) {
         userSubmissionStatus[problemId] = 'Attempted'
       } else {

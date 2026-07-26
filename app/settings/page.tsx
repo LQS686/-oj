@@ -26,7 +26,7 @@ import { SettingsTabs } from './_components/SettingsTabs'
 import { ProfileSection } from './_components/ProfileSection'
 import { AccountSection } from './_components/AccountSection'
 import { PreferencesSection } from './_components/PreferencesSection'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { EducationalPageShell, PageLoading, RouteSuspenseFallback } from '@/components/common'
 import { loginPath } from '@/lib/navigation'
 
 function SettingsPageContent() {
@@ -352,7 +352,7 @@ function SettingsPageContent() {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<PageLoading label="加载设置中..." />}>
+    <Suspense fallback={<RouteSuspenseFallback label="加载设置中..." />}>
       <SettingsPageContent />
     </Suspense>
   )

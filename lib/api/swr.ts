@@ -2,7 +2,7 @@
  * lib/api/swr.ts
  * SWR 客户端工具：fetcher + 响应处理
  *
- * 业务返回格式：{ ok, data, error, code }
+ * 业务返回格式：{ success, data, error, code }
  * fetcher 自动解包：成功返回 data，失败抛出 Error
  */
 
@@ -18,7 +18,7 @@ class SwrError extends Error {
 /**
  * 默认 fetcher：
  * - 调用 fetch(url, { credentials: 'include' })
- * - 解包 { ok, data, error, code } 响应
+ * - 解包 { success, data, error, code } 响应
  * - 401 时抛出 SwrError('UNAUTHORIZED')，调用方可决定是否跳转登录
  */
 export async function swrFetcher<T = unknown>(url: string): Promise<T> {
@@ -39,7 +39,7 @@ export async function swrFetcher<T = unknown>(url: string): Promise<T> {
   if (!body) {
     throw new SwrError('空响应', 'EMPTY', res.status)
   }
-  if (!body.ok) {
+  if (!body.success) {
     throw new SwrError(body.error || '请求失败', body.code || 'UNKNOWN', res.status)
   }
   return body.data

@@ -15,7 +15,7 @@ import {
   Tag,
   Shuffle,
 } from 'lucide-react'
-import { getDifficultyColor } from '@/lib/status'
+import { getDifficultyClass } from '@/lib/status'
 import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -322,7 +322,7 @@ export default function ProblemsPage() {
                 </div>
 
                 <div className="col-span-1 flex items-center justify-center">
-                  <span className={`difficulty-tag ${getDifficultyColor(problem.difficulty)}`}>
+                  <span className={`difficulty-tag ${getDifficultyClass(problem.difficulty)}`}>
                     {problem.difficulty}
                   </span>
                 </div>
@@ -481,7 +481,7 @@ export default function ProblemsPage() {
                             >
                               {checked && <Check className="w-3 h-3" />}
                             </span>
-                            <span className={`difficulty-tag ${getDifficultyColor(d)}`}>{d}</span>
+                            <span className={`difficulty-tag ${getDifficultyClass(d)}`}>{d}</span>
                           </button>
                         )
                       })}

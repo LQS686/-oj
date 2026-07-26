@@ -46,10 +46,27 @@ export function canAccessAdmin(user: RoleUser | null): boolean {
   return isSystemAdmin(user) || isAdmin(user)
 }
 
-/** @internal 仅供测试使用 */
 /** 是否可管理系统设置（仅 SYSTEM_ADMIN） */
 export function canManageSystemSettings(user: RoleUser | null): boolean {
   return isSystemAdmin(user)
+}
+
+/** 是否可管理系统公告（仅 SYSTEM_ADMIN） */
+export function canManageSystemAnnouncements(user: RoleUser | null): boolean {
+  return isSystemAdmin(user)
+}
+
+/**
+ * 仅 SYSTEM_ADMIN 可访问的后台页面路径（与菜单 systemAdminOnly / withApi.systemAdmin 对齐）
+ * middleware 与 AdminLayout 共用，避免路径漂移。
+ */
+export const SYSTEM_ADMIN_ONLY_PATHS = ['/admin/settings', '/admin/announcements'] as const
+
+/** 当前路径是否属于 SYSTEM_ADMIN 专属后台页 */
+export function isSystemAdminOnlyPath(pathname: string): boolean {
+  return SYSTEM_ADMIN_ONLY_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  )
 }
 
 /** 是否可管理前台内容（SYSTEM_ADMIN / ADMIN / TEACHER） */

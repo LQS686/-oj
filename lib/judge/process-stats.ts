@@ -69,7 +69,7 @@ export function readStatFileInt(filePath: string): number {
   }
 }
 
-/** @deprecated 使用 readStatFileInt；保留别名兼容 */
+/** @deprecated 使用 readStatFileInt */
 export function readMemFileKB(memFilePath: string): number {
   return readStatFileInt(memFilePath)
 }

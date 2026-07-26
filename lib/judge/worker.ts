@@ -204,11 +204,12 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
         time: result.time,
         memory: result.memory,
         passedTests: result.passedTests,
-        totalTests: result.totalTests || 0,
+        totalTests: result.totalTests ?? 0,
         problemId: submission.problemId,
         message: result.message,
         testResults: result.testResults,
         timeElapsedMs: assignmentTimeElapsedMs,
+        assignmentSubmissionId: assignmentSubmissionId ?? undefined,
       })
     } catch (wsError) {
       logger.error(`WebSocket 推送失败`, wsError)
@@ -254,13 +255,14 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
       try {
         emitSubmissionUpdate(submission.userId, {
           id: job.id,
-          status: 'SE',
+          status: SubmissionStatus.SYSTEM_ERROR,
           score: 0,
           time: 0,
           memory: 0,
           passedTests: 0,
           totalTests: 0,
           message: `系统错误: ${error.message}`,
+          assignmentSubmissionId: submission.assignmentSubmissionId ?? undefined,
         })
       } catch (wsError) {
         logger.error(`WebSocket 推送失败`, wsError)
@@ -271,12 +273,9 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
   }
 })
 
-// 启动时扫描 DB 中 status='PENDING'/'JUDGING'/'RUNNING' 的 submission 重新入队（重启恢复）
-// 注：submitCode 创建提交时 status='PENDING'，评测中仅在内存 JudgeResult 中为 'JUDGING'（不写 DB），
-// 评测完成后直接写最终状态（AC/WA/TLE...）。因此 Worker 崩溃后，DB 中残留的是 'PENDING'（未开始）
-// 或 'JUDGING'（历史兼容）。两者都需恢复。
-// 项目约束（Task 12.3）：recover 路径需接受 PENDING/JUDGING/RUNNING 作为合法起始状态，
-// 此处扫描时同时兼容历史字面量 'Pending'/'Judging'/'Running' 以防 DB 中存在旧数据。
+// 启动时扫描 DB 中 status=PENDING/JUDGING/RUNNING 的 submission 重新入队（重启恢复）
+// submitCode 创建时写 PENDING；评测中通常不写 JUDGING 到 DB；完成后写终态。
+// Worker 崩溃后残留的非终态记录在此恢复入队。
 async function recoverPendingJobs() {
   try {
     const pendingSubmissions = await prisma.submission.findMany({
@@ -286,10 +285,6 @@ async function recoverPendingJobs() {
             SubmissionStatus.PENDING,
             SubmissionStatus.JUDGING,
             SubmissionStatus.RUNNING,
-            // 历史大驼峰兼容
-            'Pending',
-            'Judging',
-            'Running',
           ],
         },
       },

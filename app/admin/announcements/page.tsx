@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
 import { Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, toLocalDatetimeInput } from '@/lib/utils'
 import { useDialog } from '@/components/common/DialogProvider'
+import { useUser } from '@/contexts/UserContext'
+import { canManageSystemAnnouncements } from '@/lib/permissions'
 
 interface AnnouncementRow {
   id: string
@@ -28,9 +30,33 @@ const emptyForm = {
   expiresAt: '',
 }
 
+function getPublicStatus(row: AnnouncementRow): { label: string; className: string } {
+  if (!row.isPublished) {
+    return { label: '草稿', className: 'bg-muted text-muted-foreground' }
+  }
+  const now = Date.now()
+  if (row.expiresAt && new Date(row.expiresAt).getTime() < now) {
+    return {
+      label: '已过期',
+      className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    }
+  }
+  if (row.publishedAt && new Date(row.publishedAt).getTime() > now) {
+    return {
+      label: '定时发布',
+      className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    }
+  }
+  return {
+    label: '展示中',
+    className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  }
+}
+
 export default function AdminAnnouncementsPage() {
   const dialog = useDialog()
   const router = useRouter()
+  const { user, isLoading: userLoading } = useUser()
   const [items, setItems] = useState<AnnouncementRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,17 +66,27 @@ export default function AdminAnnouncementsPage() {
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<AnnouncementRow | null>(null)
 
+  useEffect(() => {
+    if (userLoading) return
+    if (!canManageSystemAnnouncements(user)) {
+      setError('需要系统管理员权限')
+      setLoading(false)
+      router.replace('/403')
+    }
+  }, [user, userLoading, router])
+
   const load = useCallback(async () => {
+    if (!canManageSystemAnnouncements(user)) return
     try {
       setLoading(true)
       const res = await fetchWithCookie('/api/admin/announcements')
       if (res.status === 403) {
-        setError('需要管理员权限')
+        setError('需要系统管理员权限')
         setTimeout(() => router.push('/403'), 2000)
         return
       }
       const data = await res.json()
-      if (data.success || data.ok) {
+      if (data.success) {
         setItems(data.data?.items ?? [])
       } else {
         setError(data.error || '加载失败')
@@ -60,11 +96,12 @@ export default function AdminAnnouncementsPage() {
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, [router, user])
 
   useEffect(() => {
+    if (userLoading || !canManageSystemAnnouncements(user)) return
     load()
-  }, [load])
+  }, [load, user, userLoading])
 
   const openCreate = () => {
     setEditing(null)
@@ -79,7 +116,7 @@ export default function AdminAnnouncementsPage() {
       content: row.content,
       isPinned: row.isPinned,
       isPublished: row.isPublished,
-      expiresAt: row.expiresAt ? row.expiresAt.slice(0, 16) : '',
+      expiresAt: row.expiresAt ? toLocalDatetimeInput(row.expiresAt) : '',
     })
     setModalOpen(true)
   }
@@ -105,7 +142,7 @@ export default function AdminAnnouncementsPage() {
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      if (data.success || data.ok) {
+      if (data.success) {
         setModalOpen(false)
         load()
       } else {
@@ -125,7 +162,7 @@ export default function AdminAnnouncementsPage() {
         method: 'DELETE',
       })
       const data = await res.json()
-      if (data.success || data.ok) {
+      if (data.success) {
         setDeleteTarget(null)
         load()
       } else {
@@ -143,7 +180,7 @@ export default function AdminAnnouncementsPage() {
       body: JSON.stringify({ isPublished: !row.isPublished }),
     })
     const data = await res.json()
-    if (data.success || data.ok) load()
+    if (data.success) load()
     else await dialog.alert({ tone: 'error', message: data.error || '操作失败' })
   }
 
@@ -176,15 +213,14 @@ export default function AdminAnnouncementsPage() {
                           <Pin className="w-3 h-3" /> 置顶
                         </span>
                       )}
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          row.isPublished
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {row.isPublished ? '已发布' : '草稿'}
-                      </span>
+                      {(() => {
+                        const status = getPublicStatus(row)
+                        return (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${status.className}`}>
+                            {status.label}
+                          </span>
+                        )
+                      })()}
                     </div>
                     <h3 className="font-semibold text-foreground">{row.title}</h3>
                     <p className="text-sm text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">

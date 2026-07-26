@@ -7,6 +7,10 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { formatDateTime } from '@/lib/utils'
 import { loginPath } from '@/lib/navigation'
+import {
+  isNonFinalSubmissionStatus,
+  SubmissionStatus,
+} from '@/lib/constants/submission-status'
 
 interface Submission {
  id: string
@@ -78,26 +82,21 @@ export default function ContestSubmissionsPage() {
 
  const getStatusColor = (status: string) => {
  switch (status) {
- case 'AC':
- case 'Accepted':
+ case SubmissionStatus.ACCEPTED:
  return 'bg-secondary/100/20 text-green-400'
- case 'WA':
- case 'Wrong Answer':
+ case SubmissionStatus.WRONG_ANSWER:
  return 'bg-error/100/20 text-red-400'
- case 'TLE':
- case 'Time Limit Exceeded':
+ case SubmissionStatus.TIME_LIMIT_EXCEEDED:
  return 'bg-orange-500/20 text-orange-400'
- case 'MLE':
- case 'Memory Limit Exceeded':
+ case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
  return 'bg-purple-500/20 text-purple-400'
- case 'RE':
- case 'Runtime Error':
+ case SubmissionStatus.RUNTIME_ERROR:
  return 'bg-yellow-500/20 text-accent-light'
- case 'CE':
- case 'Compilation Error':
+ case SubmissionStatus.COMPILE_ERROR:
  return 'bg-muted text-muted-foreground'
- case 'Pending':
- case 'Judging':
+ case SubmissionStatus.PENDING:
+ case SubmissionStatus.JUDGING:
+ case SubmissionStatus.RUNNING:
  return 'bg-indigo-500/20 text-indigo-400'
  default:
  return 'bg-muted text-muted-foreground'
@@ -156,7 +155,7 @@ export default function ContestSubmissionsPage() {
  </td>
  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
  <Link 
- href={`/contests/${params.id}/problems/${sub.problemId}`}
+ href={`/contests/${params.id}/problems?problem=${encodeURIComponent(sub.problemId)}`}
  className="text-indigo-400 hover:text-indigo-300"
  >
  {sub.problem.problemNumber || 'P?'} {sub.problem.title}

@@ -3,7 +3,8 @@
 
 /**
  * 评测结果状态
- * 参考 LemonLime ResultState，映射为 OJ 用的短代码
+ * 参考 LemonLime ResultState，映射为 OJ 用的短代码。
+ * 中间态与 SubmissionStatus 对齐：PENDING / JUDGING（禁止再写 Pending/Judging）。
  */
 export type ResultState =
   | 'AC'   // Accepted (CorrectAnswer)
@@ -17,8 +18,8 @@ export type ResultState =
   | 'PE'   // Presentation Error
   | 'OLE'  // Output Limit Exceeded
   | 'CSP'  // Cannot Start Program
-  | 'Judging'
-  | 'Pending'
+  | 'JUDGING'
+  | 'PENDING'
 
 /**
  * 编译状态
@@ -92,8 +93,8 @@ export const RESULT_STATE_LABELS: Record<ResultState, string> = {
   PE: 'Presentation Error',
   OLE: 'Output Limit Exceeded',
   CSP: 'Cannot Start Program',
-  Judging: 'Judging',
-  Pending: 'Pending',
+  JUDGING: 'Judging',
+  PENDING: 'Pending',
 }
 
 /**
@@ -111,8 +112,21 @@ export const RESULT_STATE_COLORS: Record<ResultState, string> = {
   PE: 'yellow',
   OLE: 'yellow',
   CSP: 'red',
-  Judging: 'blue',
-  Pending: 'gray',
+  JUDGING: 'blue',
+  PENDING: 'gray',
+}
+
+const COMPARISON_MODES = ['default', 'strict', 'ignore-spaces', 'real-number'] as const
+
+/** 将 DB/API 中的 string 收窄为 ComparisonMode；非法值回落到 default */
+export function parseComparisonMode(
+  value: unknown,
+  fallback: ComparisonMode = 'default'
+): ComparisonMode {
+  return typeof value === 'string' &&
+    (COMPARISON_MODES as readonly string[]).includes(value)
+    ? (value as ComparisonMode)
+    : fallback
 }
 
 /**

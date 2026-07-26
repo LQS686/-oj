@@ -234,12 +234,13 @@ export default function EditAssignmentModal({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">作业描述</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">作业说明</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={2}
-                  className="input w-full resize-none"
+                  placeholder="要求、参考资料、注意事项等（支持 Markdown）"
+                  rows={5}
+                  className="input w-full resize-y min-h-[6rem]"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

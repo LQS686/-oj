@@ -3,6 +3,7 @@ export type { EducationalPageShellProps, EducationalPageWidth } from './Educatio
 export { DenseListShell, denseListRowClass } from './DenseListShell'
 export type { DenseListColumn, DenseListShellProps } from './DenseListShell'
 export { PageLoading } from './PageLoading'
+export { RouteSuspenseFallback } from './RouteSuspenseFallback'
 export { default as RouteLoading } from './RouteLoading'
 export { default as NavigationProgress } from './NavigationProgress'
 export { ListEmptyState } from './ListEmptyState'

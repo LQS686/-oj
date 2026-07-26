@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { isAcceptedStatus } from '@/lib/constants/submission-status'
 
 /* ============================================================================
  * 班级作业（增强 service：列表统计 / 创建 / 详情 / 统计 / 提交 / 进度）
@@ -13,8 +14,8 @@ export type AssignmentStatus = 'upcoming' | 'active' | 'ended'
 
 /**
  * 根据作业的 startTime / endTime 推断当前状态。
- *  - null startTime 视为已开始（兼容旧数据）
- *  - null endTime 视为永不结束（兼容旧数据）
+ *  - 无 startTime：视为已开始
+ *  - 无 endTime：视为永不结束
  */
 export function getAssignmentStatus(
   startTime: Date | null | undefined,
@@ -29,7 +30,7 @@ export function getAssignmentStatus(
 export interface ListClassAssignmentsFilter {
   page?: number
   pageSize?: number
-  status?: 'upcoming' | 'active' | 'ongoing' | 'ended'
+  status?: 'upcoming' | 'active' | 'ended'
 }
 
 export async function listClassAssignmentsWithStats(
@@ -42,16 +43,13 @@ export async function listClassAssignmentsWithStats(
   const now = new Date()
   if (filter.status === 'upcoming') {
     where.startTime = { gt: now }
-  } else if (filter.status === 'active' || filter.status === 'ongoing') {
-    // active 状态：已开始但未结束。null startTime 视为已开始；null endTime 视为永不结束。
-    // 用 AND 显式排除 upcoming（startTime <= now 或 startTime 为 null）
-    // 用 OR 显式包含 null endTime（兼容旧数据）
+  } else if (filter.status === 'active') {
+    // 已开始且未结束：无 startTime 视为已开始；无 endTime 视为永不结束
     where.AND = [
       { OR: [{ startTime: { lte: now } }, { startTime: null }, { startTime: { isSet: false } }] },
       { OR: [{ endTime: { gte: now } }, { endTime: null }, { endTime: { isSet: false } }] },
     ]
   } else if (filter.status === 'ended') {
-    // null endTime 不归入 ended
     where.endTime = { lt: now }
   }
 
@@ -100,23 +98,21 @@ export async function listClassAssignmentsWithStats(
     const problemIds = a.problemIds || []
     const problemCount = problemIds.length
 
-    const memberProblemScores = new Map<string, Map<string, number>>()
+    const memberSolvedProblems = new Map<string, Set<string>>()
     submissions.forEach((sub: any) => {
-      let m = memberProblemScores.get(sub.userId)
-      if (!m) {
-        m = new Map()
-        memberProblemScores.set(sub.userId, m)
+      if (!isAcceptedStatus(sub.status)) return
+      let solved = memberSolvedProblems.get(sub.userId)
+      if (!solved) {
+        solved = new Set()
+        memberSolvedProblems.set(sub.userId, solved)
       }
-      const cur = m.get(sub.problemId) || 0
-      m.set(sub.problemId, Math.max(cur, sub.score || 0))
+      solved.add(sub.problemId)
     })
 
     let totalCompletedProblems = 0
-    memberProblemScores.forEach((m) =>
-      m.forEach((score) => {
-        if (score === 100) totalCompletedProblems++
-      })
-    )
+    memberSolvedProblems.forEach((solved) => {
+      totalCompletedProblems += solved.size
+    })
 
     const totalProblems = memberCount * problemCount
     const completionRate =
@@ -128,7 +124,6 @@ export async function listClassAssignmentsWithStats(
       description: a.description,
       startTime: a.startTime,
       endTime: a.endTime,
-      deadline: a.endTime,
       problemCount,
       stats: {
         totalMembers: memberCount,
@@ -198,7 +193,6 @@ export async function computeAssignmentStatistics(
 
   const totalMembers = members.length
   const totalProblems = assignment.problemIds.length
-  const deadline = assignment.endTime ? new Date(assignment.endTime) : null
 
   const memberCompletionMap = new Map<string, Set<string>>()
   members.forEach((m: any) => memberCompletionMap.set(m.userId, new Set()))
@@ -407,34 +401,52 @@ export async function listAssignmentSubmissions(
   const userMap = new Map<any, any>(users.map((u: any) => [u.id, u]))
   const problemMap = new Map<any, any>(problems.map((p: any) => [p.id, p]))
 
-  const items = submissions.map((s: any) => {
-    const u = userMap.get(s.userId)
-    const p = problemMap.get(s.problemId)
-    return {
-      id: s.id,
-      problem: {
-        id: s.problemId,
-        title: p?.title || 'Unknown Problem',
-        problemNumber: p?.problemNumber,
-      },
-      userId: s.userId,
-      user: { id: s.userId, username: u?.username, nickname: u?.nickname },
-      language: s.language,
-      code: s.code,
-      status: s.status,
-      score: s.score || 0,
-      time: s.time || 0,
-      memory: s.memory || 0,
-      passedTests: s.passedTests,
-      totalTests: s.totalTests,
-      message: s.message,
-      submittedAt: s.submittedAt,
-      isLate: s.isLate,
-      // Phase 1：作业计时字段
-      timeElapsedMs: s.timeElapsedMs || 0,
-      isFirstAc: s.isFirstAc || false,
-    }
-  })
+  const casIds = submissions.map((s: any) => s.id as string)
+  const linkedMain =
+    casIds.length > 0
+      ? await prisma.submission.findMany({
+          where: { assignmentSubmissionId: { in: casIds } },
+          select: { id: true, assignmentSubmissionId: true },
+        })
+      : []
+  const mainIdByCas = new Map(
+    linkedMain
+      .filter((s) => s.assignmentSubmissionId)
+      .map((s) => [s.assignmentSubmissionId as string, s.id])
+  )
+
+  const items = submissions
+    .map((s: any) => {
+      const mainId = mainIdByCas.get(s.id)
+      if (!mainId) return null
+      const u = userMap.get(s.userId)
+      const p = problemMap.get(s.problemId)
+      return {
+        id: mainId,
+        assignmentSubmissionId: s.id,
+        problem: {
+          id: s.problemId,
+          title: p?.title || 'Unknown Problem',
+          problemNumber: p?.problemNumber,
+        },
+        userId: s.userId,
+        user: { id: s.userId, username: u?.username, nickname: u?.nickname },
+        language: s.language,
+        code: s.code,
+        status: s.status,
+        score: s.score || 0,
+        time: s.time || 0,
+        memory: s.memory || 0,
+        passedTests: s.passedTests,
+        totalTests: s.totalTests,
+        message: s.message,
+        submittedAt: s.submittedAt,
+        isLate: s.isLate,
+        timeElapsedMs: s.timeElapsedMs || 0,
+        isFirstAc: s.isFirstAc || false,
+      }
+    })
+    .filter(Boolean)
 
   return {
     submissions: items,

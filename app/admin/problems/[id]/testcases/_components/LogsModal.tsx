@@ -69,7 +69,7 @@ export function LogsModal({ open, onClose, loading, logs }: LogsModalProps) {
                       <>
                         <div>通过测试点：{log.details?.passed ?? '—'}</div>
                         <div>失败测试点：{log.details?.failed ?? '—'}</div>
-                        {log.details?.fixedCount !== undefined && (
+                        {log.details?.fixedCount != null && (
                           <div>自动纠正：{log.details.fixedCount}</div>
                         )}
                       </>

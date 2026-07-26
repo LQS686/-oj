@@ -6,13 +6,15 @@
  */
 import { useState } from 'react'
 import { Timer, MemoryStick, ChevronDown, ChevronUp } from 'lucide-react'
-import { getDifficultyColor } from '@/lib/status'
+import { getDifficultyClass } from '@/lib/status'
 
 export interface ProblemMetaHeaderProps {
   timeLimit: number
   memoryLimit: number
   tags?: string[]
-  difficulty: string
+  difficulty?: string
+  /** 竞赛等场景：仅展示时限/内存 */
+  hideDifficultyAndTags?: boolean
 }
 
 const TAG_COLLAPSE_THRESHOLD = 3
@@ -22,10 +24,12 @@ export default function ProblemMetaHeader({
   memoryLimit,
   tags,
   difficulty,
+  hideDifficultyAndTags = false,
 }: ProblemMetaHeaderProps) {
   const [expanded, setExpanded] = useState(false)
 
-  const hasTags = Array.isArray(tags) && tags.length > 0
+  const showDifficulty = !hideDifficultyAndTags && !!difficulty
+  const hasTags = !hideDifficultyAndTags && Array.isArray(tags) && tags.length > 0
   const needsCollapse = hasTags && tags!.length > TAG_COLLAPSE_THRESHOLD
   const visibleTags = needsCollapse && !expanded
     ? tags!.slice(0, TAG_COLLAPSE_THRESHOLD)
@@ -43,9 +47,11 @@ export default function ProblemMetaHeader({
           <MemoryStick className="w-3.5 h-3.5" />
           {memoryLimit}MB
         </span>
-        <span className={`difficulty-tag ${getDifficultyColor(difficulty)}`}>
-          {difficulty}
-        </span>
+        {showDifficulty && (
+          <span className={`difficulty-tag ${getDifficultyClass(difficulty!)}`}>
+            {difficulty}
+          </span>
+        )}
       </div>
 
       {hasTags && (

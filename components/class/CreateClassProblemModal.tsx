@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PlusCircle, Search, AlertCircle } from 'lucide-react'
 import { CreateModalShell } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
-import { DIFFICULTIES, DIFFICULTY_COLORS, migrateDifficulty, type Difficulty } from '@/lib/constants'
+import { DIFFICULTIES, DIFFICULTY_COLORS, isValidDifficulty, normalizeDifficulty, type Difficulty } from '@/lib/constants'
 
 interface Problem {
   id: string
@@ -226,8 +226,10 @@ export default function CreateClassProblemModal({
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1.5">
                                   <h3 className="font-medium text-foreground truncate">{problem.title}</h3>
-                                  <span className={`tag ${DIFFICULTY_COLORS[migrateDifficulty(problem.difficulty)] || ''}`}>
-                                    {migrateDifficulty(problem.difficulty)}
+                                  <span className={`tag ${DIFFICULTY_COLORS[normalizeDifficulty(problem.difficulty)] || ''}`}>
+                                    {isValidDifficulty(problem.difficulty)
+                                      ? problem.difficulty
+                                      : normalizeDifficulty(problem.difficulty)}
                                   </span>
                                 </div>
                                 <div className="flex gap-1 flex-wrap">

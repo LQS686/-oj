@@ -46,7 +46,6 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     description?: string
     startTime?: string | Date
     endTime?: string | Date
-    deadline?: string | Date
     problemIds?: string[]
     allowLateSubmission?: boolean
   }>(req)

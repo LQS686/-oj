@@ -11,10 +11,12 @@ import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import {
   batchRegisterUsers,
   parseBatchRegisterCSV,
+  type BatchRegisterError,
   type BatchUserInput,
 } from '@/lib/user/service'
 
 const MAX_JSON_USERS = 100
+const MAX_CSV_USERS = 500
 
 /**
  * POST /api/admin/users/batch-register
@@ -25,6 +27,7 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const contentType = req.headers.get('content-type') || ''
   let users: BatchUserInput[] = []
   let startRow = 1
+  let parseErrors: BatchRegisterError[] = []
 
   if (contentType.includes('multipart/form-data')) {
     const formData = await req.formData()
@@ -38,14 +41,19 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
     }
     const csvText = await f.text()
     try {
-      users = parseBatchRegisterCSV(csvText)
+      const parsed = parseBatchRegisterCSV(csvText)
+      users = parsed.users
+      parseErrors = parsed.parseErrors
     } catch (parseError) {
       throw400('CSV_PARSE_ERROR', parseError instanceof Error ? parseError.message : 'CSV解析失败')
     }
-    if (users.length === 0) {
+    if (users.length === 0 && parseErrors.length === 0) {
       throw400('EMPTY_CSV', 'CSV文件中没有有效的用户数据')
     }
-    // CSV 跳过表头，行号从 2 开始
+    if (users.length > MAX_CSV_USERS) {
+      throw400('TOO_MANY', `CSV 单次最多导入 ${MAX_CSV_USERS} 个用户`)
+    }
+    // 行号已在 parse 时写入 user.row（文件原始行号）
     startRow = 2
   } else {
     const body = await readJson<{ users?: BatchUserInput[] }>(req)
@@ -61,5 +69,10 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
   }
 
   const result = await batchRegisterUsers(users, startRow, user.role)
+  if (parseErrors.length > 0) {
+    result.errors = [...parseErrors, ...result.errors].sort((a, b) => a.row - b.row)
+    result.failed += parseErrors.length
+    result.total += parseErrors.length
+  }
   return ok(result)
 })

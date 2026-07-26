@@ -17,13 +17,27 @@ export interface VerifyStdInput {
   solutionLanguage: string
 }
 
-export interface VerifyStdCaseResult {
+/**
+ * 写入 VerificationLog.details 的用例结果。
+ * 字段全部必填、用 null 表示缺省——避免 `?:` 引入 undefined，
+ * 从而可直接赋给 Prisma.InputJsonValue（无需断言）。
+ */
+export type VerifyStdCaseResult = {
   id: string
   index: number
   status: 'OK' | 'FAILED' | 'ERROR'
-  time?: number
-  memory?: number
-  error?: string
+  time: number | null
+  memory: number | null
+  error: string | null
+}
+
+/** VerificationLog.details 的完整 JSON 形状（无 undefined，可直接写入 Prisma Json） */
+export type VerifyStdLogDetails = {
+  passed: number
+  failed: number
+  results: VerifyStdCaseResult[]
+  fixedCount: number | null
+  compileError: string | null
 }
 
 export interface VerifyStdResult {
@@ -32,6 +46,22 @@ export interface VerifyStdResult {
   fixedCount?: number
   results: VerifyStdCaseResult[]
   compileError?: string
+}
+
+function buildLogDetails(partial: {
+  passed: number
+  failed: number
+  results?: VerifyStdCaseResult[]
+  fixedCount?: number | null
+  compileError?: string | null
+}): VerifyStdLogDetails {
+  return {
+    passed: partial.passed,
+    failed: partial.failed,
+    results: partial.results ?? [],
+    fixedCount: partial.fixedCount ?? null,
+    compileError: partial.compileError ?? null,
+  }
 }
 
 export async function verifyProblemWithStd(input: VerifyStdInput): Promise<VerifyStdResult> {
@@ -53,22 +83,23 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
 
   const compileResult = await compileCode(code, language)
   if (!compileResult.success) {
+    const compileError = compileResult.error || compileResult.stderr || '编译失败'
     await prisma.verificationLog.create({
       data: {
         problemId: input.problemId,
         operatorId: input.operatorId,
         status: 'FAILED',
-        details: {
+        details: buildLogDetails({
           passed: 0,
           failed: problem.testCases.length,
-          compileError: compileResult.error || compileResult.stderr || '编译失败',
-        },
+          compileError,
+        }),
       },
     })
     return {
       verified: false,
       message: '标程编译失败',
-      compileError: compileResult.error || compileResult.stderr || '编译失败',
+      compileError,
       results: [],
     }
   }
@@ -100,8 +131,9 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
             id: tc.id,
             index: i + 1,
             status: 'OK',
-            time: runResult.time,
-            memory: runResult.memory,
+            time: runResult.time ?? null,
+            memory: runResult.memory ?? null,
+            error: null,
           })
         } else {
           failedCount++
@@ -114,7 +146,14 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
                 : runResult.runtimeError
                   ? 'Runtime Error'
                   : `exit code ${runResult.exitCode}`)
-          results.push({ id: tc.id, index: i + 1, status: 'FAILED', error })
+          results.push({
+            id: tc.id,
+            index: i + 1,
+            status: 'FAILED',
+            time: null,
+            memory: null,
+            error,
+          })
         }
       } catch (err) {
         failedCount++
@@ -122,6 +161,8 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
           id: tc.id,
           index: i + 1,
           status: 'ERROR',
+          time: null,
+          memory: null,
           error: err instanceof Error ? err.message : '执行错误',
         })
       }
@@ -133,7 +174,7 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
           problemId: input.problemId,
           operatorId: input.operatorId,
           status: 'FAILED',
-          details: { passed: passedCount, failed: failedCount, results },
+          details: buildLogDetails({ passed: passedCount, failed: failedCount, results }),
         },
       })
       return {
@@ -159,12 +200,12 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
           problemId: input.problemId,
           operatorId: input.operatorId,
           status: 'SUCCESS',
-          details: {
+          details: buildLogDetails({
             passed: passedCount,
             failed: 0,
             results,
             fixedCount: updatedOutputs.length,
-          },
+          }),
         },
       })
     })

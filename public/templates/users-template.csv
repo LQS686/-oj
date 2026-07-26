@@ -1,4 +1,4 @@
-username,password,role
-student1,Password123,USER
-student2,Password456,USER
-teacher1,Password789,TEACHER
+username,password,role,email
+student1,Password123,STUDENT,student1@example.com
+student2,Password456,STUDENT,
+teacher1,Password789,TEACHER,teacher1@example.com

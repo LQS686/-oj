@@ -10,7 +10,7 @@
 | 角色值           | 中文标签   | 说明                                                   |
 | ---------------- | ---------- | ------------------------------------------------------ |
 | `SYSTEM_ADMIN`   | 系统管理员 | 站点最高权限，唯一、不可剥夺/修改/删除                 |
-| `ADMIN`          | 管理员     | 除系统设置外的所有功能，可访问后台                     |
+| `ADMIN`          | 管理员     | 除系统设置与系统公告外的后台功能                       |
 | `TEACHER`        | 教师       | 除后台管理外的所有前台内容管理功能                     |
 | `STUDENT`        | 学生       | 默认角色，仅参与能力（做题/参赛/加入班级）             |
 
@@ -26,6 +26,7 @@
 | 能力                | SYSTEM_ADMIN | ADMIN | TEACHER | STUDENT |
 | ------------------- | :----------: | :---: | :-----: | :-----: |
 | 系统设置（站点配置）|      ✅      |  ❌   |   ❌    |   ❌    |
+| 系统公告            |      ✅      |  ❌   |   ❌    |   ❌    |
 | 后台管理（/admin/*）|      ✅      |  ✅   |   ❌    |   ❌    |
 | 前台内容管理        |      ✅      |  ✅   |   ✅    |   ❌    |
 | 查看（公开内容）    |      ✅      |  ✅   |   ✅    |   ✅    |
@@ -33,7 +34,8 @@
 
 说明：
 - **系统设置**：站点级配置（站点名称、SMTP、系统参数等），仅 `SYSTEM_ADMIN`。
-- **后台管理**：访问 `/admin/*` 页面与 `/api/admin/*` 接口（用户管理、题目审核等）。
+- **系统公告**：全站公告发布/编辑/删除，仅 `SYSTEM_ADMIN`（与「班级公告」无关）。
+- **后台管理**：访问一般 `/admin/*` 页面与 `/api/admin/*` 接口（用户管理、题目审核等）；系统设置与系统公告除外。
 - **前台内容管理**：创建/编辑题目、竞赛、训练、题解等公开内容。
 - **查看 / 参与**：所有角色共享的基础能力。
 
@@ -48,8 +50,8 @@
 - **批量豁免**：批量操作（`filterUserIdsForBatchAction`）自动跳过 `SYSTEM_ADMIN`。
 
 ### ADMIN
-- 拥有除系统设置外的所有功能。
-- 可访问后台（`/admin/*`、`/api/admin/*`）。
+- 拥有除系统设置、系统公告外的后台管理功能。
+- 可访问一般后台（`/admin/*`、`/api/admin/*`）；不可访问 `/admin/settings`、`/admin/announcements`。
 - 可被 `SYSTEM_ADMIN` 在后台用户管理中授予 / 撤销。
 
 ### TEACHER
@@ -72,6 +74,8 @@
 | `isStudent(user)`          | `@/lib/permissions` | 是否为学生（`STUDENT`）                       |
 | `canAccessAdmin(user)`     | `@/lib/permissions` | 是否可访问后台（`SYSTEM_ADMIN` + `ADMIN`）    |
 | `canManageSystemSettings(user)` | `@/lib/permissions` | 是否可管理系统设置（仅 `SYSTEM_ADMIN`）  |
+| `canManageSystemAnnouncements(user)` | `@/lib/permissions` | 是否可管理系统公告（仅 `SYSTEM_ADMIN`） |
+| `isSystemAdminOnlyPath(pathname)` | `@/lib/permissions` | 是否为 SYSTEM_ADMIN 专属后台路径 |
 | `canManageContent(user)`   | `@/lib/permissions` | 是否可管理前台内容（`SYSTEM_ADMIN`+`ADMIN`+`TEACHER`） |
 | `canCreateContest(user)`   | `@/lib/permissions` | 是否可创建竞赛（等同 `canManageContent`）     |
 | `canCreateClass(user)`     | `@/lib/permissions` | 是否可创建班级（等同 `canManageContent`）     |
@@ -96,7 +100,7 @@ API 路由应使用 [lib/api/withApi.ts](../lib/api/withApi.ts) 提供的包装�
 | `withApi.public`    | 无                                        | 公开接口（登录、题目列表）     |
 | `withApi.auth`      | 已登录                                    | 任意登录用户接口               |
 | `withApi.admin`     | `canAccessAdmin`（`SYSTEM_ADMIN`+`ADMIN`）| 后台管理接口 `/api/admin/*`    |
-| `withApi.systemAdmin` | 仅 `SYSTEM_ADMIN`                       | 系统设置接口                   |
+| `withApi.systemAdmin` | 仅 `SYSTEM_ADMIN`                       | 系统设置、系统公告等接口       |
 | `withApi.classRole` | 班级角色（owner/assistant/student）       | 班级内部操作（如作业列表/创建、笔记创建等） |
 
 ```ts
@@ -115,7 +119,7 @@ export const PATCH = withApi.systemAdmin(async (req, { user }) => {
 
 [middleware.ts](../middleware.ts) 在边缘层拦截页面路由：
 
-- **`/admin/*`（非 `/api/`）**：基于 JWT payload 中的 `role`，调用 `canAccessAdmin` 判定，仅 `SYSTEM_ADMIN` 与 `ADMIN` 可放行，其余重定向到 `/403`。
+- **`/admin/*`（非 `/api/`）**：基于 JWT payload 中的 `role`，调用 `canAccessAdmin` 判定，仅 `SYSTEM_ADMIN` 与 `ADMIN` 可放行；另对 `SYSTEM_ADMIN_ONLY_PATHS`（系统设置、系统公告）要求 `isSystemAdmin`，其余重定向到 `/403`。
 - **`/api/admin/*`**：middleware **不**拦截，由 API 路由的 `withApi.admin` / `withApi.systemAdmin` 在 Node 层鉴权。
 - matcher 配置：`['/api/:path*', '/admin/:path*']`。
 

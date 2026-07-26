@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma'
 import { addJudgeJob } from '@/lib/judge/queue'
 import { logger } from '@/lib/logger'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
+import { parseComparisonMode } from '@/lib/judge/types'
+import type { TestCase } from '@prisma/client'
 import {
   createClassAssignmentSubmissionDirect,
   createSubmissionDirect,
@@ -60,9 +62,9 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
     throw new ApiError('ASSIGNMENT_NOT_STARTED', '作业尚未开始，无法提交', 403)
   }
 
-  const deadline = assignment.endTime ? new Date(assignment.endTime) : null
+  const endAt = assignment.endTime ? new Date(assignment.endTime) : null
   const now = new Date()
-  let isLate = deadline ? now > deadline : false
+  let isLate = endAt ? now > endAt : false
 
   if (status === 'ended') {
     if (!assignment.allowLateSubmission) {
@@ -143,9 +145,9 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
       language: input.language,
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
-      comparisonMode: problem.comparisonMode as any,
+      comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
-      testCases: problem.testCases.map((tc: any) => ({
+      testCases: problem.testCases.map((tc: TestCase) => ({
         id: tc.id,
         input: tc.input,
         output: tc.output,

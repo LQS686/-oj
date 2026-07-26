@@ -18,8 +18,8 @@ import { fetchWithCookie } from '@/lib/api/base'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
 import { PageContainer } from '@/components/layout'
 import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
-import { PageLoading } from '@/components/common'
-import { loginPath } from '@/lib/navigation'
+import { PageLoading, RouteSuspenseFallback } from '@/components/common'
+import { loginPathFromLocation } from '@/lib/navigation'
 
 type PermissionReason =
  | 'ADMIN'
@@ -196,7 +196,7 @@ function SolutionsListPageContent() {
 
  const handleWriteSolution = () => {
  if (!user) {
- router.push(loginPath())
+ router.push(loginPathFromLocation())
  return
  }
  setCreateOpen(true)
@@ -395,7 +395,7 @@ function SolutionsListPageContent() {
 
 export default function SolutionsListPage() {
  return (
- <Suspense fallback={<PageLoading label="加载中..." />}>
+ <Suspense fallback={<RouteSuspenseFallback label="加载中..." />}>
  <SolutionsListPageContent />
  </Suspense>
  )

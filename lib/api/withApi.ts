@@ -286,7 +286,7 @@ export function readQuery<T = Record<string, string>>(req: NextRequest): T {
 }
 
 /* ============================================================================
- * 向后兼容：从 lib/api/handler.ts 重新导出
+ * 从 lib/api/handler.ts / response.ts 重新导出
  * ========================================================================== */
 export { getCachedUser, clearAuthUserCache } from './handler'
 export { fail, ok, serverError, unauthorized, forbidden, notFound, badRequest, conflict, tooManyRequests } from './response'

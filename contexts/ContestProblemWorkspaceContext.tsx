@@ -9,7 +9,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Submission, JudgeStatusData } from '@/types/models'
+import type { JudgeStatusData } from '@/types/models'
+import type { SubmissionListRow } from '@/hooks/useSubmissionResultFlow'
 
 export interface ContestProblemItem {
   id: string
@@ -18,7 +19,7 @@ export interface ContestProblemItem {
   title: string
   problemNumber: string | null
   difficulty: string
-  status: 'Accepted' | 'Attempted' | null
+  status: 'AC' | 'Attempted' | null
 }
 
 export interface ContestMeta {
@@ -53,10 +54,10 @@ interface ContestProblemWorkspaceValue {
   setLastResult: (v: ContestProblemWorkspaceValue['lastResult']) => void
   currentSubmissionId: string | null
   setCurrentSubmissionId: (v: string | null) => void
-  activeTab: 'description' | 'submissions'
-  setActiveTab: (t: 'description' | 'submissions') => void
-  submissions: Submission[]
-  setSubmissions: React.Dispatch<React.SetStateAction<Submission[]>>
+  activeTab: 'description' | 'submissions' | 'code'
+  setActiveTab: (t: 'description' | 'submissions' | 'code') => void
+  submissions: SubmissionListRow[]
+  setSubmissions: React.Dispatch<React.SetStateAction<SubmissionListRow[]>>
   submissionsLoading: boolean
   setSubmissionsLoading: (v: boolean) => void
   registerSubmitHandler: (fn: () => void) => void
@@ -86,8 +87,10 @@ export function ContestProblemWorkspaceProvider({
   const [judgeProgress, setJudgeProgress] = useState<ContestProblemWorkspaceValue['judgeProgress']>(null)
   const [lastResult, setLastResult] = useState<ContestProblemWorkspaceValue['lastResult']>(null)
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'description' | 'submissions'>('description')
-  const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [activeTab, setActiveTab] = useState<'description' | 'submissions' | 'code'>(
+    'description'
+  )
+  const [submissions, setSubmissions] = useState<SubmissionListRow[]>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
 
   const submitHandlerRef = useRef<(() => void) | null>(null)

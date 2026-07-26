@@ -7,6 +7,7 @@ import type { Server as HTTPServer } from 'http'
 import type { Socket } from 'socket.io';
 import { Server as SocketIOServer } from 'socket.io'
 import { verifyToken, JWTPayload } from '@/lib/auth'
+import { canAccessAdmin } from '@/lib/permissions'
 import { logger } from '@/lib/logger'
 
 let io: SocketIOServer | null = null
@@ -26,9 +27,15 @@ const MAX_HEARTBEATS_PER_MINUTE = 30
 const ALLOWED_EVENT_TYPES = [
   'join',
   'leave',
+  'watchSubmission',
+  'unwatchSubmission',
   'ping',
   'pong',
 ] as const
+
+function submissionRoom(submissionId: string) {
+  return `submission:${submissionId}`
+}
 
 const connectionRateLimit = new Map<string, { count: number; resetAt: number }>()
 
@@ -55,9 +62,9 @@ function cleanupRateLimit(): void {
 
 rateLimitCleanupTimer = setInterval(cleanupRateLimit, 60 * 1000)
 
-async function authenticateSocket(socket: Socket): Promise<string | null> {
+async function authenticateSocket(socket: Socket): Promise<JWTPayload | null> {
   try {
-    const token = socket.handshake.auth.token || 
+    const token = socket.handshake.auth.token ||
                   socket.handshake.headers.authorization?.replace('Bearer ', '') ||
                   parseCookies(socket.handshake.headers.cookie || '').token
 
@@ -65,12 +72,7 @@ async function authenticateSocket(socket: Socket): Promise<string | null> {
       return null
     }
 
-    const payload = verifyToken(token)
-    if (!payload) {
-      return null
-    }
-
-    return payload.userId
+    return verifyToken(token)
   } catch (error) {
     logger.error('❌ Socket 认证失败:', error)
     return null
@@ -126,18 +128,23 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       credentials: true,
     },
     path: '/socket.io/',
+    // 仅 WebSocket：禁止 Engine.IO HTTP long-polling，降低延迟与代理歧义
+    transports: ['websocket'],
+    allowUpgrades: false,
     pingInterval: 10000,
     pingTimeout: 5000,
     maxHttpBufferSize: MAX_MESSAGE_SIZE,
   })
 
-  const connectedClients = new Map<string, { 
-    socketId: string, 
-    userId: string | null, 
-    connectedAt: number, 
-    heartbeatCount: number,
-    heartbeatWindowStart: number,
+  const connectedClients = new Map<string, {
+    socketId: string
+    userId: string | null
+    role: string | null
+    connectedAt: number
+    heartbeatCount: number
+    heartbeatWindowStart: number
     isAuthenticated: boolean
+    watchedSubmissionId: string | null
   }>()
 
   io.on('connection', async (socket) => {
@@ -151,18 +158,20 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       return
     }
 
-    const userId = await authenticateSocket(socket)
-    const isAuthenticated = userId !== null
+    const auth = await authenticateSocket(socket)
+    const isAuthenticated = auth !== null
 
     logger.info(`✅ 客户端连接: ${socket.id}, IP=${clientIP}, 认证=${isAuthenticated}, 剩余配额=${rateCheck.remaining}`)
     
     connectedClients.set(socket.id, {
       socketId: socket.id,
-      userId: userId,
+      userId: auth?.userId ?? null,
+      role: auth?.role ?? null,
       connectedAt: Date.now(),
       heartbeatCount: 0,
       heartbeatWindowStart: Date.now(),
-      isAuthenticated: isAuthenticated
+      isAuthenticated: isAuthenticated,
+      watchedSubmissionId: null,
     })
 
     // P0 修复：所有客户端（含未认证）默认加入公共广播房间，
@@ -186,7 +195,12 @@ export function initWebSocketServer(httpServer: HTTPServer) {
         return next(new Error('消息大小超过限制'))
       }
       
-      if (eventName === 'join' || eventName === 'leave') {
+      if (
+        eventName === 'join' ||
+        eventName === 'leave' ||
+        eventName === 'watchSubmission' ||
+        eventName === 'unwatchSubmission'
+      ) {
         if (!client?.isAuthenticated) {
           logger.warn(`🚫 未认证用户尝试访问私有房间: Socket=${socket.id}, 事件=${eventName}`)
           socket.emit('error', { event: eventName, message: '请先认证后再访问私有房间' })
@@ -259,6 +273,57 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       } catch (error) {
         logger.error('❌ 处理 leave 事件错误:', error)
         socket.emit('error', { event: 'leave', message: '处理离开房间失败' })
+      }
+    })
+
+    /** 管理员订阅单条提交房间（查看他人提交详情，不依赖选手 user 房间） */
+    socket.on('watchSubmission', (submissionId: string) => {
+      try {
+        const client = connectedClients.get(socket.id)
+        if (!client?.isAuthenticated || !client.userId) {
+          socket.emit('error', { event: 'watchSubmission', message: '请先认证' })
+          return
+        }
+        if (!submissionId || typeof submissionId !== 'string') {
+          socket.emit('error', { event: 'watchSubmission', message: '缺少 submissionId' })
+          return
+        }
+        if (!canAccessAdmin({ role: client.role })) {
+          socket.emit('error', { event: 'watchSubmission', message: '需要管理员权限' })
+          return
+        }
+        if (client.watchedSubmissionId) {
+          socket.leave(submissionRoom(client.watchedSubmissionId))
+        }
+        const room = submissionRoom(submissionId)
+        socket.join(room)
+        client.watchedSubmissionId = submissionId
+        connectedClients.set(socket.id, client)
+        logger.info(`管理员 ${client.userId} 订阅提交房间: ${room}`)
+        socket.emit('watchingSubmission', { submissionId, room })
+      } catch (error) {
+        logger.error('❌ 处理 watchSubmission 错误:', error)
+        socket.emit('error', { event: 'watchSubmission', message: '订阅提交失败' })
+      }
+    })
+
+    socket.on('unwatchSubmission', (submissionId?: string) => {
+      try {
+        const client = connectedClients.get(socket.id)
+        if (!client?.isAuthenticated) {
+          socket.emit('error', { event: 'unwatchSubmission', message: '请先认证' })
+          return
+        }
+        const targetId = submissionId || client.watchedSubmissionId
+        if (!targetId) return
+        socket.leave(submissionRoom(targetId))
+        if (client.watchedSubmissionId === targetId) {
+          client.watchedSubmissionId = null
+          connectedClients.set(socket.id, client)
+        }
+        socket.emit('unwatchedSubmission', { submissionId: targetId })
+      } catch (error) {
+        logger.error('❌ 处理 unwatchSubmission 错误:', error)
       }
     })
 
@@ -364,7 +429,26 @@ export function getIO(): SocketIOServer | null {
 /**
  * 发送提交状态更新到指定用户
  */
-export function emitSubmissionUpdate(userId: string, data: { id: string; status: string; score: number; time?: number; memory?: number; passedTests?: number; totalTests?: number; problemId?: string; message?: string; testResults?: any[]; timeElapsedMs?: number }) {
+export function emitSubmissionUpdate(userId: string, data: {
+  id: string
+  status: string
+  score: number
+  time?: number
+  memory?: number
+  passedTests?: number
+  totalTests?: number
+  problemId?: string
+  message?: string
+  testResults?: Array<{
+    testId: string
+    status: string
+    time: number
+    memory: number
+    message?: string
+  }>
+  timeElapsedMs?: number
+  assignmentSubmissionId?: string
+}) {
   const ioInstance = getIO()
   if (!ioInstance) {
     logger.warn('⚠️  WebSocket 服务器未初始化，跳过推送')
@@ -372,8 +456,10 @@ export function emitSubmissionUpdate(userId: string, data: { id: string; status:
   }
 
   const roomName = `user:${userId}`
+  const subRoom = submissionRoom(data.id)
   ioInstance.to(roomName).emit('submission:update', data)
-  logger.info(`📤 推送提交更新到用户 ${userId}:`, {
+  ioInstance.to(subRoom).emit('submission:update', data)
+  logger.info(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
     id: data.id,
     status: data.status,
     score: data.score,
@@ -395,8 +481,10 @@ export function emitJudgeProgress(userId: string, data: {
   if (!ioInstance) return
 
   const roomName = `user:${userId}`
+  const subRoom = submissionRoom(data.submissionId)
   ioInstance.to(roomName).emit('judge:progress', data)
-  logger.info(`📊 推送评测进度到用户 ${userId}: ${data.currentTest}/${data.totalTests}`)
+  ioInstance.to(subRoom).emit('judge:progress', data)
+  logger.info(`📊 推送评测进度到 ${roomName} / ${subRoom}: ${data.currentTest}/${data.totalTests}`)
 }
 
 /**
@@ -406,6 +494,8 @@ export function emitNotification(userId: string, notification: {
   type: 'info' | 'success' | 'warning' | 'error'
   title: string
   message: string
+  unreadCount?: number
+  id?: string
 }) {
   const ioInstance = getIO()
   if (!ioInstance) return

@@ -23,13 +23,20 @@ import {
   Loader2,
 } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
-import { getStatusText, getDifficultyColor } from '@/lib/status'
+import { getStatusText, getDifficultyClass } from '@/lib/status'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { fetchWithCookie } from '@/lib/api/base'
 import { PageContainer } from '@/components/layout'
 import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
+import {
+  isAcceptedStatus,
+  isCompileErrorStatus,
+  isFinalSubmissionStatus,
+  isNonFinalSubmissionStatus,
+  SubmissionStatus,
+} from '@/lib/constants/submission-status'
 
 interface TestResult {
   testId: string
@@ -75,31 +82,9 @@ interface SubmissionHistoryItem {
   language: string
 }
 
-const FINAL_STATUSES = new Set([
-  'AC', 'Accepted',
-  'WA', 'Wrong Answer',
-  'TLE', 'Time Limit Exceeded',
-  'MLE', 'Memory Limit Exceeded',
-  'RE', 'Runtime Error',
-  'CE', 'Compile Error',
-  'SE', 'System Error',
-  'PE', 'Presentation Error',
-  'OLE', 'Output Limit Exceeded',
-  'CSP',
-  'PC', 'Partly Correct',
-])
-
 function isFinalStatus(status: string | undefined | null): boolean {
   if (!status) return false
-  return FINAL_STATUSES.has(status)
-}
-
-function isPassStatus(status: string) {
-  return status === 'AC' || status === 'Accepted'
-}
-
-function isJudgingStatus(status: string) {
-  return ['Judging', 'Pending', 'Running', 'JUDGING', 'PENDING', 'RUNNING'].includes(status)
+  return isFinalSubmissionStatus(status)
 }
 
 function toCodeLanguage(lang: string): CodeLanguage {
@@ -109,26 +94,19 @@ function toCodeLanguage(lang: string): CodeLanguage {
 
 function getTestStatusIcon(status: string, className = 'w-4 h-4') {
   switch (status) {
-    case 'AC':
-    case 'Accepted':
+    case SubmissionStatus.ACCEPTED:
       return <CheckCircle className={`${className} text-secondary`} />
-    case 'WA':
-    case 'Wrong Answer':
+    case SubmissionStatus.WRONG_ANSWER:
       return <XCircle className={`${className} text-error`} />
-    case 'TLE':
-    case 'Time Limit Exceeded':
+    case SubmissionStatus.TIME_LIMIT_EXCEEDED:
       return <Clock className={`${className} text-accent`} />
-    case 'MLE':
-    case 'Memory Limit Exceeded':
+    case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
       return <Database className={`${className} text-info`} />
-    case 'RE':
-    case 'Runtime Error':
+    case SubmissionStatus.RUNTIME_ERROR:
       return <AlertTriangle className={`${className} text-warning`} />
-    case 'CE':
-    case 'Compile Error':
+    case SubmissionStatus.COMPILE_ERROR:
       return <Code className={`${className} text-muted-foreground`} />
-    case 'PC':
-    case 'Partly Correct':
+    case SubmissionStatus.PARTLY_CORRECT:
       return <CheckCircle2 className={`${className} text-[var(--difficulty-medium)]`} />
     default:
       return <AlertTriangle className={`${className} text-muted-foreground`} />
@@ -137,7 +115,7 @@ function getTestStatusIcon(status: string, className = 'w-4 h-4') {
 
 function StatusBadge({ status }: { status: string }) {
   const text = getStatusText(status)
-  if (isJudgingStatus(status)) {
+  if (isNonFinalSubmissionStatus(status)) {
     return (
       <span className="tag tag-info">
         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -145,7 +123,7 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     )
   }
-  if (isPassStatus(status)) {
+  if (isAcceptedStatus(status)) {
     return (
       <span className="tag tag-success">
         <CheckCircle className="w-3.5 h-3.5" />
@@ -153,7 +131,7 @@ function StatusBadge({ status }: { status: string }) {
       </span>
     )
   }
-  if (status === 'WA' || status === 'Wrong Answer') {
+  if (status === SubmissionStatus.WRONG_ANSWER) {
     return (
       <span className="tag tag-error">
         <XCircle className="w-3.5 h-3.5" />
@@ -170,8 +148,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function TestPointRow({ result, index }: { result: TestResult; index: number }) {
-  const isPass = isPassStatus(result.status)
-  const judging = isJudgingStatus(result.status)
+  const isPass = isAcceptedStatus(result.status)
+  const judging = isNonFinalSubmissionStatus(result.status)
   const hasMessage = !!result.message
   const [expanded, setExpanded] = useState(!isPass && hasMessage)
 
@@ -251,7 +229,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       } else {
         if (response.status === 404) {
           setSubmission((prev) => {
-            if (!prev) setError('提交记录不存在或已被删除。如果这是作业提交，请从作业页面查看详情。')
+            if (!prev) setError('提交记录不存在或已被删除。')
             return prev
           })
         } else {
@@ -311,45 +289,12 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         if (isFinalStatus(prev.status)) return prev
         return {
           ...prev,
-          status: data.status === 'Judging' || data.status === 'Pending' ? data.status : prev.status,
+          status: isNonFinalSubmissionStatus(data.status) ? data.status : prev.status,
           totalTests: data.totalTests || prev.totalTests,
         }
       })
     },
   })
-
-  useEffect(() => {
-    if (!submission) return
-    if (isFinalStatus(submission.status)) return
-
-    let intervalId: ReturnType<typeof setInterval> | null = null
-    const start = () => {
-      if (intervalId) return
-      intervalId = setInterval(() => fetchSubmission(), 3000)
-    }
-    const stop = () => {
-      if (intervalId) {
-        clearInterval(intervalId)
-        intervalId = null
-      }
-    }
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchSubmission()
-        start()
-      } else {
-        stop()
-      }
-    }
-
-    if (document.visibilityState === 'visible') start()
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      stop()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, submission?.status])
 
   useEffect(() => {
     if (submission) {
@@ -418,9 +363,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const isAc = isPassStatus(submission.status)
-  const isCe = submission.status === 'CE' || submission.status === 'Compile Error'
-  const judging = isJudgingStatus(submission.status)
+  const isAc = isAcceptedStatus(submission.status)
+  const isCe = isCompileErrorStatus(submission.status)
+  const judging = isNonFinalSubmissionStatus(submission.status)
   const problemHref = `/problem/${submission.problem.problemNumber || submission.problem.id}`
   const codeLines = submission.code ? submission.code.split('\n').length : 0
   const showTests =
@@ -474,7 +419,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
               {formatDateTime(submission.submittedAt)}
             </span>
             <span className="tag">{submission.language}</span>
-            <span className={`tag ${getDifficultyColor(submission.problem.difficulty)}`}>
+            <span className={`tag ${getDifficultyClass(submission.problem.difficulty)}`}>
               {submission.problem.difficulty}
             </span>
             <span className="hidden sm:inline text-border">·</span>

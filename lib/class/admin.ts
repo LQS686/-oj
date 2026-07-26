@@ -53,7 +53,7 @@ export async function adminUpdateClassVisibility(classId: string, isPublic: bool
 
 /**
  * 管理员更新班级信息（名称 / 描述 / 公告 / 头像 / 人数 / 可见性）
- * 仅传入的字段会被更新；若只更新可见性，保留原有提示文案以保持向后兼容。
+ * 仅传入的字段会被更新。
  */
 export async function adminUpdateClass(
   classId: string,

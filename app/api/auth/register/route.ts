@@ -77,7 +77,6 @@ export const POST = withApi.public(async (req) => {
 
   const response = NextResponse.json(
     {
-      ok: true,
       success: true,
       data: { user, token },
     },

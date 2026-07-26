@@ -1,5 +1,5 @@
 /**
- * 题目提交记录（公共题库 + 班级作业合并流）
+ * 题目提交记录（主 Submission 表；含作业关联提交）
  * GET /api/problems/[id]/submissions
  *
  * 权限策略：
@@ -9,7 +9,7 @@
  * 防止未登录用户通过题目详情页读取他人提交。
  */
 import { withApi, ok, readQuery, throw400, throw403, throw404 } from '@/lib/api/withApi'
-import { listProblemSubmissionsMerged } from '@/lib/problem/service'
+import { listProblemSubmissions } from '@/lib/problem/service'
 import { canAccessAdmin } from '@/lib/permissions'
 
 export const GET = withApi.auth(async (req, ctx, { user }) => {
@@ -20,11 +20,8 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
   const page = Math.max(1, parseInt(q.page || '1') || 1)
   const pageSize = Math.max(1, parseInt(q.pageSize || '20') || 20)
 
-  // 权限校验：普通用户仅能查询自己的提交记录；
-  // 仅管理员可查看所有人的提交（不限定 userId）。
   const isAdmin = canAccessAdmin(user)
   if (!isAdmin) {
-    // 普通用户请求他人提交时直接拒绝（防止越权）
     if (q.userId && q.userId !== user.id) {
       throw403('只能查看自己的提交记录')
     }
@@ -32,7 +29,7 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
 
   const effectiveUserId = isAdmin ? q.userId : user.id
 
-  const result = await listProblemSubmissionsMerged(id, {
+  const result = await listProblemSubmissions(id, {
     page,
     pageSize,
     userId: effectiveUserId,

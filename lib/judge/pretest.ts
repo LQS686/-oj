@@ -92,7 +92,7 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
   const { code, language, timeLimit, memoryLimit, comparisonMode = 'default', realPrecision = 3, testCases } = options
 
   const baseResult: PretestResult = {
-    status: 'Judging',
+    status: 'JUDGING',
     passedTests: 0,
     totalTests: testCases.length,
     time: 0,

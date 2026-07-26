@@ -1,6 +1,5 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
 import ContestHeader from './ContestHeader'
 import { PageContainer } from '@/components/layout'
@@ -13,7 +12,7 @@ interface Contest {
   type: string
 }
 
-/** 进入单题详情时隐藏竞赛顶栏（倒计时改在右侧栏） */
+/** 与作业页一致：workspace 宽度 + 顶栏卡片 + 内容区 */
 export default function ContestHeaderShell({
   contest,
   canViewDetails,
@@ -23,17 +22,12 @@ export default function ContestHeaderShell({
   canViewDetails: boolean
   children: ReactNode
 }) {
-  const pathname = usePathname()
-  const hideHeader = /^\/contests\/[^/]+\/problems\/[^/]+$/.test(pathname)
-
   return (
-    <div className="min-h-screen bg-background">
-      {!hideHeader && <ContestHeader contest={contest} canViewDetails={canViewDetails} />}
-      {hideHeader ? (
-        <>{children}</>
-      ) : (
-        <PageContainer variant="full" className="py-6">{children}</PageContainer>
-      )}
+    <div className="min-h-screen bg-background pb-20 lg:pb-6">
+      <PageContainer variant="workspace" className="py-4">
+        <ContestHeader contest={contest} canViewDetails={canViewDetails} />
+        {children}
+      </PageContainer>
     </div>
   )
 }

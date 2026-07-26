@@ -9,7 +9,7 @@ import { redistributeTestScores, deleteTestCaseFiles } from '@/lib/problem/testc
 import { trimAll, escapeHtml } from '@/lib/sanitize'
 import { ApiError } from '@/lib/api/withApi'
 import { logger } from '@/lib/logger'
-import { DIFFICULTIES, isValidDifficulty, migrateDifficulty } from '@/lib/constants'
+import { DIFFICULTIES, isValidDifficulty } from '@/lib/constants'
 
 /* ============================================================================
  * 管理员视角：列出全部题目（含隐藏字段）/ 创建题目（含自动编号）
@@ -178,19 +178,13 @@ export async function createAdminProblem(
   if (typeof description !== 'string' || description.length < 10) {
     throw new ApiError('INVALID_DESCRIPTION', '题目描述至少需要10个字符', 400)
   }
-  // 难度校验：统一使用洛谷 8 档标准（lib/constants.ts）
-  // - 合法 8 档直接通过
-  // - 旧版 4 档（简单/中等/困难）或英文值自动迁移为 8 档标准
-  // - 完全无法识别的值拒绝
+  // 难度校验：仅接受洛谷 8 档标准（lib/constants.ts）
   if (!isValidDifficulty(difficulty)) {
-    // 尝试旧版迁移；若仍不是合法 8 档则拒绝
-    if (!isValidDifficulty(migrateDifficulty(difficulty))) {
-      throw new ApiError(
-        'INVALID_DIFFICULTY',
-        `难度值无效，必须是 8 档之一：${DIFFICULTIES.join(' / ')}（旧版简单/中等/困难将自动迁移）`,
-        400
-      )
-    }
+    throw new ApiError(
+      'INVALID_DIFFICULTY',
+      `难度值无效，必须是 8 档之一：${DIFFICULTIES.join(' / ')}`,
+      400
+    )
   }
   if (timeLimit !== undefined && timeLimit !== null) {
     const t = parseLimit(timeLimit, 1000)
@@ -374,11 +368,10 @@ export async function updateAdminProblem(
     }
   }
   if (body.difficulty !== undefined && body.difficulty !== null) {
-    // 难度校验：8 档直接通过 / 旧版自动迁移 / 完全无法识别拒绝
-    if (!isValidDifficulty(body.difficulty) && !isValidDifficulty(migrateDifficulty(body.difficulty))) {
+    if (!isValidDifficulty(body.difficulty)) {
       throw new ApiError(
         'INVALID_DIFFICULTY',
-        `难度值无效，必须是 8 档之一：${DIFFICULTIES.join(' / ')}（旧版简单/中等/困难将自动迁移）`,
+        `难度值无效，必须是 8 档之一：${DIFFICULTIES.join(' / ')}`,
         400
       )
     }

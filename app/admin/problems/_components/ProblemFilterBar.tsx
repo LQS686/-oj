@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Search, ChevronDown, Check, X, RotateCcw } from 'lucide-react'
 import { FilterBar } from '@/components/admin'
 import { DIFFICULTIES } from '@/lib/constants'
-import { getDifficultyColor } from '@/lib/status'
+import { getDifficultyClass } from '@/lib/status'
 import { countActiveFilters, type ProblemFilters } from '../_utils'
 
 interface ProblemFilterBarProps {
@@ -205,7 +205,10 @@ export function ProblemFilterBar({
                       : 'border-border bg-background text-muted-foreground hover:bg-muted'
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${getDifficultyColor(d)}`} />
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: `var(--${getDifficultyClass(d)})` }}
+                  />
                   {d}
                 </button>
               )

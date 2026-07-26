@@ -179,7 +179,7 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
   logger.info('[chunk-direct] enter', { contentType: contentType.substring(0, 80), method: req.method })
   if (!contentType.includes('multipart/form-data')) {
     logger.warn('[chunk-direct] INVALID_CONTENT_TYPE', { contentType })
-    writeJson(res, 400, { ok: false, code: 'INVALID_CONTENT_TYPE', error: '请求必须是 multipart/form-data' })
+    writeJson(res, 400, { success: false, code: 'INVALID_CONTENT_TYPE', error: '请求必须是 multipart/form-data' })
     return true
   }
 
@@ -187,7 +187,7 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
   const user = await getUserFromRawRequest(req)
   logger.info('[chunk-direct] auth', { hasUser: !!user, userId: user?.id?.slice(0, 8) })
   if (!user) {
-    writeJson(res, 401, { ok: false, code: 'UNAUTHORIZED', error: '未登录' })
+    writeJson(res, 401, { success: false, code: 'UNAUTHORIZED', error: '未登录' })
     return true
   }
 
@@ -197,18 +197,18 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
     logger.info('[chunk-direct] body read', { size: body.length })
   } catch (e: any) {
     if (e?.message === 'PAYLOAD_TOO_LARGE') {
-      writeJson(res, 413, { ok: false, code: 'PAYLOAD_TOO_LARGE', error: '请求体过大' })
+      writeJson(res, 413, { success: false, code: 'PAYLOAD_TOO_LARGE', error: '请求体过大' })
       return true
     }
     logger.error('读取 chunk body 失败', e instanceof Error ? e : new Error(String(e)))
-    writeJson(res, 500, { ok: false, code: 'READ_FAILED', error: '读取请求失败' })
+    writeJson(res, 500, { success: false, code: 'READ_FAILED', error: '读取请求失败' })
     return true
   }
 
   const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i)
   const boundary = boundaryMatch?.[1] || boundaryMatch?.[2]
   if (!boundary) {
-    writeJson(res, 400, { ok: false, code: 'INVALID_BOUNDARY', error: 'multipart boundary 缺失' })
+    writeJson(res, 400, { success: false, code: 'INVALID_BOUNDARY', error: 'multipart boundary 缺失' })
     return true
   }
 
@@ -225,7 +225,7 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
       hasFile: !!filePart,
       fileHasFilename: !!filePart?.filename,
     })
-    writeJson(res, 400, { ok: false, code: 'INVALID_PARAMS', error: 'Invalid params' })
+    writeJson(res, 400, { success: false, code: 'INVALID_PARAMS', error: 'Invalid params' })
     return true
   }
 
@@ -235,7 +235,7 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
 
   if (!isValidUploadId(uploadId)) {
     logger.warn('[chunk-direct] INVALID_UPLOAD_ID', { uploadId })
-    writeJson(res, 400, { ok: false, code: 'INVALID_UPLOAD_ID', error: '无效的上传ID' })
+    writeJson(res, 400, { success: false, code: 'INVALID_UPLOAD_ID', error: '无效的上传ID' })
     return true
   }
 
@@ -244,28 +244,28 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
   } catch (e) {
     if (e instanceof ApiError) {
       logger.warn('[chunk-direct] 鉴权失败', { code: e.code, message: e.message, uploadId: uploadId.slice(0, 8), userId: user.id.slice(0, 8) })
-      writeJson(res, e.status, { ok: false, code: e.code, error: e.message })
+      writeJson(res, e.status, { success: false, code: e.code, error: e.message })
       return true
     }
     throw e
   }
 
   if (isNaN(chunkIndex) || chunkIndex < 0 || chunkIndex > MAX_CHUNK_INDEX) {
-    writeJson(res, 400, { ok: false, code: 'INVALID_CHUNK_INDEX', error: `chunkIndex 超出范围 (0-${MAX_CHUNK_INDEX})` })
+    writeJson(res, 400, { success: false, code: 'INVALID_CHUNK_INDEX', error: `chunkIndex 超出范围 (0-${MAX_CHUNK_INDEX})` })
     return true
   }
 
   if (chunkBuffer.length > MAX_CHUNK_SIZE) {
-    writeJson(res, 400, { ok: false, code: 'CHUNK_TOO_LARGE', error: `分片大小超过限制 (Max ${MAX_CHUNK_SIZE} bytes)` })
+    writeJson(res, 400, { success: false, code: 'CHUNK_TOO_LARGE', error: `分片大小超过限制 (Max ${MAX_CHUNK_SIZE} bytes)` })
     return true
   }
 
   try {
     await saveChunk(uploadId, chunkIndex, chunkBuffer)
-    writeJson(res, 200, { ok: true, success: true, data: {} })
+    writeJson(res, 200, { success: true, data: {} })
   } catch (e) {
     logger.error('saveChunk 失败', e instanceof Error ? e : new Error(String(e)))
-    writeJson(res, 500, { ok: false, code: 'SAVE_FAILED', error: '保存分片失败' })
+    writeJson(res, 500, { success: false, code: 'SAVE_FAILED', error: '保存分片失败' })
   }
   return true
 }

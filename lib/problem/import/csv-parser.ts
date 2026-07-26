@@ -13,7 +13,7 @@
  *   sample_output      样例输出
  *   hint               提示
  *   source             来源
- *   difficulty         难度（8 档之一，缺省由 service 兜底）
+ *   difficulty         难度（必须是 8 档之一；缺省用 ImportOptions.defaultDifficulty）
  *   tags               标签（逗号分隔，整行用引号包裹）
  *   timeLimit          时间限制 ms（默认 1000）
  *   memoryLimit        内存限制 MB（默认 128）

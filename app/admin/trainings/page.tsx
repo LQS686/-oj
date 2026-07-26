@@ -14,7 +14,7 @@ import {
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
-import { PageLoading, useDialog } from '@/components/common'
+import { PageLoading, useDialog, RouteSuspenseFallback } from '@/components/common'
 import AdminCreateTrainingModal from '@/components/admin/AdminCreateTrainingModal'
 
 interface AdminTraining {
@@ -287,7 +287,7 @@ function AdminTrainingsPageContent() {
 
 export default function AdminTrainingsPage() {
  return (
- <Suspense fallback={<PageLoading />}>
+ <Suspense fallback={<RouteSuspenseFallback label="加载中" />}>
  <AdminTrainingsPageContent />
  </Suspense>
  )

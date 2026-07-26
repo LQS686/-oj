@@ -29,7 +29,7 @@ export default function AnnouncementDetailPage() {
         setError('')
         const res = await fetchWithCookie(`/api/announcements/${id}`)
         const json = await res.json()
-        if (!json.success && !json.ok) {
+        if (!json.success) {
           throw new Error(json.error || '加载失败')
         }
         if (!cancelled) setItem(json.data)

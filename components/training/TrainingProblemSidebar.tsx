@@ -47,7 +47,7 @@ export default function TrainingProblemSidebar() {
           {trainingProblems.map((tp, index) => {
             const letter = tp.label || LETTERS[index] || String(index + 1)
             const isActive = tp.id === problemId
-            const isAccepted = tp.status === 'Accepted'
+            const isAccepted = tp.status === 'AC'
             const isAttempted = tp.status === 'Attempted'
             return (
               <Link

@@ -179,7 +179,7 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
 
   const result: JudgeResult = {
     submissionId: job.submissionId,
-    status: 'Judging',
+    status: 'JUDGING',
     score: 0,
     time: 0,
     memory: 0,
@@ -243,7 +243,7 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
           submissionId: job.submissionId,
           currentTest,
           totalTests: job.testCases.length,
-          status: 'Judging',
+          status: 'JUDGING',
         })
 
         // 计算单测点有效限制

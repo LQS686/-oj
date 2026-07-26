@@ -59,36 +59,7 @@ export function isValidDifficulty(value: unknown): value is Difficulty {
  * 将任意难度值规范化为合法难度档位
  * - 合法值直接返回
  * - 非法值返回 fallback（默认 '入门'）
- *
- * 用于兼容旧数据 / 用户输入，确保落库的 difficulty 始终是 8 档之一。
  */
 export function normalizeDifficulty(value: unknown, fallback: Difficulty = '入门'): Difficulty {
   return isValidDifficulty(value) ? value : fallback
-}
-
-/** 旧版兼容映射（4 档简化版 → 8 档标准版），用于历史数据迁移 / 用户旧输入兼容 */
-export const LEGACY_DIFFICULTY_MAP: Record<string, Difficulty> = {
-  '简单': '普及-',
-  '中等': '普及',
-  '困难': '提高',
-  'easy': '入门',
-  'medium': '普及',
-  'hard': '提高',
-  'Easy': '入门',
-  'Medium': '普及',
-  'Hard': '提高',
-}
-
-/**
- * 将旧版难度值转换为 8 档标准版
- * - 已是 8 档之一的直接返回
- * - 旧版 4 档 / 英文值按映射表转换
- * - 无法识别的返回 fallback
- */
-export function migrateDifficulty(value: unknown, fallback: Difficulty = '入门'): Difficulty {
-  if (isValidDifficulty(value)) return value
-  if (typeof value === 'string' && value in LEGACY_DIFFICULTY_MAP) {
-    return LEGACY_DIFFICULTY_MAP[value]
-  }
-  return fallback
 }

@@ -20,9 +20,15 @@ import {
 } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText } from '@/lib/status'
+import {
+  isAcceptedStatus,
+  isNonFinalSubmissionStatus,
+  NON_FINAL_STATUS_QUERY,
+  SubmissionStatus,
+} from '@/lib/constants/submission-status'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { EducationalPageShell, PageLoading, RouteSuspenseFallback } from '@/components/common'
 import { loginPath } from '@/lib/navigation'
 import { canAccessAdmin } from '@/lib/permissions'
 
@@ -55,7 +61,7 @@ const STATUS_GROUPS: { key: string; label: string; status: string }[] = [
   { key: 'all', label: '全部', status: '' },
   { key: 'ac', label: '通过', status: 'AC' },
   { key: 'failed', label: '失败', status: 'WA,TLE,MLE,CE,RE' },
-  { key: 'pending', label: '等待', status: 'PENDING,JUDGING,RUNNING,Pending,Judging,Running' },
+  { key: 'pending', label: '等待', status: NON_FINAL_STATUS_QUERY },
 ]
 
 const LANGUAGES = [
@@ -182,7 +188,7 @@ function SubmissionsContent() {
 
   const getStatusBadge = (status: string) => {
     const text = getStatusText(status)
-    if (status === 'AC') {
+    if (isAcceptedStatus(status)) {
       return (
         <span className="tag tag-success">
           <CheckCircle className="w-3 h-3" />
@@ -190,7 +196,7 @@ function SubmissionsContent() {
         </span>
       )
     }
-    if (status === 'WA') {
+    if (status === SubmissionStatus.WRONG_ANSWER) {
       return (
         <span className="tag tag-error">
           <XCircle className="w-3 h-3" />
@@ -198,7 +204,7 @@ function SubmissionsContent() {
         </span>
       )
     }
-    if (['PENDING', 'JUDGING', 'RUNNING', 'Pending', 'Judging', 'Running'].includes(status)) {
+    if (isNonFinalSubmissionStatus(status)) {
       return (
         <span className="tag tag-info">
           <Clock className="w-3 h-3" />
@@ -599,7 +605,7 @@ function SubmissionsContent() {
 
 export default function SubmissionsPage() {
   return (
-    <Suspense fallback={<PageLoading label="加载中..." />}>
+    <Suspense fallback={<RouteSuspenseFallback label="加载中..." />}>
       <SubmissionsContent />
     </Suspense>
   )

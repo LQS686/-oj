@@ -9,8 +9,9 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Submission, JudgeStatusData } from '@/types/models'
+import type { JudgeStatusData } from '@/types/models'
 import type { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
+import type { SubmissionListRow } from '@/hooks/useSubmissionResultFlow'
 
 export interface TrainingProblemItem {
   id: string
@@ -19,7 +20,7 @@ export interface TrainingProblemItem {
   title: string
   problemNumber: string | null
   difficulty: string
-  status: 'Accepted' | 'Attempted' | null
+  status: 'AC' | 'Attempted' | null
 }
 
 export interface TrainingMeta {
@@ -55,8 +56,8 @@ interface TrainingProblemWorkspaceValue {
   setCurrentSubmissionId: (v: string | null) => void
   activeTab: 'description' | 'solutions' | 'submissions'
   setActiveTab: (t: TrainingProblemWorkspaceValue['activeTab']) => void
-  submissions: Submission[]
-  setSubmissions: React.Dispatch<React.SetStateAction<Submission[]>>
+  submissions: SubmissionListRow[]
+  setSubmissions: React.Dispatch<React.SetStateAction<SubmissionListRow[]>>
   submissionsLoading: boolean
   setSubmissionsLoading: (v: boolean) => void
   registerSubmitHandler: (fn: () => void) => void
@@ -88,7 +89,7 @@ export function TrainingProblemWorkspaceProvider({
   const [showResultModal, setShowResultModal] = useState(false)
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions'>('description')
-  const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [submissions, setSubmissions] = useState<SubmissionListRow[]>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
 
   const submitHandlerRef = useRef<(() => void) | null>(null)

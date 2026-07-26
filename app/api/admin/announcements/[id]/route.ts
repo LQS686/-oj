@@ -1,12 +1,12 @@
 /**
- * /api/admin/announcements/[id]
+ * /api/admin/announcements/[id] — 仅 SYSTEM_ADMIN
  */
 import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import { deleteAnnouncement, updateAnnouncement } from '@/lib/announcement/service'
 import { prisma } from '@/lib/prisma'
 
-export const PATCH = withApi.admin(async (req, ctx) => {
+export const PATCH = withApi.systemAdmin(async (req, ctx) => {
   const { id: resolved } = ctx.params
   if (!isObjectId(resolved)) throw400('INVALID_ID', '无效的公告 ID')
 
@@ -40,12 +40,12 @@ export const PATCH = withApi.admin(async (req, ctx) => {
   return ok({ id: updated?.id })
 })
 
-export const DELETE = withApi.admin(async (_req, ctx) => {
+export const DELETE = withApi.systemAdmin(async (_req, ctx) => {
   const { id: resolved } = ctx.params
   if (!isObjectId(resolved)) throw400('INVALID_ID', '无效的公告 ID')
 
   const existing = await prisma.systemAnnouncement.findUnique({ where: { id: resolved } })
-  if (!existing) throw400('NOT_FOUND', '公告不存在')
+  if (!existing) throw404('公告不存在')
 
   await deleteAnnouncement(resolved)
   return ok({ id: resolved })

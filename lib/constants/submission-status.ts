@@ -1,13 +1,7 @@
 /**
  * 提交评测状态统一枚举（lib/constants/submission-status.ts）
  *
- * 唯一真相源：所有写入 Submission.status 的字面量必须来自本枚举。
- * 前端渲染 getStatusConfig() 同时支持短码与长文本两种形态以兼容历史数据。
- *
- * 设计原则：
- *  - 短码（2~3 个大写字母）方便 SQL/索引与人工阅读；
- *  - 系统内部状态（Pending/Judging/Running/SE）也集中在此，避免散落字面量；
- *  - SYSTEM_ERROR = 'SE' 是兼容历史代码中误用的字面量，规范写法应是 SYSTEM_ERROR。
+ * 唯一真相源：读写一律使用本枚举字面量，不做历史写法兼容。
  */
 
 export const SubmissionStatus = {
@@ -65,10 +59,24 @@ export function assertSubmissionStatus(value: unknown): SubmissionStatusValue {
   return value
 }
 
-/** 状态机：从当前状态推断允许的下一状态（防御非法转换） */
+/**
+ * 若已是枚举值则原样返回，否则返回空串。
+ * 不做驼峰/长文本映射。
+ */
+export function normalizeStatus(value: unknown): string {
+  if (!isSubmissionStatus(value)) return ''
+  return value
+}
+
+/** 状态机：从当前状态推断允许的下一状态 */
 const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
-  PENDING: new Set([SubmissionStatus.JUDGING, SubmissionStatus.RUNNING, SubmissionStatus.SYSTEM_ERROR, SubmissionStatus.REMOVED]),
-  JUDGING: new Set([
+  [SubmissionStatus.PENDING]: new Set([
+    SubmissionStatus.JUDGING,
+    SubmissionStatus.RUNNING,
+    SubmissionStatus.SYSTEM_ERROR,
+    SubmissionStatus.REMOVED,
+  ]),
+  [SubmissionStatus.JUDGING]: new Set([
     SubmissionStatus.RUNNING,
     SubmissionStatus.ACCEPTED,
     SubmissionStatus.WRONG_ANSWER,
@@ -83,7 +91,7 @@ const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
     SubmissionStatus.SYSTEM_ERROR,
     SubmissionStatus.REMOVED,
   ]),
-  RUNNING: new Set([
+  [SubmissionStatus.RUNNING]: new Set([
     SubmissionStatus.ACCEPTED,
     SubmissionStatus.WRONG_ANSWER,
     SubmissionStatus.RUNTIME_ERROR,
@@ -107,123 +115,26 @@ const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
   [SubmissionStatus.PRESENTATION_ERROR]: new Set([SubmissionStatus.SYSTEM_ERROR]),
   [SubmissionStatus.PARTLY_CORRECT]: new Set([SubmissionStatus.SYSTEM_ERROR]),
   [SubmissionStatus.CHECKER_SPECIAL_PROBLEM]: new Set([SubmissionStatus.SYSTEM_ERROR]),
-  // REMOVED：严格终态，不允许转出到任何状态（孤儿提交保留记录但不再参与统计/评测）
+  // REMOVED：严格终态
   [SubmissionStatus.REMOVED]: new Set([]),
 }
 
 /**
- * 历史数据兼容性：早期代码用 'Pending'/'Judging' 大驼峰 + 'Accepted' 长文本，
- * 后期用 'PENDING'/'JUDGING' 大写下划线 + 'AC' 短码。
- * 这里统一抽象为 toUpperCase + 比较，并支持大驼峰 → 短码的映射。
- */
-function normalizeInput(value: unknown): string {
-  return typeof value === 'string' ? value.trim().toUpperCase().replace(/-/g, '_') : ''
-}
-
-/**
- * 大驼峰 → 枚举短码映射（兼容历史写法）。
- *   - normalizeStatus 把 'WrongAnswer' 转成 'WRONG_ANSWER'（下划线连接），
- *     然后查表映射到 'WA'。
- *   - 'PENDING'/'JUDGING' 是枚举值本身就 upper，不在 LEGACY_TO_ENUM 中。
- */
-const LEGACY_TO_ENUM: Record<string, string> = {
-  PENDING: 'PENDING',
-  JUDGING: 'JUDGING',
-  RUNNING: 'RUNNING',
-  ACCEPTED: 'AC',
-  WRONG_ANSWER: 'WA',
-  COMPILE_ERROR: 'CE',
-  RUNTIME_ERROR: 'RE',
-  TIME_LIMIT_EXCEEDED: 'TLE',
-  MEMORY_LIMIT_EXCEEDED: 'MLE',
-  OUTPUT_LIMIT_EXCEEDED: 'OLE',
-  PRESENTATION_ERROR: 'PE',
-  PARTLY_CORRECT: 'PC',
-  CHECKER_SPECIAL_PROBLEM: 'CSP',
-  SYSTEM_ERROR: 'SE',
-  REMOVED: 'removed',
-}
-
-/**
- * 字符串归一化：驼峰 → 下划线连接大写。
- *   'WrongAnswer' -> 'WRONG_ANSWER'
- *   'MemoryLimitExceeded' -> 'MEMORY_LIMIT_EXCEEDED'
- *   'AC' -> 'AC'（已是短码）
- *   'PENDING' -> 'PENDING'
- */
-function toSnakeUpper(s: string): string {
-  return s
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/[-\s]+/g, '_')
-    .toUpperCase()
-}
-
-/**
- * 类型守卫：判断 value 是否为合法的 SubmissionStatus 字符串（兼容历史写法）。
- *   支持 'AC' / 'ACCEPTED' / 'Accepted' 三种写法。
- */
-export function isValidStatus(value: unknown): value is string {
-  const n = normalizeInput(value)
-  if (!n) return false
-  // 已是枚举短码
-  if (ALL_SUBMISSION_STATUSES.has(n)) return true
-  // 转为大写下划线后查表
-  const snake = toSnakeUpper(n)
-  if (ALL_SUBMISSION_STATUSES.has(snake)) return true
-  if (snake in LEGACY_TO_ENUM) return true
-  return false
-}
-
-/**
- * 标准化：将历史短码或大驼峰写法映射到标准枚举值。
- *   'AC' -> 'AC'（已是枚举值）
- *   'Accepted' -> 'AC'
- *   'WA' -> 'WA'
- *   'CE' -> 'CE'
- *   'SE' -> 'SE'
- * 未知值原样返回（不抛错，便于兼容未来扩展）。
- */
-export function normalizeStatus(value: unknown): string {
-  if (typeof value !== 'string') return ''
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  // 1) 已是枚举短码（AC/WA/CE 等）
-  if (ALL_SUBMISSION_STATUSES.has(trimmed)) return trimmed
-  // 2) 转为大写下划线（含 'Accepted' → 'ACCEPTED' 和 'WrongAnswer' → 'WRONG_ANSWER'）
-  const snakeUpper = toSnakeUpper(trimmed)
-  if (ALL_SUBMISSION_STATUSES.has(snakeUpper)) return snakeUpper
-  // 3) 通过 LEGACY_TO_ENUM 映射
-  const mapped = LEGACY_TO_ENUM[snakeUpper]
-  if (mapped) return mapped
-  // 4) 未知值返回原始大写下划线形式（便于日志调试）
-  return snakeUpper
-}
-
-/**
- * 状态机转换校验（自动归一化两端）。
- *   输入 'Accepted' -> 'AC' 后再查表；'Pending' -> 'PENDING' 后查表。
- *
- * fail-closed 策略：
- *   - 空源状态放行（recover / 首次创建场景，无源状态可校验）
- *   - 非空未知源状态拒绝转换，防止新增枚举值未及时维护 ALLOWED_TRANSITIONS
- *     时状态机保护形同虚设。
+ * 状态机转换校验（仅接受枚举字面量）。
+ * 空源状态放行（recover / 首次创建）；未知非空源状态拒绝。
  */
 export function canTransition(from: string, to: string): boolean {
-  const f = normalizeStatus(from) || from
-  const t = normalizeStatus(to) || to
-  // 空源状态放行（recover / 首次创建场景）
-  if (!f) return true
-  const allowed = ALLOWED_TRANSITIONS[f]
+  if (!from) return true
+  const allowed = ALLOWED_TRANSITIONS[from]
   if (!allowed) {
-    // fail-closed：未知非空源状态拒绝任何转换，需显式登记到 ALLOWED_TRANSITIONS
     if (typeof console !== 'undefined') {
       console.warn(
-        `[submission-status] canTransition 拒绝未知源状态: from=${f}, to=${t}`
+        `[submission-status] canTransition 拒绝未知源状态: from=${from}, to=${to}`
       )
     }
     return false
   }
-  return allowed.has(t)
+  return allowed.has(to)
 }
 
 const NON_FINAL_STATUSES = new Set<string>([
@@ -232,14 +143,29 @@ const NON_FINAL_STATUSES = new Set<string>([
   SubmissionStatus.RUNNING,
 ])
 
-/** 是否仍在评测流程中（兼容 PENDING / Pending 等历史写法） */
+/** 是否仍在评测流程中 */
 export function isNonFinalSubmissionStatus(status: unknown): boolean {
-  if (typeof status !== 'string' || !status.trim()) return false
-  return NON_FINAL_STATUSES.has(normalizeStatus(status))
+  return typeof status === 'string' && NON_FINAL_STATUSES.has(status)
 }
 
 /** 是否已出终态结果 */
 export function isFinalSubmissionStatus(status: unknown): boolean {
-  if (typeof status !== 'string' || !status.trim()) return false
-  return !isNonFinalSubmissionStatus(status)
+  return typeof status === 'string' && status.length > 0 && !isNonFinalSubmissionStatus(status)
 }
+
+/** 是否通过 */
+export function isAcceptedStatus(status: unknown): boolean {
+  return status === SubmissionStatus.ACCEPTED
+}
+
+/** 是否编译错误 */
+export function isCompileErrorStatus(status: unknown): boolean {
+  return status === SubmissionStatus.COMPILE_ERROR
+}
+
+/** 非终态查询（列表筛选「等待/评测中」） */
+export const NON_FINAL_STATUS_QUERY = [
+  SubmissionStatus.PENDING,
+  SubmissionStatus.JUDGING,
+  SubmissionStatus.RUNNING,
+].join(',')

@@ -24,6 +24,17 @@ export function formatMemory(kb: number): string {
 }
 
 /**
+ * 将 Date / ISO 字符串转为 `<input type="datetime-local">` 所需的本地时间
+ * （YYYY-MM-DDTHH:mm）。不可用 toISOString().slice(0,16)，否则会按 UTC 显示。
+ */
+export function toLocalDatetimeInput(date: Date | string | number): string {
+  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/**
  * 统一格式化日期时间：YYYY-MM-DD HH:mm
  * 用于提交时间、创建时间、公告发布时间等需要精确到分钟的场景
  */
@@ -63,6 +74,28 @@ export function formatDateTimeShort(date: Date | string | number): string {
   const h = String(d.getHours()).padStart(2, '0')
   const min = String(d.getMinutes()).padStart(2, '0')
   return `${M}-${day} ${h}:${min}`
+}
+
+/**
+ * 格式化时长（分钟 → 可读字符串）
+ * 用于竞赛时长等：10080 →「7 天」，150 →「2 小时 30 分钟」
+ */
+export function formatDurationMinutes(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) return '—'
+  const m = Math.round(minutes)
+  if (m < 60) return `${m} 分钟`
+
+  const days = Math.floor(m / (60 * 24))
+  const hours = Math.floor((m % (60 * 24)) / 60)
+  const mins = m % 60
+
+  if (days > 0) {
+    if (hours === 0 && mins === 0) return `${days} 天`
+    if (mins === 0) return `${days} 天 ${hours} 小时`
+    return `${days} 天 ${hours} 小时`
+  }
+  if (mins === 0) return `${hours} 小时`
+  return `${hours} 小时 ${mins} 分钟`
 }
 
 /**

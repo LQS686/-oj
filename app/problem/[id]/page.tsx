@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, use, useMemo } from 'react'
+import { useState, useEffect, use, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen,
@@ -19,7 +19,6 @@ import {
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
-import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
@@ -27,7 +26,7 @@ import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import ProblemStatsPanel from '@/components/problem/ProblemStatsPanel'
 import PretestPanel from '@/components/problem/PretestPanel'
-import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
+import SubmissionResultModal from '@/components/submission/SubmissionResultModal'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canManageContent } from '@/lib/permissions'
@@ -36,11 +35,13 @@ import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import toast from 'react-hot-toast'
 import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { PageContainer } from '@/components/layout'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
 import {
-  isFinalSubmissionStatus,
-  isNonFinalSubmissionStatus,
-} from '@/lib/constants/submission-status'
+  createPendingListRow,
+  defaultMergeSubmissionList,
+  useSubmissionResultFlow,
+  type SubmissionListRow,
+} from '@/hooks/useSubmissionResultFlow'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -83,18 +84,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('cpp')
   const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions' | 'stats' | 'code'>('description')
-  const [submitting, setSubmitting] = useState(false)
-  const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
-  const [judgeStatus, setJudgeStatus] = useState<any>(null)
-  const [judgeProgress, setJudgeProgress] = useState<{ currentTest: number; totalTests: number } | null>(null)
-  const [lastResult, setLastResult] = useState<SubmissionResultData | null>(null)
-  const [showResultModal, setShowResultModal] = useState(false)
-  
+
   const [problem, setProblem] = useState<any>(null)
   const [problemLoading, setProblemLoading] = useState(true)
   const [problemError, setProblemError] = useState<string | null>(null)
-  
-  const [submissions, setSubmissions] = useState<any[]>([])
+
+  const [submissions, setSubmissions] = useState<SubmissionListRow[]>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
 
@@ -226,29 +221,6 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     return () => window.removeEventListener('resize', handleResize)
   }, [activeTab])
   
-  // 用 ref 跟踪当前提交 ID，避免回调闭包拿到陈旧值
-  const currentSubmissionIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    currentSubmissionIdRef.current = currentSubmissionId
-  }, [currentSubmissionId])
-
-  // 用 ref 跟踪 submitting 状态，避免回调闭包拿到陈旧值
-  const submittingRef = useRef(false)
-  useEffect(() => {
-    submittingRef.current = submitting
-  }, [submitting])
-
-  // 每次点击提交递增；用于丢弃上一轮未完成请求/WS/轮询带回的过期结果
-  const submitEpochRef = useRef(0)
-  const showResultModalRef = useRef(false)
-  useEffect(() => {
-    showResultModalRef.current = showResultModal
-  }, [showResultModal])
-  const lastResultRef = useRef<SubmissionResultData | null>(null)
-  useEffect(() => {
-    lastResultRef.current = lastResult
-  }, [lastResult])
-
   const fetchSubmissions = async () => {
     try {
       setSubmissionsLoading(true)
@@ -296,260 +268,33 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     }
   }, [activeTab, problemId, user, fromAssignment, classId])
 
-  // 轮询兜底：只要在"提交记录" tab 且有非终态提交，就每 5s 拉一次。
-  // 解决 WebSocket 断连 / 漏推 / 跨标签页 等场景下前端永远不刷新的问题。
-  // 用 ref 跟踪 hasNonFinal，避免 submissions 变化导致 interval 反复重建（曾经的 bug：
-  // 每次 WS 乐观更新 setSubmissions → effect 重建 setInterval → 3s 后 fetchSubmissions →
-  // 再次 setSubmissions → 再次重建 → 形成高频刷新循环）。
-  const hasNonFinalRef = useRef(false)
-  useEffect(() => {
-    hasNonFinalRef.current = submissions.some(
-      (s) => isNonFinalSubmissionStatus(s?.status)
-    )
-  }, [submissions])
-
-  useEffect(() => {
-    if (activeTab !== 'submissions') return
-
-    let intervalId: ReturnType<typeof setInterval> | null = null
-    const start = () => {
-      if (intervalId) return
-      intervalId = setInterval(() => {
-        // 每次轮询前检查 ref，若已全部终态则停止（避免无意义请求）
-        if (!hasNonFinalRef.current) {
-          stop()
-          return
-        }
-        fetchSubmissions()
-      }, 5000)
-    }
-    const stop = () => {
-      if (intervalId) {
-        clearInterval(intervalId)
-        intervalId = null
-      }
-    }
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // 切回页面时立即刷新一次（若仍有非终态），再启动轮询
-        if (hasNonFinalRef.current) {
-          fetchSubmissions()
-          start()
-        } else {
-          stop()
-        }
-      } else {
-        stop()
-      }
-    }
-
-    // 初始：若有非终态提交且页面可见，启动轮询
-    if (hasNonFinalRef.current && document.visibilityState === 'visible') {
-      start()
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-
-    return () => {
-      stop()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
-
-  const applyModalFinalResult = (result: SubmissionResultData) => {
-    // 必须严格匹配当前提交；提交请求飞行中 id 被清空，可避免沿用上一份 AC
-    if (!result.submissionId || result.submissionId !== currentSubmissionIdRef.current) return
-    if (!showResultModalRef.current && !submittingRef.current) return
-    const prev = lastResultRef.current
-    if (prev?.submissionId === result.submissionId && prev.status === result.status) return
-    submittingRef.current = false
-    setSubmitting(false)
-    setJudgeProgress(null)
-    lastResultRef.current = result
-    setLastResult(result)
-  }
-
-  // 兜底：只要当前提交已经是终态，就把"评测中..."按钮重置回"提交"。
-  // 解决 ref 跟 data.id 没对上、tab 切换、refetch 时机错位 等场景下
-  // submitting 卡在 true 不下来的问题。
-  useEffect(() => {
-    if (!submitting) return
-    if (!Array.isArray(submissions) || submissions.length === 0) return
-    const currentId = currentSubmissionIdRef.current
-    if (!currentId) return
-    const current = submissions.find((s) => s?.id === currentId)
-    if (!current) return
-    const status = current.status
-    if (isFinalSubmissionStatus(status)) {
-      applyModalFinalResult({
-        submissionId: current.id,
-        status,
-        score: typeof current.score === 'number' ? current.score : 0,
-        time: typeof current.time === 'number' ? current.time : 0,
-        memory: typeof current.memory === 'number' ? current.memory : 0,
-        passedTests: typeof current.passedTests === 'number' ? current.passedTests : 0,
-        totalTests: typeof current.totalTests === 'number' ? current.totalTests : 0,
-        message: current.message ?? null,
-        testResults: Array.isArray(current.testResults) ? current.testResults : undefined,
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissions, submitting])
-
-  // 评测弹窗兜底：WS 丢包时主动轮询当前提交详情，避免一直卡在「正在评测中」
-  useEffect(() => {
-    if (!submitting || !currentSubmissionId) return
-    const watchedId = currentSubmissionId
-    const epoch = submitEpochRef.current
-    let cancelled = false
-
-    const tick = async () => {
-      try {
-        const res = await fetchWithCookie(`/api/submissions/${watchedId}`, {
-          cache: 'no-store',
-        })
-        const data = await res.json()
-        if (cancelled || epoch !== submitEpochRef.current) return
-        if (!data.success || !data.data) return
-        const sub = data.data
-        if (sub.id !== currentSubmissionIdRef.current) return
-        const status = sub.status as string
-        if (!status || isNonFinalSubmissionStatus(status)) {
-          if (typeof sub.passedTests === 'number' && typeof sub.totalTests === 'number') {
-            setJudgeProgress({
-              currentTest: sub.passedTests,
-              totalTests: sub.totalTests,
-            })
-          }
-          return
-        }
-        applyModalFinalResult({
-          submissionId: sub.id,
-          status,
-          score: typeof sub.score === 'number' ? sub.score : 0,
-          time: typeof sub.time === 'number' ? sub.time : 0,
-          memory: typeof sub.memory === 'number' ? sub.memory : 0,
-          passedTests: typeof sub.passedTests === 'number' ? sub.passedTests : 0,
-          totalTests: typeof sub.totalTests === 'number' ? sub.totalTests : 0,
-          message: sub.message ?? null,
-          testResults: Array.isArray(sub.testResults) ? sub.testResults : undefined,
-        })
-        void fetchSubmissions()
-      } catch {
-        // 忽略瞬时网络错误，下一轮继续
-      }
-    }
-
-    void tick()
-    const timer = setInterval(() => void tick(), 1500)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submitting, currentSubmissionId])
-
-  const { isConnected } = useSubmissionSocket({
-    userId: user?.id || '',
+  const {
+    submitting,
+    lastResult,
+    showResultModal,
+    judgeProgress,
+    isConnected,
+    submittingRef,
+    beginSubmitSession,
+    bindSubmission,
+    abortSubmitSession,
+    closeResultModal,
+    isEpochCurrent,
+  } = useSubmissionResultFlow({
+    userId: user?.id,
     enabled: !!user,
-    onSubmissionUpdate: (data) => {
-      // 1) 乐观更新提交列表：让"提交记录" tab 立即反映出最新状态，
-      //    无需等待服务器再次回包 / 不依赖 currentSubmissionId 是否对得上。
-      //    不再额外触发 fetchSubmissions() —— 乐观更新已更新列表，
-      //    轮询 effect 会在有非终态提交时定期兜底刷新，避免每个 WS 事件都打一次 API。
-      if (data?.id) {
-        setSubmissions((prev) => {
-          if (!Array.isArray(prev)) return prev
-          const idx = prev.findIndex((s) => s?.id === data.id)
-          if (idx === -1) {
-            // 列表里还没这条记录：可能是刚提交但还没拉过列表。
-            // 若是终态事件，插入到列表头部；若是中间态，也插入以便轮询跟踪。
-            if (isFinalSubmissionStatus(data.status)) {
-              return [
-                {
-                  id: data.id,
-                  status: data.status,
-                  score: data.score,
-                  time: data.time,
-                  memory: data.memory,
-                  passedTests: data.passedTests,
-                  totalTests: data.totalTests,
-                  message: data.message,
-                  language: language,
-                  submittedAt: new Date().toISOString(),
-                },
-                ...prev,
-              ]
-            }
-            return prev
-          }
-          const next = prev.slice()
-          next[idx] = {
-            ...next[idx],
-            status: data.status,
-            score: typeof data.score === 'number' ? data.score : next[idx].score,
-            time: typeof data.time === 'number' ? data.time : next[idx].time,
-            memory: typeof data.memory === 'number' ? data.memory : next[idx].memory,
-            passedTests: typeof data.passedTests === 'number' ? data.passedTests : next[idx].passedTests,
-            totalTests: typeof data.totalTests === 'number' ? data.totalTests : next[idx].totalTests,
-            message: data.message ?? next[idx].message,
-            testResults:
-              Array.isArray(data.testResults) && data.testResults.length > 0
-                ? data.testResults
-                : next[idx].testResults,
-          }
-          return next
-        })
-      }
-
-      // 仅接受「当前提交 id」；飞行中 id 为 null，不会误用上一份 AC
-      if (data.id !== currentSubmissionIdRef.current) return
-
-      const isFinal = isFinalSubmissionStatus(data.status)
-      if (isFinal) {
-        applyModalFinalResult({
-          submissionId: data.id,
-          status: data.status,
-          score: typeof data.score === 'number' ? data.score : 0,
-          time: typeof data.time === 'number' ? data.time : 0,
-          memory: typeof data.memory === 'number' ? data.memory : 0,
-          passedTests: typeof data.passedTests === 'number' ? data.passedTests : 0,
-          totalTests: typeof data.totalTests === 'number' ? data.totalTests : 0,
-          message: data.message ?? null,
-          testResults: Array.isArray(data.testResults) ? data.testResults : undefined,
-        })
-      } else if (submittingRef.current || showResultModalRef.current) {
-        setJudgeStatus({
-          submissionId: data.id,
-          status: data.status,
-          passedTests: data.passedTests || 0,
-          totalTests: data.totalTests || 0,
-          testResults: data.testResults || [],
-        })
-      }
+    submissions,
+    setSubmissions,
+    onRefreshAfterFinal: () => {
+      void fetchSubmissions()
     },
-    onJudgeProgress: (data) => {
-      if (data?.submissionId === currentSubmissionIdRef.current) {
-        setJudgeProgress({
-          currentTest: data.currentTest,
-          totalTests: data.totalTests,
-        })
-        if (!judgeStatus) {
-          setJudgeStatus({
-            submissionId: data.submissionId,
-            status: 'Judging',
-            passedTests: 0,
-            totalTests: data.totalTests,
-            testResults: [],
-          })
-        }
-      }
-    }
+    mergeListOnUpdate: (prev, data) =>
+      defaultMergeSubmissionList(prev, data, { language }),
   })
 
   const handleSubmit = async () => {
     if (!user) {
-      router.push(loginPath())
+      router.push(loginPathFromLocation())
       return
     }
 
@@ -558,25 +303,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       return
     }
 
-    // 防重复提交：用 ref 同步守卫，避免 React state 异步更新间隙双击绕过 disabled
-    if (submittingRef.current) return
-    submittingRef.current = true
-    const epoch = ++submitEpochRef.current
-
-    // 先清空上一轮提交 id，避免请求飞行期间 WS/列表仍按旧 id 弹出「恭喜通过」
-    currentSubmissionIdRef.current = null
-    setCurrentSubmissionId(null)
-    setSubmitting(true)
-    setJudgeStatus(null)
-    setJudgeProgress(null)
-    lastResultRef.current = null
-    setLastResult(null)
-    showResultModalRef.current = true
-    setShowResultModal(true)
+    const epoch = beginSubmitSession()
+    if (epoch < 0) return
 
     try {
       let submitUrl: string
-      let submitBody: any
+      let submitBody: Record<string, string>
 
       if (fromAssignment && classId) {
         submitUrl = `/api/classes/${classId}/assignments/${fromAssignment}/submit`
@@ -596,47 +328,37 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
       const data = await response.json()
 
-      if (epoch !== submitEpochRef.current) return
+      if (!isEpochCurrent(epoch)) return
 
       if (data.success) {
-        const payload = data.data || {}
-        const submissionId = payload.submissionId || data.submissionId
-        const listId =
-          payload.assignmentSubmissionId || submissionId
-        currentSubmissionIdRef.current = submissionId
-        setCurrentSubmissionId(submissionId)
+        const payload = data.data
+        const submissionId = payload?.submissionId
+        if (!submissionId || !bindSubmission(epoch, submissionId)) return
         setActiveTab('submissions')
-        setExpandedSubmissionId(listId)
+        setExpandedSubmissionId(submissionId)
         setSubmissions((prev) => {
           const list = Array.isArray(prev) ? prev : []
-          if (list.some((s) => s?.id === listId)) return list
+          if (list.some((s) => s?.id === submissionId)) return list
           return [
-            {
-              id: listId,
-              status: 'Pending',
-              score: 0,
-              time: 0,
-              memory: 0,
-              passedTests: 0,
-              totalTests: 0,
+            createPendingListRow({
+              id: submissionId,
               language,
               code,
-              submittedAt: new Date().toISOString(),
-            },
+              extras: {
+                problemId,
+                userId: user?.id,
+                assignmentSubmissionId: payload.assignmentSubmissionId,
+              },
+            }),
             ...list,
           ]
         })
-        void fetchSubmissions()
       } else {
-        submittingRef.current = false
-        setSubmitting(false)
-        setShowResultModal(false)
+        abortSubmitSession()
         toast.error(data.error || '提交失败')
       }
-    } catch (error) {
-      submittingRef.current = false
-      setSubmitting(false)
-      setShowResultModal(false)
+    } catch {
+      abortSubmitSession()
       toast.error('网络错误，请稍后重试')
     }
   }
@@ -817,7 +539,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
                   transition={{ duration: 0.2 }}
                 >
                   <SubmissionList
-                    submissions={submissions}
+                    submissions={submissions as import('@/components/problem/SubmissionList').SubmissionListItem[]}
                     loading={submissionsLoading}
                     error={null}
                     user={user}
@@ -923,32 +645,19 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
       <SubmissionResultModal
         isOpen={showResultModal}
-        onClose={() => {
-          showResultModalRef.current = false
-          setShowResultModal(false)
-          setJudgeStatus(null)
-          lastResultRef.current = null
-          setLastResult(null)
-        }}
+        onClose={closeResultModal}
         isJudging={submitting}
         judgeProgress={judgeProgress}
-        result={lastResult as SubmissionResultData | null}
+        result={lastResult}
         onContinueSubmit={() => {
-          // CodeMirror 的可编辑元素是 .cm-content，外层容器标记了 data-testid
-          const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null
+          const cmContent = document.querySelector(
+            '[data-testid="code-editor-wrapper"] .cm-content'
+          ) as HTMLElement | null
           cmContent?.focus()
-          showResultModalRef.current = false
-          setShowResultModal(false)
-          setJudgeStatus(null)
-          lastResultRef.current = null
-          setLastResult(null)
+          closeResultModal()
         }}
         onViewDetail={(submissionId) => {
-          showResultModalRef.current = false
-          setShowResultModal(false)
-          setJudgeStatus(null)
-          lastResultRef.current = null
-          setLastResult(null)
+          closeResultModal()
           setActiveTab('submissions')
           setExpandedSubmissionId(submissionId)
         }}

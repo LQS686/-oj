@@ -7,6 +7,12 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { Search, User, FileText, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { formatDateTime, formatMemory, formatTime } from '@/lib/utils'
 import { getStatusText } from '@/lib/status'
+import {
+  isAcceptedStatus,
+  isNonFinalSubmissionStatus,
+  NON_FINAL_STATUS_QUERY,
+  SubmissionStatus,
+} from '@/lib/constants/submission-status'
 
 interface Submission {
   id: string
@@ -24,7 +30,7 @@ const STATUS_GROUPS: { key: string; label: string; status: string }[] = [
   { key: 'all', label: '全部', status: 'all' },
   { key: 'ac', label: '通过', status: 'AC' },
   { key: 'failed', label: '失败', status: 'WA,TLE,MLE,CE,RE' },
-  { key: 'pending', label: '等待', status: 'PENDING,JUDGING,RUNNING,Pending,Judging,Running' },
+  { key: 'pending', label: '等待', status: NON_FINAL_STATUS_QUERY },
 ]
 
 const LANGUAGES = [
@@ -107,42 +113,41 @@ export default function AdminSubmissionsPage() {
   }, [fetchSubmissions])
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'AC':
-        return <CheckCircle className="w-4 h-4 text-secondary" />
-      case 'WA':
-      case 'RE':
-      case 'CE':
-      case 'TLE':
-      case 'MLE':
-        return <XCircle className="w-4 h-4 text-error" />
-      default:
-        return <AlertCircle className="w-4 h-4 text-info" />
+    if (isAcceptedStatus(status)) {
+      return <CheckCircle className="w-4 h-4 text-secondary" />
     }
+    if (
+      status === SubmissionStatus.WRONG_ANSWER ||
+      status === SubmissionStatus.RUNTIME_ERROR ||
+      status === SubmissionStatus.COMPILE_ERROR ||
+      status === SubmissionStatus.TIME_LIMIT_EXCEEDED ||
+      status === SubmissionStatus.MEMORY_LIMIT_EXCEEDED
+    ) {
+      return <XCircle className="w-4 h-4 text-error" />
+    }
+    return <AlertCircle className="w-4 h-4 text-info" />
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'AC':
-        return 'tag-success'
-      case 'WA':
-      case 'RE':
-      case 'TLE':
-      case 'MLE':
-        return 'tag-error'
-      case 'CE':
-        return 'tag-warning'
-      case 'PENDING':
-      case 'JUDGING':
-      case 'RUNNING':
-      case 'Pending':
-      case 'Judging':
-      case 'Running':
-        return 'tag-info'
-      default:
-        return 'tag'
+    if (isAcceptedStatus(status)) return 'tag-success'
+    if (
+      status === SubmissionStatus.WRONG_ANSWER ||
+      status === SubmissionStatus.RUNTIME_ERROR ||
+      status === SubmissionStatus.TIME_LIMIT_EXCEEDED ||
+      status === SubmissionStatus.MEMORY_LIMIT_EXCEEDED
+    ) {
+      return 'tag-error'
     }
+    if (status === SubmissionStatus.COMPILE_ERROR) return 'tag-warning'
+    if (isNonFinalSubmissionStatus(status)) return 'tag-info'
+    return 'tag'
   }
+
+  const sumByNormalizedStatus = (counts: Record<string, number>, match: (status: string) => boolean) =>
+    Object.entries(counts).reduce(
+      (sum, [status, n]) => (match(status) ? sum + n : sum),
+      0
+    )
 
   const globalTotal = Object.values(totalByStatus).reduce((sum, n) => sum + n, 0)
   const activeCount =
@@ -307,7 +312,7 @@ export default function AdminSubmissionsPage() {
         <div className="card p-4">
           <div className="text-muted-foreground text-sm">通过 (AC)</div>
           <div className="text-2xl font-bold text-secondary mt-1 tabular-nums">
-            {totalByStatus['AC'] || 0}
+            {sumByNormalizedStatus(totalByStatus, isAcceptedStatus)}
           </div>
         </div>
         <div className="card p-4">
@@ -322,12 +327,7 @@ export default function AdminSubmissionsPage() {
         <div className="card p-4">
           <div className="text-muted-foreground text-sm">等待评测</div>
           <div className="text-2xl font-bold text-info mt-1 tabular-nums">
-            {(totalByStatus['PENDING'] || 0) +
-              (totalByStatus['JUDGING'] || 0) +
-              (totalByStatus['RUNNING'] || 0) +
-              (totalByStatus['Pending'] || 0) +
-              (totalByStatus['Judging'] || 0) +
-              (totalByStatus['Running'] || 0)}
+            {sumByNormalizedStatus(totalByStatus, isNonFinalSubmissionStatus)}
           </div>
         </div>
       </div>

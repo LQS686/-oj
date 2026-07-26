@@ -18,7 +18,7 @@ export function isSettingsTabId(value: string | null): value is SettingsTabId {
 export const NOTIFICATION_ITEMS = [
   { key: 'submissionComplete' as const, label: '提交评测完成', desc: '代码评测完成时发送站内通知' },
   { key: 'contestReminder' as const, label: '竞赛提醒', desc: '竞赛开始前发送提醒' },
-  { key: 'systemAnnouncement' as const, label: '系统公告', desc: '接收平台公告类通知' },
+  { key: 'systemAnnouncement' as const, label: '系统公告', desc: '首页收到新公告时的实时提示' },
 ]
 
 /** 做题默认语言（与评测机一致） */
@@ -27,6 +27,8 @@ export const CODE_LANGUAGE_OPTIONS = [
   { value: 'c', label: 'C' },
   { value: 'python', label: 'Python' },
 ] as const
+
+export type CodeLanguageValue = (typeof CODE_LANGUAGE_OPTIONS)[number]['value']
 
 export const DEFAULT_PREFERENCES: Preferences = {
   notifications: {
@@ -49,17 +51,14 @@ export const INITIAL_EMAIL_CHANGE = {
 
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const LEGACY_LANG_MAP: Record<string, string> = {
-  'C++': 'cpp',
-  'c++': 'cpp',
-  C: 'c',
-  Python: 'python',
-  python3: 'python',
-  Java: 'cpp',
-  JavaScript: 'cpp',
+function isCodeLanguage(value: unknown): value is CodeLanguageValue {
+  return (
+    typeof value === 'string' &&
+    CODE_LANGUAGE_OPTIONS.some((o) => o.value === value)
+  )
 }
 
-/** 将 API / 旧版偏好归一为当前 Preferences 结构 */
+/** 将 API 偏好归一为当前 Preferences（仅接受 cpp / c / python） */
 export function normalizePreferences(raw: Record<string, unknown> | null | undefined): Preferences {
   const base = structuredClone(DEFAULT_PREFERENCES)
   if (!raw || typeof raw !== 'object') return base
@@ -78,20 +77,8 @@ export function normalizePreferences(raw: Record<string, unknown> | null | undef
     }
   }
 
-  let codeLang =
-    typeof raw.defaultCodeLanguage === 'string' ? raw.defaultCodeLanguage : ''
-
-  // 兼容旧版 { editor: { defaultLanguage: 'C++' } }
-  if (!codeLang && raw.editor && typeof raw.editor === 'object') {
-    const editor = raw.editor as Record<string, unknown>
-    if (typeof editor.defaultLanguage === 'string') {
-      codeLang = editor.defaultLanguage
-    }
-  }
-
-  const mapped = LEGACY_LANG_MAP[codeLang] || codeLang
-  if (CODE_LANGUAGE_OPTIONS.some((o) => o.value === mapped)) {
-    base.defaultCodeLanguage = mapped
+  if (isCodeLanguage(raw.defaultCodeLanguage)) {
+    base.defaultCodeLanguage = raw.defaultCodeLanguage
   }
 
   return base

@@ -21,7 +21,6 @@ export const POST = withApi.public(async (req) => {
     const result = await loginUser({ username, password })
 
     const response = NextResponse.json({
-      ok: true,
       success: true,
       data: {
         user: result.user,

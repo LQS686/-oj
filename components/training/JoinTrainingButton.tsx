@@ -23,7 +23,8 @@ interface JoinTrainingButtonProps {
  initialJoined: boolean
  isLoggedIn: boolean
  solvedCount?: number
- /** 已加入时「开始/继续学习」跳转目标（通常为下一道未完成题） */
+ /** 已加入时「开始/继续学习」；优先于 startHref，便于同页切换练习 Tab */
+ onStart?: () => void
  startHref?: string
  onJoinedChange?: (joined: boolean) => void
  className?: string
@@ -34,6 +35,7 @@ export function JoinTrainingButton({
  initialJoined,
  isLoggedIn,
  solvedCount = 0,
+ onStart,
  startHref,
  onJoinedChange,
  className = '',
@@ -125,9 +127,13 @@ export function JoinTrainingButton({
  return (
  <div className={`flex items-center gap-2 ${className}`}>
  <button
- onClick={() =>
- router.push(startHref || `/training/${trainingId}?tab=problems`)
- }
+ onClick={() => {
+   if (onStart) {
+     onStart()
+     return
+   }
+   router.push(startHref || `/training/${trainingId}?tab=problems`)
+ }}
  className="btn-primary btn flex-1"
  >
  {solvedCount > 0 ? (

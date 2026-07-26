@@ -16,13 +16,16 @@ import { getAssignableRoles } from './admin'
  * 批量注册用户（原 /api/admin/users/batch-register）
  * ========================================================================== */
 
-export type BatchUserRole = 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT'
+/** 可出现在 CSV / 表单中的角色；SYSTEM_ADMIN 不可通过批量注册赋予 */
+export type BatchUserRole = 'ADMIN' | 'TEACHER' | 'STUDENT'
 
 export interface BatchUserInput {
   username: string
   email?: string
   password: string
   role?: string
+  /** 原始行号（CSV 为文件行号，1-based；JSON 可省略） */
+  row?: number
 }
 
 export interface BatchRegisterError {
@@ -39,7 +42,12 @@ export interface BatchRegisterResult {
   errors: BatchRegisterError[]
 }
 
-const BATCH_VALID_ROLES: BatchUserRole[] = ['SYSTEM_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT']
+export interface ParseBatchCsvResult {
+  users: BatchUserInput[]
+  parseErrors: BatchRegisterError[]
+}
+
+const BATCH_VALID_ROLES: BatchUserRole[] = ['ADMIN', 'TEACHER', 'STUDENT']
 
 function isBatchUserRole(role: unknown): role is BatchUserRole {
   return typeof role === 'string' && BATCH_VALID_ROLES.includes(role as BatchUserRole)
@@ -47,8 +55,6 @@ function isBatchUserRole(role: unknown): role is BatchUserRole {
 
 function getBatchRoleDefaults(role: BatchUserRole) {
   switch (role) {
-    case 'SYSTEM_ADMIN':
-      return { rank: '管理员', color: '#FF6B6B' }
     case 'ADMIN':
       return { rank: '管理员', color: '#FF6B6B' }
     case 'TEACHER':
@@ -59,41 +65,67 @@ function getBatchRoleDefaults(role: BatchUserRole) {
 }
 
 /**
- * 解析 CSV 文本（username, email, password, role 列表头）
+ * 解析 CSV 文本。表头需含 username、password；email / role 可选。
+ * 行号对应文件原始行号（含表头），空白行跳过；格式无效行记入 parseErrors。
  */
-export function parseBatchRegisterCSV(csvText: string): BatchUserInput[] {
-  const lines = csvText.split(/\r?\n/).filter((line) => line.trim())
-  if (lines.length < 2) return []
+export function parseBatchRegisterCSV(csvText: string): ParseBatchCsvResult {
+  const lines = csvText.split(/\r?\n/)
+  const users: BatchUserInput[] = []
+  const parseErrors: BatchRegisterError[] = []
 
-  const headerLine = lines[0].toLowerCase()
-  const headers = headerLine.split(',').map((h) => h.trim())
+  let headerLineIdx = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim()) {
+      headerLineIdx = i
+      break
+    }
+  }
+  if (headerLineIdx === -1) {
+    return { users, parseErrors }
+  }
 
+  const headers = lines[headerLineIdx].toLowerCase().split(',').map((h) => h.trim())
   const usernameIndex = headers.findIndex((h) => h === 'username')
   const emailIndex = headers.findIndex((h) => h === 'email')
   const passwordIndex = headers.findIndex((h) => h === 'password')
   const roleIndex = headers.findIndex((h) => h === 'role')
 
   if (usernameIndex === -1 || passwordIndex === -1) {
-    throw new Error('CSV文件必须包含 username, password 列（email 可选）')
+    throw new Error('CSV文件必须包含 username, password 列（email、role 可选）')
   }
 
-  const users: BatchUserInput[] = []
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerLineIdx + 1; i < lines.length; i++) {
+    const row = i + 1
     const line = lines[i].trim()
     if (!line) continue
+
     const values = line.split(',').map((v) => v.trim())
-    if (values.length < 2) continue
-    const user: BatchUserInput = {
-      username: values[usernameIndex] || '',
-      password: values[passwordIndex] || '',
+    const username = values[usernameIndex] || ''
+    const password = values[passwordIndex] || ''
+
+    if (values.length < 2 || (!username && !password)) {
+      parseErrors.push({
+        row,
+        error: '行格式无效：至少需要 username 与 password',
+      })
+      continue
     }
-    if (emailIndex !== -1 && values[emailIndex]) user.email = values[emailIndex]
+
+    const user: BatchUserInput = {
+      username,
+      password,
+      row,
+    }
+    if (emailIndex !== -1 && values[emailIndex]) {
+      user.email = values[emailIndex]
+    }
     if (roleIndex !== -1 && values[roleIndex]) {
       user.role = values[roleIndex].toUpperCase()
     }
     users.push(user)
   }
-  return users
+
+  return { users, parseErrors }
 }
 
 /**
@@ -113,7 +145,7 @@ export async function batchRegisterUsers(
 
   for (let i = 0; i < users.length; i++) {
     const user = users[i]
-    const rowNumber = startRow + i
+    const rowNumber = user.row ?? startRow + i
     try {
       if (!user.username || !user.password) {
         result.failed++
@@ -128,8 +160,11 @@ export async function batchRegisterUsers(
 
       const trimmedUsername = String(user.username).trim()
       const trimmedPassword = String(user.password)
-      const trimmedEmail = user.email
-        ? String(user.email).trim().toLowerCase()
+      const rawEmail = user.email != null ? String(user.email).trim() : ''
+      const hasEmail = rawEmail.length > 0
+      // 邮箱列可选：未填时写入唯一占位邮箱（User.email 为必填唯一字段）
+      const trimmedEmail = hasEmail
+        ? rawEmail.toLowerCase()
         : `${trimmedUsername}@placeholder.local`
 
       if (!validateUsername(trimmedUsername)) {
@@ -143,7 +178,7 @@ export async function batchRegisterUsers(
         continue
       }
 
-      if (user.email && !validateEmail(trimmedEmail)) {
+      if (hasEmail && !validateEmail(trimmedEmail)) {
         result.failed++
         result.errors.push({
           row: rowNumber,
@@ -166,20 +201,35 @@ export async function batchRegisterUsers(
         continue
       }
 
-      const requestedRole = isBatchUserRole(user.role) ? user.role : 'STUDENT'
-      // 校验操作者是否有权分配该角色（SYSTEM_ADMIN 不可被赋予；ADMIN 只能赋予 TEACHER/STUDENT）
-      const assignable = getAssignableRoles(operatorRole)
-      if (!assignable.includes(requestedRole)) {
+      const roleRaw = user.role != null ? String(user.role).trim() : ''
+      let role: BatchUserRole
+      if (!roleRaw) {
+        role = 'STUDENT'
+      } else if (!isBatchUserRole(roleRaw.toUpperCase())) {
         result.failed++
         result.errors.push({
           row: rowNumber,
           username: trimmedUsername,
           email: trimmedEmail,
-          error: `无权分配该角色: ${requestedRole}`,
+          error: `无效角色: ${roleRaw}（可选 STUDENT / TEACHER / ADMIN）`,
+        })
+        continue
+      } else {
+        role = roleRaw.toUpperCase() as BatchUserRole
+      }
+
+      // 校验操作者是否有权分配该角色（SYSTEM_ADMIN 不可被赋予；ADMIN 只能赋予 TEACHER/STUDENT）
+      const assignable = getAssignableRoles(operatorRole)
+      if (!assignable.includes(role)) {
+        result.failed++
+        result.errors.push({
+          row: rowNumber,
+          username: trimmedUsername,
+          email: trimmedEmail,
+          error: `无权分配该角色: ${role}`,
         })
         continue
       }
-      const role = requestedRole
       const sanitizedUsername = escapeHtml(trimmedUsername)
       const sanitizedEmail = trimmedEmail
 
@@ -197,7 +247,7 @@ export async function batchRegisterUsers(
         continue
       }
 
-      if (user.email) {
+      if (hasEmail) {
         const existingEmail = await prisma.user.findUnique({
           where: { email: sanitizedEmail },
         })

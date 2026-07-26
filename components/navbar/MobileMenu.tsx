@@ -4,18 +4,19 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
- Menu, 
- X, 
- BookOpen, 
- Trophy, 
- Dumbbell, 
- Users, 
- BarChart3,
- ListChecks,
- Settings,
- User,
- LogOut
+import {
+  Menu,
+  X,
+  BookOpen,
+  Trophy,
+  Dumbbell,
+  Users,
+  BarChart3,
+  ListChecks,
+  Settings,
+  User,
+  LogOut,
+  CircleHelp,
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { canAccessAdmin } from '@/lib/permissions'
@@ -61,6 +62,7 @@ export default function MobileMenu() {
  { href: '/training', label: '训练', icon: Dumbbell },
  { href: '/classes', label: '班级', icon: Users },
  { href: '/rank', label: '排行榜', icon: BarChart3 },
+ { href: '/help', label: '使用帮助', icon: CircleHelp },
  ]
 
  useEffect(() => {

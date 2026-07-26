@@ -54,10 +54,13 @@ export async function createNotification(data: NotificationData) {
     },
   })
   clearNotificationCache(data.userId)
+  const unreadCount = await getUnreadCount(data.userId)
   emitNotification(data.userId, {
     type: 'info',
     title: data.title,
     message: data.content,
+    unreadCount,
+    id: result.id,
   })
   logger.info(`通知已创建并推送: ${data.title} -> 用户 ${data.userId}`)
   return result
@@ -75,19 +78,37 @@ export async function createNotifications(notifications: NotificationData[]) {
       isRead: false,
     })),
   })
-  notifications.forEach((data) => {
-    clearNotificationCache(data.userId)
-    emitNotification(data.userId, {
+  const userIds = Array.from(new Set(notifications.map((n) => n.userId)))
+  for (const userId of userIds) {
+    clearNotificationCache(userId)
+  }
+  // 按用户推送权威未读数；同用户多条时合并为一次推送（带最新未读）
+  for (const userId of userIds) {
+    const unreadCount = await getUnreadCount(userId)
+    const last = [...notifications].reverse().find((n) => n.userId === userId)!
+    emitNotification(userId, {
       type: 'info',
-      title: data.title,
-      message: data.content,
+      title: last.title,
+      message: last.content,
+      unreadCount,
     })
-  })
+  }
   logger.info(`批量通知已创建并推送: ${notifications.length} 条`)
 }
 
 export async function clearNotificationCache(userId: string) {
   cache.delete(`notification:unread:${userId}`)
+}
+
+/** 静默同步未读角标（无桌面通知文案） */
+async function pushUnreadCount(userId: string) {
+  const unreadCount = await getUnreadCount(userId)
+  emitNotification(userId, {
+    type: 'info',
+    title: '',
+    message: '',
+    unreadCount,
+  })
 }
 
 export async function markRead(id: string, userId: string) {
@@ -96,6 +117,7 @@ export async function markRead(id: string, userId: string) {
     data: { isRead: true },
   })
   clearNotificationCache(userId)
+  await pushUnreadCount(userId)
   return result
 }
 
@@ -105,12 +127,14 @@ export async function markAllRead(userId: string) {
     data: { isRead: true },
   })
   clearNotificationCache(userId)
+  await pushUnreadCount(userId)
   return result
 }
 
 export async function deleteNotification(id: string, userId: string) {
   const result = await prisma.notification.deleteMany({ where: { id, userId } })
   clearNotificationCache(userId)
+  await pushUnreadCount(userId)
   return result
 }
 

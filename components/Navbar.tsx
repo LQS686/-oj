@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState, memo } from 'react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { CircleHelp } from 'lucide-react'
 import Logo from './navbar/Logo'
 import NavLinks from './navbar/NavLinks'
 import SearchBar from './navbar/Search'
@@ -44,6 +46,18 @@ const Navbar = () => {
 
           <div className="flex items-center gap-2">
             <SearchBar />
+            <Link
+              href="/help"
+              className={`btn-ghost btn p-3 group ${
+                pathname === '/help' || pathname?.startsWith('/help/')
+                  ? 'text-primary-light'
+                  : ''
+              }`}
+              aria-label="使用帮助"
+              title="使用帮助"
+            >
+              <CircleHelp className="w-5 h-5" />
+            </Link>
             <UserMenu />
             <MobileMenu />
           </div>

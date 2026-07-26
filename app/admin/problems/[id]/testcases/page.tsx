@@ -18,7 +18,10 @@ import {
 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { ensureTotalScoreIs100 } from '@/lib/problem/testcase-scoring'
+import {
+  distributeTestCaseScores,
+  ensureTotalScoreIs100,
+} from '@/lib/problem/testcase-scoring'
 import { AdminPageShell } from '@/components/admin'
 import { PageLoading, useDialog } from '@/components/common'
 import { ZipUploadPanel } from './_components/ZipUploadPanel'
@@ -168,9 +171,10 @@ export default function ProblemTestCasesPage() {
     void fetchProblemData()
   }, [fetchProblemData])
 
-  const distributeScores = (cases: TestCase[]): TestCase[] => {
+  /** 增删/复制测点时始终重均分（不能用 ensure：总分已是 100 时不会重分） */
+  const redistributeScores = (cases: TestCase[]): TestCase[] => {
     if (cases.length === 0) return cases
-    return ensureTotalScoreIs100(cases)
+    return distributeTestCaseScores(cases, 'rebalance')
   }
 
   const updateCase = (index: number, patch: Partial<TestCase>) => {
@@ -178,7 +182,7 @@ export default function ProblemTestCasesPage() {
   }
 
   const handleAddTestCase = () => {
-    const next = distributeScores([
+    const next = redistributeScores([
       ...testCases,
       { input: '', output: '', isSample: false, score: 0, timeLimit: null, memoryLimit: null },
     ])
@@ -194,14 +198,14 @@ export default function ProblemTestCasesPage() {
       confirmVariant: 'destructive',
     })
     if (!ok) return
-    applyCases(distributeScores(testCases.filter((_, i) => i !== index)))
+    applyCases(redistributeScores(testCases.filter((_, i) => i !== index)))
   }
 
   const handleDuplicate = (index: number) => {
     const copy = { ...testCases[index] }
     const next = [...testCases]
     next.splice(index + 1, 0, copy)
-    applyCases(distributeScores(next))
+    applyCases(redistributeScores(next))
     setExpanded((prev) => ({ ...prev, [index + 1]: true }))
   }
 
@@ -265,9 +269,9 @@ export default function ProblemTestCasesPage() {
           confirmText: '覆盖',
           cancelText: '追加',
         })
-        applyCases(distributeScores(replace ? newTestCases : [...testCases, ...newTestCases]))
+        applyCases(redistributeScores(replace ? newTestCases : [...testCases, ...newTestCases]))
       } else {
-        applyCases(distributeScores(newTestCases))
+        applyCases(redistributeScores(newTestCases))
       }
 
       setUploadResult({
@@ -290,26 +294,32 @@ export default function ProblemTestCasesPage() {
     setSuccessMsg('')
 
     try {
+      let casesToSave = testCases
       if (totalScore !== 100 && testCases.length > 0) {
         const ok = await dialog.confirm({
-          message: `当前测试点总分为 ${totalScore} 分，通常应为 100 分。是否继续保存？`,
+          title: '分值总和不是 100',
+          message: `当前测试点总分为 ${totalScore} 分，应为 100 分。是否自动均分后保存？`,
           tone: 'warning',
+          confirmText: '均分并保存',
+          cancelText: '取消',
         })
         if (!ok) {
           setSubmitting(false)
           return false
         }
+        casesToSave = redistributeScores(testCases)
+        applyCases(casesToSave)
       }
 
       const response = await fetchWithCookie(`/api/admin/problems/${problemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testCases }),
+        body: JSON.stringify({ testCases: casesToSave }),
       })
       const data = await response.json()
 
       if (data.success) {
-        setSavedSnapshot(serializeCases(testCases))
+        setSavedSnapshot(serializeCases(casesToSave))
         setSuccessMsg('测试用例保存成功')
         if (successMsgTimerRef.current) clearTimeout(successMsgTimerRef.current)
         successMsgTimerRef.current = setTimeout(() => {
@@ -483,7 +493,7 @@ export default function ProblemTestCasesPage() {
           </button>
           <button
             type="button"
-            onClick={() => setTestCases(distributeScores(testCases))}
+            onClick={() => applyCases(redistributeScores(testCases))}
             className="btn btn-ghost text-sm gap-1.5"
             disabled={testCases.length === 0}
           >

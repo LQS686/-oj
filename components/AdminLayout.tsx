@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
+import { canAccessAdmin, isSystemAdmin, isSystemAdminOnlyPath } from '@/lib/permissions'
 import { formatDateTime } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -23,11 +23,12 @@ import {
   BookOpen,
   UserCircle
 } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import type { Notification } from '@/types/models'
 import { getRoleLabel } from '@/lib/permissions'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
+import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 
 interface AdminMenuItem {
   icon: React.ComponentType<{ className?: string }>
@@ -56,7 +57,7 @@ const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
       { icon: BookOpen, label: '题单管理', href: '/admin/trainings' },
       { icon: GraduationCap, label: '班级管理', href: '/admin/classes' },
       { icon: Users, label: '用户管理', href: '/admin/users' },
-      { icon: Megaphone, label: '系统公告', href: '/admin/announcements' },
+      { icon: Megaphone, label: '系统公告', href: '/admin/announcements', systemAdminOnly: true },
     ]
   },
   {
@@ -79,9 +80,33 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [avatarError, setAvatarError] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [notifications, setNotifications] = useState<(Notification & { message?: string })[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
+
+  const fetchNotificationList = useCallback(async () => {
+    try {
+      const response = await fetchWithCookie('/api/notifications?limit=10')
+      const data = await response.json()
+      if (data.success) {
+        setNotifications(data.data?.notifications || data.data || [])
+      }
+    } catch (error) {
+      logger.error('获取通知失败', error)
+    }
+  }, [])
+
+  const { unreadCount } = useUnreadNotifications({
+    userId: user?.id,
+    enabled: !!user && canAccess,
+    onNotification: useCallback(
+      (notification: { title?: string }) => {
+        // 静默未读同步（已读/删除）无 title，不必重拉列表
+        if (!notification.title?.trim()) return
+        void fetchNotificationList()
+      },
+      [fetchNotificationList]
+    ),
+  })
 
   // 桌面端（≥ 768px）默认展开，移动端默认收起
   // 初始渲染使用 false（移动端友好），useEffect 中根据视口调整，避免水合不一致
@@ -92,14 +117,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     setMounted(true)
   }, [])
 
-  // 权限门：仅 SYSTEM_ADMIN / ADMIN 可访问后台，未通过则跳到 /403
+  // 权限门：仅 SYSTEM_ADMIN / ADMIN 可访问后台；系统专属页另需 SYSTEM_ADMIN
   // 等待用户信息加载完成后再判定，避免短暂闪现 / 误判
   useEffect(() => {
     if (isLoading) return
     if (!user || !canAccess) {
       router.push('/403')
+      return
     }
-  }, [user, isLoading, canAccess, router])
+    if (isSystemAdminOnlyPath(pathname) && !isSystemAdmin(user)) {
+      router.push('/403')
+    }
+  }, [user, isLoading, canAccess, router, pathname])
 
   useEffect(() => {
     document.body.style.paddingTop = '0'
@@ -125,55 +154,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const fetchNotifications = async () => {
-    try {
-      const response = await fetchWithCookie('/api/notifications?limit=10')
-      const data = await response.json()
-      if (data.success) {
-        setNotifications(data.data?.notifications || data.data || [])
-        setUnreadCount(data.data?.unreadCount || 0)
-      }
-    } catch (error) {
-      logger.error('获取通知失败', error)
-    }
-  }
+  useEffect(() => {
+    if (!user || !canAccess) return
+    void fetchNotificationList()
+  }, [user, canAccess, fetchNotificationList])
 
   useEffect(() => {
-    // fetchNotifications 是 async，setState 在异步回调中执行，非同步调用
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchNotifications()
-
-    // 30s 轮询：页面不可见时暂停，可见时立即刷新并恢复轮询
-    let intervalId: ReturnType<typeof setInterval> | null = null
-    const start = () => {
-      if (intervalId) return
-      intervalId = setInterval(fetchNotifications, 30000)
+    if (notificationOpen) {
+      void fetchNotificationList()
     }
-    const stop = () => {
-      if (intervalId) {
-        clearInterval(intervalId)
-        intervalId = null
-      }
-    }
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchNotifications()
-        start()
-      } else {
-        stop()
-      }
-    }
-
-    if (document.visibilityState === 'visible') {
-      start()
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-
-    return () => {
-      stop()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
-  }, [])
+  }, [notificationOpen, fetchNotificationList])
 
   const handleLogout = async () => {
     try {
@@ -181,10 +171,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         method: 'POST',
       })
       logout()
-      router.push(loginPath())
+      router.push(loginPathFromLocation())
     } catch (error) {
       logger.error('登出失败', error)
-      router.push(loginPath())
+      router.push(loginPathFromLocation())
     }
   }
 

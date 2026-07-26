@@ -35,6 +35,7 @@ import SubmissionHeatmap from '@/components/user/SubmissionHeatmap'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import { useUser } from '@/contexts/UserContext'
 import { getRoleLabel, getRoleColor } from '@/lib/permissions'
+import { isAcceptedStatus } from '@/lib/constants/submission-status'
 
 function difficultyBarClass(diff: string): string {
   if (diff.includes('入门')) return 'bg-success'
@@ -44,9 +45,9 @@ function difficultyBarClass(diff: string): string {
 }
 
 function statusTagClass(status: string): string {
-  if (status === 'AC' || status === 'Accepted') return 'tag-success'
-  if (status === 'WA' || status === 'Wrong Answer') return 'tag-error'
-  if (status === 'TLE' || status === 'Time Limit Exceeded') return 'tag-warning'
+  if (isAcceptedStatus(status)) return 'tag-success'
+  if (status === 'WA') return 'tag-error'
+  if (status === 'TLE') return 'tag-warning'
   return 'tag'
 }
 

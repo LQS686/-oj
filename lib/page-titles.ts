@@ -26,10 +26,8 @@ const RULES: TitleRule[] = [
   { test: /^\/admin\/users$/, title: '用户管理' },
   { test: /^\/admin\/classes$/, title: '班级管理' },
   { test: /^\/admin\/submissions$/, title: '提交记录' },
-  { test: /^\/admin\/announcements$/, title: '公告管理' },
+  { test: /^\/admin\/announcements$/, title: '系统公告' },
   { test: /^\/admin\/settings$/, title: '系统设置' },
-  { test: /^\/admin\/roles$/, title: '角色管理' },
-  { test: /^\/admin\/permissions$/, title: '权限管理' },
   { test: /^\/admin$/, title: '管理后台' },
 
   // 竞赛

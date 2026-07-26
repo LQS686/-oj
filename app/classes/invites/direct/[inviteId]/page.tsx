@@ -8,7 +8,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { Mail, Users, Check, X, Clock, Calendar, AlertCircle, UserCheck } from 'lucide-react'
 import { EducationalPageShell, PageLoading, useDialog } from '@/components/common'
 import { formatDateTime } from '@/lib/utils'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
 
 interface InviteDetail {
   invite: {
@@ -48,7 +48,7 @@ export default function DirectInviteDetailPage() {
   useEffect(() => {
     if (authLoading) return
     if (!user) {
-      router.push(loginPath())
+      router.push(loginPathFromLocation())
       return
     }
     fetchInviteDetail()

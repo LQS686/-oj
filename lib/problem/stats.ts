@@ -3,7 +3,7 @@
  * 题目统计聚合：状态分布、语言分布、AC 率、近 7 天趋势、AC 平均耗时/内存
  *
  * 参考 HOJ ProblemStatistics.vue 与 Hydro OJ 题目统计页：
- *   - 状态分布（AC/WA/TLE/MLE/RE/CE/Pending）
+ *   - 状态分布（AC/WA/TLE/MLE/RE/CE/PENDING）
  *   - 语言分布
  *   - 近 7 天提交趋势
  *   - AC 平均耗时与内存

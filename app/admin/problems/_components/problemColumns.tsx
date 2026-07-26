@@ -2,7 +2,7 @@
 
 import { Edit, Trash2, Eye, EyeOff, Trophy, Database } from 'lucide-react'
 import { type Column } from '@/components/admin'
-import { getDifficultyColor } from '@/lib/status'
+import { getDifficultyClass } from '@/lib/status'
 import { formatDate } from '@/lib/utils'
 import type { Problem } from '../_types'
 
@@ -43,7 +43,7 @@ export function buildProblemColumns({
       label: '难度',
       sortable: true,
       render: (value) => (
-        <span className={`difficulty-tag ${getDifficultyColor(value)}`}>
+        <span className={`difficulty-tag ${getDifficultyClass(value)}`}>
           {value}
         </span>
       ),

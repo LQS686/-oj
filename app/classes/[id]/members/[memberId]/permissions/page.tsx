@@ -11,7 +11,7 @@ import { ClassWorkspaceShell, PageLoading, useDialog } from '@/components/common
 import { useClass } from '@/hooks/useClass'
 import { useUser } from '@/contexts/UserContext'
 import { classRoleDisplayLabel, isClassAdminRole } from '@/lib/class/roles'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
 
 type Permissions = ClassPermissions
 
@@ -88,7 +88,7 @@ export default function MemberPermissionsPage() {
 
       if (response.status === 401) {
         // 保持 loading，避免跳转前闪「权限不足」
-        router.push(loginPath())
+        router.push(loginPathFromLocation())
         return
       }
 
@@ -150,7 +150,7 @@ export default function MemberPermissionsPage() {
       )
 
       if (response.status === 401) {
-        router.push(loginPath())
+        router.push(loginPathFromLocation())
         return
       }
 

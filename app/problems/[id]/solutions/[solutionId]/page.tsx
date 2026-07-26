@@ -22,7 +22,7 @@ import { canManageContent } from '@/lib/permissions'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { PageContainer } from '@/components/layout'
 import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
-import { PageLoading } from '@/components/common'
+import { PageLoading, RouteSuspenseFallback } from '@/components/common'
 
 interface SolutionDetail {
  id: string
@@ -478,7 +478,7 @@ function SolutionDetailPageContent() {
 
 export default function SolutionDetailPage() {
  return (
- <Suspense fallback={<PageLoading label="加载中..." />}>
+ <Suspense fallback={<RouteSuspenseFallback label="加载中..." />}>
  <SolutionDetailPageContent />
  </Suspense>
  )

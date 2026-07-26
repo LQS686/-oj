@@ -6,9 +6,9 @@ import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { Clock, Database, BookOpen, TrendingUp, ArrowLeft, Play, Target, AlertCircle } from 'lucide-react'
-import { getDifficultyColor } from '@/lib/status'
+import { getDifficultyClass } from '@/lib/status'
 import { ClassWorkspaceShell, PageLoading } from '@/components/common'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
 
 interface ClassProblem {
  id: string
@@ -43,7 +43,7 @@ export default function ClassProblemDetailPage() {
  useEffect(() => {
  if (authLoading) return
  if (!user) {
- router.push(loginPath())
+ router.push(loginPathFromLocation())
  return
  }
  fetchProblem()
@@ -117,7 +117,7 @@ export default function ClassProblemDetailPage() {
  <h1 className="text-2xl font-bold text-foreground hidden sm:block">{problem.title}</h1>
  </div>
  <div className="flex items-center gap-3 flex-wrap">
- <span className={`tag border ${getDifficultyColor(problem.difficulty)}`}>
+ <span className={`tag border ${getDifficultyClass(problem.difficulty)}`}>
  {problem.difficulty}
  </span>
  {problem.tags.map((tag, idx) => (

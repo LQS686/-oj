@@ -75,17 +75,50 @@ export async function buildClassAssignmentDetail(
   const viewerIsClassAdmin = isClassAdminApiRole(viewerRole)
   const viewerCanManageContent = await getUserCanManageContent(viewerUserId)
   const canViewAllSubmissions = viewerIsClassAdmin || viewerCanManageContent
+
+  // 列表主键 = 主 Submission.id；assignmentSubmissionId 仅为作业记录元数据
+  const assignmentSubmissionIds = submissions.map((s: any) => s.id as string)
+  const linkedMainSubs =
+    assignmentSubmissionIds.length > 0
+      ? await prisma.submission.findMany({
+          where: { assignmentSubmissionId: { in: assignmentSubmissionIds } },
+          select: { id: true, assignmentSubmissionId: true },
+        })
+      : []
+  const mainIdByAssignmentSubId = new Map(
+    linkedMainSubs
+      .filter((s) => s.assignmentSubmissionId)
+      .map((s) => [s.assignmentSubmissionId as string, s.id])
+  )
+
+  const mapSubmissionRow = (s: any) => {
+    const mainId = mainIdByAssignmentSubId.get(s.id)
+    if (!mainId) {
+      // 作业提交必须有关联主 Submission；无关联则丢弃（数据不完整，无法用主 id 推送）
+      return null
+    }
+    return {
+      id: mainId,
+      assignmentSubmissionId: s.id,
+      userId: s.userId,
+      problemId: s.problemId,
+      status: s.status,
+      score: s.score || 0,
+      submittedAt: s.submittedAt,
+      language: s.language,
+      time: s.time || 0,
+      memory: s.memory || 0,
+      passedTests: s.passedTests || 0,
+      totalTests: s.totalTests || 0,
+      message: s.message || null,
+      code: s.code,
+      isLate: s.isLate || false,
+      timeElapsedMs: s.timeElapsedMs || 0,
+    }
+  }
+
   const allSubmissions = canViewAllSubmissions
-    ? submissions.map((s: any) => ({
-        id: s.id,
-        userId: s.userId,
-        problemId: s.problemId,
-        status: s.status,
-        score: s.score || 0,
-        submittedAt: s.submittedAt,
-        // Phase 1：作业维度做题用时，用于完成情况统计表展示与排序
-        timeElapsedMs: s.timeElapsedMs || 0,
-      }))
+    ? submissions.map(mapSubmissionRow).filter(Boolean)
     : []
 
   // 题目统计
@@ -112,7 +145,6 @@ export async function buildClassAssignmentDetail(
       description: assignment.description,
       startTime: assignment.startTime,
       endTime: assignment.endTime,
-      deadline: assignment.endTime,
       status: getAssignmentStatus(assignment.startTime, assignment.endTime),
       allowLateSubmission: assignment.allowLateSubmission,
       problems: problems.map((p: any) => ({
@@ -128,22 +160,7 @@ export async function buildClassAssignmentDetail(
       createdAt: assignment.createdAt,
       createdBy: assignment.createdBy,
     },
-    submissions: userSubmissions.map((s: any) => ({
-      id: s.id,
-      problemId: s.problemId,
-      status: s.status,
-      score: s.score || 0,
-      submittedAt: s.submittedAt,
-      language: s.language,
-      time: s.time || 0,
-      memory: s.memory || 0,
-      passedTests: s.passedTests || 0,
-      totalTests: s.totalTests || 0,
-      message: s.message || null,
-      code: s.code,
-      isLate: s.isLate || false,
-      timeElapsedMs: s.timeElapsedMs || 0,
-    })),
+    submissions: userSubmissions.map(mapSubmissionRow).filter(Boolean),
     allSubmissions,
   }
 }
@@ -156,14 +173,14 @@ export async function recalculateLateFlags(assignmentId: string): Promise<void> 
   const assignment = await prisma.classAssignment.findUnique({ where: { id: assignmentId } })
   if (!assignment || !assignment.endTime) return
 
-  const deadline = new Date(assignment.endTime)
+  const endAt = new Date(assignment.endTime)
   const submissions = await prisma.classAssignmentSubmission.findMany({
     where: { assignmentId },
     select: { id: true, submittedAt: true, isLate: true },
   })
 
   for (const s of submissions) {
-    const newIsLate = new Date(s.submittedAt) > deadline
+    const newIsLate = new Date(s.submittedAt) > endAt
     if (s.isLate !== newIsLate) {
       await prisma.classAssignmentSubmission.update({
         where: { id: s.id },
@@ -182,12 +199,11 @@ export async function updateClassAssignment(
     description?: string
     startTime?: string | Date
     endTime?: string | Date
-    deadline?: string | Date
     problemIds?: string[]
     allowLateSubmission?: boolean
   }
 ) {
-  const finalEndTime = body.endTime || body.deadline
+  const finalEndTime = body.endTime
   if (!body.title || !body.problemIds || body.problemIds.length === 0) {
     throw new ApiError('MISSING_FIELDS', '请填写完整的作业信息', 400)
   }

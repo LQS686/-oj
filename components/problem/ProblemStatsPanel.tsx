@@ -58,9 +58,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgClass: str
   MLE:         { label: 'Memory Limit Exceeded',color:'#f59e0b',bgClass: 'bg-warning',     textClass: 'text-warning',            order: 4 },
   RE:          { label: 'Runtime Error',      color: '#a855f7', bgClass: 'bg-accent',      textClass: 'text-accent-light',       order: 5 },
   CE:          { label: 'Compile Error',      color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 6 },
-  Pending:     { label: 'Pending',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 7 },
-  Judging:     { label: 'Judging',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 8 },
-  Running:     { label: 'Running',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 9 },
+  PENDING:     { label: 'Pending',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 7 },
+  JUDGING:     { label: 'Judging',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 8 },
+  RUNNING:     { label: 'Running',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 9 },
 }
 
 // 语言显示配置

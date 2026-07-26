@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
-import { PageLoading, useDialog } from '@/components/common'
+import { PageLoading, useDialog, RouteSuspenseFallback } from '@/components/common'
 import AdminCreateContestModal from '@/components/admin/AdminCreateContestModal'
 import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
@@ -389,7 +389,7 @@ function AdminContestsPageContent() {
 
 export default function AdminContestsPage() {
  return (
- <Suspense fallback={<PageLoading label="加载中..." />}>
+ <Suspense fallback={<RouteSuspenseFallback label="加载中..." />}>
  <AdminContestsPageContent />
  </Suspense>
  )

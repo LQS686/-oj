@@ -42,7 +42,7 @@ export interface ImportedProblem {
   samples: ImportedSample[]
   hint?: string
   source?: string
-  /** 难度（必须是 8 档之一，否则 service 会按 fallback 处理） */
+  /** 难度（必须是洛谷 8 档之一；缺省由 ImportOptions.defaultDifficulty 填充） */
   difficulty: string
   tags: string[]
   timeLimit: number

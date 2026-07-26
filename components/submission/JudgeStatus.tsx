@@ -1,6 +1,11 @@
 'use client'
 
 import { CheckCircle2, XCircle, Clock, Loader2, AlertCircle, X } from 'lucide-react'
+import {
+  SubmissionStatus,
+  isAcceptedStatus,
+  isNonFinalSubmissionStatus,
+} from '@/lib/constants/submission-status'
 
 interface TestResult {
  testId?: string
@@ -31,34 +36,27 @@ export default function JudgeStatus({
 
  const getStatusIcon = (status: string) => {
  switch (status) {
- case 'AC':
- case 'Accepted':
+ case SubmissionStatus.ACCEPTED:
  return <CheckCircle2 className="w-5 h-5 text-secondary-light" />
- case 'WA':
- case 'Wrong Answer':
+ case SubmissionStatus.WRONG_ANSWER:
  return <XCircle className="w-5 h-5 text-error" />
- case 'TLE':
- case 'Time Limit Exceeded':
+ case SubmissionStatus.TIME_LIMIT_EXCEEDED:
  return <Clock className="w-5 h-5 text-accent" />
- case 'MLE':
- case 'Memory Limit Exceeded':
+ case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
  return <AlertCircle className="w-5 h-5 text-purple-400" />
- case 'RE':
- case 'Runtime Error':
+ case SubmissionStatus.RUNTIME_ERROR:
  return <AlertCircle className="w-5 h-5 text-error" />
- case 'PE':
- case 'Presentation Error':
+ case SubmissionStatus.PRESENTATION_ERROR:
  return <AlertCircle className="w-5 h-5 text-accent" />
- case 'OLE':
- case 'Output Limit Exceeded':
+ case SubmissionStatus.OUTPUT_LIMIT_EXCEEDED:
  return <AlertCircle className="w-5 h-5 text-accent" />
- case 'CSP':
+ case SubmissionStatus.CHECKER_SPECIAL_PROBLEM:
  return <AlertCircle className="w-5 h-5 text-error" />
- case 'PC':
- case 'Partly Correct':
+ case SubmissionStatus.PARTLY_CORRECT:
  return <CheckCircle2 className="w-5 h-5 text-primary-light" />
- case 'Judging':
- case 'Pending':
+ case SubmissionStatus.PENDING:
+ case SubmissionStatus.JUDGING:
+ case SubmissionStatus.RUNNING:
  return <Loader2 className="w-5 h-5 text-primary-light animate-spin" />
  default:
  return <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
@@ -67,33 +65,26 @@ export default function JudgeStatus({
 
  const getStatusColor = (status: string) => {
  switch (status) {
- case 'AC':
- case 'Accepted':
+ case SubmissionStatus.ACCEPTED:
  return 'bg-secondary/10 border-secondary/30'
- case 'WA':
- case 'Wrong Answer':
+ case SubmissionStatus.WRONG_ANSWER:
  return 'bg-error/10 border-error/30'
- case 'TLE':
- case 'Time Limit Exceeded':
+ case SubmissionStatus.TIME_LIMIT_EXCEEDED:
  return 'bg-accent/10 border-accent/30'
- case 'MLE':
- case 'Memory Limit Exceeded':
+ case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
  return 'bg-purple-500/10 border-purple-500/30'
- case 'RE':
- case 'Runtime Error':
+ case SubmissionStatus.RUNTIME_ERROR:
  return 'bg-error/10 border-error/30'
- case 'PE':
- case 'Presentation Error':
- case 'OLE':
- case 'Output Limit Exceeded':
+ case SubmissionStatus.PRESENTATION_ERROR:
+ case SubmissionStatus.OUTPUT_LIMIT_EXCEEDED:
  return 'bg-accent/10 border-accent/30'
- case 'CSP':
+ case SubmissionStatus.CHECKER_SPECIAL_PROBLEM:
  return 'bg-error/10 border-error/30'
- case 'PC':
- case 'Partly Correct':
+ case SubmissionStatus.PARTLY_CORRECT:
  return 'bg-primary/10 border-primary/30'
- case 'Judging':
- case 'Pending':
+ case SubmissionStatus.PENDING:
+ case SubmissionStatus.JUDGING:
+ case SubmissionStatus.RUNNING:
  return 'bg-primary/10 border-primary/30'
  default:
  return 'bg-muted border-border'
@@ -103,65 +94,49 @@ export default function JudgeStatus({
  const getStatusText = (status: string) => {
  const statusMap: Record<string, string> = {
  AC: '通过',
- Accepted: '通过',
  WA: '答案错误',
- 'Wrong Answer': '答案错误',
  TLE: '超时',
- 'Time Limit Exceeded': '超时',
  MLE: '超内存',
- 'Memory Limit Exceeded': '超内存',
  RE: '运行错误',
- 'Runtime Error': '运行错误',
  CE: '编译错误',
- 'Compile Error': '编译错误',
  PE: '格式错误',
- 'Presentation Error': '格式错误',
  OLE: '输出超限',
- 'Output Limit Exceeded': '输出超限',
  CSP: '无法启动',
  PC: '部分正确',
- 'Partly Correct': '部分正确',
  SE: '系统错误',
- 'System Error': '系统错误',
- Judging: '评测中',
- Pending: '等待评测',
+ JUDGING: '评测中',
+ PENDING: '等待评测',
+ RUNNING: '运行中',
  }
  return statusMap[status] || status
  }
 
  const getStatusTextColor = (status: string) => {
  switch (status) {
- case 'AC':
- case 'Accepted':
+ case SubmissionStatus.ACCEPTED:
  return 'text-secondary-light'
- case 'WA':
- case 'Wrong Answer':
- case 'RE':
- case 'Runtime Error':
- case 'CSP':
+ case SubmissionStatus.WRONG_ANSWER:
+ case SubmissionStatus.RUNTIME_ERROR:
+ case SubmissionStatus.CHECKER_SPECIAL_PROBLEM:
  return 'text-error'
- case 'TLE':
- case 'Time Limit Exceeded':
- case 'PE':
- case 'Presentation Error':
- case 'OLE':
- case 'Output Limit Exceeded':
+ case SubmissionStatus.TIME_LIMIT_EXCEEDED:
+ case SubmissionStatus.PRESENTATION_ERROR:
+ case SubmissionStatus.OUTPUT_LIMIT_EXCEEDED:
  return 'text-accent'
- case 'MLE':
- case 'Memory Limit Exceeded':
+ case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
  return 'text-purple-400'
- case 'PC':
- case 'Partly Correct':
+ case SubmissionStatus.PARTLY_CORRECT:
  return 'text-primary-light'
- case 'Judging':
- case 'Pending':
+ case SubmissionStatus.PENDING:
+ case SubmissionStatus.JUDGING:
+ case SubmissionStatus.RUNNING:
  return 'text-primary-light'
  default:
  return 'text-muted-foreground'
  }
  }
 
- const isJudging = status === 'Judging' || status === 'Pending'
+ const isJudging = isNonFinalSubmissionStatus(status)
 
  return (
  <div className="card-static rounded-lg overflow-hidden" role="status" aria-live={isJudging ? "polite" : "assertive"}>
@@ -205,9 +180,9 @@ export default function JudgeStatus({
  <div className="relative w-full h-2.5 bg-muted rounded-full overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`评测进度: ${Math.round(progress)}%`}>
  <div
  className={`absolute top-0 left-0 h-full transition-all duration-500 ease-out rounded-full ${
-            status === 'AC' || status === 'Accepted'
+            isAcceptedStatus(status)
               ? 'bg-secondary'
-              : status === 'Judging' || status === 'Pending'
+              : isNonFinalSubmissionStatus(status)
                 ? 'bg-primary'
                 : passedTests > 0
                   ? 'bg-accent'
@@ -230,9 +205,9 @@ export default function JudgeStatus({
  <div
  key={result.testId}
  className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
- result.status === 'AC' || result.status === 'Accepted'
+ isAcceptedStatus(result.status)
  ? 'bg-secondary/5 border-secondary/20'
- : result.status === 'Pending' || result.status === 'Judging'
+ : isNonFinalSubmissionStatus(result.status)
  ? 'bg-muted border-border'
  : 'bg-error/5 border-error/20'
  }`}

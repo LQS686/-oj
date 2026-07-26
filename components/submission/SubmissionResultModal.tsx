@@ -18,6 +18,7 @@ import {
 import Confetti from './Confetti'
 import { formatTime, formatMemory } from '@/lib/utils'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
+import { isAcceptedStatus, isCompileErrorStatus } from '@/lib/constants/submission-status'
 
 export interface TestResultItem {
   testId?: string
@@ -49,7 +50,7 @@ export interface JudgeProgressData {
 interface SubmissionResultModalProps {
   isOpen: boolean
   onClose: () => void
-  /** 是否处于评测中（Pending/Judging/Running） */
+  /** 是否处于评测中（PENDING / JUDGING / RUNNING） */
   isJudging: boolean
   /** 评测进度（评测中时展示） */
   judgeProgress?: JudgeProgressData | null
@@ -74,7 +75,6 @@ interface StatusMeta {
 function getStatusMeta(status: string): StatusMeta {
   switch (status) {
     case 'AC':
-    case 'Accepted':
       return {
         text: '通过',
         description: '所有测试点均通过，干得漂亮！',
@@ -85,7 +85,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-secondary-light',
       }
     case 'PC':
-    case 'Partly Correct':
       return {
         text: '部分正确',
         description: '部分测试点未通过，继续加油！',
@@ -96,7 +95,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-primary-light',
       }
     case 'WA':
-    case 'Wrong Answer':
       return {
         text: '答案错误',
         description: '程序输出与期望不符',
@@ -107,7 +105,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-error',
       }
     case 'TLE':
-    case 'Time Limit Exceeded':
       return {
         text: '超时',
         description: '程序运行时间超出限制',
@@ -118,7 +115,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-accent',
       }
     case 'MLE':
-    case 'Memory Limit Exceeded':
       return {
         text: '超内存',
         description: '程序内存使用超出限制',
@@ -129,7 +125,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-purple-400',
       }
     case 'RE':
-    case 'Runtime Error':
       return {
         text: '运行错误',
         description: '程序运行时崩溃（如除零、数组越界）',
@@ -140,7 +135,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-error',
       }
     case 'CE':
-    case 'Compile Error':
       return {
         text: '编译错误',
         description: '代码无法通过编译，请检查语法',
@@ -151,7 +145,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-accent',
       }
     case 'PE':
-    case 'Presentation Error':
       return {
         text: '格式错误',
         description: '输出格式与期望略有差异',
@@ -162,7 +155,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-accent',
       }
     case 'OLE':
-    case 'Output Limit Exceeded':
       return {
         text: '输出超限',
         description: '程序输出内容超出限制',
@@ -183,7 +175,6 @@ function getStatusMeta(status: string): StatusMeta {
         textCls: 'text-error',
       }
     case 'SE':
-    case 'System Error':
       return {
         text: '系统错误',
         description: '评测系统内部错误，请稍后重试',
@@ -290,8 +281,8 @@ export default function SubmissionResultModal({
 }: SubmissionResultModalProps) {
   const status = result?.status || ''
   const meta = useMemo(() => (status ? getStatusMeta(status) : null), [status])
-  const isAC = status === 'AC' || status === 'Accepted'
-  const isCE = status === 'CE' || status === 'Compile Error'
+  const isAC = isAcceptedStatus(status)
+  const isCE = isCompileErrorStatus(status)
   const isFinal = !!result && !isJudging
 
   // ESC 关闭（仅评测完成后）

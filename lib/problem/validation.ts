@@ -7,19 +7,16 @@
  */
 import { required, optional, toInt, toBool, ValidationError } from '@/lib/api/validation'
 import { validateObjectId } from '@/lib/api/validation'
-import { isValidDifficulty, migrateDifficulty, DIFFICULTIES } from '@/lib/constants'
+import { isValidDifficulty, DIFFICULTIES } from '@/lib/constants'
 
 export function parseProblemListQuery(q: Record<string, string>) {
-  // 难度查询参数：允许 8 档标准值或旧版值（自动迁移为 8 档）
   const rawDifficulty = optional(q.difficulty)
-  const difficulty = rawDifficulty
-    ? isValidDifficulty(rawDifficulty)
-      ? rawDifficulty
-      : migrateDifficulty(rawDifficulty, undefined as any)
-    : undefined
+  if (rawDifficulty && !isValidDifficulty(rawDifficulty)) {
+    throw new ValidationError(`难度值无效，必须是：${DIFFICULTIES.join(' / ')}`)
+  }
   return {
     keyword: optional(q.keyword),
-    difficulty,
+    difficulty: rawDifficulty && isValidDifficulty(rawDifficulty) ? rawDifficulty : undefined,
     isPublic: q.isPublic ? toBool(q.isPublic) : undefined,
     categoryId: q.categoryId ? validateObjectId(q.categoryId, 'categoryId') : undefined,
     tagIds: q.tagIds ? q.tagIds.split(',').filter(Boolean) : undefined,
@@ -29,11 +26,10 @@ export function parseProblemListQuery(q: Record<string, string>) {
 }
 
 export function parseProblemCreate(body: any) {
-  const rawDifficulty = required(body?.difficulty, '难度')
-  // 难度规范化：8 档直接通过，旧版 4 档/英文值自动迁移为 8 档标准
-  const difficulty = isValidDifficulty(rawDifficulty)
-    ? rawDifficulty
-    : migrateDifficulty(rawDifficulty)
+  const difficulty = required(body?.difficulty, '难度')
+  if (!isValidDifficulty(difficulty)) {
+    throw new ValidationError(`难度值无效，必须是：${DIFFICULTIES.join(' / ')}`)
+  }
   return {
     title: required(body?.title, '题目标题'),
     description: required(body?.description, '题目描述'),

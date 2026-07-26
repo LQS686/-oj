@@ -40,7 +40,7 @@ export default function AdminSettingsPage() {
  const response = await fetchWithCookie('/api/admin/settings')
 
  if (response.status === 403) {
- setError('需要管理员权限')
+ setError('需要系统管理员权限')
  setTimeout(() => router.push('/403'), 2000)
  return
  }

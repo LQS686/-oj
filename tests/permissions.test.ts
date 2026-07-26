@@ -24,6 +24,8 @@ import {
   isStudent,
   canAccessAdmin,
   canManageSystemSettings,
+  canManageSystemAnnouncements,
+  isSystemAdminOnlyPath,
   canManageContent,
   canCreateContest,
   canCreateClass,
@@ -95,15 +97,30 @@ describe('canAccessAdmin', () => {
   })
 })
 
-describe('canManageSystemSettings', () => {
+describe('canManageSystemSettings / canManageSystemAnnouncements', () => {
   it('仅 SYSTEM_ADMIN → true', () => {
     expect(canManageSystemSettings({ role: 'SYSTEM_ADMIN' })).toBe(true)
+    expect(canManageSystemAnnouncements({ role: 'SYSTEM_ADMIN' })).toBe(true)
     expect(canManageSystemSettings({ role: 'ADMIN' })).toBe(false)
+    expect(canManageSystemAnnouncements({ role: 'ADMIN' })).toBe(false)
     expect(canManageSystemSettings({ role: 'TEACHER' })).toBe(false)
-    expect(canManageSystemSettings({ role: 'STUDENT' })).toBe(false)
+    expect(canManageSystemAnnouncements({ role: 'STUDENT' })).toBe(false)
   })
   it('null → false', () => {
     expect(canManageSystemSettings(null)).toBe(false)
+    expect(canManageSystemAnnouncements(null)).toBe(false)
+  })
+})
+
+describe('isSystemAdminOnlyPath', () => {
+  it('系统设置 / 系统公告路径 → true', () => {
+    expect(isSystemAdminOnlyPath('/admin/settings')).toBe(true)
+    expect(isSystemAdminOnlyPath('/admin/announcements')).toBe(true)
+    expect(isSystemAdminOnlyPath('/admin/announcements/x')).toBe(true)
+  })
+  it('一般后台路径 → false', () => {
+    expect(isSystemAdminOnlyPath('/admin')).toBe(false)
+    expect(isSystemAdminOnlyPath('/admin/users')).toBe(false)
   })
 })
 

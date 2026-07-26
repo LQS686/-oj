@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Timer, Play, CheckCircle2 } from 'lucide-react'
-import { computeContestCountdown, type ContestCountdownState } from '@/lib/contest/countdown'
+import { useContestCountdown } from '@/hooks/useContestCountdown'
 
 interface ContestCountdownPanelProps {
   startTime: string | Date
@@ -15,16 +14,7 @@ export default function ContestCountdownPanel({
   endTime,
   className = '',
 }: ContestCountdownPanelProps) {
-  const [state, setState] = useState<ContestCountdownState>(() =>
-    computeContestCountdown(startTime, endTime)
-  )
-
-  useEffect(() => {
-    const tick = () => setState(computeContestCountdown(startTime, endTime))
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [startTime, endTime])
+  const state = useContestCountdown(startTime, endTime)
 
   const Icon =
     state.phase === 'running' ? Play : state.phase === 'upcoming' ? Timer : CheckCircle2

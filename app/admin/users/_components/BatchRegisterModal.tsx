@@ -46,6 +46,30 @@ export function BatchRegisterModal({
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const notifyBatchOutcome = async (succeeded: number, failed: number) => {
+    if (failed === 0) {
+      await dialog.alert({
+        tone: 'success',
+        title: '批量注册完成',
+        message: `全部成功，共注册 ${succeeded} 个用户`,
+      })
+      return
+    }
+    if (succeeded === 0) {
+      await dialog.alert({
+        tone: 'error',
+        title: '批量注册失败',
+        message: `全部失败，共 ${failed} 个用户未注册成功，详见下方列表`,
+      })
+      return
+    }
+    await dialog.alert({
+      tone: 'warning',
+      title: '批量注册部分成功',
+      message: `成功 ${succeeded} 个，失败 ${failed} 个，详见下方列表`,
+    })
+  }
+
   const addBatchUser = () => {
     setBatchUsers([...batchUsers, { username: '', password: '', role: 'STUDENT' }])
   }
@@ -64,9 +88,11 @@ export function BatchRegisterModal({
 
   const handleBatchRegister = async () => {
     const validUsers = batchUsers
-      .filter(u => u.username)
+      .filter(u => u.username.trim())
       .map(u => ({
         ...u,
+        username: u.username.trim(),
+        email: u.email?.trim() || undefined,
         password: useUnifiedPassword ? unifiedPassword : u.password
       }))
 
@@ -117,7 +143,10 @@ export function BatchRegisterModal({
           }
         })
         setBatchResults(newResults)
-        onSuccess()
+        const succeeded = result.succeeded ?? 0
+        const failed = result.failed ?? 0
+        await notifyBatchOutcome(succeeded, failed)
+        if (succeeded > 0) onSuccess()
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '批量注册失败' })
       }
@@ -178,15 +207,26 @@ export function BatchRegisterModal({
       }
 
       xhr.onload = async () => {
-        if (xhr.status === 200) {
-          const data = JSON.parse(xhr.responseText)
-          if (data.success && data.data) {
+        try {
+          let data: any
+          try {
+            data = JSON.parse(xhr.responseText || '{}')
+          } catch {
+            await dialog.alert({ tone: 'error', message: '服务器响应异常' })
+            return
+          }
+          if (xhr.status === 200 && data.success && data.data) {
             const result = data.data
-            const summary = `成功: ${result.succeeded}, 失败: ${result.failed}`
+            const succeeded = result.succeeded ?? 0
+            const failed = result.failed ?? 0
             const newResults: BatchResult[] = [
-              { success: result.failed === 0, message: summary }
+              {
+                success: failed === 0,
+                message: `共 ${result.total ?? succeeded + failed} 人：成功 ${succeeded}，失败 ${failed}`,
+                user: { username: '汇总', email: '' },
+              },
             ]
-            result.errors.forEach((err: any) => {
+            ;(result.errors || []).forEach((err: any) => {
               newResults.push({
                 success: false,
                 message: `第${err.row}行 - ${err.username || '未知'}: ${err.error}`,
@@ -194,14 +234,17 @@ export function BatchRegisterModal({
               })
             })
             setCsvResults(newResults)
-            onSuccess()
+            await notifyBatchOutcome(succeeded, failed)
+            if (succeeded > 0) onSuccess()
           } else {
-            await dialog.alert({ tone: 'error', message: data.error || 'CSV 导入失败' })
+            await dialog.alert({
+              tone: 'error',
+              message: data.error || (xhr.status === 200 ? 'CSV 导入失败' : `上传失败（${xhr.status}）`),
+            })
           }
-        } else {
-          await dialog.alert({ tone: 'error', message: '上传失败' })
+        } finally {
+          setCsvUploading(false)
         }
-        setCsvUploading(false)
       }
 
       xhr.onerror = async () => {
@@ -401,7 +444,7 @@ export function BatchRegisterModal({
                 选择文件
               </button>
               <p className="text-muted-foreground text-xs mt-4">
-                格式: 用户名,密码,角色(STUDENT/TEACHER{operatorIsSystemAdmin ? '/ADMIN' : ''})，邮箱可选
+                表头须含 username,password；可选 role(STUDENT/TEACHER{operatorIsSystemAdmin ? '/ADMIN' : ''})、email
               </p>
               <a
                 href="/templates/users-template.csv"
@@ -457,7 +500,7 @@ export function BatchRegisterModal({
 
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
               <button onClick={onClose} className="btn btn-ghost">
-                关闭
+                取消
               </button>
               <button
                 onClick={handleCsvUpload}

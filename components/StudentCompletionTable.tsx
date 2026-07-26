@@ -5,13 +5,18 @@ import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, Code, X, FileC
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDateTime, formatDateTimeShort } from '@/lib/utils'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
+import {
+  isAcceptedStatus,
+  isNonFinalSubmissionStatus,
+  SubmissionStatus,
+} from '@/lib/constants/submission-status'
 
 interface RawSubmission {
   id: string
   userId?: string
-  problemId: string
+  problemId?: string
   status: string
-  score: number
+  score?: number
   submittedAt: string
   code?: string
   language?: string
@@ -66,19 +71,19 @@ const statusConfig: Record<string, { label: string; className: string; iconColor
  MLE: { label: '内存溢出', className: 'text-warning bg-warning/10', iconColor: 'text-warning' },
  RE: { label: '运行错误', className: 'text-error bg-error/10', iconColor: 'text-error' },
  CE: { label: '编译错误', className: 'text-accent bg-accent/10', iconColor: 'text-accent' },
- Pending: { label: '评测中', className: 'text-primary-light bg-primary/10', iconColor: 'text-primary-light' }
+ PENDING: { label: '等待评测', className: 'text-primary-light bg-primary/10', iconColor: 'text-primary-light' },
+ JUDGING: { label: '评测中', className: 'text-primary-light bg-primary/10', iconColor: 'text-primary-light' },
+ RUNNING: { label: '运行中', className: 'text-primary-light bg-primary/10', iconColor: 'text-primary-light' },
 }
 
 function getStatusIcon(status: string) {
- const config = statusConfig[status]
- switch (status) {
- case 'AC':
+ if (status === SubmissionStatus.ACCEPTED) {
  return <CheckCircle2 className="w-4 h-4 text-secondary" />
- case 'Pending':
- return <Clock className="w-3.5 h-3 text-muted-foreground animate-spin" />
- default:
- return <XCircle className="w-4 h-4 text-error" />
  }
+ if (isNonFinalSubmissionStatus(status)) {
+ return <Clock className="w-3.5 h-3 text-muted-foreground animate-spin" />
+ }
+ return <XCircle className="w-4 h-4 text-error" />
 }
 
 function SubmissionModal({
@@ -205,9 +210,9 @@ function SubmissionModal({
  </span>
  </div>
  <span className={`text-xs font-bold tabular-nums ${
- sub.status === 'AC' ? 'text-secondary' : sub.score > 0 ? 'text-accent' : 'text-muted-foreground'
+ isAcceptedStatus(sub.status) ? 'text-secondary' : (sub.score ?? 0) > 0 ? 'text-accent' : 'text-muted-foreground'
  }`}>
- {sub.score}分
+ {sub.score ?? 0}分
  </span>
  </div>
  <div className="text-[11px] text-muted-foreground tabular-nums">
@@ -344,13 +349,13 @@ export default function StudentCompletionTable({ students, problems, assignmentT
    const cfg = statusConfig[submission.status]
    const statusLabel = cfg?.label || submission.status
    const scoreClass =
-     submission.status === 'AC'
+     isAcceptedStatus(submission.status)
        ? 'text-secondary'
        : submission.score > 0
          ? 'text-accent'
          : 'text-muted-foreground'
 
-   if (submission.status === 'Pending' || submission.status === 'Judging' || submission.status === 'Running') {
+   if (isNonFinalSubmissionStatus(submission.status)) {
      return (
        <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem]">
          <Clock className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
@@ -360,7 +365,7 @@ export default function StudentCompletionTable({ students, problems, assignmentT
    }
 
    // AC 时：用"用时 mm:ss 通过"替代纯"通过"，把做题用时作为副标签突出展示
-   if (submission.status === 'AC' && typeof submission.timeElapsedMs === 'number' && submission.timeElapsedMs > 0) {
+   if (isAcceptedStatus(submission.status) && typeof submission.timeElapsedMs === 'number' && submission.timeElapsedMs > 0) {
      return (
        <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem] cursor-pointer hover:opacity-90 transition-opacity">
          <span className={`text-xs font-semibold tabular-nums ${scoreClass}`}>{submission.score} 分</span>

@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { Loader2 } from 'lucide-react'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
 
 export default function ProfilePage() {
  const router = useRouter()
@@ -15,7 +15,7 @@ export default function ProfilePage() {
  if (user) {
  router.replace(`/user/${user.id}`)
  } else {
- router.replace(loginPath())
+ router.replace(loginPathFromLocation())
  }
  }
  }, [user, loading, router])

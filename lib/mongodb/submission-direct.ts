@@ -5,7 +5,10 @@
  */
 
 import { ObjectId } from 'mongodb'
-import { canTransition as canSubmissionTransition, normalizeStatus } from '@/lib/constants/submission-status'
+import {
+  SubmissionStatus,
+  canTransition as canSubmissionTransition,
+} from '@/lib/constants/submission-status'
 import { getMongoClient, withRetry } from './client'
 
 /**
@@ -110,11 +113,10 @@ export async function updateSubmissionDirect(
       }
     }
 
-    // P0 修复：状态机守卫
+    // 状态机守卫：
     //   1) 若要更新 status，先读当前状态
     //   2) 通过 canTransition 校验合法转换
-    //   3) 仅在 PENDING/JUDGING/RUNNING 状态下允许非合法转换（recover 场景）
-    //      归一化后比较，兼容历史大驼峰写法（'Pending'/'Judging'）与枚举大写（'PENDING'/'JUDGING'）
+    //   3) 仅在 PENDING/JUDGING/RUNNING 下允许非合法转换（recover / 竞态）
     //   4) forceStatus：管理员重测，允许终态 → PENDING
     if (typeof sanitized.status === 'string' && !options?.forceStatus) {
       const current = await db.collection('Submission').findOne(
@@ -124,9 +126,11 @@ export async function updateSubmissionDirect(
       const currentStatus = (current?.status as string | undefined) ?? ''
       const nextStatus = sanitized.status as string
       if (currentStatus && !canSubmissionTransition(currentStatus, nextStatus)) {
-        // 允许 recover 路径：PENDING/JUDGING/RUNNING 状态可被强制覆盖（worker 重试/竞态/恢复/跳过中间状态）
-        const normalized = normalizeStatus(currentStatus)
-        if (normalized !== 'PENDING' && normalized !== 'JUDGING' && normalized !== 'RUNNING') {
+        if (
+          currentStatus !== SubmissionStatus.PENDING &&
+          currentStatus !== SubmissionStatus.JUDGING &&
+          currentStatus !== SubmissionStatus.RUNNING
+        ) {
           throw new Error(
             `非法状态转换: ${currentStatus} -> ${nextStatus} (submissionId=${submissionId})`
           )

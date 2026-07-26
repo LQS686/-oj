@@ -9,8 +9,9 @@ import { addJudgeJob } from '@/lib/judge/queue'
 import { createSubmissionDirect, incrementProblemSubmitCount, updateSubmissionDirect } from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
-import { SubmissionStatus } from '@/lib/constants/submission-status'
-import type { Prisma } from '@prisma/client'
+import { SubmissionStatus, isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
+import { parseComparisonMode } from '@/lib/judge/types'
+import type { TestCase } from '@prisma/client'
 
 export interface SubmissionFilter {
   userId?: string
@@ -18,6 +19,44 @@ export interface SubmissionFilter {
   contestId?: string
   status?: string
   language?: string
+}
+
+/** 评测测试点结果（与 JudgeResult.testResults / DB Json 对齐） */
+export type SubmissionTestResult = {
+  testId: string
+  status: string
+  time: number
+  memory: number
+  message?: string
+}
+
+function parseSubmissionTestResults(value: unknown): SubmissionTestResult[] {
+  if (!Array.isArray(value)) return []
+  const out: SubmissionTestResult[] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    if (typeof row.testId !== 'string' || typeof row.status !== 'string') continue
+    out.push({
+      testId: row.testId,
+      status: row.status,
+      time: typeof row.time === 'number' ? row.time : 0,
+      memory: typeof row.memory === 'number' ? row.memory : 0,
+      message: typeof row.message === 'string' ? row.message : undefined,
+    })
+  }
+  return out
+}
+
+function mapProblemTestCases(testCases: TestCase[]) {
+  return testCases.map((tc) => ({
+    id: tc.id,
+    input: tc.input,
+    output: tc.output,
+    score: tc.score,
+    timeLimit: tc.timeLimit ?? undefined,
+    memoryLimit: tc.memoryLimit ?? undefined,
+  }))
 }
 
 export async function listSubmissions(
@@ -162,16 +201,9 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
       language: body.language,
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
-      comparisonMode: problem.comparisonMode as any,
+      comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
-      testCases: (problem.testCases as any[]).map((tc) => ({
-        id: tc.id,
-        input: tc.input,
-        output: tc.output,
-        score: tc.score,
-        timeLimit: tc.timeLimit ?? undefined,
-        memoryLimit: tc.memoryLimit ?? undefined,
-      })),
+      testCases: mapProblemTestCases(problem.testCases),
     })
     logger.info(`提交 ${submission.id} 已加入评测队列`)
   } catch (queueError) {
@@ -321,9 +353,7 @@ export async function rejudgeSubmission(submissionId: string) {
     throw AppError.badRequest('NO_TESTCASES', '题目没有测试点，无法重测')
   }
 
-  const normalized = submission.status?.toUpperCase?.() || submission.status
-  if (normalized === 'PENDING' || normalized === 'JUDGING' || normalized === 'RUNNING'
-    || submission.status === 'Pending' || submission.status === 'Judging' || submission.status === 'Running') {
+  if (isNonFinalSubmissionStatus(submission.status)) {
     throw AppError.badRequest('JUDGING_IN_PROGRESS', '该提交正在评测中，请稍后再试')
   }
 
@@ -351,16 +381,9 @@ export async function rejudgeSubmission(submissionId: string) {
       language: submission.language,
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
-      comparisonMode: problem.comparisonMode as any,
+      comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
-      testCases: (problem.testCases as any[]).map((tc) => ({
-        id: tc.id,
-        input: tc.input,
-        output: tc.output,
-        score: tc.score,
-        timeLimit: tc.timeLimit ?? undefined,
-        memoryLimit: tc.memoryLimit ?? undefined,
-      })),
+      testCases: mapProblemTestCases(problem.testCases),
     })
   } catch (queueError) {
     logger.error('重测入队失败', queueError)
@@ -384,80 +407,20 @@ export async function rejudgeSubmission(submissionId: string) {
 }
 
 /**
- * 提交详情：先查 Submission，找不到再回退到 ClassAssignmentSubmission
+ * 提交详情：仅查主 Submission（作业提交也有关联的主记录）
  */
-export async function getSubmissionDetailOrClassAssignment(id: string) {
-  const submission: any = await prisma.submission.findUnique({
+export async function getSubmissionDetail(id: string) {
+  const submission = await prisma.submission.findUnique({
     where: { id },
     include: {
       problem: { select: { id: true, problemNumber: true, title: true, difficulty: true } },
       user: { select: { id: true, username: true, nickname: true } },
     },
   })
-  if (submission) {
-    const testResults = 'testResults' in submission && submission.testResults
-      ? (submission.testResults as any)
-      : []
-    return { ...submission, testResults }
-  }
-  const classSubmission = await prisma.classAssignmentSubmission.findUnique({ where: { id } })
-  if (!classSubmission) return null
-  const [problem, user, linkedSubmission] = await Promise.all([
-    prisma.problem.findUnique({
-      where: { id: classSubmission.problemId },
-      select: { id: true, problemNumber: true, title: true, difficulty: true },
-    }),
-    prisma.user.findUnique({
-      where: { id: classSubmission.userId },
-      select: { id: true, username: true, nickname: true },
-    }),
-    // 作业提交会同步写主 Submission（带 assignmentSubmissionId），测试点详情在那边
-    prisma.submission.findFirst({
-      where: { assignmentSubmissionId: classSubmission.id },
-      select: {
-        id: true,
-        testResults: true,
-        message: true,
-        time: true,
-        memory: true,
-        passedTests: true,
-        totalTests: true,
-        score: true,
-        status: true,
-      },
-    }),
-  ])
-  const linked = linkedSubmission as any
-  const testResults =
-    linked && 'testResults' in linked && linked.testResults
-      ? (linked.testResults as any)
-      : []
+  if (!submission) return null
   return {
-    id: classSubmission.id,
-    problemId: classSubmission.problemId,
-    userId: classSubmission.userId,
-    language: classSubmission.language,
-    code: classSubmission.code,
-    status: linked?.status || classSubmission.status,
-    score: linked?.score ?? classSubmission.score,
-    time: linked?.time ?? classSubmission.time,
-    memory: linked?.memory ?? classSubmission.memory,
-    passedTests: linked?.passedTests ?? classSubmission.passedTests,
-    totalTests: linked?.totalTests ?? classSubmission.totalTests,
-    message: linked?.message ?? classSubmission.message,
-    submittedAt: classSubmission.submittedAt,
-    problem: problem || {
-      id: classSubmission.problemId,
-      problemNumber: null,
-      title: '未知题目',
-      difficulty: '未知',
-    },
-    user: user || {
-      id: classSubmission.userId,
-      username: '未知用户',
-      nickname: null,
-    },
-    testResults,
+    ...submission,
+    testResults: parseSubmissionTestResults(submission.testResults),
   }
 }
 

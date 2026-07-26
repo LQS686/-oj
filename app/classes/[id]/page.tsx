@@ -23,7 +23,7 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import Link from 'next/link'
 import AssignmentOpenLink from '@/components/assignment/AssignmentOpenLink'
-import { ClassWorkspaceShell, PageLoading, useDialog } from '@/components/common'
+import { ClassWorkspaceShell, PageLoading, useDialog, RouteSuspenseFallback } from '@/components/common'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import ClassManageInlinePanel from '@/components/class/ClassManageInlinePanel'
 import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
@@ -33,13 +33,12 @@ import ViewNoteModal, { type ClassNoteDetail } from '@/components/class/ViewNote
 import CreateClassProblemModal from '@/components/class/CreateClassProblemModal'
 import { classRoleDisplayLabel, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDate } from '@/lib/utils'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
 
 interface Assignment {
   id: string
   title: string
   startTime?: string
-  deadline: string
   endTime?: string
   problemCount: number
   createdByName?: string
@@ -198,7 +197,7 @@ function ClassDetailContent() {
 
   const handleJoinClass = async () => {
     if (!user) {
-      router.push(loginPath())
+      router.push(loginPathFromLocation())
       return
     }
     const message = await dialog.prompt({
@@ -329,7 +328,7 @@ function ClassDetailContent() {
 
   const filteredAssignments = assignments.filter((a) => {
     if (assignmentFilter === 'all') return true
-    const status = getAssignmentStatus(a.startTime, a.endTime || a.deadline)
+    const status = getAssignmentStatus(a.startTime, a.endTime)
     return status === assignmentFilter
   })
 
@@ -443,7 +442,7 @@ function ClassDetailContent() {
                     ) : (
                       <div className="space-y-1 max-h-[22rem] overflow-y-auto">
                         {filteredAssignments.map((a) => {
-                          const status = getAssignmentStatus(a.startTime, a.endTime || a.deadline)
+                          const status = getAssignmentStatus(a.startTime, a.endTime)
                           const statusInfo =
                             status === 'upcoming'
                               ? { text: '未开始', cls: 'text-blue-400 bg-blue-500/10' }
@@ -472,7 +471,7 @@ function ClassDetailContent() {
                                 <div className="mt-0.5 text-[11px] text-muted-foreground flex flex-wrap gap-x-2.5">
                                   <span className="inline-flex items-center gap-0.5">
                                     <Clock className="w-3 h-3" />
-                                    {fmt(a.startTime)} – {fmt(a.deadline)}
+                                    {fmt(a.startTime)} – {fmt(a.endTime)}
                                   </span>
                                   <span>{a.problemCount || 0} 题</span>
                                 </div>
@@ -732,7 +731,7 @@ function ClassDetailContent() {
 
 export default function ClassDetailPage() {
   return (
-    <Suspense fallback={<PageLoading label="加载班级中..." />}>
+    <Suspense fallback={<RouteSuspenseFallback label="加载班级中..." />}>
       <ClassDetailContent />
     </Suspense>
   )

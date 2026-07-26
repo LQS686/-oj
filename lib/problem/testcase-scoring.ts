@@ -49,6 +49,9 @@ export function assertTotalScoreIs100(cases: TestCaseScoreInput[]): void {
 
 /**
  * 兜底归一化：如果总分不是 100，重新均分
+ *
+ * 注意：增删测点后若总分仍为 100（例如原 50+50，再加 0），不会重分。
+ * 需要强制均分时请用 distributeTestCaseScores(..., 'rebalance')。
  */
 export function normalizeTestCaseScores<T extends TestCaseScoreInput>(cases: T[]): T[] {
   if (!Array.isArray(cases) || cases.length === 0) return cases
@@ -58,7 +61,7 @@ export function normalizeTestCaseScores<T extends TestCaseScoreInput>(cases: T[]
 }
 
 /**
- * 在保存测试点前调用此函数 - 安全网
+ * 在保存测试点前调用此函数 - 安全网（总分已是 100 时保留原分值）
  */
 export function ensureTotalScoreIs100<T extends TestCaseScoreInput>(cases: T[]): T[] {
   if (!Array.isArray(cases) || cases.length === 0) return cases

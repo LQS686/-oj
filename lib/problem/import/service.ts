@@ -8,7 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { ApiError } from '@/lib/api/withApi'
-import { isValidDifficulty, migrateDifficulty } from '@/lib/constants'
+import { isValidDifficulty, normalizeDifficulty, type Difficulty } from '@/lib/constants'
 import { clearProblemCache } from '../admin'
 import { redistributeTestScores } from '../testcase'
 import type {
@@ -19,17 +19,8 @@ import type {
 } from './types'
 
 /**
- * 规范化难度值：8 档直接通过 / 旧版迁移 / fallback
- */
-function normalizeDifficulty(value: unknown, fallback: string): string {
-  if (isValidDifficulty(value)) return value as string
-  const migrated = migrateDifficulty(value)
-  if (isValidDifficulty(migrated)) return migrated
-  return fallback
-}
-
-/**
- * 题目规范化：补全默认值、清理空字段、确保字段类型正确
+ * 题目规范化：补全默认值、清理空字段、确保字段类型正确。
+ * 难度仅接受洛谷 8 档；缺省用 options.defaultDifficulty；显式非法值直接报错（不做旧档映射）。
  */
 function normalizeImportedProblem(
   raw: ImportedProblem,
@@ -46,11 +37,24 @@ function normalizeImportedProblem(
   if (description.length < 10) {
     throw new Error('题目描述至少需要 10 个字符')
   }
+
+  let difficulty: Difficulty
+  const rawDifficulty = raw.difficulty
+  if (rawDifficulty == null || String(rawDifficulty).trim() === '') {
+    difficulty = normalizeDifficulty(options.defaultDifficulty)
+  } else if (isValidDifficulty(rawDifficulty)) {
+    difficulty = rawDifficulty
+  } else {
+    throw new Error(
+      `非法难度「${String(rawDifficulty)}」，须为洛谷 8 档之一：入门 / 普及- / 普及 / 普及+ / 提高 / 提高+ / 省选 / NOI`
+    )
+  }
+
   return {
     ...raw,
     title,
     description,
-    difficulty: normalizeDifficulty(raw.difficulty, options.defaultDifficulty),
+    difficulty,
     tags: Array.isArray(raw.tags) ? raw.tags.filter(Boolean).map(t => String(t).trim()) : [],
     timeLimit: Number.isFinite(raw.timeLimit) && raw.timeLimit > 0 ? raw.timeLimit : 1000,
     memoryLimit: Number.isFinite(raw.memoryLimit) && raw.memoryLimit > 0 ? raw.memoryLimit : 128,

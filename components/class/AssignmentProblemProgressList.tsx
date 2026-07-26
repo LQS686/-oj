@@ -15,9 +15,9 @@ export interface Problem {
 export interface Submission {
   id: string
   userId?: string
-  problemId: string
+  problemId?: string
   status: string
-  score: number
+  score?: number
   submittedAt: string
   timeElapsedMs?: number
 }
@@ -107,12 +107,12 @@ export default function AssignmentProblemProgressList({
               className={`text-[10px] font-semibold tabular-nums leading-none ${
                 status?.status === 'AC'
                   ? 'text-secondary'
-                  : status && status.score > 0
+                  : status && (status.score ?? 0) > 0
                     ? 'text-accent'
                     : 'text-muted-foreground/70'
               }`}
             >
-              {status ? `${status.score}分` : '—'}
+              {status ? `${status.score ?? 0}分` : '—'}
             </span>
 
             <ProblemTimer

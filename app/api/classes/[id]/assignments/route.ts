@@ -25,7 +25,7 @@ export const GET = withApi.classRole(
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const q = readQuery<{ page?: string; pageSize?: string; status?: 'upcoming' | 'active' | 'ongoing' | 'ended' }>(req)
+  const q = readQuery<{ page?: string; pageSize?: string; status?: 'upcoming' | 'active' | 'ended' }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)
   const pageSize = Math.max(1, parseInt(q.pageSize || '20') || 20)
 
@@ -46,13 +46,10 @@ export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, {
     description?: string
     startTime?: string | Date
     endTime?: string | Date
-    deadline?: string | Date
     problemIds?: string[]
   }>(req)
 
-  // 兼容 deadline 和 endTime
-  const finalEndTime = body.endTime || body.deadline
-  if (!body.title || !finalEndTime || !body.problemIds || body.problemIds.length === 0) {
+  if (!body.title || !body.endTime || !body.problemIds || body.problemIds.length === 0) {
     throw400('MISSING_FIELDS', '请填写完整的作业信息')
   }
 
@@ -80,13 +77,13 @@ export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, {
   if (body.startTime && Number.isNaN(new Date(body.startTime).getTime())) {
     throw400('INVALID_DATE_FORMAT', '开始时间格式无效')
   }
-  if (Number.isNaN(new Date(finalEndTime!).getTime())) {
+  if (Number.isNaN(new Date(body.endTime!).getTime())) {
     throw400('INVALID_DATE_FORMAT', '结束时间格式无效')
   }
   // startTime < endTime 校验（两者都提供时）
   if (
     body.startTime &&
-    new Date(body.startTime).getTime() >= new Date(finalEndTime!).getTime()
+    new Date(body.startTime).getTime() >= new Date(body.endTime!).getTime()
   ) {
     throw400('INVALID_TIME_RANGE', '开始时间必须早于结束时间')
   }
@@ -101,7 +98,7 @@ export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, {
 
   const now = new Date()
   const finalStartTime = body.startTime ? new Date(body.startTime) : now
-  const finalEndDate = new Date(finalEndTime!)
+  const finalEndDate = new Date(body.endTime!)
 
   const assignment = await createClassAssignment({
     classId: id,

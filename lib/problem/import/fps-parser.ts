@@ -192,7 +192,7 @@ function parseFpsItem(itemXml: string, index: number): ImportedProblem {
     samples,
     hint,
     source,
-    difficulty: '入门', // FPS 标准无难度字段，由 service 层用 defaultDifficulty 兜底
+    difficulty: '入门', // FPS 标准无难度字段；可由 ImportOptions.defaultDifficulty 覆盖
     tags,
     timeLimit: parseTimeLimit(itemXml),
     memoryLimit: parseMemoryLimit(itemXml),

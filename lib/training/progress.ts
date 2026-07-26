@@ -3,6 +3,7 @@
  * 训练详情 + 用户进度
  */
 import { prisma } from '@/lib/prisma'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 import type {
   TrainingCategoryType,
   TrainingDetail,
@@ -201,7 +202,7 @@ export async function listTrainingProblemsWithStatus(
   })
 
   const problemIds = trainingProblems.map((tp) => tp.problemId)
-  const userSubmissionStatus: Record<string, 'Accepted' | 'Attempted' | null> = {}
+  const userSubmissionStatus: Record<string, 'AC' | 'Attempted' | null> = {}
 
   if (userId && problemIds.length > 0) {
     const submissions = await prisma.submission.findMany({
@@ -216,8 +217,8 @@ export async function listTrainingProblemsWithStatus(
     }
     for (const pid of problemIds) {
       const statuses = map.get(pid)
-      if (statuses?.has('Accepted') || statuses?.has('AC')) {
-        userSubmissionStatus[pid] = 'Accepted'
+      if (statuses?.has(SubmissionStatus.ACCEPTED)) {
+        userSubmissionStatus[pid] = 'AC'
       } else if (statuses && statuses.size > 0) {
         userSubmissionStatus[pid] = 'Attempted'
       } else {

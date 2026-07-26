@@ -232,7 +232,6 @@ export interface Assignment {
   startTime: string | null
   endTime: string | null
   createdBy: string
-  deadline: string | null
   createdAt: string
   updatedAt: string
   problems?: Array<{

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { getUserFromRequest } from '@/lib/auth'
-import { canAccessAdmin } from '@/lib/permissions'
+import { canAccessAdmin, isSystemAdmin, isSystemAdminOnlyPath } from '@/lib/permissions'
 import crypto from 'crypto'
 import { logger } from '@/lib/logger'
 
@@ -13,8 +13,8 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/auth/login': { maxRequests: 10, windowMs: 60000 },
   '/api/auth/register': { maxRequests: 5, windowMs: 60000 },
   '/api/auth/forgot-password': { maxRequests: 3, windowMs: 300000 },
-  // 高频轮询接口：navbar 30s 轮询 + AdminLayout 30s 轮询，放宽至 200/min
-  '/api/notifications': { maxRequests: 200, windowMs: 60000 },
+  // 通知：WS 推送 + 回前台/重连同步；非轮询
+  '/api/notifications': { maxRequests: 60, windowMs: 60000 },
   // 修复 P1：补充限流白名单（之前大量写接口无显式限流）
   '/api/submissions': { maxRequests: 20, windowMs: 60000 },
   '/api/solutions': { maxRequests: 10, windowMs: 60000 },
@@ -97,8 +97,9 @@ export async function middleware(request: NextRequest) {
   logger.setContext({ requestId })
 
   // 拦截 /admin/* 页面路由（不含 /api/admin/*）：
-  // 基于 JWT payload 中的 role 判定，仅 SYSTEM_ADMIN 和 ADMIN 可放行。
-  // /api/admin/* 由 API 路由的 withApi.admin 处理，此处不拦截。
+  // 基于 JWT payload 中的 role 判定，仅 SYSTEM_ADMIN 和 ADMIN 可放行；
+  // 系统设置 / 系统公告等路径另需 SYSTEM_ADMIN。
+  // /api/admin/* 由 API 路由的 withApi.admin / withApi.systemAdmin 处理，此处不拦截。
   if (pathname.startsWith('/admin') && !pathname.startsWith('/api/')) {
     const payload = getUserFromRequest(request)
     if (!payload) {
@@ -113,6 +114,11 @@ export async function middleware(request: NextRequest) {
       redirect.headers.set('x-request-id', requestId)
       return redirect
     }
+    if (isSystemAdminOnlyPath(pathname) && !isSystemAdmin({ role: payload.role })) {
+      const redirect = NextResponse.redirect(new URL('/403', request.url))
+      redirect.headers.set('x-request-id', requestId)
+      return redirect
+    }
     return NextResponse.next()
   }
 
@@ -120,7 +126,7 @@ export async function middleware(request: NextRequest) {
     // CSRF 校验：写操作必须同源
     if (!isAllowedOrigin(request)) {
       return new NextResponse(
-        JSON.stringify({ ok: false, success: false, error: '跨站请求被拒绝', code: 'CSRF_REJECTED' }),
+        JSON.stringify({ success: false, error: '跨站请求被拒绝', code: 'CSRF_REJECTED' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
       )
     }
@@ -143,7 +149,6 @@ export async function middleware(request: NextRequest) {
     if (!result.success) {
       return new NextResponse(
         JSON.stringify({
-          ok: false,
           success: false,
           error: '请求过于频繁，请稍后再试',
           retryAfter: result.retryAfter,

@@ -9,7 +9,7 @@ import { ClassWorkspaceShell, PageLoading } from '@/components/common'
 import { useClass } from '@/hooks/useClass'
 import { formatDateTime } from '@/lib/utils'
 import { classRoleDisplayLabel } from '@/lib/class/roles'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
 
 interface ActivityMember {
   id: string
@@ -60,7 +60,7 @@ export default function MemberActivityPage() {
 
       if (response.status === 401) {
         // 保持 loading，避免跳转前闪错误态
-        router.push(loginPath())
+        router.push(loginPathFromLocation())
         return
       }
 

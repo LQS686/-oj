@@ -8,7 +8,6 @@ import { withApi } from '@/lib/api/withApi'
 
 export const POST = withApi.public(async () => {
   const response = NextResponse.json({
-    ok: true,
     success: true,
     data: { message: '登出成功' },
   })

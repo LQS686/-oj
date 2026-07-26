@@ -10,20 +10,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
 import { formatDate } from '@/lib/utils'
 import CreateClassModal from '@/components/class/CreateClassModal'
-import {
-  EducationalPageShell,
-  PageLoading,
-  ListEmptyState,
-  LIST_GRID_CLASS,
-  LIST_GRID_SKELETON_CLASS,
-  LIST_GRID_CARD_META_ROW,
-  LIST_GRID_CARD_TITLE,
-  LIST_GRID_CARD_MIDDLE,
-  LIST_GRID_CARD_FOOTER,
-  listGridCardLinkClass,
-  useDialog,
-} from '@/components/common'
-import { loginPath } from '@/lib/navigation'
+import { EducationalPageShell, PageLoading, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback } from '@/components/common'
+import { loginPathFromLocation } from '@/lib/navigation'
 
 interface Class {
   id: string
@@ -372,7 +360,7 @@ function ClassesPageContent() {
 
 export default function ClassesPage() {
   return (
-    <Suspense fallback={<PageLoading label="加载班级中..." />}>
+    <Suspense fallback={<RouteSuspenseFallback label="加载班级中..." />}>
       <ClassesPageContent />
     </Suspense>
   )
@@ -386,7 +374,7 @@ function ClassDetailModal({ classData, onClose, user, router }: { classData: Cla
 
   const handleJoinClass = async () => {
     if (!user) {
-      router.push(loginPath())
+      router.push(loginPathFromLocation())
       return
     }
 

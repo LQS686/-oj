@@ -1,5 +1,5 @@
 /**
- * /api/admin/settings - 系统设置（管理员）
+ * /api/admin/settings - 系统设置（仅 SYSTEM_ADMIN）
  *
  * GET  读取系统设置
  * PUT  保存系统设置

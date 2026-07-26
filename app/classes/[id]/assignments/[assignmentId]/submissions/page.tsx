@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use, useRef } from 'react'
+import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
 import type { Assignment } from '@/types/models'
 import { ClassWorkspaceShell } from '@/components/common'
@@ -36,6 +37,7 @@ interface Submission {
  message?: string
  submittedAt: string
  isLate: boolean
+ assignmentSubmissionId?: string
  // Phase 1：作业计时字段
  timeElapsedMs?: number
  isFirstAc?: boolean
@@ -80,28 +82,27 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  fetchAssignment()
  }, [classId, assignmentId])
 
- useEffect(() => {
- const fetchSubmissions = async () => {
+ const fetchSubmissions = useCallback(async (showLoading = true) => {
  try {
- setLoading(true)
- 
+ if (showLoading) setLoading(true)
+
  const params = new URLSearchParams()
  if (filterUserId) params.append('userId', filterUserId)
  if (filterProblemId) params.append('problemId', filterProblemId)
  if (filterStatus) params.append('status', filterStatus)
  params.append('page', '1')
  params.append('pageSize', '50')
- 
+
  const response = await fetchWithCookie(
  `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
  { cache: 'no-store' }
  )
  const data = await response.json()
- 
+
  if (data.success) {
  const submissionsList = data.data.submissions || []
  setSubmissions(submissionsList)
- 
+
  if (isFromLeaderboard && submissionsList.length > 0) {
  const firstSubmission = submissionsList[0]
  setTargetUser({
@@ -117,96 +118,21 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  } catch (error) {
  logger.error('获取提交记录失败', error)
  } finally {
- setLoading(false)
+ if (showLoading) setLoading(false)
  }
- }
- 
- fetchSubmissions()
  }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus, isFromLeaderboard])
 
- // 用 ref 跟踪是否有非终态提交，避免 submissions 变化导致 interval 反复重建
- const hasNonFinalRef = useRef(false)
  useEffect(() => {
- hasNonFinalRef.current = Array.isArray(submissions) && submissions.some(
- (s) => s?.status === 'Pending' || s?.status === 'Judging' || s?.status === 'Running'
- )
- }, [submissions])
+ void fetchSubmissions()
+ }, [fetchSubmissions])
 
- // 轮询兜底：列表里有非终态记录时每 3s 拉一次，
- // 解决 WebSocket 漏推 / 断连时提交记录永远不刷新的问题。
- // 页面隐藏时暂停轮询，恢复前台时若仍有非终态则重启。
- useEffect(() => {
- const fetchSubmissionsPolling = async () => {
- try {
- const params = new URLSearchParams()
- if (filterUserId) params.append('userId', filterUserId)
- if (filterProblemId) params.append('problemId', filterProblemId)
- if (filterStatus) params.append('status', filterStatus)
- params.append('page', '1')
- params.append('pageSize', '50')
-
- const response = await fetchWithCookie(
- `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
- { cache: 'no-store' }
- )
- const data = await response.json()
- if (data.success) {
- setSubmissions(data.data.submissions || [])
- }
- } catch (error) {
- logger.error('轮询提交记录失败', error)
- }
- }
-
- let intervalId: ReturnType<typeof setInterval> | null = null
- const start = () => {
- if (intervalId) return
- intervalId = setInterval(() => {
- // 每次轮询前检查 ref，若已全部终态则停止（避免无意义请求）
- if (!hasNonFinalRef.current) {
- stop()
- return
- }
- fetchSubmissionsPolling()
- }, 3000)
- }
- const stop = () => {
- if (intervalId) {
- clearInterval(intervalId)
- intervalId = null
- }
- }
- const onVisibilityChange = () => {
- if (document.visibilityState === 'visible') {
- // 切回页面时若仍有非终态提交，立即刷新一次并启动轮询
- if (hasNonFinalRef.current) {
- fetchSubmissionsPolling()
- start()
- } else {
- stop()
- }
- } else {
- stop()
- }
- }
-
- // 初始：若有非终态提交且页面可见，启动轮询
- if (hasNonFinalRef.current && document.visibilityState === 'visible') {
- start()
- }
- document.addEventListener('visibilitychange', onVisibilityChange)
-
- return () => {
- stop()
- document.removeEventListener('visibilitychange', onVisibilityChange)
- }
- }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus])
-
- // WebSocket 实时推送：本地有用户提交时收到推送，
- // 立即合并到列表（乐观更新），再后台拉一次拿权威数据
+ // WebSocket：按主 Submission.id 合并列表；重连时整表刷新补上断连窗口
  useSubmissionSocket({
  userId: user?.id || '',
  enabled: !!user,
+ onConnected: () => {
+ void fetchSubmissions(false)
+ },
  onSubmissionUpdate: (data) => {
  if (!data?.id) return
  setSubmissions((prev) => {
@@ -224,16 +150,20 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  totalTests: typeof data.totalTests === 'number' ? data.totalTests : next[idx].totalTests,
  message: data.message ?? next[idx].message,
  }
- // 同步更新 hasNonFinalRef，让轮询 effect 立即感知状态变化
- hasNonFinalRef.current = next.some(
- (s) => s?.status === 'Pending' || s?.status === 'Judging' || s?.status === 'Running'
- )
  return next
  })
  },
  })
 
  const getStatusInfo = (status: string, score: number) => {
+ if (isNonFinalSubmissionStatus(status)) {
+ return {
+ icon: <Clock className="w-5 h-5 animate-pulse" />,
+ color: 'text-primary',
+ bg: 'bg-primary/10',
+ label: status
+ }
+ }
  switch (status) {
  case 'AC':
  return {
@@ -271,7 +201,6 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  label: 'RE'
  }
  case 'SE':
- case 'system_error':
  return {
  icon: <AlertCircle className="w-5 h-5" />,
  color: 'text-muted-foreground',
@@ -279,21 +208,11 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  label: '系统错误'
  }
  case 'removed':
- case 'REMOVED':
  return {
  icon: <XCircle className="w-5 h-5" />,
  color: 'text-muted-foreground',
  bg: 'bg-gray-500/20',
  label: '题目已移除'
- }
- case 'PENDING':
- case 'Judging':
- case 'Running':
- return {
- icon: <Clock className="w-5 h-5 animate-pulse" />,
- color: 'text-primary',
- bg: 'bg-primary/10',
- label: status
  }
  default:
  if (score > 0 && score < 100) {
@@ -400,8 +319,8 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  <option value="TLE">TLE (超时)</option>
  <option value="MLE">MLE (内存超限)</option>
  <option value="RE">RE (运行错误)</option>
- <option value="SYSTEM_ERROR">SYSTEM_ERROR (系统错误)</option>
- <option value="REMOVED">REMOVED (题目已移除)</option>
+ <option value="SE">SE (系统错误)</option>
+ <option value="removed">removed (题目已移除)</option>
  </select>
  </div>
  </div>

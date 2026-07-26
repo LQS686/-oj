@@ -17,7 +17,7 @@ export default function AnnouncementsListPage() {
     fetchWithCookie('/api/announcements?limit=20')
       .then((r) => r.json())
       .then((json) => {
-        if ((json.success || json.ok) && json.data?.items) {
+        if ((json.success) && json.data?.items) {
           setItems(json.data.items)
         }
       })
@@ -31,7 +31,7 @@ export default function AnnouncementsListPage() {
     fetchWithCookie('/api/announcements?limit=20')
       .then((r) => r.json())
       .then((json) => {
-        if (!cancelled && (json.success || json.ok) && json.data?.items) {
+        if (!cancelled && (json.success) && json.data?.items) {
           setItems(json.data.items)
         }
       })

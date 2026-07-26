@@ -12,6 +12,8 @@ import {
 } from '@/lib/mongodb-direct'
 import { addJudgeJob } from '@/lib/judge/queue'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
+import { parseComparisonMode } from '@/lib/judge/types'
+import type { TestCase } from '@prisma/client'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 
 /* ============================================================================
@@ -146,9 +148,9 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
       language: input.language,
       timeLimit: problem.timeLimit,
       memoryLimit: problem.memoryLimit,
-      comparisonMode: problem.comparisonMode as any,
+      comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
-      testCases: problem.testCases.map((tc: any) => ({
+      testCases: problem.testCases.map((tc: TestCase) => ({
         id: tc.id,
         input: tc.input,
         output: tc.output,

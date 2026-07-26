@@ -163,7 +163,6 @@ export async function computeContestRankings(
     if (contest.type === 'ACM') {
       if (problemStats.status === 'AC') return
       if (sub.status === 'AC') {
-        // 兼容不同状态写法
         problemStats.status = 'AC'
         problemStats.time = relativeTime
         problemStats.score = 1 // ACM 1题1分
@@ -171,8 +170,7 @@ export async function computeContestRankings(
         stats.solved += 1
         stats.totalScore += 1
       } else if (
-        ['WA', 'TLE', 'MLE', 'RE'].includes(sub.status) ||
-        sub.status === 'Wrong Answer'
+        ['WA', 'TLE', 'MLE', 'RE'].includes(sub.status)
       ) {
         problemStats.status = 'WA'
         problemStats.tries += 1

@@ -1,5 +1,5 @@
 /**
- * /api/admin/announcements — 系统公告管理
+ * /api/admin/announcements — 系统公告管理（仅 SYSTEM_ADMIN）
  */
 import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import {
@@ -7,12 +7,12 @@ import {
   listAllAnnouncementsForAdmin,
 } from '@/lib/announcement/service'
 
-export const GET = withApi.admin(async () => {
+export const GET = withApi.systemAdmin(async () => {
   const items = await listAllAnnouncementsForAdmin()
   return ok({ items })
 })
 
-export const POST = withApi.admin(async (req, _ctx, { user }) => {
+export const POST = withApi.systemAdmin(async (req, _ctx, { user }) => {
   const body = await readJson<{
     title?: string
     content?: string

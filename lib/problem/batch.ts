@@ -4,7 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { ApiError } from '@/lib/api/withApi'
-import { DIFFICULTIES, isValidDifficulty, migrateDifficulty } from '@/lib/constants'
+import { DIFFICULTIES, isValidDifficulty } from '@/lib/constants'
 import { clearProblemCache } from './admin'
 import { deleteTestCaseFiles } from './testcase'
 import { logger } from '@/lib/logger'
@@ -17,8 +17,6 @@ export type BatchProblemAction = 'visibility' | 'difficulty' | 'delete'
 export type BatchProblemVisibility = 'public' | 'private' | 'contest'
 
 const VALID_VISIBILITY: BatchProblemVisibility[] = ['public', 'private', 'contest']
-// 批量修改难度允许 8 档 + 兼容旧版 4 档（自动迁移）
-const VALID_DIFFICULTY_BATCH = [...DIFFICULTIES] as readonly string[]
 
 /**
  * 批量修改题目可见性
@@ -132,9 +130,12 @@ export function validateBatchProblemInput(input: {
       return { action, problemIds, visibility: visibility as BatchProblemVisibility }
     }
     case 'difficulty': {
-      // 统一使用 8 档标准，旧版 4 档自动迁移
-      if (!difficulty || (!VALID_DIFFICULTY_BATCH.includes(difficulty) && !isValidDifficulty(migrateDifficulty(difficulty)))) {
-        throw new ApiError('INVALID_DIFFICULTY', `难度值无效，必须是 8 档之一：${DIFFICULTIES.join(' / ')}（旧版简单/中等/困难将自动迁移）`, 400)
+      if (!difficulty || !isValidDifficulty(difficulty)) {
+        throw new ApiError(
+          'INVALID_DIFFICULTY',
+          `难度值无效，必须是 8 档之一：${DIFFICULTIES.join(' / ')}`,
+          400
+        )
       }
       return { action, problemIds, difficulty }
     }

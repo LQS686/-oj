@@ -18,34 +18,22 @@ import {
   Check,
 } from 'lucide-react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { getStatusConfig, getStatusText } from '@/lib/status'
+import {
+  SubmissionStatus,
+  isAcceptedStatus,
+  isCompileErrorStatus,
+  isNonFinalSubmissionStatus,
+} from '@/lib/constants/submission-status'
 import { formatDateTime, formatTime, formatMemory } from '@/lib/utils'
 import { fetchWithCookie } from '@/lib/api/base'
-import type { Submission } from '@/types/models'
 import type { UserData } from '@/lib/api/auth'
 import { loginPath } from '@/lib/navigation'
 import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
+import type { SubmissionListRow } from '@/hooks/useSubmissionResultFlow'
 
-export type SubmissionListItem = Partial<Submission> & {
-  id: string
-  status: string
-  submittedAt: string
-  score?: number
-  language?: string
-  time?: number
-  memory?: number
-  passedTests?: number
-  totalTests?: number
-  message?: string | null
-  code?: string
-  testResults?: Array<{
-    testId?: string
-    status: string
-    time: number
-    memory: number
-    message?: string | null
-  }> | null
-}
+export type SubmissionListItem = SubmissionListRow
 
 interface SubmissionListProps {
   submissions: SubmissionListItem[]
@@ -60,18 +48,6 @@ interface SubmissionListProps {
 function toCodeLanguage(lang?: string): CodeLanguage {
   if (lang === 'c' || lang === 'python') return lang
   return 'cpp'
-}
-
-function isJudgingStatus(status: string) {
-  return ['Pending', 'Judging', 'Running', 'PENDING', 'JUDGING', 'RUNNING'].includes(status)
-}
-
-function isPassStatus(status: string) {
-  return status === 'AC' || status === 'Accepted'
-}
-
-function isCeStatus(status: string) {
-  return status === 'CE' || status === 'Compile Error'
 }
 
 function StatusIcon({ name, className }: { name: string; className?: string }) {
@@ -95,29 +71,29 @@ function StatusIcon({ name, className }: { name: string; className?: string }) {
 
 function shortStatus(status: string): string {
   switch (status) {
-    case 'Accepted':
+    case SubmissionStatus.ACCEPTED:
       return 'AC'
-    case 'Wrong Answer':
+    case SubmissionStatus.WRONG_ANSWER:
       return 'WA'
-    case 'Time Limit Exceeded':
+    case SubmissionStatus.TIME_LIMIT_EXCEEDED:
       return 'TLE'
-    case 'Memory Limit Exceeded':
+    case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
       return 'MLE'
-    case 'Runtime Error':
+    case SubmissionStatus.RUNTIME_ERROR:
       return 'RE'
-    case 'Compile Error':
+    case SubmissionStatus.COMPILE_ERROR:
       return 'CE'
-    case 'System Error':
+    case SubmissionStatus.SYSTEM_ERROR:
       return 'SE'
-    case 'Presentation Error':
+    case SubmissionStatus.PRESENTATION_ERROR:
       return 'PE'
-    case 'Output Limit Exceeded':
+    case SubmissionStatus.OUTPUT_LIMIT_EXCEEDED:
       return 'OLE'
-    case 'Partly Correct':
+    case SubmissionStatus.PARTLY_CORRECT:
       return 'PC'
-    case 'Judging':
-    case 'Pending':
-    case 'Running':
+    case SubmissionStatus.PENDING:
+    case SubmissionStatus.JUDGING:
+    case SubmissionStatus.RUNNING:
       return '...'
     default:
       return status.length > 4 ? status.slice(0, 4) : status
@@ -127,34 +103,25 @@ function shortStatus(status: string): string {
 /** 洛谷风格测试点色块背景 */
 function testPointBlockClass(status: string): string {
   switch (status) {
-    case 'AC':
-    case 'Accepted':
+    case SubmissionStatus.ACCEPTED:
       return 'bg-[var(--difficulty-easy)]'
-    case 'WA':
-    case 'Wrong Answer':
+    case SubmissionStatus.WRONG_ANSWER:
       return 'bg-[var(--difficulty-hard)]'
-    case 'TLE':
-    case 'Time Limit Exceeded':
+    case SubmissionStatus.TIME_LIMIT_EXCEEDED:
       return 'bg-[var(--difficulty-medium)]'
-    case 'MLE':
-    case 'Memory Limit Exceeded':
+    case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
       return 'bg-[var(--info)]'
-    case 'RE':
-    case 'Runtime Error':
+    case SubmissionStatus.RUNTIME_ERROR:
       return 'bg-[var(--difficulty-expert)]'
-    case 'CE':
-    case 'Compile Error':
+    case SubmissionStatus.COMPILE_ERROR:
       return 'bg-muted-foreground'
-    case 'PE':
-    case 'Presentation Error':
-    case 'OLE':
-    case 'Output Limit Exceeded':
-    case 'PC':
-    case 'Partly Correct':
+    case SubmissionStatus.PRESENTATION_ERROR:
+    case SubmissionStatus.OUTPUT_LIMIT_EXCEEDED:
+    case SubmissionStatus.PARTLY_CORRECT:
       return 'bg-[var(--accent)]'
-    case 'Pending':
-    case 'Judging':
-    case 'Running':
+    case SubmissionStatus.PENDING:
+    case SubmissionStatus.JUDGING:
+    case SubmissionStatus.RUNNING:
       return 'bg-primary/70'
     default:
       return 'bg-muted-foreground'
@@ -274,9 +241,9 @@ function ExpandedDetail({
 }) {
   const [copied, setCopied] = useState(false)
   const data = detail || submission
-  const judging = isJudgingStatus(data.status)
-  const isAc = isPassStatus(data.status)
-  const isCe = isCeStatus(data.status)
+  const judging = isNonFinalSubmissionStatus(data.status)
+  const isAc = isAcceptedStatus(data.status)
+  const isCe = isCompileErrorStatus(data.status)
   const testResults = data.testResults || []
   const showTests = judging || testResults.length > 0
   const codeLines = data.code ? data.code.split('\n').length : 0
@@ -415,6 +382,7 @@ export default function SubmissionList({
   expandedId = null,
   onExpandedChange,
 }: SubmissionListProps) {
+  const pathname = usePathname()
   const [detailCache, setDetailCache] = useState<Record<string, SubmissionListItem>>({})
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
   const expandedStatus = submissions.find((s) => s.id === expandedId)?.status
@@ -533,7 +501,7 @@ export default function SubmissionList({
           <div className="space-y-3">
             <p className="text-muted-foreground">请登录后查看提交记录</p>
             <Link
-              href={loginPath()}
+              href={loginPath(pathname)}
               className="btn btn-primary btn-sm inline-flex items-center gap-2"
             >
               <LogIn className="w-4 h-4" />

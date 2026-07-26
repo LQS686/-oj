@@ -48,7 +48,7 @@
  */
 import AdmZip from 'adm-zip'
 import { ApiError } from '@/lib/api/withApi'
-import { isValidDifficulty, migrateDifficulty } from '@/lib/constants'
+import { isValidDifficulty } from '@/lib/constants'
 import type { ImportedProblem, ImportedTestCase } from './types'
 
 /* ============================================================================
@@ -452,7 +452,7 @@ function mergeJudgeConfig(
   realPrecision: number
 } {
   /**
-   * 从 yaml 取数值字段，config.yaml 优先，problem.yaml 兜底，超范围用 default
+   * 从 yaml 取数值字段：config.yaml 优先，其次 problem.yaml，再否则用 default
    */
   const getNumber = (
     key: string,
@@ -466,7 +466,7 @@ function mergeJudgeConfig(
       const n = Number(cv)
       if (Number.isFinite(n) && n >= min && n <= max) return Math.round(n)
     }
-    // problem.yaml 兜底
+    // 其次 problem.yaml
     const pv = problemYaml[key]
     if (pv !== undefined && pv !== null && !Array.isArray(pv)) {
       const n = Number(pv)
@@ -476,7 +476,7 @@ function mergeJudgeConfig(
   }
 
   /**
-   * 从 yaml 取枚举字段，config.yaml 优先，problem.yaml 兜底，非法值用 fallback
+   * 从 yaml 取枚举字段：config.yaml 优先，其次 problem.yaml，非法/缺失用 default
    */
   const getEnum = <T extends string>(
     key: string,
@@ -642,20 +642,11 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
     ? rawTags.map(String).map(s => s.trim()).filter(Boolean)
     : (typeof rawTags === 'string' && rawTags.trim() ? [rawTags.trim()] : [])
 
-  // 12. 解析 difficulty：必须通过项目 8 档校验或旧版迁移
-  //   - 8 档直接通过：入门/普及-/普及/普及+/提高/提高+/省选/NOI
-  //   - 旧版（简单/中等/困难/easy/medium/hard）自动迁移
-  //   - 完全无法识别 → 默认 "入门"
-  //   与 service.ts 的 normalizeImportedProblem 保持一致
+  // 12. 解析 difficulty：必须是项目 8 档之一，否则默认「入门」
   const rawDifficulty = typeof problemYaml.difficulty === 'string'
     ? problemYaml.difficulty.trim()
     : ''
-  const difficulty = (() => {
-    if (isValidDifficulty(rawDifficulty)) return rawDifficulty
-    const migrated = migrateDifficulty(rawDifficulty)
-    if (isValidDifficulty(migrated)) return migrated
-    return '入门'
-  })()
+  const difficulty = isValidDifficulty(rawDifficulty) ? rawDifficulty : '入门'
 
   // 13. 解析其它字段
   const source = typeof problemYaml.source === 'string'

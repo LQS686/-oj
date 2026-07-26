@@ -6,6 +6,7 @@ import { AlertCircle, Medal, RefreshCw, Download, Lock, Unlock } from 'lucide-re
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { useDialog } from '@/components/common/DialogProvider'
+import { canAccessAdmin } from '@/lib/permissions'
 
 interface RankItem {
   rank: number
@@ -91,7 +92,7 @@ export default function ContestRankPage() {
   const [unsealing, setUnsealing] = useState(false)
 
   // 是否管理员（用于显示"解冻"按钮）
-  const isAdmin = user?.role === 'SYSTEM_ADMIN' || user?.role === 'ADMIN'
+  const isAdmin = canAccessAdmin(user)
 
   const fetchRank = async (silent = false) => {
     try {

@@ -73,7 +73,11 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   try {
     const submission = await submitCode(user.id, body)
     return ok(
-      { data: submission, submissionId: submission.id, message: '代码已提交，正在评测中...' },
+      {
+        submissionId: submission.id,
+        submission,
+        message: '代码已提交，正在评测中...',
+      },
       { status: 201 }
     )
   } catch (err: any) {

@@ -5,7 +5,7 @@ import { join } from 'path'
 import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 import type { ExecuteOptions, ExecuteResult } from './executor-types'
-import { computeExtraTime, readProcCpuTimeMs, readProcVmHwmKB, readWindowsProcessMemoryKB, readMemFileKB, readTimeFileMs } from './process-stats'
+import { computeExtraTime, readMemFileKB, readTimeFileMs } from './process-stats'
 import {
   assertDockerJudgeEnabled,
   getRunInfo,
@@ -368,62 +368,13 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       })
 
       const maxMemoryBytes = memoryLimit * 1024 * 1024
-      let monitorInterval: NodeJS.Timeout | null = null
-      // timeoutId 提升至外层作用域，便于内存轮询杀进程后清除墙超时定时器
+      // timeoutId 提升至外层，便于墙超时杀进程后清除
       let timeoutId: NodeJS.Timeout | null = null
       let processKilled = false
       let forceKilled = false
 
-      // Windows win-runner 自身负责 PeakWorkingSet；轮询其 PowerShell 进程内存无意义。
-      // Linux 仍轮询作兜底（无 GNU time 时），并用于运行中 MLE 软杀。
-      if (childProcess.pid && !useWinRunner) {
-        const sampleOnce = () => {
-          if (processKilled || !childProcess.pid) return
-          if (isLinux) {
-            const cpuMs = readProcCpuTimeMs(childProcess.pid)
-            if (cpuMs > cpuTimeMs) cpuTimeMs = cpuMs
-            const hwm = readProcVmHwmKB(childProcess.pid)
-            if (hwm > peakMemoryKB) peakMemoryKB = hwm
-            if (hwm > 0 && hwm * 1024 > maxMemoryBytes) {
-              logger.debug(`内存超过限制`, {
-                current: Math.round(hwm / 1024),
-                limit: memoryLimit
-              })
-              memoryExceeded = true
-              processKilled = true
-              forceKilled = true
-              if (timeoutId) clearTimeout(timeoutId)
-              childProcess.kill('SIGKILL')
-              if (monitorInterval) clearInterval(monitorInterval)
-            }
-          } else if (isWindows) {
-            const memKB = readWindowsProcessMemoryKB(childProcess.pid)
-            if (memKB > peakMemoryKB) peakMemoryKB = memKB
-            if (memKB > 0 && memKB * 1024 > maxMemoryBytes) {
-              logger.debug(`内存超过限制`, {
-                current: Math.round(memKB / 1024),
-                limit: memoryLimit
-              })
-              memoryExceeded = true
-              processKilled = true
-              forceKilled = true
-              if (timeoutId) clearTimeout(timeoutId)
-              try {
-                if (childProcess.pid && childProcess.pid > 0) {
-                  spawnSync('taskkill', ['/F', '/T', '/PID', String(childProcess.pid)], { stdio: 'ignore' })
-                }
-              } catch {
-                // 忽略：进程可能已退出
-              }
-              if (monitorInterval) clearInterval(monitorInterval)
-            }
-          }
-        }
-        // 立即采样一次，再高频轮询，尽量覆盖短时程序
-        sampleOnce()
-        const pollIntervalMs = isLinux ? 10 : 50
-        monitorInterval = setInterval(sampleOnce, pollIntervalMs)
-      }
+      // 内存/CPU 峰值由 runner.sh（Linux：ulimit 硬限 + GNU time / 选手 PID 采样）
+      // 或 win-runner（PeakWorkingSet）写出文件；勿轮询 bash/PowerShell 包装进程 PID。
 
       if (!useWinRunner) {
         const { createReadStream, createWriteStream } = await import('fs')
@@ -490,38 +441,26 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           // （close 在所有 stdio 流关闭后触发，确保输出已完整刷盘）
         }, hardTimeoutMs)
 
-        // 统一收尾函数：close/error/兜底定时器共用
+        // 统一收尾函数：close/error/墙超时收尾共用
         const finishResolve = () => {
           if (resolved) return
           resolved = true
           if (timeoutId) clearTimeout(timeoutId)
           if (fallbackTimer) clearTimeout(fallbackTimer)
-          if (monitorInterval) clearInterval(monitorInterval)
           processKilled = true
           // close 事件触发时所有 stdio 流已关闭，输出已完整刷盘
           endTime = Date.now()
           exitCode = savedExitCode || 0
 
-          // Linux: 退出前再读一次 /proc 拿最终 CPU 时间与峰值内存
-          // 注：close 事件触发时 /proc/[pid] 可能已消失，readProc* 失败返回 -1
-          // 此时使用轮询期间采集到的最大值
-          if (isLinux && childProcess.pid && !savedForceKilled) {
-            const finalCpu = readProcCpuTimeMs(childProcess.pid)
-            if (finalCpu > cpuTimeMs) cpuTimeMs = finalCpu
-            const finalHwm = readProcVmHwmKB(childProcess.pid)
-            if (finalHwm > peakMemoryKB) peakMemoryKB = finalHwm
-          }
-
-          // wrapper 写出的峰值内存 / CPU 时间（Linux GNU time / Windows GetProcess*）优先合并
+          // wrapper 写出的峰值内存 / CPU 时间（Linux GNU time·选手 PID 采样 / Windows GetProcess*）
           const fileMem = readMemFileKB(memFilePath)
           if (fileMem > 0 && fileMem > peakMemoryKB) peakMemoryKB = fileMem
-          // time 文件存在且可读时采用（含 0），避免再被 wrapper 墙钟污染
           const fileCpu = readTimeFileMs(timeFilePath)
           if (fileCpu >= 0) {
             if (fileCpu > cpuTimeMs) cpuTimeMs = fileCpu
           }
 
-          // 退出后若峰值已超限，补判 MLE（Windows win-runner 无运行中软杀）
+          // 退出后若峰值已超限，补判 MLE
           if (!memoryExceeded && peakMemoryKB > 0 && peakMemoryKB * 1024 > maxMemoryBytes) {
             memoryExceeded = true
             logger.debug(`退出后检测内存超限`, {
@@ -536,30 +475,46 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             logger.debug(`CPU 时间回退为墙钟`, { platform: process.platform, cpuTimeMs })
           }
 
-          // P1-3: runner.sh 的 ulimit -t CPU 超限会发 SIGXCPU(退出码 152)
-          // 或 SIGKILL(137)，非 Docker 路径应视为 TLE 而非 RE
-          // 参考资源：HOJ SandboxRun.java:113-146 的信号映射表
-          if (savedExitCode === 137 || savedExitCode === 152) {
+          // 信号分类（HOJ SandboxRun 信号表）：
+          //   152 = SIGXCPU → CPU TLE（ulimit -t）
+          //   137 = SIGKILL → 墙钟强杀 / ulimit -v；用峰值、CPU、墙钟区分 MLE vs TLE
+          const wallMs = Math.max(0, endTime - startTime)
+          if (savedExitCode === 152) {
             savedTimeout = true
+          } else if (savedExitCode === 137) {
+            if (savedForceKilled || savedTimeout) {
+              savedTimeout = true
+            } else if (peakMemoryKB > 0 && peakMemoryKB * 1024 >= maxMemoryBytes) {
+              memoryExceeded = true
+            } else if (cpuTimeMs > timeLimit || wallMs >= hardTimeoutMs * 0.95) {
+              savedTimeout = true
+            } else if (
+              useRunnerWrapper &&
+              peakMemoryKB === 0 &&
+              wallMs < hardTimeoutMs * 0.5
+            ) {
+              // 早死且无峰值文件：更像 RLIMIT_AS（ulimit -v）
+              memoryExceeded = true
+            } else {
+              savedTimeout = true
+            }
+          }
+
+          // 必须回写 timeout：judger 只看 executeResult.timeout
+          if (savedTimeout) {
+            timeout = true
+            memoryExceeded = false
           }
 
           // 状态判定优先级：TLE > MLE > RE
-          // timeout 标志由墙钟超时定时器或内存轮询设置，优先级最高
           if (!savedTimeout && !memoryExceeded && savedExitCode !== 0) {
             runtimeError = true
           }
 
-          // exceedsTimeLimit: 程序正常完成（未被强制杀死），但 CPU 时间超过 timeLimit
-          // 此时 timeout 保持 false（程序在 cpuTimeLimitMs 窗口内完成），
-          // 由 judger 决定是否触发重测（参考 Hydro default.ts:55 rerun 机制）
           if (!savedForceKilled && !savedTimeout && !memoryExceeded && cpuTimeMs > timeLimit) {
             exceedsTimeLimit = true
           }
 
-          // CPU TLE 精确判定：程序在墙钟窗口内完成，但 CPU 时间超过 cpuTimeLimitMs
-          // 这种情况通常是 CPU 满载死循环在 extraTime 窗口内被强制杀死，
-          // 或程序在 extraTime 窗口内自然结束但 CPU 时间已超限
-          // 参考 HOJ DefaultJudge.java:57 的二次 TLE 判定
           if (!savedTimeout && !memoryExceeded && !runtimeError && cpuTimeMs > cpuTimeLimitMs) {
             savedTimeout = true
             timeout = true
@@ -595,7 +550,6 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           resolved = true
           if (timeoutId) clearTimeout(timeoutId)
           if (fallbackTimer) clearTimeout(fallbackTimer)
-          if (monitorInterval) clearInterval(monitorInterval)
           processKilled = true
           endTime = Date.now()
           runtimeError = true
@@ -629,14 +583,13 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       }
     }
 
-    // 兜底：极端异常时（startTime / endTime 未设置）使用当前时刻
     if (!startTime) startTime = Date.now()
     if (!endTime) endTime = Date.now()
-    // 对外展示时间：优先选手进程 CPU 时间（与洛谷/HOJ/LemonLime 一致），墙钟仅作兜底
+    // 对外展示时间：优先选手进程 CPU 时间（与洛谷/HOJ/LemonLime 一致）；无 CPU 采样时用墙钟
     const preciseTime = Math.max(1, Math.round(cpuTimeMs > 0 ? cpuTimeMs : endTime - startTime))
     if (cpuTimeMs <= 0) cpuTimeMs = preciseTime
 
-    // 内存采集失败时返回 0（不再使用伪造回退值），并记录警告
+    // 内存采集失败时返回 0（不再使用伪造值），并记录警告
     if (peakMemoryKB === 0 && !USE_DOCKER) {
       logger.warn(`内存采集失败，记为 0`, {
         language,

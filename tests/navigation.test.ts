@@ -12,6 +12,7 @@ describe('navigation helpers', () => {
   it('builds login path with redirect', () => {
     expect(loginPath('/settings')).toBe('/login?redirect=%2Fsettings')
     expect(loginPath('/login')).toBe('/login')
+    expect(loginPath()).toBe('/login?redirect=%2F')
   })
 
   it('resolves redirect and returnUrl', () => {

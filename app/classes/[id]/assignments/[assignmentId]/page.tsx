@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUser } from '@/contexts/UserContext'
@@ -19,6 +19,8 @@ import {
   ListChecks,
   History,
   Code as CodeIcon,
+  Info,
+  Calendar,
 } from 'lucide-react'
 import StudentCompletionTable from '@/components/StudentCompletionTable'
 import ProblemDescription from '@/components/problem/ProblemDescription'
@@ -28,22 +30,30 @@ import AssignmentProblemProgressList from '@/components/class/AssignmentProblemP
 import SubmissionList from '@/components/problem/SubmissionList'
 import PretestPanel from '@/components/problem/PretestPanel'
 import { logger } from '@/lib/logger'
-import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useClass } from '@/hooks/useClass'
+import {
+  createPendingListRow,
+  defaultMergeSubmissionList,
+  useSubmissionResultFlow,
+  type SubmissionListRow,
+} from '@/hooks/useSubmissionResultFlow'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
 import { canManageContent } from '@/lib/permissions'
 import { isClassAdminApiRole, isClassStudentApiRole, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDateTime } from '@/lib/utils'
-import SubmissionResultModal, { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
+import SubmissionResultModal from '@/components/submission/SubmissionResultModal'
 import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { PageContainer } from '@/components/layout'
-import { loginPath } from '@/lib/navigation'
+import { loginPathFromLocation } from '@/lib/navigation'
 import { useDialog } from '@/components/common'
+import { isAcceptedStatus } from '@/lib/constants/submission-status'
 import {
-  isFinalSubmissionStatus,
-  isNonFinalSubmissionStatus,
-} from '@/lib/constants/submission-status'
+  EntityDescriptionCard,
+  EntityDetailHeader,
+  EntityInfoCard,
+  EntityOverviewLayout,
+} from '@/components/entity'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -70,25 +80,6 @@ interface Assignment {
  problems: Problem[]
 }
 
-interface Submission {
- id: string
- userId?: string
- problemId: string
- status: string
- score: number
- submittedAt: string
- /** 作业维度做题用时（毫秒），仅 AC 时有意义 */
- timeElapsedMs?: number
- language?: string
- time?: number
- memory?: number
- passedTests?: number
- totalTests?: number
- message?: string | null
- code?: string
- isLate?: boolean
-}
-
 interface ClassMember {
  id: string
  userId: string
@@ -109,16 +100,20 @@ export default function AssignmentDetailPage() {
  const [assignment, setAssignment] = useState<Assignment | null>(null)
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
- const [submissions, setSubmissions] = useState<Submission[]>([])
- const [allSubmissions, setAllSubmissions] = useState<Submission[]>([])
+ const [submissions, setSubmissions] = useState<SubmissionListRow[]>([])
+ const [allSubmissions, setAllSubmissions] = useState<SubmissionListRow[]>([])
  const [classMembers, setClassMembers] = useState<ClassMember[]>([])
  const [userRole, setUserRole] = useState<string>('student')
 const [editOpen, setEditOpen] = useState(false)
  const [canManage, setCanManage] = useState(false)
 
- // 顶层视图切换：题目作答 / 完成情况统计（管理员）
- const initialViewTab = searchParams.get('tab') === 'completion' ? 'completion' : 'problems'
- const [viewTab, setViewTab] = useState<'problems' | 'completion'>(initialViewTab)
+ // 顶层：简介 / 题目 / 完成情况（管理员）
+ type ViewTab = 'info' | 'problems' | 'completion'
+ const parseViewTab = (raw: string | null): ViewTab => {
+   if (raw === 'completion' || raw === 'problems' || raw === 'info') return raw
+   return 'info'
+ }
+ const [viewTab, setViewTab] = useState<ViewTab>(() => parseViewTab(searchParams.get('tab')))
  // 中栏 Tab：与题库页一致（不含题解，作业场景）
  const [problemTab, setProblemTab] = useState<'description' | 'submissions' | 'code'>('description')
  const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
@@ -127,41 +122,17 @@ const [editOpen, setEditOpen] = useState(false)
 
  const [code, setCode] = useState('')
  const [language, setLanguage] = useState('cpp')
- const [submitting, setSubmitting] = useState(false)
- const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null)
- const [judgeStatus, setJudgeStatus] = useState<any>(null)
- const [judgeProgress, setJudgeProgress] = useState<{ currentTest: number; totalTests: number } | null>(null)
- const [lastResult, setLastResult] = useState<SubmissionResultData | null>(null)
- const [showResultModal, setShowResultModal] = useState(false)
  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
  const [submitCooldown, setSubmitCooldown] = useState(false)
-
- // ref 跟踪 currentSubmissionId，避免回调闭包拿到陈旧值
- const currentSubmissionIdRef = useRef<string | null>(null)
- useEffect(() => {
- currentSubmissionIdRef.current = currentSubmissionId
- }, [currentSubmissionId])
-
- // ref 跟踪 submitting 状态，避免回调闭包拿到陈旧值
- const submittingRef = useRef(false)
- useEffect(() => {
- submittingRef.current = submitting
- }, [submitting])
-
- const submitEpochRef = useRef(0)
- const showResultModalRef = useRef(false)
- useEffect(() => {
- showResultModalRef.current = showResultModal
- }, [showResultModal])
- const lastResultRef = useRef<SubmissionResultData | null>(null)
- useEffect(() => {
- lastResultRef.current = lastResult
- }, [lastResult])
 
  useEffect(() => {
  fetchAssignment()
  fetchClassMembers()
  }, [params.id, params.assignmentId])
+
+ useEffect(() => {
+   setViewTab(parseViewTab(searchParams.get('tab')))
+ }, [searchParams])
 
  useDocumentTitle(assignment?.title, {
    mode: 'assignment',
@@ -236,6 +207,7 @@ const [editOpen, setEditOpen] = useState(false)
  }, [])
 
  useEffect(() => {
+ // 仅在题目 Tab 拉题面；completion/info 不请求，避免无效流量
  if (assignment?.problems?.length && viewTab === 'problems') {
  const targetIndex = Math.min(selectedProblemIndex, assignment.problems.length - 1)
  fetchProblemDetail(assignment.problems[targetIndex].id)
@@ -270,183 +242,42 @@ const [editOpen, setEditOpen] = useState(false)
  }
  }, [params.id, params.assignmentId])
 
- const applyModalFinalResult = (result: SubmissionResultData, opts?: { clearCode?: boolean }) => {
- if (!result.submissionId || result.submissionId !== currentSubmissionIdRef.current) return
- if (!showResultModalRef.current && !submittingRef.current) return
- const prev = lastResultRef.current
- if (prev?.submissionId === result.submissionId && prev.status === result.status) return
- submittingRef.current = false
- setSubmitting(false)
- setSubmitCooldown(false)
- setJudgeProgress(null)
- if (opts?.clearCode) setCode('')
- lastResultRef.current = result
- setLastResult(result)
- }
-
- // 兜底：作业内部"我的提交状态"列表里只要当前提交是终态，就把按钮重置。
- // 解决 ref 没追上 / tab 切换 / 多提交 等场景下 submitting 卡在 true 的问题。
- useEffect(() => {
- if (!submitting) return
- if (!Array.isArray(submissions) || submissions.length === 0) return
- const currentId = currentSubmissionIdRef.current
- if (!currentId) return
- const current = submissions.find((s) => s?.id === currentId || s?.id === expandedSubmissionId)
- if (!current) return
- const status = current.status
- if (isFinalSubmissionStatus(status)) {
- applyModalFinalResult({
- submissionId: currentId,
- status,
- score: typeof current.score === 'number' ? current.score : 0,
- time: typeof current.time === 'number' ? current.time : 0,
- memory: typeof current.memory === 'number' ? current.memory : 0,
- passedTests: typeof current.passedTests === 'number' ? current.passedTests : 0,
- totalTests: typeof current.totalTests === 'number' ? current.totalTests : 0,
- message: current.message ?? null,
- testResults: Array.isArray((current as any).testResults) ? (current as any).testResults : undefined,
- })
- }
- // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [submissions, submitting, user?.id, expandedSubmissionId])
-
- // 评测弹窗兜底轮询（WS 丢包 / 作业提交 ID 与列表 ID 不一致时）
- useEffect(() => {
- if (!submitting || !currentSubmissionId) return
- const watchedId = currentSubmissionId
- const epoch = submitEpochRef.current
- let cancelled = false
- const tick = async () => {
- try {
- const res = await fetchWithCookie(`/api/submissions/${watchedId}`, { cache: 'no-store' })
- const data = await res.json()
- if (cancelled || epoch !== submitEpochRef.current) return
- if (!data.success || !data.data) return
- const sub = data.data
- if (sub.id !== currentSubmissionIdRef.current) return
- const status = sub.status as string
- if (!status || isNonFinalSubmissionStatus(status)) {
- if (typeof sub.passedTests === 'number' && typeof sub.totalTests === 'number') {
- setJudgeProgress({ currentTest: sub.passedTests, totalTests: sub.totalTests })
- }
- return
- }
- applyModalFinalResult({
- submissionId: sub.id,
- status,
- score: typeof sub.score === 'number' ? sub.score : 0,
- time: typeof sub.time === 'number' ? sub.time : 0,
- memory: typeof sub.memory === 'number' ? sub.memory : 0,
- passedTests: typeof sub.passedTests === 'number' ? sub.passedTests : 0,
- totalTests: typeof sub.totalTests === 'number' ? sub.totalTests : 0,
- message: sub.message ?? null,
- testResults: Array.isArray(sub.testResults) ? sub.testResults : undefined,
- })
- void fetchAssignment()
- } catch {
- // ignore
- }
- }
- void tick()
- const timer = setInterval(() => void tick(), 1500)
- return () => {
- cancelled = true
- clearInterval(timer)
- }
- // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [submitting, currentSubmissionId])
-
- const { isConnected } = useSubmissionSocket({
- userId: user?.id || '',
- enabled: !!user,
- onSubmissionUpdate: (data) => {
- const isFinal = isFinalSubmissionStatus(data.status)
- const isCurrentSubmission = data.id === currentSubmissionIdRef.current
-
- if (isFinal && isCurrentSubmission) {
- applyModalFinalResult({
- submissionId: data.id,
- status: data.status,
- score: typeof data.score === 'number' ? data.score : (data.passedTests || 0) * 10,
- time: data.time ?? 0,
- memory: data.memory ?? 0,
- passedTests: data.passedTests || 0,
- totalTests: data.totalTests || 0,
- message: data.message,
- testResults: data.testResults,
- timeElapsedMs: data.timeElapsedMs,
- }, { clearCode: true })
- setJudgeStatus({
- submissionId: data.id,
- status: data.status,
- passedTests: data.passedTests || 0,
- totalTests: data.totalTests || 0,
- testResults: data.testResults || [],
- })
- }
-
- // 4) 乐观合并到本作业的"我的提交"列表（无论是否 currentSubmissionId）
- if (data?.id && isFinal) {
- const currentProblemId = assignment?.problems?.[selectedProblemIndex]?.id || ''
- setSubmissions((prev) => {
- if (!Array.isArray(prev)) return prev
- const filtered = prev.filter(
- (s) => !(s.userId === user?.id && s.problemId === currentProblemId)
- )
- return [
- ...filtered,
- {
- id: data.id,
+ const {
+ submitting,
+ lastResult,
+ showResultModal,
+ judgeProgress,
+ beginSubmitSession,
+ bindSubmission,
+ abortSubmitSession,
+ closeResultModal,
+ isEpochCurrent,
+ } = useSubmissionResultFlow({
  userId: user?.id,
- problemId: currentProblemId,
- status: data.status,
- score: typeof data.score === 'number' ? data.score : 0,
- submittedAt: new Date().toISOString(),
- language: data.language,
- time: data.time ?? 0,
- memory: data.memory ?? 0,
- passedTests: data.passedTests || 0,
- totalTests: data.totalTests || 0,
- message: data.message,
- testResults: Array.isArray(data.testResults) ? data.testResults : undefined,
- }
- ]
- })
- }
-
- // 5) 当前提交的中间态（非终态）也驱动进度条状态
- if (isCurrentSubmission && !isFinal) {
- setJudgeStatus({
- submissionId: data.id,
- status: data.status,
- passedTests: data.passedTests || 0,
- totalTests: data.totalTests || 0,
- testResults: data.testResults || [],
- })
- }
+ enabled: !!user,
+ submissions,
+ setSubmissions,
+ onRefreshAfterFinal: () => {
+ void fetchAssignment()
  },
- onJudgeProgress: (data) => {
- if (data?.submissionId === currentSubmissionIdRef.current) {
- setJudgeProgress({
- currentTest: data.currentTest,
- totalTests: data.totalTests,
- })
- if (!judgeStatus) {
- setJudgeStatus({
- submissionId: data.submissionId,
- status: 'Judging',
- passedTests: 0,
- totalTests: data.totalTests,
- testResults: [],
- })
+ onFinalApplied: (result) => {
+ // 与原先 WS 终态行为一致：通过后清空编辑器；任意终态结束冷却
+ if (isAcceptedStatus(result.status)) {
+ setCode('')
  }
- }
- }
+ setSubmitCooldown(false)
+ },
+ mergeListOnUpdate: (prev, data) =>
+ defaultMergeSubmissionList(prev, data, {
+ language,
+ problemId: assignment?.problems?.[selectedProblemIndex]?.id,
+ userId: user?.id,
+ }),
  })
 
  const handleSubmit = async () => {
  if (!user) {
- router.push(loginPath())
+ router.push(loginPathFromLocation())
  return
  }
  if (!code.trim() || code.trim().length < 10) return
@@ -454,21 +285,10 @@ const [editOpen, setEditOpen] = useState(false)
  // 作业状态守卫：upcoming/ended(无 allowLateSubmission) 禁止提交
  if (assignment.status === 'upcoming') return
  if (assignment.status === 'ended' && !assignment.allowLateSubmission) return
- // 防重复提交：用 ref 同步守卫，避免 React state 异步更新间隙双击绕过 disabled
- if (submittingRef.current || submitCooldown) return
- submittingRef.current = true
- const epoch = ++submitEpochRef.current
-
- currentSubmissionIdRef.current = null
- setCurrentSubmissionId(null)
- setSubmitting(true)
+ if (submitCooldown) return
+ const epoch = beginSubmitSession()
+ if (epoch < 0) return
  setSubmitCooldown(true)
- setJudgeStatus(null)
- setJudgeProgress(null)
- lastResultRef.current = null
- setLastResult(null)
- showResultModalRef.current = true
- setShowResultModal(true)
 
  try {
  const submitUrl = `/api/classes/${params.id}/assignments/${params.assignmentId}/submit`
@@ -482,48 +302,38 @@ const [editOpen, setEditOpen] = useState(false)
  })
  })
  const data = await response.json()
- if (epoch !== submitEpochRef.current) return
+ if (!isEpochCurrent(epoch)) return
  if (data.success) {
- const payload = data.data || {}
- const submissionId = payload.submissionId || data.submissionId
- const listId = payload.assignmentSubmissionId || submissionId
- currentSubmissionIdRef.current = submissionId
- setCurrentSubmissionId(submissionId)
+ const payload = data.data
+ const submissionId = payload?.submissionId
+ if (!submissionId || !bindSubmission(epoch, submissionId)) return
  setProblemTab('submissions')
- setExpandedSubmissionId(listId)
+ setExpandedSubmissionId(submissionId)
  setSubmissions((prev) => {
  const list = Array.isArray(prev) ? prev : []
- if (list.some((s) => s?.id === listId)) return list
+ if (list.some((s) => s?.id === submissionId)) return list
  const problemId = assignment.problems[selectedProblemIndex].id
  return [
- {
- id: listId,
- userId: user.id,
- problemId,
- status: 'Pending',
- score: 0,
- time: 0,
- memory: 0,
- passedTests: 0,
- totalTests: 0,
+ createPendingListRow({
+ id: submissionId,
  language,
  code,
- submittedAt: new Date().toISOString(),
+ extras: {
+ userId: user.id,
+ problemId,
+ assignmentSubmissionId: payload.assignmentSubmissionId,
  },
+ }),
  ...list,
  ]
  })
- void fetchAssignment()
  } else {
-   submittingRef.current = false
-   setSubmitting(false)
-   // 后端返回 429 (SUBMIT_TOO_FREQUENT) 时，冷却时间延长到 10 秒以匹配限流窗口
-   const cooldownMs = data.code === 'SUBMIT_TOO_FREQUENT' ? 10000 : 3000
-   setTimeout(() => setSubmitCooldown(false), cooldownMs)
+ abortSubmitSession()
+ const cooldownMs = data.code === 'SUBMIT_TOO_FREQUENT' ? 10000 : 3000
+ setTimeout(() => setSubmitCooldown(false), cooldownMs)
  }
- } catch (error) {
- submittingRef.current = false
- setSubmitting(false)
+ } catch {
+ abortSubmitSession()
  setTimeout(() => setSubmitCooldown(false), 3000)
  }
  }
@@ -566,7 +376,7 @@ const [editOpen, setEditOpen] = useState(false)
  }
  }
 
- /** 班级班主任/助教，或站点管理员/教师，均可查看完成情况统计 */
+ /** 班级班主任/助教，或站点管理员/教师，均可查看完成情况 */
  const isAdminOrOwner =
    isClassAdminApiRole(userRole) || canManage
 
@@ -596,107 +406,200 @@ const [editOpen, setEditOpen] = useState(false)
 
  const statusConfig = getStatusConfig(assignment.status)
  const selectedProblem = assignment.problems?.[selectedProblemIndex]
+ const problemCount = assignment.problems?.length || 0
+ // 按题目去重：同一题多次 AC 只计 1
+ const solvedCount = new Set(
+   submissions
+     .filter((s) => isAcceptedStatus(s.status) && s.problemId)
+     .map((s) => s.problemId as string)
+ ).size
+
+ const switchViewTab = (key: ViewTab) => {
+   // 学生不可进入完成情况；避免 URL 夹带 tab=completion 时整页空白
+   const next = key === 'completion' && !isAdminOrOwner ? 'info' : key
+   setViewTab(next)
+   const tabParams = new URLSearchParams(searchParams.toString())
+   tabParams.set('tab', next)
+   router.replace(`${window.location.pathname}?${tabParams.toString()}`, { scroll: false })
+ }
+
+ // 成员角色未就绪时 canManage 仍可能为 true（站内教师）；班级助教需等 members
+ const effectiveViewTab: ViewTab =
+   viewTab === 'completion' && !isAdminOrOwner ? 'info' : viewTab
 
  const tabs = [
- { key: 'problems' as const, label: '题目', icon: FileText },
- ...(isAdminOrOwner
- ? [{ key: 'completion' as const, label: '完成情况统计', icon: BarChart3 }]
- : []),
+   { key: 'info' as const, label: '简介', icon: Info },
+   { key: 'problems' as const, label: '题目', icon: FileText },
+   ...(isAdminOrOwner
+     ? [{ key: 'completion' as const, label: '完成情况', icon: BarChart3 }]
+     : []),
  ]
+
+ const openProblemAt = (index: number) => {
+   setSelectedProblemIndex(index)
+   setExpandedSubmissionId(null)
+   setProblemTab('description')
+   switchViewTab('problems')
+ }
+
+ // 进度已在顶栏展示，侧栏不再重复「完成」
+ const infoItems = [
+   {
+     icon: Calendar,
+     label: '起止时间',
+     value: (
+       <span className="tabular-nums text-xs sm:text-sm">
+         {formatDateTime(assignment.startTime)}
+         <span className="mx-1 text-muted-foreground">—</span>
+         {formatDateTime(assignment.endTime)}
+       </span>
+     ),
+   },
+   {
+     icon: FileCode,
+     label: '题目数量',
+     value: `${problemCount} 题`,
+   },
+   {
+     icon: Clock,
+     label: '补交',
+     value: assignment.allowLateSubmission ? '允许截止后提交' : '不允许补交',
+   },
+ ]
+
+ const statusHint =
+   assignment.status === 'upcoming'
+     ? '作业尚未开始，可先阅读说明与题目（开始后方可提交）。'
+     : assignment.status === 'ended'
+       ? assignment.allowLateSubmission
+         ? '已截止，仍允许补交。'
+         : '作业已截止，仍可查看题目与提交记录。'
+       : '作业进行中，可进入作答。'
+
+ const enterProblemsLabel =
+   assignment.status === 'upcoming'
+     ? '查看题目'
+     : assignment.status === 'ended'
+       ? assignment.allowLateSubmission
+         ? '进入补交'
+         : '查看题目'
+       : '进入题目'
 
  return (
  <div className="min-h-screen bg-background pb-20 lg:pb-6">
  <PageContainer variant="workspace" className="py-4">
- {/* 作业信息：单卡压缩，把首屏留给做题区 */}
- <div className="bg-card rounded-xl border border-border overflow-hidden mb-3 shadow-sm">
- <div className="px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-2">
- <div className="flex items-center gap-2 min-w-0 flex-1">
- <h1 className="text-lg font-bold text-foreground truncate">{assignment.title}</h1>
- <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${statusConfig.color}`}>
- {statusConfig.label}
- </span>
- </div>
-
- <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
- <span className="inline-flex items-center gap-1">
- <Clock className="w-3.5 h-3.5" />
- <span className="tabular-nums">
- {formatDateTime(assignment.startTime)}
- <span className="mx-1 text-border">–</span>
- {formatDateTime(assignment.endTime)}
- </span>
- </span>
- <span className="inline-flex items-center gap-1">
- <FileCode className="w-3.5 h-3.5" />
- 题目 {assignment.problems?.length || 0}
- </span>
- <span className="inline-flex items-center gap-1">
- <CheckCircle2 className="w-3.5 h-3.5 text-secondary-light" />
- 完成 {submissions.filter(s => s.status === 'AC').length}/{assignment.problems?.length || 0}
- </span>
- </div>
-
- {isAdminOrOwner && (
- <div className="flex items-center gap-1.5 shrink-0">
- <button
- type="button"
- onClick={() => setEditOpen(true)}
- className="btn btn-ghost btn-sm border border-border inline-flex items-center gap-1 h-8 px-2.5"
- >
- <Edit className="w-3.5 h-3.5" /> 编辑
- </button>
- <button
- type="button"
- onClick={handleDeleteAssignment}
- className="btn btn-ghost btn-sm border border-error/30 text-error inline-flex items-center gap-1 h-8 px-2.5 hover:bg-error/10"
- >
- <Trash2 className="w-3.5 h-3.5" /> 删除
- </button>
- </div>
- )}
- </div>
-
- {assignment.description && (
- <p className="px-4 pb-2.5 text-sm text-muted-foreground line-clamp-2">
- {assignment.description}
- </p>
- )}
-
- <div className="px-2 flex items-center gap-0.5 border-t border-border">
- {tabs.map((tab) => {
- const Icon = tab.icon
- const isActive = viewTab === tab.key
- return (
- <button
- key={tab.key}
- onClick={() => {
- setViewTab(tab.key)
- const tabParams = new URLSearchParams(searchParams.toString())
- tabParams.set('tab', tab.key)
- router.replace(`${window.location.pathname}?${tabParams.toString()}`, { scroll: false })
- }}
- className={`relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
- isActive
- ? 'text-primary-light'
- : 'text-muted-foreground hover:text-foreground'
- }`}
- >
- {isActive && (
- <motion.div
- layoutId="assignment-view-tab-indicator"
- className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full"
- transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+ <EntityDetailHeader
+   layoutId="assignment-view-tab-indicator"
+   title={
+     <>
+       <h1 className="text-lg font-bold text-foreground truncate">{assignment.title}</h1>
+       <span
+         className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${statusConfig.color}`}
+       >
+         {statusConfig.label}
+       </span>
+     </>
+   }
+   meta={
+     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+       <span className="inline-flex items-center gap-1">
+         <CheckCircle2 className="w-3.5 h-3.5 text-secondary-light" />
+         完成 {solvedCount}/{problemCount}
+       </span>
+     </div>
+   }
+   actions={
+     isAdminOrOwner ? (
+       <div className="flex items-center gap-1.5 shrink-0">
+         <button
+           type="button"
+           onClick={() => setEditOpen(true)}
+           className="btn btn-ghost btn-sm border border-border inline-flex items-center gap-1 h-8 px-2.5"
+         >
+           <Edit className="w-3.5 h-3.5" /> 编辑
+         </button>
+         <button
+           type="button"
+           onClick={handleDeleteAssignment}
+           className="btn btn-ghost btn-sm border border-error/30 text-error inline-flex items-center gap-1 h-8 px-2.5 hover:bg-error/10"
+         >
+           <Trash2 className="w-3.5 h-3.5" /> 删除
+         </button>
+       </div>
+     ) : undefined
+   }
+   tabs={tabs}
+   activeKey={effectiveViewTab}
+   onSelect={(key) => switchViewTab(key as ViewTab)}
  />
- )}
- <Icon className="w-3.5 h-3.5" />
- {tab.label}
- </button>
- )
- })}
- </div>
- </div>
 
- {viewTab === 'problems' && (
+ {effectiveViewTab === 'info' && (
+   <EntityOverviewLayout
+     main={
+       <EntityDescriptionCard
+         title="作业说明"
+         content={assignment.description}
+         emptyTitle="暂无作业说明"
+         emptyHint={
+           isAdminOrOwner
+             ? '可点击顶部「编辑」，补充要求、参考资料与注意事项（支持 Markdown）'
+             : assignment.status === 'upcoming'
+               ? '老师尚未填写说明，开始前可先查看题目'
+               : '老师尚未填写说明，可进入题目作答'
+         }
+         footer={
+           problemCount > 0 ? (
+             <div className="mt-5 pt-4 border-t border-border">
+               <p className="text-xs text-muted-foreground mb-2">题目一览</p>
+               <div className="flex flex-wrap gap-2">
+                 {assignment.problems.map((p, idx) => {
+                   const letter = String.fromCharCode(65 + idx)
+                   const done = submissions.some(
+                     (s) => s.problemId === p.id && isAcceptedStatus(s.status)
+                   )
+                   return (
+                     <button
+                       key={p.id}
+                       type="button"
+                       title={p.title}
+                       onClick={() => openProblemAt(idx)}
+                       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                         done
+                           ? 'border-secondary/30 bg-secondary/10 text-secondary'
+                           : 'border-border bg-muted/40 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+                       }`}
+                     >
+                       <span className="font-mono font-bold">{letter}</span>
+                       <span className="truncate max-w-[10rem]">{p.title}</span>
+                     </button>
+                   )
+                 })}
+               </div>
+             </div>
+           ) : undefined
+         }
+       />
+     }
+     aside={
+       <>
+         <div className="card-static p-4 space-y-3 rounded-xl">
+           <p className="text-xs text-muted-foreground leading-relaxed">{statusHint}</p>
+           <button
+             type="button"
+             onClick={() => switchViewTab('problems')}
+             className="btn btn-primary w-full"
+             disabled={problemCount === 0}
+           >
+             {problemCount === 0 ? '暂无题目' : enterProblemsLabel}
+           </button>
+         </div>
+         <EntityInfoCard title="基本信息" items={infoItems} />
+       </>
+     }
+   />
+ )}
+
+ {effectiveViewTab === 'problems' && (
  <ProblemWorkspaceShell
  dense
  codeMode={problemTab === 'code'}
@@ -773,7 +676,7 @@ const [editOpen, setEditOpen] = useState(false)
  <span className="text-sm text-muted-foreground">加载题目内容...</span>
  </div>
  ) : problemDetail ? (
- <ProblemDescription problem={problemDetail} />
+ <ProblemDescription problem={problemDetail} hideTags />
  ) : (
  <div className="p-10 text-center text-sm text-muted-foreground">题目内容加载失败</div>
  )}
@@ -789,7 +692,7 @@ const [editOpen, setEditOpen] = useState(false)
  transition={{ duration: 0.18 }}
  >
  <SubmissionList
- submissions={submissions.filter((s) => s.problemId === selectedProblem?.id) as any}
+ submissions={submissions.filter((s) => s.problemId === selectedProblem?.id)}
  loading={false}
  error={null}
  user={user}
@@ -931,7 +834,7 @@ const [editOpen, setEditOpen] = useState(false)
  )}
 
  {/* 移动端底部 Tab Bar：题面 / 代码 / 提交 */}
- {viewTab === 'problems' && (
+ {effectiveViewTab === 'problems' && (
  <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">
  <div className="grid grid-cols-3">
  <button
@@ -959,7 +862,7 @@ const [editOpen, setEditOpen] = useState(false)
  </div>
  )}
 
- {viewTab === 'completion' && isAdminOrOwner && (
+ {effectiveViewTab === 'completion' && isAdminOrOwner && (
  <StudentCompletionTable
  students={(Array.isArray(classMembers) ? classMembers : [])
  .filter((m) => isClassStudentApiRole(m.role))
@@ -971,12 +874,14 @@ const [editOpen, setEditOpen] = useState(false)
  let totalTimeMs = 0
 
  memberSubs.forEach(sub => {
+ if (!sub.problemId) return
  const existing = submissionsMap[sub.problemId]
- if (!existing || sub.score > (existing.score || 0)) {
+ const score = sub.score ?? 0
+ if (!existing || score > (existing.score || 0)) {
  submissionsMap[sub.problemId] = {
  problemId: sub.problemId,
  status: sub.status,
- score: sub.score || 0,
+ score,
  submittedAt: sub.submittedAt,
  timeElapsedMs: sub.timeElapsedMs || 0,
  }
@@ -1006,11 +911,8 @@ const [editOpen, setEditOpen] = useState(false)
  assignmentTitle={assignment.title}
  allSubmissions={allSubmissions}
  onProblemClick={(index) => {
- setSelectedProblemIndex(index)
- setExpandedSubmissionId(null)
- setViewTab('problems')
- setProblemTab('description')
  setCode('')
+ openProblemAt(index)
  }}
  />
  )}
@@ -1029,32 +931,17 @@ const [editOpen, setEditOpen] = useState(false)
  />
  <SubmissionResultModal
  isOpen={showResultModal}
- onClose={() => {
- showResultModalRef.current = false
- setShowResultModal(false)
- setJudgeStatus(null)
- lastResultRef.current = null
- setLastResult(null)
- }}
+ onClose={closeResultModal}
  isJudging={submitting}
  judgeProgress={judgeProgress}
- result={lastResult as SubmissionResultData | null}
+ result={lastResult}
  onContinueSubmit={() => {
- // CodeMirror 的可编辑元素是 .cm-content，外层容器标记了 data-testid
  const cmContent = document.querySelector('[data-testid="code-editor-wrapper"] .cm-content') as HTMLElement | null
  cmContent?.focus()
- showResultModalRef.current = false
- setShowResultModal(false)
- setJudgeStatus(null)
- lastResultRef.current = null
- setLastResult(null)
+ closeResultModal()
  }}
  onViewDetail={(submissionId) => {
- showResultModalRef.current = false
- setShowResultModal(false)
- setJudgeStatus(null)
- lastResultRef.current = null
- setLastResult(null)
+ closeResultModal()
  setProblemTab('submissions')
  setExpandedSubmissionId(submissionId)
  }}
