@@ -1,0 +1,17 @@
+schema_version: 2
+title: '[GESP202306 一级] 时间规划'
+problem_number: LB3838
+luogu_pid: B3838
+difficulty: 入门
+tags:
+- 数学
+- '2023'
+- 顺序结构
+- 分支结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: default
+real_precision: 3

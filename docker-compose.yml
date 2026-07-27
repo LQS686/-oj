@@ -89,6 +89,9 @@ services:
       - mongo_config:/data/configdb
       - ./scripts/mongo-init.sh:/scripts/mongo-init.sh:ro
       - ./scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      # 宿主机 keyfile 挂载进容器，避免容器重建后 keyfile 变化导致副本集认证失败
+      # 部署脚本会在首次运行时生成 ./mongo-keyfile
+      - ./mongo-keyfile:/tmp/mongo-keyfile:ro
     logging:
       driver: "json-file"
       options:

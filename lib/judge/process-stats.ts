@@ -1,4 +1,3 @@
-import { spawnSync } from 'child_process'
 import { readFileSync } from 'fs'
 
 /**
@@ -51,7 +50,7 @@ export function readProcVmHwmKB(pid: number): number {
 
 /**
  * 读取评测 wrapper 写出的整数统计文件（内存 KB / 时间 ms）
- * Linux: /usr/bin/time；Windows: win-runner.exe GetProcessMemoryInfo / GetProcessTimes
+ * Linux: /usr/bin/time 或 /proc 采样
  */
 export function readStatFileInt(filePath: string): number {
   try {
@@ -74,74 +73,27 @@ export function readMemFileKB(memFilePath: string): number {
   return readStatFileInt(memFilePath)
 }
 
-/** wrapper 写出的选手进程 CPU 时间（ms） */
+/** wrapper 写出的选手进程 CPU 时间（ms）；文件可为 "cpu" 或 "cpu wall" */
 export function readTimeFileMs(timeFilePath: string): number {
   return readStatFileInt(timeFilePath)
 }
 
 /**
- * Windows: 通过 PowerShell 读取 PeakWorkingSet64（KB）
- * PeakWorkingSet 是进程生命周期峰值，比 WorkingSet / tasklist 更适合 OJ 统计。
- * 失败返回 -1
+ * 解析 wrapper 时间文件：第一列为 CPU ms，第二列为子进程墙钟 ms（可选）。
+ * 极短程序 getrusage 常为 0，需用墙钟展示真实耗时。
  */
-export function readWindowsProcessMemoryKB(pid: number): number {
+export function readTimeFilePair(timeFilePath: string): { cpuMs: number; wallMs: number } | null {
   try {
-    const safePid = Math.floor(pid)
-    if (!Number.isFinite(safePid) || safePid <= 0) return -1
-
-    // PeakWorkingSet64 优先；进程刚退出时 Get-Process 可能失败，再回退 WorkingSet64
-    const script = [
-      `$p = Get-Process -Id ${safePid} -ErrorAction SilentlyContinue`,
-      'if ($null -eq $p) { exit 2 }',
-      '$peak = $p.PeakWorkingSet64',
-      'if ($peak -le 0) { $peak = $p.WorkingSet64 }',
-      '[int][math]::Round($peak / 1024)',
-    ].join('; ')
-
-    const result = spawnSync(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
-      {
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'ignore'],
-        timeout: 2000,
-        windowsHide: true,
-      }
-    )
-    if (result.status !== 0 || !result.stdout) {
-      // PowerShell 不可用时回退 tasklist（当前工作集，非峰值）
-      return readWindowsMemoryViaTasklist(safePid)
+    if (!timeFilePath) return null
+    const raw = readFileSync(timeFilePath, 'utf-8').trim()
+    if (!raw) return null
+    const parts = raw.split(/\s+/).map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n) && n >= 0)
+    if (parts.length === 0) return null
+    return {
+      cpuMs: parts[0],
+      wallMs: parts.length >= 2 ? parts[1] : -1,
     }
-    const mem = parseInt(String(result.stdout).trim(), 10)
-    if (Number.isNaN(mem) || mem < 0) return -1
-    return mem
   } catch {
-    return -1
-  }
-}
-
-function readWindowsMemoryViaTasklist(pid: number): number {
-  try {
-    const result = spawnSync('tasklist', ['/fi', `PID eq ${pid}`, '/fo', 'csv', '/nh'], {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'ignore'],
-      timeout: 2000,
-      windowsHide: true,
-    })
-    if (result.status !== 0 || !result.stdout) return -1
-    const line = result.stdout.trim().split('\n')[0]
-    if (!line) return -1
-    const cols = line.match(/"[^"]*"/g)
-    if (!cols || cols.length < 5) return -1
-    const memStr = cols[4]
-      .replace(/"/g, '')
-      .replace(/,/g, '')
-      .replace(/\s*K/i, '')
-      .trim()
-    const mem = parseInt(memStr, 10)
-    if (Number.isNaN(mem)) return -1
-    return mem
-  } catch {
-    return -1
+    return null
   }
 }

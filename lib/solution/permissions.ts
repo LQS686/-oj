@@ -4,14 +4,14 @@
  * 规则优先级：
  *   1. 管理员/教师（SYSTEM_ADMIN / TEACHER）始终允许
  *   2. 作业场景（isAssignmentContext=true）一律隐藏
- *   3. 其他情况下查询该用户在该题的最高分，达到 60 分即可查看
+ *   3. 其他情况下查询该用户在该题的最高分，达到 90 分即可查看
  */
 
 import { prisma } from '@/lib/prisma'
 import { canManageContent } from '@/lib/permissions'
 
 /** 查看题解所需的最低分 */
-export const REQUIRED_SOLUTION_SCORE = 60
+export const REQUIRED_SOLUTION_SCORE = 90
 
 /** 题解不可见的原因枚举 */
 export type SolutionViewReason =
@@ -32,7 +32,7 @@ export interface SolutionViewResult {
   allowed: boolean
   reason: SolutionViewReason
   bestScore?: number
-  /** 始终为 60（与 REQUIRED_SOLUTION_SCORE 保持一致） */
+  /** 与 REQUIRED_SOLUTION_SCORE 保持一致 */
   requiredScore: typeof REQUIRED_SOLUTION_SCORE
 }
 

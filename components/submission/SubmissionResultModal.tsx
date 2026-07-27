@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle2,
@@ -14,11 +14,14 @@ import {
   RotateCcw,
   Timer,
   Database,
+  Download,
+  Loader2,
 } from 'lucide-react'
 import Confetti from './Confetti'
 import { formatTime, formatMemory } from '@/lib/utils'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
 import { isAcceptedStatus, isCompileErrorStatus } from '@/lib/constants/submission-status'
+import { downloadFirstWaTestCase, findFirstWaIndex } from '@/lib/submission/wa-download'
 
 export interface TestResultItem {
   testId?: string
@@ -284,6 +287,20 @@ export default function SubmissionResultModal({
   const isAC = isAcceptedStatus(status)
   const isCE = isCompileErrorStatus(status)
   const isFinal = !!result && !isJudging
+  const firstWaIndex = findFirstWaIndex(result?.testResults)
+  const [waDownloading, setWaDownloading] = useState(false)
+
+  const handleDownloadWa = async () => {
+    if (!result?.submissionId || waDownloading) return
+    setWaDownloading(true)
+    try {
+      await downloadFirstWaTestCase(result.submissionId)
+    } catch {
+      // 弹窗内静默失败；详情页有更完整的错误展示
+    } finally {
+      setWaDownloading(false)
+    }
+  }
 
   // ESC 关闭（仅评测完成后）
   useEffect(() => {
@@ -547,6 +564,22 @@ export default function SubmissionResultModal({
                     >
                       <RotateCcw className="w-4 h-4" />
                       继续提交
+                    </button>
+                  )}
+                  {isFinal && firstWaIndex >= 0 && result?.submissionId && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDownloadWa()}
+                      disabled={waDownloading}
+                      className="btn btn-ghost cursor-pointer flex items-center gap-1.5"
+                      title="仅可下载第一个 WA 测试点"
+                    >
+                      {waDownloading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      下载 WA#{firstWaIndex + 1}
                     </button>
                   )}
                   {onViewDetail && result?.submissionId && (

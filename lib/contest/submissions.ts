@@ -13,7 +13,7 @@ import {
 import { addJudgeJob } from '@/lib/judge/queue'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { parseComparisonMode } from '@/lib/judge/types'
-import type { TestCase } from '@prisma/client'
+import { mapTestCasesMeta, TESTCASE_META_SELECT } from '@/lib/judge/testcase-loader'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 
 /* ============================================================================
@@ -117,7 +117,7 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
   // 假设前端传的是真实 problemId
   const contestProblem = await prisma.contestProblem.findFirst({
     where: { contestId: input.contestId, problemId: input.problemId },
-    include: { problem: { include: { testCases: true } } },
+    include: { problem: { include: { testCases: { select: TESTCASE_META_SELECT } } } },
   })
   if (!contestProblem) {
     throw new ApiError('PROBLEM_NOT_IN_CONTEST', '该题目不属于当前竞赛', 400)
@@ -150,14 +150,7 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
       memoryLimit: problem.memoryLimit,
       comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
-      testCases: problem.testCases.map((tc: TestCase) => ({
-        id: tc.id,
-        input: tc.input,
-        output: tc.output,
-        score: tc.score,
-        timeLimit: tc.timeLimit ?? undefined,
-        memoryLimit: tc.memoryLimit ?? undefined,
-      })),
+      testCases: mapTestCasesMeta(problem.testCases),
     })
     logger.info(`竞赛提交 ${submission.id} 已加入评测队列`)
   } catch (queueError) {

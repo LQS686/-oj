@@ -1,0 +1,15 @@
+schema_version: 2
+title: '[GESP202403 二级] 乘法问题'
+problem_number: LB3954
+luogu_pid: B3954
+difficulty: 入门
+tags:
+- '2024'
+- 循环结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

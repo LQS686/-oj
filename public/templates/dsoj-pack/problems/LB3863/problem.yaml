@@ -1,0 +1,15 @@
+schema_version: 2
+title: '[GESP202309 一级] 买文具'
+problem_number: LB3863
+luogu_pid: B3863
+difficulty: 入门
+tags:
+- '2023'
+- 分支结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: default
+real_precision: 3

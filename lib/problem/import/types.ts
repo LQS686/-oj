@@ -29,6 +29,18 @@ export interface ImportedSample {
   explanation?: string
 }
 
+/** 题包内附带的题解（如 dsoj-pack solutions/） */
+export interface ImportedSolution {
+  title: string
+  content: string
+  /** 原作者名（展示用，入库仍挂导入操作者） */
+  authorName?: string
+  /** 点赞数（仅用于排序截断） */
+  thumbUp?: number
+  /** 外部 ID（如洛谷 lid） */
+  externalId?: string
+}
+
 /** 统一的中间题目数据结构 */
 export interface ImportedProblem {
   /** 题目编号（可选，不填则自动生成 Pxxxx） */
@@ -52,10 +64,17 @@ export interface ImportedProblem {
   /** 标程代码（FPS 的 solution / Hydro 的 std.cpp 等，存到 problem.stdCode） */
   stdCode?: string
   stdLang?: string
-  /** 完整测试用例集（不含样例，样例自动从 samples 同步） */
+  /** 完整测试用例集（仅 testcases/；与 samples/ 题面样例分离） */
   testCases: ImportedTestCase[]
+  /** 可选题解列表（导入后写入 Solution 表） */
+  solutions?: ImportedSolution[]
   /** 原始题号/外部 ID（用于去重日志，不写库） */
   externalId?: string
+  /**
+   * 题包内声明的可见性（dsoj-pack problem.yaml）
+   * 有值时优先于 ImportOptions.visibility
+   */
+  visibility?: 'public' | 'private' | 'contest'
 }
 
 /** 单题导入结果 */

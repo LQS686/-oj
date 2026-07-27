@@ -1,0 +1,14 @@
+schema_version: 2
+title: '[GESP样题 一级] 当天的第几秒'
+problem_number: LB3847
+luogu_pid: B3847
+difficulty: 入门
+tags:
+- 分支结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: default
+real_precision: 3

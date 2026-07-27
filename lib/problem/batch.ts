@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { ApiError } from '@/lib/api/withApi'
 import { DIFFICULTIES, isValidDifficulty } from '@/lib/constants'
 import { clearProblemCache } from './admin'
+import { purgeProblemDependents } from './purge-dependents'
 import { deleteTestCaseFiles } from './testcase'
 import { logger } from '@/lib/logger'
 
@@ -49,7 +50,7 @@ export async function batchUpdateProblemDifficulty(problemIds: string[], difficu
 }
 
 /**
- * 批量删除题目：级联删除 submissions / solutions / contestProblems / trainingProblems / testCases
+ * 批量删除题目：先清理全部依赖关系，再硬删 Problem
  *
  * 参考 HOJ 外键级联 + Hydro 硬删 document+软删 storage 的策略：
  *   - DB 记录硬删除
@@ -79,11 +80,7 @@ export async function batchDeleteProblems(problemIds: string[]) {
     )
   }
 
-  await prisma.submission.deleteMany({ where: { problemId: { in: problemIds } } })
-  await prisma.solution.deleteMany({ where: { problemId: { in: problemIds } } })
-  await prisma.contestProblem.deleteMany({ where: { problemId: { in: problemIds } } })
-  await prisma.trainingProblem.deleteMany({ where: { problemId: { in: problemIds } } })
-  await prisma.testCase.deleteMany({ where: { problemId: { in: problemIds } } })
+  await purgeProblemDependents(problemIds)
   const result = await prisma.problem.deleteMany({ where: { id: { in: problemIds } } })
 
   // 同步清理磁盘测试点文件（DB 已删，磁盘文件不再有用）

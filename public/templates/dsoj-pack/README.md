@@ -1,175 +1,210 @@
-# DSOJ 标准题包模板
+# dsoj-pack 格式说明（v2）
 
-本文件夹是 DSOJ 标准题包格式的完整模板，可作为爬虫批量采集题目的输出目录结构参考。
+本目录是爬虫输出的题包根目录。**v2** 相对 v1 的核心变化：
+
+1. 题目目录改为稳定 **PID 命名**（如 `LP1001/`），不再使用 `0001-LP1001-中文标题/`
+2. 新增机器可读索引 **`index.json`**（解析首选入口）
+3. `pack.yaml` 的 `version` 升为 `"2.0"`，并指向 `index`
+4. 可选采集 **题解**（`solutions/`）；AI 补全写入 **`testcases/`**
+
+单题正文仍为扁平 markdown + `samples/` + `testcases/`，便于人工阅读与导入。
 
 ## 目录结构
 
-```
-dsoj-pack.zip
-├── pack.yaml              # 包元信息（可选，推荐）
-├── README.md              # 格式说明（可选）
-├── problems/
-│   └── <slug>/
-│       ├── problem.yaml   # 题目元信息（必需）
-│       ├── description.md # 题目描述（markdown，必需）
-│       ├── background.md # 题目背景（markdown，可选）
-│       ├── input.md       # 输入格式（可选）
-│       ├── output.md      # 输出格式（可选）
-│       ├── hint.md        # 说明/提示（可选，含数据范围、样例解释）
-│       ├── samples/       # 展示样例（可选，1.in/1.out）
-│       ├── testcases/     # 完整测试点（必需，1.in/1.out）
-│       ├── config.yaml    # 测试配置覆盖（可选）
-│       └── std.cpp        # 标准代码（可选）
-```
-
-## 文件说明
-
-### pack.yaml（包元信息，可选）
-
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| format | string | 是 | 固定值 `dsoj-pack`，用于格式识别 |
-| version | string | 是 | 格式版本，当前为 `1.0` |
-| created_at | string | 否 | 打包时间（ISO 8601） |
-| source | string | 否 | 数据来源（如"洛谷批量采集"） |
-| description | string | 否 | 包说明 |
-| problem_count | number | 否 | 题目数量（仅用于展示） |
-
-### problem.yaml（题目元信息，必需）
-
-| 字段 | 类型 | 必需 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| title | string | 是 | - | 题目标题（1-200 字符） |
-| problem_number | string | 否 | 自动分配 | 题号（如 P1001，1-50 字符） |
-| difficulty | string | 是 | "入门" | 难度，8 档之一（见下表） |
-| tags | string[] | 否 | [] | 标签列表 |
-| source | string | 否 | "DSOJ Pack" | 题目来源 |
-| visibility | string | 否 | public | 可见性（public/private/contest） |
-| time_limit | number | 是 | 1000 | 时间限制（毫秒，1-30000） |
-| memory_limit | number | 是 | 128 | 内存限制（MB，1-1024） |
-| comparison_mode | string | 否 | default | 比较模式（default/strict/ignore-spaces/real-number） |
-| real_precision | number | 否 | 3 | 实数比较精度（0-12，仅 real-number 模式生效） |
-
-**难度 8 档**（对齐洛谷标准，详见 `lib/constants.ts`）：
-
-| 值 | 颜色 | 说明 |
-|----|------|------|
-| 入门 | 红 | 入门级 |
-| 普及- | 橙 | 普及减 |
-| 普及 | 黄 | 普及 |
-| 普及+ | 绿 | 普及加 |
-| 提高 | 青 | 提高 |
-| 提高+ | 蓝 | 提高加 |
-| 省选 | 紫 | 省选级 |
-| NOI | 黑 | NOI 级 |
-
-旧版难度值（简单/中等/困难/easy/medium/hard）会被自动迁移到对应 8 档。
-
-### config.yaml（测试配置覆盖，可选）
-
-字段与 problem.yaml 相同（time_limit / memory_limit / comparison_mode / real_precision），
-但**优先级更高**。常用于"题目默认 1s，但某组测试点需要 2s"等场景。
-
-字段范围与 problem.yaml 一致：
-- time_limit: 1-30000 ms
-- memory_limit: 1-1024 MB
-- real_precision: 0-12
-- comparison_mode: default / strict / ignore-spaces / real-number
-
-### description.md（题目描述，必需）
-
-markdown 格式。**只写题目主干描述**，不要包含以下内容（前端会通过独立字段/区块渲染，重复会导致内容显示两次）：
-
-- ❌ 题目标题（H1）—— 标题来自 `problem.yaml.title`，前端在页面顶部以 H1 渲染
-- ❌ "## 输入格式" 段落 —— 输入格式应写入 `input.md`
-- ❌ "## 输出格式" 段落 —— 输出格式应写入 `output.md`
-- ❌ "## 数据范围" 段落 —— 数据范围应写入 `hint.md`（说明/提示区块）
-
-支持嵌入 HTML 标签（由前端 rehype-raw 渲染）、数学公式（KaTeX）、
-代码高亮（Prism）。推荐使用纯 markdown 编写。
-
-**正确示例**（`0001-a-plus-b/description.md`）：
-
-```markdown
-给定两个整数 $a$ 和 $b$，求 $a + b$ 的值。
+```text
+dsoj-pack/
+├── pack.yaml                 # 题包元信息
+├── index.json                # 题目索引（权威列表）
+├── README.md                 # 本说明
+└── problems/
+    └── LP1001/               # 目录名 = problem_number（洛谷题号加 L 前缀）
+        ├── problem.yaml
+        ├── description.md    # 必有
+        ├── background.md     # 可选
+        ├── input.md          # 可选
+        ├── output.md         # 可选
+        ├── hint.md           # 常有（可为空）
+        ├── samples/
+        │   ├── 1.in
+        │   └── 1.out
+        ├── testcases/        # AI 补全的测试点（.in / .out）
+        │   └── quality.json  # 可选：补全质量元数据
+        ├── solutions/        # 可选：采集的题解（需登录 Cookie）
+        │   ├── index.json    # lid/title/thumb_up/file（无作者）
+        │   ├── {lid}.md      # 仅标题+正文（采集时已去营销/「洛谷」）
+        │   └── _runnable/    # 可选缓存：AI 抽出的可运行代码，非导入必需
+        └── generator.py      # 可选：AI 缓存的造数脚本
 ```
 
-### background.md（题目背景，可选）
+题号规则：洛谷 `P1001` → 题包目录 / `problem_number` 为 `LP1001`；已是 `L…` 则保持不变。`luogu_pid` 为去掉一个前导 `L` 后的原题号。
 
-markdown 格式。**只写题目背景**（如赛事背景、故事背景等），展示在"题目描述"区块之前。
+## pack.yaml
 
-若题目没有背景，不提供此文件即可。
+| 字段 | 说明 |
+|------|------|
+| `format` | 固定 `dsoj-pack` |
+| `version` | `2.0` |
+| `problem_count` | 题目数 |
+| `index` | 索引文件名，默认 `index.json` |
+| `source` / `description` / `created_at` | 元信息（`created_at` 可为空） |
 
-### input.md / output.md（输入/输出格式，可选）
+## index.json
 
-markdown 格式。若不提供，前端会显示为空。推荐填写，便于学员理解题意。
-
-- `input.md`：写输入格式描述，**数据范围建议附在此文件末尾**（与输入字段相关）
-- `output.md`：写输出格式描述
-
-**正确示例**（`0001-a-plus-b/input.md`）：
-
-```markdown
-一行，包含两个整数 $a$ 和 $b$，以空格分隔。
-
-**数据范围**：$-10^9 \le a, b \le 10^9$
+```json
+{
+  "schema_version": 2,
+  "problem_count": 1,
+  "problems": [
+    {
+      "order": 1,
+      "pid": "LP1001",
+      "luogu_pid": "P1001",
+      "dir": "LP1001",
+      "title": "A+B Problem",
+      "difficulty": "入门",
+      "tags": ["模拟"]
+    }
+  ]
+}
 ```
 
-### hint.md（提示，可选）
+- `order`：展示 / 导入顺序（替代旧目录名前缀序号）
+- `dir`：相对 `problems/` 的目录名
+- `pid`：题包题号（与目录名一致）
 
-markdown 格式。展示在题目"说明/提示"区块，包含：
-- 数据范围
-- **样例解释**（所有样例的解释统一写在这里，不再为每个样例单独提供解释文件）
-- 算法提示、实现注意点等
+每次成功写入题目或执行 `rebuild_index` / `migrate-pack` 时会刷新本文件。
 
-**不要把数据范围放在 description.md 或 input.md 中**（数据范围应附在 hint.md 中）。
+## problem.yaml
 
-### samples/（展示样例，可选）
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `schema_version` | int | `2` |
+| `title` | str | 标题 |
+| `problem_number` | str | 题包题号，如 `LP1001` |
+| `luogu_pid` | str | 洛谷原题号，如 `P1001` |
+| `difficulty` | str | 中文难度 |
+| `tags` | list[str] | 标签 |
+| `source` | str | 来源，默认「洛谷」 |
+| `visibility` | str | 默认 `public` |
+| `time_limit` | int | 毫秒 |
+| `memory_limit` | int | MB |
+| `comparison_mode` | str | 默认 `default` |
+| `real_precision` | int | 默认 `3` |
 
-- 文件名约定：`<编号>.in` / `<编号>.out`
-- 编号从 1 开始，连续递增
-- 展示在题目描述的"样例"区域，**不参与评测**
-- 若不提供，导入时会自动取 testcases 的前 2 组作为展示样例
+## 样例与测试点
 
-### testcases/（完整测试点，必需）
+| 目录 | 用途 |
+|------|------|
+| `samples/` | 题面样例；连续编号 `1.in` / `1.out` …；空 `.in` 表示「无输入」合法 |
+| `testcases/` | 补全后的评测数据；同样连续编号；可含 `.out` 与 `quality.json` |
 
-- 文件名约定：`<编号>.in` / `<编号>.out` / `<编号>.score`
-- 编号从 1 开始，连续递增
-- **参与评测**，是题目的完整测试集
-- `.score` 文件可选，内容是该测点分数（0-100 的整数），不填则所有测点均分 100 分
-- **单题测试点数量上限：50 组**（对齐项目 `TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES`）
+内置 `Pack` API 会读取样例对，并对 `testcases/` 仅收集 `.in` 列表（`testcase_inputs`）。题解不在 `ProblemBundle` 内，需自行读 `solutions/`。
 
-### std.cpp / std.c / std.py（标准代码，可选）
+## solutions/（可选）
 
-标程代码文件。导入后存入 `problem.stdCode` + `problem.stdLang` 字段，
-供 AI 题解生成和评测验证使用。
+采集题解时（GUI / CLI 开启且 Cookie 有效）写入：
 
-- 扩展名决定 `stdLang`：`.cpp` → cpp，`.c` → c，`.py` → python
-- 支持的扩展名：`.cpp` / `.cc` / `.cxx` / `.c` / `.py`
-- 候选文件名：`std.*` / `standard.cpp` / `sol.cpp`（按优先级查找）
+```text
+solutions/
+├── index.json
+└── {lid}.md          # 文首元数据 + --- + 正文
+```
 
-### spj.cpp（特判代码，可选）
+`solutions/index.json` 示例：
 
-当前项目 Problem 模型暂未启用 SPJ 字段，解析时会忽略此文件，
-待项目支持 SPJ 后启用。
+```json
+{
+  "count": 2,
+  "solutions": [
+    {
+      "lid": "xxxx",
+      "title": "题解标题",
+      "thumb_up": 10,
+      "file": "xxxx.md"
+    }
+  ]
+}
+```
 
-## 导入方法
+题解 `{lid}.md` 仅含标题与正文，**不含**作者 / lid / 点赞等元数据。采集时已去掉文首营销块与正文中的「洛谷」品牌字样。
 
-1. 将整个 `dsoj-pack-template/` 文件夹打包为 ZIP
-2. 进入管理后台 → 题库管理 → 批量导入
-3. 选择格式 "DSOJ"
-4. 上传 ZIP 文件
+`solutions/_runnable/`、`generator.py`、`testcases/quality.json` 属于爬虫 / AI 工作缓存，**不是** OJ 导入的必需要素；维护清理可能删除它们。
 
-## 爬虫采集建议
+采集时自动清洗：
 
-1. **目录命名**：建议用 `题号-slug` 格式（如 `0001-a-plus-b`），便于排序和去重
-2. **编号填充**：题号前补零到 4 位（0001、0002、...、9999），保证排序正确
-3. **UTF-8 编码**：所有 .md / .yaml / .in / .out 文件必须 UTF-8 编码
-4. **换行符**：建议统一使用 LF（\n），避免 CRLF 跨平台问题
-5. **测试数据完整性**：每组测试点必须同时有 `.in` 和 `.out` 文件
-6. **去重**：通过 `problem.yaml.problem_number` 或题目标题去重
-7. **错误隔离**：单题解析失败不影响其他题，可在采集脚本中针对每题独立 try/catch
+- 题解：文首「洛谷网校」Banner、正文/标题中的「洛谷」、落盘时不写作者信息
+- 题面：「对应的选择、判断题：…`ti.luogu.com.cn/problemset/…`」行；若背景因此变空则不写 `background.md`
 
-## 完整示例
+已落盘题包可批量回扫：
 
-参考 `problems/0001-a-plus-b/` 和 `problems/0002-max-of-three/` 两个完整示例。
+```bash
+python -c "from luogu_crawler.paths import PROBLEMS_DIR; from luogu_crawler.text_sanitize import sanitize_solutions_under, sanitize_statements_under; print(sanitize_solutions_under(PROBLEMS_DIR)); print(sanitize_statements_under(PROBLEMS_DIR))"
+```
+
+## 解析方案（推荐）
+
+### Python（内置 API）
+
+```python
+from luogu_crawler.pack import Pack
+
+pack = Pack.open("dsoj-pack")
+print(pack.problem_count)
+
+for problem in pack.iter_problems():
+    print(problem.order, problem.pid, problem.title)
+    print(problem.description[:100])
+    for inp, out in problem.samples:
+        ...
+    # 转回爬虫内部结构
+    data = problem.to_problem_data()
+```
+
+按题号读取（`P1001` / `LP1001` 均可）：
+
+```python
+problem = pack.get("P1001")
+assert problem is not None
+print(problem.absolute_dir)
+```
+
+重建索引（手工改目录后）：
+
+```python
+from luogu_crawler.pack import rebuild_index
+rebuild_index("dsoj-pack")
+```
+
+### 无依赖伪代码
+
+1. 读 `pack.yaml`，确认 `format == dsoj-pack`
+2. 优先读 `index.json` 的 `problems[]`
+3. 对每条记录打开 `problems/{dir}/problem.yaml` + 同目录 markdown / `samples/`
+4. 若无 `index.json`，扫描 `problems/*/` 下含 `problem.yaml` 的目录（兼容 v1 目录名 `NNNN-PID-...`）
+5. 题解（若需要）再读 `problems/{dir}/solutions/index.json`
+
+### 从 v1 迁移
+
+```bash
+python -m luogu_crawler migrate-pack
+# 预览：
+python -m luogu_crawler migrate-pack --dry-run
+# 指定目录：
+python -m luogu_crawler migrate-pack --pack-dir path/to/dsoj-pack
+```
+
+迁移会把 `0003-LP1001-A+B_Problem` 重命名为 `LP1001`，并生成 / 刷新 `index.json`。
+
+## ZIP 打包
+
+将本目录内容打成**扁平 ZIP**（顶层直接是 `pack.yaml` / `index.json` / `problems/`，不再套一层 `dsoj-pack/`）：
+
+```bash
+python -m luogu_crawler pack
+```
+
+- 默认输出：项目根目录的 **`dsoj-pack.zip`**（可用环境变量 `LUOGU_OUTPUT_ZIP` 覆盖）
+- 打包包含 `dsoj-pack` 内全部文件（含 `testcases/`、`solutions/` 等），不做排除
+- GUI「打包导出」页可改输出路径与压缩等级
+
+相关环境变量：`LUOGU_DSOJ_PACK_DIR`、`LUOGU_PROBLEMS_DIR`、`LUOGU_OUTPUT_ZIP`。

@@ -12,55 +12,33 @@ export function assertDockerJudgeEnabled() {
   }
 }
 
+/** Linux 运行命令（WSL / 容器）；已移除 Windows 宿主路径。 */
 export function getRunInfo(language: string, compiledPath: string): { command: string, args: string[] } {
   const relativeCompiledPath = compiledPath.split('\\').pop() || compiledPath.split('/').pop() || ''
+  // 无斜杠的本地二进制必须带 ./，否则 PATH 不含「.」时会 command not found
+  const localBin = relativeCompiledPath.includes('/')
+    ? relativeCompiledPath
+    : `./${relativeCompiledPath}`
 
   const commands: Record<string, { command: string, args: string[] }> = {
     cpp: {
-      command: relativeCompiledPath,
-      args: []
+      command: localBin,
+      args: [],
     },
     c: {
-      command: relativeCompiledPath,
-      args: []
+      command: localBin,
+      args: [],
     },
     python: {
-      command: process.platform === 'win32' ? 'python' : 'python3',
-      args: [relativeCompiledPath]
+      command: 'python3',
+      args: [relativeCompiledPath],
     },
   }
 
-  const cmdInfo = commands[language] || { command: relativeCompiledPath, args: [] }
-
-  if (process.platform === 'win32') {
-    let executablePath = cmdInfo.command
-    const args = [...cmdInfo.args]
-
-    if (executablePath.startsWith('./')) {
-      executablePath = executablePath.substring(2)
-    }
-
-    if ((language === 'cpp' || language === 'c') && !executablePath.endsWith('.exe')) {
-      executablePath += '.exe'
-    }
-
-    if (language !== 'cpp' && language !== 'c') {
-      args.forEach((arg, i) => {
-        if (arg.startsWith('./')) {
-          args[i] = arg.substring(2)
-        }
-      })
-    }
-
-    return {
-      command: executablePath,
-      args
-    }
-  } else {
-    return {
-      command: cmdInfo.command,
-      args: cmdInfo.args
-    }
+  const cmdInfo = commands[language] || { command: localBin, args: [] }
+  return {
+    command: cmdInfo.command,
+    args: cmdInfo.args,
   }
 }
 
@@ -83,14 +61,14 @@ const pulledImages = new Set<string>()
 /**
  * 确保 Docker 评测镜像已存在本地，不存在则拉取。
  * 首次评测超时的主要根因：docker run 触发隐式拉取，但 spawn 超时仅 hardTimeoutMs（~1.2s），
- * 远不足以拉取数百 MB 镜像。本函数将"拉取"与"执行"分离，拉取使用独立的长超时。
+ * 远不足以拉取数百 MB 镜像。本函数将「拉取」与「执行」分离，拉取使用独立的长超时。
  */
 export async function ensureDockerImage(image: string): Promise<void> {
   if (pulledImages.has(image)) return
 
   // 检查镜像是否已存在
   try {
-    // P2 安全修复：改为 spawnSync 数组形式，避免命令拼接注入风险
+    // P2 安全修复：改用 spawnSync 数组形式，避免命令拼接注入风险
     const inspectResult = spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore', timeout: 5000 })
     if (inspectResult.status !== 0) {
       throw new Error(`docker image inspect 退出码: ${inspectResult.status}`)

@@ -52,7 +52,7 @@ const FORMAT_OPTIONS: {
   {
     id: 'dsoj',
     label: 'DSOJ',
-    desc: 'DSOJ 自主可控标准题包（ZIP，含 problem.yaml + testcases/）',
+    desc: 'DSOJ 标准题包 v2（ZIP：pack.yaml + index.json + problems/<题号>/）',
     accept: '.zip',
     icon: Package,
   },

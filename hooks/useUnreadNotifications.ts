@@ -63,8 +63,7 @@ export function useUnreadNotifications({
       return
     }
 
-    void syncUnread()
-
+    // 未读数由「入房成功 onConnected」拉取；此处只处理回前台补同步
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         void syncUnread()

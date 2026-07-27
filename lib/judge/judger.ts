@@ -2,7 +2,7 @@
 // 参考 Project LemonLime 的 TaskJudger，协调 compiler/executor/comparator
 import type { JudgeJob, JudgeResult } from './queue'
 import { compileCode } from './compiler'
-import { executeCode } from './executor'
+import { executeCode, cleanupExecuteArtifacts } from './executor'
 import { compareOutput } from './comparator'
 import { validateCodeSafety } from './codeAnalyzer'
 import { COMPILE_STATE_MESSAGES } from './types'
@@ -10,6 +10,31 @@ import type { ResultState } from './types'
 import { join } from 'path'
 import { logger } from '@/lib/logger'
 import { emitJudgeProgress } from '@/lib/websocket/server'
+import { materializeTestCaseToDisk, cleanupMaterializedTestCase } from './testcase-loader'
+import { computeExtraTime } from './process-stats'
+import {
+  mapPool,
+  resolveCaseConcurrency,
+  resolveLargeCaseConcurrency,
+  resolveFailFastMode,
+  shouldFailFast,
+  LARGE_CASE_BYTES,
+} from './pool'
+
+const CASE_CONCURRENCY = resolveCaseConcurrency()
+const LARGE_CASE_CONCURRENCY = resolveLargeCaseConcurrency()
+const FAIL_FAST_MODE = resolveFailFastMode()
+
+type CaseVerdict = {
+  testId: string
+  status: ResultState
+  score: number
+  time: number
+  memory: number
+  message?: string
+  /** fail-fast 跳过：不参与最终状态判定 */
+  skipped?: boolean
+}
 
 /**
  * 多段错误信息合并：参考 HOJ JudgeStrategy.mergeNonEmptyStrings。
@@ -109,65 +134,193 @@ async function runOnce(
   job: JudgeJob,
   compiledPath: string,
   tcTimeLimit: number,
-  tcMemoryLimit: number
-): Promise<{ status: ResultState; score: number; time: number; memory: number; message: string; outputCorrect: boolean; exceedsTimeLimit: boolean }> {
+  tcMemoryLimit: number,
+  files: { inputPath: string; expectedPath: string; expectedBytes: number },
+  signal?: AbortSignal,
+): Promise<{ status: ResultState; score: number; time: number; memory: number; message: string; outputCorrect: boolean; exceedsTimeLimit: boolean; aborted?: boolean }> {
+  if (signal?.aborted) {
+    return {
+      status: 'SE',
+      score: 0,
+      time: 0,
+      memory: 0,
+      message: '已跳过（前面测点已失败）',
+      outputCorrect: false,
+      exceedsTimeLimit: false,
+      aborted: true,
+    }
+  }
+
   const executeResult = await executeCode({
     code: job.code,
     language: job.language,
-    input: testCase.input,
+    inputPath: files.inputPath,
     timeLimit: tcTimeLimit,
     memoryLimit: tcMemoryLimit,
     compiledPath,
     extraTimeRatio: job.extraTimeRatio ?? 0.1,
+    expectedOutputBytes: files.expectedBytes,
+    signal,
   })
 
-  // 细粒度状态判定
-  if (executeResult.cannotStart) {
-    return { status: 'CSP', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '无法启动程序', outputCorrect: false, exceedsTimeLimit: false }
-  }
-  if (executeResult.timeout) {
-    // 细化 TLE 消息：区分 CPU TLE 与墙钟 TLE（参考 HOJ/Hydro 的 clockLimit = 3 × cpuLimit 设计）
-    // executeResult.error 已包含详细原因（CPU 时间超限 / 墙钟超时）
-    const tleMsg = executeResult.error || '超出时间限制'
-    return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: tleMsg, outputCorrect: false, exceedsTimeLimit: false }
-  }
-  if (executeResult.memoryExceeded) {
-    return { status: 'MLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '超出内存限制', outputCorrect: false, exceedsTimeLimit: false }
-  }
-  if (executeResult.runtimeError) {
-    // 识别 UBSanitizer 的 runtime error 输出，细化 RE 消息
-    // UBSan 在触发 UB 时向 stderr 输出形如 "runtime error: ..." 的诊断信息
-    // 常见 UB：signed integer overflow, division by zero, null pointer dereference,
-    //          load of value ... which is not a valid value for type 'int' (未初始化变量) 等
-    // 参考：https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
-    const reMsg = formatRuntimeErrorMessage(executeResult.error, executeResult.output)
-    return { status: 'RE', score: 0, time: executeResult.time, memory: executeResult.memory, message: reMsg, outputCorrect: false, exceedsTimeLimit: false }
-  }
+  try {
+    if (executeResult.aborted || signal?.aborted) {
+      return {
+        status: 'SE',
+        score: 0,
+        time: 0,
+        memory: 0,
+        message: '已跳过（前面测点已失败）',
+        outputCorrect: false,
+        exceedsTimeLimit: false,
+        aborted: true,
+      }
+    }
+    // 细粒度状态判定
+    if (executeResult.cannotStart) {
+      return { status: 'CSP', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '无法启动程序', outputCorrect: false, exceedsTimeLimit: false }
+    }
+    if (executeResult.timeout) {
+      const tleMsg = executeResult.error || '超出时间限制'
+      return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: tleMsg, outputCorrect: false, exceedsTimeLimit: false }
+    }
+    if (executeResult.outputLimitExceeded) {
+      return { status: 'OLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '超出输出限制', outputCorrect: false, exceedsTimeLimit: false }
+    }
+    if (executeResult.memoryExceeded) {
+      return { status: 'MLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '超出内存限制', outputCorrect: false, exceedsTimeLimit: false }
+    }
+    if (executeResult.runtimeError) {
+      const reMsg = formatRuntimeErrorMessage(executeResult.error, executeResult.output)
+      return { status: 'RE', score: 0, time: executeResult.time, memory: executeResult.memory, message: reMsg, outputCorrect: false, exceedsTimeLimit: false }
+    }
 
-  // 程序正常完成，比较输出
-  const compareResult = await compareOutput({
-    userOutput: executeResult.output,
-    expectedOutput: testCase.output,
-    fullScore: testCase.score,
-    comparisonMode: job.comparisonMode ?? 'default',
-    realPrecision: job.realPrecision ?? 3,
-  })
+    // 文件对文件流式比对（双方都不进 V8 大字符串）
+    // 先让出事件循环，避免同步比对堵住其它并行测点的 child exit / 调度
+    await new Promise<void>((r) => setImmediate(r))
+    const compareResult = await compareOutput({
+      userOutputPath: executeResult.artifacts?.outputPath,
+      userOutput: executeResult.artifacts?.outputPath ? undefined : executeResult.output,
+      expectedOutputPath: files.expectedPath,
+      fullScore: testCase.score,
+      comparisonMode: job.comparisonMode ?? 'default',
+      realPrecision: job.realPrecision ?? 3,
+    })
 
-  const outputCorrect = compareResult.score > 0
+    const outputCorrect = compareResult.score > 0
 
-  // 临界 TLE：executor 判定程序完成但 CPU 时间超限
-  if (executeResult.exceedsTimeLimit) {
-    return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出时间限制', outputCorrect, exceedsTimeLimit: true }
+    if (executeResult.exceedsTimeLimit) {
+      return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出时间限制', outputCorrect, exceedsTimeLimit: true }
+    }
+
+    return {
+      status: compareResult.status,
+      score: compareResult.score,
+      time: executeResult.time,
+      memory: executeResult.memory,
+      message: compareResult.message,
+      outputCorrect,
+      exceedsTimeLimit: false,
+    }
+  } finally {
+    await cleanupExecuteArtifacts(executeResult.artifacts)
   }
+}
 
-  return {
-    status: compareResult.status,
-    score: compareResult.score,
-    time: executeResult.time,
-    memory: executeResult.memory,
-    message: compareResult.message,
-    outputCorrect,
-    exceedsTimeLimit: false,
+/** 单个测点：已落盘 → 运行（含临界重测）→ 清理 */
+async function judgeOneCaseWithFiles(
+  testCase: JudgeJob['testCases'][number],
+  job: JudgeJob,
+  compiledPath: string,
+  files: NonNullable<Awaited<ReturnType<typeof materializeTestCaseToDisk>>>,
+  signal?: AbortSignal,
+): Promise<CaseVerdict> {
+  try {
+    const tcTimeLimit = testCase.timeLimit ?? job.timeLimit
+    const tcMemoryLimit = testCase.memoryLimit ?? job.memoryLimit
+
+    let verdict = await runOnce(
+      testCase,
+      job,
+      compiledPath,
+      tcTimeLimit,
+      tcMemoryLimit,
+      files,
+      signal,
+    )
+
+    if (verdict.aborted) {
+      return {
+        testId: testCase.id,
+        status: 'SE',
+        score: 0,
+        time: 0,
+        memory: 0,
+        message: verdict.message,
+        skipped: true,
+      }
+    }
+
+    const extraRatio = job.extraTimeRatio ?? 0.1
+    const extraMs = computeExtraTime(tcTimeLimit, extraRatio)
+    const maxRejudge = job.rejudgeTimes ?? 1
+    for (let r = 0; r < maxRejudge; r++) {
+      if (verdict.status !== 'TLE' || !verdict.exceedsTimeLimit || !verdict.outputCorrect) break
+      if (signal?.aborted) break
+      verdict = await runOnce(
+        testCase,
+        job,
+        compiledPath,
+        tcTimeLimit,
+        tcMemoryLimit,
+        files,
+        signal,
+      )
+      if (verdict.aborted) {
+        return {
+          testId: testCase.id,
+          status: 'SE',
+          score: 0,
+          time: 0,
+          memory: 0,
+          message: verdict.message,
+          skipped: true,
+        }
+      }
+      if (verdict.status === 'AC') break
+    }
+
+    if (
+      verdict.status === 'TLE' &&
+      verdict.exceedsTimeLimit &&
+      verdict.outputCorrect &&
+      verdict.time <= tcTimeLimit + extraMs
+    ) {
+      logger.info('临界 TLE 浮动通过', {
+        time: verdict.time,
+        timeLimit: tcTimeLimit,
+        extraMs,
+        testId: testCase.id,
+      })
+      verdict = {
+        ...verdict,
+        status: 'AC',
+        score: testCase.score,
+        message: '',
+        exceedsTimeLimit: false,
+      }
+    }
+
+    return {
+      testId: testCase.id,
+      status: verdict.status,
+      score: verdict.status === 'AC' ? testCase.score : 0,
+      time: verdict.time,
+      memory: verdict.memory,
+      message: verdict.message,
+    }
+  } finally {
+    await cleanupMaterializedTestCase(files)
   }
 }
 
@@ -175,7 +328,13 @@ async function runOnce(
 export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
   const startTime = Date.now()
 
-  logger.info(`开始评测提交`, { submissionId: job.submissionId, language: job.language, problemId: job.problemId })
+  logger.info(`开始评测提交`, {
+    submissionId: job.submissionId,
+    language: job.language,
+    problemId: job.problemId,
+    caseConcurrency: CASE_CONCURRENCY,
+    totalTests: job.testCases.length,
+  })
 
   const result: JudgeResult = {
     submissionId: job.submissionId,
@@ -229,71 +388,220 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
 
     logger.debug(`编译成功`)
 
-    // 第三步: 运行测试用例
+    // 第三步: 统一并发队列；落盘后若体积大则再受「大测点槽位」限制（规则对所有题相同，无预热）
+    const compiledPath = compileResult.compiledPath!
+    let finishedCount = 0
+    let largeInFlight = 0
+    const largeWaiters: Array<() => void> = []
+
+    const acquireLargeSlot = async () => {
+      if (largeInFlight < LARGE_CASE_CONCURRENCY) {
+        largeInFlight++
+        return
+      }
+      await new Promise<void>((resolve) => {
+        largeWaiters.push(() => {
+          largeInFlight++
+          resolve()
+        })
+      })
+    }
+    const releaseLargeSlot = () => {
+      largeInFlight = Math.max(0, largeInFlight - 1)
+      const next = largeWaiters.shift()
+      if (next) next()
+    }
+
+    logger.info('测点调度', {
+      total: job.testCases.length,
+      concurrency: CASE_CONCURRENCY,
+      largeCaseConcurrency: LARGE_CASE_CONCURRENCY,
+      largeCaseBytes: LARGE_CASE_BYTES,
+      failFast: FAIL_FAST_MODE,
+    })
+
+    emitJudgeProgress(job.userId, {
+      submissionId: job.submissionId,
+      currentTest: 0,
+      totalTests: job.testCases.length,
+      status: 'JUDGING',
+    })
+
+    // 全量跑完所有测点（默认）；仅 JUDGE_FAIL_FAST=hard|all 时才提前中止
+    const abortController =
+      FAIL_FAST_MODE === 'off' ? null : new AbortController()
+    const caseSignal = abortController?.signal
+    const caseVerdicts = await mapPool(
+      job.testCases,
+      CASE_CONCURRENCY,
+      async (testCase, index) => {
+        logger.debug(`测试用例`, { index: index + 1, total: job.testCases.length })
+
+        if (caseSignal?.aborted) {
+          finishedCount++
+          emitJudgeProgress(job.userId, {
+            submissionId: job.submissionId,
+            currentTest: finishedCount,
+            totalTests: job.testCases.length,
+            status: 'JUDGING',
+          })
+          return {
+            testId: testCase.id,
+            status: 'SE' as const,
+            score: 0,
+            time: 0,
+            memory: 0,
+            message: '已跳过（前面测点已失败）',
+            skipped: true,
+          }
+        }
+
+        let heldLarge = false
+        try {
+          // 先落盘以得知真实体积，再决定是否占用大测点槽位
+          const files = await materializeTestCaseToDisk(testCase.id)
+          if (caseSignal?.aborted) {
+            if (files) await cleanupMaterializedTestCase(files)
+            finishedCount++
+            emitJudgeProgress(job.userId, {
+              submissionId: job.submissionId,
+              currentTest: finishedCount,
+              totalTests: job.testCases.length,
+              status: 'JUDGING',
+            })
+            return {
+              testId: testCase.id,
+              status: 'SE' as const,
+              score: 0,
+              time: 0,
+              memory: 0,
+              message: '已跳过（前面测点已失败）',
+              skipped: true,
+            }
+          }
+
+          const weight = files
+            ? Math.max(files.inputBytes ?? 0, files.expectedBytes)
+            : 0
+          if (weight >= LARGE_CASE_BYTES) {
+            await acquireLargeSlot()
+            heldLarge = true
+            if (caseSignal?.aborted) {
+              finishedCount++
+              emitJudgeProgress(job.userId, {
+                submissionId: job.submissionId,
+                currentTest: finishedCount,
+                totalTests: job.testCases.length,
+                status: 'JUDGING',
+              })
+              return {
+                testId: testCase.id,
+                status: 'SE' as const,
+                score: 0,
+                time: 0,
+                memory: 0,
+                message: '已跳过（前面测点已失败）',
+                skipped: true,
+              }
+            }
+          }
+
+          const verdict = files
+            ? await judgeOneCaseWithFiles(
+                testCase,
+                job,
+                compiledPath,
+                files,
+                caseSignal,
+              )
+            : {
+                testId: testCase.id,
+                status: 'SE' as const,
+                score: 0,
+                time: 0,
+                memory: 0,
+                message: '测试点不存在或已删除',
+              }
+
+          finishedCount++
+          emitJudgeProgress(job.userId, {
+            submissionId: job.submissionId,
+            currentTest: finishedCount,
+            totalTests: job.testCases.length,
+            status: 'JUDGING',
+          })
+          if (verdict.skipped) {
+            // abort 中途结束的并行测点（仅 fail-fast 开启时）
+          } else if (verdict.status === 'AC') {
+            logger.debug(`通过`, { time: verdict.time, memory: verdict.memory, testId: testCase.id })
+          } else {
+            logger.debug(`测试失败`, {
+              status: verdict.status,
+              message: verdict.message,
+              testId: testCase.id,
+            })
+            if (
+              abortController &&
+              !verdict.skipped &&
+              shouldFailFast(verdict.status, FAIL_FAST_MODE) &&
+              !abortController.signal.aborted
+            ) {
+              logger.info('fail-fast：中止剩余测点', {
+                status: verdict.status,
+                testId: testCase.id,
+                mode: FAIL_FAST_MODE,
+              })
+              abortController.abort()
+            }
+          }
+          return verdict
+        } catch (error) {
+          finishedCount++
+          emitJudgeProgress(job.userId, {
+            submissionId: job.submissionId,
+            currentTest: finishedCount,
+            totalTests: job.testCases.length,
+            status: 'JUDGING',
+          })
+          logger.error(`测试执行错误`, error)
+          if (
+            abortController &&
+            !abortController.signal.aborted &&
+            shouldFailFast('SE', FAIL_FAST_MODE)
+          ) {
+            abortController.abort()
+          }
+          return {
+            testId: testCase.id,
+            status: 'SE' as ResultState,
+            score: 0,
+            time: 0,
+            memory: 0,
+            message: error instanceof Error ? error.message : '系统错误',
+          }
+        } finally {
+          if (heldLarge) releaseLargeSlot()
+        }
+      }
+    )
+
     let maxTime = 0
     let maxMemory = 0
-
-    for (let i = 0; i < job.testCases.length; i++) {
-      const testCase = job.testCases[i]
-      const currentTest = i + 1
-      logger.debug(`测试用例`, { index: currentTest, total: job.testCases.length })
-
-      try {
-        emitJudgeProgress(job.userId, {
-          submissionId: job.submissionId,
-          currentTest,
-          totalTests: job.testCases.length,
-          status: 'JUDGING',
-        })
-
-        // 计算单测点有效限制
-        const tcTimeLimit = testCase.timeLimit ?? job.timeLimit
-        const tcMemoryLimit = testCase.memoryLimit ?? job.memoryLimit
-
-        // 首次判定
-        let verdict = await runOnce(testCase, job, compileResult.compiledPath!, tcTimeLimit, tcMemoryLimit)
-
-        // 临界 TLE 重测：输出正确但时间略微超限，重跑以排除抖动
-        const maxRejudge = job.rejudgeTimes ?? 0
-        for (let r = 0; r < maxRejudge; r++) {
-          // 仅当"临界 TLE"时重测：程序在 extraTime 窗口内完成（未被强制杀死）、输出正确、但 CPU 时间超限
-          if (verdict.status !== 'TLE' || !verdict.exceedsTimeLimit || !verdict.outputCorrect) break
-          // 重测：取首次通过的结果
-          verdict = await runOnce(testCase, job, compileResult.compiledPath!, tcTimeLimit, tcMemoryLimit)
-          // 重测通过则停止
-          if (verdict.status === 'AC') break
-        }
-
-        // 更新最大时间和内存（符合NOI标准，确保非负）
-        maxTime = Math.max(0, maxTime, verdict.time)
-        maxMemory = Math.max(0, maxMemory, verdict.memory)
-
-        // 记录测试点结果
-        result.testResults?.push({
-          testId: testCase.id,
-          status: verdict.status,
-          time: verdict.time,
-          memory: verdict.memory,
-          message: verdict.message,
-        })
-
-        // 累计得分
-        if (verdict.status === 'AC') {
-          result.passedTests++
-          result.score += testCase.score
-          logger.debug(`通过`, { time: verdict.time, memory: verdict.memory })
-        } else {
-          logger.debug(`测试失败`, { status: verdict.status, message: verdict.message })
-        }
-      } catch (error) {
-        logger.error(`测试执行错误`, error)
-        result.testResults?.push({
-          testId: testCase.id,
-          status: 'SE',
-          time: 0,
-          memory: 0,
-          message: error instanceof Error ? error.message : '系统错误',
-        })
+    for (const v of caseVerdicts) {
+      result.testResults?.push({
+        testId: v.testId,
+        status: v.status,
+        time: v.time,
+        memory: v.memory,
+        message: v.message,
+      })
+      if (!v.skipped) {
+        maxTime = Math.max(0, maxTime, v.time)
+        maxMemory = Math.max(0, maxMemory, v.memory)
+      }
+      if (v.status === 'AC') {
+        result.passedTests++
+        result.score += v.score
       }
     }
 
@@ -301,12 +609,12 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
     result.time = maxTime
     result.memory = maxMemory
 
-    // 确定最终状态
+    // 确定最终状态（跳过 fail-fast 未跑测点，避免整单变成 SE）
     if (result.passedTests === result.totalTests) {
       result.status = 'AC'
       logger.info(`全部通过`)
     } else {
-      const failedTest = result.testResults?.find(t => t.status !== 'AC')
+      const failedTest = caseVerdicts.find((t) => t.status !== 'AC' && !t.skipped)
       const statusMap: Record<string, ResultState> = {
         WA: 'WA',
         TLE: 'TLE',
@@ -338,7 +646,12 @@ export async function executeJudge(job: JudgeJob): Promise<JudgeResult> {
   }
 
   const endTime = Date.now()
-  logger.info(`评测耗时`, { duration: endTime - startTime })
+  logger.info(`评测耗时`, {
+    duration: endTime - startTime,
+    caseConcurrency: CASE_CONCURRENCY,
+    largeCaseConcurrency: LARGE_CASE_CONCURRENCY,
+    failFast: FAIL_FAST_MODE,
+  })
 
   result.judgedAt = new Date()
   return result

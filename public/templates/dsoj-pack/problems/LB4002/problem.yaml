@@ -1,0 +1,15 @@
+schema_version: 2
+title: '[GESP202406 二级] 平方之和'
+problem_number: LB4002
+luogu_pid: B4002
+difficulty: 入门
+tags:
+- '2024'
+- 循环结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

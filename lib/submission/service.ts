@@ -11,7 +11,8 @@ import { logger } from '@/lib/logger'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
 import { SubmissionStatus, isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 import { parseComparisonMode } from '@/lib/judge/types'
-import type { TestCase } from '@prisma/client'
+import { mapTestCasesMeta, TESTCASE_META_SELECT } from '@/lib/judge/testcase-loader'
+import { canAccessAdmin } from '@/lib/permissions'
 
 export interface SubmissionFilter {
   userId?: string
@@ -48,15 +49,15 @@ function parseSubmissionTestResults(value: unknown): SubmissionTestResult[] {
   return out
 }
 
-function mapProblemTestCases(testCases: TestCase[]) {
-  return testCases.map((tc) => ({
-    id: tc.id,
-    input: tc.input,
-    output: tc.output,
-    score: tc.score,
-    timeLimit: tc.timeLimit ?? undefined,
-    memoryLimit: tc.memoryLimit ?? undefined,
-  }))
+function mapProblemTestCases(
+  testCases: Array<{
+    id: string
+    score: number
+    timeLimit?: number | null
+    memoryLimit?: number | null
+  }>
+) {
+  return mapTestCasesMeta(testCases)
 }
 
 export async function listSubmissions(
@@ -159,12 +160,12 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
   try {
     problem = await prisma.problem.findUnique({
       where: { problemNumber: body.problemId },
-      include: { testCases: true },
+      include: { testCases: { select: TESTCASE_META_SELECT } },
     })
     if (!problem && body.problemId.length === 24) {
       problem = await prisma.problem.findUnique({
         where: { id: body.problemId },
-        include: { testCases: true },
+        include: { testCases: { select: TESTCASE_META_SELECT } },
       })
     }
   } catch (error) {
@@ -344,7 +345,7 @@ export async function rejudgeSubmission(submissionId: string) {
 
   const problem = await prisma.problem.findUnique({
     where: { id: submission.problemId },
-    include: { testCases: true },
+    include: { testCases: { select: TESTCASE_META_SELECT } },
   })
   if (!problem) {
     throw AppError.notFound('关联题目不存在')
@@ -421,6 +422,44 @@ export async function getSubmissionDetail(id: string) {
   return {
     ...submission,
     testResults: parseSubmissionTestResults(submission.testResults),
+  }
+}
+
+/**
+ * 获取提交中第一个 WA 测试点数据（供下载）
+ * 仅提交者本人或管理员可访问；多个 WA 时只返回第一个。
+ */
+export async function getFirstWaTestCaseForDownload(
+  submissionId: string,
+  requester: { id: string; role?: string }
+) {
+  const detail = await getSubmissionDetail(submissionId)
+  if (!detail) throw AppError.notFound('提交记录不存在')
+
+  const isOwnerOrAdmin = detail.userId === requester.id || canAccessAdmin(requester)
+  if (!isOwnerOrAdmin) throw AppError.forbidden('无权下载该提交的测试点')
+
+  const waIndex = detail.testResults.findIndex(
+    (r) => r.status === SubmissionStatus.WRONG_ANSWER
+  )
+  if (waIndex < 0) {
+    throw AppError.badRequest('NO_WA_TESTCASE', '该提交没有 WA 测试点可下载')
+  }
+
+  const waResult = detail.testResults[waIndex]
+  const testCase = await prisma.testCase.findFirst({
+    where: { id: waResult.testId, problemId: detail.problemId },
+    select: { id: true, input: true, output: true },
+  })
+  if (!testCase) throw AppError.notFound('测试点数据不存在')
+
+  return {
+    caseIndex: waIndex + 1,
+    testId: testCase.id,
+    input: testCase.input,
+    output: testCase.output,
+    problemNumber: detail.problem?.problemNumber ?? null,
+    submissionId: detail.id,
   }
 }
 

@@ -1,0 +1,18 @@
+schema_version: 2
+title: '[GESP202406 一级] 立方数'
+problem_number: LB4001
+luogu_pid: B4001
+difficulty: 入门
+tags:
+- 数学
+- '2024'
+- 枚举
+- 分支结构
+- 循环结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

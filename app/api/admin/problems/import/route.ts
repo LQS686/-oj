@@ -3,177 +3,85 @@
  *
  * 支持三种请求方式：
  *   1. multipart/form-data：上传文件 + 格式参数（FPS / Hydro ZIP / SYZOJ JSON / CSV / DSOJ ZIP）
- *   2. application/json：直接传文本内容 + 格式参数（适合 FPS XML/JSON、SYZOJ JSON、CSV）
+ *   2. application/json：直接传文本内容 + 格式参数
  *   3. application/json + format=codeforces：触发 Codeforces API 同步
  *
- * 请求体示例（JSON）：
- *   {
- *     "format": "fps" | "hydro" | "syzoj" | "csv" | "codeforces" | "dsoj",
- *     "content": "...",           // FPS/JSON/CSV 文本内容（codeforces 不需要）
- *     "options": {
- *       "onDuplicate": "skip" | "overwrite" | "duplicate",
- *       "visibility": "public" | "private" | "contest",
- *       "defaultDifficulty": "入门" | ...,
- *       "cfTags": ["dp"],          // codeforces 专用
- *       "cfRatingRange": [800, 1500], // codeforces 专用
- *       "cfLimit": 100              // codeforces 专用
- *     }
- *   }
+ * 注意：自定义 server 下大体积 multipart 会触发 Next.js
+ * 「Response body object should not be disturbed or locked」。
+ * 因此 multipart 一律用 arrayBuffer + 自解析，且 server.ts 会对本路径做直通。
  */
 import { withApi, ok, throw400 } from '@/lib/api/withApi'
-import { isValidDifficulty } from '@/lib/constants'
 import {
-  parseFps,
-  parseHydroZip,
-  parseHydroJson,
-  parseSyzojJson,
-  parseCsvProblems,
-  fetchCodeforcesProblems,
-  parseDsojZip,
-  importProblems,
+  executeProblemImport,
+  VALID_IMPORT_FORMATS,
+  IMPORT_MAX_FILE_BYTES,
   type ImportFormat,
-  type ImportOptions,
-  type ImportedProblem,
 } from '@/lib/problem/import'
+import {
+  parseMultipartFromRequest,
+} from '@/lib/http/multipart'
 
 export const dynamic = 'force-dynamic'
-
-const VALID_FORMATS: ImportFormat[] = ['fps', 'hydro', 'syzoj', 'csv', 'codeforces', 'dsoj']
-const VALID_DUPLICATE_POLICIES = ['skip', 'overwrite', 'duplicate']
-const VALID_VISIBILITIES = ['public', 'private', 'contest']
-
-/**
- * 解析并校验导入选项
- */
-function parseOptions(raw: any, authorId: string): ImportOptions {
-  const opts = raw || {}
-  const onDuplicate = VALID_DUPLICATE_POLICIES.includes(opts.onDuplicate)
-    ? opts.onDuplicate
-    : 'skip'
-  const visibility = VALID_VISIBILITIES.includes(opts.visibility)
-    ? opts.visibility
-    : 'private'
-  const defaultDifficulty = isValidDifficulty(opts.defaultDifficulty)
-    ? opts.defaultDifficulty
-    : '入门'
-
-  const result: ImportOptions = {
-    onDuplicate,
-    visibility,
-    defaultDifficulty,
-    authorId,
-  }
-
-  if (Array.isArray(opts.cfTags)) {
-    result.cfTags = opts.cfTags.filter((t: unknown) => typeof t === 'string') as string[]
-  }
-  if (
-    Array.isArray(opts.cfRatingRange) &&
-    opts.cfRatingRange.length === 2 &&
-    typeof opts.cfRatingRange[0] === 'number' &&
-    typeof opts.cfRatingRange[1] === 'number'
-  ) {
-    result.cfRatingRange = opts.cfRatingRange
-  }
-  if (typeof opts.cfLimit === 'number' && opts.cfLimit > 0) {
-    result.cfLimit = Math.min(opts.cfLimit, 500)
-  }
-
-  return result
-}
-
-/**
- * 根据格式 + 内容解析为 ImportedProblem[]
- */
-async function parseByFormat(
-  format: ImportFormat,
-  content: string | Buffer,
-  options: ImportOptions
-): Promise<ImportedProblem[]> {
-  switch (format) {
-    case 'fps':
-      return parseFps(typeof content === 'string' ? content : content.toString('utf-8'))
-    case 'hydro': {
-      // 如果是 ZIP（PK 头）走 ZIP 解析，否则按 JSON 处理
-      const buf = typeof content === 'string' ? Buffer.from(content) : content
-      if (buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b) {
-        return parseHydroZip(buf)
-      }
-      return parseHydroJson(buf.toString('utf-8'))
-    }
-    case 'syzoj':
-      return parseSyzojJson(
-        typeof content === 'string' ? content : content.toString('utf-8')
-      )
-    case 'csv':
-      return parseCsvProblems(
-        typeof content === 'string' ? content : content.toString('utf-8')
-      )
-    case 'codeforces':
-      return fetchCodeforcesProblems({
-        tags: options.cfTags,
-        ratingRange: options.cfRatingRange,
-        limit: options.cfLimit ?? 100,
-      })
-    case 'dsoj': {
-      // DSOJ 标准格式必须是 ZIP
-      const buf = typeof content === 'string' ? Buffer.from(content) : content
-      if (buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) {
-        throw400('INVALID_DSOJ_FORMAT', 'DSOJ 标准格式必须是 ZIP 文件')
-      }
-      return parseDsojZip(buf)
-    }
-    default:
-      throw400('INVALID_FORMAT', `不支持的格式: ${format}`)
-      // unreachable: throw400 returns never，但 TS 控制流分析需要显式终止
-      throw new Error('unreachable')
-  }
-}
 
 export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const contentType = req.headers.get('content-type') || ''
 
   let format: ImportFormat
-  let rawOptions: any
+  let rawOptions: unknown = {}
   let content: string | Buffer | null = null
 
   if (contentType.includes('multipart/form-data')) {
-    // 文件上传模式
-    const formData = await req.formData()
-    const file = formData.get('file') as File | null
-    const formatStr = formData.get('format') as string | null
-    const optionsStr = formData.get('options') as string | null
-
-    if (!formatStr) throw400('NO_FORMAT', '缺少 format 参数')
-    const fmt = formatStr as ImportFormat
-    if (!VALID_FORMATS.includes(fmt)) {
-      throw400('INVALID_FORMAT', `不支持的格式: ${fmt}`)
+    let parts: Awaited<ReturnType<typeof parseMultipartFromRequest>>
+    try {
+      parts = await parseMultipartFromRequest(req, IMPORT_MAX_FILE_BYTES + 1024 * 1024)
+    } catch (e: any) {
+      const msg = e?.message || ''
+      if (msg === 'PAYLOAD_TOO_LARGE') throw400('FILE_TOO_LARGE', '文件大小超过 50MB 限制')
+      if (msg === 'INVALID_CONTENT_TYPE') throw400('INVALID_CONTENT_TYPE', '请求必须是 multipart/form-data')
+      if (msg === 'INVALID_BOUNDARY') throw400('INVALID_BOUNDARY', 'multipart boundary 缺失')
+      throw400('MULTIPART_PARSE_FAILED', 'multipart 解析失败')
+      return ok({}) // unreachable
     }
-    format = fmt
 
-    // Codeforces 不需要文件
-    if (format === 'codeforces') {
-      rawOptions = optionsStr ? JSON.parse(optionsStr) : {}
-    } else {
-      if (!file) throw400('NO_FILE', '未选择文件')
-      // 限制文件大小 50MB
-      if (file!.size > 50 * 1024 * 1024) {
-        throw400('FILE_TOO_LARGE', '文件大小超过 50MB 限制')
+    const formatPart = parts.find((p) => p.name === 'format')
+    const optionsPart = parts.find((p) => p.name === 'options')
+
+    const formatStr = formatPart?.data.toString('utf8').trim() || ''
+    if (!formatStr) throw400('NO_FORMAT', '缺少 format 参数')
+    if (!(VALID_IMPORT_FORMATS as string[]).includes(formatStr)) {
+      throw400('INVALID_FORMAT', `不支持的格式: ${formatStr}`)
+    }
+    format = formatStr as ImportFormat
+
+    if (optionsPart) {
+      try {
+        rawOptions = JSON.parse(optionsPart.data.toString('utf8'))
+      } catch {
+        throw400('INVALID_OPTIONS', 'options 不是合法 JSON')
       }
-      const arrayBuffer = await file!.arrayBuffer()
-      content = Buffer.from(arrayBuffer)
-      rawOptions = optionsStr ? JSON.parse(optionsStr) : {}
+    }
+
+    if (format !== 'codeforces') {
+      const file = parts.find((p) => p.name === 'file')
+      if (!file || file.data.length === 0) {
+        throw400('NO_FILE', '未选择文件')
+        throw new Error('unreachable')
+      }
+      if (file.data.length > IMPORT_MAX_FILE_BYTES) {
+        throw400('FILE_TOO_LARGE', '文件大小超过 50MB 限制')
+        throw new Error('unreachable')
+      }
+      content = file.data
     }
   } else {
-    // JSON 模式
     const body = await req.json().catch(() => null)
     if (!body) throw400('INVALID_JSON', '请求体不是合法 JSON')
 
     const fmt = body.format as ImportFormat
-    if (!fmt || !VALID_FORMATS.includes(fmt)) {
+    if (!fmt || !(VALID_IMPORT_FORMATS as string[]).includes(fmt)) {
       throw400(
         'INVALID_FORMAT',
-        `缺少或无效的 format 参数，支持: ${VALID_FORMATS.join(', ')}`
+        `缺少或无效的 format 参数，支持: ${VALID_IMPORT_FORMATS.join(', ')}`
       )
     }
     format = fmt
@@ -184,30 +92,12 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
     rawOptions = body.options || {}
   }
 
-  const options = parseOptions(rawOptions, user.id)
-
-  // Codeforces 模式无 content
-  const importedProblems =
-    format === 'codeforces'
-      ? await parseByFormat(format, '', options)
-      : await parseByFormat(format, content ?? '', options)
-
-  if (importedProblems.length === 0) {
-    return ok({
-      total: 0,
-      created: 0,
-      skipped: 0,
-      failed: 0,
-      results: [],
-      message: '解析完成但未找到任何题目',
-    })
-  }
-
-  const result = await importProblems(importedProblems, options)
-
-  return ok({
-    ...result,
+  const result = await executeProblemImport({
     format,
-    message: `成功导入 ${result.created} 题${result.skipped > 0 ? `，跳过 ${result.skipped} 题` : ''}${result.failed > 0 ? `，失败 ${result.failed} 题` : ''}`,
+    content,
+    rawOptions,
+    authorId: user.id,
   })
+
+  return ok(result)
 })

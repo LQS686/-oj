@@ -1,0 +1,17 @@
+schema_version: 2
+title: '[GESP202409 一级] 美丽数字'
+problem_number: LB4035
+luogu_pid: B4035
+difficulty: 入门
+tags:
+- 数学
+- '2024'
+- 分支结构
+- 循环结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

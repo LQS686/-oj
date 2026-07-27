@@ -1,0 +1,855 @@
+{
+  "schema_version": 2,
+  "problem_count": 62,
+  "problems": [
+    {
+      "order": 1,
+      "pid": "LB3834",
+      "luogu_pid": "B3834",
+      "dir": "LB3834",
+      "title": "[GESP202303 一级] 长方形面积",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2023",
+        "枚举",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 2,
+      "pid": "LB3835",
+      "luogu_pid": "B3835",
+      "dir": "LB3835",
+      "title": "[GESP202303 一级] 每月天数",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2023",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 3,
+      "pid": "LB3836",
+      "luogu_pid": "B3836",
+      "dir": "LB3836",
+      "title": "[GESP202303 二级] 百鸡问题",
+      "difficulty": "普及-",
+      "tags": [
+        "2023",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 4,
+      "pid": "LB3837",
+      "luogu_pid": "B3837",
+      "dir": "LB3837",
+      "title": "[GESP202303 二级] 画三角形",
+      "difficulty": "普及-",
+      "tags": [
+        "2023",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 5,
+      "pid": "LB3838",
+      "luogu_pid": "B3838",
+      "dir": "LB3838",
+      "title": "[GESP202306 一级] 时间规划",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2023",
+        "顺序结构",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 6,
+      "pid": "LB3839",
+      "luogu_pid": "B3839",
+      "dir": "LB3839",
+      "title": "[GESP202306 一级] 累计相加",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2023",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 7,
+      "pid": "LB3840",
+      "luogu_pid": "B3840",
+      "dir": "LB3840",
+      "title": "[GESP202306 二级] 找素数",
+      "difficulty": "普及-",
+      "tags": [
+        "2023",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 8,
+      "pid": "LB3841",
+      "luogu_pid": "B3841",
+      "dir": "LB3841",
+      "title": "[GESP202306 二级] 自幂数判断",
+      "difficulty": "普及-",
+      "tags": [
+        "2023",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 9,
+      "pid": "LB3844",
+      "luogu_pid": "B3844",
+      "dir": "LB3844",
+      "title": "[GESP样题 二级] 画正方形",
+      "difficulty": "入门",
+      "tags": [
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 10,
+      "pid": "LB3845",
+      "luogu_pid": "B3845",
+      "dir": "LB3845",
+      "title": "[GESP样题 二级] 勾股数",
+      "difficulty": "入门",
+      "tags": [
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 11,
+      "pid": "LB3846",
+      "luogu_pid": "B3846",
+      "dir": "LB3846",
+      "title": "[GESP样题 一级] 闰年求和",
+      "difficulty": "入门",
+      "tags": [
+        "枚举",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 12,
+      "pid": "LB3847",
+      "luogu_pid": "B3847",
+      "dir": "LB3847",
+      "title": "[GESP样题 一级] 当天的第几秒",
+      "difficulty": "入门",
+      "tags": [
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 13,
+      "pid": "LB3863",
+      "luogu_pid": "B3863",
+      "dir": "LB3863",
+      "title": "[GESP202309 一级] 买文具",
+      "difficulty": "入门",
+      "tags": [
+        "2023",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 14,
+      "pid": "LB3864",
+      "luogu_pid": "B3864",
+      "dir": "LB3864",
+      "title": "[GESP202309 一级] 小明的幸运数",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2023",
+        "枚举",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 15,
+      "pid": "LB3865",
+      "luogu_pid": "B3865",
+      "dir": "LB3865",
+      "title": "[GESP202309 二级] 小杨的 X 字矩阵",
+      "difficulty": "入门",
+      "tags": [
+        "2023",
+        "GESP"
+      ]
+    },
+    {
+      "order": 16,
+      "pid": "LB3866",
+      "luogu_pid": "B3866",
+      "dir": "LB3866",
+      "title": "[GESP202309 二级] 数字黑洞",
+      "difficulty": "普及-",
+      "tags": [
+        "模拟",
+        "数学",
+        "2023",
+        "GESP"
+      ]
+    },
+    {
+      "order": 17,
+      "pid": "LB3921",
+      "luogu_pid": "B3921",
+      "dir": "LB3921",
+      "title": "[GESP202312 一级] 小杨的考试",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2023",
+        "顺序结构",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 18,
+      "pid": "LB3922",
+      "luogu_pid": "B3922",
+      "dir": "LB3922",
+      "title": "[GESP202312 一级] 小杨报数",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2023",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 19,
+      "pid": "LB3923",
+      "luogu_pid": "B3923",
+      "dir": "LB3923",
+      "title": "[GESP202312 二级] 小杨做题",
+      "difficulty": "入门",
+      "tags": [
+        "2023",
+        "GESP"
+      ]
+    },
+    {
+      "order": 20,
+      "pid": "LB3924",
+      "luogu_pid": "B3924",
+      "dir": "LB3924",
+      "title": "[GESP202312 二级] 小杨的 H 字矩阵",
+      "difficulty": "入门",
+      "tags": [
+        "2023",
+        "GESP"
+      ]
+    },
+    {
+      "order": 21,
+      "pid": "LB3939",
+      "luogu_pid": "B3939",
+      "dir": "LB3939",
+      "title": "[GESP样题 四级] 绝对素数",
+      "difficulty": "普及-",
+      "tags": [
+        "枚举",
+        "素数判断",
+        "GESP"
+      ]
+    },
+    {
+      "order": 22,
+      "pid": "LB3952",
+      "luogu_pid": "B3952",
+      "dir": "LB3952",
+      "title": "[GESP202403 一级] 小杨买书",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2024",
+        "顺序结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 23,
+      "pid": "LB3953",
+      "luogu_pid": "B3953",
+      "dir": "LB3953",
+      "title": "[GESP202403 一级] 找因数",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2024",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 24,
+      "pid": "LB3954",
+      "luogu_pid": "B3954",
+      "dir": "LB3954",
+      "title": "[GESP202403 二级] 乘法问题",
+      "difficulty": "入门",
+      "tags": [
+        "2024",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 25,
+      "pid": "LB3955",
+      "luogu_pid": "B3955",
+      "dir": "LB3955",
+      "title": "[GESP202403 二级] 小杨的日字矩阵",
+      "difficulty": "入门",
+      "tags": [
+        "2024",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 26,
+      "pid": "LB4000",
+      "luogu_pid": "B4000",
+      "dir": "LB4000",
+      "title": "[GESP202406 一级] 休息时间",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2024",
+        "顺序结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 27,
+      "pid": "LB4001",
+      "luogu_pid": "B4001",
+      "dir": "LB4001",
+      "title": "[GESP202406 一级] 立方数",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2024",
+        "枚举",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 28,
+      "pid": "LB4002",
+      "luogu_pid": "B4002",
+      "dir": "LB4002",
+      "title": "[GESP202406 二级] 平方之和",
+      "difficulty": "入门",
+      "tags": [
+        "2024",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 29,
+      "pid": "LB4007",
+      "luogu_pid": "B4007",
+      "dir": "LB4007",
+      "title": "[GESP202406 二级] 计数",
+      "difficulty": "入门",
+      "tags": [
+        "2024",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 30,
+      "pid": "LB4034",
+      "luogu_pid": "B4034",
+      "dir": "LB4034",
+      "title": "[GESP202409 一级] 小杨购物",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2024",
+        "顺序结构",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 31,
+      "pid": "LB4035",
+      "luogu_pid": "B4035",
+      "dir": "LB4035",
+      "title": "[GESP202409 一级] 美丽数字",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2024",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 32,
+      "pid": "LB4036",
+      "luogu_pid": "B4036",
+      "dir": "LB4036",
+      "title": "[GESP202409 二级] 数位之和",
+      "difficulty": "普及-",
+      "tags": [
+        "2024",
+        "GESP"
+      ]
+    },
+    {
+      "order": 33,
+      "pid": "LB4037",
+      "luogu_pid": "B4037",
+      "dir": "LB4037",
+      "title": "[GESP202409 二级] 小杨的 N 字矩阵",
+      "difficulty": "入门",
+      "tags": [
+        "模拟",
+        "2024",
+        "GESP"
+      ]
+    },
+    {
+      "order": 34,
+      "pid": "LB4062",
+      "luogu_pid": "B4062",
+      "dir": "LB4062",
+      "title": "[GESP202412 一级] 温度转换",
+      "difficulty": "入门",
+      "tags": [
+        "2024",
+        "顺序结构",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 35,
+      "pid": "LB4063",
+      "luogu_pid": "B4063",
+      "dir": "LB4063",
+      "title": "[GESP202412 一级] 奇数和偶数",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2024",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 36,
+      "pid": "LB4064",
+      "luogu_pid": "B4064",
+      "dir": "LB4064",
+      "title": "[GESP202412 二级] 寻找数字",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2024",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 37,
+      "pid": "LB4065",
+      "luogu_pid": "B4065",
+      "dir": "LB4065",
+      "title": "[GESP202412 二级] 数位和",
+      "difficulty": "入门",
+      "tags": [
+        "2024",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 38,
+      "pid": "LB4257",
+      "luogu_pid": "B4257",
+      "dir": "LB4257",
+      "title": "[GESP202503 一级] 图书馆里的老鼠",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2025",
+        "顺序结构",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 39,
+      "pid": "LB4258",
+      "luogu_pid": "B4258",
+      "dir": "LB4258",
+      "title": "[GESP202503 一级] 四舍五入",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 40,
+      "pid": "LB4259",
+      "luogu_pid": "B4259",
+      "dir": "LB4259",
+      "title": "[GESP202503 二级] 等差矩阵",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 41,
+      "pid": "LB4260",
+      "luogu_pid": "B4260",
+      "dir": "LB4260",
+      "title": "[GESP202503 二级] 时间跨越",
+      "difficulty": "普及-",
+      "tags": [
+        "模拟",
+        "2025",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 42,
+      "pid": "LB4354",
+      "luogu_pid": "B4354",
+      "dir": "LB4354",
+      "title": "[GESP202506 一级] 假期阅读",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 43,
+      "pid": "LB4355",
+      "luogu_pid": "B4355",
+      "dir": "LB4355",
+      "title": "[GESP202506 一级] 值日",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2025",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 44,
+      "pid": "LB4356",
+      "luogu_pid": "B4356",
+      "dir": "LB4356",
+      "title": "[GESP202506 二级] 数三角形",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 45,
+      "pid": "LB4357",
+      "luogu_pid": "B4357",
+      "dir": "LB4357",
+      "title": "[GESP202506 二级] 幂和数",
+      "difficulty": "普及-",
+      "tags": [
+        "2025",
+        "进制",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 46,
+      "pid": "LB4409",
+      "luogu_pid": "B4409",
+      "dir": "LB4409",
+      "title": "[GESP202509 一级] 商店折扣",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "顺序结构",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 47,
+      "pid": "LB4410",
+      "luogu_pid": "B4410",
+      "dir": "LB4410",
+      "title": "[GESP202509 一级] 金字塔",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 48,
+      "pid": "LB4411",
+      "luogu_pid": "B4411",
+      "dir": "LB4411",
+      "title": "[GESP202509 二级] 优美的数字",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 49,
+      "pid": "LB4412",
+      "luogu_pid": "B4412",
+      "dir": "LB4412",
+      "title": "[GESP202509 二级] 菱形",
+      "difficulty": "普及-",
+      "tags": [
+        "2025",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 50,
+      "pid": "LB4445",
+      "luogu_pid": "B4445",
+      "dir": "LB4445",
+      "title": "[GESP202512 一级] 小杨的爱心快递",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "分支结构",
+        "分类讨论",
+        "GESP"
+      ]
+    },
+    {
+      "order": 51,
+      "pid": "LB4446",
+      "luogu_pid": "B4446",
+      "dir": "LB4446",
+      "title": "[GESP202512 一级] 手机电量显示",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 52,
+      "pid": "LB4447",
+      "luogu_pid": "B4447",
+      "dir": "LB4447",
+      "title": "[GESP202512 二级] 环保能量球",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "顺序结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 53,
+      "pid": "LB4448",
+      "luogu_pid": "B4448",
+      "dir": "LB4448",
+      "title": "[GESP202512 二级] 黄金格",
+      "difficulty": "入门",
+      "tags": [
+        "2025",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 54,
+      "pid": "LB4495",
+      "luogu_pid": "B4495",
+      "dir": "LB4495",
+      "title": "[GESP202603 一级] 交朋友",
+      "difficulty": "入门",
+      "tags": [
+        "2026",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 55,
+      "pid": "LB4496",
+      "luogu_pid": "B4496",
+      "dir": "LB4496",
+      "title": "[GESP202603 一级] 数字替换",
+      "difficulty": "入门",
+      "tags": [
+        "2026",
+        "循环结构",
+        "字符串（入门）",
+        "GESP"
+      ]
+    },
+    {
+      "order": 56,
+      "pid": "LB4497",
+      "luogu_pid": "B4497",
+      "dir": "LB4497",
+      "title": "[GESP202603 二级] 数数",
+      "difficulty": "入门",
+      "tags": [
+        "2026",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 57,
+      "pid": "LB4498",
+      "luogu_pid": "B4498",
+      "dir": "LB4498",
+      "title": "[GESP202603 二级] 画画",
+      "difficulty": "入门",
+      "tags": [
+        "2026",
+        "分支结构",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 58,
+      "pid": "LB4551",
+      "luogu_pid": "B4551",
+      "dir": "LB4551",
+      "title": "[GESP202606 一级] 去旅行",
+      "difficulty": "入门",
+      "tags": [
+        "2026",
+        "分支结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 59,
+      "pid": "LB4552",
+      "luogu_pid": "B4552",
+      "dir": "LB4552",
+      "title": "[GESP202606 一级] 交税",
+      "difficulty": "入门",
+      "tags": [
+        "2026",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 60,
+      "pid": "LB4553",
+      "luogu_pid": "B4553",
+      "dir": "LB4553",
+      "title": "[GESP202606 二级] 完全平方数计数",
+      "difficulty": "入门",
+      "tags": [
+        "数学",
+        "2026",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 61,
+      "pid": "LB4554",
+      "luogu_pid": "B4554",
+      "dir": "LB4554",
+      "title": "[GESP202606 二级] 菱形",
+      "difficulty": "普及-",
+      "tags": [
+        "2026",
+        "循环结构",
+        "GESP"
+      ]
+    },
+    {
+      "order": 62,
+      "pid": "LP1003",
+      "luogu_pid": "P1003",
+      "dir": "LP1003",
+      "title": "[NOIP 2011 提高组] 铺地毯",
+      "difficulty": "普及-",
+      "tags": [
+        "模拟",
+        "2011",
+        "NOIP 提高组",
+        "枚举"
+      ]
+    }
+  ]
+}

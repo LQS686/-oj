@@ -2,28 +2,27 @@
  * lib/problem/export/dsoj-exporter.ts
  * DSOJ 标准题包导出器（与 dsoj-parser 配套使用）
  *
- * 将数据库中的题目导出为 DSOJ 标准格式 ZIP 包，
+ * 将数据库中的题目导出为 DSOJ 标准格式 ZIP 包（v2），
  * 可由 dsoj-parser 重新导入，实现完整的导出 → 导入闭环。
  *
- * 导出格式与 dsoj-parser 完全对应：
+ * 导出格式：
  *   dsoj-pack.zip
  *   ├── pack.yaml
+ *   ├── index.json
  *   └── problems/
- *       ├── <题号>/             # 如 P1001
+ *       ├── <题号>/             # 如 LP1001 / P1001
  *       │   ├── problem.yaml
  *       │   ├── description.md
- *       │   ├── input.md
- *       │   ├── output.md
- *       │   ├── hint.md
  *       │   ├── samples/
  *       │   ├── testcases/
- *       │   ├── config.yaml
+ *       │   ├── solutions/
  *       │   └── std.cpp
  *       └── ...
  */
 import AdmZip from 'adm-zip'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { deriveLuoguPid, makePackDirName } from '@/lib/problem/pack-ids'
 
 /* ============================================================================
  * 类型定义
@@ -36,6 +35,8 @@ export interface DsojExportOptions {
   includeStdCode?: boolean
   /** 是否导出测试用例（默认 true，强烈建议保持 true） */
   includeTestCases?: boolean
+  /** 是否导出题解（默认 true） */
+  includeSolutions?: boolean
   /** 包级描述（写入 pack.yaml.description） */
   description?: string
   /** 数据来源（写入 pack.yaml.source） */
@@ -43,7 +44,7 @@ export interface DsojExportOptions {
 }
 
 /** 当前格式版本 */
-const DSOJ_PACK_VERSION = '1.0'
+const DSOJ_PACK_VERSION = '2.0'
 const DSOJ_PACK_FORMAT_ID = 'dsoj-pack'
 
 /* ============================================================================
@@ -63,9 +64,22 @@ async function loadProblemsForExport(options: DsojExportOptions) {
     where,
     include: {
       testCases: { orderBy: { orderIndex: 'asc' } },
+      solutions: {
+        orderBy: [{ isOfficial: 'desc' }, { views: 'desc' }, { createdAt: 'desc' }],
+        take: 20,
+        include: {
+          author: { select: { nickname: true, username: true } },
+        },
+      },
     },
     orderBy: { createdAt: 'asc' },
   })
+
+  // 指定 ids 时按入参顺序导出（与后台勾选顺序一致）
+  if (options.problemIds && options.problemIds.length > 0) {
+    const order = new Map(options.problemIds.map((id, i) => [id, i]))
+    problems.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+  }
 
   return problems
 }
@@ -125,18 +139,13 @@ function quoteIfNeeded(s: string): string {
  * ========================================================================== */
 
 /**
- * 生成题目目录名：直接使用题号
- *   - 有 problemNumber（如 "P1001"）：直接用题号 → "P1001"
- *   - 无 problemNumber：使用 id 的前 8 位 → "abc12345"
+ * 生成题目目录名：直接使用题号（v2 稳定 PID）
  */
 function makeProblemDirName(problem: {
   problemNumber: string | null
   id: string
 }): string {
-  if (problem.problemNumber) {
-    return problem.problemNumber
-  }
-  return problem.id.slice(0, 8).toLowerCase()
+  return makePackDirName(problem.problemNumber, problem.id)
 }
 
 /* ============================================================================
@@ -145,7 +154,7 @@ function makeProblemDirName(problem: {
 
 /**
  * 将单个题目序列化为 DSOJ 标准格式的文件列表
- *   返回形如 [{ path: "problems/001-.../problem.yaml", content: "..." }] 的列表
+ *   返回形如 [{ path: "problems/LP1001/problem.yaml", content: "..." }] 的列表
  */
 function serializeOneProblem(
   problem: any,
@@ -154,11 +163,14 @@ function serializeOneProblem(
   const files: Array<{ path: string; content: Buffer }> = []
   const dirName = makeProblemDirName(problem)
   const base = `problems/${dirName}/`
+  const luoguPid = deriveLuoguPid(problem.problemNumber)
 
   // 1. problem.yaml
   const problemYaml = serializeYaml({
+    schema_version: 2,
     title: problem.title,
     problem_number: problem.problemNumber || undefined,
+    luogu_pid: luoguPid,
     difficulty: problem.difficulty,
     tags: Array.isArray(problem.tags) ? problem.tags : [],
     source: problem.source || undefined,
@@ -272,6 +284,50 @@ function serializeOneProblem(
     })
   }
 
+  // 7. solutions/（v2：index.json 无 author；md 仅标题+正文）
+  if (options.includeSolutions !== false && Array.isArray(problem.solutions)) {
+    const solutionItems: Array<{
+      lid: string
+      title: string
+      thumb_up: number
+      file: string
+    }> = []
+
+    problem.solutions.forEach((sol: any, idx: number) => {
+      if (!sol || typeof sol.content !== 'string' || !sol.content.trim()) return
+      const lid = String(sol.id || `s${idx + 1}`).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || `s${idx + 1}`
+      const fileName = `${lid}.md`
+      const title = String(sol.title || `题解 ${idx + 1}`).trim() || `题解 ${idx + 1}`
+      // 站内无点赞字段时，用浏览量近似 thumb_up（仅供索引排序）
+      const thumbUp = typeof sol.views === 'number' ? sol.views : 0
+      const trimmed = sol.content.trim()
+      const body = trimmed.startsWith('#')
+        ? `${trimmed}\n`
+        : `# ${title}\n\n${trimmed}\n`
+
+      files.push({
+        path: `${base}solutions/${fileName}`,
+        content: Buffer.from(body, 'utf-8'),
+      })
+      solutionItems.push({
+        lid,
+        title,
+        thumb_up: thumbUp,
+        file: fileName,
+      })
+    })
+
+    if (solutionItems.length > 0) {
+      files.push({
+        path: `${base}solutions/index.json`,
+        content: Buffer.from(
+          JSON.stringify({ count: solutionItems.length, solutions: solutionItems }, null, 2) + '\n',
+          'utf-8'
+        ),
+      })
+    }
+  }
+
   return files
 }
 
@@ -308,6 +364,7 @@ export async function exportDsojPack(options: DsojExportOptions): Promise<Buffer
     source: options.packSource || 'DSOJ',
     description: options.description || `DSOJ 标准题包，共 ${problems.length} 题`,
     problem_count: problems.length,
+    index: 'index.json',
   })
   zip.addFile('pack.yaml', Buffer.from(packYaml, 'utf-8'))
 
@@ -322,10 +379,11 @@ export async function exportDsojPack(options: DsojExportOptions): Promise<Buffer
 
 \`\`\`
 dsoj-pack.zip
-├── pack.yaml              # 本文件（包元信息）
+├── pack.yaml              # 包元信息
+├── index.json             # 题目索引（权威列表）
 ├── README.md              # 本说明文件
 └── problems/
-    ├── <题号>/               # 如 P1001
+    ├── <题号>/               # 如 P1001 / LP1001
     │   ├── problem.yaml   # 题目元信息
     │   ├── description.md # 题目描述
     │   ├── background.md  # 题目背景（可选）
@@ -333,41 +391,16 @@ dsoj-pack.zip
     │   ├── output.md      # 输出格式（可选）
     │   ├── hint.md        # 提示（可选）
     │   ├── samples/       # 展示样例
-    │   │   ├── 1.in
-    │   │   └── 1.out
     │   ├── testcases/     # 完整测试点
-    │   │   ├── 1.in
-    │   │   ├── 1.out
-    │   │   └── 1.score    # 单测点分数（可选）
+    │   ├── solutions/     # 可选题解
     │   ├── config.yaml    # 测试配置覆盖（可选）
     │   └── std.cpp        # 标准代码（可选）
     └── ...
 \`\`\`
 
-## 字段说明
-
-### problem.yaml
-
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| title | string | 是 | 题目标题 |
-| problem_number | string | 否 | 题号（如 P1001），留空自动分配 |
-| difficulty | string | 是 | 难度（入门/普及-/普及/普及+/提高/提高+/省选/NOI） |
-| tags | string[] | 否 | 标签列表 |
-| source | string | 否 | 题目来源 |
-| visibility | string | 否 | 可见性（public/private/contest），默认 private |
-| time_limit | number | 是 | 时间限制（ms） |
-| memory_limit | number | 是 | 内存限制（MB） |
-| comparison_mode | string | 否 | 比较模式（default/strict/ignore-spaces/real-number） |
-| real_precision | number | 否 | 实数比较精度（real-number 模式下有效） |
-
-### config.yaml（可选）
-
-字段与 problem.yaml 相同，但优先级更高，用于覆盖 problem.yaml 的评测配置。
-
 ## 导入方法
 
-通过管理后台 → 题库管理 → 批量导入 → 选择"DSOJ"格式上传此 ZIP 包。
+通过管理后台 → 题库管理 → 批量导入 → 选择「DSOJ」格式上传此 ZIP 包。
 `
   zip.addFile('README.md', Buffer.from(readme, 'utf-8'))
 
@@ -375,6 +408,15 @@ dsoj-pack.zip
   let successCount = 0
   let failedCount = 0
   const usedDirNames = new Set<string>()
+  const indexProblems: Array<{
+    order: number
+    pid: string
+    luogu_pid?: string
+    dir: string
+    title: string
+    difficulty: string
+    tags: string[]
+  }> = []
 
   for (const problem of problems) {
     try {
@@ -402,6 +444,17 @@ dsoj-pack.zip
       for (const f of files) {
         zip.addFile(f.path, f.content)
       }
+      const pid = problem.problemNumber || baseDir
+      const luoguPid = deriveLuoguPid(pid)
+      indexProblems.push({
+        order: indexProblems.length + 1,
+        pid,
+        ...(luoguPid ? { luogu_pid: luoguPid } : {}),
+        dir: baseDir,
+        title: problem.title,
+        difficulty: problem.difficulty || '入门',
+        tags: Array.isArray(problem.tags) ? problem.tags : [],
+      })
       successCount++
     } catch (err: any) {
       failedCount++
@@ -413,6 +466,23 @@ dsoj-pack.zip
     }
   }
 
+  // 6. 写入 index.json（v2 权威索引）
+  zip.addFile(
+    'index.json',
+    Buffer.from(
+      JSON.stringify(
+        {
+          schema_version: 2,
+          problem_count: indexProblems.length,
+          problems: indexProblems,
+        },
+        null,
+        2
+      ) + '\n',
+      'utf-8'
+    )
+  )
+
   if (successCount === 0) {
     throw new Error(`所有题目导出失败（共 ${failedCount} 题）`)
   }
@@ -423,7 +493,7 @@ dsoj-pack.zip
     total: problems.length,
   })
 
-  // 6. 返回 ZIP buffer
+  // 7. 返回 ZIP buffer
   return zip.toBuffer()
 }
 

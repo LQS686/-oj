@@ -194,7 +194,10 @@ export default function CreateSolutionModal({
           if (newId) {
             onCreated?.(newId)
             onClose()
-            router.push(`/problems/${problemId}/solutions/${newId}`)
+            // 调用方（题目页题解 Tab）会行内展开；否则回题目页并展开
+            if (!onCreated) {
+              router.push(`/problem/${problemId}?tab=solutions&solution=${newId}`)
+            }
           } else {
             setError('发布成功但未返回题解 ID')
           }

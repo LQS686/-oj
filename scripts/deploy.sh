@@ -124,6 +124,11 @@ setup_env() {
     FRONTEND_URL="https://$DOMAIN"
   fi
 
+  local FORCE_SECURE=true
+  if [[ "$FRONTEND_URL" == http://* ]]; then
+    FORCE_SECURE=false
+  fi
+
   cat > .env <<EOF
 # ====== 自动生成的 OJ 平台配置 ======
 NODE_ENV=production
@@ -140,6 +145,7 @@ NEXT_PUBLIC_BASE_URL=${FRONTEND_URL}
 
 USE_DOCKER=false
 TRUSTED_PROXIES=1
+FORCE_SECURE_COOKIE=${FORCE_SECURE}
 
 JUDGE_COMPILE_TIMEOUT=20000
 JUDGE_JOB_TIMEOUT=300
@@ -200,21 +206,31 @@ deploy() {
   cd "$PROJECT_DIR"
 
   info "拉取基础镜像..."
-  docker compose pull mongo redis nginx 2>&1 | tail -1
+  # compose 仅含 app / mongo / redis（无 nginx 服务；反向代理由宿主机/宝塔 Nginx 承担）
+  docker compose pull mongo redis 2>&1 | tail -3 || warn "基础镜像拉取部分失败，将尝试使用本地镜像"
 
   # 启用 BuildKit：Dockerfile 中 --mount=type=cache 依赖 BuildKit 才能生效
-  # BuildKit 缓存 apk / npm / next build 三处慢操作的下载产物到 host，
-  # 后续 --no-cache 也能秒级复用，避免每次重新下载 gcc/g++ 等大包
   export DOCKER_BUILDKIT=1
 
   info "构建 OJ 应用镜像（首次约 5-10 分钟，后续复用缓存秒级完成）..."
-  docker compose build --build-arg JWT_SECRET="${JWT_SECRET}" 2>&1 | tail -5
+  # NEXT_PUBLIC_* 通过 compose build.args ← .env 的 FRONTEND_URL 注入
+  docker compose build app 2>&1 | tail -8
 
   info "启动所有服务..."
   docker compose up -d
 
-  info "等待服务就绪（约 30 秒）..."
-  sleep 30
+  info "等待服务就绪..."
+  local ok=0
+  for i in $(seq 1 40); do
+    if curl -sf http://localhost:3000/healthcheck-static >/dev/null 2>&1; then
+      ok=1
+      break
+    fi
+    sleep 3
+  done
+  if [ "$ok" -ne 1 ]; then
+    warn "应用尚未响应 healthcheck-static，请查看: docker compose logs -f app"
+  fi
 }
 
 # --------------- 验证 ---------------
@@ -225,20 +241,30 @@ verify() {
   docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || docker compose ps
 
   echo ""
-  info "测试 API 连接..."
-  if curl -sf http://localhost:3000/api/health/db > /dev/null 2>&1; then
-    info "API 健康检查通过！"
+  info "测试健康检查..."
+  if curl -sf http://localhost:3000/healthcheck-static >/dev/null 2>&1; then
+    info "应用存活检查通过（/healthcheck-static）"
   else
-    warn "API 尚未就绪，可等待 30 秒后重试：curl http://localhost:3000/api/health/db"
+    warn "应用尚未就绪：curl http://localhost:3000/healthcheck-static"
+  fi
+  if curl -sf http://localhost:3000/api/health/db >/dev/null 2>&1; then
+    info "数据库健康检查通过（/api/health/db）"
+  else
+    warn "数据库尚未就绪：curl http://localhost:3000/api/health/db"
+  fi
+
+  local SITE_URL="http://localhost:3000"
+  if [ "$DOMAIN" != "localhost" ]; then
+    SITE_URL="https://${DOMAIN}"
   fi
 
   echo ""
   echo -e "${BOLD}========================================${NC}"
-  echo -e "${BOLD}  🎉  部署完成！${NC}"
+  echo -e "${BOLD}  部署完成${NC}"
   echo -e "${BOLD}========================================${NC}"
   echo ""
-  echo -e "  访问地址:  ${GREEN}https://${DOMAIN}${NC}"
-  echo -e "  直接访问:  ${GREEN}http://localhost:3000${NC}"
+  echo -e "  访问地址:  ${GREEN}${SITE_URL}${NC}"
+  echo -e "  本机直连:  ${GREEN}http://localhost:3000${NC}"
   echo ""
   echo -e "  首次使用: ${YELLOW}访问网站注册首个账号，将自动获得系统管理员权限${NC}"
   echo ""

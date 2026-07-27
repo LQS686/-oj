@@ -41,12 +41,20 @@ export type ComparisonMode = 'default' | 'strict' | 'ignore-spaces' | 'real-numb
 
 /**
  * 比较输入
+ *
+ * 大数据量测点请优先传 `userOutputPath` / `expectedOutputPath`（磁盘流式比对），
+ * 避免把完整 stdout / 标准答案再次载入 V8 堆导致 OOM。
+ * 字符串字段仍保留，供小测点与单元测试使用。
  */
 export interface CompareInput {
-  /** 选手输出 */
-  userOutput: string
-  /** 标准答案 */
-  expectedOutput: string
+  /** 选手输出（小数据 / 测试用；与 userOutputPath 二选一） */
+  userOutput?: string
+  /** 标准答案（小数据 / 测试用；与 expectedOutputPath 二选一） */
+  expectedOutput?: string
+  /** 选手输出文件路径（优先于 userOutput） */
+  userOutputPath?: string
+  /** 标准答案文件路径（优先于 expectedOutput） */
+  expectedOutputPath?: string
   /** 该测点满分 */
   fullScore: number
   /** 比较模式 */

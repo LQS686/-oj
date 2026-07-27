@@ -1,0 +1,15 @@
+schema_version: 2
+title: '[GESP样题 一级] 闰年求和'
+problem_number: LB3846
+luogu_pid: B3846
+difficulty: 入门
+tags:
+- 枚举
+- 循环结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: default
+real_precision: 3

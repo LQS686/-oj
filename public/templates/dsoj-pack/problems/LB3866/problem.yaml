@@ -1,0 +1,16 @@
+schema_version: 2
+title: '[GESP202309 二级] 数字黑洞'
+problem_number: LB3866
+luogu_pid: B3866
+difficulty: 普及-
+tags:
+- 模拟
+- 数学
+- '2023'
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: default
+real_precision: 3

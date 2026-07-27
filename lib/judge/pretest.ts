@@ -11,11 +11,12 @@
  */
 import type { ComparisonMode, ResultState } from './types'
 import { compileCode } from './compiler'
-import { executeCode } from './executor'
+import { executeCode, cleanupExecuteArtifacts } from './executor'
 import { compareOutput } from './comparator'
 import { validateCodeSafety } from './codeAnalyzer'
 import { cleanup } from './judger'
 import { logger } from '@/lib/logger'
+import { mapPool, resolveCaseConcurrency } from './pool'
 
 /** 单个样例测试点的输入参数 */
 export interface PretestCase {
@@ -133,16 +134,16 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
     }
     compiledPath = compileResult.compiledPath
 
-    // 第三步：逐样例运行
-    let maxTime = 0
-    let maxMemory = 0
-    let passed = 0
+    // 第三步：并行跑完全部样例（不因 TLE/WA 等跳过）
+    const concurrency = resolveCaseConcurrency()
+    logger.info('pretest 开始跑样例', { total: testCases.length, concurrency })
 
-    for (const tc of testCases) {
+    const caseResults = await mapPool(testCases, concurrency, async (tc) => {
       const tcTimeLimit = tc.timeLimit ?? timeLimit
       const tcMemoryLimit = tc.memoryLimit ?? memoryLimit
 
       try {
+        const expectedBytes = Buffer.byteLength(tc.output ?? '', 'utf-8')
         const execResult = await executeCode({
           code,
           language,
@@ -151,67 +152,92 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
           memoryLimit: tcMemoryLimit,
           compiledPath,
           extraTimeRatio: 0.1,
+          expectedOutputBytes: expectedBytes,
         })
 
         let status: ResultState
         let message: string
         let userOutput = ''
 
-        if (execResult.cannotStart) {
-          status = 'CSP'
-          message = execResult.error || '无法启动程序'
-        } else if (execResult.timeout) {
-          status = 'TLE'
-          message = '超出时间限制'
-        } else if (execResult.memoryExceeded) {
-          status = 'MLE'
-          message = '超出内存限制'
-        } else if (execResult.runtimeError) {
-          status = 'RE'
-          message = execResult.error || '运行时错误'
-        } else {
-          // 程序正常完成，比较输出
-          userOutput = execResult.output || ''
-          const cmp = await compareOutput({
-            userOutput,
-            expectedOutput: tc.output,
-            fullScore: 100, // pretest 不计分，固定 100 用于判断 AC/WA
-            comparisonMode,
-            realPrecision,
-          })
-          status = cmp.status
-          message = cmp.message
-          if (status === 'AC') passed++
+        try {
+          if (execResult.cannotStart) {
+            status = 'CSP'
+            message = execResult.error || '无法启动程序'
+          } else if (execResult.timeout) {
+            status = 'TLE'
+            message = '超出时间限制'
+          } else if (execResult.outputLimitExceeded) {
+            status = 'OLE'
+            message = execResult.error || '超出输出限制'
+          } else if (execResult.memoryExceeded) {
+            status = 'MLE'
+            message = '超出内存限制'
+          } else if (execResult.runtimeError) {
+            status = 'RE'
+            message = execResult.error || '运行时错误'
+          } else {
+            userOutput = execResult.output || ''
+            await new Promise<void>((r) => setImmediate(r))
+            const cmp = await compareOutput({
+              userOutputPath: execResult.artifacts?.outputPath,
+              userOutput: execResult.artifacts?.outputPath ? undefined : userOutput,
+              expectedOutput: tc.output,
+              fullScore: 100,
+              comparisonMode,
+              realPrecision,
+            })
+            status = cmp.status
+            message = cmp.message
+          }
+        } finally {
+          await cleanupExecuteArtifacts(execResult.artifacts)
         }
 
-        maxTime = Math.max(maxTime, execResult.time)
-        maxMemory = Math.max(maxMemory, execResult.memory)
-
-        baseResult.results.push({
+        return {
           testId: tc.id,
           status,
           time: execResult.time,
           memory: execResult.memory,
-          // 截断输出，防止前端展示溢出（项目约束：stderr 类输出截断 2000 字符）
           userOutput: userOutput.length > 8000 ? userOutput.slice(0, 8000) + '\n[输出过长，已截断]' : userOutput,
           expectedOutput: tc.output.length > 8000 ? tc.output.slice(0, 8000) + '\n[输出过长，已截断]' : tc.output,
           message,
-        })
+          skipped: false,
+        }
       } catch (err) {
         logger.error('pretest 单测点执行错误', err)
-        baseResult.results.push({
+        return {
           testId: tc.id,
-          status: 'SE',
+          status: 'SE' as ResultState,
           time: 0,
           memory: 0,
           userOutput: '',
           expectedOutput: tc.output,
           message: err instanceof Error ? err.message : '系统错误',
-        })
+          skipped: false,
+        }
       }
+    })
+
+    let maxTime = 0
+    let maxMemory = 0
+    let passed = 0
+    for (const r of caseResults) {
+      if (r.skipped) continue
+      baseResult.results.push({
+        testId: r.testId,
+        status: r.status,
+        time: r.time,
+        memory: r.memory,
+        userOutput: r.userOutput,
+        expectedOutput: r.expectedOutput,
+        message: r.message,
+      })
+      maxTime = Math.max(maxTime, r.time)
+      maxMemory = Math.max(maxMemory, r.memory)
+      if (r.status === 'AC') passed++
     }
 
-    // 汇总状态：全部通过为 AC，否则取第一个失败样例的状态
+    // 汇总：全部样例 AC 才是 AC；fail-fast 跳过的不计入 results
     if (passed === testCases.length) {
       baseResult.status = 'AC'
     } else {
@@ -219,6 +245,7 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
       baseResult.status = firstFailed?.status || 'WA'
     }
     baseResult.passedTests = passed
+    baseResult.totalTests = testCases.length
     baseResult.time = maxTime
     baseResult.memory = maxMemory
   } catch (err) {

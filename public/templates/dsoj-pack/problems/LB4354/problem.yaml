@@ -1,0 +1,15 @@
+schema_version: 2
+title: '[GESP202506 一级] 假期阅读'
+problem_number: LB4354
+luogu_pid: B4354
+difficulty: 入门
+tags:
+- '2025'
+- 分支结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

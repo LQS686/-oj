@@ -146,7 +146,7 @@
 ```bash
 cd /www/wwwroot
 git clone https://gitee.com/carefree-old-man/dashan-oj.git
-cd oj-platform
+cd dashan-oj
 ```
 
 ---
@@ -303,7 +303,8 @@ docker builder prune -af --filter "until=168h"   # 仅清理 7 天前的 build c
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 80/443 端口冲突        | 检查是否有其他进程占用：`lsof -i :80`                                                                                                                           |
 | Docker 镜像拉取失败    | 脚本会自动配置 Docker 镜像加速器（docker.1ms.run + docker.xuanyuan.me），如仍失败可在 `/etc/docker/daemon.json` 中更换加速地址后执行 `systemctl restart docker` |
-| MongoDB 副本集未初始化 | `docker compose logs mongo` 查看日志，keyfile 由容器自动生成无需手动管理                                                                                        |
+| MongoDB 副本集未初始化 | `docker compose logs mongo`；确认项目根存在 `mongo-keyfile`（`bt-deploy.sh` 会生成并挂载到容器） |
+| `mongo-keyfile: no such file` | 先执行部署脚本生成 keyfile，或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile` |
 | 构建超过 10 分钟       | 首次构建较慢，后续升级仅增量构建                                                                                                                                |
 | API 返回 502           | 等待 40 秒健康检查通过后刷新                                                                                                                                    |
 

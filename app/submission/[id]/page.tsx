@@ -21,6 +21,7 @@ import {
   History,
   Target,
   Loader2,
+  Download,
 } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText, getDifficultyClass } from '@/lib/status'
@@ -37,6 +38,7 @@ import {
   isNonFinalSubmissionStatus,
   SubmissionStatus,
 } from '@/lib/constants/submission-status'
+import { downloadFirstWaTestCase, findFirstWaIndex } from '@/lib/submission/wa-download'
 
 interface TestResult {
   testId: string
@@ -147,7 +149,19 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function TestPointRow({ result, index }: { result: TestResult; index: number }) {
+function TestPointRow({
+  result,
+  index,
+  canDownloadWa,
+  downloading,
+  onDownloadWa,
+}: {
+  result: TestResult
+  index: number
+  canDownloadWa?: boolean
+  downloading?: boolean
+  onDownloadWa?: () => void
+}) {
   const isPass = isAcceptedStatus(result.status)
   const judging = isNonFinalSubmissionStatus(result.status)
   const hasMessage = !!result.message
@@ -163,32 +177,50 @@ function TestPointRow({ result, index }: { result: TestResult; index: number }) 
             : 'border-error/25 bg-error/5'
       }`}
     >
-      <button
-        type="button"
-        className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left"
-        onClick={() => hasMessage && setExpanded((v) => !v)}
-        disabled={!hasMessage}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          {judging ? (
-            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin shrink-0" />
-          ) : (
-            getTestStatusIcon(result.status)
-          )}
-          <span className="text-sm font-medium text-foreground">#{index + 1}</span>
-          <span className="text-xs text-muted-foreground truncate">{getStatusText(result.status)}</span>
-        </div>
-        <div className="flex items-center gap-3 text-xs font-mono tabular-nums text-muted-foreground shrink-0">
-          <span>{judging ? '—' : formatTime(result.time)}</span>
-          <span>{judging ? '—' : formatMemory(result.memory)}</span>
-          {hasMessage &&
-            (expanded ? (
-              <ChevronDown className="w-3.5 h-3.5" />
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className="flex-1 min-w-0 flex items-center justify-between gap-3 px-3 py-2 text-left"
+          onClick={() => hasMessage && setExpanded((v) => !v)}
+          disabled={!hasMessage}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {judging ? (
+              <Loader2 className="w-4 h-4 text-muted-foreground animate-spin shrink-0" />
             ) : (
-              <ChevronRight className="w-3.5 h-3.5" />
-            ))}
-        </div>
-      </button>
+              getTestStatusIcon(result.status)
+            )}
+            <span className="text-sm font-medium text-foreground">#{index + 1}</span>
+            <span className="text-xs text-muted-foreground truncate">{getStatusText(result.status)}</span>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-mono tabular-nums text-muted-foreground shrink-0">
+            <span>{judging ? '—' : formatTime(result.time)}</span>
+            <span>{judging ? '—' : formatMemory(result.memory)}</span>
+            {hasMessage &&
+              (expanded ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              ))}
+          </div>
+        </button>
+        {canDownloadWa && (
+          <button
+            type="button"
+            className="shrink-0 mr-2 btn btn-outline text-xs py-1 px-2 gap-1"
+            disabled={downloading}
+            onClick={() => onDownloadWa?.()}
+            title="下载第一个 WA 测试点"
+          >
+            {downloading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            下载
+          </button>
+        )}
+      </div>
       {expanded && result.message && (
         <pre className="mx-3 mb-2.5 text-xs text-muted-foreground whitespace-pre-wrap bg-muted/80 border border-border rounded-md p-2 max-h-40 overflow-auto custom-scrollbar">
           {result.message}
@@ -208,6 +240,8 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const [submissionHistory, setSubmissionHistory] = useState<SubmissionHistoryItem[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [waDownloading, setWaDownloading] = useState(false)
+  const [waDownloadError, setWaDownloadError] = useState('')
   const isRefreshingRef = useRef(false)
 
   const submissionTabTitle = submission?.problem?.title
@@ -370,6 +404,26 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const codeLines = submission.code ? submission.code.split('\n').length : 0
   const showTests =
     judging || !!(submission.testResults && submission.testResults.length > 0)
+  const firstWaIndex = findFirstWaIndex(submission.testResults)
+  const canDownloadWa =
+    firstWaIndex >= 0 &&
+    !!user &&
+    (submission.user.id === user.id ||
+      user.role === 'SYSTEM_ADMIN' ||
+      user.role === 'ADMIN')
+
+  const handleDownloadWa = async () => {
+    if (waDownloading) return
+    setWaDownloadError('')
+    setWaDownloading(true)
+    try {
+      await downloadFirstWaTestCase(submission.id)
+    } catch (err) {
+      setWaDownloadError(err instanceof Error ? err.message : '下载失败')
+    } finally {
+      setWaDownloading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -527,6 +581,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                       {submission.passedTests}/{submission.totalTests}
                     </span>
                   </div>
+                  {waDownloadError && (
+                    <p className="mb-2 text-xs text-error">{waDownloadError}</p>
+                  )}
                   <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar">
                     {submission.testResults && submission.testResults.length > 0 ? (
                       submission.testResults.map((result, index) => (
@@ -534,6 +591,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                           key={result.testId || `test-${index}`}
                           result={result}
                           index={index}
+                          canDownloadWa={canDownloadWa && index === firstWaIndex}
+                          downloading={waDownloading}
+                          onDownloadWa={() => void handleDownloadWa()}
                         />
                       ))
                     ) : (

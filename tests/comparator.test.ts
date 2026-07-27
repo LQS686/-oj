@@ -180,4 +180,53 @@ describe('compareOutput - 边界', () => {
     const r = await cmp(user, expected, 'default')
     expect(r.status).toBe('WA')
   })
+
+  it('userOutputPath 文件流比对 → AC', async () => {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const os = await import('os')
+    const tmp = path.join(os.tmpdir(), `dsoj-cmp-${Date.now()}.txt`)
+    await fs.writeFile(tmp, '2\n3\n5\n', 'utf-8')
+    try {
+      const r = await compareOutput({
+        userOutputPath: tmp,
+        expectedOutput: '2\n3\n5\n',
+        fullScore: FULL,
+        comparisonMode: 'default',
+      })
+      expect(r.status).toBe('AC')
+      expect(r.score).toBe(FULL)
+    } finally {
+      await fs.unlink(tmp).catch(() => {})
+    }
+  })
+
+  it('双文件同步比对百万行级 → AC 且较快', async () => {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const os = await import('os')
+    const n = 100_000
+    const body = Array.from({ length: n }, (_, i) => String(i)).join('\n') + '\n'
+    const dir = os.tmpdir()
+    const user = path.join(dir, `dsoj-u-${Date.now()}.txt`)
+    const exp = path.join(dir, `dsoj-e-${Date.now()}.txt`)
+    await fs.writeFile(user, body)
+    await fs.writeFile(exp, body)
+    try {
+      const t0 = Date.now()
+      const r = await compareOutput({
+        userOutputPath: user,
+        expectedOutputPath: exp,
+        fullScore: FULL,
+        comparisonMode: 'default',
+      })
+      const ms = Date.now() - t0
+      expect(r.status).toBe('AC')
+      // 异步逐行路径在 1e5 行会远慢于此；同步路径应在数秒内
+      expect(ms).toBeLessThan(5000)
+    } finally {
+      await fs.unlink(user).catch(() => {})
+      await fs.unlink(exp).catch(() => {})
+    }
+  })
 })

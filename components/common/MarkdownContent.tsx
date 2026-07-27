@@ -1,3 +1,5 @@
+'use client'
+
 import { useMemo, type ComponentPropsWithoutRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
@@ -5,10 +7,9 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import rehypeSanitize from 'rehype-sanitize'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import type { ExtraProps } from 'react-markdown'
 import { markdownSanitizeSchema } from '@/lib/markdown/sanitize-schema'
+import MarkdownCodeBlock from '@/components/common/MarkdownCodeBlock'
 
 interface MarkdownContentProps {
  content: string
@@ -60,37 +61,19 @@ export default function MarkdownContent({
  [rehypeSanitize, markdownSanitizeSchema],
  ]}
  components={{
+ // 去掉默认 <pre> 外壳，避免与 SyntaxHighlighter 叠成「深色外框 + 浅色内容」
+ pre({ children }) {
+  return <>{children}</>
+ },
  code({className, children, ...props}: ComponentPropsWithoutRef<'code'> & ExtraProps) {
  const match = /language-(\w+)/.exec(className || '')
- const language = match ? match[1] : ''
+ const language = match ? match[1] : 'text'
  const codeString = String(children).replace(/\n$/, '')
+ // 有语言标记、或多行内容 → 按块级代码渲染（含无语言围栏 ```）
+ const isBlock = Boolean(match) || codeString.includes('\n')
 
- if (match) {
-  // 使用浅色主题（oneLight），与题面浅色背景融合
-  // 避免 vscDarkPlus 深色主题在浅色题面中突兀（用户反馈）
-  try {
-  return (
-  <SyntaxHighlighter
-  style={oneLight}
-  language={language}
-  PreTag="div"
-  className="rounded-lg text-sm"
-  >
-  {codeString}
-  </SyntaxHighlighter>
-  )
-  } catch {
-  return (
-  <SyntaxHighlighter
-  style={oneLight}
-  language="text"
-  PreTag="div"
-  className="rounded-lg text-sm"
-  >
-  {codeString}
-  </SyntaxHighlighter>
-  )
-  }
+ if (isBlock) {
+  return <MarkdownCodeBlock language={language} code={codeString} />
  }
 
  return (

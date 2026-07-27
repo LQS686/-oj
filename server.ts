@@ -13,96 +13,25 @@ import dotenv from 'dotenv'
 import { logger } from './lib/logger'
 import { saveChunk, isValidUploadId } from './lib/upload'
 import { assertAvatarUploadOwner } from './lib/avatar-upload-registry'
-import { getUserFromRequest } from './lib/auth'
 import { ApiError } from './lib/api/withApi'
 import jwt from 'jsonwebtoken'
 import { validateEnvironment } from './lib/env'
 import { formatStartupBanner } from './lib/build-info'
+import {
+  readBodyWithLimit,
+  parseMultipart,
+  extractMultipartBoundary,
+} from './lib/http/multipart'
+import { canAccessAdmin } from './lib/permissions'
+import { getCachedUser } from './lib/api/handler'
 
 /** 单个分片大小上限：与 chunk 路由一致 */
 const MAX_CHUNK_SIZE = 2 * 1024 * 1024
 const MAX_CHUNK_INDEX = 1000
 const MAX_BODY_SIZE = 3 * 1024 * 1024 // 比 MAX_CHUNK_SIZE 多 1MB 余量
+/** 题库导入 multipart 上限（与 IMPORT_MAX_FILE_BYTES 对齐，另留表单余量） */
+const MAX_IMPORT_BODY_SIZE = 51 * 1024 * 1024
 
-/**
- * 从 IncomingMessage 读取完整 body（带大小限制，防止 OOM）
- */
-function readBodyWithLimit(req: IncomingMessage, maxBytes: number): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
-    let total = 0
-    req.on('data', (chunk: Buffer) => {
-      total += chunk.length
-      if (total > maxBytes) {
-        req.destroy()
-        reject(new Error('PAYLOAD_TOO_LARGE'))
-        return
-      }
-      chunks.push(chunk)
-    })
-    req.on('end', () => resolve(Buffer.concat(chunks)))
-    req.on('error', reject)
-  })
-}
-
-/**
- * 极简 multipart 解析（Node 原生 + 字符串搜索）
- * 输入：完整 body Buffer + boundary
- * 输出：[{ name, filename, contentType, data }]
- */
-function parseMultipart(body: Buffer, boundary: string): Array<{
-  name: string
-  filename: string | null
-  contentType: string | null
-  data: Buffer
-}> {
-  const sep = Buffer.from(`--${boundary}`)
-  const parts: Array<{
-    name: string
-    filename: string | null
-    contentType: string | null
-    data: Buffer
-  }> = []
-
-  let cursor = 0
-  while (cursor < body.length) {
-    const start = body.indexOf(sep, cursor)
-    if (start === -1) break
-    // 跳过 boundary 后的 \r\n
-    let headerStart = start + sep.length
-    if (body[headerStart] === 0x2d && body[headerStart + 1] === 0x2d) {
-      // -- 结束标记
-      break
-    }
-    if (body[headerStart] === 0x0d && body[headerStart + 1] === 0x0a) {
-      headerStart += 2
-    }
-    const headerEnd = body.indexOf(Buffer.from('\r\n\r\n'), headerStart)
-    if (headerEnd === -1) break
-    const nextStart = body.indexOf(sep, headerEnd + 4)
-    if (nextStart === -1) break
-    // data 结束位置：nextStart 之前有 \r\n
-    const dataEnd = nextStart - 2
-
-    const headerBuf = body.subarray(headerStart, headerEnd).toString('utf8')
-    const data = body.subarray(headerEnd + 4, dataEnd)
-
-    const nameMatch = headerBuf.match(/name="([^"]+)"/i)
-    const filenameMatch = headerBuf.match(/filename="([^"]*)"/i)
-    const ctMatch = headerBuf.match(/Content-Type:\s*([^\r\n]+)/i)
-
-    if (nameMatch) {
-      parts.push({
-        name: nameMatch[1],
-        filename: filenameMatch ? filenameMatch[1] : null,
-        contentType: ctMatch ? ctMatch[1].trim() : null,
-        data,
-      })
-    }
-    cursor = nextStart
-  }
-  return parts
-}
 
 /**
  * 前置路由：直接用 Node 原生方式服务 /uploads/ 静态文件。
@@ -205,8 +134,7 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
     return true
   }
 
-  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i)
-  const boundary = boundaryMatch?.[1] || boundaryMatch?.[2]
+  const boundary = extractMultipartBoundary(contentType)
   if (!boundary) {
     writeJson(res, 400, { success: false, code: 'INVALID_BOUNDARY', error: 'multipart boundary 缺失' })
     return true
@@ -273,31 +201,188 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
 /**
  * 从 IncomingMessage 解析当前登录用户（与 getUserFromRequest 等价但接受 Node 原生 req）
  */
-async function getUserFromRawRequest(req: IncomingMessage): Promise<{ id: string; role?: string } | null> {
-  // 1. 从 Authorization 头解析 Bearer token
+async function getUserFromRawRequest(
+  req: IncomingMessage
+): Promise<{ id: string; role?: string; tokenVersion?: number } | null> {
   const auth = req.headers['authorization']
   if (auth && auth.startsWith('Bearer ')) {
     try {
       const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET!) as any
-      if (payload?.userId) return { id: payload.userId, role: payload.role }
+      if (payload?.userId) {
+        return {
+          id: payload.userId,
+          role: payload.role,
+          tokenVersion: payload.tokenVersion,
+        }
+      }
     } catch {
       // ignore
     }
   }
-  // 2. 从 cookie 解析 token
   const cookieHeader = req.headers['cookie'] || ''
   const tokenMatch = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/)
   if (tokenMatch) {
     try {
       const payload = jwt.verify(decodeURIComponent(tokenMatch[1]), process.env.JWT_SECRET!) as any
-      if (payload?.userId) return { id: payload.userId, role: payload.role }
+      if (payload?.userId) {
+        return {
+          id: payload.userId,
+          role: payload.role,
+          tokenVersion: payload.tokenVersion,
+        }
+      }
     } catch {
       // ignore
     }
   }
-  // 3. 尝试 getUserFromRequest（NextRequest 形式，需要构造一个伪 request）
-  //    简化处理：返回 null，让上层走完整 Next.js 路径
   return null
+}
+
+/** 自定义 server 直通写接口的简易 CSRF：Origin/Referer host 须与 Host 一致 */
+function isAllowedOriginRaw(req: IncomingMessage): boolean {
+  const host = req.headers['host']
+  if (!host) return false
+  const origin = req.headers['origin']
+  const referer = req.headers['referer']
+  if (origin) {
+    try {
+      return new URL(origin).host === host
+    } catch {
+      return false
+    }
+  }
+  if (referer) {
+    try {
+      return new URL(referer).host === host
+    } catch {
+      return false
+    }
+  }
+  // 同源表单上传通常带 Origin；缺失则拒绝写操作
+  return false
+}
+
+/**
+ * 直接处理题库批量导入 multipart（绕开 Next.js 路由层）
+ * 与头像分片同因：大 ZIP + formData/body clone 会触发
+ * 「Response body object should not be disturbed or locked」。
+ */
+async function handleProblemImportDirect(
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<boolean> {
+  if (!isAllowedOriginRaw(req)) {
+    writeJson(res, 403, { success: false, code: 'CSRF_REJECTED', error: '跨站请求被拒绝' })
+    return true
+  }
+
+  const contentType = (req.headers['content-type'] as string) || ''
+  if (!contentType.includes('multipart/form-data')) {
+    // 非 multipart（JSON）仍走 Next.js 路由
+    return false
+  }
+
+  const session = await getUserFromRawRequest(req)
+  if (!session) {
+    writeJson(res, 401, { success: false, code: 'UNAUTHORIZED', error: '未登录' })
+    return true
+  }
+
+  const user = await getCachedUser(session.id, session.tokenVersion)
+  if (!user || !canAccessAdmin(user)) {
+    writeJson(res, 403, { success: false, code: 'FORBIDDEN', error: '需要管理员权限' })
+    return true
+  }
+
+  let body: Buffer
+  try {
+    body = await readBodyWithLimit(req, MAX_IMPORT_BODY_SIZE)
+  } catch (e: any) {
+    if (e?.message === 'PAYLOAD_TOO_LARGE') {
+      writeJson(res, 413, {
+        success: false,
+        code: 'FILE_TOO_LARGE',
+        error: '文件大小超过 50MB 限制',
+      })
+      return true
+    }
+    logger.error('读取题库导入 body 失败', e instanceof Error ? e : new Error(String(e)))
+    writeJson(res, 500, { success: false, code: 'READ_FAILED', error: '读取请求失败' })
+    return true
+  }
+
+  const boundary = extractMultipartBoundary(contentType)
+  if (!boundary) {
+    writeJson(res, 400, { success: false, code: 'INVALID_BOUNDARY', error: 'multipart boundary 缺失' })
+    return true
+  }
+
+  try {
+    const { executeProblemImport, VALID_IMPORT_FORMATS, IMPORT_MAX_FILE_BYTES } =
+      await import('./lib/problem/import/execute')
+
+    const parts = parseMultipart(body, boundary)
+    const formatPart = parts.find((p) => p.name === 'format')
+    const optionsPart = parts.find((p) => p.name === 'options')
+    const filePart = parts.find((p) => p.name === 'file')
+
+    const formatStr = formatPart?.data.toString('utf8').trim() || ''
+    if (!formatStr || !(VALID_IMPORT_FORMATS as string[]).includes(formatStr)) {
+      writeJson(res, 400, {
+        success: false,
+        code: 'INVALID_FORMAT',
+        error: `缺少或无效的 format 参数，支持: ${VALID_IMPORT_FORMATS.join(', ')}`,
+      })
+      return true
+    }
+
+    let rawOptions: unknown = {}
+    if (optionsPart) {
+      try {
+        rawOptions = JSON.parse(optionsPart.data.toString('utf8'))
+      } catch {
+        writeJson(res, 400, {
+          success: false,
+          code: 'INVALID_OPTIONS',
+          error: 'options 不是合法 JSON',
+        })
+        return true
+      }
+    }
+
+    let content: Buffer | null = null
+    if (formatStr !== 'codeforces') {
+      if (!filePart || filePart.data.length === 0) {
+        writeJson(res, 400, { success: false, code: 'NO_FILE', error: '未选择文件' })
+        return true
+      }
+      if (filePart.data.length > IMPORT_MAX_FILE_BYTES) {
+        writeJson(res, 413, {
+          success: false,
+          code: 'FILE_TOO_LARGE',
+          error: '文件大小超过 50MB 限制',
+        })
+        return true
+      }
+      content = filePart.data
+    }
+
+    const result = await executeProblemImport({
+      format: formatStr as any,
+      content,
+      rawOptions,
+      authorId: user.id,
+    })
+    writeJson(res, 200, { success: true, data: result })
+  } catch (e) {
+    if (e instanceof ApiError) {
+      writeJson(res, e.status, { success: false, code: e.code, error: e.message })
+      return true
+    }
+    logger.error('题库导入直通失败', e instanceof Error ? e : new Error(String(e)))
+    writeJson(res, 500, { success: false, code: 'IMPORT_FAILED', error: '导入失败' })
+  }
+  return true
 }
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
@@ -333,6 +418,16 @@ app.prepare().then(async () => {
       // 在 server.ts 中用 Node 原生方式处理，绕开 Next.js 路由层。
       if (req.method === 'POST' && req.url === '/api/users/avatar/upload/chunk') {
         const handled = await handleAvatarChunkDirect(req, res)
+        if (handled) return
+      }
+
+      // 前置路由：题库批量导入 multipart（大 ZIP）绕开 Next.js body 适配层
+      if (
+        req.method === 'POST' &&
+        (req.url === '/api/admin/problems/import' ||
+          req.url?.startsWith('/api/admin/problems/import?'))
+      ) {
+        const handled = await handleProblemImportDirect(req, res)
         if (handled) return
       }
 

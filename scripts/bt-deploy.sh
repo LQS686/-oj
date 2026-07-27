@@ -63,6 +63,11 @@ if [ ! -f ".env" ]; then
   fi
 
   PASS=$(openssl rand -base64 24 | tr -d '+/=' | head -c 24)
+  # HTTP（含 IP 测试）必须关闭 Secure Cookie，否则无法登录
+  FORCE_SECURE=true
+  if [[ "$FRONTEND_URL" == http://* ]]; then
+    FORCE_SECURE=false
+  fi
 
   cat > .env <<EOF
 NODE_ENV=production
@@ -76,7 +81,7 @@ NEXT_PUBLIC_API_URL=${FRONTEND_URL}
 NEXT_PUBLIC_BASE_URL=${FRONTEND_URL}
 USE_DOCKER=false
 TRUSTED_PROXIES=1
-FORCE_SECURE_COOKIE=true
+FORCE_SECURE_COOKIE=${FORCE_SECURE}
 JUDGE_COMPILE_TIMEOUT=20000
 JUDGE_JOB_TIMEOUT=300
 JUDGE_EXTRA_TIME_RATIO=0.1
@@ -89,7 +94,7 @@ MONGO_APP_USER=ojuser
 MONGO_APP_PASSWORD=${PASS}
 REDIS_PASSWORD=${PASS}
 EOF
-  info ".env 已生成"
+  info ".env 已生成（FORCE_SECURE_COOKIE=${FORCE_SECURE}）"
 else
   info ".env 已存在，跳过生成"
 fi
@@ -146,16 +151,25 @@ docker compose up -d
 # 6. 等待健康检查
 # ============================================================
 echo -n "等待服务就绪"
-for i in $(seq 1 30); do
-  if curl -sf http://localhost:3000/api/health/db > /dev/null 2>&1; then
+ready=0
+for i in $(seq 1 40); do
+  if curl -sf http://localhost:3000/healthcheck-static >/dev/null 2>&1; then
     echo ""
-    info "应用已就绪"
+    info "应用已就绪（/healthcheck-static）"
+    ready=1
     break
   fi
   echo -n "."
-  sleep 4
+  sleep 3
 done
 echo ""
+if [ "$ready" -ne 1 ]; then
+  warn "应用尚未就绪，请查看: docker compose logs -f app"
+elif curl -sf http://localhost:3000/api/health/db >/dev/null 2>&1; then
+  info "数据库健康检查通过（/api/health/db）"
+else
+  warn "数据库尚未就绪: curl http://localhost:3000/api/health/db"
+fi
 
 # ============================================================
 # 7. 输出宝塔 Nginx 配置模板（仅首次）

@@ -7,10 +7,9 @@ import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 import { CompileState } from './types'
 
-// 编译超时（毫秒）：Windows 下 MinGW g++ 首次启动较慢（含 Defender 扫描），需更宽松；
-// Linux 下 runner.sh 的 cpu_sec=15 为硬限制，exec timeout 略大作为兜底
+// 编译超时（毫秒）：Linux runner.sh 的 cpu_sec=15 为硬限制，exec timeout 略大作为兜底
 const DEFAULT_COMPILE_TIMEOUT = parseInt(
-  process.env.JUDGE_COMPILE_TIMEOUT || (process.platform === 'win32' ? '30000' : '20000'),
+  process.env.JUDGE_COMPILE_TIMEOUT || '20000',
   10,
 )
 
@@ -37,62 +36,54 @@ export interface CompileResult {
 // JUDGE_ENABLE_UBSAN 环境变量控制是否启用 UBSanitizer（-fsanitize=undefined）：
 //   - 'true'：强制启用（需确保环境提供 libubsan，Linux gcc 默认静态链接）
 //   - 'false'：强制禁用
-//   - 未设置：自动判断 —— 仅在 Linux 下启用（生产容器环境）
-//
-// 不在 Windows 本地模式默认启用的原因：
-//   MinGW 默认不提供 libubsan（-lubsan: No such file or directory），
-//   学员/开发者在 Windows 本地编译会失败。UBSan 仅在 Linux 环境
-//   （Docker 容器内或 Linux 宿主）下启用。
+//   - 未设置：默认关闭（对齐洛谷 / HOJ / Hydro 教学 OJ 计时）
 //
 // 启用后：
 //   - 编译时加 -fsanitize=undefined -fno-sanitize-recover=all
 //   - 运行时需链接 libubsan（gcc 默认静态链接，Alpine 需 apk add libubsan）
 //   - UBSanitizer 有 2-3x 内存开销，需相应调大 memoryLimit
+//
+// 竞赛严检可设 JUDGE_ENABLE_UBSAN=true（建议与 ASan 一并开启）。
 const ENABLE_UBSAN = (() => {
   const flag = process.env.JUDGE_ENABLE_UBSAN
   if (flag === 'true') return true
   if (flag === 'false') return false
-  // 默认：Linux 环境启用（生产容器 / Linux 宿主）
-  // 不依赖 USE_DOCKER：容器内模式（USE_DOCKER=false）仍是 Linux 环境，应启用
-  return process.platform === 'linux'
+  // 默认关闭：教学 OJ 计时接近洛谷；严检显式开
+  return false
 })()
 
 // JUDGE_ENABLE_ASAN 环境变量控制是否启用 AddressSanitizer（-fsanitize=address）：
 //   - 'true'：强制启用（需 libasan，Linux gcc 默认提供）
 //   - 'false'：强制禁用
-//   - 未设置：自动判断 —— 仅在 Linux 下启用（生产容器环境）
+//   - 未设置：默认关闭（对齐洛谷 / HOJ / Hydro；避免 2–5× 减速与 shadow 内存）
 //
 // 启用后：
 //   - 编译时加 -fsanitize=address -fno-sanitize-recover=all
 //   - 检测：堆/栈数组越界、use-after-free、栈缓冲区溢出（UBSan 检测不到的场景）
 //   - 与 UBSan 可同时启用（-fsanitize=address,undefined）
 //   - 内存开销：评测时实际内存 = 题目 memoryLimit × 2-3，需相应调大 memoryLimit
-//   - 性能开销：2-5x 减速
+//   - 性能开销：2-5x 减速；且与 ulimit -v 不兼容
 //
-// 按竞赛 OJ 标准（Codeforces / AtCoder）默认开启 ASan+UBSan：
-//   - Codeforces 在编译参数中加 -fsanitize=address,undefined
-//   - AtCoder 同样默认启用 ASan+UBSan
-//   - 这是检测"数组越界""use-after-free"等 UB 的最严格方案
-// 教学型 OJ（HOJ/Hydro/洛谷）默认不开 sanitizer，依赖测试数据判 WA；
-// 本项目作为教学+竞赛混合场景，按竞赛标准默认开启 ASan 以严格检测数组越界。
-//
-// 不在 Windows 本地模式默认启用的原因：
-//   MinGW 默认不提供 libasan，学员/开发者在 Windows 本地编译会失败。
-//   ASan 仅在 Linux 环境（Docker 容器内或 Linux 宿主）下启用。
-//   Windows 本地模式仍受 -ftrivial-auto-var-init=pattern + -fstack-protector-all
-//   + -D_FORTIFY_SOURCE=2 兜底，未初始化/栈溢出/libc 越界仍可检测。
-//
-// 注意：ASan 启用后题目默认 memoryLimit=128MB 可能不足以容纳 ASan 自身开销，
-//   建议对启用 ASan 的题目把 memoryLimit 调至 256MB+。
+// 教学型 OJ（洛谷/HOJ/Hydro）默认不开 sanitizer，依赖测试数据判 WA。
+// 竞赛严检（Codeforces / AtCoder 风格）请显式设 JUDGE_ENABLE_ASAN=true，
+// 并把题目 memoryLimit 调至 256MB+。
+// Linux 无 ASan 时仍靠 -ftrivial-auto-var-init / stack-protector / FORTIFY。
 const ENABLE_ASAN = (() => {
   const flag = process.env.JUDGE_ENABLE_ASAN
   if (flag === 'true') return true
   if (flag === 'false') return false
-  // 默认：Linux 环境启用（生产容器 / Linux 宿主，对齐竞赛 OJ 标准）
-  // 不依赖 USE_DOCKER：容器内模式（USE_DOCKER=false）仍是 Linux 环境，应启用
-  return process.platform === 'linux'
+  return false
 })()
 
+/** 供 executor 决定是否对 runner 启用 ulimit -v（ASan 开启时不可用） */
+export function isJudgeAsanEnabled(): boolean {
+  return ENABLE_ASAN
+}
+
+/** ASan 未启用时可对虚拟内存做硬限（DSOJ_FORCE_ULIMIT_V） */
+export function shouldForceUlimitV(): boolean {
+  return !ENABLE_ASAN
+}
 const languageConfigs: Record<string, {
   extension: string
   compileCommand?: (source: string, output: string) => string
@@ -135,11 +126,9 @@ const languageConfigs: Record<string, {
  *       1. 脏数据代码（int c; c+=a; c+=b;）的 c 不会是随机值，
  *          而是稳定的 0xFEFEFEFE + a + b（gcc），几乎必然判 WA（不再靠运气 AC）
  *       2. 合法代码（已初始化变量）不受影响
- *       3. 即使未启用 UBSan（Windows 本地模式），也能稳定检测这类 UB
- *     这是 gcc 下检测未初始化读取 UB 的最有效方案，比 UBSan 的未初始化
- *     检测更可靠。完整检测需 Clang 的 -fsanitize=memory，当前项目用 gcc 不适用。
+ *       3. 即使未启用 UBSan，也能让脏读更稳定地 WA
+ *     这是 gcc 下检测未初始化读取 UB 的有效方案。
  *     需要 gcc 12+，Alpine 3.18+ / Debian 12+ 的 gcc 均已支持。
- *     实测：MinGW gcc 13+ 也支持，Windows 本地模式同样生效。
  *   - -fwrapv：有符号整数溢出定义为回绕（二补码），避免优化器把
  *     "依赖有符号溢出的 UB 代码"优化成不可预期的结果。让溢出行为可预测。
  *   - -fstack-protector-all：为所有函数插入栈 canary（即使函数无栈缓冲区）。
@@ -201,8 +190,7 @@ function buildCompileArgs(
   ]
 
   // Sanitizer 组合：ASan + UBSan 可同时启用（-fsanitize=address,undefined）
-  // - 单独 UBSan：检测 UB（默认开启，Linux+Docker 环境）
-  // - 单独 ASan：检测数组越界（需 JUDGE_ENABLE_ASAN=true，性能开销大）
+  // - 默认均关闭（洛谷式计时）；JUDGE_ENABLE_*=true 显式开启
   // - 两者同时：覆盖最全，但内存/性能开销叠加
   if (ENABLE_UBSAN && ENABLE_ASAN) {
     args.push(
@@ -325,15 +313,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
       }
     }
 
-    // 编译代码
     let outputPath = join(tempDir, compiledBasename)
-
-    // 在Windows平台上，为C/C++编译的可执行文件添加.exe扩展名
-    if (process.platform === 'win32' && (language === 'cpp' || language === 'c')) {
-      outputPath += '.exe'
-    }
-
-    const compileCommand = config.compileCommand!(sourcePath, outputPath)
 
     // Linux 非容器模式下编译走 runner.sh 沙箱（限制内存/CPU/栈/文件描述符）
     const isLinux = process.platform === 'linux'
@@ -353,8 +333,8 @@ export async function compileCode(code: string, language: string): Promise<Compi
       // UBSanitizer / ASan 编译时需更大内存：
       //   - UBSan 静态链接开销 ~50MB
       //   - ASan 编译时插桩开销 ~100-200MB
-      // 默认 512MB，启用任一 sanitizer 提升至 768MB
-      const compileMemMb = (ENABLE_UBSAN || ENABLE_ASAN) ? '768' : '512'
+      // 默认 512MB；启用 sanitizer 时编译期内存显著更高，提到 2048MB
+      const compileMemMb = (ENABLE_UBSAN || ENABLE_ASAN) ? '2048' : '512'
       const compiler = language === 'c' ? 'gcc' : 'g++'
       const std = language === 'c' ? 'c11' : 'c++17'
       // 编译参数（不含 compiler 名称，由 runner.sh 单独传）
@@ -362,7 +342,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
       spawnCmd = 'bash'
       spawnArgs = [runnerPath, compileMemMb, '15', '64', compiler, ...compileArgs]
     } else {
-      // 非沙箱模式（Windows 或 Docker 模式）
+      // 非沙箱模式（Docker 容器内直接调用编译器）
       if (language === 'cpp') {
         spawnCmd = 'g++'
         spawnArgs = buildCompileArgs('g++', 'c++17', sourcePath, outputPath)

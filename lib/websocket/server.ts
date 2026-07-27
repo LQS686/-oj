@@ -180,6 +180,17 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     // joinPublicRoom 内部已做异常吞错。
     joinPublicRoom(socket)
 
+    // 根因修复：认证成功后立刻加入 user:{id}，不依赖客户端 emit('join')。
+    // 旧路径存在竞态——connection 里 await 认证期间 join 监听器尚未注册，
+    // 客户端 connect 后立刻 emit('join') 会被丢掉，房间为空，
+    // io.to(room).emit 仍“成功”但无人接收，弹窗永久停在「评测中」。
+    if (auth?.userId) {
+      const roomName = `user:${auth.userId}`
+      socket.join(roomName)
+      logger.info(`用户 ${auth.userId} 已自动加入房间: ${roomName}`)
+      socket.emit('joined', { userId: auth.userId, room: roomName })
+    }
+
     socket.use((packet, next) => {
       const [eventName, ...args] = packet
       const client = connectedClients.get(socket.id)
@@ -240,12 +251,13 @@ export function initWebSocketServer(httpServer: HTTPServer) {
         }
         
         const roomName = `user:${userId}`
-        socket.join(roomName)
-        logger.info(`用户 ${userId} 加入房间: ${roomName}`)
-        
+        const alreadyInRoom = socket.rooms.has(roomName)
+        if (!alreadyInRoom) {
+          socket.join(roomName)
+          logger.info(`用户 ${userId} 加入房间: ${roomName}`)
+        }
         client.userId = userId
         connectedClients.set(socket.id, client)
-        
         socket.emit('joined', { userId, room: roomName })
       } catch (error) {
         logger.error('❌ 处理 join 事件错误:', error)
@@ -459,12 +471,26 @@ export function emitSubmissionUpdate(userId: string, data: {
   const subRoom = submissionRoom(data.id)
   ioInstance.to(roomName).emit('submission:update', data)
   ioInstance.to(subRoom).emit('submission:update', data)
-  logger.info(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
-    id: data.id,
-    status: data.status,
-    score: data.score,
-    time: data.time,
-    memory: data.memory,
+
+  // 异步核对房间人数，便于发现「推了但无人在房」的回归
+  void ioInstance.in(roomName).fetchSockets().then((sockets) => {
+    logger.info(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
+      id: data.id,
+      status: data.status,
+      score: data.score,
+      time: data.time,
+      memory: data.memory,
+      roomSize: sockets.length,
+    })
+    if (sockets.length === 0) {
+      logger.warn(`⚠️  提交更新推送时用户房间为空: ${roomName}，客户端可能未入房`)
+    }
+  }).catch(() => {
+    logger.info(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
+      id: data.id,
+      status: data.status,
+      score: data.score,
+    })
   })
 }
 

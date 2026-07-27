@@ -6,10 +6,12 @@ import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 import { redistributeTestScores, deleteTestCaseFiles } from '@/lib/problem/testcase'
+import { invalidateProblemTestCaseCache } from '@/lib/judge/testcase-loader'
 import { trimAll, escapeHtml } from '@/lib/sanitize'
 import { ApiError } from '@/lib/api/withApi'
 import { logger } from '@/lib/logger'
 import { DIFFICULTIES, isValidDifficulty } from '@/lib/constants'
+import { purgeProblemDependents } from '@/lib/problem/purge-dependents'
 
 /* ============================================================================
  * 管理员视角：列出全部题目（含隐藏字段）/ 创建题目（含自动编号）
@@ -438,6 +440,7 @@ export async function updateAdminProblem(
 
   // 更新测试用例
   if (body.testCases && Array.isArray(body.testCases)) {
+    await invalidateProblemTestCaseCache(id)
     await prisma.testCase.deleteMany({ where: { problemId: id } })
     if (body.testCases.length > 0) {
       await prisma.testCase.createMany({
@@ -533,12 +536,8 @@ export async function deleteAdminProblem(
     })
   }
 
-  // 显式删除相关数据，解决外键约束问题
-  await prisma.submission.deleteMany({ where: { problemId: id } })
-  await prisma.solution.deleteMany({ where: { problemId: id } })
-  await prisma.contestProblem.deleteMany({ where: { problemId: id } })
-  await prisma.trainingProblem.deleteMany({ where: { problemId: id } })
-  await prisma.testCase.deleteMany({ where: { problemId: id } })
+  // 显式删除相关数据，解决外键约束问题（与批量删除共用级联清理）
+  await purgeProblemDependents([id])
   await prisma.problem.delete({ where: { id } })
 
   // 参考 Hydro 的"硬删 document + 软删 storage 文件"策略，

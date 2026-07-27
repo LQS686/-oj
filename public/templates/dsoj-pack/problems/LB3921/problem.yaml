@@ -1,0 +1,17 @@
+schema_version: 2
+title: '[GESP202312 一级] 小杨的考试'
+problem_number: LB3921
+luogu_pid: B3921
+difficulty: 入门
+tags:
+- 数学
+- '2023'
+- 顺序结构
+- 分支结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

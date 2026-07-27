@@ -4,7 +4,8 @@
  * 题目 / 作业 / 题单 共用的「提交 → 评测弹窗 → WS 收结果」流程。
  *
  * 约定：列表行 id、bindSubmission、WS payload.id 一律为主 Submission.id。
- * 结果只信任 WebSocket；连接/重连后对当前进行中的提交做一次状态同步（补断连窗口），无列表匹配、无周期性轮询。
+ * 结果以 WebSocket 为准；仅在断线重连并确认入房后，对「当前进行中」提交补一次权威状态
+ * （补上断连窗口内已发出的事件，不是周期性轮询兜底）。
  */
 
 import {
@@ -164,7 +165,7 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
     onFinalAppliedRef.current?.(result)
   }, [])
 
-  /** 连接/重连后：对当前进行中的提交拉一次权威状态（补上断连窗口内的事件） */
+  /** 断线重连并确认入房后：补上断连窗口内可能已发出的终态 */
   const syncCurrentSubmission = useCallback(async () => {
     const watchedId = currentSubmissionIdRef.current
     const epoch = submitEpochRef.current
@@ -199,7 +200,7 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
       })
       onRefreshRef.current?.()
     } catch {
-      // 同步失败由后续 WS 事件继续驱动
+      // 由后续 WS 事件继续驱动
     }
   }, [applyModalFinalResult])
 

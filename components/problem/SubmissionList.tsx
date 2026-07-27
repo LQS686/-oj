@@ -16,6 +16,7 @@ import {
   Code2,
   Copy,
   Check,
+  Download,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -32,6 +33,7 @@ import type { UserData } from '@/lib/api/auth'
 import { loginPath } from '@/lib/navigation'
 import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
 import type { SubmissionListRow } from '@/hooks/useSubmissionResultFlow'
+import { downloadFirstWaTestCase, findFirstWaIndex } from '@/lib/submission/wa-download'
 
 export type SubmissionListItem = SubmissionListRow
 
@@ -240,12 +242,15 @@ function ExpandedDetail({
   detailLoading: boolean
 }) {
   const [copied, setCopied] = useState(false)
+  const [waDownloading, setWaDownloading] = useState(false)
+  const [waDownloadError, setWaDownloadError] = useState('')
   const data = detail || submission
   const judging = isNonFinalSubmissionStatus(data.status)
   const isAc = isAcceptedStatus(data.status)
   const isCe = isCompileErrorStatus(data.status)
   const testResults = data.testResults || []
   const showTests = judging || testResults.length > 0
+  const firstWaIndex = findFirstWaIndex(testResults)
   const codeLines = data.code ? data.code.split('\n').length : 0
   // 短代码完整展开；超过约 16 行后限制高度并滚动，避免撑满整页
   const codeHeightPx = Math.min(Math.max(codeLines, 4) * 20 + 24, 320)
@@ -259,6 +264,19 @@ function ExpandedDetail({
       setTimeout(() => setCopied(false), 1500)
     } catch {
       // ignore
+    }
+  }
+
+  const handleDownloadWa = async () => {
+    if (waDownloading || !data.id) return
+    setWaDownloadError('')
+    setWaDownloading(true)
+    try {
+      await downloadFirstWaTestCase(data.id)
+    } catch (err) {
+      setWaDownloadError(err instanceof Error ? err.message : '下载失败')
+    } finally {
+      setWaDownloading(false)
     }
   }
 
@@ -299,7 +317,28 @@ function ExpandedDetail({
 
       {showTests && (
         <div>
-          <div className="text-sm font-medium text-foreground mb-2">测试点信息</div>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="text-sm font-medium text-foreground">测试点信息</div>
+            {firstWaIndex >= 0 && (
+              <button
+                type="button"
+                onClick={() => void handleDownloadWa()}
+                disabled={waDownloading}
+                className="btn btn-outline text-xs py-1 px-2.5 gap-1"
+                title="仅可下载第一个 WA 测试点"
+              >
+                {waDownloading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
+                下载 WA#{firstWaIndex + 1}
+              </button>
+            )}
+          </div>
+          {waDownloadError && (
+            <p className="mb-2 text-xs text-error">{waDownloadError}</p>
+          )}
           {testResults.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {testResults.map((r, i) => (

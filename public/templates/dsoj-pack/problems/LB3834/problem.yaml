@@ -1,0 +1,18 @@
+schema_version: 2
+title: '[GESP202303 一级] 长方形面积'
+problem_number: LB3834
+luogu_pid: B3834
+difficulty: 入门
+tags:
+- 数学
+- '2023'
+- 枚举
+- 分支结构
+- 循环结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: default
+real_precision: 3

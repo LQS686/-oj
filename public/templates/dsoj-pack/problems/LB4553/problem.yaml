@@ -1,0 +1,16 @@
+schema_version: 2
+title: '[GESP202606 二级] 完全平方数计数'
+problem_number: LB4553
+luogu_pid: B4553
+difficulty: 入门
+tags:
+- 数学
+- '2026'
+- 循环结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

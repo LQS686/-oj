@@ -1,0 +1,16 @@
+schema_version: 2
+title: '[GESP202503 二级] 时间跨越'
+problem_number: LB4260
+luogu_pid: B4260
+difficulty: 普及-
+tags:
+- 模拟
+- '2025'
+- 分支结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

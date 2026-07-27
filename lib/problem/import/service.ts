@@ -11,6 +11,7 @@ import { ApiError } from '@/lib/api/withApi'
 import { isValidDifficulty, normalizeDifficulty, type Difficulty } from '@/lib/constants'
 import { clearProblemCache } from '../admin'
 import { redistributeTestScores } from '../testcase'
+import { invalidateProblemTestCaseCache } from '@/lib/judge/testcase-loader'
 import type {
   ImportedProblem,
   ImportedProblemResult,
@@ -108,10 +109,72 @@ async function generateNextProblemNumber(): Promise<string> {
 }
 
 /**
+ * 组装正式评测点分数：若每点都带合法 score 且总和为 100 则保留；否则均分 100
+ */
+function buildTestCasesData(
+  problem: ImportedProblem
+): { rows: Array<{ input: string; output: string; isSample: false; score: number; orderIndex: number }>; customScores: boolean } {
+  const normalTcs = problem.testCases.map((tc) => ({
+    input: tc.input,
+    output: tc.output,
+    score: tc.score,
+  }))
+  const allCustom = normalTcs.every(
+    (tc) => typeof tc.score === 'number' && Number.isFinite(tc.score) && tc.score > 0
+  )
+  const customSum = allCustom
+    ? normalTcs.reduce((sum, tc) => sum + (tc.score as number), 0)
+    : 0
+  if (allCustom && normalTcs.length > 0 && customSum === 100) {
+    return {
+      customScores: true,
+      rows: normalTcs.map((tc, idx) => ({
+        input: tc.input,
+        output: tc.output,
+        isSample: false as const,
+        score: tc.score as number,
+        orderIndex: idx,
+      })),
+    }
+  }
+  const equal = Math.floor(100 / Math.max(1, normalTcs.length))
+  return {
+    customScores: false,
+    rows: normalTcs.map((tc, idx) => ({
+      input: tc.input,
+      output: tc.output,
+      isSample: false as const,
+      score: idx === normalTcs.length - 1 ? 100 - equal * (normalTcs.length - 1) : equal,
+      orderIndex: idx,
+    })),
+  }
+}
+
+async function importSolutions(
+  problemId: string,
+  solutions: NonNullable<ImportedProblem['solutions']>,
+  authorId: string
+) {
+  await prisma.solution.createMany({
+    data: solutions.map((s) => ({
+      problemId,
+      authorId,
+      title: (s.title || '题解').slice(0, 200),
+      content:
+        s.authorName && !s.content.startsWith('> ')
+          ? `> 原作者：${s.authorName}\n\n${s.content}`
+          : s.content,
+      isOfficial: false,
+      sourceType: 'USER',
+    })),
+  })
+}
+
+/**
  * 创建单题（含测试用例）
- * - 样例自动同步到 TestCase 表（isSample=true）
- * - 完整测试用例追加在样例之后
- * - 自动均分分数（最后一个补齐到 100）
+ * - samples/ → Problem.samples（题面展示，不进入评测）
+ * - testcases/ → TestCase 表（正式评测点，isSample=false）
+ * - solutions/ → Solution 表（可选）
  */
 async function createOne(
   problem: ImportedProblem,
@@ -132,31 +195,8 @@ async function createOne(
     }
   }
 
-  // 组装测试用例：样例在前 + 普通用例在后
-  const sampleTcs = problem.samples.length
-    ? problem.samples.map(s => ({
-        input: s.input,
-        output: s.output,
-        isSample: true,
-      }))
-    : []
-  const normalTcs = problem.testCases.map(tc => ({
-    input: tc.input,
-    output: tc.output,
-    isSample: false,
-    score: tc.score,
-  }))
-  const allTcs = [...sampleTcs, ...normalTcs]
-
-  // 均分分数（避免分数总和 ≠ 100）
-  const equal = Math.floor(100 / Math.max(1, allTcs.length))
-  const testCasesData = allTcs.map((tc, idx) => ({
-    input: tc.input,
-    output: tc.output,
-    isSample: tc.isSample,
-    score: idx === allTcs.length - 1 ? 100 - equal * (allTcs.length - 1) : equal,
-    orderIndex: idx,
-  }))
+  const visibility = problem.visibility ?? options.visibility
+  const { rows: testCasesData, customScores } = buildTestCasesData(problem)
 
   const created = await prisma.problem.create({
     data: {
@@ -175,8 +215,8 @@ async function createOne(
       memoryLimit: problem.memoryLimit,
       comparisonMode: problem.comparisonMode || 'default',
       realPrecision: problem.realPrecision ?? 3,
-      isPublic: options.visibility === 'public',
-      visibility: options.visibility,
+      isPublic: visibility === 'public',
+      visibility,
       stdCode: problem.stdCode || null,
       stdLang: problem.stdLang || null,
       author: { connect: { id: options.authorId } },
@@ -185,10 +225,22 @@ async function createOne(
     include: { testCases: true },
   })
 
-  if (created.testCases && created.testCases.length > 0) {
+  if (!customScores && created.testCases && created.testCases.length > 0) {
     await redistributeTestScores(created.id)
   }
   clearProblemCache(created.id)
+
+  // 导入附带题解（失败不回滚题目）
+  if (problem.solutions && problem.solutions.length > 0) {
+    try {
+      await importSolutions(created.id, problem.solutions, options.authorId)
+    } catch (err) {
+      logger.warn('导入题解失败（题目已创建）', {
+        problemId: created.id,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   return { id: created.id, problemNumber: created.problemNumber! }
 }
@@ -201,26 +253,10 @@ async function overwriteOne(
   problem: ImportedProblem,
   options: ImportOptions
 ): Promise<void> {
-  // 样例 + 测试用例合并
-  const sampleTcs = problem.samples.length
-    ? problem.samples.map(s => ({ input: s.input, output: s.output, isSample: true }))
-    : []
-  const normalTcs = problem.testCases.map(tc => ({
-    input: tc.input,
-    output: tc.output,
-    isSample: false,
-  }))
-  const allTcs = [...sampleTcs, ...normalTcs]
-  const equal = Math.floor(100 / Math.max(1, allTcs.length))
-  const testCasesData = allTcs.map((tc, idx) => ({
-    problemId: existingId,
-    input: tc.input,
-    output: tc.output,
-    isSample: tc.isSample,
-    score: idx === allTcs.length - 1 ? 100 - equal * (allTcs.length - 1) : equal,
-    orderIndex: idx,
-  }))
+  const visibility = problem.visibility ?? options.visibility
+  const { rows: testCasesData, customScores } = buildTestCasesData(problem)
 
+  await invalidateProblemTestCaseCache(existingId)
   await prisma.$transaction([
     prisma.problem.update({
       where: { id: existingId },
@@ -239,8 +275,8 @@ async function overwriteOne(
         memoryLimit: problem.memoryLimit,
         comparisonMode: problem.comparisonMode || 'default',
         realPrecision: problem.realPrecision ?? 3,
-        isPublic: options.visibility === 'public',
-        visibility: options.visibility,
+        isPublic: visibility === 'public',
+        visibility,
         stdCode: problem.stdCode || null,
         stdLang: problem.stdLang || null,
       },
@@ -249,9 +285,29 @@ async function overwriteOne(
   ])
 
   if (testCasesData.length > 0) {
-    await prisma.testCase.createMany({ data: testCasesData })
-    await redistributeTestScores(existingId)
+    await prisma.testCase.createMany({
+      data: testCasesData.map((tc) => ({ ...tc, problemId: existingId })),
+    })
+    if (!customScores) {
+      await redistributeTestScores(existingId)
+    }
   }
+
+  // 覆盖导入时同步题解：替换非官方题解，避免旧题解残留
+  if (problem.solutions && problem.solutions.length > 0) {
+    try {
+      await prisma.solution.deleteMany({
+        where: { problemId: existingId, isOfficial: false },
+      })
+      await importSolutions(existingId, problem.solutions, options.authorId)
+    } catch (err) {
+      logger.warn('覆盖导入题解失败（题目已更新）', {
+        problemId: existingId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
   clearProblemCache(existingId)
 }
 

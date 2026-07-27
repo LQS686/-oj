@@ -1,0 +1,24 @@
+{
+  "scores": {
+    "1.in": 87,
+    "2.in": 61,
+    "3.in": 50,
+    "4.in": 51,
+    "5.in": 52,
+    "6.in": 54,
+    "7.in": 61,
+    "8.in": 57,
+    "9.in": 64,
+    "10.in": 54,
+    "11.in": 61,
+    "12.in": 46
+  },
+  "average": 58.166666666666664,
+  "high_quality": false,
+  "samples_cloned": [],
+  "subtasks_covered": null,
+  "rejected": [],
+  "count_shortage": false,
+  "timeout_dims": [],
+  "shape_mismatch": []
+}

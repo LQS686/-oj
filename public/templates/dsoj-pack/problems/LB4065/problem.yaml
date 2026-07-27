@@ -1,0 +1,16 @@
+schema_version: 2
+title: '[GESP202412 二级] 数位和'
+problem_number: LB4065
+luogu_pid: B4065
+difficulty: 入门
+tags:
+- '2024'
+- 分支结构
+- 循环结构
+- GESP
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 512
+comparison_mode: default
+real_precision: 3

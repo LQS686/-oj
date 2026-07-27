@@ -10,6 +10,7 @@ import AdmZip from 'adm-zip'
 import path from 'path'
 import fs from 'fs'
 import { writeFile, mkdir, rm, access } from 'fs/promises'
+import { invalidateProblemTestCaseCache } from '@/lib/judge/testcase-loader'
 
 // 重新导出纯函数以兼容服务端 import（不会把 fs 传到客户端因为这些函数本身无副作用）
 export {
@@ -34,6 +35,7 @@ export interface TestcaseData {
  * 批量保存测试用例并计算分数
  */
 export async function saveTestcases(problemId: string, testcases: TestcaseData[]) {
+  await invalidateProblemTestCaseCache(problemId)
   await prisma.testCase.deleteMany({ where: { problemId } })
   if (!testcases.length) return { count: 0 }
   const equalScore = Math.floor(100 / testcases.length)

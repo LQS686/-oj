@@ -10,6 +10,7 @@
  *   - ids：题目 ID 列表（逗号分隔，dsoj 模式用）
  *   - includeStdCode：是否包含标程（true/false，默认 true，dsoj 模式用）
  *   - includeTestCases：是否包含测试用例（true/false，默认 true，dsoj 模式用）
+ *   - includeSolutions：是否包含题解（true/false，默认 true，dsoj 模式用）
  */
 import { withApi } from '@/lib/api/withApi'
 import { exportDsojPack } from '@/lib/problem/export/dsoj-exporter'
@@ -28,11 +29,13 @@ export const GET = withApi.admin(async (req, _ctx) => {
 
     const includeStdCode = searchParams.get('includeStdCode') !== 'false'
     const includeTestCases = searchParams.get('includeTestCases') !== 'false'
+    const includeSolutions = searchParams.get('includeSolutions') !== 'false'
 
     const zipBuffer = await exportDsojPack({
       problemIds,
       includeStdCode,
       includeTestCases,
+      includeSolutions,
       packSource: 'DSOJ Admin Export',
     })
 

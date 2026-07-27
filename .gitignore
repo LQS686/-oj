@@ -26,6 +26,9 @@ yarn-error.log*
 .env
 .env*.local
 
+# MongoDB 副本集 keyfile（部署脚本生成，勿提交）
+mongo-keyfile
+
 # vercel
 .vercel
 
@@ -35,6 +38,12 @@ next-env.d.ts
 
 # temporary files
 temp/
+
+# legacy Windows judge artifact (removed; ignore if leftover)
+lib/judge/win-runner.exe
+
+# 评测测点磁盘缓存（由 materialize / warm-testdata-cache 生成）
+/data/testdata/
 /public/uploads/avatars/*
 !/public/uploads/avatars/.gitkeep
 
@@ -50,3 +59,7 @@ temp/
 # reference resources (third-party source code & archives)
 /参考资源/
 *.zip
+
+# development scratch directories (not part of product)
+/_tmp_*/
+/tmp/

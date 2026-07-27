@@ -26,6 +26,7 @@ export interface JudgeJob {
   extraTimeRatio?: number            // 临界 TLE 容差比例，默认 0
   testCases: Array<{
     id: string
+    /** 可为空：正式评测由 judger 按 id 懒加载，避免队列持有全部大测点 */
     input: string
     output: string
     score: number

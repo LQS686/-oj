@@ -17,6 +17,7 @@ import { cache } from '@/lib/cache'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { finalizeTiming } from '@/lib/gamification/timing'
+import { mapTestCasesMeta, TESTCASE_META_SELECT } from './testcase-loader'
 
 // 监听评测完成事件（热重载守卫：避免 Next.js dev 模式重复注册监听器）
 if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', async (job: QueuedJob, result: JudgeResult) => {
@@ -278,17 +279,28 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
 // Worker 崩溃后残留的非终态记录在此恢复入队。
 async function recoverPendingJobs() {
   try {
-    const pendingSubmissions = await prisma.submission.findMany({
+    // 崩溃时卡在 JUDGING/RUNNING 的记录：标 SE，避免启动瞬间再次跑大数据量题把进程打崩
+    const interrupted = await prisma.submission.findMany({
       where: {
-        status: {
-          in: [
-            SubmissionStatus.PENDING,
-            SubmissionStatus.JUDGING,
-            SubmissionStatus.RUNNING,
-          ],
-        },
+        status: { in: [SubmissionStatus.JUDGING, SubmissionStatus.RUNNING] },
       },
-      include: { problem: { include: { testCases: true } } },
+      select: { id: true },
+    })
+    if (interrupted.length > 0) {
+      await Promise.allSettled(
+        interrupted.map((sub) =>
+          updateSubmissionDirect(sub.id, {
+            status: SubmissionStatus.SYSTEM_ERROR,
+            message: '评测进程异常中断，请重新提交',
+          }, { forceStatus: true }),
+        ),
+      )
+      logger.warn(`已将 ${interrupted.length} 个中断中的评测标记为 SE（请用户重交）`)
+    }
+
+    const pendingSubmissions = await prisma.submission.findMany({
+      where: { status: SubmissionStatus.PENDING },
+      include: { problem: { include: { testCases: { select: TESTCASE_META_SELECT } } } },
     })
     if (pendingSubmissions.length === 0) {
       logger.info('无需恢复的任务')
@@ -301,14 +313,7 @@ async function recoverPendingJobs() {
           logger.warn(`跳过恢复：题目不存在`, { submissionId: sub.id })
           return
         }
-        const testCases = sub.problem.testCases.map(tc => ({
-          id: tc.id,
-          input: tc.input,
-          output: tc.output,
-          score: tc.score,
-          timeLimit: tc.timeLimit ?? undefined,
-          memoryLimit: tc.memoryLimit ?? undefined,
-        }))
+        const testCases = mapTestCasesMeta(sub.problem.testCases)
         const job: JudgeJob = {
           submissionId: sub.id,
           problemId: sub.problemId,

@@ -8,7 +8,7 @@ import { addJudgeJob } from '@/lib/judge/queue'
 import { logger } from '@/lib/logger'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { parseComparisonMode } from '@/lib/judge/types'
-import type { TestCase } from '@prisma/client'
+import { mapTestCasesMeta, TESTCASE_META_SELECT } from '@/lib/judge/testcase-loader'
 import {
   createClassAssignmentSubmissionDirect,
   createSubmissionDirect,
@@ -98,7 +98,7 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
 
   const problem = await prisma.problem.findUnique({
     where: { id: input.problemId },
-    include: { testCases: { orderBy: { orderIndex: 'asc' } } },
+    include: { testCases: { select: TESTCASE_META_SELECT, orderBy: { orderIndex: 'asc' } } },
   })
   if (!problem) return { ok: false, code: 404, reason: '题目不存在' as const }
   if (!problem.testCases || problem.testCases.length === 0) {
@@ -147,14 +147,7 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
       memoryLimit: problem.memoryLimit,
       comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
-      testCases: problem.testCases.map((tc: TestCase) => ({
-        id: tc.id,
-        input: tc.input,
-        output: tc.output,
-        score: tc.score,
-        timeLimit: tc.timeLimit ?? undefined,
-        memoryLimit: tc.memoryLimit ?? undefined,
-      })),
+      testCases: mapTestCasesMeta(problem.testCases),
     })
   } catch (err) {
     logger.error(

@@ -1,21 +1,35 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import {
   Lock,
   PenSquare,
   AlertCircle,
   Sparkles,
   ChevronRight,
-  Code2
+  Code2,
+  ExternalLink,
+  FileCode,
+  Loader2,
 } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import { useUser } from '@/contexts/UserContext'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
 import { fetchWithCookie } from '@/lib/api/base'
 import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
+import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { loginPathFromLocation } from '@/lib/navigation'
+
+interface SolutionDetail {
+  id: string
+  title: string
+  content: string
+  codeLanguage: string | null
+  code: string | null
+  views: number
+}
 
 /**
  * Phase 6 Task 32.4: 语言 Tab 优先级排序
@@ -80,9 +94,10 @@ const REASON_TEXT: Record<
  (result: PermissionResult) => string
 > = {
  ASSIGNMENT_CONTEXT: () => '作业场景下不显示题解',
- NO_SUBMISSION: () => '请先尝试提交本题，达到 60 分即可查看',
+ NO_SUBMISSION: (result) =>
+ `请先尝试提交本题，达到 ${result.requiredScore} 分即可查看`,
  LOW_SCORE: (result) =>
- `再接再厉！当前最高分 ${result.bestScore ?? 0}，达到 60 分即可查看`
+ `再接再厉！当前最高分 ${result.bestScore ?? 0}，达到 ${result.requiredScore} 分即可查看`
 }
 
 function getLockMessage(result: PermissionResult): string {
@@ -96,6 +111,7 @@ export default function SolutionTabPanel({
  onRequireLogin
 }: SolutionTabPanelProps) {
  const router = useRouter()
+ const searchParams = useSearchParams()
  const { user } = useUser()
 
  const [permission, setPermission] = useState<PermissionResult | null>(null)
@@ -105,10 +121,38 @@ export default function SolutionTabPanel({
  const [solutions, setSolutions] = useState<SolutionListItem[]>([])
  const [solutionsLoading, setSolutionsLoading] = useState(false)
  const [solutionsError, setSolutionsError] = useState<string | null>(null)
+ const [listVersion, setListVersion] = useState(0)
 
  // Phase 6 Task 32.4: 语言筛选 tab（'all' = 全部，'cpp' / 'python' / ... = 按语言过滤）
  const [languageFilter, setLanguageFilter] = useState<string>('all')
  const [createOpen, setCreateOpen] = useState(false)
+
+ /** 行内展开：同一时间只开一篇，正文懒加载 */
+ const [expandedId, setExpandedId] = useState<string | null>(null)
+ const [detailCache, setDetailCache] = useState<Record<string, SolutionDetail>>({})
+ const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
+ const [detailError, setDetailError] = useState<string | null>(null)
+
+ // 深链：?create=1 打开写题解；?solution=<id> 展开指定题解
+ useEffect(() => {
+  if (searchParams.get('create') === '1') {
+   setCreateOpen(true)
+  }
+  const target = searchParams.get('solution')
+  if (target) {
+   setExpandedId(target)
+  }
+  if (searchParams.get('create') === '1' || target) {
+   const next = new URLSearchParams(searchParams.toString())
+   next.delete('create')
+   next.delete('solution')
+   // 保留 tab=solutions，清理一次性参数
+   const qs = next.toString()
+   router.replace(qs ? `/problem/${problemId}?${qs}` : `/problem/${problemId}?tab=solutions`, {
+    scroll: false,
+   })
+  }
+ }, [searchParams, router, problemId])
 
  useEffect(() => {
  let cancelled = false
@@ -222,8 +266,58 @@ export default function SolutionTabPanel({
  }
 
  const handleSolutionClick = (solutionId: string) => {
- router.push(`/problems/${problemId}/solutions/${solutionId}`)
+  setDetailError(null)
+  setExpandedId((prev) => (prev === solutionId ? null : solutionId))
  }
+
+ const expandedDetail = expandedId ? detailCache[expandedId] : undefined
+
+ useEffect(() => {
+  if (!expandedId || expandedDetail) return
+
+  let cancelled = false
+  const load = async () => {
+   try {
+    setDetailLoadingId(expandedId)
+    setDetailError(null)
+    const params = new URLSearchParams()
+    if (isAssignmentContext) params.set('isAssignmentContext', 'true')
+    const qs = params.toString()
+    const response = await fetchWithCookie(
+     `/api/solutions/${expandedId}${qs ? `?${qs}` : ''}`
+    )
+    const data = await response.json().catch(() => null)
+    if (cancelled) return
+
+    if (!response.ok || !data || data.success !== true) {
+     setDetailError(data?.error?.message || data?.error || '加载题解失败')
+     return
+    }
+
+    const detail = data.data as SolutionDetail
+    setDetailCache((prev) => ({ ...prev, [expandedId]: detail }))
+    // 同步列表浏览数（详情接口会去重 +1）
+    if (typeof detail.views === 'number') {
+     setSolutions((prev) =>
+      prev.map((s) => (s.id === expandedId ? { ...s, views: detail.views } : s))
+     )
+    }
+   } catch (error) {
+    if (cancelled) return
+    logger.error('加载题解详情失败', error)
+    setDetailError('网络错误，请稍后重试')
+   } finally {
+    if (!cancelled) {
+     setDetailLoadingId((id) => (id === expandedId ? null : id))
+    }
+   }
+  }
+
+  void load()
+  return () => {
+   cancelled = true
+  }
+ }, [expandedId, expandedDetail, isAssignmentContext])
 
  // Phase 6 Task 32.4: 派生可用语言列表（仅展示有值的语言）
  const availableLanguages = useMemo(() => {
@@ -254,6 +348,16 @@ export default function SolutionTabPanel({
   if (languageFilter === 'all') return solutions
   return solutions.filter(s => normalizeLanguage(s.codeLanguage) === languageFilter)
  }, [solutions, languageFilter])
+
+ // 筛选变化后，若展开项不在当前列表则收起
+ useEffect(() => {
+  if (!expandedId) return
+  const visible = filteredSolutions.some((s) => s.id === expandedId)
+  if (!visible) {
+   setExpandedId(null)
+   setDetailError(null)
+  }
+ }, [filteredSolutions, expandedId])
 
  if (permissionLoading) {
  return (
@@ -417,19 +521,103 @@ export default function SolutionTabPanel({
 
  {!solutionsLoading && !solutionsError && filteredSolutions.length > 0 && (
  <div className="card-static rounded-lg overflow-hidden">
- {filteredSolutions.map((solution) => (
- <SolutionCard
- key={solution.id}
- solution={solution}
- onClick={() => handleSolutionClick(solution.id)}
- />
- ))}
+ {filteredSolutions.map((solution) => {
+  const expanded = expandedId === solution.id
+  const detail = detailCache[solution.id]
+  const loading = detailLoadingId === solution.id
+  return (
+   <SolutionCard
+    key={solution.id}
+    solution={solution}
+    expandable
+    expanded={expanded}
+    onClick={() => handleSolutionClick(solution.id)}
+   >
+    {expanded && (
+     <div className="space-y-3">
+      <div className="flex items-center justify-end">
+       <Link
+        href={`/problems/${problemId}/solutions/${solution.id}`}
+        onClick={(e) => e.stopPropagation()}
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+       >
+        在新页打开
+        <ExternalLink className="w-3 h-3" />
+       </Link>
+      </div>
+
+      {loading && !detail && (
+       <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        加载题解…
+       </div>
+      )}
+
+      {!loading && detailError && expandedId === solution.id && !detail && (
+       <div className="flex items-center gap-2 py-4 text-sm text-error">
+        <AlertCircle className="w-4 h-4 shrink-0" />
+        {detailError}
+       </div>
+      )}
+
+      {detail && (
+       <>
+        <div className="max-h-[min(60vh,520px)] overflow-y-auto pr-1">
+         <MarkdownRenderer
+          content={detail.content || ''}
+          preprocessContent={false}
+         />
+        </div>
+        {detail.code && (
+         <div className="rounded-lg border border-border bg-muted/40 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-border bg-muted/60">
+           <div className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+            <FileCode className="w-3.5 h-3.5 text-primary" />
+            附件代码
+           </div>
+           {detail.codeLanguage && (
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+             {detail.codeLanguage}
+            </span>
+           )}
+          </div>
+          <pre className="p-3 overflow-x-auto text-xs font-mono text-foreground leading-relaxed max-h-64">
+           <code>{detail.code}</code>
+          </pre>
+         </div>
+        )}
+       </>
+      )}
+     </div>
+    )}
+   </SolutionCard>
+  )
+ })}
  </div>
  )}
  <CreateSolutionModal
  open={createOpen}
  onClose={() => setCreateOpen(false)}
  problemId={problemId}
+ onCreated={(newId) => {
+  setListVersion((v) => v + 1)
+  setExpandedId(newId)
+  setDetailCache((prev) => {
+   const next = { ...prev }
+   delete next[newId]
+   return next
+  })
+ }}
+ onSaved={() => {
+  setListVersion((v) => v + 1)
+  if (expandedId) {
+   setDetailCache((prev) => {
+    const next = { ...prev }
+    delete next[expandedId]
+    return next
+   })
+  }
+ }}
  />
  </div>
  )

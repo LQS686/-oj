@@ -80,10 +80,34 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const classNameParam = searchParams.get('className')
 
   const isAssignmentContext = fromAssignment === '1'
-  
+  const tabParam = searchParams.get('tab')
+
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('cpp')
-  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions' | 'stats' | 'code'>('description')
+  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions' | 'stats' | 'code'>(() => {
+    if (
+      tabParam === 'solutions' ||
+      tabParam === 'submissions' ||
+      tabParam === 'stats' ||
+      tabParam === 'code' ||
+      tabParam === 'description'
+    ) {
+      return tabParam
+    }
+    return 'description'
+  })
+
+  useEffect(() => {
+    if (
+      tabParam === 'solutions' ||
+      tabParam === 'submissions' ||
+      tabParam === 'stats' ||
+      tabParam === 'code' ||
+      tabParam === 'description'
+    ) {
+      setActiveTab(tabParam)
+    }
+  }, [tabParam])
 
   const [problem, setProblem] = useState<any>(null)
   const [problemLoading, setProblemLoading] = useState(true)

@@ -3,53 +3,39 @@
  * DSOJ 标准题包格式解析器（自主实现，不复用其它格式解析器）
  *
  * 设计目标：
- *   1. 格式稳定：版本化（pack.yaml.version），未来升级兼容
+ *   1. 格式稳定：版本化（pack.yaml.version），兼容 v1.0 / v2.0
  *   2. 爬虫友好：所有字段文件化、UTF-8 编码、文件名约定清晰
  *   3. 完整性：覆盖 Problem 模型所有手动创建字段 + 全部测试数据
  *   4. 独立性：单题目录损坏不影响其他题导入
  *
- * 字段规范与项目真相源对齐：
- *   - 难度：lib/constants.ts 的 8 档（入门/普及-/普及/普及+/提高/提高+/省选/NOI）
- *   - visibility：public / private / contest（默认 public，与 schema 默认一致）
- *   - comparison_mode：default / strict / ignore-spaces / real-number
- *   - time_limit：1-30000 ms（默认 1000，对齐 admin 校验）
- *   - memory_limit：1-1024 MB（默认 128，对齐 schema 默认）
- *   - real_precision：0-12（默认 3）
- *   - 测试点数量上限：50（对齐 TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES）
- *   - 单测点 score：0-100（不填则由 service 均分）
- *   - 标程语言：cpp / c / python（通过 std 文件扩展名识别）
+ * v2 相对 v1 的核心变化：
+ *   - 题目目录改为稳定 PID 命名（如 LP1001/），不再依赖 0001-LP1001-标题/
+ *   - 包根增加权威 index.json（导入优先按 order 读取）
+ *   - pack.yaml.version = "2.0"，可声明 index 文件名
+ *   - 可选采集题解 solutions/；忽略 AI 过程产物（generator.py / quality.json / _runnable/）
  *
  * 格式规范：
- *   dsoj-pack.zip
- *   ├── pack.yaml              # 包元信息（可选，推荐）
- *   │   - format: dsoj-pack    # 格式标识（必需，固定值）
- *   │   - version: "1.0"       # 格式版本
- *   │   - source: ...          # 数据来源
- *   │   - description: ...     # 包说明
- *   │   - created_at: ...      # 打包时间
+ *   dsoj-pack.zip（推荐扁平；也兼容单层 dsoj-pack/ 包裹）
+ *   ├── pack.yaml
+ *   ├── index.json              # v2 权威题目列表（推荐）
  *   ├── problems/
- *   │   ├── <slug>/            # 题目目录（任意合法目录名）
- *   │   │   ├── problem.yaml   # 题目元信息（必需）
- *   │   │   ├── description.md # 题目描述（markdown，必需）
- *   │   │   ├── background.md # 题目背景（markdown，可选）
- *   │   │   ├── input.md       # 输入格式（可选）
- *   │   │   ├── output.md      # 输出格式（可选）
- *   │   │   ├── hint.md        # 提示（可选）
- *   │   │   ├── samples/       # 展示样例（可选，1.in/1.out）
- *   │   │   ├── testcases/     # 完整测试点（必需，1.in/1.out/1.score）
- *   │   │   ├── config.yaml    # 测试配置覆盖（可选）
- *   │   │   ├── std.cpp        # 标准代码（可选，支持 .cpp/.c/.py）
- *   │   │   └── spj.cpp        # 特判代码（可选，当前项目暂未启用 SPJ，解析时忽略）
- *   │   └── ...
+ *   │   ├── <pid>/              # 如 LP1001
+ *   │   │   ├── problem.yaml
+ *   │   │   ├── description.md
+ *   │   │   ├── background.md / input.md / output.md / hint.md
+ *   │   │   ├── samples/
+ *   │   │   ├── testcases/
+ *   │   │   ├── solutions/      # 可选
+ *   │   │   ├── config.yaml / std.cpp
+ *   │   │   └── …
  *
  * 优先级：config.yaml > problem.yaml > 默认值
- *
- * 安全：isStrictSafePath 防 Zip Slip（绝对路径 / .. 穿越 / 盘符 / 控制字符）
+ * 安全：isStrictSafePath 防 Zip Slip
  */
 import AdmZip from 'adm-zip'
 import { ApiError } from '@/lib/api/withApi'
 import { isValidDifficulty } from '@/lib/constants'
-import type { ImportedProblem, ImportedTestCase } from './types'
+import type { ImportedProblem, ImportedSolution, ImportedTestCase } from './types'
 
 /* ============================================================================
  * 常量定义
@@ -58,8 +44,11 @@ import type { ImportedProblem, ImportedTestCase } from './types'
 /** 格式标识（pack.yaml.format 必须为这个值） */
 const DSOJ_FORMAT_ID = 'dsoj-pack'
 
-/** 当前支持的格式版本 */
-const DSOJ_FORMAT_VERSION = '1.0'
+/** 支持的格式版本（v1 扫描目录；v2 优先 index.json） */
+const DSOJ_SUPPORTED_VERSIONS = new Set(['1.0', '2.0'])
+
+/** 当前推荐格式版本 */
+const DSOJ_FORMAT_VERSION = '2.0'
 
 /** 题目根目录前缀（所有题目必须在 problems/ 下） */
 const PROBLEMS_DIR = 'problems/'
@@ -79,6 +68,12 @@ const SAMPLES_DIR_NAMES = ['samples'] as const
 
 /** 标程候选文件名（按优先级，扩展名决定 stdLang） */
 const STD_FILE_NAMES = ['std.cpp', 'std.c', 'std.py', 'standard.cpp', 'sol.cpp'] as const
+
+/** 单题最多导入的题解篇数（按点赞降序截断） */
+const MAX_IMPORTED_SOLUTIONS = 20
+
+/** 不应作为测试点的文件名 */
+const TESTCASE_IGNORE_NAMES = new Set(['quality.json', 'config.json', 'config.yaml'])
 
 /* ============================================================================
  * 字段规范（与项目真相源对齐）
@@ -115,9 +110,6 @@ const MAX_TESTCASES = 50
 /** 单测点分数范围：0-100（不填则由 service 均分到 100） */
 const TESTCASE_SCORE_MIN = 0
 const TESTCASE_SCORE_MAX = 100
-
-/** 默认 visibility（与 schema @default("public") 一致） */
-const VISIBILITY_DEFAULT = 'public'
 
 /* ============================================================================
  * 极简 YAML 解析（与 hydro-parser 独立实现，避免耦合）
@@ -166,11 +158,33 @@ function parseDsojYaml(text: string): DsojYamlValue {
         // 列表起始
         currentListKey = key
         result[key] = []
+      } else if (value === 'null' || value === '~') {
+        currentListKey = null
+        result[key] = null
       } else {
         currentListKey = null
-        // 数字转换
+        // 版本 / 题号 / 文本字段禁止数字化（避免 version: 2.0 → 2）
+        const keepAsString = new Set([
+          'format',
+          'version',
+          'index',
+          'title',
+          'problem_number',
+          'luogu_pid',
+          'difficulty',
+          'source',
+          'visibility',
+          'comparison_mode',
+          'description',
+          'created_at',
+        ])
         const num = Number(value)
-        if (value !== '' && !isNaN(num)) {
+        if (
+          !keepAsString.has(key) &&
+          value !== '' &&
+          !isNaN(num) &&
+          /^-?\d+(\.\d+)?$/.test(value)
+        ) {
           result[key] = num
         } else {
           result[key] = value
@@ -186,6 +200,13 @@ function parseDsojYaml(text: string): DsojYamlValue {
  * ========================================================================== */
 
 /**
+ * 统一 ZIP entry 路径分隔符（Windows 打的包常为 \）
+ */
+function entryPath(entryName: string): string {
+  return String(entryName || '').replace(/\\/g, '/')
+}
+
+/**
  * 严格校验 ZIP entry 完整路径安全性（允许 / 作为路径分隔符）
  *
  * 与 testcase.ts 的 isSafeZipEntryName 区别：
@@ -199,7 +220,7 @@ function isStrictSafePath(path: string): boolean {
   if (!path || typeof path !== 'string') return false
   if (path.length > 512) return false
   // 统一分隔符检查（\ → /）
-  const normalized = path.replace(/\\/g, '/')
+  const normalized = entryPath(path)
   // 拒绝绝对路径（/ 开头）
   if (normalized.startsWith('/')) return false
   // 拒绝 Windows 盘符（C:\ 开头）
@@ -216,26 +237,111 @@ function isStrictSafePath(path: string): boolean {
 /**
  * 获取 ZIP 中所有有效题目目录（problems/ 下的直接子目录）
  *
- * 返回形如 ["problems/001-a-plus-b/", "problems/002-..."] 的列表，
- * 已按目录名排序，确保导入顺序稳定。
+ * @param rootPrefix 可选根前缀（如 "dsoj-pack/"），兼容单层包裹的 ZIP
+ * 返回形如 ["problems/LP1001/", "problems/LB3939/"] 的列表（不含 rootPrefix），
+ * 已按目录名排序；v2 若有 index.json 则改由 listProblemDirsFromIndex 决定顺序。
  */
-function listProblemDirs(zip: AdmZip): string[] {
+function listProblemDirs(zip: AdmZip, rootPrefix = ''): string[] {
   const all = zip.getEntries()
+  const problemsPrefix = rootPrefix + PROBLEMS_DIR
   const dirs = new Set<string>()
   for (const entry of all) {
-    if (!entry.entryName.startsWith(PROBLEMS_DIR)) continue
-    // 取 problems/ 后的第一段作为题目目录名
-    const rest = entry.entryName.slice(PROBLEMS_DIR.length)
+    const name = entryPath(entry.entryName)
+    if (!name.startsWith(problemsPrefix)) continue
+    const rest = name.slice(problemsPrefix.length)
     if (!rest) continue
     const slashIdx = rest.indexOf('/')
     if (slashIdx <= 0) continue
     const dirName = rest.slice(0, slashIdx)
-    if (!dirName) continue
-    // 目录名必须合法
+    if (!dirName || dirName.startsWith('.')) continue
     if (!isStrictSafePath(dirName)) continue
     dirs.add(PROBLEMS_DIR + dirName + '/')
   }
   return Array.from(dirs).sort()
+}
+
+/**
+ * 检测 ZIP 是否被单层目录包裹（如 dsoj-pack/pack.yaml）
+ * 扁平 ZIP（pack.yaml 在根）返回空串。
+ */
+function detectZipRootPrefix(zip: AdmZip): string {
+  const names = zip.getEntries().map((e) => e.entryName.replace(/\\/g, '/'))
+  if (names.some((n) => n === 'pack.yaml' || n.startsWith(PROBLEMS_DIR))) {
+    return ''
+  }
+  const tops = new Set<string>()
+  for (const n of names) {
+    const i = n.indexOf('/')
+    if (i > 0) tops.add(n.slice(0, i + 1))
+  }
+  if (tops.size !== 1) return ''
+  const root = [...tops][0]
+  if (
+    names.some(
+      (n) => n === `${root}pack.yaml` || n.startsWith(`${root}${PROBLEMS_DIR}`)
+    )
+  ) {
+    return root
+  }
+  return ''
+}
+
+function getZipEntry(zip: AdmZip, rootPrefix: string, relativePath: string): AdmZip.IZipEntry | null {
+  const entry = zip.getEntry(rootPrefix + relativePath)
+  if (!entry || entry.isDirectory) return null
+  return entry
+}
+
+interface PackIndexProblem {
+  order: number
+  pid?: string
+  luogu_pid?: string
+  dir: string
+  title?: string
+  difficulty?: string
+  tags?: string[]
+}
+
+/**
+ * 从 index.json 读取题目目录顺序（v2 权威入口）
+ * 无效 / 缺失时返回 null，由调用方回退到目录扫描。
+ */
+function listProblemDirsFromIndex(
+  zip: AdmZip,
+  rootPrefix: string,
+  indexFileName: string
+): PackIndexProblem[] | null {
+  const entry = getZipEntry(zip, rootPrefix, indexFileName)
+  if (!entry) return null
+  try {
+    const raw = JSON.parse(readEntryText(entry))
+    const list = Array.isArray(raw?.problems) ? raw.problems : null
+    if (!list || list.length === 0) return null
+
+    const items: PackIndexProblem[] = []
+    for (const item of list) {
+      if (!item || typeof item !== 'object') continue
+      const dir = String(item.dir || item.pid || '').trim()
+      if (!dir || !isStrictSafePath(dir)) continue
+      const order = Number(item.order)
+      items.push({
+        order: Number.isFinite(order) ? order : items.length + 1,
+        pid: typeof item.pid === 'string' ? item.pid : undefined,
+        luogu_pid: typeof item.luogu_pid === 'string' ? item.luogu_pid : undefined,
+        dir,
+        title: typeof item.title === 'string' ? item.title : undefined,
+        difficulty: typeof item.difficulty === 'string' ? item.difficulty : undefined,
+        tags: Array.isArray(item.tags)
+          ? item.tags.map(String).map((s: string) => s.trim()).filter(Boolean)
+          : undefined,
+      })
+    }
+    if (items.length === 0) return null
+    items.sort((a, b) => a.order - b.order || a.dir.localeCompare(b.dir))
+    return items
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -246,14 +352,15 @@ function listProblemDirs(zip: AdmZip): string[] {
 function findFileUnderProblemDir(
   zip: AdmZip,
   problemDir: string,
-  candidates: readonly string[]
+  candidates: readonly string[],
+  rootPrefix = ''
 ): AdmZip.IZipEntry | null {
   const all = zip.getEntries()
   for (const c of candidates) {
-    const path = problemDir + c
+    const path = rootPrefix + problemDir + c
     for (const entry of all) {
       if (entry.isDirectory) continue
-      if (entry.entryName === path) return entry
+      if (entryPath(entry.entryName) === path) return entry
     }
   }
   return null
@@ -262,22 +369,31 @@ function findFileUnderProblemDir(
 /**
  * 在指定题目目录下查找子目录
  *   candidates 是相对题目目录的目录名（如 "testcases"）
- *   返回完整目录前缀（含 problemDir）或 null
+ *   返回完整目录前缀（含 problemDir，不含 rootPrefix）或 null
+ * @param allowNested 为 true 时允许子目录内有文件（samples/1/in.txt）；
+ *                    testcases 默认只要直接子文件，避免误扫过程产物目录
  */
 function findSubdirUnderProblemDir(
   zip: AdmZip,
   problemDir: string,
-  candidates: readonly string[]
+  candidates: readonly string[],
+  rootPrefix = '',
+  allowNested = false
 ): string | null {
   const all = zip.getEntries()
   for (const c of candidates) {
-    const prefix = problemDir + c + '/'
-    const hasFile = all.some(e =>
-      !e.isDirectory &&
-      e.entryName.startsWith(prefix) &&
-      e.entryName.slice(prefix.length).indexOf('/') === -1
-    )
-    if (hasFile) return prefix
+    const relativePrefix = problemDir + c + '/'
+    const fullPrefix = rootPrefix + relativePrefix
+    const hasFile = all.some((e) => {
+      if (e.isDirectory) return false
+      const name = entryPath(e.entryName)
+      if (!name.startsWith(fullPrefix)) return false
+      const rest = name.slice(fullPrefix.length)
+      if (!rest) return false
+      if (!allowNested && rest.includes('/')) return false
+      return true
+    })
+    if (hasFile) return relativePrefix
   }
   return null
 }
@@ -317,10 +433,11 @@ function extractTestcases(
   const files: Array<{ name: string; entry: AdmZip.IZipEntry }> = []
   for (const entry of all) {
     if (entry.isDirectory) continue
-    if (!entry.entryName.startsWith(prefix)) continue
-    const filename = entry.entryName.slice(prefix.length)
+    const fullName = entryPath(entry.entryName)
+    if (!fullName.startsWith(prefix)) continue
+    const filename = fullName.slice(prefix.length)
     // 必须是直接子文件（不能嵌套目录）
-    if (filename.includes('/')) continue
+    if (!filename || filename.includes('/')) continue
     if (!isStrictSafePath(filename)) continue
     files.push({ name: filename, entry })
   }
@@ -329,6 +446,7 @@ function extractTestcases(
   const groups = new Map<number, { input?: string; output?: string; score?: number }>()
 
   for (const { name, entry } of files) {
+    if (TESTCASE_IGNORE_NAMES.has(name.toLowerCase())) continue
     // 匹配编号：1.in / 1.out / 1.score / sample1.in / test1.in
     const m = name.match(/(\d+)\.(in|out|ans|score)$/i)
     if (!m) continue
@@ -379,12 +497,63 @@ function extractTestcases(
 }
 
 /**
- * 从 samples/ 目录提取展示样例
+ * 解析 samples/ 下相对路径中的「编号 + 输入/输出角色」
+ * 支持：
+ *   - 1.in / 1.out / 1.ans
+ *   - sample1.in / test2.out（与 testcases 命名习惯对齐）
+ *   - 1/in.txt、1/input.txt、1/1.in（一层子目录）
+ */
+function parseSampleFileRole(
+  relativePath: string
+): { num: number; role: 'in' | 'out' } | null {
+  const name = entryPath(relativePath)
+  if (!name || name.split('/').length > 2) return null
+
+  // 扁平：1.in / sample1.out / test2.ans
+  const flat = name.match(/^(?:sample|samp|s|test|t)?(\d+)\.(in|out|ans)$/i)
+  if (flat) {
+    const num = parseInt(flat[1], 10)
+    if (!Number.isFinite(num) || num <= 0) return null
+    const ext = flat[2].toLowerCase()
+    return { num, role: ext === 'in' ? 'in' : 'out' }
+  }
+
+  // 一层子目录：1/in.txt、1/input、1/1.in、1/output.txt
+  const nested = name.match(/^(\d+)\/([^/]+)$/i)
+  if (!nested) return null
+  const num = parseInt(nested[1], 10)
+  if (!Number.isFinite(num) || num <= 0) return null
+  const leaf = nested[2].toLowerCase()
+  if (
+    leaf === 'in' ||
+    leaf === 'input' ||
+    leaf === 'in.txt' ||
+    leaf === 'input.txt' ||
+    /^\d+\.in$/.test(leaf)
+  ) {
+    return { num, role: 'in' }
+  }
+  if (
+    leaf === 'out' ||
+    leaf === 'ans' ||
+    leaf === 'output' ||
+    leaf === 'out.txt' ||
+    leaf === 'ans.txt' ||
+    leaf === 'output.txt' ||
+    /^\d+\.(out|ans)$/.test(leaf)
+  ) {
+    return { num, role: 'out' }
+  }
+  return null
+}
+
+/**
+ * 从 samples/ 目录提取展示样例（仅用于题面，不进入评测点）
  *
  * 文件名约定：
- *   - 1.in / 1.out               第 1 组样例输入/输出
- *
- * 返回按编号排序的样例列表
+ *   - 1.in / 1.out
+ *   - sample1.in / test1.out
+ *   - 1/in.txt + 1/out.txt
  */
 function extractSamples(
   zip: AdmZip,
@@ -397,24 +566,20 @@ function extractSamples(
 
   for (const entry of all) {
     if (entry.isDirectory) continue
-    if (!entry.entryName.startsWith(prefix)) continue
-    const filename = entry.entryName.slice(prefix.length)
-    if (filename.includes('/')) continue
+    const fullName = entryPath(entry.entryName)
+    if (!fullName.startsWith(prefix)) continue
+    const filename = fullName.slice(prefix.length)
+    if (!filename || filename.includes('..')) continue
     if (!isStrictSafePath(filename)) continue
 
-    // 1.in / 1.out
-    const m = filename.match(/^(\d+)\.(in|out|ans)$/i)
-    if (!m) continue
-    const num = parseInt(m[1], 10)
-    if (!Number.isFinite(num) || num <= 0) continue
+    const parsed = parseSampleFileRole(filename)
+    if (!parsed) continue
 
-    const ext = m[2].toLowerCase()
-    if (!groups.has(num)) groups.set(num, {})
-    const group = groups.get(num)!
-
-    if (ext === 'in') {
+    if (!groups.has(parsed.num)) groups.set(parsed.num, {})
+    const group = groups.get(parsed.num)!
+    if (parsed.role === 'in') {
       group.input = readEntryText(entry)
-    } else if (ext === 'out' || ext === 'ans') {
+    } else {
       group.output = readEntryText(entry)
     }
   }
@@ -430,6 +595,92 @@ function extractSamples(
     })
   }
   return result
+}
+
+/**
+ * 从 solutions/ 提取题解（可选）
+ * 优先读 solutions/index.json，按 thumb_up 降序截断；忽略 _runnable/ 等 AI 缓存。
+ */
+function extractSolutions(
+  zip: AdmZip,
+  problemDir: string,
+  rootPrefix = ''
+): ImportedSolution[] {
+  const indexEntry = findFileUnderProblemDir(
+    zip,
+    problemDir,
+    ['solutions/index.json'],
+    rootPrefix
+  )
+  type IndexItem = {
+    lid?: string
+    title?: string
+    author?: string
+    thumb_up?: number
+    file?: string
+  }
+  let items: IndexItem[] = []
+
+  if (indexEntry) {
+    try {
+      const raw = JSON.parse(readEntryText(indexEntry))
+      if (Array.isArray(raw?.solutions)) items = raw.solutions
+    } catch {
+      items = []
+    }
+  }
+
+  if (items.length === 0) {
+    // 无 index 时扫描 solutions/*.md（排除子目录）
+    const prefix = rootPrefix + problemDir + 'solutions/'
+    for (const entry of zip.getEntries()) {
+      if (entry.isDirectory) continue
+      const name = entry.entryName.replace(/\\/g, '/')
+      if (!name.startsWith(prefix)) continue
+      const rest = name.slice(prefix.length)
+      if (!rest || rest.includes('/') || !rest.toLowerCase().endsWith('.md')) continue
+      if (rest.startsWith('_')) continue
+      items.push({ file: rest, title: rest.replace(/\.md$/i, ''), lid: rest.replace(/\.md$/i, '') })
+    }
+  }
+
+  items.sort((a, b) => (Number(b.thumb_up) || 0) - (Number(a.thumb_up) || 0))
+
+  const results: ImportedSolution[] = []
+  for (const item of items.slice(0, MAX_IMPORTED_SOLUTIONS)) {
+    const fileName = String(item.file || (item.lid ? `${item.lid}.md` : ''))
+      .replace(/\\/g, '/')
+      .split('/')
+      .pop()
+    if (!fileName || !fileName.toLowerCase().endsWith('.md')) continue
+    if (!isStrictSafePath(fileName) || fileName.startsWith('_')) continue
+
+    const entry = findFileUnderProblemDir(
+      zip,
+      problemDir,
+      [`solutions/${fileName}`],
+      rootPrefix
+    )
+    if (!entry) continue
+
+    let content = readEntryText(entry).replace(/^\uFEFF/, '')
+    // 文首元数据 + --- + 正文
+    const sepMatch = content.match(/\r?\n---\r?\n/)
+    if (sepMatch && sepMatch.index != null) {
+      content = content.slice(sepMatch.index + sepMatch[0].length).trim()
+    }
+    if (!content.trim()) continue
+
+    const title = String(item.title || fileName.replace(/\.md$/i, '')).trim() || '题解'
+    results.push({
+      title: title.slice(0, 200),
+      content,
+      authorName: typeof item.author === 'string' ? item.author : undefined,
+      thumbUp: Number.isFinite(Number(item.thumb_up)) ? Number(item.thumb_up) : undefined,
+      externalId: typeof item.lid === 'string' ? item.lid : undefined,
+    })
+  }
+  return results
 }
 
 /* ============================================================================
@@ -517,12 +768,19 @@ function mergeJudgeConfig(
 
 /**
  * 解析单个题目目录
- *   problemDir 形如 "problems/001-a-plus-b/"
+ *   problemDir 形如 "problems/LP1001/"
+ *   rootPrefix 兼容单层包裹 ZIP（如 "dsoj-pack/"）
+ *   indexMeta 来自 index.json（可选，用于补全题号/标题）
  */
-function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
+function parseOneProblem(
+  zip: AdmZip,
+  problemDir: string,
+  rootPrefix = '',
+  indexMeta?: PackIndexProblem
+): ImportedProblem {
   // 1. 必需文件校验
   for (const required of REQUIRED_FILES) {
-    const entry = findFileUnderProblemDir(zip, problemDir, [required])
+    const entry = findFileUnderProblemDir(zip, problemDir, [required], rootPrefix)
     if (!entry) {
       throw new ApiError(
         'MISSING_REQUIRED_FILE',
@@ -533,14 +791,15 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
   }
 
   // 2. 读取 problem.yaml
-  const problemYamlEntry = findFileUnderProblemDir(zip, problemDir, ['problem.yaml'])
+  const problemYamlEntry = findFileUnderProblemDir(zip, problemDir, ['problem.yaml'], rootPrefix)
   const problemYamlText = readEntryText(problemYamlEntry)
   const problemYaml = parseDsojYaml(problemYamlText)
 
-  // 3. 读取必需字段：title
-  const title = typeof problemYaml.title === 'string'
+  // 3. 读取必需字段：title（index.json 可兜底）
+  const titleFromYaml = typeof problemYaml.title === 'string'
     ? problemYaml.title.trim()
     : ''
+  const title = titleFromYaml || indexMeta?.title?.trim() || ''
   if (!title) {
     throw new ApiError(
       'MISSING_TITLE',
@@ -551,7 +810,7 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
 
   // 4. 读取 markdown 文件
   const description = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['description.md'])
+    findFileUnderProblemDir(zip, problemDir, ['description.md'], rootPrefix)
   )
   if (!description.trim()) {
     throw new ApiError(
@@ -561,30 +820,35 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
     )
   }
   const background = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['background.md'])
+    findFileUnderProblemDir(zip, problemDir, ['background.md'], rootPrefix)
   ) || undefined
   const input = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['input.md'])
+    findFileUnderProblemDir(zip, problemDir, ['input.md'], rootPrefix)
   )
   const output = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['output.md'])
+    findFileUnderProblemDir(zip, problemDir, ['output.md'], rootPrefix)
   )
   const hint = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['hint.md'])
+    findFileUnderProblemDir(zip, problemDir, ['hint.md'], rootPrefix)
   ) || undefined
 
   // 5. 读取 config.yaml（可选）
-  const configEntry = findFileUnderProblemDir(zip, problemDir, ['config.yaml'])
+  const configEntry = findFileUnderProblemDir(zip, problemDir, ['config.yaml'], rootPrefix)
   const configYaml = configEntry ? parseDsojYaml(readEntryText(configEntry)) : null
 
   // 6. 合并评测配置
   const judgeConfig = mergeJudgeConfig(problemYaml, configYaml)
 
-  // 7. 提取测试用例
-  const testcasesDir = findSubdirUnderProblemDir(zip, problemDir, TESTCASES_DIR_NAMES)
+  // 7. 提取测试用例（忽略 quality.json / generator.py 等过程产物）
+  const testcasesDir = findSubdirUnderProblemDir(
+    zip,
+    problemDir,
+    TESTCASES_DIR_NAMES,
+    rootPrefix
+  )
   let testCases: ImportedTestCase[] = []
   if (testcasesDir) {
-    testCases = extractTestcases(zip, testcasesDir)
+    testCases = extractTestcases(zip, rootPrefix + testcasesDir)
   }
   if (testCases.length === 0) {
     throw new ApiError(
@@ -594,27 +858,38 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
     )
   }
 
-  // 8. 提取展示样例
-  const samplesDir = findSubdirUnderProblemDir(zip, problemDir, SAMPLES_DIR_NAMES)
+  // 8. 提取展示样例：仅来自 samples/，绝不把 testcases 混进题面样例
+  //    仅当完全没有 samples/ 目录时，才用前 2 个测试点作为展示兜底
+  const samplesDir = findSubdirUnderProblemDir(
+    zip,
+    problemDir,
+    SAMPLES_DIR_NAMES,
+    rootPrefix,
+    true // 允许 samples/1/in.txt 一类嵌套
+  )
   let samples: Array<{ input: string; output: string }> = []
   if (samplesDir) {
-    samples = extractSamples(zip, samplesDir)
-  }
-  // 若无单独 samples/，取 testcases 前 2 个作为展示样例
-  if (samples.length === 0 && testCases.length > 0) {
-    samples = testCases.slice(0, 2).map(tc => ({
+    samples = extractSamples(zip, rootPrefix + samplesDir)
+    // samples/ 存在但解析为空时，回退用前 2 个评测点作展示样例
+    if (samples.length === 0 && testCases.length > 0) {
+      samples = testCases.slice(0, 2).map((tc) => ({
+        input: tc.input,
+        output: tc.output,
+      }))
+    }
+  } else if (testCases.length > 0) {
+    samples = testCases.slice(0, 2).map((tc) => ({
       input: tc.input,
       output: tc.output,
     }))
   }
 
   // 9. 读取标程（支持 .cpp/.c/.py，通过扩展名识别语言）
-  const stdEntry = findFileUnderProblemDir(zip, problemDir, STD_FILE_NAMES)
+  const stdEntry = findFileUnderProblemDir(zip, problemDir, STD_FILE_NAMES, rootPrefix)
   let stdCode: string | undefined
   let stdLang: string | undefined
   if (stdEntry) {
     stdCode = readEntryText(stdEntry)
-    // 按扩展名识别语言（与项目 lib/judge/compiler.ts 支持的语言一致）
     const ext = stdEntry.entryName.toLowerCase().split('.').pop()
     if (ext === 'cpp' || ext === 'cc' || ext === 'cxx') {
       stdLang = 'cpp'
@@ -623,49 +898,55 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
     } else if (ext === 'py') {
       stdLang = 'python'
     } else {
-      // 未知扩展名默认 cpp
       stdLang = 'cpp'
     }
   }
 
-  // 10. 读取特判代码
-  // 当前项目 Problem 模型无 spjCode 字段，解析时忽略，不报错
-  const spjEntry = findFileUnderProblemDir(zip, problemDir, ['spj.cpp', 'checker.cpp'])
-  if (spjEntry) {
-    // 标记存在但暂不使用，待项目支持 SPJ 后启用
-    void readEntryText(spjEntry)
-  }
+  // 10. 特判代码：当前模型无 spj 字段，存在则忽略
+  void findFileUnderProblemDir(zip, problemDir, ['spj.cpp', 'checker.cpp'], rootPrefix)
 
-  // 11. 解析 tags（过滤空值和空白）
+  // 11. 解析 tags（yaml 优先，index.json 兜底）
   const rawTags = problemYaml.tags
-  const tags: string[] = Array.isArray(rawTags)
+  let tags: string[] = Array.isArray(rawTags)
     ? rawTags.map(String).map(s => s.trim()).filter(Boolean)
     : (typeof rawTags === 'string' && rawTags.trim() ? [rawTags.trim()] : [])
+  if (tags.length === 0 && indexMeta?.tags?.length) {
+    tags = indexMeta.tags
+  }
 
-  // 12. 解析 difficulty：必须是项目 8 档之一，否则默认「入门」
+  // 12. 解析 difficulty
   const rawDifficulty = typeof problemYaml.difficulty === 'string'
     ? problemYaml.difficulty.trim()
-    : ''
+    : (indexMeta?.difficulty ? String(indexMeta.difficulty).trim() : '')
   const difficulty = isValidDifficulty(rawDifficulty) ? rawDifficulty : '入门'
 
-  // 13. 解析其它字段
+  // 13. 其它字段
   const source = typeof problemYaml.source === 'string'
     ? problemYaml.source.trim()
     : 'DSOJ Pack'
-  const problemNumber = typeof problemYaml.problem_number === 'string'
+  const dirSlug = problemDir.replace(PROBLEMS_DIR, '').replace(/\/$/, '')
+  const problemNumberRaw = typeof problemYaml.problem_number === 'string'
     ? problemYaml.problem_number.trim()
-    : undefined
-  // visibility 校验：必须是 public/private/contest 之一，否则用默认值 public
+    : ''
+  const problemNumber =
+    problemNumberRaw ||
+    indexMeta?.pid?.trim() ||
+    (dirSlug && !/^\d{4}-/.test(dirSlug) ? dirSlug : undefined)
+
   const rawVisibility = typeof problemYaml.visibility === 'string'
     ? problemYaml.visibility.trim().toLowerCase()
     : ''
   const visibility = (VALID_VISIBILITIES as readonly string[]).includes(rawVisibility)
-    ? rawVisibility
-    : VISIBILITY_DEFAULT
+    ? (rawVisibility as 'public' | 'private' | 'contest')
+    : undefined
 
-  // visibility 已校验但 ImportedProblem 接口不包含此字段，
-  // 实际入库时由 ImportOptions.visibility 统一覆盖（service.ts 设计）
-  void visibility
+  const luoguPidRaw =
+    (typeof problemYaml.luogu_pid === 'string' ? problemYaml.luogu_pid.trim() : '') ||
+    indexMeta?.luogu_pid?.trim() ||
+    ''
+
+  // 14. 可选题解
+  const solutions = extractSolutions(zip, problemDir, rootPrefix)
 
   return {
     title,
@@ -685,8 +966,10 @@ function parseOneProblem(zip: AdmZip, problemDir: string): ImportedProblem {
     stdCode,
     stdLang,
     testCases,
+    solutions: solutions.length > 0 ? solutions : undefined,
     problemNumber: problemNumber || undefined,
-    externalId: problemDir.replace(PROBLEMS_DIR, '').replace(/\/$/, ''),
+    externalId: luoguPidRaw || dirSlug,
+    visibility,
   }
 }
 
@@ -706,7 +989,6 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
     throw new ApiError('INVALID_DSOJ_ZIP', 'DSOJ 题包内容为空', 400)
   }
 
-  // 解压 ZIP
   let zip: AdmZip
   try {
     zip = new AdmZip(zipBuffer)
@@ -714,7 +996,6 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
     throw new ApiError('INVALID_DSOJ_ZIP', `ZIP 解压失败: ${e.message}`, 400)
   }
 
-  // 安全校验：所有 entry 路径
   for (const entry of zip.getEntries()) {
     if (entry.isDirectory) continue
     if (!isStrictSafePath(entry.entryName)) {
@@ -726,11 +1007,13 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
     }
   }
 
-  // 读取 pack.yaml（可选但推荐）
-  const packEntry = zip.getEntry('pack.yaml')
-  if (packEntry && !packEntry.isDirectory) {
+  const rootPrefix = detectZipRootPrefix(zip)
+
+  // pack.yaml：校验 format / version，读取 index 文件名
+  let indexFileName = 'index.json'
+  const packEntry = getZipEntry(zip, rootPrefix, 'pack.yaml')
+  if (packEntry) {
     const packYaml = parseDsojYaml(readEntryText(packEntry))
-    // 校验格式标识
     const format = typeof packYaml.format === 'string' ? packYaml.format : ''
     if (format && format !== DSOJ_FORMAT_ID) {
       throw new ApiError(
@@ -739,44 +1022,55 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
         400
       )
     }
-    // 版本校验（当前仅支持 1.0）
-    const version = typeof packYaml.version === 'string' ? packYaml.version : ''
-    if (version && version !== DSOJ_FORMAT_VERSION) {
-      // 版本不匹配仅警告，不阻断（向前兼容）
-      // 实际生产可改为严格校验
+    const version = typeof packYaml.version === 'string' ? String(packYaml.version) : ''
+    if (version && !DSOJ_SUPPORTED_VERSIONS.has(version)) {
+      throw new ApiError(
+        'UNSUPPORTED_VERSION',
+        `不支持的题包版本 "${version}"（支持 ${[...DSOJ_SUPPORTED_VERSIONS].join(' / ')}）`,
+        400
+      )
+    }
+    if (typeof packYaml.index === 'string' && packYaml.index.trim()) {
+      const name = packYaml.index.trim().replace(/\\/g, '/')
+      if (name.includes('..') || name.includes('/')) {
+        throw new ApiError('INVALID_INDEX', 'pack.yaml.index 非法', 400)
+      }
+      indexFileName = name
     }
   }
 
-  // 列出所有题目目录
-  const problemDirs = listProblemDirs(zip)
-  if (problemDirs.length === 0) {
+  // v2：优先 index.json；失败则扫描 problems/*
+  const indexed = listProblemDirsFromIndex(zip, rootPrefix, indexFileName)
+  const problemJobs: Array<{ dir: string; meta?: PackIndexProblem }> = indexed
+    ? indexed.map((item) => ({
+        dir: PROBLEMS_DIR + item.dir.replace(/^\/+|\/+$/g, '') + '/',
+        meta: item,
+      }))
+    : listProblemDirs(zip, rootPrefix).map((dir) => ({ dir }))
+
+  if (problemJobs.length === 0) {
     throw new ApiError(
       'NO_PROBLEMS',
-      '题包未找到任何题目目录（应在 problems/ 下创建题目子目录）',
+      '题包未找到任何题目目录（应在 problems/ 下创建题目子目录，或提供 index.json）',
       400
     )
   }
 
-  // 逐题解析（单题失败不影响其他题）
   const results: ImportedProblem[] = []
   const errors: Array<{ dir: string; reason: string }> = []
 
-  for (const dir of problemDirs) {
+  for (const job of problemJobs) {
     try {
-      const problem = parseOneProblem(zip, dir)
-      results.push(problem)
+      results.push(parseOneProblem(zip, job.dir, rootPrefix, job.meta))
     } catch (err: any) {
-      // 记录错误但继续处理其他题
-      const reason = err instanceof ApiError
-        ? err.message
-        : (err?.message || '未知错误')
-      errors.push({ dir, reason })
+      const reason =
+        err instanceof ApiError ? err.message : err?.message || '未知错误'
+      errors.push({ dir: job.dir, reason })
     }
   }
 
-  // 全部失败才抛错
   if (results.length === 0) {
-    const detail = errors.map(e => `${e.dir}: ${e.reason}`).join('; ')
+    const detail = errors.map((e) => `${e.dir}: ${e.reason}`).join('; ')
     throw new ApiError(
       'ALL_PROBLEMS_FAILED',
       `题包中所有题目解析失败。详情: ${detail}`,
@@ -784,25 +1078,19 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
     )
   }
 
-  // 部分失败：在控制台输出警告（调用方可通过返回的 results.length 与题目总数对比得知）
-  // 此处不抛错，由 service.ts 的错误隔离机制处理
-  if (errors.length > 0) {
-    // 静默处理，错误信息由调用方通过对比 results.length 推断
-    // 真正的错误信息会通过 importOneProblem 的 try/catch 捕获
-  }
-
   return results
 }
 
 /**
  * 检测一个 ZIP buffer 是否是 DSOJ 标准题包
- *   通过 pack.yaml.format 字段判断
+ *   通过 pack.yaml.format 字段判断（兼容单层包裹）
  */
 export function isDsojPack(zipBuffer: Buffer): boolean {
   try {
     const zip = new AdmZip(zipBuffer)
-    const packEntry = zip.getEntry('pack.yaml')
-    if (!packEntry || packEntry.isDirectory) return false
+    const rootPrefix = detectZipRootPrefix(zip)
+    const packEntry = getZipEntry(zip, rootPrefix, 'pack.yaml')
+    if (!packEntry) return false
     const packYaml = parseDsojYaml(readEntryText(packEntry))
     return packYaml.format === DSOJ_FORMAT_ID
   } catch {

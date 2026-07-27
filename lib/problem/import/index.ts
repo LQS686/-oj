@@ -8,6 +8,7 @@ export type {
   ImportedProblem,
   ImportedTestCase,
   ImportedSample,
+  ImportedSolution,
   ImportedProblemResult,
   ImportBatchResult,
   ImportFormat,
@@ -18,6 +19,14 @@ export {
   importProblems,
   importOneProblem,
 } from './service'
+
+export {
+  executeProblemImport,
+  parseImportOptions,
+  parseImportByFormat,
+  VALID_IMPORT_FORMATS,
+  IMPORT_MAX_FILE_BYTES,
+} from './execute'
 
 export {
   parseFps,

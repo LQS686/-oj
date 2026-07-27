@@ -74,7 +74,7 @@ const RULES: TitleRule[] = [
   { test: /^\/problems\/[^/]+\/solutions\/new$/, title: '发布题解' },
   { test: /^\/problems\/[^/]+\/solutions\/[^/]+\/edit$/, title: '编辑题解' },
   { test: /^\/problems\/[^/]+\/solutions\/[^/]+$/, title: '题解' },
-  { test: /^\/problems\/[^/]+\/solutions$/, title: '题解' },
+  // 列表页已重定向到 /problem/:id?tab=solutions，标题由题目页接管
   { test: /^\/problems$/, title: '题库' },
 
   // 训练

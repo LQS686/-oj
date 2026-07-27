@@ -1,6 +1,7 @@
 // 输出比较模块
 // 参考 Project LemonLime 的 judgingthread.cpp 中的比较函数
-// 使用 Node.js ReadStream + 128KB 缓冲区逐块比较（对应 LemonLime BufferedStreamReader）
+// 使用 Node.js ReadStream + Buffer 块扫描（O(n) 按行/按 token），禁止逐字符 async 扫描大输出
+import { createReadStream } from 'fs'
 import { Readable } from 'stream'
 import type { CompareInput, CompareResult } from './types'
 
@@ -11,48 +12,71 @@ const BUFFER_SIZE = 128 * 1024
 // 拒绝 "3.14abc" 等带尾部垃圾的 token（parseFloat 会静默忽略尾部非数字字符）
 const FLOAT_REGEX = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/
 
+const LF = 0x0a
+const CR = 0x0d
+const SPACE = 0x20
+const TAB = 0x09
+
 /**
- * 流式缓冲读取器
- * 参考 LemonLime 的 BufferedStreamReader，包装 Node.js Readable，
- * 以 BUFFER_SIZE 为单位逐块读取，逐字符处理，不使用 split()。
+ * 流式缓冲读取器（Buffer 版）
+ * 参考 LemonLime BufferedStreamReader：按块读取，用 indexOf 找行/空白分隔，
+ * 避免对百万行测点做「逐字符 + async」把 V8 堆打爆。
  */
 class BufferedStreamReader {
   private stream: Readable
-  private buffer: string
+  private buffer: Buffer
   private pos: number
   private lineNumber: number
   private streamEnded: boolean
 
   constructor(stream: Readable) {
     this.stream = stream
-    this.stream.setEncoding('utf-8')
-    this.buffer = ''
+    // 保持 Buffer 模式，勿 setEncoding
+    this.buffer = Buffer.alloc(0)
     this.pos = 0
     this.lineNumber = 1
     this.streamEnded = false
   }
 
-  // 必要时从流中加载下一块数据
+  private compact(): void {
+    if (this.pos > 0) {
+      this.buffer = this.buffer.subarray(this.pos)
+      this.pos = 0
+    }
+  }
+
   private async ensureData(): Promise<void> {
     if (this.pos < this.buffer.length) return
     if (this.streamEnded) return
+
+    const pull = (): Buffer | null => {
+      // 关键：readable.read(n) 在缓冲不足 n 字节且未 end 时会返回 null。
+      // 小文件（如样例）永远凑不齐 128KiB → 一直读到空。应按可读长度拉取。
+      const available = this.stream.readableLength
+      if (available > 0) {
+        return this.stream.read(Math.min(BUFFER_SIZE, available)) as Buffer | null
+      }
+      if (this.stream.readableEnded) {
+        return this.stream.read() as Buffer | null
+      }
+      // 未知可读长度时尝试一次不限长 read（paused 模式下取当前缓冲）
+      return this.stream.read() as Buffer | null
+    }
+
     if (this.stream.readableEnded) {
+      this.compact()
+      const rest = pull()
+      if (rest !== null && rest.length > 0) {
+        this.buffer = this.buffer.length === 0 ? rest : Buffer.concat([this.buffer, rest])
+        return
+      }
       this.streamEnded = true
       return
     }
-    // 紧凑缓冲区：丢弃已消费前缀，重置 pos
-    if (this.pos > 0) {
-      this.buffer = this.buffer.slice(this.pos)
-      this.pos = 0
-    }
-    // 尝试同步读取一块
-    let chunk = this.stream.read()
-    if (chunk === null) {
-      if (this.stream.readableEnded) {
-        this.streamEnded = true
-        return
-      }
-      // 暂无数据可读，等待 'readable' 或 'end' 事件
+    this.compact()
+
+    let chunk = pull()
+    if (chunk === null || chunk.length === 0) {
       await new Promise<void>((resolve) => {
         const onReadable = (): void => {
           this.stream.off('end', onEnd)
@@ -60,116 +84,208 @@ class BufferedStreamReader {
         }
         const onEnd = (): void => {
           this.stream.off('readable', onReadable)
-          this.streamEnded = true
           resolve()
         }
         this.stream.once('readable', onReadable)
         this.stream.once('end', onEnd)
+        if (this.stream.readableLength > 0 || this.stream.readableEnded) {
+          this.stream.off('readable', onReadable)
+          this.stream.off('end', onEnd)
+          resolve()
+        }
       })
-      if (this.streamEnded) return
-      chunk = this.stream.read()
+      chunk = pull()
+      if ((chunk === null || chunk.length === 0) && this.stream.readableEnded) {
+        this.streamEnded = true
+        return
+      }
     }
-    if (chunk !== null) {
-      this.buffer += chunk
+    if (chunk !== null && chunk.length > 0) {
+      this.buffer = this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk])
     }
   }
 
-  // 是否已读到末尾
   async eof(): Promise<boolean> {
     await this.ensureData()
     return this.pos >= this.buffer.length && this.streamEnded
   }
 
-  // 当前行号
   line(): number {
     return this.lineNumber
   }
 
-  // 读取直到换行符或末尾，处理 \r\n / \n / \r 行尾，每行最多 maxLen 字符
-  // 截断后继续消费剩余字符至行尾（丢弃多余字符），避免下一轮从行中间读取导致误判 AC
-  async nextUntilNewLine(maxLen = 1024): Promise<string> {
-    let result = ''
+  /** 消费一行结尾的 \r\n / \n / \r，并增加行号 */
+  private async consumeNewlineAt(pos: number): Promise<number> {
+    const ch = this.buffer[pos]
+    if (ch === CR) {
+      pos++
+      if (pos >= this.buffer.length) {
+        this.pos = pos
+        await this.ensureData()
+        pos = this.pos
+      }
+      if (pos < this.buffer.length && this.buffer[pos] === LF) {
+        pos++
+      }
+    } else if (ch === LF) {
+      pos++
+    }
+    this.lineNumber++
+    return pos
+  }
+
+  // 读取直到换行符或末尾；返回 Buffer（调用方负责 trim/toString）
+  async nextUntilNewLineBuf(maxLen = 1024): Promise<Buffer> {
+    await this.ensureData()
+    if (this.pos >= this.buffer.length && this.streamEnded) {
+      return Buffer.alloc(0)
+    }
+
+    const parts: Buffer[] = []
+    let taken = 0
+
     while (true) {
       await this.ensureData()
       if (this.pos >= this.buffer.length) {
         break
       }
-      const ch = this.buffer[this.pos]
-      if (ch === '\r' || ch === '\n') {
-        if (ch === '\r') {
-          this.pos++
-          await this.ensureData()
-          if (this.pos < this.buffer.length && this.buffer[this.pos] === '\n') {
-            this.pos++
-          }
-        } else {
-          this.pos++
+
+      const slice = this.buffer.subarray(this.pos)
+      let nl = slice.indexOf(LF)
+      const cr = slice.indexOf(CR)
+      let cut = -1
+      if (nl >= 0 && cr >= 0) cut = Math.min(nl, cr)
+      else if (nl >= 0) cut = nl
+      else if (cr >= 0) cut = cr
+
+      if (cut >= 0) {
+        if (taken < maxLen) {
+          const need = Math.min(cut, maxLen - taken)
+          if (need > 0) parts.push(slice.subarray(0, need))
+          taken += need
         }
-        this.lineNumber++
+        this.pos = await this.consumeNewlineAt(this.pos + cut)
         break
       }
-      // 未达 maxLen 时累积字符；已达 maxLen 时仅前进 pos（丢弃多余字符）
-      if (result.length < maxLen) {
-        result += ch
+
+      if (taken < maxLen) {
+        const need = Math.min(slice.length, maxLen - taken)
+        if (need > 0) parts.push(slice.subarray(0, need))
+        taken += need
       }
-      this.pos++
+      this.pos = this.buffer.length
+      await this.ensureData()
+      if (this.pos >= this.buffer.length && this.streamEnded) {
+        break
+      }
+      if (taken >= maxLen) {
+        continue
+      }
     }
-    return result
+
+    if (parts.length === 0) return Buffer.alloc(0)
+    if (parts.length === 1) return parts[0]
+    return Buffer.concat(parts)
+  }
+
+  async nextUntilNewLine(maxLen = 1024): Promise<string> {
+    const buf = await this.nextUntilNewLineBuf(maxLen)
+    return buf.length === 0 ? '' : buf.toString('utf-8')
   }
 
   // 跳过前导空白后读取一个 token，最多 maxLen 字符
   async nextUntilSpace(maxLen = 256): Promise<string> {
-    // 跳过前导空白（空格、制表符、\r、\n，换行会增加行号）
     while (true) {
       await this.ensureData()
       if (this.pos >= this.buffer.length) break
       const ch = this.buffer[this.pos]
-      if (ch === ' ' || ch === '\t') {
+      if (ch === SPACE || ch === TAB) {
         this.pos++
-      } else if (ch === '\r' || ch === '\n') {
-        if (ch === '\r') {
-          this.pos++
-          await this.ensureData()
-          if (this.pos < this.buffer.length && this.buffer[this.pos] === '\n') {
-            this.pos++
-          }
-        } else {
-          this.pos++
-        }
-        this.lineNumber++
+      } else if (ch === CR || ch === LF) {
+        this.pos = await this.consumeNewlineAt(this.pos)
       } else {
         break
       }
     }
-    // 读取非空白字符
-    let result = ''
-    while (result.length < maxLen) {
+
+    const parts: Buffer[] = []
+    let taken = 0
+    while (taken < maxLen) {
       await this.ensureData()
       if (this.pos >= this.buffer.length) break
-      const ch = this.buffer[this.pos]
-      if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n') break
-      result += ch
-      this.pos++
+      const slice = this.buffer.subarray(this.pos)
+      let end = 0
+      while (end < slice.length) {
+        const c = slice[end]
+        if (c === SPACE || c === TAB || c === CR || c === LF) break
+        end++
+        if (taken + end >= maxLen) break
+      }
+      if (end === 0) break
+      const take = Math.min(end, maxLen - taken)
+      parts.push(slice.subarray(0, take))
+      taken += take
+      this.pos += take
+      if (take < end) break // hit maxLen
+      // 若停在空白前，下一轮 while 会 break；若本块扫完非空白，继续
+      if (this.pos < this.buffer.length) {
+        const c = this.buffer[this.pos]
+        if (c === SPACE || c === TAB || c === CR || c === LF) break
+      }
     }
-    return result
+
+    if (parts.length === 0) return ''
+    if (parts.length === 1) return parts[0].toString('utf-8')
+    return Buffer.concat(parts).toString('utf-8')
   }
 }
 
-// 将字符串切分为 BUFFER_SIZE 大小的块，构造为 Readable 流，提供流式语义
+/** 惰性字符串 → Buffer 流 */
 function createStringStream(data: string): Readable {
-  const chunks: string[] = []
-  for (let i = 0; i < data.length; i += BUFFER_SIZE) {
-    chunks.push(data.slice(i, i + BUFFER_SIZE))
-  }
-  return Readable.from(chunks)
+  let offset = 0
+  return new Readable({
+    read(size) {
+      if (offset >= data.length) {
+        this.push(null)
+        return
+      }
+      const end = Math.min(offset + Math.max(size || BUFFER_SIZE, 1), data.length)
+      const chunk = Buffer.from(data.slice(offset, end), 'utf-8')
+      offset = end
+      this.push(chunk)
+    },
+  })
 }
 
-// 截断字符串到指定长度
+function openCompareStream(path: string | undefined, fallback: string | undefined, label: string): Readable {
+  if (path) {
+    return createReadStream(path, { highWaterMark: BUFFER_SIZE })
+  }
+  if (typeof fallback === 'string') {
+    return createStringStream(fallback)
+  }
+  throw new Error(`compareOutput: 缺少 ${label}（需提供文件路径或字符串）`)
+}
+
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) : s
 }
 
-// 默认比较（NOI 模式）：逐行 trimEnd，仅跳过尾部空行，与旧 normalize 实现等价
+/** 去掉行尾空格/制表符（对齐 trimEnd），不分配字符串 */
+function trimEndBuf(buf: Buffer): Buffer {
+  let end = buf.length
+  while (end > 0) {
+    const c = buf[end - 1]
+    if (c === SPACE || c === TAB) end--
+    else break
+  }
+  return end === buf.length ? buf : buf.subarray(0, end)
+}
+
+function buffersEqual(a: Buffer, b: Buffer): boolean {
+  return a.length === b.length && (a.length === 0 || a.equals(b))
+}
+
 async function compareDefault(
   userReader: BufferedStreamReader,
   stdReader: BufferedStreamReader,
@@ -177,16 +293,16 @@ async function compareDefault(
 ): Promise<CompareResult> {
   while (true) {
     const lineNum = userReader.line()
-    const userLine = (await userReader.nextUntilNewLine()).trimEnd()
-    const stdLine = (await stdReader.nextUntilNewLine()).trimEnd()
+    const userLine = trimEndBuf(await userReader.nextUntilNewLineBuf())
+    const stdLine = trimEndBuf(await stdReader.nextUntilNewLineBuf())
     const userEof = await userReader.eof()
     const stdEof = await stdReader.eof()
 
-    if (userLine !== stdLine) {
+    if (!buffersEqual(userLine, stdLine)) {
       return {
         score: 0,
         status: 'WA',
-        message: `第 ${lineNum} 行，期望 "${truncate(stdLine, 64)}" 但得到 "${truncate(userLine, 64)}"`,
+        message: `第 ${lineNum} 行，期望 "${truncate(stdLine.toString('utf-8'), 64)}" 但得到 "${truncate(userLine.toString('utf-8'), 64)}"`,
       }
     }
     if (userEof && stdEof) {
@@ -195,7 +311,6 @@ async function compareDefault(
   }
 }
 
-// 严格比较（逐行字节精确匹配，不规范化）
 async function compareStrict(
   userReader: BufferedStreamReader,
   stdReader: BufferedStreamReader,
@@ -209,29 +324,26 @@ async function compareStrict(
       return { score: fullScore, status: 'AC', message: '' }
     }
     if (userEof && !stdEof) {
-      // 选手输出行数不足
       return { score: 0, status: 'WA', message: `第 ${stdReader.line()} 行，选手输出内容不足` }
     }
     if (!userEof && stdEof) {
-      // 选手输出行数过多
       return { score: 0, status: 'OLE', message: `第 ${userReader.line()} 行，选手输出内容过多` }
     }
 
     const lineNum = userReader.line()
-    const userLine = await userReader.nextUntilNewLine()
-    const stdLine = await stdReader.nextUntilNewLine()
+    const userLine = await userReader.nextUntilNewLineBuf()
+    const stdLine = await stdReader.nextUntilNewLineBuf()
 
-    if (userLine !== stdLine) {
+    if (!buffersEqual(userLine, stdLine)) {
       return {
         score: 0,
         status: 'WA',
-        message: `第 ${lineNum} 行，期望 "${truncate(stdLine, 64)}" 但得到 "${truncate(userLine, 64)}"`,
+        message: `第 ${lineNum} 行，期望 "${truncate(stdLine.toString('utf-8'), 64)}" 但得到 "${truncate(userLine.toString('utf-8'), 64)}"`,
       }
     }
   }
 }
 
-// 忽略空白比较（按 token 比较，忽略所有空白差异）
 async function compareIgnoreSpaces(
   userReader: BufferedStreamReader,
   stdReader: BufferedStreamReader,
@@ -242,34 +354,27 @@ async function compareIgnoreSpaces(
     const stdToken = await stdReader.nextUntilSpace()
 
     if (userToken === stdToken) {
-      // token 相同
       const userEof = await userReader.eof()
       const stdEof = await stdReader.eof()
       if (userEof && stdEof) {
-        // 均到末尾，全部 token 匹配完成
         return { score: fullScore, status: 'AC', message: '' }
       }
-      // 每次 token 相等后检查行号（对齐 LemonLime judgingthread.cpp:279-284）
       if (userReader.line() !== stdReader.line()) {
         return { score: 0, status: 'PE', message: `第 ${userReader.line()} 行格式错误` }
       }
       continue
     }
 
-    // token 不同
     const userEmpty = userToken === '' && (await userReader.eof())
     const stdEmpty = stdToken === '' && (await stdReader.eof())
 
     if (userEmpty && !stdEmpty) {
-      // 选手内容不足
       return { score: 0, status: 'WA', message: `第 ${stdReader.line()} 行，选手输出内容不足` }
     }
     if (stdEmpty && !userEmpty) {
-      // 选手内容过多
       return { score: 0, status: 'OLE', message: `第 ${userReader.line()} 行，选手输出内容过多` }
     }
 
-    // token 实质不同
     return {
       score: 0,
       status: 'WA',
@@ -278,7 +383,6 @@ async function compareIgnoreSpaces(
   }
 }
 
-// 浮点数比较（带 epsilon）
 async function compareRealNumbers(
   userReader: BufferedStreamReader,
   stdReader: BufferedStreamReader,
@@ -303,7 +407,6 @@ async function compareRealNumbers(
       return { score: 0, status: 'OLE', message: `第 ${userReader.line()} 行，选手输出内容过多` }
     }
 
-    // 校验 token 格式：对齐 LemonLime fscanf("%Lf")，拒绝带尾部垃圾的 token
     if (userToken.length > 0 && !FLOAT_REGEX.test(userToken)) {
       return { score: 0, status: 'WA', message: `第 ${userReader.line()} 行，无效的数字格式: ${userToken}` }
     }
@@ -314,7 +417,6 @@ async function compareRealNumbers(
     const a = parseFloat(userToken)
     const b = parseFloat(stdToken)
 
-    // NaN / Inf 处理
     if (Number.isNaN(a) !== Number.isNaN(b) || Number.isFinite(a) !== Number.isFinite(b)) {
       return { score: 0, status: 'WA', message: `第 ${userReader.line()} 行，期望 ${b} 但得到 ${a}` }
     }
@@ -326,19 +428,39 @@ async function compareRealNumbers(
   }
 }
 
-// 比较调度入口
+// 比较调度入口（双方均为文件时走同步比对，避免百万行 Promise OOM）
 export async function compareOutput(input: CompareInput): Promise<CompareResult> {
-  const userReader = new BufferedStreamReader(createStringStream(input.userOutput))
-  const stdReader = new BufferedStreamReader(createStringStream(input.expectedOutput))
-  switch (input.comparisonMode) {
-    case 'strict':
-      return await compareStrict(userReader, stdReader, input.fullScore)
-    case 'ignore-spaces':
-      return await compareIgnoreSpaces(userReader, stdReader, input.fullScore)
-    case 'real-number':
-      return await compareRealNumbers(userReader, stdReader, input.fullScore, input.realPrecision ?? 3)
-    case 'default':
-    default:
-      return await compareDefault(userReader, stdReader, input.fullScore)
+  if (input.userOutputPath && input.expectedOutputPath) {
+    // 让出事件循环，使并行测点的其它 child 能完成调度
+    await new Promise<void>((r) => setImmediate(r))
+    const { compareFilesSync } = await import('./comparator-sync-file')
+    return compareFilesSync(
+      input.userOutputPath,
+      input.expectedOutputPath,
+      input.fullScore,
+      input.comparisonMode,
+      input.realPrecision ?? 3,
+    )
+  }
+
+  const userStream = openCompareStream(input.userOutputPath, input.userOutput, 'userOutput')
+  const stdStream = openCompareStream(input.expectedOutputPath, input.expectedOutput, 'expectedOutput')
+  const userReader = new BufferedStreamReader(userStream)
+  const stdReader = new BufferedStreamReader(stdStream)
+  try {
+    switch (input.comparisonMode) {
+      case 'strict':
+        return await compareStrict(userReader, stdReader, input.fullScore)
+      case 'ignore-spaces':
+        return await compareIgnoreSpaces(userReader, stdReader, input.fullScore)
+      case 'real-number':
+        return await compareRealNumbers(userReader, stdReader, input.fullScore, input.realPrecision ?? 3)
+      case 'default':
+      default:
+        return await compareDefault(userReader, stdReader, input.fullScore)
+    }
+  } finally {
+    userStream.destroy()
+    stdStream.destroy()
   }
 }
