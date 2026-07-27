@@ -41,20 +41,25 @@
 
 ### 其他功能
 
-- **代码编辑器** — 集成 CodeMirror 6，支持 C++/C/Java/Python/JavaScript 等多语言高亮与自动补全
+- **代码编辑器** — 基于 CodeMirror 6，支持 C++/C/Java/Python/JavaScript 等多语言高亮与自动补全
 - **题目预测试** — 提交前自定义测试用例快速验证（`/api/problems/[id]/pretest` + `PretestPanel`）
 - **题目统计** — 提交分布、AC 率、难度通过率等多维统计（`/api/problems/[id]/stats` + `ProblemStatsPanel`）
 - **随机一题** — 训练模式推荐题目（`/api/problems/random`）
-- **竞赛模式** — ACM/OI 赛制，实时榜单，赛题管理、解封
-- **训练题单** — 官方 / 竞赛真题 / 我的收藏分类（个人创建已移除，仅管理员可创建）
+- **竞赛模式** — ACM/OI 赛制，实时榜单，赛题管理、解封、倒计时面板
+- **训练题单** — 官方 / 竞赛真题 / 我的收藏分类（个人创建已移除，仅管理员可创建）；独立 `/training/[id]/problems` 题单工作区
 - **题目导入导出** — 支持 DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces 同步格式
+- **题目标准程序验证** — 后台使用 std 答案对题目进行回归测试（`/api/admin/problems/[id]/verify` + `verify-std`）
+- **Windows 评测 runner** — Windows 开发环境下提供 C# 实现的隔离评测 runner（`lib/judge/win-runner.*`）
 - **用户热力图** — 用户主页展示一年提交活跃度（`SubmissionHeatmap`）
+- **帮助中心** — `app/help/` 提供平台使用说明
 - **响应式设计** — 移动端 Drawer 抽屉菜单适配
 - **Docker 部署** — 一键部署，MongoDB 副本集 + Redis 缓存 + Nginx 反代
 
 > **说明**：班级积分账户、积分商城、积分流水及邀请码机制已移除；历史 MongoDB 集合需自行清理（见更新日志）。
 
 ## 快速开始
+
+> **推荐开发方式（Linux / WSL + Docker）**：在 WSL 内用 `docker compose up -d --build` 跑完整栈；或编辑在 Windows、运行在 WSL：`.\scripts\wsl-dev.ps1`（见 [docs/WSL_DEV.md](docs/WSL_DEV.md)）。**不支持 Windows 宿主本地评测。**
 
 ### 环境要求
 
@@ -108,23 +113,34 @@ ENCRYPTION_KEY=your-32-char-hex-key
 > 可在后台管理题目、竞赛、班级等。
 > 详见 `app/api/auth/register/route.ts` 的 `isFirstUser` 判定逻辑。
 
-> ⚠️ **生产环境强制要求**：必须设置 `JWT_SECRET`（≥32 字符）与 `USE_DOCKER=true`（评测沙箱）。Windows 开发环境下若未启用 Docker，评测机会在启动时输出安全告警但仍可运行（仅供开发）。
+> ⚠️ **生产环境强制要求**：必须设置 `JWT_SECRET`（≥32 字符）。生产评测建议 `USE_DOCKER=true`，或使用本仓库 `docker compose`（应用容器内 `USE_DOCKER=false`，依赖容器隔离）。**请勿在 Windows 宿主上直接跑评测。**
 
 ## Docker 部署
 
+**推荐（按环境选择脚本）：**
+
+| 场景 | 脚本 |
+|------|------|
+| WSL / Linux | `sudo bash scripts/deploy.sh` 或 `docker compose up -d --build` |
+| 宝塔面板 | `sudo bash scripts/bt-deploy.sh https://你的域名`（详见 [docs/BT_DEPLOY.md](docs/BT_DEPLOY.md)） |
+
+手动部署：
+
 ```bash
 cp .env.example .env
-# 编辑 .env 设置 JWT_SECRET
-docker-compose up -d --build
-docker-compose logs -f app
+# 编辑 .env：填写 JWT_SECRET / ENCRYPTION_KEY / MONGO_*_PASSWORD / REDIS_PASSWORD / FRONTEND_URL
+# 首次还需：openssl rand -base64 512 | tr -d '\n' > mongo-keyfile && chmod 600 mongo-keyfile
+docker compose up -d --build
+docker compose logs -f app
 ```
 
-| 服务  | 端口   | 说明             |
-| ----- | ------ | ---------------- |
-| app   | 3000   | Next.js 应用     |
-| mongo | 27017  | MongoDB (副本集) |
-| redis | 6379   | Redis 缓存       |
-| nginx | 80/443 | 反向代理         |
+| 服务  | 端口   | 说明 |
+| ----- | ------ | ---- |
+| app   | 3000   | Next.js 应用（自定义 server + Socket.IO） |
+| mongo | 内部   | MongoDB 7 副本集（默认不映射宿主端口） |
+| redis | 内部   | Redis 缓存（默认不映射宿主端口） |
+
+> 反向代理（80/443）由**宿主机 Nginx / 宝塔**承担，compose 内不含 nginx 服务。
 
 ## 技术架构
 
@@ -147,10 +163,10 @@ docker-compose logs -f app
 ### 评测系统
 
 - 内存队列 (EventEmitter) / BullMQ（可选）
-- Docker 沙箱隔离编译执行（生产强制；Windows 开发环境告警降级）
+- Docker / 容器内 `runner.sh` 沙箱编译执行（Linux only；不支持 Windows 宿主评测）
 - 输出比对 + 时间/内存检查
 - 静态危险模式告警（最终安全边界由沙箱决定）
-
+- 默认跑完全部测点（OI 全量）；不因 TLE 跳过剩余点
 ## 安全架构
 
 本项目经过完整的安全加固流程，覆盖 P0-P3 全部 20 项优化项。
@@ -196,26 +212,30 @@ dashan-oj/
 │   ├── problems/、contests/、training/  # 列表与详情页
 │   └── profile/、settings/       # 用户中心
 ├── components/
-│   ├── common/                   # EducationalPageShell、MarkdownRenderer 等
+│   ├── common/                   # EducationalPageShell、MarkdownRenderer、Modal/Dialog/CreateModalShell 等
+│   ├── layout/                   # PageContainer 等通用布局
+│   ├── entity/                   # 实体卡片组件（EntityDetailHeader / InfoCard / OverviewLayout）
 │   ├── class/、contest/、training/、problem/、solution/
 │   └── admin/                    # 后台组件
 ├── lib/
-│   ├── api/                      # withApi（统一封装）、handler（鉴权缓存）、response、validation
-│   ├── auth/                     # 认证服务（JWT、httpOnly Cookie、tokenVersion）
+│   ├── api/                      # withApi（统一封装）、handler（鉴权缓存）、response、validation、swr
+│   ├── auth/                     # 认证服务（JWT、httpOnly Cookie、tokenVersion、server-session）
 │   ├── permissions.ts            # 4 级角色权限单一来源（canAccessAdmin 等）
-│   ├── judge/                    # 评测机（compiler/executor-core/docker/pretest/process-stats）
+│   ├── judge/                    # 评测机（compiler/executor-core/docker/pretest/process-stats/types/runner + Windows runner）
 │   ├── class/、problem/、submission/、contest/、training/、solution/
-│   ├── mongodb/                  # MongoDB 直接访问层（client/contest-direct/submission-direct/...）
+│   ├── mongodb/                  # MongoDB 直接访问层（client/contest-direct/submission-direct/assignment-direct）
 │   ├── security/                 # safe-fetch 等通用安全工具
-│   ├── cache.ts                  # 业务层缓存
+│   ├── cache.ts                  # 业务层缓存（Redis 优先 + 内存 L1）
 │   ├── crypto.ts                 # 通用加密（SMTP 授权码等敏感配置）
 │   ├── upload.ts                 # 文件上传 + 魔数校验
+│   ├── navigation.ts             # 客户端导航与进度条辅助
 │   └── prisma.ts
 ├── prisma/schema.prisma          # 30 个模型；已移除 Points* 与 ClassInvite
-├── hooks/、contexts/             # UserContext、SettingsContext、SWR Provider
-├── tests/                        # vitest 测试
-├── scripts/                      # 部署与维护脚本
-└── docs/                         # 部署 / 命名规范 / 角色体系文档
+├── hooks/                        # UserContext/SubmissionSocket/ContestCountdown/WallClock 等
+├── contexts/                     # ContestProblemWorkspaceContext / TrainingProblemWorkspaceContext 等
+├── tests/                        # vitest 测试（提交状态、批量注册 CSV、导航、Redis 配置等）
+├── scripts/                      # 部署、迁移（migrate-legacy-difficulty.cjs）与维护脚本
+└── docs/                         # 部署 / WSL 开发同步 / 命名规范 / 角色体系文档
 ```
 
 ### 业务层调用链
@@ -235,6 +255,23 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 - **清理入口** — `lib/user/service.ts` 的 `clearUserCache` 统一调用 `clearAuthUserCache`（鉴权层）+ 业务缓存
 
 ## 更新日志
+
+### 2026/07（评测与工作区重构 + 题目全链路增强）
+
+- **评测系统模块化** — `lib/judge` 拆分为 `compiler`/`executor-core`/`docker`/`pretest`/`process-stats`/`types`/`runner` 等子模块，新增 Windows 开发环境隔离评测 runner（`win-runner.exe` + C# 源码 + PowerShell 包装）
+- **题目标准程序验证** — 新增 [lib/problem/verify-std.ts](file:///e:/桌面/dsoj/lib/problem/verify-std.ts) 与 [/api/admin/problems/[id]/verify](file:///e:/桌面/dsoj/app/api/admin/problems/%5Bid%5D/verify/route.ts)，后台可用 std 答案对题目回归测试
+- **题目测试点管理** — `app/admin/problems/[id]/testcases/_components` 新增 TestCaseCard/LogsModal/VerifyModal/ZipUploadPanel
+- **题库工作区上下文** — 引入 [contexts/ContestProblemWorkspaceContext.tsx](file:///e:/桌面/dsoj/contexts/ContestProblemWorkspaceContext.tsx) 与 [TrainingProblemWorkspaceContext.tsx](file:///e:/桌面/dsoj/contexts/TrainingProblemWorkspaceContext.tsx)，统一比赛/训练问题工作区状态
+- **独立题单路由** — 新增 [app/training/[id]/problems/page.tsx](file:///e:/桌面/dsoj/app/training/%5Bid%5D/problems/page.tsx)，训练问题工作台独立可分享
+- **竞赛倒计时面板** — 新增 [components/contest/ContestCountdownPanel.tsx](file:///e:/桌面/dsoj/components/contest/ContestCountdownPanel.tsx) 与 [hooks/useContestCountdown.ts](file:///e:/桌面/dsoj/hooks/useContestCountdown.ts)
+- **实体卡片组件** — 新增 [components/entity/](file:///e:/桌面/dsoj/components/entity/)（EntityDetailHeader / InfoCard / DescriptionCard / OverviewLayout）作为通用实体视图框架
+- **通用 hook** — 新增 useWallClock / useUnreadNotifications / useSubmissionResultFlow / useContestCountdown；抽出 [hooks/socket-client.ts](file:///e:/桌面/dsoj/hooks/socket-client.ts) 复用 Socket 客户端
+- **批量注册 CSV 模板与测试** — 新增 [public/templates/users-template.csv](file:///e:/桌面/dsoj/public/templates/users-template.csv) 与 [tests/batch-register-csv.test.ts](file:///e:/桌面/dsoj/tests/batch-register-csv.test.ts)
+- **历史难度迁移** — 新增 [scripts/migrate-legacy-difficulty.cjs](file:///e:/桌面/dsoj/scripts/migrate-legacy-difficulty.cjs) 兼容旧难度枚举
+- **帮助中心** — 新增 [app/help/page.tsx](file:///e:/桌面/dsoj/app/help/page.tsx)
+- **Redis 配置与单元测试** — 新增 [lib/redis.ts](file:///e:/桌面/dsoj/lib/redis.ts) 配置封装 + [tests/redis-config.test.ts](file:///e:/桌面/dsoj/tests/redis-config.test.ts)
+- **题目工作台组件** — [ProblemLetterRail](file:///e:/桌面/dsoj/components/problem/ProblemLetterRail.tsx) / [TrainingProblemWorkspace](file:///e:/桌面/dsoj/components/training/TrainingProblemWorkspace.tsx)
+- **WSL 开发支持** — 新增 `docs/BT_DEPLOY.md` 宝塔 + WSL2 同步开发部署文档
 
 ### 2026/07（题目功能扩展 + AI 模块下线）
 
