@@ -4,7 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 
 /* ============================================================================
@@ -36,7 +36,11 @@ export async function adminUpdateContest(
     description,
     type,
     isPublic,
-    password: password || null,
+  }
+
+  // 仅在显式传入时更新密码；空串/null 表示清除，避免 undefined 被 ||null 误清
+  if (password !== undefined) {
+    updateData.password = password === '' || password === null ? null : password
   }
 
   if (startTime && endTime) {
@@ -51,16 +55,25 @@ export async function adminUpdateContest(
     updateData.duration = duration
   }
 
-  // 封榜时间：传 null/空字符串表示清除封榜
+  // 封榜时间：传 null/空字符串表示清除封榜；须落在比赛起止时间内
   if (sealRankTime !== undefined) {
     if (sealRankTime === null || sealRankTime === '') {
       updateData.sealRankTime = null
     } else {
       const sealDate = new Date(sealRankTime)
-      if (!isNaN(sealDate.getTime())) {
-        // 封榜时间应在比赛时间范围内
-        updateData.sealRankTime = sealDate
+      if (isNaN(sealDate.getTime())) {
+        throw new ApiError('INVALID_SEAL_TIME', '封榜时间格式无效', 400)
       }
+      const existing = await prisma.contest.findUnique({
+        where: { id: contestId },
+        select: { startTime: true, endTime: true },
+      })
+      const start = updateData.startTime ?? existing?.startTime
+      const end = updateData.endTime ?? existing?.endTime
+      if (start && end && (sealDate < start || sealDate > end)) {
+        throw new ApiError('INVALID_SEAL_TIME', '封榜时间必须在比赛起止时间范围内', 400)
+      }
+      updateData.sealRankTime = sealDate
     }
   }
 
@@ -73,8 +86,33 @@ export async function adminUpdateContest(
   // 1. 更新基本信息
   await prisma.contest.update({ where: { id: contestId }, data: updateData })
 
-  // 2. 如果提供了题目列表，更新题目关联
+  // 2. 如果提供了题目列表，校验题目存在且可见性允许挂入竞赛后再更新关联
   if (problems && Array.isArray(problems)) {
+    if (problems.length > 0) {
+      const found = await prisma.problem.findMany({
+        where: { id: { in: problems } },
+        select: { id: true, visibility: true, classId: true },
+      })
+      if (found.length !== problems.length) {
+        const foundIds = new Set(found.map((p) => p.id))
+        const missing = problems.filter((id) => !foundIds.has(id))
+        throw new ApiError('INVALID_PROBLEMS', `题目不存在: ${missing.slice(0, 5).join(', ')}`, 400)
+      }
+      // 竞赛仅允许 public / contest 题；禁止 private 与班级私有题绕过可见性
+      const invalid = found.filter(
+        (p) => p.classId != null || (p.visibility !== 'public' && p.visibility !== 'contest')
+      )
+      if (invalid.length > 0) {
+        throw new ApiError(
+          'INVALID_PROBLEMS',
+          `竞赛只能添加公开或竞赛可见题目: ${invalid
+            .slice(0, 5)
+            .map((p) => p.id)
+            .join(', ')}`,
+          400
+        )
+      }
+    }
     await prisma.contestProblem.deleteMany({ where: { contestId } })
     if (problems.length > 0) {
       await prisma.contestProblem.createMany({
@@ -82,7 +120,7 @@ export async function adminUpdateContest(
           contestId,
           problemId,
           orderIndex: index + 1,
-          score: 100, // 默认分数，后续可以细化
+          score: 100,
         })),
       })
     }
@@ -124,11 +162,12 @@ export async function adminDeleteContest(contestId: string) {
 /** 管理员列出所有竞赛（带作者 + 题目/参赛者计数） */
 export async function listAdminContests(opts?: { page?: number; pageSize?: number }) {
   const page = opts?.page
-  const pageSize = opts?.pageSize
+  const rawPageSize = opts?.pageSize
+  const pageSize =
+    typeof rawPageSize === 'number' && rawPageSize > 0 ? Math.min(rawPageSize, 100) : undefined
   const usePaging =
     typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
-  // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
-  const take = usePaging ? (pageSize as number) : 500
+  const take = usePaging ? (pageSize as number) : 100
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
   return prisma.contest.findMany({
     skip,

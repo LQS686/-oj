@@ -10,7 +10,7 @@
  * AppError 继承 ApiError，确保 withApi.safeCall 能正确捕获并返回对应状态码。
  */
 
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 
 export class AppError extends ApiError {
   constructor(code: string, message: string, status: number = 400) {

@@ -97,7 +97,12 @@ export default function RankPage() {
  }, [activeTab, fetchRankings, fetchMyRank])
 
  useEffect(() => {
- const socket = io({ path: '/socket.io/' })
+ const socket = io({
+   path: '/socket.io/',
+   transports: ['websocket'],
+   upgrade: false,
+   withCredentials: true,
+ })
  
  socket.on('leaderboard:update', () => {
  if (pageRef.current === 1) {

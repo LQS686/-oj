@@ -4,8 +4,19 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
-import { Save, Mail, Shield, Globe, Send } from 'lucide-react'
-import type { SystemSettings } from '@/lib/settings'
+import { Save, Mail, Shield, Globe, Send, Cpu, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+  defaultSettings,
+  defaultJudgeSettings,
+  type SystemSettings,
+  type JudgeSettings,
+  type FailFastMode,
+} from '@/lib/settings-defaults'
+
+function numOr(v: string, fallback: number): number {
+  const n = parseFloat(v)
+  return Number.isFinite(n) ? n : fallback
+}
 
 export default function AdminSettingsPage() {
  const router = useRouter()
@@ -14,22 +25,22 @@ export default function AdminSettingsPage() {
  const [error, setError] = useState('')
  const [success, setSuccess] = useState('')
  const [settings, setSettings] = useState<SystemSettings>({
- siteName: '大山 OJ',
- siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
- allowRegistration: true,
- allowGuestSubmission: false,
- defaultLanguage: 'cpp',
- maxSubmissionSize: 65536,
- smtpHost: '',
- smtpPort: 465,
- smtpUser: '',
- smtpFrom: '',
- smtpPassword: '',
- smtpSecure: true
+   ...defaultSettings,
+   judge: { ...defaultJudgeSettings },
  })
+ const [showJudgeAdvanced, setShowJudgeAdvanced] = useState(false)
  const [testEmail, setTestEmail] = useState('')
  const [testingEmail, setTestingEmail] = useState(false)
  const [testResult, setTestResult] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+ const updateJudge = <K extends keyof JudgeSettings>(key: K, value: JudgeSettings[K]) => {
+   setSettings((prev) => ({
+     ...prev,
+     judge: { ...(prev.judge ?? defaultJudgeSettings), [key]: value },
+   }))
+ }
+
+ const judge: JudgeSettings = settings.judge ?? defaultJudgeSettings
 
  useEffect(() => {
  fetchSettings()
@@ -47,7 +58,11 @@ export default function AdminSettingsPage() {
 
  const data = await response.json()
  if (data.success && data.data) {
- setSettings(prev => ({ ...prev, ...data.data }))
+ setSettings((prev) => ({
+   ...prev,
+   ...data.data,
+   judge: { ...defaultJudgeSettings, ...(data.data.judge || {}) },
+ }))
  }
  } catch (err) {
  setError('网络错误')
@@ -70,7 +85,14 @@ export default function AdminSettingsPage() {
 
  const data = await response.json()
  if (data.success) {
- setSuccess('设置已保存')
+ setSuccess('设置已保存（评测配置已热更新）')
+ if (data.data?.judge) {
+   setSettings((prev) => ({
+     ...prev,
+     ...data.data,
+     judge: { ...defaultJudgeSettings, ...data.data.judge },
+   }))
+ }
  setTimeout(() => setSuccess(''), 3000)
  } else {
  setError(data.error || '保存失败')
@@ -251,6 +273,187 @@ export default function AdminSettingsPage() {
  />
  </div>
  </div>
+ </div>
+
+ <div className="card p-6 lg:col-span-2">
+ <div className="flex items-center gap-3 mb-2">
+ <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/15">
+ <Cpu className="w-4 h-4 text-primary-light" />
+ </div>
+ <h2 className="text-lg font-bold text-foreground">评测设置</h2>
+ </div>
+ <p className="text-xs text-muted-foreground mb-6">
+ 保存后立即热更新当前进程的评测队列。若 .env / Docker 中显式设置了同名 JUDGE_* 环境变量，环境变量优先。
+ </p>
+
+ <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">单任务超时（秒）</label>
+ <input
+ type="number"
+ min={30}
+ max={3600}
+ value={judge.jobTimeout}
+ onChange={(e) => updateJudge('jobTimeout', Math.round(numOr(e.target.value, judge.jobTimeout)))}
+ className="input"
+ />
+ <p className="text-xs text-muted-foreground mt-1">超时后中止选手进程并标 SE</p>
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">Fail-fast</label>
+ <select
+ value={judge.failFast}
+ onChange={(e) => updateJudge('failFast', e.target.value as FailFastMode)}
+ className="input"
+ >
+ <option value="off">off — 跑完全部测点（OI）</option>
+ <option value="hard">hard — TLE/MLE/RE 等后中止</option>
+ <option value="all">all — 任意非 AC 即停（ACM）</option>
+ </select>
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">跨提交并发</label>
+ <input
+ type="number"
+ min={1}
+ max={16}
+ value={judge.maxConcurrent}
+ onChange={(e) => updateJudge('maxConcurrent', Math.round(numOr(e.target.value, judge.maxConcurrent)))}
+ className="input"
+ />
+ <p className="text-xs text-muted-foreground mt-1">同时评测的提交数；计时敏感建议 1</p>
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">测点并行度</label>
+ <input
+ type="number"
+ min={0}
+ max={16}
+ value={judge.caseConcurrency}
+ onChange={(e) => updateJudge('caseConcurrency', Math.round(numOr(e.target.value, judge.caseConcurrency)))}
+ className="input"
+ />
+ <p className="text-xs text-muted-foreground mt-1">0 = 按 CPU 自动（约 4–8）</p>
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">大测点并行度</label>
+ <input
+ type="number"
+ min={1}
+ max={8}
+ value={judge.largeCaseConcurrency}
+ onChange={(e) => updateJudge('largeCaseConcurrency', Math.round(numOr(e.target.value, judge.largeCaseConcurrency)))}
+ className="input"
+ />
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">临界 TLE 重测次数</label>
+ <input
+ type="number"
+ min={0}
+ max={5}
+ value={judge.rejudgeTimes}
+ onChange={(e) => updateJudge('rejudgeTimes', Math.round(numOr(e.target.value, judge.rejudgeTimes)))}
+ className="input"
+ />
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">超时容差比例</label>
+ <input
+ type="number"
+ min={0}
+ max={1}
+ step={0.05}
+ value={judge.extraTimeRatio}
+ onChange={(e) => updateJudge('extraTimeRatio', numOr(e.target.value, judge.extraTimeRatio))}
+ className="input"
+ />
+ <p className="text-xs text-muted-foreground mt-1">如 0.1 = 10% 浮动窗口</p>
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">编译超时（毫秒）</label>
+ <input
+ type="number"
+ min={5000}
+ max={120000}
+ step={1000}
+ value={judge.compileTimeout}
+ onChange={(e) => updateJudge('compileTimeout', Math.round(numOr(e.target.value, judge.compileTimeout)))}
+ className="input"
+ />
+ </div>
+ </div>
+
+ <button
+ type="button"
+ onClick={() => setShowJudgeAdvanced((v) => !v)}
+ className="mt-5 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+ >
+ {showJudgeAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+ 高级选项
+ </button>
+
+ {showJudgeAdvanced && (
+ <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 rounded-lg bg-white/5">
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">I/O 墙钟裕量上限（ms）</label>
+ <input
+ type="number"
+ min={5000}
+ max={120000}
+ step={1000}
+ value={judge.ioSlackMaxMs}
+ onChange={(e) => updateJudge('ioSlackMaxMs', Math.round(numOr(e.target.value, judge.ioSlackMaxMs)))}
+ className="input"
+ />
+ <p className="text-xs text-muted-foreground mt-1">大输出题墙钟上限，过大易卡「评测中」</p>
+ </div>
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">死任务扫描间隔（ms）</label>
+ <input
+ type="number"
+ min={2000}
+ max={30000}
+ step={500}
+ value={judge.deadCheckMs}
+ onChange={(e) => updateJudge('deadCheckMs', Math.round(numOr(e.target.value, judge.deadCheckMs)))}
+ className="input"
+ />
+ </div>
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">close 兜底等待（ms）</label>
+ <input
+ type="number"
+ min={200}
+ max={2000}
+ step={50}
+ value={judge.closeFallbackMs}
+ onChange={(e) => updateJudge('closeFallbackMs', Math.round(numOr(e.target.value, judge.closeFallbackMs)))}
+ className="input"
+ />
+ </div>
+ <div>
+ <label className="block text-sm font-medium text-muted-foreground mb-2">大测点字节阈值</label>
+ <input
+ type="number"
+ min={262144}
+ max={67108864}
+ step={1048576}
+ value={judge.largeCaseBytes}
+ onChange={(e) => updateJudge('largeCaseBytes', Math.round(numOr(e.target.value, judge.largeCaseBytes)))}
+ className="input"
+ />
+ <p className="text-xs text-muted-foreground mt-1">默认 2097152（2 MiB）</p>
+ </div>
+ </div>
+ )}
  </div>
 
  <div className="card p-6 lg:col-span-2">

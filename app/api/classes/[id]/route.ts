@@ -36,18 +36,31 @@ export const GET = withApi.public(async (req, ctx) => {
 
   const q = readQuery<{ sortBy?: string; sortOrder?: string; role?: string; active?: string; search?: string }>(req)
   const auth = getUserFromRequest(req)
-  const authUserId = auth?.userId
 
-  const detailResult = await getClassDetail(id)
-  if (!detailResult) throw404('班级不存在')
-  const safeDetail = detailResult!
-
-  // 私有班级必须登录且为成员
-  if (!safeDetail.isPublic) {
-    if (!auth || !authUserId) throw404('私有班级，只有受邀成员可访问')
-    const member = await getCurrentClassMember(id, authUserId!)
+  // 先读轻量字段做私有班级鉴权，避免未授权时加载成员列表（侧信道）
+  const basic = await getClassById(id)
+  if (basic == null) {
+    throw404('班级不存在')
+  }
+  if (!basic!.isPublic) {
+    const uid = auth?.userId
+    if (!uid) {
+      throw404('私有班级，只有受邀成员可访问')
+      return
+    }
+    const member = await getCurrentClassMember(id, uid)
     if (!member) throw404('私有班级，只有受邀成员可访问')
   }
+
+  const viewerMember = auth?.userId ? await getCurrentClassMember(id, auth.userId) : null
+  const detailResult = await getClassDetail(id, {
+    // 仅班级管理员可见成员 permissions，避免公开访客探测权限位
+    includePermissions: !!(
+      viewerMember && ['owner', 'admin', 'assistant'].includes(viewerMember.role)
+    ),
+  })
+  if (!detailResult) throw404('班级不存在')
+  const safeDetail = detailResult!
 
   // 角色 + 活跃度 + 搜索 + 排序
   let members = safeDetail.members

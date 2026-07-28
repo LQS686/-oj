@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { resolveClientIp } from '@/lib/http/client-ip';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -118,9 +119,34 @@ function redactValue(value: unknown, seen: WeakSet<object> = new WeakSet()): unk
   return result
 }
 
+function resolveAsyncLocalStorageCtor():
+  | (new <T>() => { getStore(): T | undefined; enterWith(store: T): void })
+  | null {
+  const fromGlobal = (globalThis as typeof globalThis & {
+    AsyncLocalStorage?: new <T>() => { getStore(): T | undefined; enterWith(store: T): void }
+  }).AsyncLocalStorage
+  if (typeof fromGlobal === 'function') return fromGlobal
+  // Node 下不依赖 polyfill 加载顺序；Edge / 浏览器无 async_hooks 则保持 null
+  if (typeof process !== 'undefined' && process.versions?.node) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require('node:async_hooks') as typeof import('node:async_hooks')
+      return mod.AsyncLocalStorage as unknown as new <T>() => {
+        getStore(): T | undefined
+        enterWith(store: T): void
+      }
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
 class Logger {
   private level: LogLevel;
+  /** 无 ALS 时的进程级回退（Edge / 浏览器）；Node 请求上下文走 ALS */
   private defaultContext: LogContext = {};
+  private readonly als: { getStore(): LogContext | undefined; enterWith(store: LogContext): void } | null
 
   constructor() {
     if (process.env.LOG_LEVEL) {
@@ -130,19 +156,34 @@ class Logger {
     } else {
       this.level = 'info';
     }
+
+    const ALS = resolveAsyncLocalStorageCtor()
+    this.als = ALS ? new ALS<LogContext>() : null
+  }
+
+  private activeContext(): LogContext {
+    return this.als?.getStore() ?? this.defaultContext
   }
 
   setContext(context: LogContext) {
-    this.defaultContext = { ...this.defaultContext, ...context };
+    if (this.als) {
+      this.als.enterWith({ ...this.als.getStore(), ...context })
+    } else {
+      this.defaultContext = { ...this.defaultContext, ...context }
+    }
   }
 
   clearContext() {
-    this.defaultContext = {};
+    if (this.als) {
+      this.als.enterWith({})
+    } else {
+      this.defaultContext = {}
+    }
   }
 
   private formatMessage(level: LogLevel, message: string, meta?: any, context?: LogContext) {
     const timestamp = formatLogTimestamp();
-    const mergedContext = redactValue({ ...this.defaultContext, ...context });
+    const mergedContext = redactValue({ ...this.activeContext(), ...context });
     return {
       timestamp,
       level,
@@ -222,7 +263,10 @@ class Logger {
     const url = request.url;
     const method = request.method;
     const userAgent = request.headers.get('user-agent');
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    const ip = resolveClientIp(
+      request.headers.get('x-forwarded-for'),
+      request.headers.get('x-real-ip')
+    );
     
     const requestMeta = {
       url,

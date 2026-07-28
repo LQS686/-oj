@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 
 /* ============================================================================
  * 管理员班级管理（原 /api/admin/classes*）
@@ -13,11 +13,12 @@ import { ApiError } from '@/lib/api/withApi'
 /** 管理员列出所有班级（带成员/作业/笔记计数 + owner 用户名） */
 export async function listAllClassesForAdmin(opts?: { page?: number; pageSize?: number }) {
   const page = opts?.page
-  const pageSize = opts?.pageSize
+  const rawPageSize = opts?.pageSize
+  const pageSize =
+    typeof rawPageSize === 'number' && rawPageSize > 0 ? Math.min(rawPageSize, 100) : undefined
   const usePaging =
     typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
-  // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
-  const take = usePaging ? (pageSize as number) : 500
+  const take = usePaging ? (pageSize as number) : 100
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
   const classes = await prisma.class.findMany({
     skip,
@@ -53,7 +54,7 @@ export async function adminUpdateClassVisibility(classId: string, isPublic: bool
 
 /**
  * 管理员更新班级信息（名称 / 描述 / 公告 / 头像 / 人数 / 可见性）
- * 仅传入的字段会被更新。
+ * 复用 updateClass 校验（maxMembers 不低于当前人数等）。
  */
 export async function adminUpdateClass(
   classId: string,
@@ -71,24 +72,9 @@ export async function adminUpdateClass(
     throw new ApiError('NOT_FOUND', '班级不存在', 404)
   }
 
-  const updateData: {
-    isPublic?: boolean
-    name?: string
-    description?: string | null
-    announcement?: string | null
-    avatar?: string | null
-    maxMembers?: number
-  } = {}
-  if (data.isPublic !== undefined) updateData.isPublic = data.isPublic
-  if (data.name !== undefined) updateData.name = data.name.trim()
-  if (data.description !== undefined) updateData.description = data.description
-  if (data.announcement !== undefined) updateData.announcement = data.announcement
-  if (data.avatar !== undefined) updateData.avatar = data.avatar
-  if (data.maxMembers !== undefined) updateData.maxMembers = data.maxMembers
+  const { updateClass } = await import('@/lib/class/crud')
+  await updateClass(classId, data)
 
-  await prisma.class.update({ where: { id: classId }, data: updateData })
-
-  // 仅切换可见性时保留原提示文案
   const onlyVisibility =
     data.isPublic !== undefined &&
     data.name === undefined &&
@@ -102,8 +88,9 @@ export async function adminUpdateClass(
   return '班级信息更新成功'
 }
 
-/** 管理员删除班级 */
+/** 管理员删除班级（复用显式级联清理） */
 export async function adminDeleteClass(classId: string) {
-  await prisma.class.delete({ where: { id: classId } })
+  const { deleteClass } = await import('@/lib/class/crud')
+  await deleteClass(classId)
   return '班级已删除'
 }

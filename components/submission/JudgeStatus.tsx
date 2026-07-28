@@ -6,6 +6,7 @@ import {
   isAcceptedStatus,
   isNonFinalSubmissionStatus,
 } from '@/lib/constants/submission-status'
+import { formatTime, formatMemory } from '@/lib/utils'
 
 interface TestResult {
  testId?: string
@@ -224,8 +225,8 @@ export default function JudgeStatus({
  </div>
  </div>
  <div className="text-right text-xs text-muted-foreground">
- <div>{result.time}ms</div>
- <div>{(result.memory / 1024).toFixed(1)}MB</div>
+ <div>{formatTime(result.time)}</div>
+ <div>{formatMemory(result.memory)}</div>
  </div>
  </div>
  ))}

@@ -45,13 +45,18 @@
    sudo bash scripts/bt-deploy.sh http://43.139.231.170
    ```
 
-   > ⚠️ **注意**：URL 必须是 `http://` 开头，不能用 `https://`（IP 无法申请证书）
+   > ⚠️ **注意**：URL 必须是 `http://` 开头，不能用 `https://`（IP 无法申请证书）。  
+   > 当前生产启动校验（`lib/env.ts`）**禁止** `FORCE_SECURE_COOKIE=false`。纯 HTTP 冒烟测试请二选一：  
+   > 1. 临时将容器 `NODE_ENV=development`（仅联调，勿当正式站）；  
+   > 2. 尽快切到 HTTPS（场景 A / 备案完成后切换），再保持 `FORCE_SECURE_COOKIE=true`。
 
-   `.env` 中的 `FORCE_SECURE_COOKIE` 必须设为 `false`，否则 Cookie 在 HTTP 下无法保存：
+   若必须用 HTTP + 开发模式联调 Cookie：
 
    ```bash
    cd /www/wwwroot/dashan-oj
+   sed -i 's/^NODE_ENV=.*/NODE_ENV=development/' .env
    sed -i 's/FORCE_SECURE_COOKIE=.*/FORCE_SECURE_COOKIE=false/' .env
+   docker compose up -d app
    ```
 
 2. **宝塔 Nginx 配置（仅 HTTP）**：
@@ -91,12 +96,22 @@
    }
    ```
 
-3. **修改 Cookie 配置**（HTTP 下必须）：
+3. **Cookie / 环境（HTTP 临时站）**：
 
    ```bash
-   # HTTP 协议下必须禁用 secure cookie，否则无法登录
+   # 生产禁止 FORCE_SECURE_COOKIE=false；HTTP 联调请临时 NODE_ENV=development
+   sed -i 's/^NODE_ENV=.*/NODE_ENV=development/' .env
    sed -i 's/FORCE_SECURE_COOKIE=.*/FORCE_SECURE_COOKIE=false/' .env
-   docker compose restart app
+   docker compose up -d app
+   ```
+
+   正式 HTTPS 上线前务必改回：
+
+   ```bash
+   sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' .env
+   sed -i 's/FORCE_SECURE_COOKIE=.*/FORCE_SECURE_COOKIE=true/' .env
+   # 并确认 REDIS_URL、ENCRYPTION_KEY、JWT_SECRET 已写入 .env（bt-deploy.sh 会生成）
+   docker compose up -d app
    ```
 
 4. **测试访问**：
@@ -159,13 +174,15 @@ sudo bash scripts/bt-deploy.sh https://dsoj.run
 
 脚本会自动完成：
 
-1. 生成 `.env` 配置（密码密钥随机生成）
+1. 生成 `.env`（含 `JWT_SECRET` / `ENCRYPTION_KEY` / `REDIS_URL` / Mongo·Redis 密码；按 URL 协议设置 `FORCE_SECURE_COOKIE`）
 2. 生成 MongoDB 副本集 KeyFile
 3. 拉取基础镜像（MongoDB、Redis）
 4. 构建 OJ 应用镜像（约 5 分钟）
 5. 启动所有 Docker 服务
 6. 等待健康检查通过
 7. 输出 Nginx 配置供粘贴
+
+> 生产启动另校验：`REDIS_URL`、`ENCRYPTION_KEY` 必填；HTTPS 站不得 `FORCE_SECURE_COOKIE=false`。
 
 ---
 
@@ -322,13 +339,14 @@ docker builder prune -af --filter "until=168h"   # 仅清理 7 天前的 build c
 - 仅修改 `.env` 文件后重启容器**不会生效**，因为客户端 JS 中的 URL 已固化
 - Dockerfile 通过 `ARG` 接收这些值，docker-compose.yml 从 `FRONTEND_URL` 传递
 
-### 2. HTTP 部署必须禁用 Secure Cookie
+### 2. Cookie Secure 与 HTTP / HTTPS
 
-HTTP 协议下浏览器不会保存带 `Secure` 标志的 Cookie，导致登录后刷新页面返回 401。
+浏览器在 **HTTP** 下不会保存带 `Secure` / `__Host-` 的 Cookie；**HTTPS 生产站必须开启 Secure**。
 
-- `.env` 中 `FORCE_SECURE_COOKIE=false`（IP 测试时必须）
-- docker-compose.yml 已将 `FORCE_SECURE_COOKIE` 传递给容器
-- login/register 路由中通过三值逻辑处理：`true` / `false` / 未设置
+- 生产（`NODE_ENV=production`）启动时 **禁止** `FORCE_SECURE_COOKIE=false`（见 `lib/env.ts`）
+- 正式站：`FORCE_SECURE_COOKIE=true`（或依赖 HTTPS 默认 Secure），并配置 `REDIS_URL`、`ENCRYPTION_KEY`、`JWT_SECRET`
+- 仅 HTTP 临时冒烟：临时 `NODE_ENV=development` + `FORCE_SECURE_COOKIE=false`，切勿长期如此运行
+- docker-compose / `bt-deploy.sh` 会按 `FRONTEND_URL` 是否为 `https://` 写入上述变量
 
 ### 3. CSP 不能包含 upgrade-insecure-requests
 

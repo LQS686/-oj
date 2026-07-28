@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react'
-import { authApi, type UserData } from '@/lib/api'
+import { authApi, type UserData } from '@/lib/api/auth'
 import { logger } from '@/lib/logger'
 
 type User = UserData
@@ -28,7 +28,7 @@ interface UserContextType {
   user: User | null
   isLoading: boolean
   setUser: (user: User | null) => void
-  login: (userData: User, token?: string) => void
+  login: (userData: User) => void
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -128,7 +128,13 @@ export function UserProvider({
         // 其它标签页登录/刷新 → 拉取最新登录态
         void refreshUser()
       } else if (evt.type === 'logout') {
-        // 其它标签页登出 → 立即清空本标签页状态（cookie 已被服务端清除，无需调 /auth/me）
+        // 其它标签页登出 → 立即清空本标签页状态、CSRF 缓存并切断 WS
+        void import('@/lib/api/base').then(({ clearCsrfTokenCache }) => {
+          clearCsrfTokenCache()
+        })
+        void import('@/hooks/socket-client').then(({ forceResetAppSocket }) => {
+          forceResetAppSocket()
+        })
         setUser(null)
       }
     }
@@ -195,8 +201,11 @@ export function UserProvider({
     }
   }, [])
 
-  const login = useCallback((userData: User, _token?: string) => {
+  const login = useCallback((userData: User) => {
     if (typeof window === 'undefined') return
+    void import('@/hooks/socket-client').then(({ forceResetAppSocket }) => {
+      forceResetAppSocket()
+    })
     setUser(userData)
     void refreshUser()
     broadcast({ type: 'login' })
@@ -210,6 +219,9 @@ export function UserProvider({
     } catch (error) {
       logger.debug('退出登录失败', { error: error instanceof Error ? error.message : String(error) })
     } finally {
+      void import('@/hooks/socket-client').then(({ forceResetAppSocket }) => {
+        forceResetAppSocket()
+      })
       setUser(null)
       broadcast({ type: 'logout' })
     }

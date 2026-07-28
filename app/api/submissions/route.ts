@@ -71,7 +71,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   }
 
   try {
-    const submission = await submitCode(user.id, body)
+    const submission = await submitCode(user.id, body, user.role)
     return ok(
       {
         submissionId: submission.id,

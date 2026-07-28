@@ -2,7 +2,7 @@
  * lib/problem/import/execute.ts
  * 题库批量导入执行入口（供 API 路由与自定义 server 直通共用）
  */
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { isValidDifficulty } from '@/lib/constants'
 import {
   parseFps,

@@ -11,7 +11,7 @@ import {
   isClassAdminRole,
   isClassOwnerRole,
 } from '@/lib/class/roles'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 
 /** 读某用户在某班级中的成员记录（无则返回 null） */
 export async function getCurrentClassMember(classId: string, userId: string) {

@@ -16,7 +16,8 @@
  *       │   ├── samples/
  *       │   ├── testcases/
  *       │   ├── solutions/
- *       │   └── std.cpp
+ *       │   ├── std.cpp
+ *       │   └── checker.cpp     # Special Judge（Testlib）
  *       └── ...
  */
 import AdmZip from 'adm-zip'
@@ -165,20 +166,32 @@ function serializeOneProblem(
   const base = `problems/${dirName}/`
   const luoguPid = deriveLuoguPid(problem.problemNumber)
 
-  // 1. problem.yaml
+  // 1. problem.yaml（SPJ 对齐参考题包 LB3758：special_judge + checker）
+  const isSpj =
+    problem.comparisonMode === 'special-judge' ||
+    (typeof problem.spjCode === 'string' && problem.spjCode.trim().length > 0)
+  const exportTags = Array.isArray(problem.tags) ? [...problem.tags] : []
+  if (
+    isSpj &&
+    !exportTags.some((t) => String(t).toLowerCase() === 'special judge')
+  ) {
+    exportTags.push('Special Judge')
+  }
   const problemYaml = serializeYaml({
     schema_version: 2,
     title: problem.title,
     problem_number: problem.problemNumber || undefined,
     luogu_pid: luoguPid,
     difficulty: problem.difficulty,
-    tags: Array.isArray(problem.tags) ? problem.tags : [],
+    tags: exportTags,
     source: problem.source || undefined,
     visibility: problem.visibility,
     time_limit: problem.timeLimit,
     memory_limit: problem.memoryLimit,
-    comparison_mode: problem.comparisonMode,
+    // 题包约定用下划线 special_judge；库内仍为 special-judge
+    comparison_mode: isSpj ? 'special_judge' : problem.comparisonMode || 'default',
     real_precision: problem.realPrecision,
+    ...(isSpj ? { checker: 'checker.cpp' } : {}),
   })
   files.push({
     path: base + 'problem.yaml',
@@ -281,6 +294,14 @@ function serializeOneProblem(
     files.push({
       path: base + 'std' + ext,
       content: Buffer.from(problem.stdCode, 'utf-8'),
+    })
+  }
+
+  // 6.5 Special Judge（checker.cpp，对齐洛谷命名）
+  if (problem.spjCode && String(problem.spjCode).trim()) {
+    files.push({
+      path: base + 'checker.cpp',
+      content: Buffer.from(String(problem.spjCode), 'utf-8'),
     })
   }
 

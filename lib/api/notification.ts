@@ -21,6 +21,6 @@ export const notificationApi = {
   },
 
   async markAllAsRead(): Promise<void> {
-    return apiClient.put('/notifications/mark-all-read');
+    return apiClient.post('/notifications/mark-all-read');
   },
 };

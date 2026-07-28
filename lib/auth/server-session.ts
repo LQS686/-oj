@@ -3,16 +3,20 @@
  * 服务端读取 cookie 会话，供 Root Layout 注入 UserProvider，避免硬刷新导航栏闪「登录」。
  * 仅可在 Server Component / Route Handler 中调用。
  */
+import 'server-only'
+
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
 import { getCachedUser } from '@/lib/api/handler'
+import { readAuthTokenFromCookieStore } from '@/lib/auth/cookie'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 import type { UserData } from '@/lib/api/auth'
 
 /** 从 httpOnly token cookie 解析当前用户（校验 tokenVersion） */
 export async function getServerSessionUser(): Promise<UserData | null> {
   try {
     const cookieStore = await cookies()
-    const token = cookieStore.get('token')?.value
+    const token = readAuthTokenFromCookieStore(cookieStore)
     if (!token) return null
 
     const session = verifyToken(token)
@@ -26,9 +30,8 @@ export async function getServerSessionUser(): Promise<UserData | null> {
       username: user.username,
       email: user.email || '',
       nickname: user.nickname || undefined,
-      avatar: user.avatar || undefined,
+      avatar: sanitizeAvatarUrl(user.avatar) || undefined,
       role: user.role,
-      // 完整资料由客户端 /auth/me 补全；导航栏仅需身份字段
       rating: 0,
       rank: '',
       color: '',

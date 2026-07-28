@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 import { JWTPayload } from '@/lib/auth'
 import { canAccessAdmin } from '@/lib/permissions'
 import { NextRequest } from 'next/server'
+import { resolveClientIp } from '@/lib/http/client-ip'
 
 // 审计日志记录函数
 async function logAccess(
@@ -12,7 +13,10 @@ async function logAccess(
   req?: NextRequest,
   details?: any
 ) {
-  const ip = req?.headers.get('x-forwarded-for') || (req as any)?.ip || 'unknown'
+  const ip = resolveClientIp(
+    req?.headers.get('x-forwarded-for'),
+    req?.headers.get('x-real-ip') || (req as any)?.ip || null
+  )
   const userAgent = req?.headers.get('user-agent') || 'unknown'
   
   logger.info(`[Audit] ${action} | User: ${userId || 'Guest'} | Resource: ${resource} | IP: ${ip}`)

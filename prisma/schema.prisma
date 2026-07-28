@@ -9,6 +9,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 用户角色（唯一真相源，详见 docs/ROLE_SYSTEM.md）
+enum UserRole {
+  SYSTEM_ADMIN
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
 // 用户模型
 model User {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
@@ -22,9 +30,12 @@ model User {
   solvedCount   Int       @default(0) // 解题数
   rank          String    @default("新手")
   color         String    @default("#808080")
-  role          String    @default("STUDENT") // SYSTEM_ADMIN, ADMIN, TEACHER, STUDENT（唯一真相源，详见 docs/ROLE_SYSTEM.md）
+  role          UserRole  @default(STUDENT)
   isBanned      Boolean   @default(false)
   tokenVersion  Int       @default(0) // JWT 吊销版本号：修改密码/封禁时递增，使旧 Token 失效
+  // 邮箱改绑保留期：旧邮箱在冷却期内不可被他人注册/抢注
+  previousEmail   String?
+  emailChangedAt  DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -65,6 +76,7 @@ model User {
   @@index([rating])
   @@index([solvedCount])
   @@index([role])
+  @@index([previousEmail])
 }
 
 // 头像历史记录
@@ -96,7 +108,7 @@ model Problem {
   tags          String[]
   timeLimit     Int         @default(1000)
   memoryLimit   Int         @default(128)
-  comparisonMode String     @default("default") // 输出比较模式：default/strict/ignore-spaces/real-number
+  comparisonMode String     @default("default") // 输出比较模式：default/strict/ignore-spaces/real-number/special-judge
   realPrecision Int         @default(3) // 浮点数比较精度（小数位数），仅 real-number 模式生效
   isPublic      Boolean     @default(false)
   visibility    String      @default("public") // 'public', 'private', 'contest'
@@ -109,6 +121,9 @@ model Problem {
   // 标程（用于验证数据）
   stdCode       String?
   stdLang       String?
+
+  // Special Judge（Testlib checker.cpp，仅 C++；comparisonMode=special-judge 时生效）
+  spjCode       String?
 
   verificationLogs VerificationLog[]
 

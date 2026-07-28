@@ -34,6 +34,8 @@ interface SafeFetchOptions {
   signal?: AbortSignal
   /** 超时（毫秒），默认 30000 */
   timeoutMs?: number
+  /** 响应体大小上限（字节），默认 10MB */
+  maxBodyBytes?: number
 }
 
 /**
@@ -42,7 +44,7 @@ interface SafeFetchOptions {
 function isPrivateIpv4(ip: string): boolean {
   const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
   if (!m) return false
-  const [a, b] = m.slice(1).map(Number)
+  const [a, b, c] = m.slice(1).map(Number)
   return (
     a === 0 ||
     a === 10 ||
@@ -50,18 +52,41 @@ function isPrivateIpv4(ip: string): boolean {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
-    (a === 100 && b >= 64 && b <= 127)
+    (a === 100 && b >= 64 && b <= 127) ||
+    // IETF Protocol Assignments / special-use (含 192.0.0.0/24)
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 192 && b === 0 && c === 2) || // TEST-NET-1
+    (a === 198 && (b === 18 || b === 19)) || // benchmarking
+    (a === 198 && b === 51 && c === 100) || // TEST-NET-2
+    (a === 203 && b === 0 && c === 113) || // TEST-NET-3
+    a >= 224 // multicast / reserved
   )
 }
 
+/** 将 ::ffff:7f00:1 这类十六进制 IPv4-mapped 转为 a.b.c.d */
+function ipv4MappedHexToDotted(hexMapped: string): string | null {
+  const m = hexMapped.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i)
+  if (!m) return null
+  const hi = parseInt(m[1], 16)
+  const lo = parseInt(m[2], 16)
+  if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null
+  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`
+}
+
 function isPrivateIpv6(ip: string): boolean {
-  const lower = ip.toLowerCase()
+  const lower = ip.toLowerCase().replace(/^\[|\]$/g, '')
   if (lower === '::1' || lower === '::') return true
-  if (lower.startsWith('fe80') || lower.startsWith('fc') || lower.startsWith('fd')) return true
-  // IPv4-mapped IPv6 地址（如 ::ffff:127.0.0.1）可绕过纯 IPv4 校验，
-  // 提取内嵌 IPv4 后再用既有 IPv4 私有段判断
+  if (lower.startsWith('fe80:') || lower === 'fe80::') return true
+  // Unique Local fc00::/7
+  if (/^f[cd][0-9a-f]{0,2}:/i.test(lower)) return true
+  // IPv4-mapped 点分形式 ::ffff:127.0.0.1
   const v4Mapped = lower.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
   if (v4Mapped && isPrivateIpv4(v4Mapped[1])) return true
+  // IPv4-mapped 十六进制 ::ffff:7f00:1
+  const dotted = ipv4MappedHexToDotted(lower)
+  if (dotted && isPrivateIpv4(dotted)) return true
+  // 6to4 / teredo 等常见隧道前缀（保守拒绝）
+  if (lower.startsWith('2001:db8:') || lower.startsWith('2002:')) return true
   return false
 }
 
@@ -149,22 +174,36 @@ export async function safeFetch(
   }
 
   // 4) 构造请求（替换 hostname 为 IP，原始 host 写入 Host header）
-  const requestOptions: http.RequestOptions = {
+  //    HTTPS 必须设 servername=原域名，否则 SNI 会变成 IP，证书校验/CDN 失败
+  const requestOptions: https.RequestOptions = {
     host: targetAddress,
     port,
     method: options.method || 'GET',
     path: parsed.pathname + parsed.search,
     headers: {
       ...options.headers,
-      Host: parsed.host, // 保留原始 Host 头（SNI/CDN 必需）
+      Host: parsed.host,
     },
+    ...(parsed.protocol === 'https:'
+      ? { servername: host.startsWith('[') ? host.slice(1, -1) : host }
+      : {}),
   }
 
   return new Promise((resolve, reject) => {
     const client = parsed.protocol === 'https:' ? https : http
+    const maxBodyBytes = options.maxBodyBytes ?? 10 * 1024 * 1024
     const req = client.request(requestOptions, (res) => {
       const chunks: Buffer[] = []
-      res.on('data', (chunk) => chunks.push(chunk))
+      let total = 0
+      res.on('data', (chunk: Buffer) => {
+        total += chunk.length
+        if (total > maxBodyBytes) {
+          req.destroy()
+          reject(new Error(`响应体超过大小限制 (${maxBodyBytes} bytes)`))
+          return
+        }
+        chunks.push(chunk)
+      })
       res.on('end', () => {
         const body = Buffer.concat(chunks)
         const status = res.statusCode || 0

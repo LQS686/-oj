@@ -1,61 +1,64 @@
-import { apiClient } from './base';
+import { apiClient, clearCsrfTokenCache } from './base'
 
 export interface LoginResponse {
   user: {
-    id: string;
-    username: string;
-    email: string;
-    nickname?: string;
-    avatar?: string;
-    bio?: string;
-    rating: number;
-    rank: string;
-    color: string;
-    role: string;
-    createdAt: string;
-  };
-  token: string;
+    id: string
+    username: string
+    email: string
+    nickname?: string
+    avatar?: string
+    bio?: string
+    rating: number
+    rank: string
+    color: string
+    role: string
+    createdAt: string
+  }
 }
 
 interface RegisterData {
-  username: string;
-  email: string;
-  password: string;
-  nickname?: string;
+  username: string
+  email: string
+  password: string
+  nickname?: string
 }
 
 export interface UserData {
-  id: string;
-  username: string;
-  email: string;
-  nickname?: string;
-  avatar?: string;
-  bio?: string;
-  rating: number;
-  rank: string;
-  color: string;
-  role: string;
-  createdAt: string;
+  id: string
+  username: string
+  email: string
+  nickname?: string
+  avatar?: string
+  bio?: string
+  rating: number
+  rank: string
+  color: string
+  role: string
+  createdAt: string
 }
 
 export const authApi = {
   async login(username: string, password: string, rememberMe?: boolean): Promise<LoginResponse> {
-    return apiClient.post<LoginResponse>('/auth/login', { username, password, rememberMe });
+    return apiClient.post<LoginResponse>('/auth/login', { username, password, rememberMe })
   },
 
   async register(data: RegisterData): Promise<LoginResponse> {
-    return apiClient.post<LoginResponse>('/auth/register', data);
+    return apiClient.post<LoginResponse>('/auth/register', data)
   },
 
   async logout(): Promise<void> {
-    return apiClient.post('/auth/logout');
+    try {
+      await apiClient.post('/auth/logout')
+    } finally {
+      clearCsrfTokenCache()
+    }
   },
 
   async getCurrentUser(): Promise<UserData> {
-    return apiClient.get<UserData>('/auth/me');
+    return apiClient.get<UserData>('/auth/me')
   },
 
   async forgotPassword(email: string): Promise<void> {
-    return apiClient.post('/auth/forgot-password', { email });
+    return apiClient.post('/auth/forgot-password', { email })
   },
-};
+}

@@ -14,15 +14,13 @@ export interface ProblemListFilter {
   keyword?: string
   tagIds?: string[]
   difficulty?: Difficulty
-  isPublic?: boolean
+  visibility?: 'public' | 'private' | 'contest'
   categoryId?: string
 }
 
 export async function listProblemTags(): Promise<string[]> {
   const problems = await prisma.problem.findMany({
-    where: {
-      OR: [{ isPublic: true }, { visibility: 'public' }],
-    },
+    where: { visibility: 'public' },
     select: { tags: true },
   })
 
@@ -53,7 +51,7 @@ export async function listProblems(
     ]
   }
   if (filter.difficulty) where.difficulty = filter.difficulty
-  if (filter.isPublic !== undefined) where.isPublic = filter.isPublic
+  if (filter.visibility !== undefined) where.visibility = filter.visibility
   if (filter.categoryId) where.categoryId = filter.categoryId
   if (filter.tagIds?.length) where.tags = { hasSome: filter.tagIds }
 
@@ -110,7 +108,7 @@ export async function deleteProblem(id: string) {
 export async function listTags() {
   return cache.get('problem:tags', [], async () => {
     const problems = await prisma.problem.findMany({
-      where: { isPublic: true },
+      where: { visibility: 'public' },
       select: { tags: true },
     })
     const set = new Set<string>()
@@ -147,7 +145,7 @@ export async function getRandomPublicProblem(filter: {
   difficulty?: string
   tag?: string
 } = {}): Promise<{ id: string; problemNumber: string | null } | null> {
-  const where: any = { isPublic: true }
+  const where: any = { visibility: 'public' }
   if (filter.search) {
     where.OR = [
       { title: { contains: filter.search, mode: 'insensitive' } },

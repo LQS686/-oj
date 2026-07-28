@@ -1,29 +1,36 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { encrypt, decrypt, maskApiKey } from '@/lib/crypto'
+import { encrypt, decrypt, maskApiKey, isEncryptedSecret } from '@/lib/crypto'
+import {
+  defaultSettings,
+  mergeJudgeSettings,
+  type SystemSettings,
+  type JudgeSettings,
+} from '@/lib/settings-defaults'
 
 const SETTINGS_KEY = 'system_settings'
 
-const defaultSettings = {
-  siteName: '大山 OJ',
-  siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
-  allowRegistration: true,
-  allowGuestSubmission: false,
-  defaultLanguage: 'cpp',
-  maxSubmissionSize: 65536,
-  smtpHost: '',
-  smtpPort: 465,
-  smtpUser: '',
-  smtpFrom: '',
-  // 授权码：存储时加密，对外展示时掩码
-  smtpPassword: '',
-  // 是否启用 SSL（QQ 邮箱端口 465 需为 true，587 通常为 false）
-  smtpSecure: true
-}
-
 let memorySettings: Record<string, unknown> | null = null
 
-export type SystemSettings = typeof defaultSettings
+export type { SystemSettings, JudgeSettings }
+export { defaultSettings, mergeJudgeSettings }
+export { defaultJudgeSettings, normalizeFailFast } from '@/lib/settings-defaults'
+
+function normalizeMerged(raw: Record<string, unknown>): SystemSettings {
+  const judgeRaw =
+    raw.judge && typeof raw.judge === 'object'
+      ? (raw.judge as Partial<JudgeSettings>)
+      : undefined
+  const merged = {
+    ...defaultSettings,
+    ...raw,
+    judge: mergeJudgeSettings(judgeRaw ?? defaultSettings.judge),
+  } as SystemSettings
+  merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
+  merged.siteDescription =
+    (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
+  return merged
+}
 
 /**
  * 读取原始设置（smtpPassword 保持加密态），供内部发信服务使用。
@@ -31,30 +38,47 @@ export type SystemSettings = typeof defaultSettings
  * 兜底：若数据库中 siteName/siteDescription 为空字符串（历史脏数据或绕过校验写入），
  * 回退到默认值，确保对外永不返回空品牌信息。
  */
+/**
+ * 读取原始设置。DB 失败且无内存缓存时抛错，避免调用方误用 defaultSettings 开注册。
+ */
 async function getRawSystemSettings(): Promise<SystemSettings> {
   try {
     const setting = await prisma.systemConfig.findUnique({
-      where: { key: SETTINGS_KEY }
+      where: { key: SETTINGS_KEY },
     })
     if (setting && setting.value && typeof setting.value === 'object') {
-      const merged = { ...defaultSettings, ...(setting.value as Record<string, unknown>) } as SystemSettings
-      // 空值兜底（防止历史脏数据导致前端显示空白）
-      merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
-      merged.siteDescription = (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
+      const merged = normalizeMerged(setting.value as Record<string, unknown>)
+      memorySettings = merged as unknown as Record<string, unknown>
       return merged
     }
+    // 无配置行：合法空库，返回默认值（允许首次部署）
+    const defaults = { ...defaultSettings, judge: { ...defaultSettings.judge } }
+    memorySettings = defaults as unknown as Record<string, unknown>
+    return defaults
   } catch (error) {
     logger.error('获取系统设置失败', error)
+    if (memorySettings) {
+      return normalizeMerged(memorySettings)
+    }
+    throw error
   }
+}
 
-  if (memorySettings) {
-    const merged = { ...defaultSettings, ...memorySettings } as SystemSettings
-    merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
-    merged.siteDescription = (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
-    return merged
+/**
+ * 启动预热：失败时写入 fail-closed 内存快照（关闭注册），避免评测同步读崩溃。
+ */
+export async function warmSystemSettingsCache(): Promise<SystemSettings> {
+  try {
+    return await getRawSystemSettings()
+  } catch {
+    const closed = {
+      ...defaultSettings,
+      allowRegistration: false,
+      judge: { ...defaultSettings.judge },
+    }
+    memorySettings = closed as unknown as Record<string, unknown>
+    return closed
   }
-
-  return defaultSettings
 }
 
 /**
@@ -62,18 +86,18 @@ async function getRawSystemSettings(): Promise<SystemSettings> {
  */
 export async function getSystemSettings(): Promise<SystemSettings> {
   const raw = await getRawSystemSettings()
-  // 掩码授权码用于前端显示
   return { ...raw, smtpPassword: raw.smtpPassword ? maskApiKey(raw.smtpPassword) : '' }
 }
 
 export function getSystemSettingsSync(): SystemSettings {
   if (memorySettings) {
-    const merged = { ...defaultSettings, ...memorySettings } as SystemSettings
-    merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
-    merged.siteDescription = (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
-    return { ...merged, smtpPassword: merged.smtpPassword ? maskApiKey(merged.smtpPassword) : '' }
+    const merged = normalizeMerged(memorySettings)
+    return {
+      ...merged,
+      smtpPassword: merged.smtpPassword ? maskApiKey(merged.smtpPassword) : '',
+    }
   }
-  return defaultSettings
+  return { ...defaultSettings, judge: { ...defaultSettings.judge } }
 }
 
 /**
@@ -95,6 +119,33 @@ export async function saveSystemSettings(settings: Partial<SystemSettings>): Pro
       }
     }
 
+    if ('smtpHost' in incoming && typeof incoming.smtpHost === 'string' && incoming.smtpHost) {
+      const host = incoming.smtpHost as string
+      // 禁止 IP / localhost；仅允许 FQDN，降低 SSRF/内网 SMTP 滥用面
+      if (
+        !/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(
+          host
+        ) ||
+        host.toLowerCase() === 'localhost' ||
+        host.endsWith('.local') ||
+        host.endsWith('.internal')
+      ) {
+        throw new Error('SMTP Host 必须是合法公网域名（禁止 IP / localhost）')
+      }
+      // DNS 解析后拒绝内网地址（防将 smtpHost 指到内网服务做端口探测）
+      const dns = await import('dns')
+      const { ssrf } = await import('@/lib/security/safe-fetch')
+      let addresses: { address: string; family: number }[]
+      try {
+        addresses = await dns.promises.lookup(host, { all: true })
+      } catch {
+        throw new Error('SMTP Host DNS 解析失败')
+      }
+      if (!addresses.length || addresses.some((a) => ssrf.isPrivateIp(a.address))) {
+        throw new Error('SMTP Host 解析结果包含内网地址，已拒绝')
+      }
+    }
+
     // 网站名称/描述：trim 后若为空，回退到默认值，避免前端显示空白
     if ('siteName' in incoming && typeof incoming.siteName === 'string') {
       const trimmed = (incoming.siteName as string).trim()
@@ -108,45 +159,64 @@ export async function saveSystemSettings(settings: Partial<SystemSettings>): Pro
     if ('smtpPassword' in incoming) {
       const pwd = (incoming.smtpPassword as string) || ''
       if (!pwd || pwd.includes('****')) {
-        // 未修改，保留原值
         incoming.smtpPassword = currentRaw.smtpPassword
       } else {
-        // 新授权码，加密存储
         incoming.smtpPassword = encrypt(pwd)
       }
     }
 
-    const newSettings = { ...currentRaw, ...incoming } as SystemSettings
+    // 深度合并 + 校验评测配置
+    if ('judge' in incoming && incoming.judge && typeof incoming.judge === 'object') {
+      incoming.judge = mergeJudgeSettings({
+        ...currentRaw.judge,
+        ...(incoming.judge as Partial<JudgeSettings>),
+      })
+    }
+
+    const newSettings = normalizeMerged({
+      ...(currentRaw as unknown as Record<string, unknown>),
+      ...incoming,
+    })
 
     await prisma.systemConfig.upsert({
       where: { key: SETTINGS_KEY },
       update: { value: newSettings as unknown as object },
-      create: { key: SETTINGS_KEY, value: newSettings as unknown as object }
+      create: { key: SETTINGS_KEY, value: newSettings as unknown as object },
     })
 
     memorySettings = newSettings as unknown as Record<string, unknown>
+
+    // 热更新评测运行时（动态 import 避免 settings ↔ judge 循环依赖）
+    try {
+      const { applyJudgeRuntimeConfig } = await import('@/lib/judge/config')
+      applyJudgeRuntimeConfig()
+    } catch (e) {
+      logger.warn('评测配置热更新失败（不影响设置保存）', {
+        error: e instanceof Error ? e.message : String(e),
+      })
+    }
+
     return true
   } catch (error) {
-    // 写入失败时返回 false，调用方可感知失败并重试或提示用户
-    // 不更新 memorySettings：避免将未持久化的脏数据写入缓存导致后续读取不一致
     logger.error('保存系统设置失败', error)
     return false
   }
 }
 
 /**
- * 解密 SMTP 授权码（兼容历史明文：无法解密时按明文返回）。
+ * 解密 SMTP 授权码。仅接受 AES-GCM 密文，拒绝明文。
  */
 function tryDecryptPassword(stored: string): string {
   if (!stored) return ''
-  if (stored.includes(':')) {
-    try {
-      return decrypt(stored)
-    } catch (err: any) {
-      logger.warn('[settings] SMTP 授权码解密失败，按明文处理', { reason: err?.message })
-    }
+  if (!isEncryptedSecret(stored)) {
+    throw new Error('SMTP 授权码必须为加密存储，请重新保存邮件设置')
   }
-  return stored
+  try {
+    return decrypt(stored)
+  } catch (err: any) {
+    logger.error('[settings] SMTP 授权码解密失败', { reason: err?.message })
+    throw new Error('SMTP 授权码解密失败，请重新保存邮件设置')
+  }
 }
 
 /**
@@ -161,23 +231,27 @@ export async function getSmtpConfig(): Promise<{
   from: string
 } | null> {
   const raw = await getRawSystemSettings()
-  // trim 防止粘贴带入的空格/不可见字符导致 DNS EBADNAME
   const host = (raw.smtpHost || '').trim()
   const user = (raw.smtpUser || '').trim()
   const from = (raw.smtpFrom || '').trim()
   if (!host || !user || !raw.smtpPassword) return null
+  let pass: string
+  try {
+    pass = tryDecryptPassword(raw.smtpPassword)
+  } catch {
+    // 密文损坏时 fail-closed：视为未配置，禁止用错误凭据发信
+    return null
+  }
   return {
     host,
     port: raw.smtpPort,
     secure: raw.smtpSecure,
     user,
-    pass: tryDecryptPassword(raw.smtpPassword),
-    from: from || user
+    pass,
+    from: from || user,
   }
 }
 
 export function setMemorySettings(settings: Record<string, unknown>) {
   memorySettings = settings
 }
-
-export { defaultSettings }

@@ -8,7 +8,7 @@ import { CacheKeys } from '@/lib/constants/cache-keys'
 import { redistributeTestScores, deleteTestCaseFiles } from '@/lib/problem/testcase'
 import { invalidateProblemTestCaseCache } from '@/lib/judge/testcase-loader'
 import { trimAll, escapeHtml } from '@/lib/sanitize'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { logger } from '@/lib/logger'
 import { DIFFICULTIES, isValidDifficulty } from '@/lib/constants'
 import { purgeProblemDependents } from '@/lib/problem/purge-dependents'
@@ -24,11 +24,12 @@ export async function listAllProblemsForAdmin(opts?: {
   tagIds?: string[]
 }) {
   const page = opts?.page
-  const pageSize = opts?.pageSize
+  const rawPageSize = opts?.pageSize
+  const pageSize =
+    typeof rawPageSize === 'number' && rawPageSize > 0 ? Math.min(rawPageSize, 100) : undefined
   const usePaging =
     typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
-  // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
-  const take = usePaging ? (pageSize as number) : 500
+  const take = usePaging ? (pageSize as number) : 100
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
 
   // q 关键字模糊匹配题号 / 标题 / 来源（不区分大小写，参考 HOJ ProblemMapper.xml）
@@ -107,7 +108,6 @@ export interface CreateAdminProblemInput {
   tags?: string[]
   timeLimit?: number | string
   memoryLimit?: number | string
-  isPublic?: boolean
   visibility?: string
   testCases?: any[]
   [k: string]: any
@@ -165,9 +165,9 @@ export async function createAdminProblem(
     memoryLimit,
     comparisonMode,
     realPrecision,
-    isPublic,
     visibility,
     testCases,
+    spjCode: rawSpjCode,
   } = body
 
   // 必填
@@ -200,12 +200,18 @@ export async function createAdminProblem(
       throw new ApiError('INVALID_MEMORY_LIMIT', '内存限制必须在1-1024MB之间', 400)
     }
   }
-  const VALID_COMPARISON_MODES = ['default', 'strict', 'ignore-spaces', 'real-number']
+  const VALID_COMPARISON_MODES = [
+    'default',
+    'strict',
+    'ignore-spaces',
+    'real-number',
+    'special-judge',
+  ]
   if (comparisonMode !== undefined && comparisonMode !== null) {
     if (!VALID_COMPARISON_MODES.includes(comparisonMode as string)) {
       throw new ApiError(
         'INVALID_COMPARISON_MODE',
-        '比较模式无效，必须是：default、strict、ignore-spaces、real-number',
+        '比较模式无效，必须是：default、strict、ignore-spaces、real-number、special-judge',
         400
       )
     }
@@ -215,6 +221,17 @@ export async function createAdminProblem(
     if (p < 0 || p > 12) {
       throw new ApiError('INVALID_REAL_PRECISION', '浮点数精度必须在0-12之间', 400)
     }
+  }
+  const spjCode = rawSpjCode
+  if (comparisonMode === 'special-judge') {
+    if (typeof spjCode !== 'string' || !spjCode.trim()) {
+      throw new ApiError('MISSING_SPJ_CODE', 'Special Judge 模式下必须提供 checker.cpp 源码（spjCode）', 400)
+    }
+    if (Buffer.byteLength(spjCode, 'utf8') > 512 * 1024) {
+      throw new ApiError('SPJ_CODE_TOO_LARGE', 'Special Judge 代码过大（上限 512KB）', 400)
+    }
+  } else if (spjCode !== undefined && spjCode !== null && typeof spjCode !== 'string') {
+    throw new ApiError('INVALID_SPJ_CODE', 'spjCode 必须是字符串', 400)
   }
   if (tags !== undefined && tags !== null && !Array.isArray(tags)) {
     throw new ApiError('INVALID_TAGS', '标签格式无效', 400)
@@ -259,11 +276,26 @@ export async function createAdminProblem(
       ? (comparisonMode as string)
       : 'default',
     realPrecision: parseLimit(realPrecision, 3),
+    spjCode:
+      comparisonMode === 'special-judge' && typeof spjCode === 'string'
+        ? spjCode
+        : typeof spjCode === 'string' && spjCode.trim()
+          ? spjCode
+          : null,
     isPublic: visibility === 'public',
     visibility: (visibility as string) || 'public',
     totalSubmit: 0,
     totalAccepted: 0,
     author: { connect: { id: authorId } },
+  }
+
+  // 洛谷约定：SPJ 题应带「Special Judge」标签
+  if (problemData.comparisonMode === 'special-judge') {
+    const tagList = Array.isArray(problemData.tags) ? [...problemData.tags] : []
+    if (!tagList.some((t: string) => String(t).toLowerCase() === 'special judge')) {
+      tagList.push('Special Judge')
+    }
+    problemData.tags = tagList
   }
 
   if (testCases && Array.isArray(testCases) && testCases.length > 0) {
@@ -326,7 +358,7 @@ const ADMIN_PROBLEM_EDITABLE_FIELDS = [
   'memoryLimit',
   'comparisonMode',
   'realPrecision',
-  'isPublic',
+  'spjCode',
   'visibility',
 ] as const
 
@@ -390,12 +422,18 @@ export async function updateAdminProblem(
       throw new ApiError('INVALID_MEMORY_LIMIT', '内存限制必须在1-1024MB之间', 400)
     }
   }
-  const VALID_COMPARISON_MODES = ['default', 'strict', 'ignore-spaces', 'real-number']
+  const VALID_COMPARISON_MODES = [
+    'default',
+    'strict',
+    'ignore-spaces',
+    'real-number',
+    'special-judge',
+  ]
   if (body.comparisonMode !== undefined && body.comparisonMode !== null) {
     if (!VALID_COMPARISON_MODES.includes(body.comparisonMode as string)) {
       throw new ApiError(
         'INVALID_COMPARISON_MODE',
-        '比较模式无效，必须是：default、strict、ignore-spaces、real-number',
+        '比较模式无效，必须是：default、strict、ignore-spaces、real-number、special-judge',
         400
       )
     }
@@ -405,6 +443,22 @@ export async function updateAdminProblem(
     if (p < 0 || p > 12) {
       throw new ApiError('INVALID_REAL_PRECISION', '浮点数精度必须在0-12之间', 400)
     }
+  }
+  const nextMode =
+    body.comparisonMode !== undefined && body.comparisonMode !== null
+      ? body.comparisonMode
+      : existingProblem.comparisonMode
+  const nextSpj =
+    body.spjCode !== undefined ? body.spjCode : (existingProblem as { spjCode?: string | null }).spjCode
+  if (nextMode === 'special-judge') {
+    if (typeof nextSpj !== 'string' || !nextSpj.trim()) {
+      throw new ApiError('MISSING_SPJ_CODE', 'Special Judge 模式下必须提供 checker.cpp 源码（spjCode）', 400)
+    }
+    if (Buffer.byteLength(nextSpj, 'utf8') > 512 * 1024) {
+      throw new ApiError('SPJ_CODE_TOO_LARGE', 'Special Judge 代码过大（上限 512KB）', 400)
+    }
+  } else if (body.spjCode !== undefined && body.spjCode !== null && typeof body.spjCode !== 'string') {
+    throw new ApiError('INVALID_SPJ_CODE', 'spjCode 必须是字符串', 400)
   }
   if (body.visibility !== undefined && body.visibility !== null) {
     if (!['public', 'private', 'contest'].includes(body.visibility as string)) {
@@ -429,37 +483,59 @@ export async function updateAdminProblem(
   for (const field of ADMIN_PROBLEM_EDITABLE_FIELDS) {
     if (field in body) updateData[field] = body[field]
   }
-  // Sync visibility 和 isPublic
+  // visibility 为唯一真相源；isPublic 仅派生写入以保持索引字段一致
   if (updateData.visibility) {
     updateData.isPublic = updateData.visibility === 'public'
-  } else if (updateData.isPublic !== undefined) {
-    updateData.visibility = updateData.isPublic ? 'public' : 'private'
+  }
+  // 非 SPJ 模式可清空 spjCode；SPJ 模式自动补「Special Judge」标签
+  if (nextMode === 'special-judge') {
+    const baseTags = Array.isArray(updateData.tags)
+      ? updateData.tags
+      : Array.isArray(existingProblem.tags)
+        ? [...existingProblem.tags]
+        : []
+    if (!baseTags.some((t: string) => String(t).toLowerCase() === 'special judge')) {
+      updateData.tags = [...baseTags, 'Special Judge']
+    } else if (updateData.tags === undefined && body.tags === undefined) {
+      // 未改 tags 且已有标签时无需写
+    }
+  } else if (body.comparisonMode !== undefined && body.comparisonMode !== 'special-judge') {
+    if (body.spjCode === undefined) {
+      updateData.spjCode = null
+    }
   }
 
-  await prisma.problem.update({ where: { id }, data: updateData })
+  // 题目字段与测点替换必须同事务，避免 deleteMany 成功后 createMany 失败导致 0 测点
+  await prisma.$transaction(async (tx) => {
+    await tx.problem.update({ where: { id }, data: updateData })
 
-  // 更新测试用例
+    if (body.testCases && Array.isArray(body.testCases)) {
+      await tx.testCase.deleteMany({ where: { problemId: id } })
+      if (body.testCases.length > 0) {
+        await tx.testCase.createMany({
+          data: body.testCases.map((tc: any, idx: number) => ({
+            problemId: id,
+            input: tc.input || '',
+            output: tc.output || '',
+            isSample: tc.isSample || false,
+            score: tc.score || 10,
+            timeLimit:
+              tc.timeLimit === undefined || tc.timeLimit === null ? null : Number(tc.timeLimit),
+            memoryLimit:
+              tc.memoryLimit === undefined || tc.memoryLimit === null
+                ? null
+                : Number(tc.memoryLimit),
+            orderIndex: idx,
+          })),
+        })
+      }
+    }
+  })
+
   if (body.testCases && Array.isArray(body.testCases)) {
     await invalidateProblemTestCaseCache(id)
-    await prisma.testCase.deleteMany({ where: { problemId: id } })
     if (body.testCases.length > 0) {
-      await prisma.testCase.createMany({
-        data: body.testCases.map((tc: any, idx: number) => ({
-          problemId: id,
-          input: tc.input || '',
-          output: tc.output || '',
-          isSample: tc.isSample || false,
-          score: tc.score || 10,
-          timeLimit:
-            tc.timeLimit === undefined || tc.timeLimit === null ? null : Number(tc.timeLimit),
-          memoryLimit:
-            tc.memoryLimit === undefined || tc.memoryLimit === null
-              ? null
-              : Number(tc.memoryLimit),
-          orderIndex: idx,
-        })),
-      })
-      // 仅当总分不是 100 时兜底均分，避免覆盖用户手动设定的分数
+      // 仅当总分不是 100 时均分，避免覆盖用户手动设定的分数
       const scoreSum = body.testCases.reduce(
         (sum: number, tc: any) => sum + (Number(tc?.score) || 0),
         0

@@ -26,15 +26,14 @@ export async function getClassMemberByUserId(classId: string, userId: string) {
   })
 }
 
-/** 更新成员角色 / 备注（班级角色与系统角色解耦，不再同步 User.role） */
+/** 更新成员备注（角色变更必须走 updateClassMemberRole） */
 export async function patchClassMember(
   classId: string,
   userId: string,
-  data: { remark?: string; role?: 'student' | 'assistant' | 'owner' }
+  data: { remark?: string }
 ) {
-  const update: { remark?: string; role?: string } = {}
+  const update: { remark?: string } = {}
   if (data.remark !== undefined) update.remark = data.remark
-  if (data.role !== undefined) update.role = data.role
 
   const updated = await prisma.classMember.update({
     where: { classId_userId: { classId, userId } },

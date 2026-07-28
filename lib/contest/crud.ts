@@ -84,14 +84,3 @@ export async function registerContest(contestId: string, userId: string) {
     create: { contestId, userId },
   })
 }
-
-export async function getContestRank(contestId: string, limit = 100) {
-  return cache.get('contest:rank', [contestId, limit], async () => {
-    return prisma.contestParticipant.findMany({
-      where: { contestId },
-      take: limit,
-      orderBy: { score: 'desc' },
-      include: { user: { select: { id: true, username: true, nickname: true, avatar: true } } },
-    })
-  }, { ttl: 30_000 })
-}

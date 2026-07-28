@@ -20,6 +20,7 @@ import type { ComparisonMode } from '@/lib/judge/types'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { isObjectIdLike } from '@/lib/problem/lookup'
+import { assertCanAccessProblem } from '@/lib/problem/access'
 
 // 支持的提交语言白名单（与 lib/judge/compiler.ts 的 languageConfigs 一致）
 const ALLOWED_LANGUAGES = ['cpp', 'c', 'python']
@@ -28,7 +29,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id: problemId } = ctx.params
   if (!problemId) throw400('INVALID_ID', '无效的题目ID')
 
-  const body = await readJson<{ code: string; language: string }>(req)
+  const body = await readJson<{ code: string; language: string; contestId?: string }>(req)
   if (!body.code || !body.language) {
     throw400('VALIDATION', '缺少必需字段: code, language')
   }
@@ -38,6 +39,10 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   if (typeof body.language !== 'string' || !ALLOWED_LANGUAGES.includes(body.language)) {
     throw400('VALIDATION', '不支持的语言')
   }
+  const contestId =
+    typeof body.contestId === 'string' && body.contestId.trim()
+      ? body.contestId.trim()
+      : undefined
 
   // 题目 ID 可能是 MongoDB ObjectId（24 字符 hex）或 problemNumber（如 "P1001"）
   // 直接对非 ObjectId 字符串调用 findUnique({ where: { id } }) 会触发
@@ -46,15 +51,19 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     ? { id: problemId }
     : { problemNumber: problemId }
 
-  // 校验题目存在且公开可见，避免用户对未公开/不存在的题目发起 pretest
+  // 校验题目存在且当前用户可访问，避免对未公开题目发起 pretest
   const problem = await prisma.problem.findFirst({
     where: problemWhere,
     select: {
       id: true,
+      authorId: true,
+      visibility: true,
+      classId: true,
       timeLimit: true,
       memoryLimit: true,
       comparisonMode: true,
       realPrecision: true,
+      spjCode: true,
       // samples 是题目描述中展示给用户看的样例（Json 字段），
       // 当 TestCase 表没有 isSample=true 的记录时作为 pretest 回退数据源
       samples: true,
@@ -63,6 +72,16 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   if (!problem) throw404('题目不存在')
   // throw404 返回 never，TS 已收窄 problem 为非空类型
   const safeProblem = problem!
+  await assertCanAccessProblem(
+    {
+      id: safeProblem.id,
+      authorId: safeProblem.authorId,
+      visibility: safeProblem.visibility,
+      classId: safeProblem.classId ?? null,
+    },
+    user,
+    { contestId }
+  )
 
   // 取样例测试点（isSample=true），按 orderIndex 升序
   // 注意：TestCase.problemId 必须用真正的 ObjectId（不能用 P1001）
@@ -144,6 +163,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     memoryLimit: safeProblem.memoryLimit,
     comparisonMode: (safeProblem.comparisonMode as ComparisonMode) || 'default',
     realPrecision: safeProblem.realPrecision ?? 3,
+    spjCode: safeProblem.spjCode ?? null,
     testCases,
   })
 

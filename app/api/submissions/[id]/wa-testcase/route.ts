@@ -20,12 +20,15 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const filename = data.problemNumber
     ? `${data.problemNumber}_wa${data.caseIndex}.zip`
     : `submission_${id}_wa${data.caseIndex}.zip`
+  // RFC 5987：ASCII 回退名消毒，避免 Content-Disposition 注入
+  const safeAscii = filename.replace(/[^\w.\-]+/g, '_').slice(0, 120) || 'wa.zip'
+  const encoded = encodeURIComponent(filename).replace(/['()]/g, escape)
 
   const zipBlob = new Blob([new Uint8Array(zip.toBuffer())], { type: 'application/zip' })
   return new Response(zipBlob, {
     headers: {
       'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': `attachment; filename="${safeAscii}"; filename*=UTF-8''${encoded}`,
       'Cache-Control': 'no-store',
     },
   })

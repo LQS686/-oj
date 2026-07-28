@@ -235,4 +235,22 @@ describe('safeFetch - SSRF 防护', () => {
     expect(ssrf.isPrivateIp('fd00::1')).toBe(true)
     expect(ssrf.isPrivateIp('2001:4860:4860::8888')).toBe(false) // Google DNS IPv6
   })
+
+  it('应拒绝 IPv4-mapped 点分形式 ::ffff:127.0.0.1', () => {
+    expect(ssrf.isPrivateIp('::ffff:127.0.0.1')).toBe(true)
+    expect(ssrf.isPrivateIp('::ffff:10.0.0.1')).toBe(true)
+    expect(ssrf.isPrivateIp('::ffff:192.168.1.1')).toBe(true)
+    expect(ssrf.isPrivateIp('::ffff:8.8.8.8')).toBe(false)
+  })
+
+  it('应拒绝 IPv4-mapped 十六进制 ::ffff:7f00:1', () => {
+    expect(ssrf.isPrivateIp('::ffff:7f00:1')).toBe(true) // 127.0.0.1
+    expect(ssrf.isPrivateIp('::ffff:0a00:1')).toBe(true) // 10.0.0.1
+    expect(ssrf.isPrivateIp('::ffff:c0a8:1')).toBe(true) // 192.168.0.1
+  })
+
+  it('URL 字面量应拒绝 ::ffff: 内网映射', async () => {
+    await expect(safeFetch('http://[::ffff:127.0.0.1]/x')).rejects.toThrow(/内网/)
+    await expect(safeFetch('http://[::ffff:7f00:1]/x')).rejects.toThrow(/内网/)
+  })
 })

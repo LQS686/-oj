@@ -43,7 +43,12 @@ export async function getUserPublicInfo(userId: string) {
     prisma.submission.count({ where: { userId, status: 'AC' } }),
   ])
   if (!user) return null
-  return { ...user, acceptedSubmissions: acceptedSubmissionsCount }
+  const { sanitizeAvatarUrl } = await import('@/lib/user/avatar-url')
+  return {
+    ...user,
+    avatar: sanitizeAvatarUrl(user.avatar),
+    acceptedSubmissions: acceptedSubmissionsCount,
+  }
 }
 
 /**
@@ -65,6 +70,9 @@ export async function getUserFullStats(userId: string) {
     },
   })
   if (!user) return null
+
+  const { sanitizeAvatarUrl } = await import('@/lib/user/avatar-url')
+  const safeUser = { ...user, avatar: sanitizeAvatarUrl(user.avatar) }
 
   const [
     totalSubmissions,
@@ -202,7 +210,7 @@ export async function getUserFullStats(userId: string) {
   }))
 
   return {
-    user,
+    user: safeUser,
     submissions: {
       total: totalSubmissions,
       accepted: statusCount['AC'] || 0,
@@ -239,7 +247,7 @@ export async function getUserFullStats(userId: string) {
  * 获取当前登录用户的完整资料
  */
 export async function getCurrentUserProfile(userId: string) {
-  return prisma.user.findUnique({
+  const row = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
@@ -264,6 +272,9 @@ export async function getCurrentUserProfile(userId: string) {
       },
     },
   })
+  if (!row) return null
+  const { sanitizeAvatarUrl } = await import('@/lib/user/avatar-url')
+  return { ...row, avatar: sanitizeAvatarUrl(row.avatar) }
 }
 
 /**
@@ -279,23 +290,24 @@ export async function updateCurrentUserBasic(
   if (data.bio !== undefined && data.bio.length > 500) {
     throw AppError.badRequest('INVALID_BIO', '个人简介不能超过500个字符')
   }
-
-  const client = await getMongoClient()
-  const db = client.db()
-  await db.collection('User').updateOne(
-    { _id: new ObjectId(userId) },
-    {
-      $set: {
-        ...(data.nickname !== undefined && { nickname: data.nickname }),
-        ...(data.bio !== undefined && { bio: data.bio }),
-        ...(data.avatar !== undefined && { avatar: data.avatar }),
-        updatedAt: new Date(),
-      },
+  if (data.avatar !== undefined) {
+    // 仅允许本站头像路径，禁止任意外链钓鱼
+    const ok =
+      data.avatar === '' ||
+      data.avatar.startsWith('/uploads/avatars/') ||
+      data.avatar.startsWith('/api/placeholder/')
+    if (!ok) {
+      throw AppError.badRequest('INVALID_AVATAR', '头像地址不合法')
     }
-  )
+  }
 
-  return prisma.user.findUnique({
+  const result = await prisma.user.update({
     where: { id: userId },
+    data: {
+      ...(data.nickname !== undefined && { nickname: data.nickname }),
+      ...(data.bio !== undefined && { bio: data.bio }),
+      ...(data.avatar !== undefined && { avatar: data.avatar }),
+    },
     select: {
       id: true,
       username: true,
@@ -309,10 +321,9 @@ export async function updateCurrentUserBasic(
       role: true,
       updatedAt: true,
     },
-  }).then((result) => {
-    if (result) clearUserCache(userId)
-    return result
   })
+  clearUserCache(userId)
+  return result
 }
 
 /**
@@ -342,17 +353,15 @@ export async function changeCurrentUserPassword(
   if (!isPasswordValid) {
     throw AppError.badRequest('WRONG_PASSWORD', '当前密码错误')
   }
-  const hashedPassword = await bcryptModule.hash(newPassword, 10)
-  const client = await getMongoClient()
-  const db = client.db()
-  // 修改密码时递增 tokenVersion，使所有旧 Token 失效（强制重新登录）
-  await db.collection('User').updateOne(
-    { _id: new ObjectId(userId) },
-    {
-      $set: { password: hashedPassword, updatedAt: new Date() },
-      $inc: { tokenVersion: 1 },
-    }
-  )
+  const hashedPassword = await bcryptModule.hash(newPassword, 12)
+  // 统一走 Prisma：改密与登录共用同一数据源；递增 tokenVersion 使旧 Token 失效
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      password: hashedPassword,
+      tokenVersion: { increment: 1 },
+    },
+  })
   clearUserCache(userId)
 }
 

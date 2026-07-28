@@ -152,6 +152,31 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
     mergeListRef.current = mergeListOnUpdate
   }, [mergeListOnUpdate])
 
+  // 换账号 / 禁用 / 卸载时清空弹窗与进行中状态，避免跨用户串结果
+  useEffect(() => {
+    const resetSession = () => {
+      submitEpochRef.current += 1
+      submittingRef.current = false
+      currentSubmissionIdRef.current = null
+      showResultModalRef.current = false
+      lastResultRef.current = null
+      setSubmitting(false)
+      setCurrentSubmissionId(null)
+      setJudgeStatus(null)
+      setJudgeProgress(null)
+      setLastResult(null)
+      setShowResultModal(false)
+    }
+    if (!enabled || !userId) {
+      resetSession()
+      return
+    }
+    resetSession()
+    return () => {
+      resetSession()
+    }
+  }, [userId, enabled])
+
   const applyModalFinalResult = useCallback((result: SubmissionResultData) => {
     if (!result.submissionId || result.submissionId !== currentSubmissionIdRef.current) return
     if (!showResultModalRef.current && !submittingRef.current) return

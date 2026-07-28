@@ -13,9 +13,11 @@ export const GET = withApi.auth(async (_req, _ctx, { user }) => {
 })
 
 export const PUT = withApi.auth(async (req, _ctx, { user }) => {
-  const body = await readJson<{ nickname?: string; bio?: string; avatar?: string }>(req)
+  const body = await readJson<Record<string, unknown>>(req)
+  const { parseProfileUpdate } = await import('@/lib/user/validation')
+  const parsed = parseProfileUpdate(body)
   try {
-    const updated = await updateCurrentUserBasic(user.id, body)
+    const updated = await updateCurrentUserBasic(user.id, parsed)
     return ok(updated)
   } catch (err: any) {
     if (err?.status === 400) throw400('VALIDATION', err.message)

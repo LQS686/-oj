@@ -9,6 +9,8 @@ import { Server as SocketIOServer } from 'socket.io'
 import { verifyToken, JWTPayload } from '@/lib/auth'
 import { canAccessAdmin } from '@/lib/permissions'
 import { logger } from '@/lib/logger'
+import { resolveClientIp } from '@/lib/http/client-ip'
+import { readAuthTokenFromCookieHeader } from '@/lib/auth/cookie'
 
 let io: SocketIOServer | null = null
 // 定时器引用：优雅关闭时 clearInterval，避免资源泄漏
@@ -64,15 +66,27 @@ rateLimitCleanupTimer = setInterval(cleanupRateLimit, 60 * 1000)
 
 async function authenticateSocket(socket: Socket): Promise<JWTPayload | null> {
   try {
-    const token = socket.handshake.auth.token ||
-                  socket.handshake.headers.authorization?.replace('Bearer ', '') ||
-                  parseCookies(socket.handshake.headers.cookie || '').token
+    const token =
+      readAuthTokenFromCookieHeader(socket.handshake.headers.cookie || '')
 
     if (!token) {
       return null
     }
 
-    return verifyToken(token)
+    const payload = verifyToken(token)
+    if (!payload?.userId) return null
+
+    // 校验 tokenVersion / isBanned，与 HTTP withApi 一致
+    const { getCachedUser } = await import('@/lib/api/handler')
+    const user = await getCachedUser(payload.userId, payload.tokenVersion)
+    if (!user) return null
+
+    return {
+      ...payload,
+      role: user.role,
+      username: user.username,
+      email: user.email || payload.email,
+    }
   } catch (error) {
     logger.error('❌ Socket 认证失败:', error)
     return null
@@ -81,10 +95,8 @@ async function authenticateSocket(socket: Socket): Promise<JWTPayload | null> {
 
 function getClientIP(socket: Socket): string {
   const forwarded = socket.handshake.headers['x-forwarded-for']
-  if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0].trim()
-  }
-  return socket.handshake.address || 'unknown'
+  const forwardedStr = Array.isArray(forwarded) ? forwarded[0] : forwarded
+  return resolveClientIp(forwardedStr, socket.handshake.address || null)
 }
 
 function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
@@ -140,7 +152,9 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     socketId: string
     userId: string | null
     role: string | null
-    connectedAt: number
+    tokenVersion: number | null
+    /** 最近活跃时间（心跳刷新）；用于清理僵尸连接，勿用「建连年龄」 */
+    lastSeenAt: number
     heartbeatCount: number
     heartbeatWindowStart: number
     isAuthenticated: boolean
@@ -167,7 +181,8 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       socketId: socket.id,
       userId: auth?.userId ?? null,
       role: auth?.role ?? null,
-      connectedAt: Date.now(),
+      tokenVersion: typeof auth?.tokenVersion === 'number' ? auth.tokenVersion : null,
+      lastSeenAt: Date.now(),
       heartbeatCount: 0,
       heartbeatWindowStart: Date.now(),
       isAuthenticated: isAuthenticated,
@@ -194,6 +209,10 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     socket.use((packet, next) => {
       const [eventName, ...args] = packet
       const client = connectedClients.get(socket.id)
+      if (client) {
+        client.lastSeenAt = Date.now()
+        connectedClients.set(socket.id, client)
+      }
       
       if (!ALLOWED_EVENT_TYPES.includes(eventName as any)) {
         logger.warn(`⚠️  未知消息类型: ${eventName}, Socket=${socket.id}`)
@@ -289,7 +308,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     })
 
     /** 管理员订阅单条提交房间（查看他人提交详情，不依赖选手 user 房间） */
-    socket.on('watchSubmission', (submissionId: string) => {
+    socket.on('watchSubmission', async (submissionId: string) => {
       try {
         const client = connectedClients.get(socket.id)
         if (!client?.isAuthenticated || !client.userId) {
@@ -300,10 +319,16 @@ export function initWebSocketServer(httpServer: HTTPServer) {
           socket.emit('error', { event: 'watchSubmission', message: '缺少 submissionId' })
           return
         }
-        if (!canAccessAdmin({ role: client.role })) {
+        // 实时查库角色，避免连接时缓存的旧 role 在降权后仍可订阅
+        const { getCachedUser } = await import('@/lib/api/handler')
+        const fresh = await getCachedUser(client.userId)
+        if (!fresh || !canAccessAdmin(fresh)) {
+          client.role = fresh?.role ?? client.role
+          connectedClients.set(socket.id, client)
           socket.emit('error', { event: 'watchSubmission', message: '需要管理员权限' })
           return
         }
+        client.role = fresh.role
         if (client.watchedSubmissionId) {
           socket.leave(submissionRoom(client.watchedSubmissionId))
         }
@@ -319,13 +344,14 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       }
     })
 
-    socket.on('unwatchSubmission', (submissionId?: string) => {
+    socket.on('unwatchSubmission', async (submissionId?: string) => {
       try {
         const client = connectedClients.get(socket.id)
-        if (!client?.isAuthenticated) {
+        if (!client?.isAuthenticated || !client.userId) {
           socket.emit('error', { event: 'unwatchSubmission', message: '请先认证' })
           return
         }
+        // 允许离开房间：降权后仍须能离房，避免继续接收提交推送
         const targetId = submissionId || client.watchedSubmissionId
         if (!targetId) return
         socket.leave(submissionRoom(targetId))
@@ -355,6 +381,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       if (!client) return
 
       const now = Date.now()
+      client.lastSeenAt = now
       if (now - client.heartbeatWindowStart > 60 * 1000) {
         client.heartbeatCount = 1
         client.heartbeatWindowStart = now
@@ -369,6 +396,33 @@ export function initWebSocketServer(httpServer: HTTPServer) {
         return
       }
 
+      // 已认证连接：周期性复核 tokenVersion / 封禁，吊销后立即断开
+      if (client.isAuthenticated && client.userId) {
+        void (async () => {
+          try {
+            const { getCachedUser } = await import('@/lib/api/handler')
+            const user = await getCachedUser(
+              client.userId!,
+              client.tokenVersion ?? undefined
+            )
+            if (!user) {
+              logger.warn(`会话已失效，断开 WebSocket: user=${client.userId}, socket=${socket.id}`)
+              socket.emit('error', { event: 'auth', message: '会话已失效，请重新登录' })
+              socket.disconnect(true)
+              return
+            }
+            client.role = user.role
+            socket.emit('pong')
+            connectedClients.set(socket.id, client)
+          } catch (err) {
+            logger.error('心跳会话复核失败', err)
+            socket.emit('pong')
+            connectedClients.set(socket.id, client)
+          }
+        })()
+        return
+      }
+
       socket.emit('pong')
       connectedClients.set(socket.id, client)
     })
@@ -379,17 +433,14 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     })
   })
 
-  // 定期清理无效连接
+  // 仅清理长时间无心跳的僵尸连接（Engine.IO ping 已覆盖正常超时；此处兜底）
   staleConnectionCleanupTimer = setInterval(() => {
     const now = Date.now()
-    const timeoutThreshold = 5 * 60 * 1000 // 5分钟超时
+    const idleThreshold = 5 * 60 * 1000
 
     for (const [socketId, clientInfo] of connectedClients.entries()) {
-      if (now - clientInfo.connectedAt > timeoutThreshold) {
-        logger.warn(`⚠️  清理超时连接: ${socketId}`)
-        // 必须显式 disconnect socket，否则 socket 仍存活并留在 user:{userId} 房间，
-        // 后续重连时 connectedClients.get(socket.id) 返回 undefined，
-        // join 处理把 client 视为未认证并拒绝加入，导致 submission:update 永久丢失。
+      if (now - clientInfo.lastSeenAt > idleThreshold) {
+        logger.warn(`⚠️  清理空闲连接: ${socketId}`)
         const targetSocket = io?.sockets.sockets.get(socketId)
         if (targetSocket) {
           targetSocket.disconnect(true)

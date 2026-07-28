@@ -3,7 +3,7 @@
  * 管理员批量题目操作 / 导出 / 审核 / 重生成题解
  */
 import { prisma } from '@/lib/prisma'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { DIFFICULTIES, isValidDifficulty } from '@/lib/constants'
 import { clearProblemCache } from './admin'
 import { purgeProblemDependents } from './purge-dependents'

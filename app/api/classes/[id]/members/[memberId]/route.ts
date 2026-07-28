@@ -1,6 +1,6 @@
 /**
  * 班级成员管理
- * - PATCH  /api/classes/[id]/members/[memberId]  更新成员（备注/角色）
+ * - PATCH  /api/classes/[id]/members/[memberId]  更新成员（备注/角色）或转让班主任
  * - DELETE /api/classes/[id]/members/[memberId]  移除成员
  */
 import {
@@ -15,7 +15,11 @@ import {
   requireClassAdminRole,
   requireManageableTarget,
 } from '@/lib/class/service'
-import { removeClassMember as removeClassMemberDirect } from '@/lib/class/member'
+import {
+  removeClassMember as removeClassMemberDirect,
+  updateClassMemberRole,
+  transferClassOwnership,
+} from '@/lib/class/member'
 
 export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   const { id, memberId } = ctx.params
@@ -23,15 +27,41 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
     throw400('INVALID_ID', '无效的ID')
   }
 
-  const body = await readJson<{ remark?: string; role?: 'student' | 'assistant' | 'owner' }>(req)
+  const body = await readJson<{
+    remark?: string
+    role?: 'student' | 'assistant' | 'owner'
+    transferOwnership?: boolean
+  }>(req)
+
+  // 班主任转让：仅当前 owner 可将目标成员升为 owner，并同步 Class.ownerId
+  if (body.transferOwnership === true || body.role === 'owner') {
+    await transferClassOwnership(id, user.id, memberId)
+    const { normalizeClassRoleToApi } = await import('@/lib/class/roles')
+    return ok({
+      id: memberId,
+      role: normalizeClassRoleToApi('owner'),
+      message: '班主任已转让',
+    })
+  }
+
   const operator = await requireClassAdminRole(id, user.id)
   await requireManageableTarget(id, memberId, operator.role)
 
-  const updateData: { remark?: string; role?: 'student' | 'assistant' | 'owner' } = {}
-  if (body.remark !== undefined) updateData.remark = body.remark
-  if (body.role !== undefined) updateData.role = body.role
+  let updated
+  if (body.role === 'student' || body.role === 'assistant') {
+    updated = await updateClassMemberRole(id, memberId, body.role)
+    if (body.remark !== undefined) {
+      updated = await patchClassMember(id, memberId, { remark: body.remark })
+    }
+  } else {
+    const updateData: { remark?: string } = {}
+    if (body.remark !== undefined) updateData.remark = body.remark
+    if (Object.keys(updateData).length === 0) {
+      throw400('VALIDATION', '请提供要更新的字段')
+    }
+    updated = await patchClassMember(id, memberId, updateData)
+  }
 
-  const updated = await patchClassMember(id, memberId, updateData)
   const { normalizeClassRoleToApi } = await import('@/lib/class/roles')
   return ok({
     id: updated!.userId,

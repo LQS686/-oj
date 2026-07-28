@@ -14,6 +14,7 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { canAccessAdmin } from '@/lib/permissions'
+import { ApiError } from '@/lib/api/errors'
 
 /* ============================================================================
  * 竞赛排行榜（按 ACM / OI 规则计算 + 排名）
@@ -124,8 +125,9 @@ export async function computeContestRankings(
 
   const userStatsMap = new Map<string, ContestUserStats>()
 
-  // 预填充
+  // 预填充（管理员/系统账号不入榜，避免 0 分假排名）
   contest.participants.forEach((p: any) => {
+    if (excludedUserIds.has(p.userId)) return
     userStatsMap.set(p.userId, {
       user: p.user,
       solved: 0,
@@ -249,6 +251,11 @@ export async function computeContestRankings(
 export async function finalizeContestRankings(contestId: string) {
   const contest = await prisma.contest.findUnique({ where: { id: contestId } })
   if (!contest) throw new Error('竞赛不存在')
+
+  // 仅允许比赛结束后落库，避免封榜中提前 finalize 与展示不一致
+  if (new Date() <= contest.endTime) {
+    throw new ApiError('CONTEST_NOT_ENDED', '竞赛尚未结束，不能固化排名', 400)
+  }
 
   // 落库时管理员视角，记录完整数据
   const result = await computeContestRankings(contestId, { viewerRole: 'SYSTEM_ADMIN' })

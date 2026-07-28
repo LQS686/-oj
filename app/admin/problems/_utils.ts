@@ -29,7 +29,7 @@ export const DEFAULT_FILTERS: ProblemFilters = {
  * 按搜索词 / 难度 / 可见性 / 标签 / 来源 / 数据完整度筛选题目。
  *
  * - 难度：空数组=全部；非空=任一命中
- * - 可见性：all=全部；其他值精确匹配 problem.visibility（兼容 isPublic 字段）
+ * - 可见性：all=全部；其他值精确匹配 problem.visibility
  * - 标签：AND 语义，需同时拥有所有选中标签
  * - 来源：精确匹配 problem.source（空数组=不限）
  * - 数据完整度：hasStd/noStd 基于 stdCode 字段；hasTests/noTests 基于 _count.testCases
@@ -49,9 +49,7 @@ export function filterProblems(problems: Problem[], filters: ProblemFilters): Pr
     const matchesDifficulty = difficultyFilter.length === 0 ||
       difficultyFilter.includes(p.difficulty)
 
-    // 可见性：兼容 isPublic 字段（无 visibility 时按 isPublic 推断）
-    const problemVisibility = p.visibility || (p.isPublic ? 'public' : 'private')
-    const matchesVisibility = visibility === 'all' || problemVisibility === visibility
+    const matchesVisibility = visibility === 'all' || p.visibility === visibility
 
     // 标签：AND 语义
     const matchesTags = tags.length === 0 ||

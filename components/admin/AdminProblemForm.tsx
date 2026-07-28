@@ -39,6 +39,7 @@ export default function AdminProblemForm({
   const [memoryLimit, setMemoryLimit] = useState(128)
   const [comparisonMode, setComparisonMode] = useState('default')
   const [realPrecision, setRealPrecision] = useState(3)
+  const [spjCode, setSpjCode] = useState('')
   const [visibility, setVisibility] = useState(isEdit ? 'public' : 'private')
 
   const [background, setBackground] = useState('')
@@ -63,6 +64,7 @@ export default function AdminProblemForm({
         memoryLimit,
         comparisonMode,
         realPrecision,
+        spjCode,
         visibility,
         background,
         description,
@@ -81,6 +83,7 @@ export default function AdminProblemForm({
       memoryLimit,
       comparisonMode,
       realPrecision,
+      spjCode,
       visibility,
       background,
       description,
@@ -109,6 +112,7 @@ export default function AdminProblemForm({
     setMemoryLimit(typeof problem.memoryLimit === 'number' ? problem.memoryLimit : 128)
     setComparisonMode(typeof problem.comparisonMode === 'string' ? problem.comparisonMode : 'default')
     setRealPrecision(typeof problem.realPrecision === 'number' ? problem.realPrecision : 3)
+    setSpjCode(typeof problem.spjCode === 'string' ? problem.spjCode : '')
     const vis =
       typeof problem.visibility === 'string'
         ? problem.visibility
@@ -217,6 +221,7 @@ export default function AdminProblemForm({
     memoryLimit,
     comparisonMode,
     realPrecision: comparisonMode === 'real-number' ? realPrecision : 3,
+    spjCode: comparisonMode === 'special-judge' ? spjCode : null,
     isPublic: visibility === 'public',
     visibility,
   })
@@ -243,6 +248,13 @@ export default function AdminProblemForm({
     }
     if (!description.trim()) {
       await dialog.alert({ tone: 'warning', message: '请填写题目描述' })
+      return
+    }
+    if (comparisonMode === 'special-judge' && !spjCode.trim()) {
+      await dialog.alert({
+        tone: 'warning',
+        message: 'Special Judge 模式需填写 checker.cpp（Testlib）源码',
+      })
       return
     }
 
@@ -491,6 +503,7 @@ export default function AdminProblemForm({
                 <option value="strict">严格匹配</option>
                 <option value="ignore-spaces">忽略空白</option>
                 <option value="real-number">浮点数</option>
+                <option value="special-judge">Special Judge（Testlib）</option>
               </select>
             </div>
           </div>
@@ -505,6 +518,28 @@ export default function AdminProblemForm({
                 min={0}
                 max={12}
                 className="input"
+              />
+            </div>
+          )}
+
+          {comparisonMode === 'special-judge' && (
+            <div>
+              <label className={fieldLabel}>
+                Special Judge 源码（checker.cpp / Testlib）
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                对齐洛谷：仅 C++，使用 <code className="px-1 rounded bg-gray-100">testlib.h</code>
+                （inf / ouf / ans），以 <code className="px-1 rounded bg-gray-100">quitf</code> /{' '}
+                <code className="px-1 rounded bg-gray-100">quitp</code> 结束。保存后会自动添加「Special
+                Judge」标签。
+              </p>
+              <textarea
+                value={spjCode}
+                onChange={(e) => setSpjCode(e.target.value)}
+                rows={16}
+                spellCheck={false}
+                placeholder={`#include "testlib.h"\n\nint main(int argc, char* argv[]) {\n    registerTestlibCmd(argc, argv);\n    // ...\n    quitf(_ok, "OK");\n}`}
+                className="input font-mono text-sm leading-relaxed"
               />
             </div>
           )}

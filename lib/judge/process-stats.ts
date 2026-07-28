@@ -33,8 +33,8 @@ export function readProcCpuTimeMs(pid: number): number {
 }
 
 /**
- * 解析 /proc/[pid]/status 获取 VmHWM（峰值常驻内存，KB）
- * VmHWM 已是进程生命周期内的峰值，仅需读取一次即可
+ * 解析 /proc/[pid]/status 获取 VmHWM（峰值总 RSS，KB）。
+ * 正式评测由 dsoj-watch 采样 RssAnon 峰值；本函数仅作通用兜底工具。
  * 失败返回 -1
  */
 export function readProcVmHwmKB(pid: number): number {

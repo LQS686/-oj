@@ -88,7 +88,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       const response = await fetchWithCookie('/api/notifications?limit=10')
       const data = await response.json()
       if (data.success) {
-        setNotifications(data.data?.notifications || data.data || [])
+        setNotifications(data.data?.notifications || data.data?.items || [])
       }
     } catch (error) {
       logger.error('获取通知失败', error)

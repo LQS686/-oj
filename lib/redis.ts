@@ -1,3 +1,5 @@
+import 'server-only'
+
 import Redis from 'ioredis'
 import { logger } from './logger'
 
@@ -146,9 +148,17 @@ class RedisCache {
   async keys(pattern: string, options: RedisCacheOptions = {}): Promise<string[]> {
     const fullPattern = options.prefix ? `${options.prefix}:${pattern}` : pattern
     try {
-      return await this.client.keys(fullPattern)
+      // SCAN 替代 KEYS，避免生产环境阻塞
+      const keys: string[] = []
+      let cursor = '0'
+      do {
+        const [next, batch] = await this.client.scan(cursor, 'MATCH', fullPattern, 'COUNT', 100)
+        cursor = next
+        keys.push(...batch)
+      } while (cursor !== '0')
+      return keys
     } catch (error) {
-      logger.error('Redis keys error:', error)
+      logger.error('Redis keys(scan) error:', error)
       return []
     }
   }
@@ -156,7 +166,7 @@ class RedisCache {
   async clear(pattern: string, options: RedisCacheOptions = {}): Promise<boolean> {
     const fullPattern = options.prefix ? `${options.prefix}:${pattern}` : pattern
     try {
-      const keys = await this.client.keys(fullPattern)
+      const keys = await this.keys(fullPattern)
       if (keys.length > 0) {
         await this.client.del(...keys)
       }

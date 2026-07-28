@@ -41,6 +41,9 @@ temp/
 
 # legacy Windows judge artifact (removed; ignore if leftover)
 lib/judge/win-runner.exe
+lib/judge/dsoj-watch
+lib/judge/dsoj-watch.lock
+lib/judge/dsoj-watch.new*
 
 # 评测测点磁盘缓存（由 materialize / warm-testdata-cache 生成）
 /data/testdata/

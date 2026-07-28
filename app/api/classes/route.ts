@@ -53,6 +53,28 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     throw400('INVALID_NAME', '班级名称不能为空')
   }
   const trimmedName = className!.trim()
+  if (trimmedName.length > 50) {
+    throw400('INVALID_NAME', '班级名称不能超过50个字符')
+  }
+
+  // isPublic / maxMembers 严格类型校验，禁止负数或非布尔脏数据入库
+  let isPublic = true
+  if (body.isPublic !== undefined) {
+    if (typeof body.isPublic !== 'boolean') {
+      throw400('INVALID_IS_PUBLIC', 'isPublic 必须为布尔值')
+    }
+    isPublic = body.isPublic
+  }
+  let maxMembers = 50
+  if (body.maxMembers !== undefined) {
+    if (typeof body.maxMembers !== 'number' || !Number.isInteger(body.maxMembers)) {
+      throw400('INVALID_MAX_MEMBERS', 'maxMembers 必须为整数')
+    }
+    if (body.maxMembers < 1 || body.maxMembers > 500) {
+      throw400('INVALID_MAX_MEMBERS', 'maxMembers 须在 1-500 之间')
+    }
+    maxMembers = body.maxMembers
+  }
 
   // 检查班级名是否已存在
   const existing = await findClassByName(trimmedName)
@@ -62,8 +84,8 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     name: trimmedName,
     announcement: body.announcement,
     avatar: body.avatar,
-    isPublic: body.isPublic,
-    maxMembers: body.maxMembers,
+    isPublic,
+    maxMembers,
     ownerId: user.id,
   })
 

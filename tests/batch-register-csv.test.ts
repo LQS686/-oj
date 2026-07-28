@@ -29,4 +29,17 @@ describe('parseBatchRegisterCSV', () => {
   it('缺少必填表头时抛错', () => {
     expect(() => parseBatchRegisterCSV('name,pass\na,b')).toThrow(/username/)
   })
+
+  it('支持 RFC4180 引号字段与逗号', () => {
+    const csv = [
+      'username,password,email',
+      '"user,name","Pass""word","a@b.com"',
+    ].join('\n')
+    const { users, parseErrors } = parseBatchRegisterCSV(csv)
+    expect(parseErrors).toHaveLength(0)
+    expect(users).toHaveLength(1)
+    expect(users[0].username).toBe('user,name')
+    expect(users[0].password).toBe('Pass"word')
+    expect(users[0].email).toBe('a@b.com')
+  })
 })

@@ -1,4 +1,4 @@
-import type { UserData } from '@/lib/api'
+import type { UserData } from '@/lib/api/auth'
 
 /** 通知偏好 */
 export interface NotificationPreferences {
@@ -27,10 +27,7 @@ export interface SettingsFormData {
 export interface EmailChangeState {
   newEmail: string
   currentPassword: string
-  verificationCode: string
-  step: 'input' | 'verify'
   loading: boolean
-  countdown: number
 }
 
 /** 各密码输入框的显隐状态 */

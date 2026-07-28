@@ -35,9 +35,14 @@ export enum CompileState {
 
 /**
  * 输出比较模式
- * 参考 LemonLime Task::ComparisonMode，仅保留传统题所需模式
+ * 参考 LemonLime Task::ComparisonMode；special-judge 走 Testlib checker
  */
-export type ComparisonMode = 'default' | 'strict' | 'ignore-spaces' | 'real-number'
+export type ComparisonMode =
+  | 'default'
+  | 'strict'
+  | 'ignore-spaces'
+  | 'real-number'
+  | 'special-judge'
 
 /**
  * 比较输入
@@ -124,7 +129,16 @@ export const RESULT_STATE_COLORS: Record<ResultState, string> = {
   PENDING: 'gray',
 }
 
-const COMPARISON_MODES = ['default', 'strict', 'ignore-spaces', 'real-number'] as const
+const COMPARISON_MODES = [
+  'default',
+  'strict',
+  'ignore-spaces',
+  'real-number',
+  'special-judge',
+] as const
+
+/** 全部合法比较模式（供 admin / import 校验复用） */
+export const VALID_COMPARISON_MODES: readonly ComparisonMode[] = COMPARISON_MODES
 
 /** 将 DB/API 中的 string 收窄为 ComparisonMode；非法值回落到 default */
 export function parseComparisonMode(

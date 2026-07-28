@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { ApiError } from '@/lib/api/errors'
 import {
   getClassMembership,
   isClassOwner,
@@ -148,16 +149,81 @@ export async function removeClassMember(classId: string, userId: string) {
 
 /**
  * 更新成员角色（班主任才能设置）
+ * 禁止将班级最后一个 owner 降级，否则班级变为孤儿无法管理。
  */
 export async function updateClassMemberRole(
   classId: string,
   userId: string,
   newRole: 'assistant' | 'student'
 ) {
+  const target = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId, userId } },
+  })
+  if (!target) {
+    throw new ApiError('NOT_FOUND', '成员不存在', 404)
+  }
+  if (isClassOwnerRole(target.role)) {
+    const ownerCount = await prisma.classMember.count({
+      where: { classId, role: { in: ['owner', 'admin'] } },
+    })
+    if (ownerCount <= 1) {
+      throw new ApiError(
+        'LAST_OWNER',
+        '不能降级班级唯一的班主任，请先转让班主任后再操作',
+        400
+      )
+    }
+  }
   return prisma.classMember.update({
     where: { classId_userId: { classId, userId } },
     data: { role: newRole },
   })
+}
+
+/**
+ * 转让班主任：将 newOwnerUserId 升为 owner，原 owner 降为 assistant，并同步 Class.ownerId。
+ */
+export async function transferClassOwnership(
+  classId: string,
+  currentOwnerUserId: string,
+  newOwnerUserId: string
+) {
+  if (currentOwnerUserId === newOwnerUserId) {
+    throw new ApiError('VALIDATION', '不能转让给自己', 400)
+  }
+  const [clazz, current, next] = await Promise.all([
+    prisma.class.findUnique({ where: { id: classId }, select: { ownerId: true } }),
+    prisma.classMember.findUnique({
+      where: { classId_userId: { classId, userId: currentOwnerUserId } },
+    }),
+    prisma.classMember.findUnique({
+      where: { classId_userId: { classId, userId: newOwnerUserId } },
+    }),
+  ])
+  if (!clazz) throw new ApiError('NOT_FOUND', '班级不存在', 404)
+  if (clazz.ownerId !== currentOwnerUserId) {
+    throw new ApiError('FORBIDDEN', '只有当前班主任可以转让', 403)
+  }
+  if (!current || !isClassOwnerRole(current.role)) {
+    throw new ApiError('FORBIDDEN', '当前用户不是班主任', 403)
+  }
+  if (!next) throw new ApiError('NOT_FOUND', '目标用户不是班级成员', 404)
+
+  await prisma.$transaction([
+    prisma.classMember.update({
+      where: { classId_userId: { classId, userId: newOwnerUserId } },
+      data: { role: 'owner' },
+    }),
+    prisma.classMember.update({
+      where: { classId_userId: { classId, userId: currentOwnerUserId } },
+      data: { role: 'assistant' },
+    }),
+    prisma.class.update({
+      where: { id: classId },
+      data: { ownerId: newOwnerUserId },
+    }),
+  ])
+  return { ok: true as const }
 }
 
 /**

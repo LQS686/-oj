@@ -23,7 +23,8 @@ export async function isFirstAcInAssignment(
   userId: string,
   currentSubmissionId: string
 ): Promise<boolean> {
-  return withRetry(async () => {
+  return withRetry(
+    async () => {
     const client = await getMongoClient() // 使用主库客户端，避免复制延迟导致并发 AC 重复计数
     const db = client.db()
 
@@ -36,7 +37,10 @@ export async function isFirstAcInAssignment(
     })
 
     return !existing
-  })
+  },
+    3,
+    { idempotent: true }
+  )
 }
 
 /**
@@ -52,38 +56,41 @@ export async function createClassAssignmentSubmissionDirect(data: {
   totalTests: number
   isLate: boolean
 }) {
-  return withRetry(async () => {
-    const client = await getMongoClient()
-    const db = client.db()
+  const _id = new ObjectId()
+  const client = await getMongoClient()
+  const db = client.db()
 
-    const submission = {
-      _id: new ObjectId(),
-      assignmentId: new ObjectId(data.assignmentId),
-      userId: new ObjectId(data.userId),
-      problemId: new ObjectId(data.problemId),
-      code: data.code,
-      language: data.language,
-      status: data.status,
-      score: 0,
-      time: 0,
-      memory: 0,
-      passedTests: 0,
-      totalTests: data.totalTests,
-      message: null,
-      submittedAt: new Date(),
-      isLate: data.isLate
-    }
+  const submission = {
+    _id,
+    assignmentId: new ObjectId(data.assignmentId),
+    userId: new ObjectId(data.userId),
+    problemId: new ObjectId(data.problemId),
+    code: data.code,
+    language: data.language,
+    status: data.status,
+    score: 0,
+    time: 0,
+    memory: 0,
+    passedTests: 0,
+    totalTests: data.totalTests,
+    message: null,
+    submittedAt: new Date(),
+    isLate: data.isLate,
+  }
 
+  try {
     await db.collection('ClassAssignmentSubmission').insertOne(submission)
+  } catch (error: any) {
+    if (error?.code !== 11000) throw error
+  }
 
-    return {
-      id: submission._id.toString(),
-      ...submission,
-      assignmentId: submission.assignmentId.toString(),
-      userId: submission.userId.toString(),
-      problemId: submission.problemId.toString()
-    }
-  })
+  return {
+    id: submission._id.toString(),
+    ...submission,
+    assignmentId: submission.assignmentId.toString(),
+    userId: submission.userId.toString(),
+    problemId: submission.problemId.toString(),
+  }
 }
 
 /**
@@ -100,7 +107,8 @@ export async function updateClassAssignmentSubmissionDirect(
     message?: string
   }
 ) {
-  return withRetry(async () => {
+  return withRetry(
+    async () => {
     const client = await getMongoClient()
     const db = client.db()
 
@@ -140,7 +148,10 @@ export async function updateClassAssignmentSubmissionDirect(
       { _id: new ObjectId(submissionId) },
       { $set: sanitized }
     )
-  })
+  },
+    3,
+    { idempotent: true }
+  )
 }
 
 /**
@@ -157,7 +168,8 @@ export async function updateClassAssignmentDirect(
     allowLateSubmission?: boolean
   }
 ) {
-  return withRetry(async () => {
+  return withRetry(
+    async () => {
     const client = await getMongoClient()
     const db = client.db()
 
@@ -171,7 +183,10 @@ export async function updateClassAssignmentDirect(
       { _id: new ObjectId(assignmentId) },
       { $set: updateData }
     )
-  })
+  },
+    3,
+    { idempotent: true }
+  )
 }
 
 /**
@@ -179,7 +194,8 @@ export async function updateClassAssignmentDirect(
  * deleteMany + deleteOne 放入 MongoDB session 事务，保证原子性
  */
 export async function deleteClassAssignmentDirect(assignmentId: string) {
-  return withRetry(async () => {
+  return withRetry(
+    async () => {
     const client = await getMongoClient()
     const db = client.db()
 
@@ -226,19 +242,26 @@ export async function deleteClassAssignmentDirect(assignmentId: string) {
           .deleteOne({ _id: assignmentObjectId }, { session })
       })
     })
-  })
+  },
+    3,
+    { idempotent: true }
+  )
 }
 
 /**
  * 直接删除班级作业提交记录（用于 submitAssignmentCode 失败时的补偿回滚）
  */
 export async function deleteClassAssignmentSubmissionDirect(submissionId: string) {
-  return withRetry(async () => {
+  return withRetry(
+    async () => {
     const client = await getMongoClient()
     const db = client.db()
 
     await db.collection('ClassAssignmentSubmission').deleteOne({
       _id: new ObjectId(submissionId)
     })
-  })
+  },
+    3,
+    { idempotent: true }
+  )
 }

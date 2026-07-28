@@ -17,6 +17,17 @@ import { validateCodeSafety } from './codeAnalyzer'
 import { cleanup } from './judger'
 import { logger } from '@/lib/logger'
 import { mapPool, resolveCaseConcurrency } from './pool'
+import {
+  compileSpj,
+  cleanupSpj,
+  runSpj,
+  ensureUserOutputFile,
+  isSpecialJudgeMode,
+} from './spj'
+import { writeFile, mkdir, unlink } from 'fs/promises'
+import { existsSync } from 'fs'
+import { join } from 'path'
+import * as crypto from 'crypto'
 
 /** 单个样例测试点的输入参数 */
 export interface PretestCase {
@@ -80,6 +91,8 @@ export interface PretestOptions {
   comparisonMode?: ComparisonMode
   /** 浮点数比较精度，默认 3 */
   realPrecision?: number
+  /** Testlib checker 源码（special-judge 时必填） */
+  spjCode?: string | null
   /** 样例测试点列表 */
   testCases: PretestCase[]
 }
@@ -90,7 +103,16 @@ export interface PretestOptions {
  * 不创建 Submission 记录，不进入评测队列，编译产物在 finally 中清理。
  */
 export async function executePretest(options: PretestOptions): Promise<PretestResult> {
-  const { code, language, timeLimit, memoryLimit, comparisonMode = 'default', realPrecision = 3, testCases } = options
+  const {
+    code,
+    language,
+    timeLimit,
+    memoryLimit,
+    comparisonMode = 'default',
+    realPrecision = 3,
+    spjCode,
+    testCases,
+  } = options
 
   const baseResult: PretestResult = {
     status: 'JUDGING',
@@ -108,6 +130,7 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
   }
 
   let compiledPath: string | undefined
+  let spjPath: string | undefined
 
   try {
     // 第一步：代码安全分析
@@ -134,9 +157,37 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
     }
     compiledPath = compileResult.compiledPath
 
+    if (isSpecialJudgeMode(comparisonMode)) {
+      if (!spjCode?.trim()) {
+        return {
+          ...baseResult,
+          status: 'SE',
+          compileError: '题目配置为 Special Judge，但缺少 checker 代码',
+          judgedAt: new Date(),
+        }
+      }
+      const spjResult = await compileSpj(spjCode)
+      if (!spjResult.success) {
+        return {
+          ...baseResult,
+          status: 'SE',
+          compileError: [spjResult.error || 'Special Judge 编译失败', spjResult.stderr]
+            .filter(Boolean)
+            .join('\n'),
+          judgedAt: new Date(),
+        }
+      }
+      spjPath = spjResult.compiledPath
+    }
+
     // 第三步：并行跑完全部样例（不因 TLE/WA 等跳过）
     const concurrency = resolveCaseConcurrency()
-    logger.info('pretest 开始跑样例', { total: testCases.length, concurrency })
+    logger.info('pretest 开始跑样例', { total: testCases.length, concurrency, spj: !!spjPath })
+
+    const tempDir = join(process.cwd(), 'temp', 'judge')
+    if (!existsSync(tempDir)) {
+      await mkdir(tempDir, { recursive: true })
+    }
 
     const caseResults = await mapPool(testCases, concurrency, async (tc) => {
       const tcTimeLimit = tc.timeLimit ?? timeLimit
@@ -178,16 +229,52 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
           } else {
             userOutput = execResult.output || ''
             await new Promise<void>((r) => setImmediate(r))
-            const cmp = await compareOutput({
-              userOutputPath: execResult.artifacts?.outputPath,
-              userOutput: execResult.artifacts?.outputPath ? undefined : userOutput,
-              expectedOutput: tc.output,
-              fullScore: 100,
-              comparisonMode,
-              realPrecision,
-            })
-            status = cmp.status
-            message = cmp.message
+
+            if (spjPath && isSpecialJudgeMode(comparisonMode)) {
+              const sid = crypto.randomBytes(4).toString('hex')
+              const inPath = join(tempDir, `pre_in_${sid}.txt`)
+              const ansPath = join(tempDir, `pre_ans_${sid}.txt`)
+              let ephemeralUser: string | null = null
+              try {
+                await writeFile(inPath, tc.input ?? '', 'utf8')
+                await writeFile(ansPath, tc.output ?? '', 'utf8')
+                const outFile = await ensureUserOutputFile(
+                  execResult.artifacts?.outputPath,
+                  execResult.artifacts?.outputPath ? undefined : userOutput,
+                  tempDir,
+                )
+                if (outFile.ephemeral) ephemeralUser = outFile.path
+                const cmp = await runSpj({
+                  checkerPath: spjPath,
+                  inputPath: inPath,
+                  userOutputPath: outFile.path,
+                  answerPath: ansPath,
+                  fullScore: 100,
+                })
+                status = cmp.status
+                message = cmp.message
+              } finally {
+                for (const p of [inPath, ansPath, ephemeralUser]) {
+                  if (!p) continue
+                  try {
+                    if (existsSync(p)) await unlink(p)
+                  } catch {
+                    /* ignore */
+                  }
+                }
+              }
+            } else {
+              const cmp = await compareOutput({
+                userOutputPath: execResult.artifacts?.outputPath,
+                userOutput: execResult.artifacts?.outputPath ? undefined : userOutput,
+                expectedOutput: tc.output,
+                fullScore: 100,
+                comparisonMode,
+                realPrecision,
+              })
+              status = cmp.status
+              message = cmp.message
+            }
           }
         } finally {
           await cleanupExecuteArtifacts(execResult.artifacts)
@@ -259,6 +346,13 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
         await cleanup(compiledPath, language)
       } catch (err) {
         logger.warn('pretest 清理编译产物失败', { error: err instanceof Error ? err.message : String(err) })
+      }
+    }
+    if (spjPath) {
+      try {
+        await cleanupSpj(spjPath)
+      } catch (err) {
+        logger.warn('pretest 清理 SPJ 产物失败', { error: err instanceof Error ? err.message : String(err) })
       }
     }
   }

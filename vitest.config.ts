@@ -10,6 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
+      // server-only 在 Next/tsx(--conditions=react-server) 下才放行；Vitest 无该条件，用空模块替代
+      'server-only': path.resolve(__dirname, 'tests/mocks/server-only.ts'),
     },
   },
   test: {

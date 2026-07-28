@@ -269,7 +269,8 @@ export async function deleteAnnouncement(id: string) {
 }
 
 function clearAnnouncementCache() {
-  cache.deleteByPrefix('announcement:')
+  // deleteByPrefix 会匹配 `${prefix}:*`；传入 'announcement:' 会变成 'announcement::' 导致 L1 空操作
+  cache.deleteByPrefix('announcement')
 }
 
 /**

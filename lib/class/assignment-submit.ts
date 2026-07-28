@@ -15,7 +15,7 @@ import {
   deleteClassAssignmentSubmissionDirect,
   incrementProblemSubmitCount,
 } from '@/lib/mongodb-direct'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { getAssignmentStatus } from './assignment-stats'
 
 /** 提交班级作业代码（写入评测队列） */
@@ -147,6 +147,7 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
       memoryLimit: problem.memoryLimit,
       comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
+      spjCode: problem.spjCode ?? null,
       testCases: mapTestCasesMeta(problem.testCases),
     })
   } catch (err) {

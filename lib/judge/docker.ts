@@ -44,11 +44,11 @@ export function getRunInfo(language: string, compiledPath: string): { command: s
 
 export function getDockerImage(language: string): string {
   const images: Record<string, string> = {
-    cpp: 'gcc:12',
-    c: 'gcc:12',
-    python: 'python:3.11',
+    cpp: process.env.JUDGE_DOCKER_IMAGE_CPP || process.env.JUDGE_DOCKER_IMAGE_GCC || 'gcc:12',
+    c: process.env.JUDGE_DOCKER_IMAGE_C || process.env.JUDGE_DOCKER_IMAGE_GCC || 'gcc:12',
+    python: process.env.JUDGE_DOCKER_IMAGE_PYTHON || 'python:3.11',
   }
-  return images[language] || 'ubuntu:22.04'
+  return images[language] || process.env.JUDGE_DOCKER_IMAGE_FALLBACK || 'ubuntu:22.04'
 }
 
 /**

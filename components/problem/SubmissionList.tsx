@@ -192,7 +192,7 @@ function TestPointBlock({
   return (
     <div
       ref={blockRef}
-      className="w-[4.25rem] shrink-0"
+      className="w-full min-w-0"
       onMouseEnter={showTip}
       onMouseLeave={hideTip}
       onFocus={showTip}
@@ -200,14 +200,14 @@ function TestPointBlock({
     >
       <div
         tabIndex={0}
-        className={`w-[4.25rem] h-[4.25rem] rounded p-1 flex flex-col text-white shadow-sm cursor-default outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${testPointBlockClass(result.status)}`}
+        className={`w-full aspect-square rounded p-1 flex flex-col text-white shadow-sm cursor-default outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${testPointBlockClass(result.status)}`}
         aria-label={tip}
       >
         <span className="text-[9px] font-medium opacity-90 leading-none">#{index + 1}</span>
         <span className="flex-1 flex items-center justify-center text-sm font-bold tracking-wide">
           {label}
         </span>
-        <span className="text-[8px] opacity-90 tabular-nums leading-tight text-center truncate w-full">
+        <span className="text-[8px] opacity-90 tabular-nums leading-tight text-center truncate w-full px-0.5">
           {formatBlockUsage(result.time, result.memory)}
         </span>
       </div>
@@ -340,7 +340,7 @@ function ExpandedDetail({
             <p className="mb-2 text-xs text-error">{waDownloadError}</p>
           )}
           {testResults.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid gap-1.5 grid-cols-4 sm:grid-cols-6 md:grid-cols-8">
               {testResults.map((r, i) => (
                 <TestPointBlock key={r.testId || `t-${i}`} result={r} index={i} />
               ))}
@@ -601,11 +601,11 @@ export default function SubmissionList({
               <div className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="inline-flex items-center gap-1 tabular-nums">
                   <Clock className="w-3.5 h-3.5" />
-                  {sub.time ?? 0}ms
+                  {formatTime(sub.time ?? 0)}
                 </span>
                 <span className="inline-flex items-center gap-1 tabular-nums">
                   <MemoryStick className="w-3.5 h-3.5" />
-                  {sub.memory ?? 0}KB
+                  {formatMemory(sub.memory ?? 0)}
                 </span>
               </div>
 

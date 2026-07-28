@@ -5,7 +5,8 @@
  * PUT  保存系统设置
  */
 import { withApi, ok, readJson, throw400, throw500 } from '@/lib/api/withApi'
-import { getSystemSettings, saveSystemSettings } from '@/lib/settings'
+import { getSystemSettings, saveSystemSettings, type SystemSettings } from '@/lib/settings'
+import { parseSystemSettingsUpdate } from '@/lib/settings-schema'
 
 /**
  * GET /api/admin/settings
@@ -18,9 +19,17 @@ export const GET = withApi.systemAdmin(async () => {
 /**
  * PUT /api/admin/settings
  */
-export const PUT = withApi.systemAdmin(async (req, _ctx) => {
-  const body = await readJson<Record<string, any>>(req)
-  const saved = await saveSystemSettings(body)
+export const PUT = withApi.systemAdmin(async (req) => {
+  const body = await readJson<Record<string, unknown>>(req)
+  let parsed
+  try {
+    parsed = parseSystemSettingsUpdate(body)
+  } catch (e) {
+    throw400('VALIDATION', e instanceof Error ? e.message : '设置参数不合法')
+    return // 满足类型收窄：throw400 抛错后不可达
+  }
+
+  const saved = await saveSystemSettings(parsed as Partial<SystemSettings>)
 
   if (!saved) {
     throw500('保存设置失败')

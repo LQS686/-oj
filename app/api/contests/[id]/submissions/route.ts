@@ -26,6 +26,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const result = await submitContestCode({
     contestId: contestId!,
     userId: user.id,
+    viewerRole: user.role,
     isAdmin: adminFlag,
     problemId: body.problemId,
     code: body.code,

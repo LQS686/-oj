@@ -4,7 +4,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { notificationApi } from '@/lib/api'
+import { notificationApi } from '@/lib/api/notification'
 import { logger } from '@/lib/logger'
 import { useNotificationSocket, type NotificationData } from '@/hooks/useNotificationSocket'
 
@@ -21,20 +21,29 @@ export function useUnreadNotifications({
   onNotification,
 }: Options) {
   const [unreadCount, setUnreadCount] = useState(0)
+  const userIdRef = useRef(userId)
   const onNotificationRef = useRef(onNotification)
   useEffect(() => {
     onNotificationRef.current = onNotification
   }, [onNotification])
+  useEffect(() => {
+    userIdRef.current = userId
+  }, [userId])
 
   const syncUnread = useCallback(async () => {
-    if (!userId) {
+    const uid = userId
+    if (!uid) {
       setUnreadCount(0)
       return
     }
     try {
       const data = await notificationApi.getNotifications(1, 1)
-      setUnreadCount(data.unreadCount)
+      // 忽略换账号后的过期响应，避免 A 的未读数写到 B
+      if (userIdRef.current !== uid) return
+      setUnreadCount(typeof data.unreadCount === 'number' ? data.unreadCount : 0)
     } catch (error) {
+      // 拉取失败时保留上次未读数，避免网络抖动把角标清成 0
+      if (userIdRef.current !== uid) return
       if (process.env.NODE_ENV !== 'test') {
         logger.error('同步未读通知失败', error)
       }
@@ -63,7 +72,6 @@ export function useUnreadNotifications({
       return
     }
 
-    // 未读数由「入房成功 onConnected」拉取；此处只处理回前台补同步
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         void syncUnread()

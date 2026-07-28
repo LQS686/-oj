@@ -12,6 +12,7 @@ import {
 import { toInt } from '@/lib/api/validation'
 import type { TrainingCategoryType } from '@/lib/training/types'
 import { verifyToken } from '@/lib/auth'
+import { readAuthTokenFromRequest } from '@/lib/auth/cookie'
 import { canAccessAdmin } from '@/lib/permissions'
 
 export const GET = withApi.public(async (req) => {
@@ -33,7 +34,7 @@ export const GET = withApi.public(async (req) => {
   if (limit > 50) limit = 50
 
   // 选登用户：解析 token 拿到 userId（未登录亦可）
-  const token = req.cookies.get('token')?.value
+  const token = readAuthTokenFromRequest(req)
   const userId = token ? verifyToken(token)?.userId ?? null : null
 
   const data = await listPublicTrainingsAdvanced(page, limit, {

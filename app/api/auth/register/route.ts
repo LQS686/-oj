@@ -15,8 +15,10 @@ import {
   validatePassword,
   validateRequired,
 } from '@/lib/api/validation'
-import { trimAll, escapeHtml } from '@/lib/sanitize'
+import { trimAll } from '@/lib/sanitize'
 import { getSystemSettings } from '@/lib/settings'
+import { setAuthCookie } from '@/lib/auth/cookie'
+import { setCsrfCookie, generateCsrfToken } from '@/lib/security/csrf'
 
 export const POST = withApi.public(async (req) => {
   const settings = await getSystemSettings()
@@ -49,9 +51,11 @@ export const POST = withApi.public(async (req) => {
     return fail('BAD_REQUEST', passwordValidation.errors.join('；'), 400)
   }
 
-  const sanitizedUsername = escapeHtml(username as string)
+  const sanitizedUsername = username as string
   const sanitizedEmail = (email as string).toLowerCase()
-  const sanitizedNickname = nickname ? escapeHtml(nickname as string) : sanitizedUsername
+  const sanitizedNickname = nickname
+    ? String(nickname).trim().slice(0, 50) || sanitizedUsername
+    : sanitizedUsername
 
   const hashedPassword = await bcrypt.hash(password as string, 12)
 
@@ -78,27 +82,13 @@ export const POST = withApi.public(async (req) => {
   const response = NextResponse.json(
     {
       success: true,
-      data: { user, token },
+      data: { user },
     },
     { status: 201 }
   )
 
-  // Cookie secure 配置：
-  // - FORCE_SECURE_COOKIE=false：强制禁用（HTTP 测试环境）
-  // - FORCE_SECURE_COOKIE=true：强制启用
-  // - 未设置且生产环境：默认启用
-  const isSecureCookie = process.env.FORCE_SECURE_COOKIE === 'true' ||
-    (process.env.NODE_ENV === 'production' && process.env.FORCE_SECURE_COOKIE !== 'false')
-
-  response.cookies.set('token', token, {
-    httpOnly: true,
-    secure: isSecureCookie,
-    sameSite: 'lax',
-    // P1 强化：priority='high' 提示浏览器优先保留
-    priority: 'high',
-    path: '/',
-    maxAge: 7 * 24 * 60 * 60,
-  })
+  setAuthCookie(response, token)
+  setCsrfCookie(response, generateCsrfToken())
 
   return response
 })

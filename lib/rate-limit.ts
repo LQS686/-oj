@@ -2,6 +2,7 @@ import type { NextRequest} from 'next/server';
 import { NextResponse } from 'next/server';
 import { logger } from './logger';
 import { isRedisConfigured } from './redis';
+import { resolveClientIp, getTrustedProxyCount } from './http/client-ip';
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -119,8 +120,14 @@ class RedisRateLimiter {
   async check(
     key: string,
     config: RateLimitConfig
-  ): Promise<RateLimitResult | null> {
-    if (!(await this.ensureReady()) || !this.redis) return null;
+  ): Promise<RateLimitResult | null | 'unavailable'> {
+    if (!(await this.ensureReady()) || !this.redis) {
+      // Redis 已配置但连不上：生产 fail-closed；开发可回退内存
+      if (isRedisConfigured() && process.env.NODE_ENV === 'production') {
+        return 'unavailable'
+      }
+      return null
+    }
 
     const redisKey = `ratelimit:${key}`;
     try {
@@ -129,7 +136,6 @@ class RedisRateLimiter {
         await this.redis.pexpire(redisKey, config.windowMs);
       }
       let pttl = await this.redis.pttl(redisKey);
-      // 极端竞态：key 无 TTL 时补上
       if (pttl < 0) {
         await this.redis.pexpire(redisKey, config.windowMs);
         pttl = config.windowMs;
@@ -149,10 +155,11 @@ class RedisRateLimiter {
       }
       return result;
     } catch (error) {
-      logger.warn('[rate-limit] Redis 计数失败，回退内存', {
+      logger.error('[rate-limit] Redis 计数失败', {
         error: error instanceof Error ? error.message : String(error),
       });
       this.ready = false;
+      if (process.env.NODE_ENV === 'production') return 'unavailable'
       return null;
     }
   }
@@ -210,8 +217,16 @@ async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const key = `${config.keyPrefix || 'default'}:${identifier}`;
 
-  // Redis 优先（多实例一致）；未配置或失败则单机内存
   const redisResult = await redisRateLimiter.check(key, config);
+  if (redisResult === 'unavailable') {
+    return {
+      success: false,
+      limit: config.maxRequests,
+      remaining: 0,
+      resetTime: Date.now() + config.windowMs,
+      retryAfter: 30,
+    }
+  }
   if (redisResult) return redisResult;
 
   return checkMemoryRateLimit(key, config);
@@ -277,39 +292,20 @@ export function rateLimit(options: RateLimitOptions = {}) {
 }
 
 /**
- * 受信任的反向代理层数。
- * 部署在 Nginx 后面时设为 1，Nginx+CDN 时设为 2，依此类推。
- * 取 X-Forwarded-For 中倒数第 N 个 IP（最接近应用层的代理写入的客户端 IP）。
- * 环境变量 TRUSTED_PROXIES 未设置时默认 1。
+ * 受信任的反向代理层数，见 lib/http/client-ip.ts
  */
-const TRUSTED_PROXIES = Math.max(0, parseInt(process.env.TRUSTED_PROXIES || '1', 10) || 0)
+const TRUSTED_PROXIES = getTrustedProxyCount()
 
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
   const realIP = request.headers.get('x-real-ip');
-
-  if (forwarded) {
-    const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
-    if (ips.length > 0) {
-      // 取倒数第 N 个 IP（N=受信任代理层数），这是最近一个受信任代理写入的客户端 IP
-      // 攻击者伪造的 IP 在首段，会被受信任代理追加的真实 IP 覆盖
-      const idx = Math.max(0, ips.length - TRUSTED_PROXIES)
-      return ips[idx] || 'unknown';
-    }
-  }
-
-  // X-Real-IP 通常由最近的反向代理写入，已覆盖客户端伪造值
-  if (realIP) {
-    return realIP;
-  }
-
-  // Next.js / Node.js 运行时提供的连接远端地址
   const socketIP = (request as { ip?: string }).ip;
-  if (socketIP && typeof socketIP === 'string') {
-    return socketIP;
-  }
 
-  return 'unknown';
+  return resolveClientIp(
+    forwarded,
+    realIP || (typeof socketIP === 'string' ? socketIP : null),
+    TRUSTED_PROXIES
+  );
 }
 
 export function createRateLimiter(options: RateLimitOptions = {}) {
@@ -373,3 +369,20 @@ export const apiRateLimiter = rateLimit({
 
 export { checkRateLimit, getClientIP };
 export type { RateLimitConfig, RateLimitResult };
+
+/** 供自定义 server（IncomingMessage）限流使用 */
+export function getClientIPFromHeaders(
+  headers: { get?(name: string): string | null; [key: string]: unknown }
+): string {
+  const fwd =
+    typeof headers.get === 'function'
+      ? headers.get('x-forwarded-for')
+      : (headers['x-forwarded-for'] as string | string[] | undefined)
+  const real =
+    typeof headers.get === 'function'
+      ? headers.get('x-real-ip')
+      : (headers['x-real-ip'] as string | string[] | undefined)
+  const forwarded = Array.isArray(fwd) ? fwd[0] : fwd
+  const realIP = Array.isArray(real) ? real[0] : real
+  return resolveClientIp(forwarded, realIP, TRUSTED_PROXIES)
+}

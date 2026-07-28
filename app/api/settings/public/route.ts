@@ -1,10 +1,11 @@
 /**
  * GET /api/settings/public - 公开设置
  *
- * 迁移到 withApi 中间件模式
+ * 异常时 fail-closed：关闭注册，避免配置读取失败时误开注册。
  */
 import { withApi, ok } from '@/lib/api/withApi'
 import { getSystemSettings } from '@/lib/settings'
+import { logger } from '@/lib/logger'
 
 export const GET = withApi.public(async () => {
   try {
@@ -16,10 +17,11 @@ export const GET = withApi.public(async () => {
       defaultLanguage: settings.defaultLanguage,
     })
   } catch (error) {
+    logger.error('[settings/public] 读取失败，fail-closed', error)
     return ok({
       siteName: '大山 OJ',
       siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
-      allowRegistration: true,
+      allowRegistration: false,
       defaultLanguage: 'cpp',
     })
   }

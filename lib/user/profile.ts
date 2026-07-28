@@ -2,10 +2,15 @@
  * lib/user/profile.ts
  * 基础用户信息：资料、统计、活跃用户、缓存清理
  */
+import 'server-only'
+
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { clearRankingCache } from '@/lib/ranking/service'
 import { clearAuthUserCache } from '@/lib/api/handler'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
+
+export { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export interface UserProfile {
   id: string
@@ -21,7 +26,7 @@ export interface UserProfile {
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   return cache.get('user:profile', [userId], async () => {
-    return prisma.user.findUnique({
+    const row = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -34,7 +39,9 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
         isBanned: true,
         createdAt: true,
       },
-    }) as Promise<UserProfile | null>
+    })
+    if (!row) return null
+    return { ...row, avatar: sanitizeAvatarUrl(row.avatar) }
   }, { ttl: 60_000 })
 }
 
@@ -54,13 +61,23 @@ export async function updateUserProfile(userId: string, data: Partial<{
   bio: string
   avatar: string
 }>): Promise<{ id: string; nickname: string | null; bio: string | null; avatar: string | null }> {
+  if (data.avatar !== undefined) {
+    const ok =
+      data.avatar === '' ||
+      data.avatar.startsWith('/uploads/avatars/') ||
+      data.avatar.startsWith('/api/placeholder/')
+    if (!ok) {
+      const { AppError } = await import('@/lib/errors')
+      throw AppError.badRequest('INVALID_AVATAR', '头像地址不合法')
+    }
+  }
   const updated = await prisma.user.update({
     where: { id: userId },
     data,
     select: { id: true, nickname: true, bio: true, avatar: true },
   })
   clearUserCache(userId)
-  return updated
+  return { ...updated, avatar: sanitizeAvatarUrl(updated.avatar) }
 }
 
 export async function getActiveUsers(limit = 20) {
@@ -71,15 +88,13 @@ export async function getActiveUsers(limit = 20) {
   })
 }
 
-export async function clearUserCache(userId: string) {
+export async function clearUserCache(userId: string, options?: { clearRanking?: boolean }) {
   cache.delete(`user:profile:${userId}`)
   cache.delete(`user:stats:${userId}`)
   cache.delete(`auth:user:${userId}`)
-  // 清除鉴权层用户缓存（role/tokenVersion），避免角色变更后 60s 内仍以旧角色通过鉴权
   clearAuthUserCache(userId)
-  // 任何用户变更（role / isBanned / rating / solvedCount / 删除）都会影响榜单
-  clearRankingCache()
-  // Phase 1：清理班级作业计时缓存（其他游戏化命名空间待 Phase 2+ 添加时再清理）
-  // 注：timing progress 走 DB 查询，缓存目前仅作为预留命名空间；此处按前缀清理避免脏数据
-  cache.deleteByPrefix(`timing:progress:`)
+  // 仅角色/封禁/rating/solved 等影响榜单的变更才清排行榜；资料/头像/邮箱不触发
+  if (options?.clearRanking) {
+    clearRankingCache()
+  }
 }

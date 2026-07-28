@@ -4,6 +4,9 @@
  */
 import { withApi, ok, throw400, throw404 } from '@/lib/api/withApi'
 import { findProblemByIdOrNumber, getProblemStatusCounts } from '@/lib/problem/service'
+import { assertCanAccessProblem } from '@/lib/problem/access'
+import { getUserFromRequest } from '@/lib/auth'
+import { getCachedUser } from '@/lib/api/handler'
 
 export const GET = withApi.public(async (req, ctx) => {
   const { id } = ctx.params
@@ -13,6 +16,23 @@ export const GET = withApi.public(async (req, ctx) => {
   if (!problem) throw404('题目不存在')
 
   const p = problem!
+  // 可选登录：公开题无需登录；私有/班级/竞赛题需通过访问校验
+  const session = getUserFromRequest(req)
+  const viewer = session?.userId
+    ? await getCachedUser(session.userId, session.tokenVersion)
+    : null
+  const contestId = req.nextUrl.searchParams.get('contestId') || undefined
+  await assertCanAccessProblem(
+    {
+      id: p.id,
+      authorId: p.authorId,
+      visibility: p.visibility,
+      classId: p.classId ?? null,
+    },
+    viewer,
+    { contestId }
+  )
+
   const acRate =
     p.totalSubmit > 0
       ? Math.round((p.totalAccepted / p.totalSubmit) * 100)

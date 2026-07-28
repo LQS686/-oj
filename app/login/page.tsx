@@ -28,7 +28,7 @@ import { GuestAuthShell } from '@/components/common'
 
  try {
  const result = await authApi.login(formData.username, formData.password, rememberMe)
- login(result.user, result.token)
+ login(result.user)
  router.replace(resolveLoginRedirect())
  } catch (err: any) {
  setError(err.message || '登录失败')

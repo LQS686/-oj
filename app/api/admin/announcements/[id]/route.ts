@@ -22,6 +22,16 @@ export const PATCH = withApi.systemAdmin(async (req, ctx) => {
     expiresAt?: string | null
   }>(req)
 
+  if (body.title !== undefined) {
+    const t = body.title.trim()
+    if (!t) throw400('MISSING_TITLE', '公告标题不能为空')
+    if (t.length > 200) throw400('TITLE_TOO_LONG', '公告标题不能超过 200 字')
+  }
+  if (body.content !== undefined) {
+    if (!body.content.trim()) throw400('MISSING_CONTENT', '公告内容不能为空')
+    if (body.content.length > 50_000) throw400('CONTENT_TOO_LONG', '公告内容不能超过 50000 字')
+  }
+
   const updated = await updateAnnouncement(resolved, {
     title: body.title,
     content: body.content,

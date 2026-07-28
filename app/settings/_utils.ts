@@ -43,10 +43,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 export const INITIAL_EMAIL_CHANGE = {
   newEmail: '',
   currentPassword: '',
-  verificationCode: '',
-  step: 'input' as const,
   loading: false,
-  countdown: 0,
 }
 
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

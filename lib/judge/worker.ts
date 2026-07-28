@@ -4,7 +4,7 @@ import { cleanupOldTempFiles } from './judger'
 import { prisma } from '@/lib/prisma'
 import type { JudgeJob, JudgeResult, QueuedJob } from './queue'
 import type { ComparisonMode } from './types'
-import { emitSubmissionUpdate, broadcastMessage } from '@/lib/websocket/server'
+import { emitSubmissionUpdate, emitJudgeProgress, broadcastMessage } from '@/lib/websocket/server'
 import {
   updateSubmissionDirect,
   updateClassAssignmentSubmissionDirect,
@@ -18,6 +18,56 @@ import { CacheKeys } from '@/lib/constants/cache-keys'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { finalizeTiming } from '@/lib/gamification/timing'
 import { mapTestCasesMeta, TESTCASE_META_SELECT } from './testcase-loader'
+
+// 任务进入 active：立刻写 JUDGING，避免刷新后仍显示 PENDING、看起来像卡死
+if (judgeQueue.listenerCount('active') === 0) {
+  judgeQueue.on('active', async (job: QueuedJob) => {
+    try {
+      const totalTests = job.data.testCases?.length ?? 0
+      await updateSubmissionDirect(job.id, {
+        status: SubmissionStatus.JUDGING,
+      })
+      // 作业提交同步中间态（失败不阻断）
+      try {
+        const submission = await prisma.submission.findUnique({
+          where: { id: job.id },
+          select: { userId: true, assignmentSubmissionId: true },
+        })
+        if (submission?.assignmentSubmissionId) {
+          await updateClassAssignmentSubmissionDirect(submission.assignmentSubmissionId, {
+            status: SubmissionStatus.JUDGING,
+          })
+        }
+        if (submission?.userId) {
+          emitJudgeProgress(submission.userId, {
+            submissionId: job.id,
+            currentTest: 0,
+            totalTests,
+            status: 'JUDGING',
+          })
+          emitSubmissionUpdate(submission.userId, {
+            id: job.id,
+            status: SubmissionStatus.JUDGING,
+            score: 0,
+            time: 0,
+            memory: 0,
+            passedTests: 0,
+            totalTests,
+            problemId: job.data.problemId,
+            assignmentSubmissionId: submission.assignmentSubmissionId ?? undefined,
+          })
+        }
+      } catch (wsErr) {
+        logger.warn('评测开始时推送 JUDGING 失败', {
+          jobId: job.id,
+          error: wsErr instanceof Error ? wsErr.message : String(wsErr),
+        })
+      }
+    } catch (err) {
+      logger.error('写入 JUDGING 状态失败', err, { jobId: job.id })
+    }
+  })
+}
 
 // 监听评测完成事件（热重载守卫：避免 Next.js dev 模式重复注册监听器）
 if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', async (job: QueuedJob, result: JudgeResult) => {
@@ -274,9 +324,9 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
   }
 })
 
-// 启动时扫描 DB 中 status=PENDING/JUDGING/RUNNING 的 submission 重新入队（重启恢复）
-// submitCode 创建时写 PENDING；评测中通常不写 JUDGING 到 DB；完成后写终态。
-// Worker 崩溃后残留的非终态记录在此恢复入队。
+// 启动时扫描 DB 中 status=PENDING/JUDGING/RUNNING 的 submission
+// submitCode 创建时写 PENDING；任务 active 时写 JUDGING；完成后写终态。
+// Worker 崩溃后：JUDGING/RUNNING → SE（避免启动瞬间重跑大数据量题打崩进程）；PENDING 重新入队。
 async function recoverPendingJobs() {
   try {
     // 崩溃时卡在 JUDGING/RUNNING 的记录：标 SE，避免启动瞬间再次跑大数据量题把进程打崩
@@ -324,6 +374,7 @@ async function recoverPendingJobs() {
           memoryLimit: sub.problem.memoryLimit,
           comparisonMode: (sub.problem.comparisonMode ?? 'default') as ComparisonMode,
           realPrecision: sub.problem.realPrecision ?? 3,
+          spjCode: (sub.problem as { spjCode?: string | null }).spjCode ?? null,
           testCases,
         }
         await addJudgeJob(job)

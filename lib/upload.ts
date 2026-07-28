@@ -4,7 +4,7 @@ import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'fs/promises'
 import { existsSync, createWriteStream, createReadStream } from 'fs'
 import { pipeline } from 'stream/promises'
 import { logger } from '@/lib/logger'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 
 const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'avatars')
 const TEMP_DIR = join(process.cwd(), 'temp', 'uploads')
@@ -58,12 +58,20 @@ export function detectImageMime(buffer: Buffer): string | null {
   return null
 }
 
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024
+/** 防止解压像素炸弹：约 4096×4096 */
+const AVATAR_MAX_INPUT_PIXELS = 4096 * 4096
+
 export async function processAvatar(
   buffer: Buffer,
   userId: string,
   originalName: string
 ): Promise<ProcessAvatarResult> {
   await ensureUploadDirs()
+
+  if (buffer.length > AVATAR_MAX_BYTES) {
+    throw new ApiError('FILE_TOO_LARGE', '头像文件不能超过 5MB', 400)
+  }
 
   // MIME 校验：通过 magic number（文件头魔数）检测实际类型，防止伪装扩展名上传恶意文件
   const detectedMime = detectImageMime(buffer)
@@ -74,19 +82,36 @@ export async function processAvatar(
   const timestamp = Date.now()
   const filename = `${userId}_${timestamp}.webp`
   const filepath = join(UPLOAD_DIR, filename)
-  
+
+  const sharpOpts = {
+    limitInputPixels: AVATAR_MAX_INPUT_PIXELS,
+    sequentialRead: true,
+    animated: false,
+  }
+
   // Process image: resize to 400x400, convert to webp, quality 80
-  const processedInfo = await sharp(buffer)
-    .resize(400, 400, {
-      fit: 'cover',
-      position: 'center'
-    })
-    .webp({ quality: 80 })
-    .toFile(filepath)
-    
+  let processedInfo
+  try {
+    processedInfo = await sharp(buffer, sharpOpts)
+      .rotate()
+      .resize(400, 400, {
+        fit: 'cover',
+        position: 'center',
+      })
+      .webp({ quality: 80 })
+      .toFile(filepath)
+  } catch (err: any) {
+    throw new ApiError(
+      'INVALID_IMAGE',
+      err?.message?.includes('pixel') ? '图片分辨率过大' : '图片处理失败',
+      400
+    )
+  }
+
   // Generate thumbnail (100x100)
   const thumbFilename = `${userId}_${timestamp}_thumb.webp`
-  await sharp(buffer)
+  await sharp(buffer, sharpOpts)
+    .rotate()
     .resize(100, 100, { fit: 'cover' })
     .webp({ quality: 70 })
     .toFile(join(UPLOAD_DIR, thumbFilename))
@@ -95,7 +120,7 @@ export async function processAvatar(
     filename,
     path: filepath,
     url: `/uploads/avatars/${filename}`,
-    size: processedInfo.size
+    size: processedInfo.size,
   }
 }
 
@@ -115,36 +140,56 @@ export async function mergeChunks(
   uploadId: string,
   totalChunks: number,
   userId: string,
-  originalName: string
+  originalName: string,
+  expectedFileSize?: number
 ): Promise<ProcessAvatarResult> {
   assertValidUploadId(uploadId)
   const safeId = basename(uploadId)
   const mergedFilePath = join(TEMP_DIR, `${safeId}_merged`)
   const writeStream = createWriteStream(mergedFilePath)
 
+  const maxBytes =
+    typeof expectedFileSize === 'number' && expectedFileSize > 0
+      ? Math.min(expectedFileSize, AVATAR_MAX_BYTES)
+      : AVATAR_MAX_BYTES
+
   try {
-    // Merge chunks in order
+    let totalBytes = 0
     for (let i = 0; i < totalChunks; i++) {
       const chunkPath = join(TEMP_DIR, `${safeId}_${i}`)
       if (!existsSync(chunkPath)) {
-        throw new Error(`Chunk ${i} missing`)
+        throw new ApiError('CHUNK_MISSING', `分片 ${i} 缺失`, 400)
       }
       const chunkData = await readFile(chunkPath)
+      totalBytes += chunkData.length
+      if (totalBytes > maxBytes) {
+        throw new ApiError('FILE_TOO_LARGE', '合并后文件超过申报大小或上限', 400)
+      }
       writeStream.write(chunkData)
     }
     writeStream.end()
 
-    // Wait for stream to finish
     await new Promise<void>((resolve, reject) => {
       writeStream.on('finish', () => resolve())
       writeStream.on('error', reject)
     })
 
-    // Process the merged file
+    // 累加字节须与申报 fileSize 一致（允许分片编码误差 ≤ 0）
+    if (typeof expectedFileSize === 'number' && expectedFileSize > 0 && totalBytes !== expectedFileSize) {
+      throw new ApiError(
+        'SIZE_MISMATCH',
+        `文件大小与申报不符（申报 ${expectedFileSize}，实际 ${totalBytes}）`,
+        400
+      )
+    }
+
     const mergedBuffer = await readFile(mergedFilePath)
+    // 合并后再次校验魔数，防止分片拼接出非图片内容
+    if (!detectImageMime(mergedBuffer)) {
+      throw new ApiError('INVALID_FILE_TYPE', '仅支持 JPEG/PNG/GIF/WebP 图片', 400)
+    }
     const result = await processAvatar(mergedBuffer, userId, originalName)
 
-    // Cleanup chunks and merged file
     await unlink(mergedFilePath)
     for (let i = 0; i < totalChunks; i++) {
       const chunkPath = join(TEMP_DIR, `${safeId}_${i}`)
@@ -153,8 +198,11 @@ export async function mergeChunks(
 
     return result
   } catch (error) {
-    // Cleanup on error if possible
     if (existsSync(mergedFilePath)) await unlink(mergedFilePath).catch(() => {})
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkPath = join(TEMP_DIR, `${safeId}_${i}`)
+      if (existsSync(chunkPath)) await unlink(chunkPath).catch(() => {})
+    }
     throw error
   }
 }

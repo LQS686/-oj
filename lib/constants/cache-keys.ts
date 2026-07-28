@@ -39,6 +39,10 @@ export const CacheKeys = {
   announcement: {
     listPrefix: () => 'announcement:list',
   },
+  notification: {
+    unread: (userId: string) => `notification:unread:${userId}`,
+    unreadPrefix: () => 'notification:unread',
+  },
   home: {
     dashboardPrefix: () => 'home:dashboard',
   },

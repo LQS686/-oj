@@ -5,7 +5,7 @@
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { logger } from '@/lib/logger'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import {
   createSubmissionDirect,
   incrementProblemSubmitCount,
@@ -33,7 +33,11 @@ export async function listContestSubmissionsPaged(
 ) {
   const page = filter.page ?? 1
   const limit = filter.limit ?? 20
-  const where: any = { contestId }
+  // 与榜单一致：排除管理员角色的旁路测试提交
+  const where: any = {
+    contestId,
+    user: { role: { notIn: ['SYSTEM_ADMIN', 'ADMIN'] } },
+  }
   if (filter.userId) where.userId = filter.userId
   if (filter.problemId) where.problemId = filter.problemId
 
@@ -82,6 +86,7 @@ export async function listContestSubmissionsPaged(
 export interface SubmitContestCodeInput {
   contestId: string
   userId: string
+  viewerRole: string
   isAdmin: boolean
   problemId: string
   code: string
@@ -124,6 +129,18 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
   }
   const problem = contestProblem.problem
 
+  const { assertCanAccessProblem } = await import('@/lib/problem/access')
+  await assertCanAccessProblem(
+    {
+      id: problem.id,
+      authorId: problem.authorId,
+      visibility: problem.visibility,
+      classId: problem.classId ?? null,
+    },
+    { id: input.userId, role: input.viewerRole },
+    { contestId: input.contestId }
+  )
+
   // 4. 创建提交记录
   const submission = await createSubmissionDirect({
     problemId: problem.id,
@@ -150,6 +167,7 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
       memoryLimit: problem.memoryLimit,
       comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
+      spjCode: problem.spjCode ?? null,
       testCases: mapTestCasesMeta(problem.testCases),
     })
     logger.info(`竞赛提交 ${submission.id} 已加入评测队列`)

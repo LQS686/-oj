@@ -21,7 +21,7 @@
  * 注：CSV 不支持测试用例导入，仅适合简单题面录入。
  *     需要完整测试用例的题目请用 FPS / Hydro 格式。
  */
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import type { ImportedProblem } from './types'
 
 /** 字段名别名表（允许用户用中文表头） */

@@ -92,27 +92,41 @@ export async function closeMongoClient(): Promise<void> {
   logger.info('MongoDB 客户端连接已关闭')
 }
 
+export type WithRetryOptions = {
+  /**
+   * 仅对幂等操作开启网络/主节点切换重试。
+   * insert / $inc 等非幂等写默认不重试，避免重复主键或双计。
+   */
+  idempotent?: boolean
+}
+
 /**
- * 执行带重试的数据库操作
- * @param operation 数据库操作函数
- * @param retries 重试次数
+ * 执行带重试的数据库操作（默认不重试；幂等操作显式传 idempotent: true）
  */
-export async function withRetry<T>(operation: () => Promise<T>, retries = 3): Promise<T> {
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  retries = 3,
+  options: WithRetryOptions = {}
+): Promise<T> {
   try {
     return await operation()
   } catch (error: any) {
-    if (retries > 0 && (
-      error.name === 'MongoNetworkError' ||
-      error.name === 'MongoTimeoutError' ||
-      error.code === 10107 // NotWritablePrimary
-    )) {
-      logger.warn(`Database operation failed, retrying... (${retries} attempts left)`, { error: error.message })
-      await new Promise(resolve => setTimeout(resolve, 1000)) // 等待1秒后重试
-      // 如果是因为主节点变更导致的连接失效，尝试清除缓存
+    const mayRetry =
+      options.idempotent === true &&
+      retries > 0 &&
+      (error.name === 'MongoNetworkError' ||
+        error.name === 'MongoTimeoutError' ||
+        error.code === 10107) // NotWritablePrimary
+
+    if (mayRetry) {
+      logger.warn(`Database operation failed, retrying... (${retries} attempts left)`, {
+        error: error.message,
+      })
+      await new Promise((resolve) => setTimeout(resolve, 1000))
       if (error.code === 10107) {
-         cachedClient = null;
+        cachedClient = null
       }
-      return withRetry(operation, retries - 1)
+      return withRetry(operation, retries - 1, options)
     }
     throw error
   }

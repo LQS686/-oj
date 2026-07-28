@@ -211,4 +211,124 @@ describe('parseDsojZip v2', () => {
     expect(problems).toHaveLength(1)
     expect(problems[0].title).toBe('Demo')
   })
+
+  it('解析 LB3758 风格 SPJ：special_judge + checker 字段', () => {
+    const checkerSrc = `#include "testlib.h"
+int main(int argc, char* argv[]) {
+  registerTestlibCmd(argc, argv);
+  quitf(_ok, "ok");
+}
+`
+    const zip = new AdmZip()
+    zip.addFile('pack.yaml', Buffer.from(`format: dsoj-pack\nversion: 2.0\n`, 'utf-8'))
+    zip.addFile(
+      'problems/LB3758/problem.yaml',
+      Buffer.from(
+        `schema_version: 2
+title: '[信息与未来 2021] 括号序列'
+problem_number: LB3758
+luogu_pid: B3758
+difficulty: 普及-
+tags:
+- 字符串
+- Special Judge
+- 栈
+source: 洛谷
+visibility: public
+time_limit: 1000
+memory_limit: 128
+comparison_mode: special_judge
+real_precision: 3
+checker: checker.cpp
+spj_kind: bracket_construct
+`,
+        'utf-8'
+      )
+    )
+    zip.addFile(
+      'problems/LB3758/description.md',
+      Buffer.from('括号补全题面描述至少十字以上。', 'utf-8')
+    )
+    zip.addFile('problems/LB3758/checker.cpp', Buffer.from(checkerSrc, 'utf-8'))
+    zip.addFile('problems/LB3758/samples/1.in', Buffer.from('(())()(\n', 'utf-8'))
+    zip.addFile('problems/LB3758/samples/1.out', Buffer.from('(())()()\n', 'utf-8'))
+    zip.addFile('problems/LB3758/testcases/1.in', Buffer.from('(())()(\n', 'utf-8'))
+    zip.addFile('problems/LB3758/testcases/1.out', Buffer.from('(())()()\n', 'utf-8'))
+
+    const [problem] = parseDsojZip(zip.toBuffer())
+    expect(problem.problemNumber).toBe('LB3758')
+    expect(problem.externalId).toBe('B3758')
+    expect(problem.comparisonMode).toBe('special-judge')
+    expect(problem.spjCode).toContain('registerTestlibCmd')
+    expect(problem.tags).toContain('Special Judge')
+    expect(problem.samples).toHaveLength(1)
+    expect(problem.testCases).toHaveLength(1)
+  })
+
+  it('仅有 checker.cpp 时自动启用 special-judge', () => {
+    const zip = new AdmZip()
+    zip.addFile('pack.yaml', Buffer.from(`format: dsoj-pack\nversion: 2.0\n`, 'utf-8'))
+    zip.addFile(
+      'problems/PSPJ/problem.yaml',
+      Buffer.from(
+        `title: Auto SPJ\nproblem_number: PSPJ\ndifficulty: 入门\ntime_limit: 1000\nmemory_limit: 128\n`,
+        'utf-8'
+      )
+    )
+    zip.addFile('problems/PSPJ/description.md', Buffer.from('# auto spj problem description', 'utf-8'))
+    zip.addFile(
+      'problems/PSPJ/checker.cpp',
+      Buffer.from('#include "testlib.h"\nint main(int argc,char**argv){registerTestlibCmd(argc,argv);quitf(_ok,"ok");}\n', 'utf-8')
+    )
+    zip.addFile('problems/PSPJ/testcases/1.in', Buffer.from('1\n', 'utf-8'))
+    zip.addFile('problems/PSPJ/testcases/1.out', Buffer.from('1\n', 'utf-8'))
+
+    const [problem] = parseDsojZip(zip.toBuffer())
+    expect(problem.comparisonMode).toBe('special-judge')
+    expect(problem.spjCode).toBeTruthy()
+    expect(problem.tags).toContain('Special Judge')
+  })
+
+  it('声明 special_judge 但缺少 checker 时抛错', () => {
+    const zip = new AdmZip()
+    zip.addFile('pack.yaml', Buffer.from(`format: dsoj-pack\nversion: 2.0\n`, 'utf-8'))
+    zip.addFile(
+      'problems/PBAD/problem.yaml',
+      Buffer.from(
+        `title: Bad SPJ\nproblem_number: PBAD\ndifficulty: 入门\ntime_limit: 1000\nmemory_limit: 128\ncomparison_mode: special_judge\nchecker: checker.cpp\n`,
+        'utf-8'
+      )
+    )
+    zip.addFile('problems/PBAD/description.md', Buffer.from('# bad spj missing checker file', 'utf-8'))
+    zip.addFile('problems/PBAD/testcases/1.in', Buffer.from('1\n', 'utf-8'))
+    zip.addFile('problems/PBAD/testcases/1.out', Buffer.from('1\n', 'utf-8'))
+
+    expect(() => parseDsojZip(zip.toBuffer())).toThrow(/Special Judge|checker/i)
+  })
+
+  it('可直接解析参考目录 LB3758（若存在）', () => {
+    const dir = path.join(process.cwd(), '参考资源', 'dsoj-pack', 'problems', 'LB3758')
+    if (!fs.existsSync(path.join(dir, 'problem.yaml'))) return
+
+    const zip = new AdmZip()
+    zip.addFile('pack.yaml', Buffer.from(`format: dsoj-pack\nversion: 2.0\n`, 'utf-8'))
+    const walk = (rel: string) => {
+      const abs = path.join(dir, rel)
+      for (const name of fs.readdirSync(abs)) {
+        const childRel = rel ? `${rel}/${name}` : name
+        const childAbs = path.join(dir, childRel)
+        const st = fs.statSync(childAbs)
+        if (st.isDirectory()) walk(childRel)
+        else zip.addFile(`problems/LB3758/${childRel.replace(/\\/g, '/')}`, fs.readFileSync(childAbs))
+      }
+    }
+    walk('')
+
+    const [problem] = parseDsojZip(zip.toBuffer())
+    expect(problem.problemNumber).toBe('LB3758')
+    expect(problem.comparisonMode).toBe('special-judge')
+    expect(problem.spjCode).toContain('isValidBrackets')
+    expect(problem.tags).toContain('Special Judge')
+    expect(problem.testCases.length).toBeGreaterThanOrEqual(10)
+  })
 })

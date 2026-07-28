@@ -6,12 +6,7 @@ import { existsSync } from 'fs'
 import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 import { CompileState } from './types'
-
-// 编译超时（毫秒）：Linux runner.sh 的 cpu_sec=15 为硬限制，exec timeout 略大作为兜底
-const DEFAULT_COMPILE_TIMEOUT = parseInt(
-  process.env.JUDGE_COMPILE_TIMEOUT || '20000',
-  10,
-)
+import { getJudgeConfig } from './config'
 
 export interface CompileResult {
   success: boolean
@@ -358,7 +353,11 @@ export async function compileCode(code: string, language: string): Promise<Compi
     logger.debug(`编译命令`, { cmd: spawnCmd, args: spawnArgs, useSandbox })
 
     try {
-      const { exitCode, stderr } = await spawnCompile(spawnCmd, spawnArgs, DEFAULT_COMPILE_TIMEOUT)
+      const { exitCode, stderr } = await spawnCompile(
+        spawnCmd,
+        spawnArgs,
+        getJudgeConfig().compileTimeoutMs,
+      )
 
       if (exitCode === 0) {
         return {

@@ -2,60 +2,88 @@
  * /api/users/avatar/upload/complete - 完成头像分片上传
  */
 import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
-import { mergeChunks, isValidUploadId } from '@/lib/upload'
-import { getMongoClient } from '@/lib/mongodb/client'
-import { ObjectId } from 'mongodb'
+import { mergeChunks, isValidUploadId, deleteAvatarFilesByUrl } from '@/lib/upload'
+import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { assertAvatarUploadOwner, consumeAvatarUpload } from '@/lib/avatar-upload-registry'
+import { clearUserCache } from '@/lib/user/profile'
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  const { uploadId, filename, totalChunks } = await readJson<{
+  const body = await readJson<{
     uploadId?: string
     filename?: string
     totalChunks?: number
   }>(req)
 
-  if (!uploadId || !filename || !totalChunks) {
+  const uploadId = body.uploadId
+  const filename = body.filename
+  const totalChunks = body.totalChunks
+
+  if (!uploadId || !filename || totalChunks == null) {
     throw400('INVALID_PARAMS', 'Invalid params')
   }
 
-  if (!isValidUploadId(uploadId!)) {
+  const safeUploadId = uploadId as string
+  const safeFilename = filename as string
+  const safeTotalChunks = totalChunks as number
+
+  if (!isValidUploadId(safeUploadId)) {
     throw400('INVALID_UPLOAD_ID', '无效的上传ID')
   }
 
-  // P1-5 修复：二次鉴权 - 必须是该 uploadId 的拥有者本人
-  assertAvatarUploadOwner(uploadId!, user.id)
+  const owner = await assertAvatarUploadOwner(safeUploadId, user.id)
 
-  if (totalChunks! < 1 || totalChunks! > 1000) {
+  if (safeTotalChunks < 1 || safeTotalChunks > 1000) {
     throw400('INVALID_PARAMS', 'totalChunks 范围必须在 1-1000 之间')
   }
 
-  // Merge and process
-  const result = await mergeChunks(uploadId!, totalChunks!, user.id, filename!)
+  if (safeFilename.length < 1 || safeFilename.length > 255) {
+    throw400('INVALID_FILENAME', '文件名长度不合法')
+  }
+  if (/[\\/\0]/.test(safeFilename)) {
+    throw400('INVALID_FILENAME', '文件名包含非法字符')
+  }
 
-  // P1-5：完成后清理注册表项（一次性会话）
-  consumeAvatarUpload(uploadId!)
+  const prev = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { avatar: true },
+  })
 
-  const client = await getMongoClient()
-  const db = client.db()
+  let result: { url: string; size: number }
+  try {
+    result = await mergeChunks(
+      safeUploadId,
+      safeTotalChunks,
+      user.id,
+      safeFilename,
+      owner.fileSize
+    )
+  } catch (e) {
+    // 合并失败也释放 uploadId，避免占满 30 分钟 TTL
+    await consumeAvatarUpload(safeUploadId)
+    throw e
+  }
+  await consumeAvatarUpload(safeUploadId)
 
-  await db.collection('User').updateOne(
-    { _id: new ObjectId(user.id) },
-    {
-      $set: {
-        avatar: result.url,
-        updatedAt: new Date(),
-      },
-    },
-  )
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { avatar: result.url },
+  })
+  clearUserCache(user.id)
+
+  // 旧头像文件 GC（失败不阻断）
+  if (prev?.avatar && prev.avatar !== result.url) {
+    void deleteAvatarFilesByUrl(prev.avatar).catch(() => {})
+  }
 
   try {
-    await db.collection('AvatarHistory').insertOne({
-      userId: new ObjectId(user.id),
-      url: result.url,
-      filename: filename,
-      size: result.size,
-      createdAt: new Date(),
+    await prisma.avatarHistory.create({
+      data: {
+        userId: user.id,
+        url: result.url,
+        filename: safeFilename,
+        size: result.size,
+      },
     })
   } catch (historyError) {
     logger.error(

@@ -29,7 +29,7 @@ export async function listPublicProblems(filter: {
   tag?: string
 }): Promise<ListPublicProblemsResult> {
   const { page, pageSize, search, difficulty, tag } = filter
-  const where: any = { isPublic: true }
+  const where: any = { visibility: 'public' }
   if (search) {
     where.OR = [
       { title: { contains: search, mode: 'insensitive' } },

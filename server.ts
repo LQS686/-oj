@@ -3,18 +3,25 @@
  * 集成 WebSocket 支持
  */
 
+// 必须最先导入：确保 globalThis.AsyncLocalStorage 在 next 加载前可用
+import './lib/node-als-polyfill'
+
 import { createServer, IncomingMessage, ServerResponse } from 'http'
 import { parse } from 'url'
-import { join, extname } from 'path'
+import { join, extname, resolve, relative, isAbsolute, sep } from 'path'
 import { readFile, access } from 'fs/promises'
+import { timingSafeEqual } from 'crypto'
 import next from 'next'
 import { initWebSocketServer, closeWebSocket } from './lib/websocket/server'
 import dotenv from 'dotenv'
 import { logger } from './lib/logger'
 import { saveChunk, isValidUploadId } from './lib/upload'
 import { assertAvatarUploadOwner } from './lib/avatar-upload-registry'
-import { ApiError } from './lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
+import { checkRateLimit, getClientIPFromHeaders } from './lib/rate-limit'
 import jwt from 'jsonwebtoken'
+import { isSecureAuthCookie, readAuthTokenFromCookieHeader } from './lib/auth/cookie'
+import { csrfCookieName } from './lib/security/csrf'
 import { validateEnvironment } from './lib/env'
 import { formatStartupBanner } from './lib/build-info'
 import {
@@ -58,12 +65,19 @@ async function serveStaticUpload(req: IncomingMessage, res: ServerResponse): Pro
   const url = req.url || ''
   if (!url.startsWith('/uploads/')) return false
 
-  // 安全：防止路径穿越（如 /uploads/../../etc/passwd）
+  // 安全：resolve + relative，禁止目录穿越。
+  // 旧实现用 startsWith(base) 会被 /uploads/../uploads_evil/ 绕过。
   const decoded = decodeURIComponent(url.split('?')[0])
-  const filePath = join(STATIC_UPLOADS_DIR, decoded.replace(/^\/uploads\//, ''))
-  const normalized = filePath.replace(/\\/g, '/')
-  const baseNormalized = STATIC_UPLOADS_DIR.replace(/\\/g, '/')
-  if (!normalized.startsWith(baseNormalized)) {
+  const relativeUrl = decoded.replace(/^\/uploads\/?/, '')
+  if (!relativeUrl || relativeUrl.includes('\0')) {
+    res.statusCode = 403
+    res.end('Forbidden')
+    return true
+  }
+  const base = resolve(STATIC_UPLOADS_DIR)
+  const filePath = resolve(base, relativeUrl)
+  const rel = relative(base, filePath)
+  if (!rel || rel.startsWith(`..${sep}`) || rel === '..' || isAbsolute(rel)) {
     res.statusCode = 403
     res.end('Forbidden')
     return true
@@ -104,6 +118,25 @@ async function serveStaticUpload(req: IncomingMessage, res: ServerResponse): Pro
  *   改在 server.ts 中用 Node 原生方式处理，彻底绕开 Next.js 的 Web Request 适配。
  */
 async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  if (!assertWriteSecurityRaw(req, res)) return true
+
+  // 独立限流：绕过 Next middleware，需在此单独限制分片上传频率
+  const clientIp = getClientIPFromHeaders(req.headers as any)
+  const rl = await checkRateLimit(`avatar-chunk:${clientIp}`, {
+    maxRequests: 60,
+    windowMs: 60_000,
+    keyPrefix: 'avatar-chunk',
+  })
+  if (!rl.success) {
+    writeJson(res, 429, {
+      success: false,
+      code: 'RATE_LIMITED',
+      error: '上传过于频繁，请稍后再试',
+      retryAfter: rl.retryAfter,
+    })
+    return true
+  }
+
   const contentType = (req.headers['content-type'] as string) || ''
   logger.info('[chunk-direct] enter', { contentType: contentType.substring(0, 80), method: req.method })
   if (!contentType.includes('multipart/form-data')) {
@@ -168,7 +201,7 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
   }
 
   try {
-    assertAvatarUploadOwner(uploadId, user.id)
+    await assertAvatarUploadOwner(uploadId, user.id)
   } catch (e) {
     if (e instanceof ApiError) {
       logger.warn('[chunk-direct] 鉴权失败', { code: e.code, message: e.message, uploadId: uploadId.slice(0, 8), userId: user.id.slice(0, 8) })
@@ -199,46 +232,33 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
 }
 
 /**
- * 从 IncomingMessage 解析当前登录用户（与 getUserFromRequest 等价但接受 Node 原生 req）
+ * 从 IncomingMessage 解析当前登录用户。
+ * 校验 JWT 后走 getCachedUser（tokenVersion + isBanned），与 withApi 鉴权一致。
  */
 async function getUserFromRawRequest(
   req: IncomingMessage
 ): Promise<{ id: string; role?: string; tokenVersion?: number } | null> {
-  const auth = req.headers['authorization']
-  if (auth && auth.startsWith('Bearer ')) {
-    try {
-      const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET!) as any
-      if (payload?.userId) {
-        return {
-          id: payload.userId,
-          role: payload.role,
-          tokenVersion: payload.tokenVersion,
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
   const cookieHeader = req.headers['cookie'] || ''
-  const tokenMatch = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/)
-  if (tokenMatch) {
-    try {
-      const payload = jwt.verify(decodeURIComponent(tokenMatch[1]), process.env.JWT_SECRET!) as any
-      if (payload?.userId) {
-        return {
-          id: payload.userId,
-          role: payload.role,
-          tokenVersion: payload.tokenVersion,
-        }
-      }
-    } catch {
-      // ignore
-    }
+  const token = readAuthTokenFromCookieHeader(cookieHeader)
+  if (!token) return null
+
+  let userId: string | undefined
+  let tokenVersion: number | undefined
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as any
+    userId = payload?.userId
+    tokenVersion = payload?.tokenVersion
+  } catch {
+    return null
   }
-  return null
+  if (!userId) return null
+
+  const user = await getCachedUser(userId, tokenVersion)
+  if (!user) return null
+  return { id: user.id, role: user.role, tokenVersion: user.tokenVersion }
 }
 
-/** 自定义 server 直通写接口的简易 CSRF：Origin/Referer host 须与 Host 一致 */
+/** 自定义 server 直通写接口：Origin + CSRF 双提交 */
 function isAllowedOriginRaw(req: IncomingMessage): boolean {
   const host = req.headers['host']
   if (!host) return false
@@ -258,8 +278,33 @@ function isAllowedOriginRaw(req: IncomingMessage): boolean {
       return false
     }
   }
-  // 同源表单上传通常带 Origin；缺失则拒绝写操作
   return false
+}
+
+function verifyCsrfRaw(req: IncomingMessage): boolean {
+  // 与 lib/security/csrf 一致：双提交 Cookie，无 Bearer 旁路
+  const headerToken = String(req.headers['x-csrf-token'] || '').trim()
+  if (!headerToken) return false
+
+  const name = csrfCookieName(isSecureAuthCookie())
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const cookieHeader = req.headers['cookie'] || ''
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]+)`))
+  const cookieToken = decodeURIComponent((match?.[1] || '').trim())
+  if (!cookieToken || headerToken.length !== cookieToken.length) return false
+  try {
+    return timingSafeEqual(Buffer.from(headerToken), Buffer.from(cookieToken))
+  } catch {
+    return false
+  }
+}
+
+function assertWriteSecurityRaw(req: IncomingMessage, res: ServerResponse): boolean {
+  if (!isAllowedOriginRaw(req) || !verifyCsrfRaw(req)) {
+    writeJson(res, 403, { success: false, code: 'CSRF_INVALID', error: '跨站请求被拒绝或 CSRF 校验失败' })
+    return false
+  }
+  return true
 }
 
 /**
@@ -271,10 +316,7 @@ async function handleProblemImportDirect(
   req: IncomingMessage,
   res: ServerResponse
 ): Promise<boolean> {
-  if (!isAllowedOriginRaw(req)) {
-    writeJson(res, 403, { success: false, code: 'CSRF_REJECTED', error: '跨站请求被拒绝' })
-    return true
-  }
+  if (!assertWriteSecurityRaw(req, res)) return true
 
   const contentType = (req.headers['content-type'] as string) || ''
   if (!contentType.includes('multipart/form-data')) {
@@ -321,7 +363,9 @@ async function handleProblemImportDirect(
     const { executeProblemImport, VALID_IMPORT_FORMATS, IMPORT_MAX_FILE_BYTES } =
       await import('./lib/problem/import/execute')
 
-    const parts = parseMultipart(body, boundary)
+    const parts = parseMultipart(body, boundary, {
+      maxPartBytes: IMPORT_MAX_FILE_BYTES,
+    })
     const formatPart = parts.find((p) => p.name === 'format')
     const optionsPart = parts.find((p) => p.name === 'options')
     const filePart = parts.find((p) => p.name === 'file')
@@ -377,6 +421,23 @@ async function handleProblemImportDirect(
   } catch (e) {
     if (e instanceof ApiError) {
       writeJson(res, e.status, { success: false, code: e.code, error: e.message })
+      return true
+    }
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg === 'PART_TOO_LARGE') {
+      writeJson(res, 413, {
+        success: false,
+        code: 'FILE_TOO_LARGE',
+        error: '文件大小超过 50MB 限制',
+      })
+      return true
+    }
+    if (msg === 'TOO_MANY_PARTS') {
+      writeJson(res, 400, {
+        success: false,
+        code: 'TOO_MANY_PARTS',
+        error: '表单字段过多',
+      })
       return true
     }
     logger.error('题库导入直通失败', e instanceof Error ? e : new Error(String(e)))

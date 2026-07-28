@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { byIdKey } from './crud'
 import type { TrainingCreateInput, TrainingUpdateInput } from './types'
+import { ApiError } from '@/lib/api/errors'
 
 /* ============================================================================
  * 创建 / 更新（含题目）
@@ -30,6 +31,17 @@ export async function createTrainingWithProblems(input: TrainingCreateInput) {
     },
   })
   if (problemIds && problemIds.length > 0) {
+    const existing = await prisma.problem.findMany({
+      where: { id: { in: problemIds } },
+      select: { id: true, visibility: true },
+    })
+    if (existing.length !== new Set(problemIds).size) {
+      throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
+    }
+    const nonPublic = existing.filter((p) => p.visibility !== 'public')
+    if (nonPublic.length > 0) {
+      throw new ApiError('INVALID_PROBLEMS', '训练题单只能添加公开题目', 400)
+    }
     const trainingProblems = problemIds.map((problemId, index) => ({
       trainingId: training.id,
       problemId,
@@ -74,6 +86,21 @@ export async function addTrainingProblems(
 ) {
   cache.delete(byIdKey(trainingId))
   if (problems.length === 0) return { count: 0 }
+
+  const problemIds = problems.map((p) => p.problemId)
+  const existing = await prisma.problem.findMany({
+    where: { id: { in: problemIds } },
+    select: { id: true, visibility: true },
+  })
+  if (existing.length !== new Set(problemIds).size) {
+    throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
+  }
+  // 训练题单仅允许公开题库题目，避免私有/竞赛题被挂入后绕过可见性
+  const nonPublic = existing.filter((p) => p.visibility !== 'public')
+  if (nonPublic.length > 0) {
+    throw new ApiError('INVALID_PROBLEMS', '训练题单只能添加公开题目', 400)
+  }
+
   // 计算起始 orderIndex
   const latest = await prisma.trainingProblem.findMany({
     where: { trainingId },

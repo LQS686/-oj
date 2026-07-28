@@ -2,19 +2,23 @@
 # 启用 BuildKit 缓存：apk / npm / next build 三处慢操作使用 --mount=type=cache，
 # 即使 docker compose build --no-cache 也能复用 host 上的包缓存，大幅缩短构建时间。
 
-# 构建阶段 - 使用国内镜像源
-FROM node:20-alpine AS builder
+# 构建阶段 - 固定次要版本，避免 floating tag 漂移
+# 可通过 ARG 覆盖并固定 digest，例如：
+#   --build-arg NODE_IMAGE=node:20.20-alpine3.22@sha256:<digest>
+ARG NODE_IMAGE=node:20.20-alpine3.22
+FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
-# 设置构建时环境变量（仅构建时使用，不写入镜像层）
-ARG JWT_SECRET
+# 设置构建时环境变量（仅构建时使用，不写入运行时密钥）
+# JWT_SECRET：构建阶段只用固定占位符，禁止通过 ARG 注入真实密钥进入镜像层。
+# 运行时由 docker-compose environment / k8s secret 注入真实 JWT_SECRET。
 ARG DATABASE_URL=mongodb://localhost:27017/oj_platform
 # NEXT_PUBLIC_* 必须在构建时传递，会被硬编码到 JS 中
 ARG NEXT_PUBLIC_API_URL=https://dsoj.run
 ARG NEXT_PUBLIC_BASE_URL=https://dsoj.run
 ENV NEXT_PHASE=phase-production-build
-ENV JWT_SECRET=${JWT_SECRET}
+ENV JWT_SECRET=build-time-placeholder-not-for-runtime-use-only
 ENV DATABASE_URL=${DATABASE_URL}
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
@@ -27,11 +31,9 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
 # 安装依赖（使用淘宝镜像）
 # BuildKit 缓存 /root/.npm，下次 build 时复用已下载的 npm 包
 COPY package*.json ./
-# 修复：使用 --ignore-scripts 跳过 package.json 中的 postinstall="prisma generate"，
-#   因为此时 prisma/schema.prisma 还未被 COPY 进来，prisma generate 会失败。
-#   真实的 prisma generate 在下面 COPY prisma 之后单独执行。
+# 使用 npm ci 保证与 package-lock.json 完全一致（可复现构建）
 RUN --mount=type=cache,target=/root/.npm \
-    npm config set registry https://registry.npmmirror.com && npm install --ignore-scripts
+    npm config set registry https://registry.npmmirror.com && npm ci --ignore-scripts
 
 # 复制Prisma schema并生成客户端
 COPY prisma ./prisma/
@@ -45,8 +47,9 @@ COPY . .
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 
-# 生产阶段 - 使用国内镜像源
-FROM node:20-alpine AS runner
+# 生产阶段
+ARG NODE_IMAGE=node:20.20-alpine3.22
+FROM ${NODE_IMAGE} AS runner
 
 WORKDIR /app
 
@@ -111,20 +114,21 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_m
 # katex、nodemailer 等），这些可能没被完全追踪。必须运行 npm install --omit=dev 确保所有
 # 生产依赖都装上。tsx 现在在 dependencies 中（之前在 devDependencies），也会被装上。
 # BuildKit 缓存 /root/.npm，复用 builder 阶段已下载的 npm 包
+# 安装生产依赖：与 lockfile 对齐
 RUN --mount=type=cache,target=/root/.npm \
-    npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts
+    npm config set registry https://registry.npmmirror.com && npm ci --omit=dev --ignore-scripts
 
 # 创建必要的目录并设置权限
-# addgroup nextjs root: 将 nextjs 加入 root 组，使 runner.sh 中的 ulimit 命令可执行。
-# 原因：Alpine Linux 默认不允许非 root 用户执行 ulimit -v/-t/-s（需 CAP_SYS_RESOURCE）。
-# 之前用 usermod -aG root，但 Alpine 默认不装 shadow 包（usermod 不存在）。
-# addgroup 是 BusyBox 内置命令，无需额外依赖。
-# 长期方案：改用 Docker 沙箱评测（USE_DOCKER=true）可避免此权限提升。
+# 不再将 nextjs 加入 root 组（避免提权）。内存/CPU 硬限依赖 dsoj-watch + ulimit 软限制；
+# 生产建议 USE_DOCKER=true 使用容器沙箱。
 # public/uploads/avatars: 头像持久化目录，docker-compose 会挂载 volume 到此处，
 # 预创建并 chown 确保 nextjs 用户有写权限（volume 首次挂载时属主为 root，需要显式赋权）
 RUN mkdir -p /app/temp /app/logs /app/public/uploads/avatars && \
-    chown -R nextjs:nodejs /app/temp /app/logs /app/public/uploads && \
-    addgroup nextjs root
+    chown -R nextjs:nodejs /app/temp /app/logs /app/public/uploads
+
+# 预编译评测监视器：同步密采样 RssAnon，避免 /usr/bin/time 总 RSS 虚高与后台轮询竞态
+RUN cc -O2 -o /app/lib/judge/dsoj-watch /app/lib/judge/dsoj-watch.c && \
+    chown nextjs:nodejs /app/lib/judge/dsoj-watch
 
 USER nextjs
 

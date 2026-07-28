@@ -92,7 +92,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   }
 
   // P1-5 修复：二次鉴权 - 必须是该 uploadId 的拥有者本人
-  assertAvatarUploadOwner(uploadId, user.id)
+  await assertAvatarUploadOwner(uploadId, user.id)
 
   if (chunkIndex < 0 || chunkIndex > MAX_CHUNK_INDEX) {
     throw400('INVALID_CHUNK_INDEX', `chunkIndex 超出范围 (0-${MAX_CHUNK_INDEX})`)

@@ -1,3 +1,5 @@
+import 'server-only'
+
 import { logger } from './logger'
 import { isRedisConfigured } from './redis'
 
@@ -202,11 +204,16 @@ class Cache {
     this.inflight.set(key, promise)
     try {
       const value = await promise
-      this.setMemory(key, value, ttl)
-      await this.setRedis(key, value, ttl)
+      // delete()/deleteByPrefix 可能已摘掉本 inflight：禁止把过期值写回
+      if (this.inflight.get(key) === promise) {
+        this.setMemory(key, value, ttl)
+        await this.setRedis(key, value, ttl)
+      }
       return value
     } finally {
-      this.inflight.delete(key)
+      if (this.inflight.get(key) === promise) {
+        this.inflight.delete(key)
+      }
     }
   }
 
@@ -217,6 +224,7 @@ class Cache {
 
   delete(key: string) {
     this.storage.delete(key)
+    this.inflight.delete(key)
     void this.deleteRedis(key)
   }
 
@@ -237,11 +245,15 @@ class Cache {
    */
   deleteByPrefix(prefix: string): number {
     let count = 0
+    const match = (key: string) => key.startsWith(prefix + ':') || key === prefix
     for (const key of this.storage.keys()) {
-      if (key.startsWith(prefix + ':') || key === prefix) {
+      if (match(key)) {
         this.storage.delete(key)
         count++
       }
+    }
+    for (const key of this.inflight.keys()) {
+      if (match(key)) this.inflight.delete(key)
     }
     void this.deleteRedisByPrefix(prefix)
     return count
@@ -268,6 +280,7 @@ class Cache {
 
   clear() {
     this.storage.clear()
+    this.inflight.clear()
     void this.clearRedisAll()
   }
 

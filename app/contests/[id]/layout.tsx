@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import ContestHeaderShell from './ContestHeaderShell'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
+import { readAuthTokenFromCookieStore } from '@/lib/auth/cookie'
 import { canManageContent } from '@/lib/permissions'
 import { formatPageDocumentTitle } from '@/lib/page-titles'
 import type { Metadata } from 'next'
@@ -54,7 +55,7 @@ export default async function ContestLayout({
  const isStarted = now >= contest.startTime
  
  const cookieStore = await cookies()
- const token = cookieStore.get('token')?.value
+ const token = readAuthTokenFromCookieStore(cookieStore)
  let user = null
  if (token) {
  user = verifyToken(token)

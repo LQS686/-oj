@@ -29,6 +29,8 @@
  * ```
  */
 
+import 'server-only'
+
 import type { NextRequest } from 'next/server'
 import { fail, serverError } from './response'
 import { logger } from '@/lib/logger'
@@ -36,8 +38,26 @@ import { getUserFromRequest } from '@/lib/auth'
 import { getClassMembership, type ClassMembership } from '@/lib/class/auth'
 import { getCachedUser, type AuthUser, type ApiContext } from './handler'
 import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
+import {
+  ApiError,
+  throw400,
+  throw401,
+  throw403,
+  throw404,
+  throw409,
+  throw500,
+} from './errors'
 
 export type { AuthUser, ApiContext }
+export {
+  ApiError,
+  throw400,
+  throw401,
+  throw403,
+  throw404,
+  throw409,
+  throw500,
+}
 
 export interface AuthContext {
   user: AuthUser
@@ -47,26 +67,6 @@ export interface ClassContext extends AuthContext {
   membership: ClassMembership
   classId: string
 }
-
-/**
- * 业务异常：抛出后会被 withApi 统一捕获并转为 fail(code, message, status)
- */
-export class ApiError extends Error {
-  constructor(public code: string, public message: string, public status: number = 400) {
-    super(message)
-    this.name = 'ApiError'
-  }
-}
-
-/**
- * 抛出 400 / 401 / 403 / 404 便捷函数
- */
-export const throw400 = (code: string, msg: string): never => { throw new ApiError(code, msg, 400) }
-export const throw401 = (msg = '未登录'): never => { throw new ApiError('UNAUTHORIZED', msg, 401) }
-export const throw403 = (msg = '权限不足'): never => { throw new ApiError('FORBIDDEN', msg, 403) }
-export const throw404 = (msg = '资源不存在'): never => { throw new ApiError('NOT_FOUND', msg, 404) }
-export const throw409 = (msg: string): never => { throw new ApiError('CONFLICT', msg, 409) }
-export const throw500 = (msg = '服务器错误'): never => { throw new ApiError('INTERNAL', msg, 500) }
 
 /**
  * 内部：异常包装 + 日志
@@ -117,6 +117,8 @@ async function safeCall(
       stack: err?.stack,
     })
     return serverError('服务器错误')
+  } finally {
+    logger.clearContext()
   }
 }
 
@@ -137,21 +139,25 @@ async function resolveCtxParams(ctx: any): Promise<any> {
   return ctx
 }
 
+async function assertWriteCsrf(req: NextRequest): Promise<void> {
+  const method = req.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return
+  const { assertCsrf } = await import('@/lib/security/csrf')
+  assertCsrf(req)
+}
+
 export interface RouteHandler {
   (req: NextRequest, ctx: ApiContext): Promise<Response | unknown> | Response | unknown
 }
 
 export const withApi = {
   /**
-   * 公开路由：无需登录
-   *
-   * CSRF 防护：由 middleware.ts 的 isAllowedOrigin 统一处理（Origin/Referer 同源校验），
-   * 对所有 /api/* 写操作生效。lib/security/csrf.ts 的 token 机制为预留扩展，前端未集成，
-   * 不在此处强制，避免 public 写路由（login/register/logout/forgot-password）被误拦。
+   * 公开路由：无需登录。写方法强制 CSRF（双提交 Cookie）。
    */
   public(handler: RouteHandler) {
     return async (req: NextRequest, ctx: any) => {
       return safeCall(async () => {
+        await assertWriteCsrf(req)
         const resolved = await resolveCtxParams(ctx)
         return handler(req, resolved)
       }, 'PUBLIC', req)
@@ -159,13 +165,14 @@ export const withApi = {
   },
 
   /**
-   * 需登录：自动注入 user
+   * 需登录：自动注入 user。写方法强制 CSRF。
    */
   auth<P = any>(
     handler: (req: NextRequest, ctx: ApiContext<P>, context: AuthContext) => Promise<Response | unknown> | Response | unknown
   ) {
     return async (req: NextRequest, ctx: ApiContext<P>) => {
       return safeCall(async () => {
+        await assertWriteCsrf(req)
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId, session.tokenVersion)
@@ -184,6 +191,7 @@ export const withApi = {
   ) {
     return async (req: NextRequest, ctx: any) => {
       return safeCall(async () => {
+        await assertWriteCsrf(req)
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId, session.tokenVersion)
@@ -205,6 +213,7 @@ export const withApi = {
   ) {
     return async (req: NextRequest, ctx: any) => {
       return safeCall(async () => {
+        await assertWriteCsrf(req)
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId, session.tokenVersion)
@@ -227,11 +236,12 @@ export const withApi = {
   ) {
     return async (req: NextRequest, ctx: any) => {
       return safeCall(async () => {
+        await assertWriteCsrf(req)
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId, session.tokenVersion)
-        if (!user) throw throw401('用户不存在或登录已失效')
-        // 兼容 Promise<params> 与 params 两种 Next.js 形态
+        // 会话签名有效但账号封禁/tokenVersion 失效：403 而非 401，便于前端区分「未登录」与「无权限」
+        if (!user) throw throw403('账号不可用或会话已失效')
         const rawParams: any = ctx?.params
         const resolvedParams = rawParams && typeof rawParams.then === 'function' ? await rawParams : rawParams
         const classId = resolvedParams?.id

@@ -16,10 +16,11 @@ export function formatTime(ms: number): string {
 
 /**
  * 格式化内存（KB → 可读字符串）
+ * ≤1024KB 显示 KB；超过 1024KB 显示 MB
  */
 export function formatMemory(kb: number): string {
   if (kb <= 0) return '0KB'
-  if (kb < 1024) return `${kb}KB`
+  if (kb <= 1024) return `${Math.round(kb)}KB`
   return `${(kb / 1024).toFixed(2)}MB`
 }
 

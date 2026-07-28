@@ -4,15 +4,18 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # JWT_SECRET 构建时占位符，运行时通过 environment 注入真实值
-        JWT_SECRET: ${JWT_SECRET:-build-placeholder-not-used-at-runtime}
         # NEXT_PUBLIC_* 在构建时被硬编码到客户端 JS 中，必须通过 ARG 传递
         # 修改 FRONTEND_URL 后必须重新 build 镜像才能生效（docker compose build --no-cache app）
+        # JWT_SECRET 禁止作为 build arg：真实密钥不得进入镜像层，仅运行时 environment 注入
         NEXT_PUBLIC_API_URL: ${FRONTEND_URL:-https://dsoj.run}
         NEXT_PUBLIC_BASE_URL: ${FRONTEND_URL:-https://dsoj.run}
     image: oj-platform:app
+    # 默认仅绑定本机回环，避免 0.0.0.0 直接暴露应用端口；生产应经反向代理。
+    # 需要外部访问时设 APP_HOST_BIND=0.0.0.0
     ports:
-      - "3000:3000"
+      - "${APP_HOST_BIND:-127.0.0.1}:${APP_HOST_PORT:-3000}:3000"
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=mongodb://${MONGO_APP_USER:-ojuser}:${MONGO_APP_PASSWORD:?err}@mongo:27017/oj_platform?authSource=oj_platform&replicaSet=rs0
@@ -107,6 +110,8 @@ services:
   redis:
     image: redis:7-alpine
     command: redis-server --requirepass ${REDIS_PASSWORD:?err} --appendonly yes
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?err}
     restart: always
     mem_limit: 256m
     networks:
@@ -119,7 +124,8 @@ services:
         max-size: "10m"
         max-file: "5"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?err}", "ping"]
+      # 密码走环境变量，避免出现在 docker inspect / ps 命令行参数中
+      test: ["CMD", "sh", "-c", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
       interval: 30s
       timeout: 10s
       retries: 3

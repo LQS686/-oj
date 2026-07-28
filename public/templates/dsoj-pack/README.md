@@ -24,6 +24,7 @@ dsoj-pack/
         ├── input.md          # 可选
         ├── output.md         # 可选
         ├── hint.md           # 常有（可为空）
+        ├── checker.cpp       # 可选：Special Judge（Testlib）
         ├── samples/
         │   ├── 1.in
         │   └── 1.out
@@ -88,8 +89,23 @@ dsoj-pack/
 | `visibility` | str | 默认 `public` |
 | `time_limit` | int | 毫秒 |
 | `memory_limit` | int | MB |
-| `comparison_mode` | str | 默认 `default` |
+| `comparison_mode` | str | 默认 `default`；SPJ 题写 `special_judge`（亦接受 `special-judge`） |
 | `real_precision` | int | 默认 `3` |
+| `checker` | str | SPJ 时 checker 文件名，如 `checker.cpp` |
+| `spj_kind` | str | 可选元数据（导入忽略，仅保留兼容） |
+
+### Special Judge
+
+对齐参考题包 `LB3758`：
+
+```yaml
+comparison_mode: special_judge
+checker: checker.cpp
+tags:
+  - Special Judge
+```
+
+并将 Testlib 源码放在题目目录的 `checker.cpp`（或 `spj.cpp` / `chk.cpp`）。仅有 checker 文件时导入也会自动启用 SPJ；声明了 `special_judge` 却找不到 checker 会报错。
 
 ## 样例与测试点
 

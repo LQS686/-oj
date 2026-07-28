@@ -67,10 +67,18 @@ docker compose logs -f app
 ## 评测相关注意
 
 - **仅 Linux**：Windows 宿主调用评测会直接报错并提示改用 WSL/Docker。
+- **Node**：推荐 20/22 LTS。Node 24 + `tsx server.ts` 需 `lib/node-als-polyfill.ts`（已默认导入），否则会报 `AsyncLocalStorage accessed in runtime where it is not available`。
+- **自定义 server**：`npm run dev` / `start` 使用 `tsx --conditions=react-server`，使 `server-only` 在 Node 侧解析为空模块（与 Next 服务端一致）；勿把 `ioredis` / `prisma` 经 barrel 引进 Client Component。
+- **单元测试**：Vitest 将 `server-only` 别名到 `tests/mocks/server-only.ts`；跑 `npm test` 无需额外条件。纯逻辑模块请从 `lib/api/errors` 导入 `ApiError`。
+- **Redis**：本地 `npm run dev` 强烈建议配置 `REDIS_URL`（缓存 / 限流 / 头像分片 / 登录锁 / 跨实例吊销）；生产未配置会启动失败。
+- **CSRF**：浏览器写请求须带可读 CSRF Cookie + `X-CSRF-Token`；前端请用 `fetchWithCookie` / `apiClient`，勿裸 `fetch` POST。
 - **默认关闭 ASan/UBSan**（对齐洛谷/HOJ）。严检：`JUDGE_ENABLE_ASAN=true`。
 - Linux 跑测使用原生 `<in >out` 重定向；大输出题（如 LP3383）更快。
 - **fail-fast（默认 off）**：默认跑完全部测点；不因 TLE/WA 跳过。仅当显式 `JUDGE_FAIL_FAST=hard|all` 时提前中止。
-- **CPU 硬限**与墙钟分离：大 I/O 题墙钟可因输出体积放宽，但暴力解仍按 `timeLimit+extra` 尽快杀掉单点，避免单点拖满墙钟裕量。- 测点并行：超过体积阈值的测点占用「大测点槽位」（默认最多 2 路）。
+- **CPU 硬限**与墙钟分离：大 I/O 题墙钟可因输出体积放宽，但暴力解仍按 `timeLimit+extra` 尽快杀掉单点，避免单点拖满墙钟裕量。
+- 测点并行：超过体积阈值的测点占用「大测点槽位」（默认最多 2 路）。
+- `dsoj-watch`：启动时预编译；并行测点用 flock + 原子 mv，避免半截二进制误报 RE。改完 `dsoj-watch.c` / `runner.sh` 后请同步到 `~/dsoj` 并重启 `npm run dev`。
+- SPJ / 选手进程使用环境变量白名单，不继承宿主机 `JWT_SECRET` / `DATABASE_URL` 等。
 - 改完 `lib/judge/*.ts` / `runner.sh` 后：`npm run dev` 一般热更新；异常则重启。Docker 路径需重建/重启容器。
 
 ---

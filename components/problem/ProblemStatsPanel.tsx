@@ -80,7 +80,7 @@ function getLanguageConfig(lang: string) {
 
 function formatMemory(kb: number): string {
   if (kb <= 0) return '-'
-  if (kb < 1024) return `${kb} KB`
+  if (kb <= 1024) return `${Math.round(kb)} KB`
   return `${(kb / 1024).toFixed(2)} MB`
 }
 
@@ -90,7 +90,13 @@ function formatTime(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
-export default function ProblemStatsPanel({ problemId }: { problemId: string }) {
+export default function ProblemStatsPanel({
+  problemId,
+  contestId,
+}: {
+  problemId: string
+  contestId?: string
+}) {
   const [stats, setStats] = useState<ProblemStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -101,7 +107,8 @@ export default function ProblemStatsPanel({ problemId }: { problemId: string }) 
       try {
         setLoading(true)
         setError(null)
-        const res = await fetchWithCookie(`/api/problems/${problemId}/stats`)
+        const qs = contestId ? `?contestId=${encodeURIComponent(contestId)}` : ''
+        const res = await fetchWithCookie(`/api/problems/${problemId}/stats${qs}`)
         const data = await res.json()
         if (cancelled) return
         if (data.success) {
@@ -118,7 +125,7 @@ export default function ProblemStatsPanel({ problemId }: { problemId: string }) 
     }
     fetchStats()
     return () => { cancelled = true }
-  }, [problemId])
+  }, [problemId, contestId])
 
   if (loading) {
     return (

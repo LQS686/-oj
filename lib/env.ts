@@ -134,7 +134,25 @@ export function validateEnvironment(): EnvironmentCheckResult {
 
   // FRONTEND_URL：仅生产必填
   const feErr = checkFrontendUrl()
-  if (feErr) warnings.push(feErr)
+  if (feErr) {
+    if (process.env.NODE_ENV === 'production') errors.push(feErr)
+    else warnings.push(feErr)
+  }
+
+  // 生产环境强制 Redis（限流 / 头像上传会话 / 缓存）
+  if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL?.trim()) {
+    errors.push('生产环境必须设置 REDIS_URL')
+  }
+
+  // 生产环境禁止显式关闭 Secure Cookie（__Host-token 依赖 Secure）
+  if (process.env.NODE_ENV === 'production' && process.env.FORCE_SECURE_COOKIE === 'false') {
+    errors.push('生产环境禁止 FORCE_SECURE_COOKIE=false，请使用 HTTPS 并启用 Secure Cookie')
+  }
+
+  // ENCRYPTION_KEY：生产必填（SMTP 等密文）
+  if (process.env.NODE_ENV === 'production' && !process.env.ENCRYPTION_KEY?.trim()) {
+    errors.push('生产环境必须设置 ENCRYPTION_KEY（32 字节）')
+  }
 
   // TZ：生产环境建议设置，确保日期时间处理一致
   const tzErr = checkTz()

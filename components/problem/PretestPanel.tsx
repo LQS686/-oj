@@ -58,9 +58,17 @@ export interface PretestPanelProps {
   language: string
   /** 禁用运行按钮（如未登录、代码为空） */
   disabled?: boolean
+  /** 竞赛上下文：竞赛题 pretest 必须传入 */
+  contestId?: string
 }
 
-export default function PretestPanel({ problemId, code, language, disabled }: PretestPanelProps) {
+export default function PretestPanel({
+  problemId,
+  code,
+  language,
+  disabled,
+  contestId,
+}: PretestPanelProps) {
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<PretestResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -82,7 +90,11 @@ export default function PretestPanel({ problemId, code, language, disabled }: Pr
       const res = await fetchWithCookie(`/api/problems/${problemId}/pretest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language }),
+        body: JSON.stringify({
+          code,
+          language,
+          ...(contestId ? { contestId } : {}),
+        }),
       })
       const data = await res.json()
       if (!data.success) {
@@ -347,6 +359,6 @@ function OutputBlock({
 /** 内存格式化：KB → MB（保留 2 位小数） */
 function formatMemory(kb: number): string {
   if (kb <= 0) return '0 KB'
-  if (kb < 1024) return `${kb} KB`
+  if (kb <= 1024) return `${Math.round(kb)} KB`
   return `${(kb / 1024).toFixed(2)} MB`
 }

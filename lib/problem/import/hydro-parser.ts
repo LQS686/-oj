@@ -29,7 +29,7 @@
  * 安全：使用项目已有的 isSafeZipEntryName 防 Zip Slip。
  */
 import AdmZip from 'adm-zip'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { isSafeZipEntryName } from '../testcase'
 import type { ImportedProblem, ImportedTestCase } from './types'
 
@@ -507,7 +507,7 @@ function findTestdataFolderUnderRoot(zip: AdmZip, root: string): string {
 function readTestdataConfig(
   zip: AdmZip,
   root: string
-): { timeLimit?: number; memoryLimit?: number; comparisonMode?: 'default' | 'strict' | 'ignore-spaces' | 'real-number'; realPrecision?: number } {
+): { timeLimit?: number; memoryLimit?: number; comparisonMode?: 'default' | 'strict' | 'ignore-spaces' | 'real-number' | 'special-judge'; realPrecision?: number } {
   const all = zip.getEntries()
   const cfgCandidates = ['testdata/config.yaml', 'testdata/config.yml']
   for (const c of cfgCandidates) {
@@ -516,7 +516,7 @@ function readTestdataConfig(
     if (!entry) continue
     const text = entry.getData().toString('utf-8')
     const yaml = parseSimpleYaml(text)
-    const result: { timeLimit?: number; memoryLimit?: number; comparisonMode?: 'default' | 'strict' | 'ignore-spaces' | 'real-number'; realPrecision?: number } = {}
+    const result: { timeLimit?: number; memoryLimit?: number; comparisonMode?: 'default' | 'strict' | 'ignore-spaces' | 'real-number' | 'special-judge'; realPrecision?: number } = {}
     // 时间限制：time 字段（"1s" / "1000ms" / "1000"）
     if (yaml.time !== undefined && yaml.time !== null && !Array.isArray(yaml.time)) {
       result.timeLimit = parseHydroLimit(yaml.time, 1000, 'ms')
@@ -536,6 +536,14 @@ function readTestdataConfig(
       if (typeof yaml.precision === 'number') {
         result.realPrecision = yaml.precision
       }
+    } else if (
+      checker === 'testlib' ||
+      checker.endsWith('.cpp') ||
+      checker === 'spj' ||
+      checker === 'special' ||
+      checker === 'special-judge'
+    ) {
+      result.comparisonMode = 'special-judge'
     }
     return result
   }
@@ -599,13 +607,25 @@ function parseOneProblem(zip: AdmZip, root: string): ImportedProblem {
     }
   }
 
-  // 3. 标程
-  const stdEntry = findEntryUnderRoot(zip, root, ['std.cpp', 'standard.cpp', 'spj.cpp'])
+  // 3. 标程 / Special Judge（勿把 spj.cpp 当标程）
+  const stdEntry = findEntryUnderRoot(zip, root, ['std.cpp', 'standard.cpp'])
   const stdCode = stdEntry ? readEntryText(stdEntry) : undefined
+  const spjEntry = findEntryUnderRoot(zip, root, [
+    'checker.cpp',
+    'spj.cpp',
+    'testdata/checker.cpp',
+    'testdata/chk.cpp',
+  ])
+  const spjCodeRaw = spjEntry ? readEntryText(spjEntry) : undefined
+  const spjCode = spjCodeRaw?.trim() || undefined
 
   // 4. 时间/内存限制优先级：
   //    testdata/config.yaml > problem.yaml (time/memory) > problem.yaml (timeLimit/memoryLimit) > 默认
   const cfg = readTestdataConfig(zip, root)
+  const comparisonMode =
+    spjCode || cfg.comparisonMode === 'special-judge'
+      ? 'special-judge'
+      : cfg.comparisonMode
   const rawTl = yaml.timeLimit ?? yaml.time_limit ?? yaml.time
   const rawMl = yaml.memoryLimit ?? yaml.memory_limit ?? yaml.memory
   const timeLimit = cfg.timeLimit ?? parseHydroLimit(
@@ -669,13 +689,21 @@ function parseOneProblem(zip: AdmZip, root: string): ImportedProblem {
     hint,
     source: String(yaml.source || 'Hydro OJ'),
     difficulty: String(yaml.difficulty || '入门'),
-    tags: ['Hydro', ...tags],
+    tags: [
+      'Hydro',
+      ...tags,
+      ...(comparisonMode === 'special-judge' &&
+      !tags.some((t) => String(t).toLowerCase() === 'special judge')
+        ? ['Special Judge']
+        : []),
+    ],
     timeLimit,
     memoryLimit,
-    comparisonMode: cfg.comparisonMode,
+    comparisonMode,
     realPrecision: cfg.realPrecision,
     stdCode,
     stdLang: stdCode ? 'cpp' : undefined,
+    spjCode,
     testCases,
     externalId: String(yaml.id || yaml.title || `hydro-${root.replace('/', '') || 'single'}`),
   }

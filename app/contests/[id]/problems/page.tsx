@@ -162,7 +162,9 @@ function ContestProblemsWorkspace() {
     async function loadDetail() {
       try {
         setProblemLoading(true)
-        const res = await fetchWithCookie(`/api/problems/${selectedProblemId}`)
+        const res = await fetchWithCookie(
+          `/api/problems/${selectedProblemId}?contestId=${encodeURIComponent(contestId)}`
+        )
         const data = await res.json()
         if (cancelled) return
         if (data.success) setProblemDetail(data.data)
@@ -177,7 +179,7 @@ function ContestProblemsWorkspace() {
     return () => {
       cancelled = true
     }
-  }, [selectedProblemId])
+  }, [selectedProblemId, contestId])
 
   const titleContext = useMemo(
     () => ({
@@ -557,6 +559,7 @@ function ContestProblemsWorkspace() {
                 code={code}
                 language={language}
                 disabled={!user || submitting}
+                contestId={contestId}
               />
             )}
           </>

@@ -21,7 +21,7 @@
  *
  * 多题导出是 JSON 数组（或 { problems: [...] } 包装）。
  */
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import type { ImportedProblem, ImportedTestCase } from './types'
 
 /**

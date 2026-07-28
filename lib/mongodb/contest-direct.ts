@@ -6,7 +6,7 @@
 
 import { ObjectId } from 'mongodb'
 import bcrypt from 'bcryptjs'
-import { getMongoClient, withRetry } from './client'
+import { getMongoClient } from './client'
 
 /**
  * 直接创建竞赛及关联题目（绕过 Prisma 事务）
@@ -24,40 +24,39 @@ export async function createContestDirect(data: {
   authorId: string
   problemIds?: string[]
 }) {
-  return withRetry(async () => {
-    const client = await getMongoClient()
-    const db = client.db()
+  const _id = new ObjectId()
+  const client = await getMongoClient()
+  const db = client.db()
 
-    // 1. 创建竞赛
-    const hashedPassword = data.password ? await bcrypt.hash(data.password, 12) : null
+  const hashedPassword = data.password ? await bcrypt.hash(data.password, 12) : null
 
-    const contest = {
-      _id: new ObjectId(),
-      title: data.title,
-      description: data.description,
-      type: data.type,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      duration: data.duration,
-      isPublic: data.isPublic,
-      password: hashedPassword,
-      authorId: new ObjectId(data.authorId),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
+  const contest = {
+    _id,
+    title: data.title,
+    description: data.description,
+    type: data.type,
+    startTime: data.startTime,
+    endTime: data.endTime,
+    duration: data.duration,
+    isPublic: data.isPublic,
+    password: hashedPassword,
+    authorId: new ObjectId(data.authorId),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
 
-    const contestProblems =
-      data.problemIds && data.problemIds.length > 0
-        ? data.problemIds.map((pid, index) => ({
-            _id: new ObjectId(),
-            contestId: contest._id,
-            problemId: new ObjectId(pid),
-            orderIndex: index,
-            score: 100, // 默认分数
-          }))
-        : []
+  const contestProblems =
+    data.problemIds && data.problemIds.length > 0
+      ? data.problemIds.map((pid, index) => ({
+          _id: new ObjectId(),
+          contestId: contest._id,
+          problemId: new ObjectId(pid),
+          orderIndex: index,
+          score: 100,
+        }))
+      : []
 
-    // insertOne + insertMany 放入事务，任一步失败则整体回滚
+  try {
     await client.withSession(async (session) => {
       await session.withTransaction(async () => {
         await db.collection('Contest').insertOne(contest, { session })
@@ -66,13 +65,15 @@ export async function createContestDirect(data: {
         }
       })
     })
+  } catch (error: any) {
+    if (error?.code !== 11000) throw error
+  }
 
-    return {
-      id: contest._id.toString(),
-      ...contest,
-      authorId: contest.authorId.toString()
-    }
-  })
+  return {
+    id: contest._id.toString(),
+    ...contest,
+    authorId: contest.authorId.toString(),
+  }
 }
 
 /**
@@ -83,38 +84,43 @@ export async function registerContestParticipantDirect(data: {
   userId: string
   inviteCode?: string
 }) {
-  return withRetry(async () => {
-    const client = await getMongoClient()
-    const db = client.db()
+  const _id = new ObjectId()
+  const client = await getMongoClient()
+  const db = client.db()
 
-    // 检查是否已经报名 (Double check)
-    const existing = await db.collection('ContestParticipant').findOne({
-      contestId: new ObjectId(data.contestId),
-      userId: new ObjectId(data.userId)
-    })
+  const existing = await db.collection('ContestParticipant').findOne({
+    contestId: new ObjectId(data.contestId),
+    userId: new ObjectId(data.userId),
+  })
 
-    if (existing) {
+  if (existing) {
+    throw new Error('Already registered')
+  }
+
+  const participant = {
+    _id,
+    contestId: new ObjectId(data.contestId),
+    userId: new ObjectId(data.userId),
+    inviteCode: data.inviteCode || null,
+    score: 0,
+    rank: 0,
+    penalty: 0,
+    joinedAt: new Date(),
+  }
+
+  try {
+    await db.collection('ContestParticipant').insertOne(participant)
+  } catch (error: any) {
+    if (error?.code === 11000) {
       throw new Error('Already registered')
     }
+    throw error
+  }
 
-    const participant = {
-      _id: new ObjectId(),
-      contestId: new ObjectId(data.contestId),
-      userId: new ObjectId(data.userId),
-      inviteCode: data.inviteCode || null,
-      score: 0,
-      rank: 0,
-      penalty: 0,
-      joinedAt: new Date()
-    }
-
-    await db.collection('ContestParticipant').insertOne(participant)
-
-    return {
-      id: participant._id.toString(),
-      ...participant,
-      contestId: participant.contestId.toString(),
-      userId: participant.userId.toString()
-    }
-  })
+  return {
+    id: participant._id.toString(),
+    ...participant,
+    contestId: participant.contestId.toString(),
+    userId: participant.userId.toString(),
+  }
 }

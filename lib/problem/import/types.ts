@@ -59,11 +59,13 @@ export interface ImportedProblem {
   tags: string[]
   timeLimit: number
   memoryLimit: number
-  comparisonMode?: 'default' | 'strict' | 'ignore-spaces' | 'real-number'
+  comparisonMode?: 'default' | 'strict' | 'ignore-spaces' | 'real-number' | 'special-judge'
   realPrecision?: number
   /** 标程代码（FPS 的 solution / Hydro 的 std.cpp 等，存到 problem.stdCode） */
   stdCode?: string
   stdLang?: string
+  /** Special Judge（Testlib checker.cpp） */
+  spjCode?: string
   /** 完整测试用例集（仅 testcases/；与 samples/ 题面样例分离） */
   testCases: ImportedTestCase[]
   /** 可选题解列表（导入后写入 Solution 表） */

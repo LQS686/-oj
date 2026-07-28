@@ -7,6 +7,8 @@ import { NextResponse } from 'next/server'
 import { withApi, readJson, fail } from '@/lib/api/withApi'
 import { loginUser, LoginError } from '@/lib/auth/login-service'
 import { authRateLimiter } from '@/lib/rate-limit'
+import { setAuthCookie } from '@/lib/auth/cookie'
+import { setCsrfCookie, generateCsrfToken } from '@/lib/security/csrf'
 
 export const POST = withApi.public(async (req) => {
   const rateLimitResponse = await authRateLimiter(req)
@@ -24,32 +26,17 @@ export const POST = withApi.public(async (req) => {
       success: true,
       data: {
         user: result.user,
-        // 修复 P1：不再在响应体返回明文 token，让前端完全依赖 cookie。
-        //   避免 XSS 窃取 localStorage 里的 token。
       },
     })
 
-    // Cookie secure 配置：
-    // - FORCE_SECURE_COOKIE=false：强制禁用（HTTP 测试环境）
-    // - FORCE_SECURE_COOKIE=true：强制启用
-    // - 未设置且生产环境：默认启用
-    const isSecureCookie = process.env.FORCE_SECURE_COOKIE === 'true' ||
-      (process.env.NODE_ENV === 'production' && process.env.FORCE_SECURE_COOKIE !== 'false')
-
-    response.cookies.set('token', result.token, {
-      httpOnly: true,
-      secure: isSecureCookie,
-      sameSite: 'lax',
-      // P1 强化：priority='high' 提示浏览器优先保留；path=/ 全站可用
-      priority: 'high',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60,
-    })
+    setAuthCookie(response, result.token)
+    setCsrfCookie(response, generateCsrfToken())
 
     return response
   } catch (error: any) {
     if (error instanceof LoginError) {
       if (error.code === 'ACCOUNT_LOCKED') return fail(error.code, error.message, 429)
+      if (error.code === 'AUTH_UNAVAILABLE') return fail(error.code, error.message, 503)
       if (error.code === 'BAD_REQUEST') return fail(error.code, error.message, 400)
       if (error.code === 'UNAUTHORIZED') return fail(error.code, error.message, 401)
       if (error.code === 'FORBIDDEN') return fail(error.code, error.message, 403)

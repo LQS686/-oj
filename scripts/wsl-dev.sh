@@ -97,6 +97,10 @@ if [[ "$FULL" -eq 1 ]] || [[ ! -d node_modules ]]; then
     echo "==> 无 node_modules，执行 npm install..."
   fi
   npm install
+else
+  # 日常同步：schema 可能新增字段（如 spjCode），须刷新 Client，否则运行时 Unknown argument
+  echo "==> prisma generate（同步 schema → Client）..."
+  npx prisma generate >/dev/null
 fi
 
 ensure_mongo() {
@@ -148,7 +152,7 @@ ensure_redis || true
 stop_old_dev() {
   echo "==> 停止旧的 ~/dsoj 开发进程（若有）..."
   local pid cwd
-  for pid in $(pgrep -f 'tsx server\.ts|next dev' 2>/dev/null || true); do
+  for pid in $(pgrep -f 'tsx.*server\.ts|next dev' 2>/dev/null || true); do
     cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
     if [[ "$cwd" == "$DST" ]]; then
       echo "    kill $pid ($cwd)"
@@ -179,6 +183,15 @@ stop_old_dev
 if ! command -v node >/dev/null 2>&1; then
   echo "未找到 node。请在 WSL 安装 Node.js 20+。"
   exit 1
+fi
+
+NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
+if [[ "$NODE_MAJOR" -lt 20 ]]; then
+  echo "!! Node $(node -v) 过旧，需要 >= 20"
+  exit 1
+fi
+if [[ "$NODE_MAJOR" -ge 24 ]]; then
+  echo "==> 提示: 当前 Node $(node -v)。自定义 server 已内置 AsyncLocalStorage polyfill；若仍启动失败，建议改用 Node 22 LTS。"
 fi
 
 echo

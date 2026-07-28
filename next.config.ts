@@ -78,6 +78,15 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), sync-xhr=()",
           },
+          // HSTS：仅显式 FORCE_HSTS=true 时启用，避免 HTTP 部署被浏览器强制升级
+          ...(process.env.FORCE_HSTS === 'true'
+            ? [
+                {
+                  key: "Strict-Transport-Security",
+                  value: "max-age=31536000; includeSubDomains",
+                },
+              ]
+            : []),
           {
             key: "Content-Security-Policy",
             value: cspDirectives,

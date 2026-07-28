@@ -6,13 +6,19 @@ import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { AppError } from '@/lib/errors'
 import { addJudgeJob } from '@/lib/judge/queue'
-import { createSubmissionDirect, incrementProblemSubmitCount, updateSubmissionDirect } from '@/lib/mongodb-direct'
+import {
+  createSubmissionDirect,
+  decrementProblemSubmitCount,
+  incrementProblemSubmitCount,
+  updateSubmissionDirect,
+} from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
 import { SubmissionStatus, isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 import { parseComparisonMode } from '@/lib/judge/types'
 import { mapTestCasesMeta, TESTCASE_META_SELECT } from '@/lib/judge/testcase-loader'
 import { canAccessAdmin } from '@/lib/permissions'
+import { assertCanAccessProblem } from '@/lib/problem/access'
 
 export interface SubmissionFilter {
   userId?: string
@@ -154,7 +160,19 @@ export interface CreateSubmissionAdvancedInput {
   contestId?: string
 }
 
-export async function submitCode(userId: string, body: CreateSubmissionAdvancedInput) {
+export async function submitCode(
+  userId: string,
+  body: CreateSubmissionAdvancedInput,
+  viewerRole?: string
+) {
+  // 竞赛提交必须走 /api/contests/[id]/submissions（含时间窗/报名/题目归属校验）
+  if (body.contestId) {
+    throw AppError.badRequest(
+      'USE_CONTEST_ENDPOINT',
+      '竞赛提交请使用竞赛提交接口，不能通过普通题库提交写入 contestId'
+    )
+  }
+
   // 验证题目存在（支持 problemNumber 与 ObjectID 两种）
   let problem: any
   try {
@@ -175,11 +193,20 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
     throw AppError.notFound('题目不存在')
   }
 
+  await assertCanAccessProblem(
+    {
+      id: problem.id,
+      authorId: problem.authorId,
+      visibility: problem.visibility,
+      classId: problem.classId ?? null,
+    },
+    { id: userId, role: viewerRole }
+  )
+
   // 创建提交记录
   const submission = await createSubmissionDirect({
     problemId: problem.id,
     userId,
-    contestId: body.contestId || undefined,
     language: body.language,
     code: body.code,
     status: SubmissionStatus.PENDING,
@@ -204,6 +231,7 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
       memoryLimit: problem.memoryLimit,
       comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
+      spjCode: problem.spjCode ?? null,
       testCases: mapProblemTestCases(problem.testCases),
     })
     logger.info(`提交 ${submission.id} 已加入评测队列`)
@@ -213,6 +241,15 @@ export async function submitCode(userId: string, body: CreateSubmissionAdvancedI
       status: SubmissionStatus.SYSTEM_ERROR,
       message: '评测系统错误，请稍后重试',
     })
+    // 入队失败仍保留 SE 记录，但须回滚 totalSubmit，避免虚高
+    try {
+      await decrementProblemSubmitCount(problem.id)
+    } catch (decErr) {
+      logger.error(
+        `totalSubmit 回滚失败 (submissionId=${submission.id}, problemId=${problem.id})`,
+        decErr
+      )
+    }
   }
 
   return submission
@@ -384,6 +421,7 @@ export async function rejudgeSubmission(submissionId: string) {
       memoryLimit: problem.memoryLimit,
       comparisonMode: parseComparisonMode(problem.comparisonMode),
       realPrecision: problem.realPrecision,
+      spjCode: problem.spjCode ?? null,
       testCases: mapProblemTestCases(problem.testCases),
     })
   } catch (queueError) {
@@ -438,6 +476,23 @@ export async function getFirstWaTestCaseForDownload(
 
   const isOwnerOrAdmin = detail.userId === requester.id || canAccessAdmin(requester)
   if (!isOwnerOrAdmin) throw AppError.forbidden('无权下载该提交的测试点')
+
+  // 题目仍须当前可访问，避免历史 IDOR 提交继续泄露隐藏测点
+  const problem = await prisma.problem.findUnique({
+    where: { id: detail.problemId },
+    select: {
+      id: true,
+      authorId: true,
+      visibility: true,
+      classId: true,
+    },
+  })
+  if (!problem) throw AppError.notFound('题目不存在')
+  await assertCanAccessProblem(
+    problem,
+    { id: requester.id, role: requester.role },
+    { contestId: detail.contestId ?? undefined }
+  )
 
   const waIndex = detail.testResults.findIndex(
     (r) => r.status === SubmissionStatus.WRONG_ANSWER

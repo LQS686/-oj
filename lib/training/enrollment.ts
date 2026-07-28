@@ -28,6 +28,7 @@ export async function enrollTraining(trainingId: string, userId: string) {
   })
   cache.delete(enrollmentKey(userId, trainingId))
   cache.delete(userEnrollmentsKey(userId))
+  cache.deleteByPrefix('training:list:')
   return result
 }
 
@@ -47,6 +48,7 @@ export async function unenrollTraining(trainingId: string, userId: string) {
   })
   cache.delete(enrollmentKey(userId, trainingId))
   cache.delete(userEnrollmentsKey(userId))
+  cache.deleteByPrefix('training:list:')
   return existing
 }
 

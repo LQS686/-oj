@@ -34,8 +34,16 @@ export function readBodyWithLimit(req: IncomingMessage, maxBytes: number): Promi
 
 /**
  * 极简 multipart 解析（Buffer + boundary）
+ * @param maxParts 部件数量上限（默认 20）
+ * @param maxPartBytes 单部件大小上限（默认 5MB；大文件上传须显式提高）
  */
-export function parseMultipart(body: Buffer, boundary: string): MultipartPart[] {
+export function parseMultipart(
+  body: Buffer,
+  boundary: string,
+  options?: { maxParts?: number; maxPartBytes?: number }
+): MultipartPart[] {
+  const maxParts = options?.maxParts ?? 20
+  const maxPartBytes = options?.maxPartBytes ?? 5 * 1024 * 1024
   const sep = Buffer.from(`--${boundary}`)
   const parts: MultipartPart[] = []
 
@@ -58,12 +66,18 @@ export function parseMultipart(body: Buffer, boundary: string): MultipartPart[] 
 
     const headerBuf = body.subarray(headerStart, headerEnd).toString('utf8')
     const data = body.subarray(headerEnd + 4, dataEnd)
+    if (data.length > maxPartBytes) {
+      throw new Error('PART_TOO_LARGE')
+    }
 
     const nameMatch = headerBuf.match(/name="([^"]+)"/i)
     const filenameMatch = headerBuf.match(/filename="([^"]*)"/i)
     const ctMatch = headerBuf.match(/Content-Type:\s*([^\r\n]+)/i)
 
     if (nameMatch) {
+      if (parts.length >= maxParts) {
+        throw new Error('TOO_MANY_PARTS')
+      }
       parts.push({
         name: nameMatch[1],
         filename: filenameMatch ? filenameMatch[1] : null,
@@ -84,10 +98,13 @@ export function extractMultipartBoundary(contentType: string): string | null {
 
 /**
  * 从 Web Request 读取 multipart（用 arrayBuffer，避免 req.formData() 在自定义 server 下锁 body）
+ * @param maxBytes 整包 body 上限
+ * @param maxPartBytes 单部件上限（默认与 maxBytes 相同，适配题库大 ZIP）
  */
 export async function parseMultipartFromRequest(
   req: Request,
-  maxBytes: number
+  maxBytes: number,
+  options?: { maxParts?: number; maxPartBytes?: number }
 ): Promise<MultipartPart[]> {
   const contentType = req.headers.get('content-type') || ''
   if (!contentType.includes('multipart/form-data')) {
@@ -98,5 +115,8 @@ export async function parseMultipartFromRequest(
 
   const ab = await req.arrayBuffer()
   if (ab.byteLength > maxBytes) throw new Error('PAYLOAD_TOO_LARGE')
-  return parseMultipart(Buffer.from(ab), boundary)
+  return parseMultipart(Buffer.from(ab), boundary, {
+    maxParts: options?.maxParts,
+    maxPartBytes: options?.maxPartBytes ?? maxBytes,
+  })
 }

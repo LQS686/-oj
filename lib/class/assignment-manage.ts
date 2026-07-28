@@ -10,7 +10,7 @@ import {
   isClassAdminApiRole,
   isClassOwnerRole,
 } from '@/lib/class/roles'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { getUserCanManageContent, validateAssignmentProblems } from './helpers'
 import { getClassAssignmentDetail, getAssignmentStatus } from './assignment-stats'
 
@@ -288,9 +288,17 @@ export async function updateClassAssignment(
         where: { assignmentId, problemId: { in: removedProblemIds } },
         data: { status: SubmissionStatus.REMOVED },
       })
-      // 删除计时进度记录
-      await prisma.classAssignmentProblemProgress.deleteMany({
-        where: { assignmentId, problemId: { in: removedProblemIds } },
+      // 保留计时进度（暂停并固化），不硬删，避免历史用时丢失
+      await prisma.classAssignmentProblemProgress.updateMany({
+        where: {
+          assignmentId,
+          problemId: { in: removedProblemIds },
+          completedAt: null,
+        },
+        data: {
+          isPaused: true,
+          lastResumedAt: null,
+        },
       })
     }
   }

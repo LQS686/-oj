@@ -5,7 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { createNotification } from '@/lib/notification/service'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 
 /* ============================================================================
  * 班级直接邀请（按用户名）
@@ -23,6 +23,18 @@ export async function createOrReactivateDirectInvite(input: {
   if (existingInvite) {
     if (existingInvite.status === 'pending') {
       throw new ApiError('PENDING_INVITE', '已向该用户发送过邀请，请等待对方响应', 400)
+    }
+    // 同一用户重发冷却 10 分钟，防止通知轰炸
+    const cooldownMs = 10 * 60 * 1000
+    const lastAt = existingInvite.respondedAt || existingInvite.createdAt
+    const elapsed = Date.now() - new Date(lastAt).getTime()
+    if (elapsed < cooldownMs) {
+      const minutes = Math.ceil((cooldownMs - elapsed) / 60000)
+      throw new ApiError(
+        'INVITE_COOLDOWN',
+        `对该用户的邀请冷却中，请 ${minutes} 分钟后再试`,
+        429
+      )
     }
     const updated = await updateDirectInvite(existingInvite.id, {
       inviterId: input.inviterId,
@@ -176,71 +188,100 @@ export async function respondDirectInvite(
   currentUserId: string,
   action: 'accept' | 'reject'
 ): Promise<RespondDirectInviteResult> {
-  const invite = await prisma.classDirectInvite.findUnique({
-    where: { id: inviteId },
-  })
-  if (!invite) return { ok: false, error: '邀请不存在', code: 404 }
-  if (invite.inviteeId !== currentUserId) {
-    return { ok: false, error: '无权响应此邀请', code: 403 }
-  }
-  if (invite.status !== 'pending') {
-    return { ok: false, error: '该邀请已被处理', code: 400 }
-  }
-
-  // 过期
-  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-    await prisma.classDirectInvite.update({
-      where: { id: inviteId },
-      data: { status: 'expired', respondedAt: new Date() },
-    })
-    return { ok: false, error: '邀请已过期', code: 400 }
-  }
-
   const newStatus = action === 'accept' ? 'accepted' : 'rejected'
 
-  // 接受邀请时：更新邀请状态 + 建成员需事务保证，避免"已接受但未入班"且 unique 约束阻断重试
-  if (action === 'accept') {
-    await prisma.$transaction(async (tx) => {
-      await tx.classDirectInvite.update({
-        where: { id: inviteId },
-        data: { status: newStatus, respondedAt: new Date() },
-      })
-      const existingMember = await tx.classMember.findUnique({
-        where: {
-          classId_userId: { classId: invite.classId, userId: currentUserId },
-        },
-      })
-      if (!existingMember) {
-        await tx.classMember.create({
-          data: {
-            classId: invite.classId,
-            userId: currentUserId,
-            role: 'student',
-            permissions: {
-              canViewProblems: true,
-              canSubmit: true,
-              canViewNotes: true,
-              canCreateNotes: false,
-              canManageAssignments: false,
-              canInviteMembers: false,
-              canManageMembers: false,
-              canViewStats: false,
-            },
-            joinedAt: new Date(),
-            lastActiveAt: new Date(),
+  // 过期检查与状态更新放在同一事务内，避免 TOCTOU
+  try {
+    if (action === 'accept') {
+      await prisma.$transaction(async (tx) => {
+        const invite = await tx.classDirectInvite.findUnique({ where: { id: inviteId } })
+        if (!invite) throw new ApiError('NOT_FOUND', '邀请不存在', 404)
+        if (invite.inviteeId !== currentUserId) {
+          throw new ApiError('FORBIDDEN', '无权响应此邀请', 403)
+        }
+        if (invite.status !== 'pending') {
+          throw new ApiError('ALREADY_PROCESSED', '该邀请已被处理', 400)
+        }
+        if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+          await tx.classDirectInvite.update({
+            where: { id: inviteId },
+            data: { status: 'expired', respondedAt: new Date() },
+          })
+          throw new ApiError('EXPIRED', '邀请已过期', 400)
+        }
+
+        await tx.classDirectInvite.update({
+          where: { id: inviteId },
+          data: { status: newStatus, respondedAt: new Date() },
+        })
+        const existingMember = await tx.classMember.findUnique({
+          where: {
+            classId_userId: { classId: invite.classId, userId: currentUserId },
           },
         })
-      }
-    })
-  } else {
-    // 拒绝：仅需更新邀请状态，单次写无需事务
+        if (!existingMember) {
+          const classRecord = await tx.class.findUnique({
+            where: { id: invite.classId },
+            select: { maxMembers: true },
+          })
+          if (classRecord && classRecord.maxMembers != null && classRecord.maxMembers > 0) {
+            const currentCount = await tx.classMember.count({ where: { classId: invite.classId } })
+            if (currentCount >= classRecord.maxMembers) {
+              throw new ApiError('CLASS_FULL', '班级人数已达上限', 400)
+            }
+          }
+          await tx.classMember.create({
+            data: {
+              classId: invite.classId,
+              userId: currentUserId,
+              role: 'student',
+              permissions: {
+                canViewProblems: true,
+                canSubmit: true,
+                canViewNotes: true,
+                canCreateNotes: false,
+                canManageAssignments: false,
+                canInviteMembers: false,
+                canManageMembers: false,
+                canViewStats: false,
+              },
+              joinedAt: new Date(),
+              lastActiveAt: new Date(),
+            },
+          })
+        }
+      })
+      const invite = await prisma.classDirectInvite.findUnique({ where: { id: inviteId } })
+      return { ok: true, status: 'accepted', classId: invite!.classId }
+    }
+
+    const invite = await prisma.classDirectInvite.findUnique({ where: { id: inviteId } })
+    if (!invite) return { ok: false, error: '邀请不存在', code: 404 }
+    if (invite.inviteeId !== currentUserId) {
+      return { ok: false, error: '无权响应此邀请', code: 403 }
+    }
+    if (invite.status !== 'pending') {
+      return { ok: false, error: '该邀请已被处理', code: 400 }
+    }
+    if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+      await prisma.classDirectInvite.update({
+        where: { id: inviteId },
+        data: { status: 'expired', respondedAt: new Date() },
+      })
+      return { ok: false, error: '邀请已过期', code: 400 }
+    }
     await prisma.classDirectInvite.update({
       where: { id: inviteId },
       data: { status: newStatus, respondedAt: new Date() },
     })
+    return { ok: true, status: 'rejected', classId: invite.classId }
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.code === 'EXPIRED') return { ok: false, error: e.message, code: 400 }
+      return { ok: false, error: e.message, code: e.status }
+    }
+    throw e
   }
-
-  return { ok: true, status: newStatus, classId: invite.classId }
 }
 
 /** 通知邀请人（接受/拒绝结果） */

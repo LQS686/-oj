@@ -33,12 +33,17 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
   if (contentType.includes('multipart/form-data')) {
     let parts: Awaited<ReturnType<typeof parseMultipartFromRequest>>
     try {
-      parts = await parseMultipartFromRequest(req, IMPORT_MAX_FILE_BYTES + 1024 * 1024)
+      parts = await parseMultipartFromRequest(req, IMPORT_MAX_FILE_BYTES + 1024 * 1024, {
+        maxPartBytes: IMPORT_MAX_FILE_BYTES,
+      })
     } catch (e: any) {
       const msg = e?.message || ''
-      if (msg === 'PAYLOAD_TOO_LARGE') throw400('FILE_TOO_LARGE', '文件大小超过 50MB 限制')
+      if (msg === 'PAYLOAD_TOO_LARGE' || msg === 'PART_TOO_LARGE') {
+        throw400('FILE_TOO_LARGE', '文件大小超过 50MB 限制')
+      }
       if (msg === 'INVALID_CONTENT_TYPE') throw400('INVALID_CONTENT_TYPE', '请求必须是 multipart/form-data')
       if (msg === 'INVALID_BOUNDARY') throw400('INVALID_BOUNDARY', 'multipart boundary 缺失')
+      if (msg === 'TOO_MANY_PARTS') throw400('TOO_MANY_PARTS', '表单字段过多')
       throw400('MULTIPART_PARSE_FAILED', 'multipart 解析失败')
       return ok({}) // unreachable
     }

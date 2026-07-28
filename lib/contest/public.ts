@@ -92,10 +92,14 @@ export async function listPublicContests(
   }
 
   return {
-    contests: contests.map((c: any) => ({
-      ...c,
-      isRegistered: registeredSet.has(c.id),
-    })) as any,
+    contests: contests.map((c: any) => {
+      const { password, ...safe } = c
+      return {
+        ...safe,
+        hasPassword: !!password,
+        isRegistered: registeredSet.has(c.id),
+      }
+    }) as any,
     pagination: {
       page,
       limit,
@@ -127,7 +131,9 @@ export async function getContestDetailWithRegistration(
     })
     isRegistered = !!participant
   }
-  return { ...contest, isRegistered }
+  // 永不向公开 API 返回 password 哈希
+  const { password, ...safe } = contest
+  return { ...safe, hasPassword: !!password, isRegistered }
 }
 
 export async function updateContestWithProblems(
@@ -142,29 +148,78 @@ export async function updateContestWithProblems(
     isPublic?: boolean
     password?: string | null
     problemIds?: string[]
-    // 封榜时间：传 null 清除封榜，传 Date 设置封榜
     sealRankTime?: Date | null
   }
 ) {
   const { problemIds, ...contestData } = data
-  const updated = await prisma.contest.update({
-    where: { id: contestId },
-    data: contestData as any,
-  })
 
-  if (Array.isArray(problemIds)) {
-    await prisma.contestProblem.deleteMany({ where: { contestId } })
-    if (problemIds.length > 0) {
-      await prisma.contestProblem.createMany({
-        data: problemIds.map((problemId, index) => ({
-          contestId,
-          problemId,
-          orderIndex: index,
-          score: 100,
-        })),
-      })
+  const start = contestData.startTime ?? undefined
+  const end = contestData.endTime ?? undefined
+  if (start instanceof Date && end instanceof Date) {
+    if (!(end.getTime() > start.getTime())) {
+      const { ApiError } = await import('@/lib/api/withApi')
+      throw new ApiError('INVALID_TIME', '结束时间必须晚于开始时间', 400)
     }
   }
+
+  if (Array.isArray(problemIds) && problemIds.length > 0) {
+    const found = await prisma.problem.findMany({
+      where: { id: { in: problemIds } },
+      select: { id: true, visibility: true, classId: true },
+    })
+    if (found.length !== problemIds.length) {
+      const { ApiError } = await import('@/lib/api/withApi')
+      throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
+    }
+    const invalid = found.filter(
+      (p) => p.classId != null || (p.visibility !== 'public' && p.visibility !== 'contest')
+    )
+    if (invalid.length > 0) {
+      const { ApiError } = await import('@/lib/api/withApi')
+      throw new ApiError('INVALID_PROBLEMS', '竞赛只能添加公开或竞赛可见题目', 400)
+    }
+  }
+
+  // sealRankTime 必须落在 [startTime, endTime] 内（若三者齐全）
+  if (contestData.sealRankTime instanceof Date) {
+    const existing = await prisma.contest.findUnique({
+      where: { id: contestId },
+      select: { startTime: true, endTime: true },
+    })
+    const start =
+      contestData.startTime instanceof Date
+        ? contestData.startTime
+        : existing?.startTime
+    const end =
+      contestData.endTime instanceof Date ? contestData.endTime : existing?.endTime
+    const seal = contestData.sealRankTime
+    if (start && end && (seal.getTime() < start.getTime() || seal.getTime() > end.getTime())) {
+      const { ApiError } = await import('@/lib/api/withApi')
+      throw new ApiError('INVALID_SEAL_TIME', '封榜时间必须在比赛起止时间内', 400)
+    }
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const contest = await tx.contest.update({
+      where: { id: contestId },
+      data: contestData as any,
+    })
+
+    if (Array.isArray(problemIds)) {
+      await tx.contestProblem.deleteMany({ where: { contestId } })
+      if (problemIds.length > 0) {
+        await tx.contestProblem.createMany({
+          data: problemIds.map((problemId, index) => ({
+            contestId,
+            problemId,
+            orderIndex: index,
+            score: 100,
+          })),
+        })
+      }
+    }
+    return contest
+  })
   cache.delete(CacheKeys.contest.byId(contestId))
   cache.deleteByPrefix('contest:rank')
   return updated

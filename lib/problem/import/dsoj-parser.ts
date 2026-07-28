@@ -26,14 +26,19 @@
  *   │   │   ├── samples/
  *   │   │   ├── testcases/
  *   │   │   ├── solutions/      # 可选
- *   │   │   ├── config.yaml / std.cpp
+ *   │   │   ├── config.yaml / std.cpp / checker.cpp
  *   │   │   └── …
+ *
+ * Special Judge（对齐参考题包 LB3758）：
+ *   - problem.yaml.comparison_mode: special_judge（亦接受 special-judge）
+ *   - problem.yaml.checker: checker.cpp（显式 checker 文件名）
+ *   - 题目目录下放置 Testlib checker 源码
  *
  * 优先级：config.yaml > problem.yaml > 默认值
  * 安全：isStrictSafePath 防 Zip Slip
  */
 import AdmZip from 'adm-zip'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { isValidDifficulty } from '@/lib/constants'
 import type { ImportedProblem, ImportedSolution, ImportedTestCase } from './types'
 
@@ -86,8 +91,48 @@ const TESTCASE_IGNORE_NAMES = new Set(['quality.json', 'config.json', 'config.ya
 /** 合法的 visibility 值（与 schema 默认 "public" 一致） */
 const VALID_VISIBILITIES = ['public', 'private', 'contest'] as const
 
-/** 合法的 comparison_mode 值 */
-const VALID_COMPARISON_MODES = ['default', 'strict', 'ignore-spaces', 'real-number'] as const
+/** 合法的 comparison_mode 值（库内统一用连字符） */
+const VALID_COMPARISON_MODES = [
+  'default',
+  'strict',
+  'ignore-spaces',
+  'real-number',
+  'special-judge',
+] as const
+
+/**
+ * 题包 YAML 中 comparison_mode 别名 → 库内值
+ * 参考题包（LB3758）使用 special_judge（下划线）
+ */
+const COMPARISON_MODE_ALIASES: Record<string, (typeof VALID_COMPARISON_MODES)[number]> = {
+  default: 'default',
+  strict: 'strict',
+  'ignore-spaces': 'ignore-spaces',
+  ignore_spaces: 'ignore-spaces',
+  'real-number': 'real-number',
+  real_number: 'real-number',
+  float: 'real-number',
+  'special-judge': 'special-judge',
+  special_judge: 'special-judge',
+  spj: 'special-judge',
+  checker: 'special-judge',
+}
+
+/** 默认 SPJ 文件名候选（problem.yaml.checker 优先） */
+const DEFAULT_CHECKER_FILE_NAMES = ['checker.cpp', 'spj.cpp', 'chk.cpp'] as const
+
+/** 校验 checker 文件名：仅允许题目目录下的简单 .cpp 名，防路径穿越 */
+function isSafeCheckerFileName(name: string): boolean {
+  const n = name.trim().replace(/^\.\//, '')
+  return /^[A-Za-z0-9][A-Za-z0-9_.-]*\.cpp$/i.test(n) && !n.includes('..') && !n.includes('/')
+}
+
+/** 将 YAML 中的 comparison_mode 归一化为库内枚举 */
+function normalizeComparisonMode(raw: unknown): (typeof VALID_COMPARISON_MODES)[number] | null {
+  if (typeof raw !== 'string') return null
+  const key = raw.trim().toLowerCase()
+  return COMPARISON_MODE_ALIASES[key] ?? null
+}
 
 /** 时间限制范围（ms）：1-30000，对齐 admin 校验 */
 const TIME_LIMIT_MIN = 1
@@ -175,6 +220,8 @@ function parseDsojYaml(text: string): DsojYamlValue {
           'source',
           'visibility',
           'comparison_mode',
+          'checker',
+          'spj_kind',
           'description',
           'created_at',
         ])
@@ -699,7 +746,7 @@ function mergeJudgeConfig(
 ): {
   timeLimit: number
   memoryLimit: number
-  comparisonMode: 'default' | 'strict' | 'ignore-spaces' | 'real-number'
+  comparisonMode: 'default' | 'strict' | 'ignore-spaces' | 'real-number' | 'special-judge'
   realPrecision: number
 } {
   /**
@@ -728,21 +775,26 @@ function mergeJudgeConfig(
 
   /**
    * 从 yaml 取枚举字段：config.yaml 优先，其次 problem.yaml，非法/缺失用 default
+   * comparison_mode 额外支持 special_judge 等别名
    */
   const getEnum = <T extends string>(
     key: string,
     validValues: readonly T[],
     fallback: T
   ): T => {
-    const cv = configYaml?.[key]
-    if (typeof cv === 'string' && (validValues as readonly string[]).includes(cv)) {
-      return cv as T
+    const tryResolve = (raw: unknown): T | null => {
+      if (key === 'comparison_mode') {
+        const normalized = normalizeComparisonMode(raw)
+        return normalized && (validValues as readonly string[]).includes(normalized)
+          ? (normalized as T)
+          : null
+      }
+      if (typeof raw === 'string' && (validValues as readonly string[]).includes(raw)) {
+        return raw as T
+      }
+      return null
     }
-    const pv = problemYaml[key]
-    if (typeof pv === 'string' && (validValues as readonly string[]).includes(pv)) {
-      return pv as T
-    }
-    return fallback
+    return tryResolve(configYaml?.[key]) ?? tryResolve(problemYaml[key]) ?? fallback
   }
 
   return {
@@ -902,8 +954,34 @@ function parseOneProblem(
     }
   }
 
-  // 10. 特判代码：当前模型无 spj 字段，存在则忽略
-  void findFileUnderProblemDir(zip, problemDir, ['spj.cpp', 'checker.cpp'], rootPrefix)
+  // 10. Special Judge（对齐 LB3758：comparison_mode + checker 字段 + checker.cpp）
+  const checkerFromYaml = (() => {
+    const raw =
+      (typeof configYaml?.checker === 'string' && configYaml.checker) ||
+      (typeof problemYaml.checker === 'string' && problemYaml.checker) ||
+      ''
+    const name = String(raw).trim().replace(/^\.\//, '')
+    return isSafeCheckerFileName(name) ? name : ''
+  })()
+  const checkerCandidates = [
+    ...(checkerFromYaml ? [checkerFromYaml] : []),
+    ...DEFAULT_CHECKER_FILE_NAMES.filter((n) => n !== checkerFromYaml),
+  ]
+  const spjEntry = findFileUnderProblemDir(zip, problemDir, checkerCandidates, rootPrefix)
+  const spjCode = spjEntry ? readEntryText(spjEntry) : undefined
+  const spjCodeTrimmed = spjCode?.trim() || undefined
+
+  let comparisonMode = judgeConfig.comparisonMode
+  if (spjCodeTrimmed) {
+    comparisonMode = 'special-judge'
+  } else if (comparisonMode === 'special-judge') {
+    throw new ApiError(
+      'MISSING_CHECKER',
+      `题目 ${problemDir} 声明了 Special Judge（comparison_mode=special_judge），但未找到 checker 源码` +
+        (checkerFromYaml ? `（已声明 checker=${checkerFromYaml}）` : '（请放置 checker.cpp）'),
+      400
+    )
+  }
 
   // 11. 解析 tags（yaml 优先，index.json 兜底）
   const rawTags = problemYaml.tags
@@ -912,6 +990,12 @@ function parseOneProblem(
     : (typeof rawTags === 'string' && rawTags.trim() ? [rawTags.trim()] : [])
   if (tags.length === 0 && indexMeta?.tags?.length) {
     tags = indexMeta.tags
+  }
+  if (
+    comparisonMode === 'special-judge' &&
+    !tags.some((t) => String(t).toLowerCase() === 'special judge')
+  ) {
+    tags = [...tags, 'Special Judge']
   }
 
   // 12. 解析 difficulty
@@ -961,10 +1045,11 @@ function parseOneProblem(
     tags,
     timeLimit: judgeConfig.timeLimit,
     memoryLimit: judgeConfig.memoryLimit,
-    comparisonMode: judgeConfig.comparisonMode,
+    comparisonMode,
     realPrecision: judgeConfig.realPrecision,
     stdCode,
     stdLang,
+    spjCode: spjCodeTrimmed,
     testCases,
     solutions: solutions.length > 0 ? solutions : undefined,
     problemNumber: problemNumber || undefined,

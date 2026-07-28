@@ -62,7 +62,7 @@ import { GuestAuthShell } from '@/components/common'
  password: formData.password,
  nickname: formData.nickname || formData.username,
  })
- login(result.user, result.token)
+ login(result.user)
  router.push('/')
  } catch (err: any) {
  setError(err.message || '注册失败')

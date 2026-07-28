@@ -47,11 +47,12 @@ export function assertAssignableRole(
  */
 export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: number }) {
   const page = opts?.page
-  const pageSize = opts?.pageSize
+  const rawPageSize = opts?.pageSize
+  const pageSize =
+    typeof rawPageSize === 'number' && rawPageSize > 0 ? Math.min(rawPageSize, 100) : undefined
   const usePaging =
     typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
-  // 未传分页参数时加 take 上限防 OOM；传入参数时按 page/pageSize 分页
-  const take = usePaging ? (pageSize as number) : 500
+  const take = usePaging ? (pageSize as number) : 100
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
   const [data, total] = await Promise.all([
     prisma.user.findMany({
@@ -176,12 +177,13 @@ export async function adminUpdateUser(
   if ('role' in body) {
     assertValidRole(body.role)
     updateData.role = body.role
+    // 角色变更必须吊销旧 token，否则 60s 缓存窗口内仍以旧角色通过 withApi.admin
+    shouldInvalidateTokens = true
   }
   if ('isBanned' in body) {
     updateData.isBanned = Boolean(body.isBanned)
-    if (updateData.isBanned) {
-      shouldInvalidateTokens = true
-    }
+    // 封禁与解封均递增 tokenVersion：封禁立即失效；解封后旧 JWT 也不应继续复用
+    shouldInvalidateTokens = true
   }
   if (body.password) {
     if (body.password.length < 8) {
@@ -204,7 +206,7 @@ export async function adminUpdateUser(
       isBanned: true,
     },
   })
-  clearUserCache(targetUserId)
+  clearUserCache(targetUserId, { clearRanking: true })
   return result
 }
 
@@ -213,7 +215,7 @@ export async function adminUpdateUser(
  */
 export async function adminDeleteUser(targetUserId: string) {
   const result = await prisma.user.delete({ where: { id: targetUserId } })
-  clearUserCache(targetUserId)
+  clearUserCache(targetUserId, { clearRanking: true })
   return result
 }
 
@@ -238,7 +240,9 @@ export async function filterUserIdsForBatchAction(
     )
   }
   // 跳过超级管理员；ADMIN 操作时还要跳过其他管理员
-  const protectedRoles = isAdmin({ role: operatorRole }) ? ['SYSTEM_ADMIN', 'ADMIN'] : ['SYSTEM_ADMIN']
+  const protectedRoles = (isAdmin({ role: operatorRole })
+    ? ['SYSTEM_ADMIN', 'ADMIN']
+    : ['SYSTEM_ADMIN']) as Array<'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT'>
   const protectedUsers = await prisma.user.findMany({
     where: { id: { in: filtered }, role: { in: protectedRoles } },
     select: { id: true },
@@ -268,10 +272,11 @@ export async function batchUpdateUserRole(
     where: { id: { in: finalUserIds } },
     data: {
       role,
+      // 批量提权/降权后吊销旧 JWT，避免 60s 缓存窗口内仍以旧 role 通过 withApi.admin
+      tokenVersion: { increment: 1 },
     },
   })
-  // 显式清理鉴权层缓存（clearUserCache 内部已链式调用，此处双保险）
-  finalUserIds.forEach(clearUserCache)
+  finalUserIds.forEach((id) => clearUserCache(id, { clearRanking: true }))
   return result
 }
 
@@ -280,6 +285,6 @@ export async function batchUpdateUserRole(
  */
 export async function batchDeleteUsers(finalUserIds: string[]) {
   const result = await prisma.user.deleteMany({ where: { id: { in: finalUserIds } } })
-  finalUserIds.forEach(clearUserCache)
+  finalUserIds.forEach((id) => clearUserCache(id, { clearRanking: true }))
   return result
 }

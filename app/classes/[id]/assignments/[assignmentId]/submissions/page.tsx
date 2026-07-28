@@ -7,7 +7,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { ArrowLeft, Filter, Code, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, formatTime, formatMemory } from '@/lib/utils'
 import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
 import type { Assignment } from '@/types/models'
@@ -426,8 +426,8 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  </span>
  </td>
  <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
- <div>{submission.time}ms</div>
- <div className="text-xs text-muted-foreground">{submission.memory}KB</div>
+ <div>{formatTime(submission.time ?? 0)}</div>
+ <div className="text-xs text-muted-foreground">{formatMemory(submission.memory ?? 0)}</div>
  </td>
  <td className="px-6 py-4 whitespace-nowrap text-sm">
  <button

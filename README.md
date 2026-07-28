@@ -12,7 +12,7 @@
 
 ### 核心功能
 
-- **用户认证系统** — JWT + httpOnly Cookie 统一认证（token 不再落 localStorage），密码 bcrypt 加密，tokenVersion 吊销机制
+- **用户认证系统** — JWT + httpOnly Cookie（不落 localStorage）；CSRF 双提交；tokenVersion 吊销；跨标签登录态同步
 - **题目管理** — 题目列表、详情展示（KaTeX 数学公式渲染）、统计分析
 - **题库筛选** — 内嵌搜索栏；难度下拉多选；标签弹窗多选（OR 匹配）
 - **代码提交** — 支持 C++ (C++17)、C (C11)、Java (Java 17)、Python (Python 3.10)、JavaScript (Node.js 18)
@@ -49,7 +49,7 @@
 - **训练题单** — 官方 / 竞赛真题 / 我的收藏分类（个人创建已移除，仅管理员可创建）；独立 `/training/[id]/problems` 题单工作区
 - **题目导入导出** — 支持 DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces 同步格式
 - **题目标准程序验证** — 后台使用 std 答案对题目进行回归测试（`/api/admin/problems/[id]/verify` + `verify-std`）
-- **Windows 评测 runner** — Windows 开发环境下提供 C# 实现的隔离评测 runner（`lib/judge/win-runner.*`）
+- **Linux 评测沙箱** — `runner.sh`（ulimit + CPU/墙钟/OLE 监视）；Windows 宿主请用 WSL / Docker（见 [docs/WSL_DEV.md](docs/WSL_DEV.md)）
 - **用户热力图** — 用户主页展示一年提交活跃度（`SubmissionHeatmap`）
 - **帮助中心** — `app/help/` 提供平台使用说明
 - **响应式设计** — 移动端 Drawer 抽屉菜单适配
@@ -65,8 +65,8 @@
 
 - Node.js 20+
 - MongoDB 7+ (Replica Set 模式)
-- Redis 7+ (可选，用于队列)
-- g++/gcc（C/C++ 编译器）
+- Redis 7+（**生产强制**；本地开发强烈建议配置，用于缓存 / 限流 / 头像分片 / 登录锁 / 多实例鉴权吊销）
+- g++/gcc（C/C++ 编译器，Linux / WSL / 容器内）
 
 ### 安装步骤
 
@@ -85,7 +85,7 @@ cp .env.example .env
 npx prisma db push
 npx prisma generate
 
-# 启动开发服务器
+# 启动开发服务器（自定义 server + Socket.IO；tsx 带 react-server 条件以兼容 server-only）
 npm run dev
 ```
 
@@ -101,11 +101,15 @@ NODE_ENV=development
 PORT=3000
 FRONTEND_URL=http://localhost:3000
 
-# 可选（评测队列）
+# 生产强制；本地强烈建议（缓存 / 限流 / 头像上传 / 登录锁 / 跨实例会话吊销）
 REDIS_URL=redis://localhost:6379
 
-# 可选（敏感配置加密；未配置时降级为不加密，仅开发环境允许）
-ENCRYPTION_KEY=your-32-char-hex-key
+# 生产强制（SMTP 等密文）；开发未配置时加密写入会失败
+# 生成: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+ENCRYPTION_KEY=
+
+# 可选：非生产但已上 HTTPS 时强制 Cookie Secure
+# FORCE_SECURE_COOKIE=true
 ```
 
 > ⚠️ **重要**：本项目**无任何默认账户**（包括管理员/测试用户）。
@@ -113,8 +117,7 @@ ENCRYPTION_KEY=your-32-char-hex-key
 > 可在后台管理题目、竞赛、班级等。
 > 详见 `app/api/auth/register/route.ts` 的 `isFirstUser` 判定逻辑。
 
-> ⚠️ **生产环境强制要求**：必须设置 `JWT_SECRET`（≥32 字符）。生产评测建议 `USE_DOCKER=true`，或使用本仓库 `docker compose`（应用容器内 `USE_DOCKER=false`，依赖容器隔离）。**请勿在 Windows 宿主上直接跑评测。**
-
+> ⚠️ **生产环境强制校验**（`lib/env.ts` 启动时检查）：`JWT_SECRET`（≥32）、`REDIS_URL`、`ENCRYPTION_KEY`；禁止 `FORCE_SECURE_COOKIE=false`。生产评测建议 `USE_DOCKER=true`，或使用本仓库 `docker compose`（应用容器内 `USE_DOCKER=false`，依赖容器隔离）。**请勿在 Windows 宿主上直接跑评测。**
 ## Docker 部署
 
 **推荐（按环境选择脚本）：**
@@ -150,26 +153,28 @@ docker compose logs -f app
 - **语言**: TypeScript（严格模式，无 `as any` 类型绕过）
 - **样式**: Tailwind CSS
 - **状态管理**: React Context (UserContext / SettingsContext) + SWR 数据缓存
-- **通信**: WebSocket (Socket.IO) 实时评测推送，cookie 自动携带鉴权
+- **通信**: WebSocket (Socket.IO) 实时推送；HTTP 写请求经 `apiClient` / `fetchWithCookie` 自动带 CSRF
 
 ### 后端
 
-- **API**: Next.js API Routes，`withApi` 统一封装鉴权 + JSON 解析 + 异常处理（5 种模式：public / auth / admin / systemAdmin / class）
-- **数据库**: MongoDB Replica Set + Prisma ORM（30 个模型；MongoDB 用 `db push` 同步 schema，无 SQL 式 migrate）
-- **认证**: JWT + httpOnly Cookie 统一模式（token 不再落 localStorage），tokenVersion 吊销机制
-- **缓存**: 分层缓存 — `lib/api/handler.ts` 进程级用户缓存（60s TTL，鉴权层）/ `lib/cache.ts` 业务层（`REDIS_URL` 时 Redis 优先 + 内存 L1）
-- **安全**: 4 级 RBAC 权限、SSRF 防护、魔数校验上传、execSync 命令注入防护、CSRF + 限流中间件（`REDIS_URL` 时跨实例原子限流）
+- **API**: Next.js API Routes，`withApi` 统一封装鉴权 + CSRF + JSON 解析 + 异常处理（5 种模式：public / auth / admin / systemAdmin / classRole）
+- **数据库**: MongoDB Replica Set + Prisma ORM（MongoDB 用 `db push` 同步 schema，无 SQL 式 migrate）
+- **认证**: JWT + httpOnly Cookie（token 不落 localStorage）；tokenVersion 吊销；跨标签 `BroadcastChannel` 同步登录态
+- **缓存**: 鉴权 L1（进程内 60s）+ 业务层（Redis 优先 + 内存 L1 + singleflight）；失效时摘除 inflight，避免脏回写
+- **配置**: 系统设置 Zod schema（`lib/settings-schema.ts`）；敏感项 `ENCRYPTION_KEY` 加解密
+- **安全**: 4 级 RBAC、CSRF 双提交 Cookie、SSRF（`safe-fetch`）、上传魔数校验、限流（Redis 时跨实例原子）、评测子进程环境白名单
 
 ### 评测系统
 
 - 内存队列 (EventEmitter) / BullMQ（可选）
-- Docker / 容器内 `runner.sh` 沙箱编译执行（Linux only；不支持 Windows 宿主评测）
-- 输出比对 + 时间/内存检查
+- Docker / 容器内 `runner.sh` + `dsoj-watch` 沙箱（Linux only；不支持 Windows 宿主评测）
+- 标准输出比对 + Special Judge（testlib / 自定义 checker；子进程 env 白名单，不继承 `JWT_SECRET` 等）
 - 静态危险模式告警（最终安全边界由沙箱决定）
 - 默认跑完全部测点（OI 全量）；不因 TLE 跳过剩余点
+
 ## 安全架构
 
-本项目经过完整的安全加固流程，覆盖 P0-P3 全部 20 项优化项。
+认证、上传、CSRF、限流与评测沙箱均按生产多实例场景加固；细节见下方与 [docs/ROLE_SYSTEM.md](docs/ROLE_SYSTEM.md)。
 
 ### 角色体系（4 级）
 
@@ -180,17 +185,17 @@ docker compose logs -f app
 | 教师       | `TEACHER`      | 出题、建班、建赛                     |
 | 学生       | `STUDENT`      | 默认角色，答题与参与                 |
 
-> 角色判断统一使用 `canAccessAdmin(user)` / `canManageContent(user)`（见 `lib/permissions.ts`），禁止直接 `isAdmin(user)` 比较。
+> 角色判断统一使用 `canAccessAdmin(user)` / `canManageContent(user)`（见 `lib/permissions.ts`），禁止直接 `role === 'ADMIN'` 比较。详见 [docs/ROLE_SYSTEM.md](docs/ROLE_SYSTEM.md)。
 
 ### 关键安全措施
 
-- **JWT 安全** — httpOnly + Secure + SameSite Cookie，tokenVersion 吊销，payload 仅含 userId/email/username/role
-- **文件上传** — `detectImageMime()` 魔数校验（JPEG/PNG/GIF/WebP），拒绝伪造扩展名（`lib/upload.ts`）
-- **命令注入防护** — `execSync` 调用前对 pid 做 `Number.isFinite` 校验（`lib/judge/executor.ts`）
-- **加密安全** — 安全关键随机值使用 `crypto.randomBytes`（题目编号、临时密码等），禁用 `Math.random`
-- **权限白名单** — 班级成员权限更新走 `ALLOWED_PERMISSION_KEYS` 过滤（`lib/class/service.ts`）
-- **类型安全** — 85 处 `(ctx as any).params` 已全部清理为类型安全的 `ctx.params`
-
+- **JWT / Cookie** — httpOnly + Secure（生产 / `__Host-`）+ SameSite；tokenVersion 吊销；payload 含 userId / tokenVersion / role 等最小字段
+- **CSRF** — 双提交 Cookie（`csrf` / `__Host-csrf`）+ `X-CSRF-Token`；`withApi` 对所有写方法强制校验；`GET /api/auth/csrf` 签发；前端 `fetchWithCookie` / `apiClient` 自动携带，跨标签登出清缓存
+- **会话缓存** — `getCachedUser` 进程内 TTL 60s；封禁 / 改密等 `clearAuthUserCache` 时写 Redis 吊销戳，其它实例 L1 命中即失效
+- **文件上传** — 头像分片 Redis 会话 + 魔数校验 + 合并失败清理分片；班级头像拒绝 `javascript:` 等危险 URL
+- **评测隔离** — 选手程序与 SPJ checker 使用白名单 `spawnEnv`，不继承应用环境变量；Docker 路径 drop capabilities / 只读挂载
+- **日志** — `logger` 请求上下文走 AsyncLocalStorage，避免并发请求 `requestId` 串扰
+- **加密** — `crypto.randomBytes` / `randomInt`；生产禁止关闭 Secure Cookie
 ## 项目结构
 
 ```
@@ -198,7 +203,7 @@ dashan-oj/
 ├── app/                          # Next.js App Router
 │   ├── api/                      # API 路由（100 个 route.ts，150 个方法）
 │   │   ├── admin/                # 管理后台 API（含 classes/contests/problems/users）
-│   │   ├── auth/                 # 认证（login/logout/register/me/forgot-password）
+│   │   ├── auth/                 # login/logout/register/me/forgot-password/csrf
 │   │   ├── classes/[id]/         # 班级（成员/作业/笔记/题目/直邀）
 │   │   ├── problems/             # 题目列表与详情
 │   │   ├── submissions/          # 提交与评测
@@ -218,74 +223,93 @@ dashan-oj/
 │   ├── class/、contest/、training/、problem/、solution/
 │   └── admin/                    # 后台组件
 ├── lib/
-│   ├── api/                      # withApi（统一封装）、handler（鉴权缓存）、response、validation、swr
-│   ├── auth/                     # 认证服务（JWT、httpOnly Cookie、tokenVersion、server-session）
+│   ├── api/                      # withApi、errors、handler（鉴权缓存）、response、validation
+│   ├── auth/                     # JWT、httpOnly Cookie、tokenVersion、server-session、login-service
 │   ├── permissions.ts            # 4 级角色权限单一来源（canAccessAdmin 等）
-│   ├── judge/                    # 评测机（compiler/executor-core/docker/pretest/process-stats/types/runner + Windows runner）
+│   ├── judge/                    # compiler/executor-core/docker/spj/pretest/runner.sh/dsoj-watch（Linux only）
 │   ├── class/、problem/、submission/、contest/、training/、solution/
 │   ├── mongodb/                  # MongoDB 直接访问层（client/contest-direct/submission-direct/assignment-direct）
-│   ├── security/                 # safe-fetch 等通用安全工具
-│   ├── cache.ts                  # 业务层缓存（Redis 优先 + 内存 L1）
+│   ├── security/                 # csrf（双提交）、safe-fetch（SSRF）、csrf-constants
+│   ├── settings.ts / settings-schema.ts / settings-defaults.ts
+│   ├── cache.ts                  # 业务层缓存（Redis + L1 + singleflight；delete 清 inflight）
 │   ├── crypto.ts                 # 通用加密（SMTP 授权码等敏感配置）
 │   ├── upload.ts                 # 文件上传 + 魔数校验
-│   ├── navigation.ts             # 客户端导航与进度条辅助
-│   └── prisma.ts
-├── prisma/schema.prisma          # 30 个模型；已移除 Points* 与 ClassInvite
-├── hooks/                        # UserContext/SubmissionSocket/ContestCountdown/WallClock 等
-├── contexts/                     # ContestProblemWorkspaceContext / TrainingProblemWorkspaceContext 等
-├── tests/                        # vitest 测试（提交状态、批量注册 CSV、导航、Redis 配置等）
-├── scripts/                      # 部署、迁移（migrate-legacy-difficulty.cjs）与维护脚本
-└── docs/                         # 部署 / WSL 开发同步 / 命名规范 / 角色体系文档
+│   ├── logger.ts                 # AsyncLocalStorage 请求上下文
+│   ├── node-als-polyfill.ts      # 自定义 server 启动前注入 ALS（Node 24）
+│   └── prisma.ts                 # server-only；仅服务端导入
+├── prisma/schema.prisma          # 已移除 Points* 与 ClassInvite
+├── hooks/                        # socket-client、SubmissionSocket、ContestCountdown、WallClock 等
+├── contexts/                     # UserContext（跨标签同步）、Settings、Contest/Training 工作区
+├── tests/                        # vitest（含 mocks/server-only.ts stub）
+├── scripts/                      # 部署、WSL 同步、迁移与维护脚本
+└── docs/                         # WSL_DEV / BT_DEPLOY / ROLE_SYSTEM / NAMING_CONVENTION
 ```
 
 ### 业务层调用链
 
 ```
-Route → withApi.auth / withApi.public / withApi.admin / withApi.class
-       → 鉴权（getCachedUser + tokenVersion 校验）
-       → lib/<domain>/service.ts → prisma
-                                  ↓
-                          lib/cache.ts (TTL 缓存)
+Route → withApi.public|auth|admin|systemAdmin|classRole
+       → assertCsrf（写方法）+ getCachedUser（tokenVersion / 吊销戳）
+       → lib/<domain>/*.ts → prisma
+                            ↓
+                     lib/cache.ts（TTL + singleflight）
 ```
 
 ### 缓存分层
 
-- **鉴权层** — `lib/api/handler.ts` 的 `userCache` Map（60s TTL，LRU 10000 条），仅缓存 role/tokenVersion
-- **业务层** — `lib/cache.ts`（`REDIS_URL` 时 Redis 优先 + 内存 L1；未配置则纯内存），缓存题目、竞赛、用户统计等
-- **清理入口** — `lib/user/service.ts` 的 `clearUserCache` 统一调用 `clearAuthUserCache`（鉴权层）+ 业务缓存
+- **鉴权层** — `lib/api/handler.ts` 的 `userCache`（60s TTL，LRU 10000）；`clearAuthUserCache` 清本机并写 Redis `auth:userinv:*` 吊销戳
+- **业务层** — `lib/cache.ts`（`REDIS_URL` 时 Redis 优先 + 内存 L1 + singleflight）；`delete` / `deleteByPrefix` 同步摘除 inflight，防止失效后脏回写
+- **清理入口** — `lib/user/profile.ts` 的 `clearUserCache` 联动鉴权层 + 业务缓存（可选清排行榜）
+
+### 开发与测试注意
+
+- `npm run dev` / `start` 使用 `tsx --conditions=react-server`，使 `import 'server-only'` 在自定义 Node server 下可用
+- Vitest 将 `server-only` 别名到 `tests/mocks/server-only.ts`；纯解析器应从 `lib/api/errors` 导入 `ApiError`，勿拉整包 `withApi`
+- 前端写操作统一走 `apiClient` / `fetchWithCookie`（自动 CSRF）；跨标签登出会 `clearCsrfTokenCache` + `forceResetAppSocket`
 
 ## 更新日志
 
+### 2026/07（安全硬化回归修复）
+
+- **CSRF 全链路** — `withApi` 写方法强制双提交校验；`GET /api/auth/csrf`；客户端 Cookie 缺失不复用内存 token；跨标签 logout 清 CSRF / Socket
+- **多实例会话吊销** — 封禁 / 改密 / 批量角色变更后 Redis 吊销戳，其它实例鉴权 L1 立即失效
+- **缓存正确性** — `cache.delete*` 清理 inflight；singleflight 仅在仍为当前 Promise 时写回
+- **评测 env 隔离** — SPJ / g++ 非 runner 路径不再继承 `process.env`
+- **日志隔离** — `logger` 使用 AsyncLocalStorage，修复 `withApi.finally(clearContext)` 串扰
+- **server-only** — prisma / redis / cache / withApi 等标 `server-only`；Vitest stub；业务异常下沉 `lib/api/errors.ts`
+- **生产 env 校验** — 强制 `REDIS_URL` / `ENCRYPTION_KEY`；禁止生产关闭 Secure Cookie
+- **其它** — 头像合并失败清理分片；班级头像 URL 白名单；系统设置 Zod schema
+
 ### 2026/07（评测与工作区重构 + 题目全链路增强）
 
-- **评测系统模块化** — `lib/judge` 拆分为 `compiler`/`executor-core`/`docker`/`pretest`/`process-stats`/`types`/`runner` 等子模块，新增 Windows 开发环境隔离评测 runner（`win-runner.exe` + C# 源码 + PowerShell 包装）
-- **题目标准程序验证** — 新增 [lib/problem/verify-std.ts](file:///e:/桌面/dsoj/lib/problem/verify-std.ts) 与 [/api/admin/problems/[id]/verify](file:///e:/桌面/dsoj/app/api/admin/problems/%5Bid%5D/verify/route.ts)，后台可用 std 答案对题目回归测试
-- **题目测试点管理** — `app/admin/problems/[id]/testcases/_components` 新增 TestCaseCard/LogsModal/VerifyModal/ZipUploadPanel
-- **题库工作区上下文** — 引入 [contexts/ContestProblemWorkspaceContext.tsx](file:///e:/桌面/dsoj/contexts/ContestProblemWorkspaceContext.tsx) 与 [TrainingProblemWorkspaceContext.tsx](file:///e:/桌面/dsoj/contexts/TrainingProblemWorkspaceContext.tsx)，统一比赛/训练问题工作区状态
-- **独立题单路由** — 新增 [app/training/[id]/problems/page.tsx](file:///e:/桌面/dsoj/app/training/%5Bid%5D/problems/page.tsx)，训练问题工作台独立可分享
-- **竞赛倒计时面板** — 新增 [components/contest/ContestCountdownPanel.tsx](file:///e:/桌面/dsoj/components/contest/ContestCountdownPanel.tsx) 与 [hooks/useContestCountdown.ts](file:///e:/桌面/dsoj/hooks/useContestCountdown.ts)
-- **实体卡片组件** — 新增 [components/entity/](file:///e:/桌面/dsoj/components/entity/)（EntityDetailHeader / InfoCard / DescriptionCard / OverviewLayout）作为通用实体视图框架
-- **通用 hook** — 新增 useWallClock / useUnreadNotifications / useSubmissionResultFlow / useContestCountdown；抽出 [hooks/socket-client.ts](file:///e:/桌面/dsoj/hooks/socket-client.ts) 复用 Socket 客户端
-- **批量注册 CSV 模板与测试** — 新增 [public/templates/users-template.csv](file:///e:/桌面/dsoj/public/templates/users-template.csv) 与 [tests/batch-register-csv.test.ts](file:///e:/桌面/dsoj/tests/batch-register-csv.test.ts)
-- **历史难度迁移** — 新增 [scripts/migrate-legacy-difficulty.cjs](file:///e:/桌面/dsoj/scripts/migrate-legacy-difficulty.cjs) 兼容旧难度枚举
-- **帮助中心** — 新增 [app/help/page.tsx](file:///e:/桌面/dsoj/app/help/page.tsx)
-- **Redis 配置与单元测试** — 新增 [lib/redis.ts](file:///e:/桌面/dsoj/lib/redis.ts) 配置封装 + [tests/redis-config.test.ts](file:///e:/桌面/dsoj/tests/redis-config.test.ts)
-- **题目工作台组件** — [ProblemLetterRail](file:///e:/桌面/dsoj/components/problem/ProblemLetterRail.tsx) / [TrainingProblemWorkspace](file:///e:/桌面/dsoj/components/training/TrainingProblemWorkspace.tsx)
-- **WSL 开发支持** — 新增 `docs/BT_DEPLOY.md` 宝塔 + WSL2 同步开发部署文档
+- **评测系统模块化** — `lib/judge` 拆分为 `compiler` / `executor-core` / `docker` / `spj` / `pretest` / `process-stats` / `types` / `runner.sh` 等（Linux only）
+- **题目标准程序验证** — `lib/problem/verify-std.ts` 与 `/api/admin/problems/[id]/verify`，后台可用 std 答案回归测试
+- **题目测试点管理** — `app/admin/problems/[id]/testcases/_components`（TestCaseCard / LogsModal / VerifyModal / ZipUploadPanel）
+- **题库工作区上下文** — `contexts/ContestProblemWorkspaceContext.tsx`、`TrainingProblemWorkspaceContext.tsx`
+- **独立题单路由** — `app/training/[id]/problems/page.tsx`
+- **竞赛倒计时面板** — `components/contest/ContestCountdownPanel.tsx`、`hooks/useContestCountdown.ts`
+- **实体卡片组件** — `components/entity/`（EntityDetailHeader / InfoCard / DescriptionCard / OverviewLayout）
+- **通用 hook** — useWallClock / useUnreadNotifications / useSubmissionResultFlow / useContestCountdown；`hooks/socket-client.ts`
+- **批量注册 CSV** — `public/templates/users-template.csv`、`tests/batch-register-csv.test.ts`
+- **历史难度迁移** — `scripts/migrate-legacy-difficulty.cjs`
+- **帮助中心** — `app/help/page.tsx`
+- **Redis 配置与单测** — `lib/redis.ts`、`tests/redis-config.test.ts`
+- **题目工作台** — `ProblemLetterRail` / `TrainingProblemWorkspace`
+- **WSL / 宝塔文档** — `docs/WSL_DEV.md`、`docs/BT_DEPLOY.md`
 
 ### 2026/07（题目功能扩展 + AI 模块下线）
 
-- **代码编辑器** — 新增 [components/code-editor/CodeEditor.tsx](file:///e:/桌面/dsoj/components/code-editor/CodeEditor.tsx)，基于 CodeMirror 6，支持多语言高亮与自动补全
-- **题目预测试** — [app/api/problems/[id]/pretest/route.ts](file:///e:/桌面/dsoj/app/api/problems/%5Bid%5D/pretest/route.ts) + [components/problem/PretestPanel.tsx](file:///e:/桌面/dsoj/components/problem/PretestPanel.tsx)，提交前自定义测试用例验证
-- **题目统计** — [app/api/problems/[id]/stats/route.ts](file:///e:/桌面/dsoj/app/api/problems/%5Bid%5D/stats/route.ts) + [ProblemStatsPanel](file:///e:/桌面/dsoj/components/problem/ProblemStatsPanel.tsx)
-- **随机一题** — [app/api/problems/random/route.ts](file:///e:/桌面/dsoj/app/api/problems/random/route.ts) 为训练/刷题模式推荐题目
-- **竞赛解封** — [app/api/admin/contests/[id]/unseal/route.ts](file:///e:/桌面/dsoj/app/api/admin/contests/%5Bid%5D/unseal/route.ts)
-- **题目导入** — [lib/problem/import/](file:///e:/桌面/dsoj/lib/problem/import/) 支持 DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces 六种格式
-- **题目导出** — [lib/problem/export/dsoj-exporter.ts](file:///e:/桌面/dsoj/lib/problem/export/dsoj-exporter.ts)
-- **用户热力图** — [components/user/SubmissionHeatmap.tsx](file:///e:/桌面/dsoj/components/user/SubmissionHeatmap.tsx)
-- **SSRF 防护** — 抽出通用 [lib/security/safe-fetch.ts](file:///e:/桌面/dsoj/lib/security/safe-fetch.ts)，被评测子系统复用
-- **大规模模块拆分** — `lib/class`、`lib/contest`、`lib/problem`、`lib/training`、`lib/user`、`lib/judge`、`lib/mongodb` 均按职责拆分为多个子模块（共 60+ 新文件），service.ts 单文件平均 < 200 行
-- **AI 模块下线** — 移除全部 AI 生成、提示词、队列、providers 模块与相关管理页面/API（净减少约 2.25 万行）
+- **代码编辑器** — `components/code-editor/CodeEditor.tsx`（CodeMirror 6）
+- **题目预测试** — `/api/problems/[id]/pretest` + `PretestPanel`
+- **题目统计** — `/api/problems/[id]/stats` + `ProblemStatsPanel`
+- **随机一题** — `/api/problems/random`
+- **竞赛解封** — `/api/admin/contests/[id]/unseal`
+- **题目导入** — `lib/problem/import/`（DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces）
+- **题目导出** — `lib/problem/export/dsoj-exporter.ts`
+- **用户热力图** — `components/user/SubmissionHeatmap.tsx`
+- **SSRF 防护** — `lib/security/safe-fetch.ts`
+- **大规模模块拆分** — class / contest / problem / training / user / judge / mongodb 按职责拆分
+- **AI 模块下线** — 移除全部 AI 生成相关模块与管理页/API
 
 ### 2026/07（班级作业审查优化 + UI 规范化）
 
@@ -304,20 +328,14 @@ Route → withApi.auth / withApi.public / withApi.admin / withApi.class
 
 ### 2026/07（安全加固与冗余清理）
 
-- **邀请码废除** — 移除 `ClassInvite` 模型与全部邀请码相关 API/页面，班级加入改用用户名直邀
-- **认证统一** — JWT token 全部走 httpOnly Cookie，前端不再读写 localStorage；`UserContext`、`useSubmissionSocket`、批量注册 XHR 等全部清理
-- **4 级角色体系** — 标准化为 `SYSTEM_ADMIN` / `ADMIN` / `TEACHER` / `STUDENT`；`lib/permissions.ts` 为单一来源；9 个路由文件的 `isAdmin(user)` 改为 `canAccessAdmin(user)`
-- **文件上传安全** — `detectImageMime()` 魔数校验（JPEG/PNG/GIF/WebP），拒绝伪造扩展名
-- **命令注入防护** — `execSync` 调用前对 pid 做 `Number.isFinite` 校验
-- **加密安全** — 题目编号、临时密码等安全关键随机值改用 `crypto.randomBytes`
-- **缓存一致性** — `clearUserCache` 统一入口联动 `clearAuthUserCache`，修复角色变更后鉴权缓存未清除的问题
-- **类型安全** — 85 处 `(ctx as any).params` 类型绕过全部清理为类型安全的 `ctx.params`
-- **死代码清理** — `lib/api/handler.ts` 移除 `withAuth`/`withClassRole`/`withAdmin`/`parseJson`/`parseQuery` 等已被 `withApi` 取代的旧 API，精简至 90 行
-- **命名冲突解决** — `clearUserCache` 重命名为 `clearAuthUserCache`（鉴权层）vs `clearUserCache`（业务层统一入口），职责分离
-- **组件去重** — 合并重复的 `MarkdownRenderer` 组件到 `components/common/`
-- **默认角色修正** — fallback 值从无效的 `'user'` 改为 `'STUDENT'`
-- **审计日志** — `contest-auth` 审计日志从 `JSON.stringify` 改为对象直传
-- **测试改进** — 测试凭据从硬编码改为环境变量；API Key 前缀打印从 8 字符减至 4 字符
+- **邀请码废除** — 移除 `ClassInvite`；班级加入改用用户名直邀
+- **认证统一** — JWT 全部走 httpOnly Cookie；前端不再读写 localStorage token
+- **4 级角色体系** — `SYSTEM_ADMIN` / `ADMIN` / `TEACHER` / `STUDENT`；`lib/permissions.ts` 为单一来源
+- **文件上传安全** — `detectImageMime()` 魔数校验（JPEG/PNG/GIF/WebP）
+- **缓存一致性** — `clearUserCache`（`lib/user/profile.ts`）联动 `clearAuthUserCache`
+- **死代码清理** — `handler.ts` 移除已被 `withApi` 取代的旧高阶函数
+- **命名分离** — `clearAuthUserCache`（鉴权层）vs `clearUserCache`（业务统一入口）
+- **组件去重** — `MarkdownRenderer` 合并到 `components/common/`
 
 ### 2026/06（近期）
 

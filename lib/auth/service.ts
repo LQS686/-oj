@@ -1,7 +1,9 @@
 /**
  * lib/auth/service.ts
- * 认证与当前用户上下文服务
+ * 认证与当前用户上下文服务（仅服务端）
  */
+import 'server-only'
+
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 

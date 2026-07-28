@@ -14,7 +14,7 @@
  *   - 完整支持 CDATA section
  *   - 单题解析失败抛错由 service 层 try/catch 隔离
  */
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import type { ImportedProblem, ImportedTestCase } from './types'
 
 /* ============================================================================

@@ -21,7 +21,9 @@ export interface ErrorThreshold {
 class ErrorMonitor {
   private errorStats: Map<string, ErrorStats> = new Map();
   private thresholds: Map<string, ErrorThreshold> = new Map();
-  private readonly MAX_OCCURRENCES = 100; // 每个错误最多保存的发生记录数
+  /** action=block 时写入：key → 解封时间戳 */
+  private blockedUntil: Map<string, number> = new Map();
+  private readonly MAX_OCCURRENCES = 100;
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
@@ -187,10 +189,18 @@ class ErrorMonitor {
         logger.error(message, { key, count, threshold, context });
         // 这里可以添加发送邮件、短信等通知机制
         break;
-      case 'block':
+      case 'block': {
         logger.warn(message, { key, count, threshold, context });
-        // 这里可以添加临时阻止相关请求的机制
-        break;
+        const blockScope = String(context?.errorType || key)
+        const until = Date.now() + threshold.timeWindow * 1000
+        this.blockedUntil.set(blockScope, until)
+        void redisCache.set(
+          `error-block:${blockScope}`,
+          { until },
+          { ttl: threshold.timeWindow }
+        )
+        break
+      }
       case 'log':
         logger.info(message, { key, count, threshold, context });
         break;
@@ -233,11 +243,29 @@ class ErrorMonitor {
   clearErrorStats(key?: string) {
     if (key) {
       this.errorStats.delete(key);
+      this.blockedUntil.delete(key);
       redisCache.delete(`error:${key}`);
+      redisCache.delete(`error-block:${key}`);
     } else {
       this.errorStats.clear();
+      this.blockedUntil.clear();
       redisCache.clear('error:*');
+      redisCache.clear('error-block:*');
     }
+  }
+
+  /** 查询某错误键是否处于 block 阈值触发的临时阻断期 */
+  isBlocked(key: string): boolean {
+    const until = this.blockedUntil.get(key);
+    if (until && until > Date.now()) return true;
+    if (until) this.blockedUntil.delete(key);
+    return false;
+  }
+
+  async isBlockedAsync(key: string): Promise<boolean> {
+    if (this.isBlocked(key)) return true;
+    const remote = await redisCache.get<{ until: number }>(`error-block:${key}`);
+    return !!(remote && remote.until > Date.now());
   }
 }
 

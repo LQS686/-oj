@@ -3,6 +3,7 @@ import { writeFile, unlink, open as fsOpen } from 'fs/promises'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { join } from 'path'
 import * as crypto from 'crypto'
+import { constants as osConstants } from 'os'
 import { logger } from '@/lib/logger'
 import type { ExecuteArtifacts, ExecuteOptions, ExecuteResult } from './executor-types'
 import { computeExtraTime, readMemFileKB, readTimeFileMs, readTimeFilePair } from './process-stats'
@@ -14,6 +15,7 @@ import {
   getDockerRunCommand,
 } from './docker'
 import { shouldForceUlimitV } from './compiler'
+import { getJudgeConfig } from './config'
 
 const USE_DOCKER = process.env.USE_DOCKER === 'true' || false
 
@@ -108,6 +110,17 @@ async function readFilePreview(filePath: string, maxBytes: number): Promise<stri
   }
 }
 
+/** Node exit(code, signal)：SIGKILL 时 code 常为 null，需还原为 128+signo */
+function normalizeChildExitCode(code: number | null, signal: NodeJS.Signals | null): number {
+  if (typeof code === 'number') return code
+  if (signal) {
+    const signo = (osConstants.signals as Record<string, number | undefined>)[signal]
+    if (typeof signo === 'number' && signo > 0) return 128 + signo
+  }
+  // 未知信号终止：不要当成「非 0 → RE」，交给上层用 forceKilled/timeout 判断
+  return 0
+}
+
 /** 评测仅 Linux（WSL / 容器）；Windows 宿主请走 WSL + Docker。构建阶段跳过以免 next build 误伤。 */
 function assertLinuxJudgeHost(): void {
   if (process.env.NEXT_PHASE === 'phase-production-build') return
@@ -163,12 +176,15 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
   // 2. timeLimit * 3 作为基础墙钟窗口（sleep 型死循环）
   // 3. 另按标准答案体积加 IO 裕量：大输出时墙钟可远大于 CPU，
   //    若仍用 3×TL，会把「CPU 未超限、只是写了上百万行」的正解误杀成 TLE（如 LP3383）
+  //    I/O 预算按 ~8MB/s，上限 ioSlackMaxMs（系统设置可调），避免暴力解拖到 120s+
   const cpuTimeLimitMs = timeLimit + extraTime
   const expectedBytesForWall = expectedOutputBytes ?? 0
-  const ioSlackMs = Math.min(120_000, Math.ceil(expectedBytesForWall / 2000))
+  const ioSlackMaxMs = getJudgeConfig().ioSlackMaxMs
+  const ioSlackMs = Math.min(ioSlackMaxMs, Math.ceil(expectedBytesForWall / 8000))
   const wallClockLimitMs = Math.max(cpuTimeLimitMs, timeLimit * 3, timeLimit + ioSlackMs)
   const hardTimeoutMs = wallClockLimitMs
   const outputLimitBytes = computeOutputLimitBytes(expectedOutputBytes, outputLimitOverride)
+  const closeFallbackMs = getJudgeConfig().closeFallbackMs
 
   const tempDir = join(process.cwd(), 'temp', 'judge')
   const timestamp = Date.now()
@@ -207,8 +223,10 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     let cannotStart = false
     let peakMemoryKB = 0
     let cpuTimeMs = 0
-    /** wrapper 已写出 CPU（含 0ms）；为 true 时禁止用墙钟覆盖，避免小数据虚高到几十 ms */
+    /** wrapper 已写出时间文件（含 CPU=0）；禁止再用 Node 外包墙钟冒充 */
     let cpuSampledFromWrapper = false
+    /** dsoj-watch 测得的选手墙钟（ms），与 CPU 分离 */
+    let wrapperWallMs = 0
     let exceedsTimeLimit = false
     let abortedBySignal = false
     let startTime = 0
@@ -248,6 +266,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       )
       // 137 可能是 OOM 也可能是 CPU hard ulimit；等采到 stats 后再区分
       let dockerSigkill = false
+      // 根因：宿主机编译产物与测点在 temp/judge，容器内 --tmpfs /app/temp 是空目录。
+      // 必须 bind mount 同一目录，选手程序与输入文件才能在容器内可见。
       const dockerRunCommand = [
         'run', '--name', containerId,
         '--memory', `${memoryLimit}m`,
@@ -258,7 +278,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         '--cap-drop', 'ALL',
         '--read-only',
         '--tmpfs', '/tmp',
-        '--tmpfs', '/app/temp',
+        '-v', `${tempDir}:/app/temp:rw`,
         '--user', 'nobody',
         '--pids-limit', '100',
         '--ulimit', 'nofile=1024:1024',
@@ -305,26 +325,27 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           else signal.addEventListener('abort', onAbort, { once: true })
         }
 
-        dockerProcess.on('exit', (code) => {
+        dockerProcess.on('exit', (code, signalName) => {
           clearTimeout(timeoutId)
           signal?.removeEventListener('abort', onAbort)
           endTime = Date.now()
-          exitCode = code || 0
+          const normalized = normalizeChildExitCode(code, signalName)
+          exitCode = normalized
           // 状态判定优先级：TLE > MLE > RE（参考 HOJ DefaultJudge.java:54-81）
           if (abortedBySignal) {
             // fail-fast 中止，不记 TLE
           } else if (timeout) {
             // 已由墙钟超时定时器标记，保持 timeout = true
-          } else if (code === 152) {
+          } else if (normalized === 152) {
             // SIGXCPU：Docker --ulimit cpu 软限制
             timeout = true
-          } else if (code === 137) {
+          } else if (normalized === 137) {
             // SIGKILL：OOM 或 CPU hard ulimit —— 等 stats 后再区分
             dockerSigkill = true
-          } else if (code === 124 || code === 143) {
+          } else if (normalized === 124 || normalized === 143) {
             // 124 = GNU timeout；143 = SIGTERM
             timeout = true
-          } else if (code !== 0) {
+          } else if (normalized !== 0) {
             runtimeError = true
           }
           resolve()
@@ -452,7 +473,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         Math.max(1, Math.ceil(Number(cpuTimeLimitMs) / 1000) || 1),
         300,
       )
-      const safeStack = Math.min(Math.max(1, Number(memoryLimit) || 16), 64)
+      const safeStackMb = 8
       const commandPath =
         typeof runInfo.command === 'string' ? runInfo.command.split(/[\n\r;|&`$()<>]/)[0] : ''
       if (!commandPath || !/^[a-zA-Z0-9_./\-]+$/.test(commandPath)) {
@@ -464,12 +485,17 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         runnerPath,
         String(safeMem),
         String(safeCpu),
-        String(safeStack),
+        String(safeStackMb),
         commandPath,
         ...runInfo.args,
       ]
+      // 禁止继承应用环境：选手程序可读 process.env / getenv，会泄露 JWT_SECRET 等
       const spawnEnv: NodeJS.ProcessEnv = {
-        ...process.env,
+        PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+        HOME: tempDir,
+        LANG: process.env.LANG || 'C.UTF-8',
+        TZ: process.env.TZ || 'UTC',
+        NODE_ENV: 'production',
         DSOJ_MEM_FILE: memFilePath,
         DSOJ_TIME_FILE: timeFilePath,
         DSOJ_STDIN_FILE: workingInputPath,
@@ -477,6 +503,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         DSOJ_STDERR_FILE: errorPath,
         DSOJ_OUTPUT_LIMIT_BYTES: String(Math.max(1024, outputLimitBytes)),
         DSOJ_CPU_LIMIT_MS: String(Math.max(1, cpuTimeLimitMs)),
+        // runner 内墙钟硬杀：比 Node setTimeout 更及时（事件循环忙碌时也生效）
+        DSOJ_WALL_LIMIT_MS: String(Math.max(1, hardTimeoutMs)),
       }
       if (shouldForceUlimitV()) {
         spawnEnv.DSOJ_FORCE_ULIMIT_V = '1'
@@ -503,6 +531,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         let resolved = false
         let exited = false
         let savedExitCode: number | null = 0
+        /** Node 原始 exit code；用于区分「真·正常退出 0」与「code=null 被归一成 0」 */
+        let rawExitCode: number | null = 0
         let savedForceKilled = false
         let savedTimeout = false
         let fallbackTimer: NodeJS.Timeout | null = null
@@ -556,7 +586,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           processKilled = true
           // close 事件触发时所有 stdio 流已关闭，输出已完整刷盘
           endTime = Date.now()
-          exitCode = savedExitCode || 0
+          const finalCode = savedExitCode ?? 0
+          exitCode = finalCode
 
           if (abortedBySignal) {
             timeout = false
@@ -568,15 +599,14 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             return
           }
 
-          // wrapper 写出的峰值内存 / CPU·墙钟（Linux GNU time / /proc）
+          // wrapper 写出的峰值内存（RssAnon）/ CPU·墙钟（wait4 + monotonic）
           const fileMem = readMemFileKB(memFilePath)
           if (fileMem > 0 && fileMem > peakMemoryKB) peakMemoryKB = fileMem
           const timePair = readTimeFilePair(timeFilePath)
           if (timePair) {
-            // CPU>0 用 CPU；极短程序 getrusage 常为 0，改用 wrapper 测得的子进程墙钟（真实耗时）
-            cpuTimeMs = timePair.cpuMs > 0
-              ? timePair.cpuMs
-              : (timePair.wallMs > 0 ? timePair.wallMs : 0)
+            // 真实 CPU（可为 0）；墙钟单独保留，不把墙钟冒充成 CPU
+            cpuTimeMs = Math.max(0, timePair.cpuMs)
+            wrapperWallMs = Math.max(0, timePair.wallMs)
             cpuSampledFromWrapper = true
           } else {
             const fileCpu = readTimeFileMs(timeFilePath)
@@ -595,24 +625,27 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             })
           }
 
-          // 仅在完全采不到选手时间时，才回退墙钟（wrapper 自身开销会被算进去）
-          if (!cpuSampledFromWrapper && cpuTimeMs <= 0) {
-            cpuTimeMs = Math.max(0, endTime - startTime)
-            logger.debug(`CPU 时间回退为墙钟`, { platform: process.platform, cpuTimeMs })
-          }
+          // 不再用 Node 外包墙钟冒充 CPU（含 spawn/bash 开销，非真实选手时间）
 
           // 信号分类（HOJ SandboxRun 信号表）：
           //   152 = SIGXCPU → CPU TLE（ulimit -t / runner CPU 轮询）
           //   153 = SIGXFSZ → OLE（输出超限）
           //   137 = SIGKILL → 墙钟强杀 / ulimit -v；用峰值、CPU、墙钟区分 MLE vs TLE
-          const wallMs = Math.max(0, endTime - startTime)
-          if (savedExitCode === 153 || outputLimitExceeded) {
+          const wallMs = wrapperWallMs > 0 ? wrapperWallMs : Math.max(0, endTime - startTime)
+
+          // 选手已正常退出(0)：墙钟定时器晚到的竞态不得改判 TLE
+          if (rawExitCode === 0) {
+            savedTimeout = false
+            timeout = false
+          }
+
+          if (finalCode === 153 || outputLimitExceeded) {
             outputLimitExceeded = true
             memoryExceeded = false
             savedTimeout = false
-          } else if (savedExitCode === 152) {
+          } else if (finalCode === 152) {
             savedTimeout = true
-          } else if (savedExitCode === 137) {
+          } else if (finalCode === 137) {
             if (savedForceKilled || savedTimeout) {
               savedTimeout = true
             } else if (peakMemoryKB > 0 && peakMemoryKB * 1024 >= maxMemoryBytes) {
@@ -625,6 +658,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             } else {
               savedTimeout = true
             }
+          } else if (rawExitCode === null && (savedForceKilled || savedTimeout)) {
+            // 强杀且 Node 未给出 code（也无 signal 映射）→ 按超时，避免误报 RE
+            savedTimeout = true
           }
 
           // 必须回写 timeout：judger 只看 executeResult.timeout
@@ -633,8 +669,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             memoryExceeded = false
           }
 
-          // 状态判定优先级：TLE > OLE > MLE > RE
-          if (!savedTimeout && !outputLimitExceeded && !memoryExceeded && savedExitCode !== 0) {
+          // 状态判定优先级：TLE > OLE > MLE > RE（null 已归一化，勿用 !== 0 误伤）
+          if (!savedTimeout && !outputLimitExceeded && !memoryExceeded && finalCode !== 0) {
             runtimeError = true
           }
 
@@ -650,12 +686,14 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           resolve()
         }
 
-        childProcess.on('exit', (code) => {
+        childProcess.on('exit', (code, signalName) => {
           if (exited) return
           exited = true
           // 仅保存状态，不执行 endTime/resolve，等待 close 事件
           // （close 在所有 stdio 流关闭后触发，确保 stdout 已刷盘）
-          savedExitCode = code
+          // SIGKILL 时 code=null，必须映射为 128+signo，否则 null!==0 会误报 RE
+          rawExitCode = code
+          savedExitCode = normalizeChildExitCode(code, signalName)
           savedForceKilled = forceKilled
           savedTimeout = timeout
           // P1-5: exit 比 close 更早触发；启动兜底定时器，
@@ -665,7 +703,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
               logger.debug(`close 事件超时未触发，强制 resolve（孙进程可能持有 fd）`)
               finishResolve()
             }
-          }, 2000)
+          }, closeFallbackMs)
         })
 
         childProcess.on('close', () => {
@@ -705,10 +743,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         if (fileMem > 0 && fileMem > peakMemoryKB) peakMemoryKB = fileMem
         const timePair = readTimeFilePair(timeFilePath)
         if (timePair) {
-          const merged = timePair.cpuMs > 0
-            ? timePair.cpuMs
-            : (timePair.wallMs > 0 ? timePair.wallMs : 0)
-          cpuTimeMs = merged
+          cpuTimeMs = Math.max(0, timePair.cpuMs)
+          if (timePair.wallMs > 0) wrapperWallMs = timePair.wallMs
           cpuSampledFromWrapper = true
         } else {
           const fileCpu = readTimeFileMs(timeFilePath)
@@ -733,18 +769,25 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
 
     if (!startTime) startTime = Date.now()
     if (!endTime) endTime = Date.now()
-    // 展示时间：wrapper 采样优先（CPU，或 CPU=0 时的子进程墙钟）；勿用 Node 外包一层的大墙钟
+    /**
+     * 真实 CPU（wait4）与展示时间分离：
+     * - TLE / 临界重测一律看 realCpuMs
+     * - 展示：CPU>0 用 CPU；否则用 wrapper 选手墙钟；绝不伪造 1ms / Node 墙钟
+     */
+    const realCpuMs = Math.max(0, Math.round(cpuTimeMs))
     let preciseTime: number
     if (cpuSampledFromWrapper) {
-      preciseTime = Math.max(0, Math.round(cpuTimeMs))
-      // 真实跑过但四舍五入仍为 0 时，至少显示 1ms，避免“什么都没跑”的错觉
-      if (preciseTime === 0 && endTime > startTime) preciseTime = 1
-    } else if (cpuTimeMs > 0) {
-      preciseTime = Math.max(1, Math.round(cpuTimeMs))
+      preciseTime = realCpuMs > 0 ? realCpuMs : Math.max(0, Math.round(wrapperWallMs))
+    } else if (realCpuMs > 0) {
+      preciseTime = realCpuMs
     } else {
-      preciseTime = Math.max(1, Math.round(endTime - startTime))
+      preciseTime = 0
+      if (!abortedBySignal) {
+        logger.warn('未采到选手时间，记为 0', { language, platform: process.platform })
+      }
     }
-    cpuTimeMs = preciseTime
+    // 后续 TLE 判定使用真实 CPU
+    cpuTimeMs = realCpuMs
 
     // fail-fast 中止：不按 TLE/RE 处理
     if (abortedBySignal) {
@@ -760,17 +803,18 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     // sleep 死循环通常 CPU≈墙钟或输出为空，仍保持 TLE。
     if (timeout && !abortedBySignal) {
       const outSize = existsSync(outputPath) ? statSync(outputPath).size : 0
-      if (outSize > 0 && cpuTimeMs > 0 && cpuTimeMs <= timeLimit) {
+      const childWall = wrapperWallMs > 0 ? wrapperWallMs : Math.max(0, endTime - startTime)
+      if (outSize > 0 && realCpuMs > 0 && realCpuMs <= timeLimit) {
         logger.info('墙钟超时但 CPU 未超限且已有输出，按 IO 密集处理', {
-          cpuTimeMs,
+          realCpuMs,
           timeLimit,
-          wallMs: endTime - startTime,
+          wallMs: childWall,
           outSize,
         })
         timeout = false
-      } else if (outSize > 0 && cpuTimeMs > timeLimit && cpuTimeMs <= cpuTimeLimitMs) {
+      } else if (outSize > 0 && realCpuMs > timeLimit && realCpuMs <= cpuTimeLimitMs) {
         logger.info('墙钟超时且 CPU 处于浮动窗口，转临界 TLE', {
-          cpuTimeMs,
+          realCpuMs,
           timeLimit,
           cpuTimeLimitMs,
         })
@@ -853,7 +897,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       outputLimitExceeded,
       runtimeError,
       cannotStart,
-      cpuTime: abortedBySignal ? 0 : cpuTimeMs,
+      cpuTime: abortedBySignal ? 0 : realCpuMs,
       exceedsTimeLimit,
       timeoutType,
       aborted: abortedBySignal || undefined,

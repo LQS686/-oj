@@ -87,7 +87,7 @@ export async function listActiveUsers(limit = 5) {
     .slice(0, limit)
     .map((entry) => entry[0])
   if (sortedUserIds.length === 0) {
-    return prisma.user.findMany({
+    const fallback = await prisma.user.findMany({
       take: limit,
       orderBy: { rating: 'desc' },
       select: {
@@ -100,6 +100,8 @@ export async function listActiveUsers(limit = 5) {
         _count: { select: { solutions: true } },
       },
     })
+    const { sanitizeAvatarUrl } = await import('@/lib/user/avatar-url')
+    return fallback.map((u) => ({ ...u, avatar: sanitizeAvatarUrl(u.avatar) }))
   }
   const users = await prisma.user.findMany({
     where: { id: { in: sortedUserIds } },
@@ -117,7 +119,11 @@ export async function listActiveUsers(limit = 5) {
       },
     },
   })
-  return sortedUserIds.map((id) => users.find((u) => u.id === id)).filter((u) => u !== undefined)
+  const { sanitizeAvatarUrl } = await import('@/lib/user/avatar-url')
+  return sortedUserIds
+    .map((id) => users.find((u) => u.id === id))
+    .filter((u) => u !== undefined)
+    .map((u) => ({ ...u!, avatar: sanitizeAvatarUrl(u!.avatar) }))
 }
 
 /**

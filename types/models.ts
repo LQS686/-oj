@@ -37,6 +37,8 @@ export interface Problem {
   memoryLimit: number
   comparisonMode: string
   realPrecision: number
+  /** Testlib Special Judge 源码（comparisonMode=special-judge） */
+  spjCode: string | null
   visibility: string
   isPublic: boolean
   totalSubmit: number

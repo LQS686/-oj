@@ -1,15 +1,14 @@
 // 简化版评测队列系统（基于内存队列，适合开发/小规模使用）
 // 生产环境建议使用 BullMQ + Redis
+// Linux-only：任务超时必须 abort 并杀掉选手进程树，避免占槽位后仍空转。
 
 import { EventEmitter } from 'events'
 import { logger } from '@/lib/logger'
 import type { ResultState, ComparisonMode } from './types'
-
-// 评测机默认配置（可通过环境变量覆盖）
-const DEFAULT_EXTRA_TIME_RATIO = parseFloat(process.env.JUDGE_EXTRA_TIME_RATIO || '0.1')
-const DEFAULT_REJUDGE_TIMES = parseInt(process.env.JUDGE_REJUDGE_TIMES || '1', 10)
-const DEFAULT_MAX_CONCURRENT = parseInt(process.env.JUDGE_MAX_CONCURRENT || '1', 10)
-const DEFAULT_JOB_TIMEOUT = parseInt(process.env.JUDGE_JOB_TIMEOUT || '300', 10) * 1000
+import {
+  getJudgeConfig,
+  registerJudgeQueueRuntimeApplier,
+} from './config'
 
 // 评测任务数据类型
 export interface JudgeJob {
@@ -22,6 +21,8 @@ export interface JudgeJob {
   memoryLimit: number
   comparisonMode?: ComparisonMode    // 输出比较模式，默认 'default'
   realPrecision?: number             // 浮点数比较精度，默认 3
+  /** Testlib checker 源码（comparisonMode=special-judge 时必填） */
+  spjCode?: string | null
   rejudgeTimes?: number              // 临界 TLE 重测次数，默认 0（关闭）
   extraTimeRatio?: number            // 临界 TLE 容差比例，默认 0
   testCases: Array<{
@@ -73,38 +74,130 @@ class JudgeQueue extends EventEmitter {
   private queue: QueuedJob[] = []
   private processing: Map<string, QueuedJob> = new Map()
   private completed: Map<string, QueuedJob> = new Map()
-  private maxConcurrent: number = 3
+  private maxConcurrent: number = 1
+  private jobTimeoutMs: number = 300_000
+  private deadCheckMs: number = 5_000
   private isProcessing: boolean = false
   private deadJobChecker: NodeJS.Timeout | null = null
+  /** 活跃任务 AbortController：超时/取消时真正中止 executeJudge 与选手进程 */
+  private abortControllers = new Map<string, AbortController>()
+  /** 精确到点的任务级超时定时器（比周期扫描更及时） */
+  private jobTimeoutTimers = new Map<string, NodeJS.Timeout>()
 
-  constructor(maxConcurrent: number = 3) {
+  constructor(maxConcurrent?: number) {
     super()
-    this.maxConcurrent = maxConcurrent
-    this.deadJobChecker = setInterval(() => this.checkDeadJobs(), 30000)
+    const cfg = getJudgeConfig()
+    this.maxConcurrent = maxConcurrent ?? cfg.maxConcurrent
+    this.jobTimeoutMs = cfg.jobTimeoutMs
+    this.deadCheckMs = cfg.deadCheckMs
+    this.startDeadJobChecker()
   }
 
-  // 死任务检测：扫描 processing，对超时未完成的 job 强制标记失败
+  /** 后台保存系统设置后热更新并发/超时/扫描间隔 */
+  applyRuntimeConfig(patch: {
+    maxConcurrent: number
+    jobTimeoutMs: number
+    deadCheckMs: number
+  }) {
+    const prev = {
+      maxConcurrent: this.maxConcurrent,
+      jobTimeoutMs: this.jobTimeoutMs,
+      deadCheckMs: this.deadCheckMs,
+    }
+    this.maxConcurrent = Math.min(16, Math.max(1, patch.maxConcurrent))
+    this.jobTimeoutMs = Math.min(3_600_000, Math.max(30_000, patch.jobTimeoutMs))
+    this.deadCheckMs = Math.min(30_000, Math.max(2_000, patch.deadCheckMs))
+    if (prev.deadCheckMs !== this.deadCheckMs) {
+      this.startDeadJobChecker()
+    }
+    // 并发升高时立刻尝试调度等待中的任务
+    if (this.maxConcurrent > prev.maxConcurrent && !this.isProcessing) {
+      void this.processQueue()
+    }
+    logger.info('评测队列运行时配置已更新', {
+      prev,
+      next: {
+        maxConcurrent: this.maxConcurrent,
+        jobTimeoutMs: this.jobTimeoutMs,
+        deadCheckMs: this.deadCheckMs,
+      },
+    })
+  }
+
+  private startDeadJobChecker() {
+    if (this.deadJobChecker) {
+      clearInterval(this.deadJobChecker)
+      this.deadJobChecker = null
+    }
+    this.deadJobChecker = setInterval(() => this.checkDeadJobs(), this.deadCheckMs)
+    this.deadJobChecker.unref?.()
+  }
+
+  private clearJobGuards(jobId: string) {
+    const timer = this.jobTimeoutTimers.get(jobId)
+    if (timer) {
+      clearTimeout(timer)
+      this.jobTimeoutTimers.delete(jobId)
+    }
+    this.abortControllers.delete(jobId)
+  }
+
+  private armJobGuards(job: QueuedJob): AbortSignal {
+    this.clearJobGuards(job.id)
+    const ac = new AbortController()
+    this.abortControllers.set(job.id, ac)
+    const timeoutMs = this.jobTimeoutMs
+    const timer = setTimeout(() => {
+      this.failDeadJob(job, `评测超时（超过 ${timeoutMs / 1000}s）`)
+    }, timeoutMs)
+    // unref：避免仅因超时定时器阻止进程退出
+    timer.unref?.()
+    this.jobTimeoutTimers.set(job.id, timer)
+    return ac.signal
+  }
+
+  /**
+   * 强制失败并 abort 在跑进程。
+   * 旧实现只改状态不杀进程，会导致孤儿评测占满 CPU、后续任务排队更久。
+   */
+  private failDeadJob(job: QueuedJob, errorMsg: string) {
+    if (job.status !== 'active') return
+    logger.warn(`检测到死任务，强制中止并标记失败`, {
+      jobId: job.id,
+      startedAt: job.startedAt,
+      error: errorMsg,
+    })
+    const ac = this.abortControllers.get(job.id)
+    try {
+      ac?.abort(errorMsg)
+    } catch {
+      /* ignore */
+    }
+    this.clearJobGuards(job.id)
+    try {
+      job.status = 'failed'
+      job.error = errorMsg
+      job.completedAt = new Date()
+      this.processing.delete(job.id)
+      this.completed.set(job.id, job)
+      this.emit('failed', job, new Error(errorMsg))
+    } catch (e) {
+      logger.error(`清理死任务时出错`, e, { jobId: job.id })
+    }
+  }
+
+  // 死任务检测（备份）：定时器漏触发时仍能 abort + 释放槽位
   private checkDeadJobs() {
     const now = Date.now()
-    // 先收集要清理的 job，避免遍历时 delete 导致迭代异常
-    const deadJobs: Array<[string, QueuedJob]> = []
-    for (const [jobId, job] of this.processing) {
-      if (job.startedAt && now - job.startedAt.getTime() > DEFAULT_JOB_TIMEOUT) {
-        deadJobs.push([jobId, job])
+    const timeoutMs = this.jobTimeoutMs
+    const deadJobs: QueuedJob[] = []
+    for (const job of this.processing.values()) {
+      if (job.startedAt && now - job.startedAt.getTime() > timeoutMs) {
+        deadJobs.push(job)
       }
     }
-    for (const [jobId, job] of deadJobs) {
-      logger.warn(`检测到死任务，强制标记失败`, { jobId, startedAt: job.startedAt })
-      try {
-        job.status = 'failed'
-        job.error = `评测超时（超过 ${DEFAULT_JOB_TIMEOUT / 1000}s）`
-        job.completedAt = new Date()
-        this.processing.delete(jobId)
-        this.completed.set(jobId, job)
-        this.emit('failed', job, new Error('评测超时'))
-      } catch (e) {
-        logger.error(`清理死任务时出错`, e, { jobId })
-      }
+    for (const job of deadJobs) {
+      this.failDeadJob(job, `评测超时（超过 ${timeoutMs / 1000}s）`)
     }
   }
 
@@ -114,6 +207,18 @@ class JudgeQueue extends EventEmitter {
       clearInterval(this.deadJobChecker)
       this.deadJobChecker = null
     }
+    for (const timer of this.jobTimeoutTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.jobTimeoutTimers.clear()
+    for (const ac of this.abortControllers.values()) {
+      try {
+        ac.abort('queue-disposed')
+      } catch {
+        /* ignore */
+      }
+    }
+    this.abortControllers.clear()
   }
 
   // 添加任务到队列
@@ -151,14 +256,17 @@ class JudgeQueue extends EventEmitter {
         job.status = 'active'
         job.startedAt = new Date()
         this.processing.set(job.id, job)
-        
+        const signal = this.armJobGuards(job)
+
         this.emit('active', job)
         logger.info(`开始评测`, { jobId: job.id })
-        
+
         // 异步执行评测（不等待）
-        this.executeJob(job).catch((error: Error) => {
+        this.executeJob(job, signal).catch((error: Error) => {
           logger.error(`评测执行错误`, error, { jobId: job.id })
+          this.clearJobGuards(job.id)
           // 补全：确保 job 不永久占槽位
+          if (job.status === 'failed' || job.status === 'completed') return
           try {
             job.status = 'failed'
             job.error = error instanceof Error ? error.message : String(error)
@@ -180,13 +288,15 @@ class JudgeQueue extends EventEmitter {
   }
 
   // 执行单个评测任务
-  private async executeJob(job: QueuedJob) {
+  private async executeJob(job: QueuedJob, signal: AbortSignal) {
     try {
       // 导入评测逻辑
       const { executeJudge } = await import('./judger')
-      
-      // 执行评测
-      const result = await executeJudge(job.data)
+
+      // 执行评测（传入 job-level AbortSignal，超时可杀进程树）
+      const result = await executeJudge(job.data, { signal })
+
+      this.clearJobGuards(job.id)
 
       // 竞态保护：若 job 已被 checkDeadJobs 标记为 failed/completed，
       // 则不再覆盖状态、不从 processing 删除、不重复 emit，直接返回结果。
@@ -205,7 +315,7 @@ class JudgeQueue extends EventEmitter {
 
       this.emit('completed', job, result)
       logger.info(`评测完成`, { jobId: job.id, status: result.status })
-      
+
       // 清理旧的已完成任务（保留最近100个）
       if (this.completed.size > 100) {
         const oldestKey = this.completed.keys().next().value as string | undefined
@@ -214,6 +324,7 @@ class JudgeQueue extends EventEmitter {
         }
       }
     } catch (error) {
+      this.clearJobGuards(job.id)
       // 竞态保护：若 job 已被 checkDeadJobs 标记为 failed/completed，
       // 则不覆盖状态、不重复 emit（避免数据库被多次更新）
       if (job.status === 'failed' || job.status === 'completed') {
@@ -260,7 +371,7 @@ class JudgeQueue extends EventEmitter {
     }
   }
 
-  // 取消任务
+  // 取消任务（等待中直接移除；执行中 abort 进程树并标失败）
   async cancel(jobId: string): Promise<boolean> {
     // 从等待队列中移除
     const index = this.queue.findIndex(j => j.id === jobId)
@@ -270,7 +381,12 @@ class JudgeQueue extends EventEmitter {
       return true
     }
 
-    // 无法取消正在执行的任务
+    const active = this.processing.get(jobId)
+    if (active && active.status === 'active') {
+      this.failDeadJob(active, '评测已取消')
+      return true
+    }
+
     return false
   }
 
@@ -286,19 +402,24 @@ declare global {
   var __judgeQueue: JudgeQueue | undefined
 }
 
-export const judgeQueue = global.__judgeQueue ?? new JudgeQueue(DEFAULT_MAX_CONCURRENT)
+export const judgeQueue = global.__judgeQueue ?? new JudgeQueue()
 
 if (!global.__judgeQueue) {
   global.__judgeQueue = judgeQueue
 }
 
+registerJudgeQueueRuntimeApplier((patch) => {
+  judgeQueue.applyRuntimeConfig(patch)
+})
+
 // 辅助函数
 export async function addJudgeJob(data: JudgeJob): Promise<string> {
-  // 注入环境变量默认值（未显式指定时使用）
+  const cfg = getJudgeConfig()
+  // 注入当前生效默认值（未显式指定时使用）
   const enrichedData: JudgeJob = {
     ...data,
-    extraTimeRatio: data.extraTimeRatio ?? DEFAULT_EXTRA_TIME_RATIO,
-    rejudgeTimes: data.rejudgeTimes ?? DEFAULT_REJUDGE_TIMES,
+    extraTimeRatio: data.extraTimeRatio ?? cfg.extraTimeRatio,
+    rejudgeTimes: data.rejudgeTimes ?? cfg.rejudgeTimes,
   }
   return judgeQueue.add(enrichedData)
 }

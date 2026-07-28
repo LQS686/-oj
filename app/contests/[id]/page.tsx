@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import ContestRegistration from './ContestRegistration'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
+import { readAuthTokenFromCookieStore } from '@/lib/auth/cookie'
 import { canManageContent } from '@/lib/permissions'
 import Link from 'next/link'
 import {
@@ -39,7 +40,7 @@ export default async function ContestOverviewPage({
   if (!contest) return null
 
   const cookieStore = await cookies()
-  const token = cookieStore.get('token')?.value
+  const token = readAuthTokenFromCookieStore(cookieStore)
   let canEdit = false
 
   if (token) {

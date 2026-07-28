@@ -51,7 +51,7 @@ export function useNotificationSocket({
       return
     }
 
-    const socket = acquireAppSocket()
+    const socket = acquireAppSocket(userId)
     socketRef.current = socket
 
     const markJoinedAndNotify = (joinedUserId: string) => {

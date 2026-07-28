@@ -58,7 +58,6 @@ function SettingsPageContent() {
     emailPassword: false,
   })
 
-  const emailCountdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const messageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -80,10 +79,6 @@ function SettingsPageContent() {
 
   useEffect(() => {
     return () => {
-      if (emailCountdownTimerRef.current) {
-        clearInterval(emailCountdownTimerRef.current)
-        emailCountdownTimerRef.current = null
-      }
       if (messageTimerRef.current) {
         clearTimeout(messageTimerRef.current)
         messageTimerRef.current = null
@@ -192,7 +187,7 @@ function SettingsPageContent() {
     }
   }
 
-  const handleSendVerificationCode = async () => {
+  const handleSubmitEmailChange = async () => {
     if (!emailChange.newEmail || !emailChange.currentPassword) {
       showMessage('error', '请填写新邮箱和当前密码')
       return
@@ -209,58 +204,19 @@ function SettingsPageContent() {
     setEmailChange((prev) => ({ ...prev, loading: true }))
     try {
       const response = await fetchWithCookie('/api/users/profile/email', {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           newEmail: emailChange.newEmail,
-          currentPassword: emailChange.currentPassword,
+          password: emailChange.currentPassword,
         }),
       })
       const data = await response.json()
       if (data.success) {
-        showMessage('success', '验证码已发送至新邮箱')
-        setEmailChange((prev) => ({ ...prev, step: 'verify', loading: false, countdown: 60 }))
-
-        if (emailCountdownTimerRef.current) clearInterval(emailCountdownTimerRef.current)
-        emailCountdownTimerRef.current = setInterval(() => {
-          setEmailChange((prev) => {
-            if (prev.countdown <= 1) {
-              if (emailCountdownTimerRef.current) {
-                clearInterval(emailCountdownTimerRef.current)
-                emailCountdownTimerRef.current = null
-              }
-              return { ...prev, countdown: 0 }
-            }
-            return { ...prev, countdown: prev.countdown - 1 }
-          })
-        }, 1000)
-      } else {
-        showMessage('error', data.error || '发送验证码失败')
-        setEmailChange((prev) => ({ ...prev, loading: false }))
-      }
-    } catch {
-      showMessage('error', '网络错误')
-      setEmailChange((prev) => ({ ...prev, loading: false }))
-    }
-  }
-
-  const handleConfirmEmailChange = async () => {
-    if (!emailChange.verificationCode) {
-      showMessage('error', '请输入验证码')
-      return
-    }
-
-    setEmailChange((prev) => ({ ...prev, loading: true }))
-    try {
-      const response = await fetchWithCookie('/api/users/profile/email', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: emailChange.verificationCode }),
-      })
-      const data = await response.json()
-      if (data.success) {
-        showMessage('success', '邮箱已更新')
-        const updatedUser = { ...user, email: data.newEmail } as SettingsUser
+        const newEmail =
+          typeof data.data?.newEmail === 'string' ? data.data.newEmail : emailChange.newEmail
+        showMessage('success', data.data?.message || '邮箱修改成功，请重新登录')
+        const updatedUser = { ...user, email: newEmail } as SettingsUser
         setUserLocal(updatedUser)
         setUser(updatedUser)
         persistUserToStorage(updatedUser)
@@ -326,8 +282,7 @@ function SettingsPageContent() {
                   onFormDataChange={setFormData}
                   onEmailChange={setEmailChange}
                   onShowPasswordsChange={setShowPasswords}
-                  onSendVerificationCode={handleSendVerificationCode}
-                  onConfirmEmailChange={handleConfirmEmailChange}
+                  onSubmitEmailChange={handleSubmitEmailChange}
                   onCancelEmailChange={handleCancelEmailChange}
                   onPasswordChange={handlePasswordChange}
                 />

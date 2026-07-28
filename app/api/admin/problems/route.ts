@@ -20,10 +20,10 @@ export const GET = withApi.admin(async (req) => {
   const q = url.searchParams.get('q') || undefined
   const pageStr = url.searchParams.get('page')
   const pageSizeStr = url.searchParams.get('pageSize')
-  const tagIdsParam = url.searchParams.get('tagIds') || url.searchParams.get('tags')
+  const tagIdsParam = url.searchParams.get('tagIds')
   const page = pageStr ? parseInt(pageStr, 10) : undefined
   const pageSize = pageSizeStr ? parseInt(pageSizeStr, 10) : undefined
-  // tagIds 以逗号分隔（兼容 tags 参数名）
+  // tagIds 以逗号分隔
   const tagIds = tagIdsParam
     ? tagIdsParam.split(',').map(s => s.trim()).filter(Boolean)
     : undefined

@@ -13,6 +13,15 @@ import {
   updateAdminProblem,
   deleteAdminProblem,
 } from '@/lib/problem/service'
+import { resolveClientIp } from '@/lib/http/client-ip'
+
+function auditIpFromReq(req: Request): string | undefined {
+  const ip = resolveClientIp(
+    req.headers.get('x-forwarded-for'),
+    req.headers.get('x-real-ip')
+  )
+  return ip === 'unknown' ? undefined : ip
+}
 
 /**
  * GET /api/admin/problems/[id] - 获取题目详情（管理员）
@@ -32,8 +41,8 @@ export const PATCH = withApi.admin(async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
-  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
-  return ok(await updateAdminProblem(id, body, { id: user.id, username: user.username, ip: ip ?? undefined }))
+  const ip = auditIpFromReq(req)
+  return ok(await updateAdminProblem(id, body, { id: user.id, username: user.username, ip }))
 })
 
 /**
@@ -43,8 +52,8 @@ export const PUT = withApi.admin(async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   const body = await readJson<Record<string, any>>(req)
-  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
-  return ok(await updateAdminProblem(id, body, { id: user.id, username: user.username, ip: ip ?? undefined }))
+  const ip = auditIpFromReq(req)
+  return ok(await updateAdminProblem(id, body, { id: user.id, username: user.username, ip }))
 })
 
 /**

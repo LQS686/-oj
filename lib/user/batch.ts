@@ -9,7 +9,6 @@ import {
   validateUsername,
   validatePassword,
 } from '@/lib/api/validation'
-import { escapeHtml } from '@/lib/sanitize'
 import { getAssignableRoles } from './admin'
 
 /* ============================================================================
@@ -65,8 +64,42 @@ function getBatchRoleDefaults(role: BatchUserRole) {
 }
 
 /**
+ * 按 RFC4180 解析一行 CSV（支持引号字段与 "" 转义）
+ */
+function parseCsvLine(line: string): string[] {
+  const values: string[] = []
+  let cur = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          cur += '"'
+          i++
+        } else {
+          inQuotes = false
+        }
+      } else {
+        cur += ch
+      }
+    } else if (ch === '"') {
+      inQuotes = true
+    } else if (ch === ',') {
+      values.push(cur.trim())
+      cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  values.push(cur.trim())
+  return values
+}
+
+/**
  * 解析 CSV 文本。表头需含 username、password；email / role 可选。
  * 行号对应文件原始行号（含表头），空白行跳过；格式无效行记入 parseErrors。
+ * 字段支持 RFC4180 引号转义（如 `"Smith, Jr."`、`""`）。
  */
 export function parseBatchRegisterCSV(csvText: string): ParseBatchCsvResult {
   const lines = csvText.split(/\r?\n/)
@@ -84,7 +117,7 @@ export function parseBatchRegisterCSV(csvText: string): ParseBatchCsvResult {
     return { users, parseErrors }
   }
 
-  const headers = lines[headerLineIdx].toLowerCase().split(',').map((h) => h.trim())
+  const headers = parseCsvLine(lines[headerLineIdx].toLowerCase())
   const usernameIndex = headers.findIndex((h) => h === 'username')
   const emailIndex = headers.findIndex((h) => h === 'email')
   const passwordIndex = headers.findIndex((h) => h === 'password')
@@ -99,7 +132,7 @@ export function parseBatchRegisterCSV(csvText: string): ParseBatchCsvResult {
     const line = lines[i].trim()
     if (!line) continue
 
-    const values = line.split(',').map((v) => v.trim())
+    const values = parseCsvLine(line)
     const username = values[usernameIndex] || ''
     const password = values[passwordIndex] || ''
 
@@ -230,7 +263,7 @@ export async function batchRegisterUsers(
         })
         continue
       }
-      const sanitizedUsername = escapeHtml(trimmedUsername)
+      const sanitizedUsername = trimmedUsername
       const sanitizedEmail = trimmedEmail
 
       const existingUsername = await prisma.user.findUnique({
@@ -258,6 +291,17 @@ export async function batchRegisterUsers(
             username: sanitizedUsername,
             email: sanitizedEmail,
             error: '邮箱已存在',
+          })
+          continue
+        }
+        const { isEmailInHoldPeriod } = await import('@/lib/user/auth-actions')
+        if (await isEmailInHoldPeriod(sanitizedEmail)) {
+          result.failed++
+          result.errors.push({
+            row: rowNumber,
+            username: sanitizedUsername,
+            email: sanitizedEmail,
+            error: '该邮箱处于改绑冷却期，暂时不可注册',
           })
           continue
         }

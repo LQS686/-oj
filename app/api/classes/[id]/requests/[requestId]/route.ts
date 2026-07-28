@@ -27,7 +27,6 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   }
   const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以操作')
-  const memberRole = member!.role
 
   return ok(
     await decideClassJoinRequest({
@@ -35,7 +34,6 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
       requestId,
       action: body.action as 'approve' | 'reject',
       operatorUserId: user.id,
-      operatorRole: memberRole,
     })
   )
 })

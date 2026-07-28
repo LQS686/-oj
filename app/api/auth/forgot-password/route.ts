@@ -19,6 +19,7 @@ import { findUserByEmail, hashPassword } from '@/lib/auth/service'
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/email'
 import { getSystemSettings } from '@/lib/settings'
+import { clearUserCache } from '@/lib/user/profile'
 
 // 可读字符集（去除易混淆的 0/O/1/l/I）
 const PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
@@ -89,12 +90,13 @@ export const POST = withApi.public(async (req) => {
     return fail('EMAIL_ERROR', result.error || '邮件发送失败，请稍后重试或联系管理员', 503)
   }
 
-  // 发信成功后再将新密码哈希入库
+  // 发信成功后再将新密码哈希入库；递增 tokenVersion 使旧会话立即失效
   const hashed = await hashPassword(tempPassword)
   await prisma.user.update({
     where: { id: user.id },
-    data: { password: hashed }
+    data: { password: hashed, tokenVersion: { increment: 1 } },
   })
+  clearUserCache(user.id)
 
   return ok({ message: '新密码已发送至邮箱，请查收' })
 })

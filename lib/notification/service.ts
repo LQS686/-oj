@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { CacheKeys } from '@/lib/constants/cache-keys'
 import { emitNotification } from '@/lib/websocket/server'
 import { logger } from '@/lib/logger'
 import { DEFAULT_PAGE_SIZE } from '@/lib/types/common'
@@ -39,7 +40,7 @@ export async function listNotifications(
     prisma.notification.count({ where }),
     prisma.notification.count({ where: { userId: filter.userId, isRead: false } }),
   ])
-  return { items, total, unreadCount, page, pageSize }
+  return { items, notifications: items, total, unreadCount, page, pageSize }
 }
 
 export async function createNotification(data: NotificationData) {
@@ -97,7 +98,7 @@ export async function createNotifications(notifications: NotificationData[]) {
 }
 
 export async function clearNotificationCache(userId: string) {
-  cache.delete(`notification:unread:${userId}`)
+  cache.delete(CacheKeys.notification.unread(userId))
 }
 
 /** 静默同步未读角标（无桌面通知文案） */
@@ -117,7 +118,7 @@ export async function markRead(id: string, userId: string) {
     data: { isRead: true },
   })
   clearNotificationCache(userId)
-  await pushUnreadCount(userId)
+  void pushUnreadCount(userId).catch(() => {})
   return result
 }
 
@@ -127,14 +128,14 @@ export async function markAllRead(userId: string) {
     data: { isRead: true },
   })
   clearNotificationCache(userId)
-  await pushUnreadCount(userId)
+  void pushUnreadCount(userId).catch(() => {})
   return result
 }
 
 export async function deleteNotification(id: string, userId: string) {
   const result = await prisma.notification.deleteMany({ where: { id, userId } })
   clearNotificationCache(userId)
-  await pushUnreadCount(userId)
+  void pushUnreadCount(userId).catch(() => {})
   return result
 }
 

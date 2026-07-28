@@ -5,6 +5,7 @@
 import jwt from 'jsonwebtoken'
 import type { NextRequest } from 'next/server'
 import dotenv from 'dotenv'
+import { readAuthTokenFromRequest } from './cookie'
 
 // 加载环境变量
 dotenv.config()
@@ -69,16 +70,8 @@ export function verifyToken(token: string): JWTPayload | null {
 }
 
 export function getTokenFromRequest(request: NextRequest): string | null {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7)
-    if (token && token !== 'null' && token !== 'undefined' && token.split('.').length === 3) {
-      return token
-    }
-  }
-
-  const token = request.cookies.get('token')?.value
-  return token || null
+  // 仅 Cookie 会话；不接受 Authorization Bearer（避免 CSRF 旁路与双通道）
+  return readAuthTokenFromRequest(request)
 }
 
 export function getUserFromRequest(request: NextRequest): JWTPayload | null {
@@ -87,4 +80,5 @@ export function getUserFromRequest(request: NextRequest): JWTPayload | null {
   return verifyToken(token)
 }
 
-export * from './service'
+// 注意：勿在此 barrel 再导出 ./service（会把 prisma/cache/ioredis 拉进客户端图）
+// 需要 findUserById / hashPassword 等请直接 import '@/lib/auth/service'

@@ -19,6 +19,7 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/submissions': { maxRequests: 20, windowMs: 60000 },
   '/api/solutions': { maxRequests: 10, windowMs: 60000 },
   '/api/classes': { maxRequests: 20, windowMs: 60000 },
+  '/api/search': { maxRequests: 30, windowMs: 60000 },
 }
 
 /**
@@ -43,8 +44,7 @@ function findRateLimitConfig(pathname: string): { maxRequests: number; windowMs:
 }
 
 /**
- * CSRF 防护：对写操作校验 Origin / Referer，防止跨站请求伪造。
- * 同源判定：Origin 或 Referer 的 host 必须与当前请求 Host 一致。
+ * CSRF 防护：写操作必须同源，且禁止「无 Origin 也无 Referer」的模糊放行。
  */
 function isAllowedOrigin(request: NextRequest): boolean {
   if (!WRITE_METHODS.has(request.method.toUpperCase())) {
@@ -52,38 +52,29 @@ function isAllowedOrigin(request: NextRequest): boolean {
   }
 
   const host = request.headers.get('host')
-  if (!host) {
-    // 修复 P0：无 Host 头视为异常，fail-closed 拒绝写方法。
-    //   仅读取 Host 失败时（理论上不应发生在 Next.js）才放行。
-    return false
-  }
+  if (!host) return false
 
   const origin = request.headers.get('origin')
   const referer = request.headers.get('referer')
 
-  // 优先校验 Origin
   if (origin) {
     try {
-      const originHost = new URL(origin).host
-      return originHost === host
+      return new URL(origin).host === host
     } catch {
       return false
     }
   }
 
-  // Origin 缺失时回退到 Referer
   if (referer) {
     try {
-      const refererHost = new URL(referer).host
-      return refererHost === host
+      return new URL(referer).host === host
     } catch {
       return false
     }
   }
 
-  // 同源 POST 且无 Origin/Referer：浏览器同源请求至少会携带 Referer
-  // 缺失两者可能是非浏览器客户端（curl / 服务端调用），放行由鉴权层处理
-  return true
+  // 无 Origin/Referer 的写请求一律拒绝
+  return false
 }
 
 export async function middleware(request: NextRequest) {
@@ -123,12 +114,27 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/api/')) {
-    // CSRF 校验：写操作必须同源
-    if (!isAllowedOrigin(request)) {
-      return new NextResponse(
-        JSON.stringify({ success: false, error: '跨站请求被拒绝', code: 'CSRF_REJECTED' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      )
+    // CSRF：同源 Origin/Referer + 双提交 Cookie（/api/auth/csrf 自身除外）
+    if (WRITE_METHODS.has(request.method.toUpperCase())) {
+      if (!isAllowedOrigin(request)) {
+        return new NextResponse(
+          JSON.stringify({ success: false, error: '跨站请求被拒绝', code: 'CSRF_REJECTED' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+      if (pathname !== '/api/auth/csrf') {
+        const { verifyCsrfToken } = await import('@/lib/security/csrf')
+        if (!verifyCsrfToken(request)) {
+          return new NextResponse(
+            JSON.stringify({
+              success: false,
+              error: 'CSRF token 缺失或校验失败',
+              code: 'CSRF_INVALID',
+            }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+          )
+        }
+      }
     }
 
     const baseConfig = findRateLimitConfig(pathname)

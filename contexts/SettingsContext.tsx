@@ -1,23 +1,8 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
-import { settingsApi } from '@/lib/api'
-import type { SystemSettings } from '@/lib/settings'
-
-const defaultSettings: SystemSettings = {
-  siteName: '大山 OJ',
-  siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
-  allowRegistration: true,
-  allowGuestSubmission: false,
-  defaultLanguage: 'cpp',
-  maxSubmissionSize: 65536,
-  smtpHost: '',
-  smtpPort: 465,
-  smtpUser: '',
-  smtpFrom: '',
-  smtpPassword: '',
-  smtpSecure: true
-}
+import { settingsApi } from '@/lib/api/settings'
+import { defaultSettings, type SystemSettings } from '@/lib/settings-defaults'
 
 interface SettingsContextType {
   settings: SystemSettings
@@ -28,39 +13,46 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<SystemSettings>(defaultSettings)
+  const [settings, setSettings] = useState<SystemSettings>({
+    ...defaultSettings,
+    judge: { ...defaultSettings.judge },
+  })
   const [loading, setLoading] = useState(true)
 
   const fetchSettings = useCallback(async () => {
     try {
       const settingsData = await settingsApi.getPublicSettings()
-      const merged = { ...defaultSettings, ...settingsData }
+      const merged: SystemSettings = {
+        ...defaultSettings,
+        ...settingsData,
+        judge: { ...defaultSettings.judge },
+      }
       // 防御：若 API 返回空字符串（绕过后端校验的脏数据），回退到默认品牌信息
       merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
-      merged.siteDescription = (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
+      merged.siteDescription =
+        (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
       setSettings(merged)
-    } catch (error) {
-      console.error('获取系统设置失败:', error)
+    } catch {
+      // 使用默认设置
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchSettings()
+    void fetchSettings()
   }, [fetchSettings])
 
-  const value = useMemo(() => ({
-    settings,
-    loading,
-    refreshSettings: fetchSettings,
-  }), [settings, loading, fetchSettings])
-
-  return (
-    <SettingsContext.Provider value={value}>
-      {children}
-    </SettingsContext.Provider>
+  const value = useMemo(
+    () => ({
+      settings,
+      loading,
+      refreshSettings: fetchSettings,
+    }),
+    [settings, loading, fetchSettings],
   )
+
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
 }
 
 export function useSettings() {
@@ -70,5 +62,3 @@ export function useSettings() {
   }
   return context
 }
-
-export { defaultSettings }

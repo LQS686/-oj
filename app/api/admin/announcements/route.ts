@@ -25,8 +25,10 @@ export const POST = withApi.systemAdmin(async (req, _ctx, { user }) => {
   if (!body.title?.trim()) throw400('MISSING_TITLE', '请填写公告标题')
   if (!body.content?.trim()) throw400('MISSING_CONTENT', '请填写公告内容')
 
-  const title = body.title!
+  const title = body.title!.trim()
   const content = body.content!
+  if (title.length > 200) throw400('TITLE_TOO_LONG', '公告标题不能超过 200 字')
+  if (content.length > 50_000) throw400('CONTENT_TOO_LONG', '公告内容不能超过 50000 字')
 
   const created = await createAnnouncement({
     title,

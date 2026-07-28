@@ -61,6 +61,8 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('@/lib/error-monitor', () => ({
   errorMonitor: {
     trackError: vi.fn(),
+    isBlockedAsync: vi.fn().mockResolvedValue(false),
+    isBlocked: vi.fn().mockReturnValue(false),
   },
 }))
 
@@ -182,14 +184,14 @@ describe('loginUser', () => {
     expect(result.user.username).toBe('alice')
   })
 
-  it('应剥离 username 中的 HTML 转义字符（XSS 防护）', async () => {
+  it('登录查询使用原始 username（不做 HTML 转义入库查询）', async () => {
     fakePrisma.user.findFirst.mockResolvedValue(null)
     await expect(
       loginUser({ username: '<script>alert(1)</script>', password: 'pwd' })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
-    // findFirst 的 username 应该是转义后的（不含原始 HTML）
     const callArgs = fakePrisma.user.findFirst.mock.calls[0][0]
-    expect(callArgs.where.OR[0].username).not.toContain('<script>')
+    // 用户名仅 trim/去 NUL，非法字符不会通过注册校验；登录侧按字面匹配
+    expect(callArgs.where.OR[0].username).toBe('<script>alert(1)</script>')
   })
 
   it('应剥离 username 中的 NUL 字节', async () => {
@@ -201,17 +203,10 @@ describe('loginUser', () => {
     expect(callArgs.where.OR[0].username).not.toContain('\u0000')
   })
 
-  it('Redis 不可用时应降级（不阻塞登录）', async () => {
+  it('Redis 已配置但不可用时应 fail-closed 拒绝登录', async () => {
     mockRedis.get.mockRejectedValue(new Error('Redis down'))
-    fakePrisma.user.findFirst.mockResolvedValue({
-      id: 'u1', username: 'alice', email: 'a@a.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rating: 0, rank: 'gray',
-      color: '#999', role: 'USER', isBanned: false, tokenVersion: 0,
-      createdAt: new Date(),
+    await expect(loginUser({ username: 'alice', password: 'pwd' })).rejects.toMatchObject({
+      code: 'AUTH_UNAVAILABLE',
     })
-    bcryptCompare.mockResolvedValue(true)
-    // 即便 redis 抛错也不应阻塞登录（只 warn）
-    const result = await loginUser({ username: 'alice', password: 'pwd' })
-    expect(result.user.username).toBe('alice')
   })
 })

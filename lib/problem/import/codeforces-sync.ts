@@ -10,7 +10,7 @@
  *
  * 安全：使用 safeFetch（SSRF 防护），统一网络出口策略。
  */
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { safeFetch } from '@/lib/security/safe-fetch'
 import { logger } from '@/lib/logger'
 import type { ImportedProblem } from './types'

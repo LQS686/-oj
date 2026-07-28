@@ -6,7 +6,7 @@
 import { prisma } from '@/lib/prisma'
 import { createNotifications } from '@/lib/notification/service'
 import { isClassAdminRole } from '@/lib/class/roles'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 
 /* ============================================================================
  * 加入申请
@@ -36,6 +36,19 @@ export async function createOrReuseJoinRequest(
   if (existingRequest) {
     if (existingRequest.status === 'pending') {
       return { ok: false, error: '您已提交过申请，请等待审批', code: 400 }
+    }
+    // 被拒绝后冷却 10 分钟，防止对管理员刷通知
+    if (existingRequest.status === 'rejected' && existingRequest.reviewedAt) {
+      const cooldownMs = 10 * 60 * 1000
+      const elapsed = Date.now() - new Date(existingRequest.reviewedAt).getTime()
+      if (elapsed < cooldownMs) {
+        const minutes = Math.ceil((cooldownMs - elapsed) / 60000)
+        return {
+          ok: false,
+          error: `申请被拒绝后需等待 ${minutes} 分钟再重新申请`,
+          code: 429,
+        }
+      }
     }
     // 已被处理（approved/rejected）：更新为新申请
     const updated = await prisma.classJoinRequest.update({
@@ -126,17 +139,20 @@ export interface DecideJoinRequestInput {
   requestId: string
   action: 'approve' | 'reject'
   operatorUserId: string
-  operatorRole: string
 }
 
 /**
  * 校验班级加入申请：班级存在性、申请存在性、操作者权限（owner / assistant）
+ * operatorRole 在服务端按 membership 重查，不信任调用方传入。
  */
 export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
   const classRecord = await prisma.class.findUnique({ where: { id: input.classId } })
   if (!classRecord) throw new ApiError('NOT_FOUND', '班级不存在', 404)
 
-  if (!isClassAdminRole(input.operatorRole)) {
+  const operator = await prisma.classMember.findUnique({
+    where: { classId_userId: { classId: input.classId, userId: input.operatorUserId } },
+  })
+  if (!operator || !isClassAdminRole(operator.role)) {
     throw new ApiError('FORBIDDEN', '无权处理加入申请', 403)
   }
 
@@ -159,7 +175,7 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
       // 已经存在成员，仅更新申请状态
       await prisma.classJoinRequest.update({
         where: { id: input.requestId },
-        data: { status: 'approved' },
+        data: { status: 'approved', reviewerId: input.operatorUserId, reviewedAt: new Date() },
       })
       return { message: '该用户已是班级成员' }
     }
@@ -176,7 +192,11 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
       })
       await tx.classJoinRequest.update({
         where: { id: input.requestId },
-        data: { status: 'approved' },
+        data: {
+          status: 'approved',
+          reviewerId: input.operatorUserId,
+          reviewedAt: new Date(),
+        },
       })
     })
     return { message: '已批准加入申请' }
@@ -185,7 +205,11 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
   // 拒绝
   await prisma.classJoinRequest.update({
     where: { id: input.requestId },
-    data: { status: 'rejected' },
+    data: {
+      status: 'rejected',
+      reviewerId: input.operatorUserId,
+      reviewedAt: new Date(),
+    },
   })
   return { message: '已拒绝加入申请' }
 }

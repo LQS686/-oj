@@ -51,7 +51,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     tags?: string[]
     timeLimit?: number
     memoryLimit?: number
-    isPublic?: boolean
+    visibility?: 'public' | 'private' | 'contest'
     testCases?: any[]
   }>(req)
 
@@ -108,7 +108,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
       tags: body.tags || [],
       timeLimit: body.timeLimit,
       memoryLimit: body.memoryLimit,
-      isPublic: body.isPublic ?? false,
+      visibility: body.visibility ?? 'private',
       testCases: processedTestCases,
       authorId: user.id,
     })

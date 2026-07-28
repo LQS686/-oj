@@ -47,13 +47,22 @@ export interface CreateProblemInput {
   memoryLimit?: number
   comparisonMode?: string
   realPrecision?: number
-  isPublic?: boolean
+  spjCode?: string | null
+  /** 可见性：唯一真相源；缺省 private */
+  visibility?: 'public' | 'private' | 'contest'
   testCases?: TestCaseInput[]
   authorId: string
 }
 
 export async function createProblemWithTestcases(input: CreateProblemInput) {
-  const VALID_COMPARISON_MODES = ['default', 'strict', 'ignore-spaces', 'real-number']
+  const VALID_COMPARISON_MODES = [
+    'default',
+    'strict',
+    'ignore-spaces',
+    'real-number',
+    'special-judge',
+  ]
+  const visibility = input.visibility ?? 'private'
   const problem = await prisma.problem.create({
     data: {
       title: input.title,
@@ -75,7 +84,9 @@ export async function createProblemWithTestcases(input: CreateProblemInput) {
         typeof input.realPrecision === 'number' && input.realPrecision >= 0
           ? input.realPrecision
           : 3,
-      isPublic: input.isPublic ?? false,
+      spjCode: input.spjCode ?? null,
+      visibility,
+      isPublic: visibility === 'public',
       authorId: input.authorId,
     },
   })

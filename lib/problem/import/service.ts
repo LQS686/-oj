@@ -7,7 +7,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { ApiError } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { isValidDifficulty, normalizeDifficulty, type Difficulty } from '@/lib/constants'
 import { clearProblemCache } from '../admin'
 import { redistributeTestScores } from '../testcase'
@@ -219,6 +219,7 @@ async function createOne(
       visibility,
       stdCode: problem.stdCode || null,
       stdLang: problem.stdLang || null,
+      spjCode: problem.spjCode || null,
       author: { connect: { id: options.authorId } },
       testCases: { create: testCasesData },
     },
@@ -279,6 +280,7 @@ async function overwriteOne(
         visibility,
         stdCode: problem.stdCode || null,
         stdLang: problem.stdLang || null,
+        spjCode: problem.spjCode || null,
       },
     }),
     prisma.testCase.deleteMany({ where: { problemId: existingId } }),

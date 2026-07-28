@@ -113,7 +113,7 @@ export function useSubmissionSocket({
       return
     }
 
-    const socket = acquireAppSocket()
+    const socket = acquireAppSocket(userId)
     socketRef.current = socket
 
     const markJoinedAndNotify = (joinedUserId: string) => {
@@ -188,7 +188,7 @@ export function useSubmissionSocket({
       socket.off('submission:update', onSubmission)
       socket.off('judge:progress', onProgress)
       socket.off('notification', onNotify)
-      if (watchSubmissionIdRef.current) {
+      if (watchSubmissionIdRef.current && socket.connected) {
         socket.emit('unwatchSubmission', watchSubmissionIdRef.current)
       }
       socketRef.current = null

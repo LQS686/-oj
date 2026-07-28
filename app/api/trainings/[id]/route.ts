@@ -11,6 +11,7 @@ import {
 import { canViewTraining, loadTrainingAccess } from '@/lib/training/access'
 import { isObjectId } from '@/lib/api/validation'
 import { verifyToken } from '@/lib/auth'
+import { readAuthTokenFromRequest } from '@/lib/auth/cookie'
 import { prisma } from '@/lib/prisma'
 import { canAccessAdmin, canManageContent } from '@/lib/permissions'
 
@@ -18,7 +19,7 @@ export const GET = withApi.public(async (req, ctx) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
-  const token = req.cookies.get('token')?.value
+  const token = readAuthTokenFromRequest(req)
   const userId = token ? verifyToken(token)?.userId ?? null : null
 
   const access = await loadTrainingAccess(id)

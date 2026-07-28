@@ -7,10 +7,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "tsx --conditions=react-server server.ts",
     "dev:default": "next dev",
     "build": "next build",
-    "start": "tsx server.ts",
+    "start": "tsx --conditions=react-server server.ts",
     "start:default": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -53,12 +53,14 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "server-only": "^0.0.1",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "swr": "^2.4.1",
     "tailwind-merge": "^3.3.1",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",

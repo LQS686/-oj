@@ -4,7 +4,10 @@
  */
 
 import { prisma } from '@/lib/prisma'
-import { isAcceptedStatus } from '@/lib/constants/submission-status'
+import { isAcceptedStatus, SubmissionStatus } from '@/lib/constants/submission-status'
+
+/** 统计/列表默认排除已从作业移除的提交 */
+const ACTIVE_SUBMISSION_WHERE = { status: { not: SubmissionStatus.REMOVED } }
 
 /* ============================================================================
  * 班级作业（增强 service：列表统计 / 创建 / 详情 / 统计 / 提交 / 进度）
@@ -82,7 +85,7 @@ export async function listClassAssignmentsWithStats(
   const allSubmissions =
     assignmentIds.length > 0
       ? await prisma.classAssignmentSubmission.findMany({
-          where: { assignmentId: { in: assignmentIds } },
+          where: { assignmentId: { in: assignmentIds }, ...ACTIVE_SUBMISSION_WHERE },
         })
       : []
 
@@ -162,7 +165,9 @@ export async function getClassAssignmentDetail(
         user: { select: { username: true, nickname: true, avatar: true } },
       },
     }),
-    prisma.classAssignmentSubmission.findMany({ where: { assignmentId } }),
+    prisma.classAssignmentSubmission.findMany({
+      where: { assignmentId, ...ACTIVE_SUBMISSION_WHERE },
+    }),
   ])
   if (!assignment) return null
   return { assignment, members, submissions }
@@ -185,7 +190,9 @@ export async function computeAssignmentStatistics(
         user: { select: { username: true, nickname: true, avatar: true } },
       },
     }),
-    prisma.classAssignmentSubmission.findMany({ where: { assignmentId } }),
+    prisma.classAssignmentSubmission.findMany({
+      where: { assignmentId, ...ACTIVE_SUBMISSION_WHERE },
+    }),
     prisma.problem.findMany({
       where: { id: { in: assignment.problemIds } },
     }),
@@ -370,6 +377,7 @@ export async function listAssignmentSubmissions(
   if (filter.userId) where.userId = filter.userId
   if (filter.problemId) where.problemId = filter.problemId
   if (filter.status) where.status = filter.status
+  else where.status = { not: SubmissionStatus.REMOVED }
 
   const [total, submissions] = await Promise.all([
     prisma.classAssignmentSubmission.count({ where }),
@@ -471,7 +479,7 @@ export async function getMyAssignmentProgress(
   if (!assignment) return null
 
   const submissions = await prisma.classAssignmentSubmission.findMany({
-    where: { assignmentId, userId },
+    where: { assignmentId, userId, ...ACTIVE_SUBMISSION_WHERE },
   })
 
   const problemScores: { [k: string]: { score: number; submitted: boolean } } = {}

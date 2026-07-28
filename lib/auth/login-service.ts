@@ -1,62 +1,19 @@
+/**
+ * lib/auth/login-service.ts
+ * 登录：账号锁定 + 密码校验 + 签发 JWT（仅用于 Cookie）
+ */
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { signToken } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { trimAll, escapeHtml, removeNullBytes } from '@/lib/sanitize'
+import { trimAll, removeNullBytes } from '@/lib/sanitize'
 import { validateRequired } from '@/lib/api/validation'
 import { errorMonitor } from '@/lib/error-monitor'
-import type { LoginResponse } from '@/lib/api/auth'
 import { getRedisClient, isRedisConfigured } from '@/lib/redis'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 const MAX_LOGIN_ATTEMPTS = 5
 const LOCKOUT_DURATION_SEC = 15 * 60
-
-async function checkAccountLockout(usernameOrEmail: string): Promise<void> {
-  const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
-  // 未配置 REDIS_URL 时不连 localhost，避免无效连接噪声
-  if (!isRedisConfigured()) return
-  try {
-    const client = getRedisClient()
-    const attempts = await client.get(key)
-    if (attempts && parseInt(attempts, 10) >= MAX_LOGIN_ATTEMPTS) {
-      const ttl = await client.ttl(key)
-      const minutes = Math.ceil((ttl > 0 ? ttl : LOCKOUT_DURATION_SEC) / 60)
-      throw new LoginError(
-        `登录失败次数过多，账号已临时锁定，请 ${minutes} 分钟后重试`,
-        'ACCOUNT_LOCKED'
-      )
-    }
-  } catch (e) {
-    if (e instanceof LoginError) throw e
-    logger.warn('Redis 不可用，跳过账号锁定检查', e)
-  }
-}
-
-async function recordLoginFailure(usernameOrEmail: string): Promise<void> {
-  if (!isRedisConfigured()) return
-  const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
-  try {
-    const client = getRedisClient()
-    const multi = client.multi()
-    multi.incr(key)
-    multi.expire(key, LOCKOUT_DURATION_SEC)
-    await multi.exec()
-  } catch {
-    logger.warn('Redis 不可用，跳过登录失败记录')
-  }
-}
-
-async function clearLoginAttempts(usernameOrEmail: string): Promise<void> {
-  if (!isRedisConfigured()) return
-  const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
-  try {
-    const client = getRedisClient()
-    await client.del(key)
-  } catch (e) {
-    // 登录成功后清理失败不影响主流程，但需记录便于排查 Redis 连接问题
-    logger.warn('Redis 不可用，跳过登录失败计数清理', e instanceof Error ? e : new Error(String(e)))
-  }
-}
 
 export class LoginError extends Error {
   constructor(message: string, public code: string = 'AUTH_ERROR') {
@@ -68,13 +25,6 @@ export class LoginError extends Error {
 export interface LoginInput {
   username: string
   password: string
-}
-
-export interface RegisterInput {
-  username: string
-  email: string
-  password: string
-  nickname?: string
 }
 
 export interface UserResponse {
@@ -91,13 +41,78 @@ export interface UserResponse {
   createdAt: string
 }
 
-function mapUserToResponse(user: any): UserResponse {
+/** 服务端登录结果：token 仅用于写 Cookie，不下发响应体 */
+export interface LoginResult {
+  user: UserResponse
+  token: string
+}
+
+async function checkAccountLockout(usernameOrEmail: string): Promise<void> {
+  const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
+  if (!isRedisConfigured()) return
+  try {
+    const client = getRedisClient()
+    const attempts = await client.get(key)
+    if (attempts && parseInt(attempts, 10) >= MAX_LOGIN_ATTEMPTS) {
+      const ttl = await client.ttl(key)
+      const minutes = Math.ceil((ttl > 0 ? ttl : LOCKOUT_DURATION_SEC) / 60)
+      throw new LoginError(
+        `登录失败次数过多，账号已临时锁定，请 ${minutes} 分钟后重试`,
+        'ACCOUNT_LOCKED'
+      )
+    }
+  } catch (e) {
+    if (e instanceof LoginError) throw e
+    logger.error('Redis 不可用，拒绝登录（账号锁定检查失败）', e)
+    throw new LoginError('登录服务暂时不可用，请稍后重试', 'AUTH_UNAVAILABLE')
+  }
+}
+
+async function recordLoginFailure(usernameOrEmail: string): Promise<void> {
+  if (!isRedisConfigured()) return
+  const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
+  try {
+    const client = getRedisClient()
+    const multi = client.multi()
+    multi.incr(key)
+    multi.expire(key, LOCKOUT_DURATION_SEC)
+    await multi.exec()
+  } catch (e) {
+    logger.error('Redis 不可用，无法记录登录失败次数', e)
+  }
+}
+
+async function clearLoginAttempts(usernameOrEmail: string): Promise<void> {
+  if (!isRedisConfigured()) return
+  const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
+  try {
+    const client = getRedisClient()
+    await client.del(key)
+  } catch (e) {
+    logger.warn('Redis 不可用，跳过登录失败计数清理', e instanceof Error ? e : new Error(String(e)))
+  }
+}
+
+function mapUserToResponse(user: {
+  id: string
+  username: string
+  email: string
+  nickname: string | null
+  avatar: string | null
+  bio: string | null
+  rating: number
+  rank: string
+  color: string
+  role: string
+  createdAt: Date
+}): UserResponse {
+  const avatar = sanitizeAvatarUrl(user.avatar)
   return {
     id: user.id,
     username: user.username,
     email: user.email,
     nickname: user.nickname ?? undefined,
-    avatar: user.avatar ?? undefined,
+    avatar: avatar ?? undefined,
     bio: user.bio ?? undefined,
     rating: user.rating,
     rank: user.rank,
@@ -107,32 +122,30 @@ function mapUserToResponse(user: any): UserResponse {
   }
 }
 
-export async function loginUser(input: LoginInput): Promise<LoginResponse> {
+export async function loginUser(input: LoginInput): Promise<LoginResult> {
   try {
     const trimmedInput = trimAll(input as unknown as Record<string, unknown>)
     const { username, password } = trimmedInput as unknown as LoginInput
 
     const requiredError = validateRequired(trimmedInput, ['username', 'password'])
     if (requiredError) {
-      logger.warn('登录尝试缺少字段', { input: trimmedInput })
       throw new LoginError('请输入用户名和密码', 'BAD_REQUEST')
     }
 
-    const sanitizedUsername = removeNullBytes(escapeHtml(username))
-
-    if (sanitizedUsername.length > 100) {
-      logger.warn('登录尝试用户名过长', { usernameLength: sanitizedUsername.length })
+    const sanitizedUsername = removeNullBytes(String(username).trim())
+    if (sanitizedUsername.length < 1 || sanitizedUsername.length > 100) {
       throw new LoginError('用户名格式不正确', 'BAD_REQUEST')
+    }
+
+    if (await errorMonitor.isBlockedAsync('auth')) {
+      throw new LoginError('登录暂时受限，请稍后再试', 'RATE_LIMITED')
     }
 
     await checkAccountLockout(sanitizedUsername)
 
     const user = await prisma.user.findFirst({
       where: {
-        OR: [
-          { username: sanitizedUsername },
-          { email: sanitizedUsername },
-        ],
+        OR: [{ username: sanitizedUsername }, { email: sanitizedUsername }],
       },
       select: {
         id: true,
@@ -153,20 +166,16 @@ export async function loginUser(input: LoginInput): Promise<LoginResponse> {
     })
 
     if (!user) {
-      logger.warn('登录失败: 用户不存在', { username: sanitizedUsername })
       await recordLoginFailure(sanitizedUsername)
       throw new LoginError('用户名或密码错误', 'UNAUTHORIZED')
     }
 
     if (user.isBanned) {
-      logger.warn('登录被阻止: 用户被封禁', { userId: user.id, username: user.username })
       throw new LoginError('账号已被封禁', 'FORBIDDEN')
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password)
-
     if (!isPasswordValid) {
-      logger.warn('登录失败: 密码错误', { userId: user.id, username: user.username })
       await recordLoginFailure(sanitizedUsername)
       throw new LoginError('用户名或密码错误', 'UNAUTHORIZED')
     }
@@ -181,10 +190,7 @@ export async function loginUser(input: LoginInput): Promise<LoginResponse> {
       tokenVersion: user.tokenVersion,
     })
 
-    const userResponse = mapUserToResponse(user)
-
-    logger.info('登录成功', { userId: user.id, username: user.username, role: user.role })
-    return { user: userResponse, token }
+    return { user: mapUserToResponse(user), token }
   } catch (error) {
     if (error instanceof LoginError) throw error
     errorMonitor.trackError(error as Error, { errorType: 'auth', operation: 'login' })
