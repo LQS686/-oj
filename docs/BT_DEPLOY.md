@@ -3,160 +3,28 @@
 ## 架构
 
 ```
-浏览器 → https://dsoj.run (宝塔 Nginx :443)
+浏览器 → Nginx :80/:443（宝塔）
+              ↓ 反代
+       127.0.0.1:3000（Docker app）
               ↓
-       127.0.0.1:3000 (Docker app 容器)
-              ↓
-        Docker 内部网络 (172.28.0.0/16)
-           ├── mongo:27017 (MongoDB 7 副本集)
-           └── redis:6379  (Redis 7)
+        Docker 网络 172.28.0.0/16
+           ├── mongo:27017（副本集 rs0）
+           └── redis:6379
 ```
 
-- **宝塔 Nginx**：负责 SSL 终止、域名路由、HTTPS
-- **Docker**：负责应用 + 数据库 + 缓存，与宿主机隔离
-- **宝塔 Redis**：保持运行不使用，Docker 内自有一套 Redis
+- **宝塔 Nginx**：SSL、域名、反向代理（含 WebSocket）
+- **Docker Compose**：应用 + MongoDB + Redis
+- 宝塔自带 Redis **不要占用**；本项目用容器内 Redis
 
 ---
 
-## 前置条件
+## 一键流程（推荐）
 
-1. 服务器已安装宝塔面板
-2. 域名 DNS 已解析到服务器 IP（可选，域名备案期间可用 IP 测试）
-3. 宝塔安全组已放行 80/443 端口
+### 1. 安装 Docker
 
----
+宝塔 → 软件商店 → **Docker管理器** → 安装。
 
-## 场景 A：域名已备案
-
-如果域名已备案完成，直接按下面的步骤操作即可。
-
----
-
-## 场景 B：域名备案中，先用 IP 测试
-
-如果域名还在备案，可以先用服务器 IP 测试，等备案完成后再切换。
-
-### 用 IP 测试的部署步骤
-
-1. **首次部署时使用 IP 作为站点 URL**：
-
-   ```bash
-   cd /www/wwwroot/dashan-oj
-   sudo bash scripts/bt-deploy.sh http://43.139.231.170
-   ```
-
-   > ⚠️ **注意**：URL 必须是 `http://` 开头，不能用 `https://`（IP 无法申请证书）。  
-   > 当前生产启动校验（`lib/env.ts`）**禁止** `FORCE_SECURE_COOKIE=false`。纯 HTTP 冒烟测试请二选一：  
-   > 1. 临时将容器 `NODE_ENV=development`（仅联调，勿当正式站）；  
-   > 2. 尽快切到 HTTPS（场景 A / 备案完成后切换），再保持 `FORCE_SECURE_COOKIE=true`。
-
-   若必须用 HTTP + 开发模式联调 Cookie：
-
-   ```bash
-   cd /www/wwwroot/dashan-oj
-   sed -i 's/^NODE_ENV=.*/NODE_ENV=development/' .env
-   sed -i 's/FORCE_SECURE_COOKIE=.*/FORCE_SECURE_COOKIE=false/' .env
-   docker compose up -d app
-   ```
-
-2. **宝塔 Nginx 配置（仅 HTTP）**：
-
-   宝塔 → 网站 → 添加站点 → 域名填 `dsoj.run`
-
-   配置文件使用以下简化版（无 SSL）：
-
-   ```nginx
-   server {
-       listen 80;
-       server_name dsoj.run;
-
-       client_max_body_size 50M;
-
-       location /socket.io/ {
-           proxy_pass http://127.0.0.1:3000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection "upgrade";
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_read_timeout 86400;
-       }
-
-       location / {
-           proxy_pass http://127.0.0.1:3000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection 'upgrade';
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_cache_bypass $http_upgrade;
-       }
-   }
-   ```
-
-3. **Cookie / 环境（HTTP 临时站）**：
-
-   ```bash
-   # 生产禁止 FORCE_SECURE_COOKIE=false；HTTP 联调请临时 NODE_ENV=development
-   sed -i 's/^NODE_ENV=.*/NODE_ENV=development/' .env
-   sed -i 's/FORCE_SECURE_COOKIE=.*/FORCE_SECURE_COOKIE=false/' .env
-   docker compose up -d app
-   ```
-
-   正式 HTTPS 上线前务必改回：
-
-   ```bash
-   sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' .env
-   sed -i 's/FORCE_SECURE_COOKIE=.*/FORCE_SECURE_COOKIE=true/' .env
-   # 并确认 REDIS_URL、ENCRYPTION_KEY、JWT_SECRET 已写入 .env（bt-deploy.sh 会生成）
-   docker compose up -d app
-   ```
-
-4. **测试访问**：
-
-   浏览器访问 `https://dsoj.run`，点击"注册"创建首个管理员账号
-
-### 域名备案完成后切换
-
-1. **修改 .env 文件**：
-
-   ```bash
-   cd /www/wwwroot/dashan-oj
-   # 编辑 .env，将 FRONTEND_URL 改为域名
-   sed -i 's|FRONTEND_URL=.*|FRONTEND_URL=https://dsoj.run|' .env
-   sed -i 's|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=https://dsoj.run|' .env
-   sed -i 's|NEXT_PUBLIC_BASE_URL=.*|NEXT_PUBLIC_BASE_URL=https://dsoj.run|' .env
-   ```
-
-2. **强制重新构建镜像**（必须，因为 `NEXT_PUBLIC_*` 在构建时硬编码）：
-
-   ```bash
-   # 启用 BuildKit 以使用 Dockerfile 中的 --mount=type=cache 缓存（apk/npm/next build）
-   # 首次构建会下载包到 host 缓存，后续 --no-cache 也能秒级复用
-   export DOCKER_BUILDKIT=1
-   docker compose build --no-cache app
-   docker compose up -d
-   ```
-
-3. **配置 Nginx SSL**：
-
-   宝塔 → 网站 → 找到原站点 → 添加域名 `dsoj.run` → SSL → Let's Encrypt → 申请证书
-
-   然后替换配置文件为下面的 HTTPS 版本。
-
----
-
-## 第一步：安装 Docker
-
-宝塔 → 软件商店 → 搜索「Docker管理器」→ 安装。
-
----
-
-## 第二步：克隆项目
-
-宝塔 → 终端（或 SSH 登录），执行：
+### 2. 克隆代码
 
 ```bash
 cd /www/wwwroot
@@ -164,98 +32,54 @@ git clone https://gitee.com/carefree-old-man/dashan-oj.git
 cd dashan-oj
 ```
 
----
+### 3. 执行部署脚本
 
-## 第三步：一键部署
+**已备案 / 已有 HTTPS 域名：**
 
 ```bash
 sudo bash scripts/bt-deploy.sh https://dsoj.run
 ```
 
-脚本会自动完成：
+**备案中，先用 IP 的 HTTP 测试：**
 
-1. 生成 `.env`（含 `JWT_SECRET` / `ENCRYPTION_KEY` / `REDIS_URL` / Mongo·Redis 密码；按 URL 协议设置 `FORCE_SECURE_COOKIE`）
-2. 生成 MongoDB 副本集 KeyFile
-3. 拉取基础镜像（MongoDB、Redis）
-4. 构建 OJ 应用镜像（约 5 分钟）
-5. 启动所有 Docker 服务
-6. 等待健康检查通过
-7. 输出 Nginx 配置供粘贴
+```bash
+sudo bash scripts/bt-deploy.sh http://你的服务器IP
+```
 
-> 生产启动另校验：`REDIS_URL`、`ENCRYPTION_KEY` 必填；HTTPS 站不得 `FORCE_SECURE_COOKIE=false`。
+脚本会自动：
 
----
+1. 检查 Docker / Compose / 磁盘（至少约 4GB 可用）
+2. 配置国内镜像加速（如尚未配置）
+3. 生成 `.env`（含 JWT / ENCRYPTION_KEY / Redis·Mongo 密码）
+4. 按 URL 协议设置 `FORCE_SECURE_COOKIE`（HTTP→false，HTTPS→true）
+5. 生成 `mongo-keyfile`
+6. 拉取基础镜像并构建应用（首次约 5–10 分钟）
+7. 先拉起 mongo/redis，再启动 app，并做健康检查
+8. 写出 Nginx 片段：`nginx/baota-proxy.conf`
 
-## 第四步：配置宝塔 Nginx
+> **说明**：HTTP 临时站可在 `NODE_ENV=production` 下运行（脚本已兼容）。  
+> 切勿在 HTTPS 站点关闭 Secure Cookie。
 
-脚本运行完后会输出 Nginx 配置。执行以下操作：
+### 4. 配置宝塔网站
 
-1. **宝塔 → 网站 → 添加站点**
-   - 域名：`dsoj.run`
-   - 其他默认即可
+1. 网站 → 添加站点 → 域名填脚本提示的域名（或 IP）
+2. HTTPS 站：SSL → Let's Encrypt → 申请证书
+3. 设置 → 配置文件 → 粘贴 `nginx/baota-proxy.conf` 内容并保存
 
-2. **SSL → Let's Encrypt → 申请证书**
+### 5. 验证
 
-3. **设置 → 配置文件 → 粘贴脚本输出的 Nginx 配置**
+浏览器打开站点 → **注册首个账号**（自动成为系统管理员）。
 
-配置模板如下（`替换域名`）：
+本机探针：
 
-```nginx
-server {
-    listen 80;
-    server_name dsoj.run;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name dsoj.run;
-
-    ssl_certificate /www/server/panel/vhost/cert/dsoj.run/fullchain.pem;
-    ssl_certificate_key /www/server/panel/vhost/cert/dsoj.run/privkey.pem;
-
-    client_max_body_size 50M;
-
-    # WebSocket 支持（评测提交）
-    location /socket.io/ {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_read_timeout 86400;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
+```bash
+curl -sf http://127.0.0.1:3000/healthcheck-static && echo OK
+curl -sf http://127.0.0.1:3000/api/health/db && echo DB_OK
 ```
 
 ---
 
-## 第五步：验证
-
-浏览器访问 `https://dsoj.run`（或 `http://服务器IP`）。
-
-> **注意**：系统管理员账号是**首位注册用户**，没有预设的 `admin` 账号。首次访问请点击"注册"创建管理员账号。
-
----
-
-## 升级更新
-
-在宝塔终端中执行：
+## 升级 / 切域名
 
 ```bash
 cd /www/wwwroot/dashan-oj
@@ -263,7 +87,17 @@ git pull
 sudo bash scripts/bt-deploy.sh
 ```
 
-脚本会自动重新构建应用镜像并重启服务，**数据库数据不受影响**。
+切到正式 HTTPS 域名（会更新 `.env` 并**强制重建**镜像，因 `NEXT_PUBLIC_*` 构建期固化）：
+
+```bash
+sudo bash scripts/bt-deploy.sh https://dsoj.run
+```
+
+仅重启、不重建镜像：
+
+```bash
+sudo bash scripts/bt-deploy.sh --no-build
+```
 
 ---
 
@@ -272,154 +106,54 @@ sudo bash scripts/bt-deploy.sh
 ```bash
 cd /www/wwwroot/dashan-oj
 
-# 查看容器状态
 docker compose ps
-
-# 查看应用日志
 docker compose logs -f app
-
-# 重启某个服务
 docker compose restart app
-docker compose restart mongo
-docker compose restart redis
 
-# 停止所有服务
+# 停止 / 启动（数据在 volume，不会丢）
 docker compose down
-
-# 启动所有服务
 docker compose up -d
 ```
 
-### 清理 Docker 构建垃圾
-
-每次 `docker compose build` 都会产生构建缓存、悬挂镜像等垃圾，长期累积会撑满磁盘（之前导致 ENOSPC 构建失败）。`bt-deploy.sh` 已在构建后自动清理，手动清理命令：
+### 清理构建垃圾
 
 ```bash
-# 查看 Docker 磁盘占用
 docker system df
-
-# 一键清理构建垃圾（安全，不影响运行中的容器和数据卷）
-# 注意：不要执行 `docker builder prune -af`！会清掉 BuildKit cache mount
-# （Dockerfile 中 --mount=type=cache 持久化的 apk / npm 包），下次构建
-# 又要重新下载 gcc/g++ 等大包，重新陷入 13+ 分钟卡顿。
-docker image prune -f                    # 清理悬挂镜像 (<none>:<none>)
-docker container prune -f                # 清理已停止的容器
-docker builder prune -af --filter "until=168h"   # 仅清理 7 天前的 build cache，保留近期 BuildKit 缓存
-
-# ⚠️ 危险！切勿执行，会删除 mongo_data/redis_data 数据卷导致数据丢失
-# docker system prune -af --volumes   ← 不要执行！
+docker image prune -f
+docker container prune -f
+# 仅清 7 天前的 build cache（保留近期 BuildKit 缓存，切勿 -af 全清）
+docker builder prune -af --filter "until=168h"
 ```
 
-> `bt-deploy.sh` 升级脚本已内置自动清理（步骤 4），每次升级后无需手动清理。
+⚠️ **禁止**：`docker system prune -af --volumes`（会删掉 mongo/redis 数据卷）。
 
 ---
 
 ## 常见问题
 
-| 问题                   | 解决方法                                                                                                                                                        |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 80/443 端口冲突        | 检查是否有其他进程占用：`lsof -i :80`                                                                                                                           |
-| Docker 镜像拉取失败    | 脚本会自动配置 Docker 镜像加速器（docker.1ms.run + docker.xuanyuan.me），如仍失败可在 `/etc/docker/daemon.json` 中更换加速地址后执行 `systemctl restart docker` |
-| MongoDB 副本集未初始化 | `docker compose logs mongo`；确认项目根存在 `mongo-keyfile`（`bt-deploy.sh` 会生成并挂载到容器） |
-| `mongo-keyfile: no such file` | 先执行部署脚本生成 keyfile，或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile` |
-| 构建超过 10 分钟       | 首次构建较慢，后续升级仅增量构建                                                                                                                                |
-| API 返回 502           | 等待 40 秒健康检查通过后刷新                                                                                                                                    |
+| 问题                                 | 处理                                                                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| 首次部署 app 起不来 / Cookie 登不上  | HTTP 必须用 `http://IP` 部署；脚本会设 `FORCE_SECURE_COOKIE=false`。HTTPS 必须为 `true`。                                         |
+| `FORCE_SECURE_COOKIE=false` 启动失败 | 旧版会在生产直接拒绝。请 `git pull` 后重跑脚本；HTTPS 站不要关 Secure。                                                           |
+| mongo 一直 unhealthy，app 起不来     | 已改为带账号的 healthcheck；仍失败时看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。                                |
+| `mongo-keyfile: no such file`        | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile` |
+| 构建 ENOSPC / 磁盘满                 | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                   |
+| 镜像拉取失败                         | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`                                                  |
+| 改域名后前端仍请求旧地址             | 必须重建：`sudo bash scripts/bt-deploy.sh https://新域名`（不要用 `--no-build`）                                                  |
+| API 502                              | `docker compose ps`；等健康检查通过；看 `docker compose logs -f app`                                                              |
+| 80/443 冲突                          | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                |
 
 ---
 
-## 部署注意事项（重要！）
+## 部署注意（踩坑摘要）
 
-以下是部署过程中踩过的坑，后续开发和维护时务必注意：
+1. **`NEXT_PUBLIC_*` 构建期固化** — 改 `FRONTEND_URL` 必须重建 app 镜像。
+2. **Cookie Secure** — HTTP 关、HTTPS 开；与 `FRONTEND_URL` 协议保持一致（脚本会自动纠正）。
+3. **CSP 勿加 `upgrade-insecure-requests`**（HTTP 站静态资源会挂）。
+4. **监听 `0.0.0.0`** — Dockerfile 已设 `HOSTNAME=0.0.0.0`；compose 默认只把端口绑到 `127.0.0.1:3000` 给 Nginx。
+5. **runner 阶段必须 `npm ci --omit=dev`** — standalone 追不全自定义 `server.ts` 依赖；勿删。
+6. **须显式 COPY `server.ts` / `lib` / `prisma`** — 不要用 tracing 冒充。
+7. **健康检查用 `/healthcheck-static`** — 不要改回依赖动态路由的 `/api/health` 作容器探活。
+8. **`.env` 值不要包反引号**。
 
-### 1. NEXT_PUBLIC_* 环境变量在构建时硬编码
-
-`NEXT_PUBLIC_API_URL` 和 `NEXT_PUBLIC_BASE_URL` 会在 `next build` 时被硬编码到客户端 JS 中。
-
-- **修改 `FRONTEND_URL` 后必须重新构建镜像**：`export DOCKER_BUILDKIT=1 && docker compose build --no-cache app`（启用 BuildKit 以复用 Dockerfile 中的 `--mount=type=cache`，避免重新下载大包）
-- 仅修改 `.env` 文件后重启容器**不会生效**，因为客户端 JS 中的 URL 已固化
-- Dockerfile 通过 `ARG` 接收这些值，docker-compose.yml 从 `FRONTEND_URL` 传递
-
-### 2. Cookie Secure 与 HTTP / HTTPS
-
-浏览器在 **HTTP** 下不会保存带 `Secure` / `__Host-` 的 Cookie；**HTTPS 生产站必须开启 Secure**。
-
-- 生产（`NODE_ENV=production`）启动时 **禁止** `FORCE_SECURE_COOKIE=false`（见 `lib/env.ts`）
-- 正式站：`FORCE_SECURE_COOKIE=true`（或依赖 HTTPS 默认 Secure），并配置 `REDIS_URL`、`ENCRYPTION_KEY`、`JWT_SECRET`
-- 仅 HTTP 临时冒烟：临时 `NODE_ENV=development` + `FORCE_SECURE_COOKIE=false`，切勿长期如此运行
-- docker-compose / `bt-deploy.sh` 会按 `FRONTEND_URL` 是否为 `https://` 写入上述变量
-
-### 3. CSP 不能包含 upgrade-insecure-requests
-
-`upgrade-insecure-requests` 指令会强制浏览器将 HTTP 请求升级为 HTTPS。
-
-- HTTP 部署时会导致静态资源（CSS/JS）请求变为 `https://` 协议而加载失败
-- 域名切换到 HTTPS 后方可考虑添加此指令
-- 配置位于 `next.config.ts` 的 `headers()` 函数中
-
-### 4. 服务器必须绑定 0.0.0.0
-
-`server.ts` 中 `hostname` 必须为 `0.0.0.0`，不能用 `localhost`。
-
-- `localhost` 只监听 127.0.0.1，Docker 容器外无法访问
-- Dockerfile 中已设置 `ENV HOSTNAME="0.0.0.0"`
-
-### 5. 评测编译必须使用 spawn（不能用 exec）
-
-Alpine Linux 上 `exec`（通过 shell 执行命令）存在兼容性问题。
-
-- `lib/judge/compiler.ts` 中使用 `spawn` 直接调用命令数组
-- `spawn` 不经过 shell 解析，更可靠且安全
-- 切勿改回 `exec`，否则评测编译会静默失败（exitCode=1，stderr 为空）
-
-### 6. runner.sh 路径必须用 process.cwd()（不能用 __dirname）
-
-ESM/tsx 环境下 `__dirname` 不可靠（可能指向 npx 缓存目录）。
-
-- `lib/judge/compiler.ts` 和 `lib/judge/executor.ts` 中使用 `process.cwd()`
-- `runner.sh` 位于 `lib/judge/runner.sh`，通过 `join(process.cwd(), 'lib', 'judge', 'runner.sh')` 定位
-
-### 7. nextjs 用户需要 root 组权限（非沙箱评测模式）
-
-Alpine Linux 默认不允许非 root 用户执行 `ulimit`（runner.sh 中用于资源限制）。
-
-- Dockerfile 中 `addgroup nextjs root` 解决此问题（Alpine 无 `usermod`，用 `addgroup`）
-- 如移除此行，评测编译会失败（spawn exitCode=1，stderr 为空）
-- 长期方案：改用 Docker 沙箱评测（`USE_DOCKER=true`）可避免此权限提升
-
-### 8. .env 文件值不要用反引号
-
-`.env` 文件中值的反引号（`` ` ``）在 shell 中是命令替换符号，可能导致解析问题。
-
-```
-# 错误
-FRONTEND_URL=`http://example.com`
-# 正确
-FRONTEND_URL=http://example.com
-```
-
-### 9. Dockerfile runner 阶段必须保留 `npm install --omit=dev`（P0！）
-
-**这是 2026-07-16 多日宕机的根因，切勿再次移除！**
-
-Next.js standalone 模式只追踪构建图里的依赖，**不会追踪自定义 server.ts 动态 import 的模块**（dotenv、socket.io、ioredis、jsonwebtoken、mongodb、bcryptjs、adm-zip、katex、nodemailer 等）。移除 `npm install --omit=dev` 会导致这些生产依赖全部缺失，server.ts 启动即崩溃。
-
-- **必须保留**：`RUN npm config set registry https://registry.npmmirror.com && npm install --omit=dev --ignore-scripts`
-- **不要为了省磁盘空间而移除它**：如需节省磁盘，用 `docker builder prune -af` 清理构建缓存
-- **`tsx` 必须在 `dependencies` 中**（不能在 `devDependencies`）：server.ts 生产环境用 tsx 启动，`npm install --omit=dev` 必须能装上它
-
-### 10. Dockerfile runner 阶段必须显式 COPY server.ts 和 lib
-
-Next.js standalone **不会自动追踪自定义 server 文件**。必须显式 COPY：
-
-```dockerfile
-COPY --from=builder --chown=nextjs:nodejs /app/server.ts ./
-COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.server.json ./
-```
-
-**不要用 `outputFileTracingIncludes` 替代显式 COPY**：tracing 机制会在 `/app/` 下产生双份文件冲突，导致 server.ts 找不到正确的 lib 路径。
-
-### 11. Healthcheck 必须用静态页面
-
-`/api/health` 是动态 API route，任何 import 失败都会让它返回 404。Healthcheck 必须用静态页面 `/healthcheck-static`（`force-static`），编译期固定产物，不依赖任何 lib。
+更细的编译 / 评测相关说明见仓库历史注释与 `Dockerfile`。

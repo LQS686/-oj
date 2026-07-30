@@ -127,6 +127,7 @@ setup_env() {
   local FORCE_SECURE=true
   if [[ "$FRONTEND_URL" == http://* ]]; then
     FORCE_SECURE=false
+    warn "HTTP 站点：FORCE_SECURE_COOKIE=false（生产校验已允许，仅临时测试用）"
   fi
 
   cat > .env <<EOF

@@ -144,9 +144,22 @@ export function validateEnvironment(): EnvironmentCheckResult {
     errors.push('生产环境必须设置 REDIS_URL')
   }
 
-  // 生产环境禁止显式关闭 Secure Cookie（__Host-token 依赖 Secure）
+  // Secure Cookie：HTTPS 生产站禁止关闭；HTTP（IP 冒烟 / 备案前）允许关闭并告警
   if (process.env.NODE_ENV === 'production' && process.env.FORCE_SECURE_COOKIE === 'false') {
-    errors.push('生产环境禁止 FORCE_SECURE_COOKIE=false，请使用 HTTPS 并启用 Secure Cookie')
+    const fe = (process.env.FRONTEND_URL || '').trim()
+    if (fe.startsWith('https://')) {
+      errors.push(
+        'HTTPS 生产站禁止 FORCE_SECURE_COOKIE=false，请启用 Secure Cookie（或去掉该变量）'
+      )
+    } else if (fe.startsWith('http://')) {
+      warnings.push(
+        '当前为 HTTP 部署且 FORCE_SECURE_COOKIE=false（Cookie 无 Secure）。仅限临时测试，备案/上线 HTTPS 后务必改为 true 并重建'
+      )
+    } else {
+      errors.push(
+        '生产环境 FORCE_SECURE_COOKIE=false 时必须设置合法的 FRONTEND_URL（http:// 或 https://）'
+      )
+    }
   }
 
   // ENCRYPTION_KEY：生产必填（SMTP 等密文）

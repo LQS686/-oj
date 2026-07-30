@@ -16,8 +16,12 @@ services:
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_HOST_PORT:-3000}:3000"
     expose:
       - "3000"
+    # .env 中 JUDGE_* / LOG_LEVEL / TRUSTED_PROXIES 等一并注入；下方 environment 覆盖敏感与必填项
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
+      - TZ=${TZ:-Asia/Shanghai}
       - DATABASE_URL=mongodb://${MONGO_APP_USER:-ojuser}:${MONGO_APP_PASSWORD:?err}@mongo:27017/oj_platform?authSource=oj_platform&replicaSet=rs0
       - JWT_SECRET=${JWT_SECRET:?err}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?err}
@@ -29,6 +33,7 @@ services:
       - FORCE_SECURE_COOKIE=${FORCE_SECURE_COOKIE:-true}
       - PORT=3000
       - REDIS_URL=redis://:${REDIS_PASSWORD:?err}@redis:6379
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-1}
     depends_on:
       mongo:
         condition: service_healthy
@@ -101,11 +106,16 @@ services:
         max-size: "10m"
         max-file: "5"
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
+      # 启用 --auth 后无凭证 ping 常失败，导致 app depends_on 一直等不到 healthy
+      test:
+        [
+          "CMD-SHELL",
+          'mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand(''ping'').ok" | grep -q 1',
+        ]
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      retries: 12
+      start_period: 60s
 
   redis:
     image: redis:7-alpine
@@ -125,7 +135,13 @@ services:
         max-file: "5"
     healthcheck:
       # 密码走环境变量，避免出现在 docker inspect / ps 命令行参数中
-      test: ["CMD", "sh", "-c", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
