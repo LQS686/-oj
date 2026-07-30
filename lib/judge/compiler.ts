@@ -35,7 +35,7 @@ export interface CompileResult {
 //
 // 启用后：
 //   - 编译时加 -fsanitize=undefined -fno-sanitize-recover=all
-//   - 运行时需链接 libubsan（gcc 默认静态链接，Alpine 需 apk add libubsan）
+//   - 运行时需链接 libubsan（glibc 发行版 gcc 常可静态链接；Alpine/musl 无此库，勿在 Alpine 上强制开启）
 //   - UBSanitizer 有 2-3x 内存开销，需相应调大 memoryLimit
 //
 // 竞赛严检可设 JUDGE_ENABLE_UBSAN=true（建议与 ASan 一并开启）。
@@ -308,7 +308,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
       }
     }
 
-    let outputPath = join(tempDir, compiledBasename)
+    const outputPath = join(tempDir, compiledBasename)
 
     // Linux 非容器模式下编译走 runner.sh 沙箱（限制内存/CPU/栈/文件描述符）
     const isLinux = process.platform === 'linux'
