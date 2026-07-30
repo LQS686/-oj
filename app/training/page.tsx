@@ -12,8 +12,10 @@
  * 5. 防御性：API 字段错位时降级为空
  * 6. fetch：cache: 'no-store'
  */
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { fetchWithCookie } from '@/lib/api/base'
+import { errorLike } from '@/lib/api/errors'
 import { useUser } from '@/contexts/UserContext'
 import { BookOpen, AlertCircle, RefreshCw, Bookmark, ChevronLeft, ChevronRight } from 'lucide-react'
 import TrainingCard from '@/components/training/TrainingCard'
@@ -75,12 +77,12 @@ export default function TrainingListPage() {
       }
       const items: TrainingListItem[] = Array.isArray(data.data?.items) ? data.data.items : []
 
-      const numberedItems = items.map((item, idx) => ({ ...item, number: (page - 1) * 24 + idx + 1 } as any))
+      const numberedItems = items.map((item, idx) => ({ ...item, number: (page - 1) * 24 + idx + 1 }))
       setTrainings(numberedItems)
       setTotal(typeof data.data?.total === 'number' ? data.data.total : 0)
       setTotalPages(typeof data.data?.totalPages === 'number' ? data.data.totalPages : 1)
-    } catch (e: any) {
-      if (e?.name === 'AbortError') return
+    } catch (e: unknown) {
+      if (errorLike(e).name === 'AbortError') return
       setError('网络错误')
       setTrainings([])
     } finally {
@@ -90,7 +92,7 @@ export default function TrainingListPage() {
   }, [page, source])
 
   // 切换 source/page 时拉取，AbortController 取消旧请求
-  useEffect(() => {
+  useDeferredEffect(() => {
     const ac = new AbortController()
     fetchTrainings(ac.signal)
     return () => ac.abort()

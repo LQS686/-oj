@@ -10,6 +10,7 @@ import {
   canTransition as canSubmissionTransition,
 } from '@/lib/constants/submission-status'
 import { getMongoClient, withRetry } from './client'
+import { errorLike } from '@/lib/api/errors'
 
 /**
  * 直接创建提交记录（绕过 Prisma 事务）
@@ -52,9 +53,10 @@ export async function createSubmissionDirect(data: {
 
   try {
     await db.collection('Submission').insertOne(submission)
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 同 _id 的 DuplicateKey：上次已写入但 ack 丢失，视为成功
-    if (error?.code !== 11000) throw error
+    const e = errorLike(error)
+    if (Number(e.code) !== 11000) throw error
   }
 
   return {
@@ -103,7 +105,7 @@ export async function updateSubmissionDirect(
     passedTests?: number
     totalTests?: number
     message?: string | null
-    testResults?: any
+    testResults?: unknown
   },
   options?: { forceStatus?: boolean }
 ) {

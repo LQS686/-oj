@@ -15,7 +15,7 @@ export interface ClassDetail {
   creatorId: string
   memberCount?: number
   createdAt: string
-  [k: string]: any
+  [k: string]: unknown
 }
 
 export interface ClassMember {

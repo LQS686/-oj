@@ -3,6 +3,7 @@
  * 公开训练列表高级查询（带分类/标签/作者/题目计数/用户进度）
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import type {
   TrainingListItem,
   PaginatedResponse,
@@ -14,7 +15,7 @@ import type {
  * MongoDB/Prisma：单独的 `classId: null` 匹配不到「字段未写入」的文档，
  * 会导致公开题单被全部滤空。
  */
-function whereNotClassScoped(): { OR: Array<Record<string, unknown>> } {
+function whereNotClassScoped(): Prisma.TrainingWhereInput {
   return {
     OR: [{ classId: null }, { classId: { isSet: false } }],
   }
@@ -40,7 +41,7 @@ export async function listPublicTrainingsAdvanced(
 ): Promise<PaginatedResponse<TrainingListItem>> {
   // 公开题单：isPublic + published + 非班级私有
   // 登录用户：额外可看到自己创建的私有/草稿题单（仍排除班级私有）
-  const visibility: Record<string, unknown> = filter.userId
+  const visibility: Prisma.TrainingWhereInput = filter.userId
     ? {
         OR: [
           { isPublic: true, status: 'published' },
@@ -49,7 +50,7 @@ export async function listPublicTrainingsAdvanced(
       }
     : { isPublic: true, status: 'published' }
 
-  const baseScope: Record<string, unknown> = {
+  const baseScope: Prisma.TrainingWhereInput = {
     AND: [visibility, whereNotClassScoped()],
   }
 
@@ -68,7 +69,7 @@ export async function listPublicTrainingsAdvanced(
     })
     baseScope.id = { in: visibleJoined.map((t: { id: string }) => t.id) }
   }
-  const extra: Record<string, unknown>[] = []
+  const extra: Prisma.TrainingWhereInput[] = []
   if (filter.keyword) {
     extra.push({
       OR: [
@@ -95,12 +96,12 @@ export async function listPublicTrainingsAdvanced(
   if (filter.isRecommended === true) {
     extra.push({ isRecommended: true })
   }
-  const where: Record<string, unknown> =
+  const where: Prisma.TrainingWhereInput =
     extra.length > 0 ? { AND: [baseScope, ...extra] } : baseScope
 
   const [trainings, total] = await Promise.all([
     prisma.training.findMany({
-      where: where as any,
+      where,
       skip: (page - 1) * limit,
       take: limit,
       orderBy: [{ isRecommended: 'desc' }, { createdAt: 'desc' }],
@@ -110,7 +111,7 @@ export async function listPublicTrainingsAdvanced(
         category: { select: { id: true, name: true } },
       },
     }),
-    prisma.training.count({ where: where as any }),
+    prisma.training.count({ where }),
   ])
 
   // 批量拉取当前用户在这些题单上的进度
@@ -155,7 +156,7 @@ export async function listPublicTrainingsAdvanced(
     }
   }
 
-  const items: TrainingListItem[] = trainings.map((t: any) => {
+  const items: TrainingListItem[] = trainings.map((t) => {
     const p = progressMap.get(t.id)
     const problemTotal = t._count.problems
     return {

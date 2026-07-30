@@ -151,7 +151,7 @@ class BufferedStreamReader {
       }
 
       const slice = this.buffer.subarray(this.pos)
-      let nl = slice.indexOf(LF)
+      const nl = slice.indexOf(LF)
       const cr = slice.indexOf(CR)
       let cut = -1
       if (nl >= 0 && cr >= 0) cut = Math.min(nl, cr)

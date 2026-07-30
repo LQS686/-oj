@@ -4,6 +4,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { notificationApi } from '@/lib/api/notification'
 import { logger } from '@/lib/logger'
 import { useNotificationSocket, type NotificationData } from '@/hooks/useNotificationSocket'
@@ -66,7 +67,7 @@ export function useUnreadNotifications({
     },
   })
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!enabled || !userId) {
       setUnreadCount(0)
       return

@@ -118,8 +118,9 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     // samples 结构：Array<{ input: string; output: string; explanation?: string }>
     testCases = safeProblem.samples
       .filter(
-        (s: any): s is { input: string; output: string } =>
-          s && typeof s === 'object' && typeof s.input === 'string' && typeof s.output === 'string'
+        (s): s is { input: string; output: string } =>
+          s != null && typeof s === 'object' && 'input' in s && 'output' in s
+          && typeof s.input === 'string' && typeof s.output === 'string'
       )
       .map((s, idx) => ({
         id: `problem-sample-${idx}`,

@@ -24,7 +24,7 @@ export const GET = withApi.admin(async () => {
       latency: pingTime,
       timestamp: new Date().toISOString(),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Health check failed:', error)
     return NextResponse.json(
       {

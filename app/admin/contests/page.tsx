@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useCallback, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
-import { PageLoading, useDialog, RouteSuspenseFallback } from '@/components/common'
+import { useDialog, RouteSuspenseFallback } from '@/components/common'
 import AdminCreateContestModal from '@/components/admin/AdminCreateContestModal'
 import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
@@ -41,7 +42,7 @@ function AdminContestsPageContent() {
  })
 
  // 支持 ?create=1 / ?edit=<id> 自动打开弹窗（外部跳转入口）
- useEffect(() => {
+ useDeferredEffect(() => {
    if (searchParams.get('create') === '1') {
      setCreateOpen(true)
      setEditContestId(null)
@@ -81,7 +82,7 @@ function AdminContestsPageContent() {
  }
  }, [router])
 
- useEffect(() => {
+ useDeferredEffect(() => {
  fetchContests()
  }, [fetchContests])
 

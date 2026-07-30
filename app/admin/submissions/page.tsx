@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -51,7 +52,6 @@ export default function AdminSubmissionsPage() {
   const [language, setLanguage] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [totalByStatus, setTotalByStatus] = useState<Record<string, number>>({})
 
@@ -90,11 +90,6 @@ export default function AdminSubmissionsPage() {
         const submissionsData = data.data?.submissions || data.data || []
         setSubmissions(Array.isArray(submissionsData) ? submissionsData : [])
         setTotal(data.data?.total || 0)
-        setTotalPages(
-          data.data?.totalPages ||
-            Math.ceil((data.data?.total || 0) / pageSize) ||
-            1
-        )
         if (data.data?.totalByStatus) {
           setTotalByStatus(data.data.totalByStatus)
         }
@@ -108,7 +103,7 @@ export default function AdminSubmissionsPage() {
     }
   }, [page, pageSize, statusFilter, language, searchQuery, router])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void fetchSubmissions()
   }, [fetchSubmissions])
 
@@ -170,12 +165,12 @@ export default function AdminSubmissionsPage() {
         <div className="flex items-center gap-2 min-w-0">
           <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
           <span className="text-foreground truncate">
-            {value?.problemNumber && (
+            {(value as Submission['problem'] | null | undefined)?.problemNumber && (
               <span className="font-mono text-xs text-muted-foreground mr-1.5">
-                {value.problemNumber}
+                {(value as Submission['problem'] | null | undefined)?.problemNumber}
               </span>
             )}
-            {value?.title || '—'}
+            {(value as Submission['problem'] | null | undefined)?.title || '—'}
           </span>
         </div>
       ),
@@ -186,7 +181,7 @@ export default function AdminSubmissionsPage() {
       render: (value) => (
         <div className="flex items-center gap-2">
           <User className="w-4 h-4 text-muted-foreground" />
-          <span className="text-foreground">{value?.nickname || value?.username || '—'}</span>
+          <span className="text-foreground">{(value as Submission['user'] | null | undefined)?.nickname || (value as Submission['user'] | null | undefined)?.username || '—'}</span>
         </div>
       ),
     },
@@ -194,9 +189,9 @@ export default function AdminSubmissionsPage() {
       key: 'status',
       label: '状态',
       render: (value) => (
-        <div className="flex items-center gap-2" title={getStatusText(value)}>
-          {getStatusIcon(value)}
-          <span className={`tag ${getStatusColor(value)}`}>{getStatusText(value)}</span>
+        <div className="flex items-center gap-2" title={getStatusText(value as string)}>
+          {getStatusIcon(value as string)}
+          <span className={`tag ${getStatusColor(value as string)}`}>{getStatusText(value as string)}</span>
         </div>
       ),
     },
@@ -204,20 +199,20 @@ export default function AdminSubmissionsPage() {
       key: 'score',
       label: '分数',
       render: (value) => (
-        <span className="font-mono font-semibold tabular-nums">{value ?? 0}</span>
+        <span className="font-mono font-semibold tabular-nums">{(value as number) ?? 0}</span>
       ),
     },
     {
       key: 'language',
       label: '语言',
-      render: (value) => <span className="tag">{value}</span>,
+      render: (value) => <span className="tag">{value as string}</span>,
     },
     {
       key: 'time',
       label: '用时 · 内存',
       render: (value, row) => (
         <span className="font-mono text-sm text-muted-foreground tabular-nums whitespace-nowrap">
-          {formatTime(value ?? 0)} · {formatMemory(row.memory ?? 0)}
+          {formatTime((value as number | null) ?? 0)} · {formatMemory(row.memory ?? 0)}
         </span>
       ),
     },
@@ -227,7 +222,7 @@ export default function AdminSubmissionsPage() {
       render: (value) => (
         <div className="flex items-center gap-2 text-muted-foreground whitespace-nowrap">
           <Clock className="w-4 h-4 shrink-0" />
-          <span className="text-sm">{formatDateTime(value)}</span>
+          <span className="text-sm">{formatDateTime(value as string)}</span>
         </div>
       ),
     },

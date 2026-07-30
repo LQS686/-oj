@@ -2,8 +2,7 @@
  * lib/solution/validation.ts
  * 题解参数校验
  */
-import { required, optional, toInt, toBool } from '@/lib/api/validation'
-import { validateObjectId } from '@/lib/api/validation'
+import { required, toInt, toBool, validateObjectId, asRecord } from '@/lib/api/validation'
 
 export function parseSolutionListQuery(q: Record<string, string>) {
   return {
@@ -14,11 +13,12 @@ export function parseSolutionListQuery(q: Record<string, string>) {
   }
 }
 
-export function parseSolutionCreate(body: any) {
+export function parseSolutionCreate(body: unknown) {
+  const b = asRecord(body)
   return {
-    problemId: validateObjectId(body?.problemId, 'problemId'),
-    title: required(body?.title, '标题'),
-    content: required(body?.content, '内容'),
-    isPublic: body?.isPublic ? toBool(body.isPublic) : true,
+    problemId: validateObjectId(b.problemId, 'problemId'),
+    title: required(b.title, '标题'),
+    content: required(b.content, '内容'),
+    isPublic: b.isPublic ? toBool(b.isPublic) : true,
   }
 }

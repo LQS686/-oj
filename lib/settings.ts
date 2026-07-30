@@ -7,6 +7,7 @@ import {
   type SystemSettings,
   type JudgeSettings,
 } from '@/lib/settings-defaults'
+import { errorLike } from '@/lib/api/errors'
 
 const SETTINGS_KEY = 'system_settings'
 
@@ -224,8 +225,9 @@ function tryDecryptPassword(stored: string): string {
   }
   try {
     return decrypt(stored)
-  } catch (err: any) {
-    logger.error('[settings] SMTP 授权码解密失败', { reason: err?.message })
+  } catch (err: unknown) {
+    const e = errorLike(err)
+    logger.error('[settings] SMTP 授权码解密失败', { reason: e.message })
     throw new Error('SMTP 授权码解密失败，请重新保存邮件设置')
   }
 }

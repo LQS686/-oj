@@ -4,7 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { getMongoClient } from '@/lib/mongodb-direct'
-import { ObjectId } from 'mongodb'
+import type bcrypt from 'bcryptjs'
 import { AppError } from '@/lib/errors'
 import { clearUserCache } from './profile'
 import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
@@ -333,7 +333,7 @@ export async function changeCurrentUserPassword(
   userId: string,
   currentPassword: string,
   newPassword: string,
-  bcryptModule: typeof import('bcryptjs')
+  bcryptModule: typeof bcrypt
 ) {
   if (!currentPassword || !newPassword) {
     throw AppError.badRequest('MISSING_FIELDS', '请提供当前密码和新密码')

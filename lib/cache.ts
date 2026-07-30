@@ -1,5 +1,6 @@
 import 'server-only'
 
+import type Redis from 'ioredis'
 import { logger } from './logger'
 import { isRedisConfigured } from './redis'
 
@@ -53,7 +54,7 @@ class Cache {
   private cleanupInterval: NodeJS.Timeout
   // PERF-05 singleflight：缓存 miss 时去重并发同 key 回源请求
   private inflight: Map<string, Promise<unknown>> = new Map()
-  private redis: import('ioredis').default | null = null
+  private redis: Redis | null = null
   private redisInit: Promise<boolean> | null = null
 
   constructor() {

@@ -5,8 +5,7 @@
  * 难度校验对齐洛谷 8 档标准（lib/constants.ts 为唯一真相源）：
  *   入门 / 普及- / 普及 / 普及+ / 提高 / 提高+ / 省选 / NOI
  */
-import { required, optional, toInt, ValidationError } from '@/lib/api/validation'
-import { validateObjectId } from '@/lib/api/validation'
+import { required, optional, toInt, ValidationError, validateObjectId, asRecord } from '@/lib/api/validation'
 import { isValidDifficulty, DIFFICULTIES } from '@/lib/constants'
 
 export function parseProblemListQuery(q: Record<string, string>) {
@@ -28,27 +27,28 @@ export function parseProblemListQuery(q: Record<string, string>) {
   }
 }
 
-export function parseProblemCreate(body: any) {
-  const difficulty = required(body?.difficulty, '难度')
+export function parseProblemCreate(body: unknown) {
+  const b = asRecord(body)
+  const difficulty = required(b.difficulty, '难度')
   if (!isValidDifficulty(difficulty)) {
     throw new ValidationError(`难度值无效，必须是：${DIFFICULTIES.join(' / ')}`)
   }
   return {
-    title: required(body?.title, '题目标题'),
-    description: required(body?.description, '题目描述'),
+    title: required(b.title, '题目标题'),
+    description: required(b.description, '题目描述'),
     difficulty,
-    timeLimit: toInt(body?.timeLimit, '时间限制', 1000),
-    memoryLimit: toInt(body?.memoryLimit, '内存限制', 256),
+    timeLimit: toInt(b.timeLimit, '时间限制', 1000),
+    memoryLimit: toInt(b.memoryLimit, '内存限制', 256),
     comparisonMode:
-      body?.comparisonMode && typeof body.comparisonMode === 'string'
-        ? body.comparisonMode
+      b.comparisonMode && typeof b.comparisonMode === 'string'
+        ? b.comparisonMode
         : 'default',
-    realPrecision: toInt(body?.realPrecision, '浮点数精度', 3),
+    realPrecision: toInt(b.realPrecision, '浮点数精度', 3),
     visibility:
-      body?.visibility === 'public' || body?.visibility === 'private' || body?.visibility === 'contest'
-        ? body.visibility
+      b.visibility === 'public' || b.visibility === 'private' || b.visibility === 'contest'
+        ? b.visibility
         : 'private',
-    tags: body?.tags || [],
+    tags: Array.isArray(b.tags) ? b.tags : [],
   }
 }
 

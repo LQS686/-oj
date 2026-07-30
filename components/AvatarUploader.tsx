@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Camera, Upload, X, Check, AlertCircle, History, Trash2, Loader2 } from 'lucide-react'
 import Image from 'next/image'
-import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
+import { errorLike } from '@/lib/api/errors'
 import { useDialog } from '@/components/common/DialogProvider'
+import { logger } from '@/lib/logger'
 
 interface UploadHistory {
  id: string
@@ -39,11 +41,7 @@ export default function AvatarUploader({
  const fileInputRef = useRef<HTMLInputElement>(null)
  const CHUNK_SIZE = 1024 * 1024 // 1MB
 
- useEffect(() => {
- fetchHistory()
- }, [])
-
- const fetchHistory = async () => {
+ const fetchHistory = useCallback(async () => {
  try {
  const res = await fetchWithCookie('/api/users/avatar/history')
  const data = await res.json()
@@ -51,9 +49,13 @@ export default function AvatarUploader({
  setHistory(data.data)
  }
  } catch (err) {
- console.error('Failed to fetch history', err)
+ logger.error('Failed to fetch history', err)
  }
- }
+ }, [])
+
+ useDeferredEffect(() => {
+ void fetchHistory()
+ }, [fetchHistory])
 
  const compressImage = (file: File): Promise<File> => {
  return new Promise((resolve) => {
@@ -206,8 +208,9 @@ export default function AvatarUploader({
  setPreview(null)
  fetchHistory() // Refresh history
  
- } catch (err: any) {
- setError(err.message || '上传失败')
+ } catch (err: unknown) {
+ const e = errorLike(err)
+ setError(e.message || '上传失败')
  setProgress(0)
  } finally {
  setUploading(false)
@@ -263,8 +266,9 @@ export default function AvatarUploader({
    }
    // 从列表中移除
    setHistory((prev) => prev.filter((item) => item.id !== historyItem.id))
-  } catch (err: any) {
-   setError(err.message || '删除头像历史失败')
+  } catch (err: unknown) {
+   const e = errorLike(err)
+   setError(e.message || '删除头像历史失败')
   } finally {
    setDeletingId(null)
   }

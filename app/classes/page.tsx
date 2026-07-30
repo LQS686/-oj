@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { Users, Search, Plus, Calendar, TrendingUp, X, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
@@ -10,7 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
 import { formatDate } from '@/lib/utils'
 import CreateClassModal from '@/components/class/CreateClassModal'
-import { EducationalPageShell, PageLoading, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback } from '@/components/common'
+import { EducationalPageShell, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback } from '@/components/common'
 import { loginPathFromLocation } from '@/lib/navigation'
 
 interface Class {
@@ -22,7 +23,7 @@ interface Class {
   memberCount: number
   maxMembers: number
   createdAt: string
-  members?: any[]
+  members?: Array<{ userId: string; [key: string]: unknown }>
   stats?: {
     memberCount: number
     problemCount: number
@@ -48,7 +49,7 @@ function ClassesPageContent() {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [canCreate, setCanCreate] = useState(false)
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!user) {
       setCanCreate(false)
       return
@@ -56,7 +57,7 @@ function ClassesPageContent() {
     setCanCreate(canCreateClass(user))
   }, [user])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (searchParams.get('create') === '1' && user && canCreate) {
       setCreateClassOpen(true)
       router.replace('/classes', { scroll: false })
@@ -78,7 +79,7 @@ function ClassesPageContent() {
       if (searchQuery) params.append('search', searchQuery)
       if (showMyClasses) params.append('myClasses', 'true')
 
-      const headers: any = {}
+      const headers: Record<string, string> = {}
 
       const response = await fetchWithCookie(`/api/classes?${params}`, { headers })
       const data = await response.json()
@@ -116,12 +117,6 @@ function ClassesPageContent() {
     }
   }, [fetchClasses])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setPage(1)
-    fetchClasses()
-  }
-
   const handleClassClick = async (classData: Class) => {
     if (!user) {
       try {
@@ -152,7 +147,9 @@ function ClassesPageContent() {
       const data = await response.json()
       
       if (data.success) {
-        const isMember = data.data.members.some((m: any) => m.userId === user.id)
+        const isMember = data.data.members.some(
+          (m: { userId: string }) => m.userId === user.id
+        )
         
         if (isMember) {
           router.push(`/classes/${classData.id}`)
@@ -366,7 +363,17 @@ export default function ClassesPage() {
   )
 }
 
-function ClassDetailModal({ classData, onClose, user, router }: { classData: Class, onClose: () => void, user: any, router: any }) {
+function ClassDetailModal({
+  classData,
+  onClose,
+  user,
+  router,
+}: {
+  classData: Class
+  onClose: () => void
+  user: { id: string } | null | undefined
+  router: { push: (href: string) => void }
+}) {
   const dialog = useDialog()
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)

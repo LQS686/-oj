@@ -10,7 +10,8 @@
  * 3. catch + finally 中重置 isJoining
  * 4. disabled={isJoining} 防双击
  */
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2, LogIn, Play, UserPlus, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -47,7 +48,7 @@ export function JoinTrainingButton({
  // ref 用于 in-flight 检测，防止双击
  const joiningRef = useRef(false)
 
- useEffect(() => {
+ useDeferredEffect(() => {
    setJoined(initialJoined)
  }, [initialJoined])
 
@@ -73,7 +74,7 @@ export function JoinTrainingButton({
  setJoined(true)
  onJoinedChange?.(true)
  toast.success('已加入题单')
- } catch (e) {
+ } catch {
  toast.error('网络错误')
  } finally {
  setIsJoining(false)
@@ -100,7 +101,7 @@ export function JoinTrainingButton({
  setJoined(false)
  onJoinedChange?.(false)
  toast.success('已退出题单')
- } catch (e) {
+ } catch {
  toast.error('网络错误')
  } finally {
  setIsJoining(false)

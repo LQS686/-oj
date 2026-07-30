@@ -3,9 +3,15 @@
  * 题解 CRUD
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
+import type { NextRequest } from 'next/server'
 import { cache } from '@/lib/cache'
 import { AppError } from '@/lib/errors'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
+
+type SolutionWithAuthor = Prisma.SolutionGetPayload<{
+  include: { author: { select: { id: true; username: true; nickname: true; avatar: true } } }
+}>
 
 export interface SolutionFilter {
   problemId?: string
@@ -16,13 +22,13 @@ export interface SolutionFilter {
 export async function listSolutions(
   filter: SolutionFilter = {},
   options: ListOptions = {}
-): Promise<PaginatedResult<any>> {
+): Promise<PaginatedResult<SolutionWithAuthor>> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const where: any = {}
+  const where: Prisma.SolutionWhereInput = {}
   if (filter.problemId) where.problemId = filter.problemId
   if (filter.authorId) where.authorId = filter.authorId
-  if (filter.isPublic !== undefined) where.isPublic = filter.isPublic
+  // 注：Solution 模型无 isPublic 字段（schema 中不存在），filter.isPublic 在此被忽略。
 
   const [items, total] = await Promise.all([
     prisma.solution.findMany({
@@ -46,12 +52,12 @@ export async function getSolutionById(id: string) {
   }, { ttl: 30_000 })
 }
 
-export async function createSolution(data: any, authorId: string) {
+export async function createSolution(data: Omit<Prisma.SolutionUncheckedCreateInput, 'authorId'>, authorId: string) {
   cache.deleteByPrefix('solution:list:')
   return prisma.solution.create({ data: { ...data, authorId } })
 }
 
-export async function updateSolution(id: string, data: any) {
+export async function updateSolution(id: string, data: Prisma.SolutionUncheckedUpdateInput) {
   // LOGIC-09: 先写 DB 再清缓存；同时补清列表前缀，避免列表仍展示旧数据
   const result = await prisma.solution.update({ where: { id }, data })
   cache.delete(`solution:byId:${id}`)
@@ -111,7 +117,7 @@ export interface SolutionViewUserPayload {
 }
 
 export async function loadSolutionViewUser(
-  request: import('next/server').NextRequest
+  request: NextRequest
 ): Promise<SolutionViewUserPayload | null> {
   const { getUserFromRequest } = await import('@/lib/auth')
   const payload = getUserFromRequest(request)
@@ -296,7 +302,7 @@ export async function updateUserSolution(
   if (!isAuthor && !isAdmin && !isTeacher) {
     throw AppError.forbidden('无权修改此题解')
   }
-  const data: any = {}
+  const data: Prisma.SolutionUncheckedUpdateInput = {}
   if (input.title !== undefined) {
     if (typeof input.title !== 'string' || input.title.length < 1 || input.title.length > 100) {
       throw AppError.badRequest('VALIDATION', '标题长度需在 1-100 字符之间')

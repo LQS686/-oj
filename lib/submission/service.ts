@@ -3,6 +3,7 @@
  * 提交 CRUD、判题结果查询
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { AppError } from '@/lib/errors'
 import { addJudgeJob } from '@/lib/judge/queue'
@@ -75,10 +76,10 @@ function mapProblemTestCases(
 export async function listSubmissions(
   filter: SubmissionFilter = {},
   options: ListOptions = {}
-): Promise<PaginatedResult<any>> {
+): Promise<PaginatedResult<Prisma.SubmissionGetPayload<object>>> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const where: any = {}
+  const where: Prisma.SubmissionWhereInput = {}
   if (filter.userId) where.userId = filter.userId
   if (filter.problemId) where.problemId = filter.problemId
   if (filter.contestId) where.contestId = filter.contestId
@@ -133,7 +134,7 @@ export async function updateSubmissionStatus(
     passedTests: number
     totalTests: number
     message: string
-    testResults: any
+    testResults: Prisma.InputJsonValue
   }> = {}
 ) {
   cache.delete(`submission:byId:${id}`)
@@ -180,7 +181,10 @@ export async function submitCode(
   }
 
   // 验证题目存在（支持 problemNumber 与 ObjectID 两种）
-  let problem: any
+  type ProblemWithCases = Prisma.ProblemGetPayload<{
+    include: { testCases: { select: typeof TESTCASE_META_SELECT } }
+  }>
+  let problem: ProblemWithCases | null = null
   try {
     problem = await prisma.problem.findUnique({
       where: { problemNumber: body.problemId },
@@ -275,7 +279,7 @@ export async function listSubmissionsAdvanced(
     keyword?: string
   }
 ) {
-  const where: any = {}
+  const where: Prisma.SubmissionWhereInput = {}
   if (filter.problemId) where.problemId = filter.problemId
   if (filter.userId) where.userId = filter.userId
   if (filter.language) where.language = filter.language
@@ -317,10 +321,10 @@ export async function listSubmissionsAdvanced(
         pagination: { page, limit, total: 0, totalPages: 0 },
       }
     }
-    const or: any[] = []
+    const or: Prisma.SubmissionWhereInput[] = []
     if (userIds.length) or.push({ userId: { in: userIds } })
     if (problemIds.length) or.push({ problemId: { in: problemIds } })
-    where.AND = [...(where.AND || []), { OR: or }]
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), { OR: or }]
   }
 
   const [submissions, total] = await Promise.all([
@@ -349,7 +353,7 @@ export async function listSubmissionsAdvanced(
     prisma.submission.count({ where }),
   ])
 
-  const validSubmissions = submissions.filter((sub: any) => sub.problem !== null)
+  const validSubmissions = submissions.filter((sub) => sub.problem !== null)
   if (validSubmissions.length < submissions.length) {
     logger.warn(`发现 ${submissions.length - validSubmissions.length} 条无效提交记录（对应题目不存在）`)
   }
@@ -662,7 +666,28 @@ export async function getFirstWaTestCaseForDownload(
  * ========================================================================== */
 
 export interface ListAdminSubmissionsResult {
-  submissions: Array<any>
+  submissions: Array<
+    Prisma.SubmissionGetPayload<{
+      select: {
+        id: true
+        userId: true
+        problemId: true
+        language: true
+        code: true
+        status: true
+        score: true
+        time: true
+        memory: true
+        passedTests: true
+        totalTests: true
+        message: true
+        submittedAt: true
+      }
+    }> & {
+      user: { id: string; username: string; nickname: string | null }
+      problem: { id: string; problemNumber: string | null; title: string }
+    }
+  >
   total: number
   page: number
   pageSize: number
@@ -683,7 +708,7 @@ export async function listAdminSubmissions(filter: {
 }): Promise<ListAdminSubmissionsResult> {
   const page = filter.page ?? 1
   const pageSize = filter.pageSize ?? 50
-  const where: any = {}
+  const where: Prisma.SubmissionWhereInput = {}
   if (filter.language) where.language = filter.language
   if (filter.status && filter.status !== 'all') {
     const statuses = filter.status.split(',').map((s) => s.trim()).filter(Boolean)
@@ -735,10 +760,10 @@ export async function listAdminSubmissions(filter: {
         totalByStatus: totalByStatusEmpty,
       }
     }
-    const or: any[] = []
+    const or: Prisma.SubmissionWhereInput[] = []
     if (userIds.length) or.push({ userId: { in: userIds } })
     if (problemIds.length) or.push({ problemId: { in: problemIds } })
-    where.AND = [...(where.AND || []), { OR: or }]
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), { OR: or }]
   }
   // 全局状态统计（不受 status 筛选影响），用于前端统计卡显示全局数字
   const statusGroups = await prisma.submission.groupBy({
@@ -780,8 +805,8 @@ export async function listAdminSubmissions(filter: {
     !!(filter.status && filter.status !== 'all') || !!filter.language || !!keyword
   const finalTotal = hasNarrowFilter ? total : globalTotal
   // 批量查询用户和题目信息，避免 N+1（原每条提交 2 次查询，pageSize=50 时 100 次往返）
-  const userIds = [...new Set(submissionsRaw.map((s: any) => s.userId).filter(Boolean))]
-  const problemIds = [...new Set(submissionsRaw.map((s: any) => s.problemId).filter(Boolean))]
+  const userIds = [...new Set(submissionsRaw.map((s) => s.userId).filter(Boolean))]
+  const problemIds = [...new Set(submissionsRaw.map((s) => s.problemId).filter(Boolean))]
   const [users, problems] = await Promise.all([
     userIds.length
       ? prisma.user.findMany({
@@ -796,9 +821,9 @@ export async function listAdminSubmissions(filter: {
         })
       : [],
   ])
-  const userMap = new Map(users.map((u: any) => [u.id, u]))
-  const problemMap = new Map(problems.map((p: any) => [p.id, p]))
-  const submissions = submissionsRaw.map((sub: any) => ({
+  const userMap = new Map(users.map((u) => [u.id, u]))
+  const problemMap = new Map(problems.map((p) => [p.id, p]))
+  const submissions = submissionsRaw.map((sub) => ({
     ...sub,
     user: userMap.get(sub.userId) || {
       id: sub.userId,

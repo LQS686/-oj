@@ -4,7 +4,7 @@
  * 迁移到 withApi 中间件模式（使用 NextResponse 以便设置 cookie）
  */
 import { NextResponse } from 'next/server'
-import { withApi, readJson, fail } from '@/lib/api/withApi'
+import { withApi, readJson, fail, errorLike } from '@/lib/api/withApi'
 import { loginUser, LoginError } from '@/lib/auth/login-service'
 import { authRateLimiter } from '@/lib/rate-limit'
 import { setAuthCookie } from '@/lib/auth/cookie'
@@ -33,7 +33,7 @@ export const POST = withApi.public(async (req) => {
     setCsrfCookie(response, generateCsrfToken())
 
     return response
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof LoginError) {
       if (error.code === 'ACCOUNT_LOCKED') return fail(error.code, error.message, 429)
       if (error.code === 'AUTH_UNAVAILABLE') return fail(error.code, error.message, 503)
@@ -41,7 +41,7 @@ export const POST = withApi.public(async (req) => {
       if (error.code === 'UNAUTHORIZED') return fail(error.code, error.message, 401)
       if (error.code === 'FORBIDDEN') return fail(error.code, error.message, 403)
     }
-    const msg = error?.message
+    const msg = errorLike(error).message
     if (msg === '请输入用户名和密码') return fail('BAD_REQUEST', msg, 400)
     if (msg === '用户名格式不正确') return fail('BAD_REQUEST', msg, 400)
     if (msg === '用户名或密码错误') return fail('UNAUTHORIZED', msg, 401)

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { BookOpen, AlertCircle } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { CreateModalShell } from '@/components/common'
@@ -84,7 +85,7 @@ export default function CreateAssignmentModal({
     }
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open) return
     resetForm()
     void fetchProblems()

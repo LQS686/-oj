@@ -4,7 +4,7 @@
  * GET 鉴权：仅管理员（包含草稿）
  */
 import { withApi, ok, readQuery } from '@/lib/api/withApi'
-import { prisma } from '@/lib/prisma'
+import { prisma, type Prisma } from '@/lib/prisma'
 import { toInt } from '@/lib/api/validation'
 
 export const GET = withApi.admin(async (req, _ctx) => {
@@ -18,7 +18,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
   const page = Math.max(1, toInt(q.page, 'page', 1))
   const pageSize = Math.min(100, Math.max(1, toInt(q.pageSize, 'pageSize', 20)))
 
-  const where: any = {}
+  const where: Prisma.TrainingWhereInput = {}
   if (q.keyword) {
     where.OR = [
       { title: { contains: q.keyword, mode: 'insensitive' } },
@@ -44,7 +44,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
   ])
 
   return ok({
-    items: items.map((t: any) => ({
+    items: items.map((t) => ({
       id: t.id,
       title: t.title,
       description: t.description,

@@ -13,6 +13,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { normalizeClassRoleToApi } from './roles'
+import type { ClassPermissionFlags } from './permission-flags'
 
 export type ClassRole = 'owner' | 'assistant' | 'student'
 
@@ -25,7 +26,7 @@ export interface ClassMembership {
   userId: string
   dbRole: string
   role: ClassRole
-  permissions: Record<string, any> | null
+  permissions: ClassPermissionFlags | null
   isOwner: boolean
   isTeacher: boolean
   isAssistant: boolean
@@ -53,7 +54,7 @@ export async function getClassMembership(
     userId,
     dbRole: member.role,
     role,
-    permissions: (member.permissions as Record<string, any>) || null,
+    permissions: (member.permissions as ClassPermissionFlags | null) || null,
     isOwner: role === 'owner',
     isTeacher: role === 'owner',
     isAssistant: role === 'assistant',

@@ -22,6 +22,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Clock, CheckCircle2, PauseCircle } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
@@ -88,6 +89,7 @@ export default function ProblemTimer({
   const [displayMs, setDisplayMs] = useState<number>(0)
   const [isCompleted, setIsCompleted] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(true)
+  const [assignmentEnded, setAssignmentEnded] = useState(false)
 
   // ref 镜像，避免 effect 闭包拿到陈旧值
   const isCompletedRef = useRef(false)
@@ -102,13 +104,16 @@ export default function ProblemTimer({
     activeRef.current = active
   }, [active])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     baseUrlRef.current = `/api/classes/${classId}/assignments/${assignmentId}/problems/${problemId}/timing`
     if (assignmentEndTime) {
       const endMs = new Date(assignmentEndTime).getTime()
-      assignmentEndedRef.current = !Number.isNaN(endMs) && Date.now() > endMs
+      const ended = !Number.isNaN(endMs) && Date.now() > endMs
+      assignmentEndedRef.current = ended
+      setAssignmentEnded(ended)
     } else {
       assignmentEndedRef.current = false
+      setAssignmentEnded(false)
     }
   }, [classId, assignmentId, problemId, assignmentEndTime])
 
@@ -338,7 +343,7 @@ export default function ProblemTimer({
   }
 
   // 作业已结束但题目未 AC：展示累计用时 + 结束标记，不再计时
-  if (assignmentEndedRef.current) {
+  if (assignmentEnded) {
     return (
       <span
         className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-muted/50 text-muted-foreground border border-border ${className || ''}`}

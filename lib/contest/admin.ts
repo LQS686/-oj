@@ -3,6 +3,7 @@
  * 管理员竞赛管理（创建/编辑/删除/列表 + 报名信息查询）
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { ApiError } from '@/lib/api/errors'
 import { CacheKeys } from '@/lib/constants/cache-keys'
@@ -31,7 +32,7 @@ export async function adminUpdateContest(
 ) {
   const { title, description, type, startTime, endTime, isPublic, password, problems, sealRankTime, sealUnlocked } = body
 
-  const updateData: any = {
+  const updateData: Prisma.ContestUpdateInput = {
     title,
     description,
     type,

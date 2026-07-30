@@ -6,13 +6,8 @@
  * - 简介：说明 + 可点题号构成/难度；侧栏动作/进度/元信息各司其职
  * - 练习：内嵌三栏工作台，不再跳转独立题目页
  */
-import {
-  useEffect,
-  useState,
-  useCallback,
-  useMemo,
-  Suspense,
-} from 'react'
+import { useState, useCallback, useMemo, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { fetchWithCookie } from '@/lib/api/base'
 import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 import { useUser } from '@/contexts/UserContext'
@@ -114,7 +109,7 @@ function TrainingDetailPageContent() {
 
   useDocumentTitle(training?.title)
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     const tab = searchParams.get('tab')
     if (tab === 'problems' || tab === 'intro') setActiveTab(tab)
     const problem = searchParams.get('problem')
@@ -180,7 +175,7 @@ function TrainingDetailPageContent() {
     [trainingId]
   )
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void fetchDetail()
   }, [fetchDetail])
 

@@ -3,9 +3,10 @@
  * 公共题库列表 / 创建（原 /api/problems）
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 export interface ListPublicProblemsResult {
-  problems: any[]
+  problems: Prisma.ProblemGetPayload<object>[]
   pagination: {
     total: number
     page: number
@@ -29,7 +30,7 @@ export async function listPublicProblems(filter: {
   tag?: string
 }): Promise<ListPublicProblemsResult> {
   const { page, pageSize, search, difficulty, tag } = filter
-  const where: any = { visibility: 'public' }
+  const where: Prisma.ProblemWhereInput = { visibility: 'public' }
   if (search) {
     where.OR = [
       { title: { contains: search, mode: 'insensitive' } },

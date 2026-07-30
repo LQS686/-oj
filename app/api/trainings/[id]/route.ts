@@ -66,10 +66,10 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   }>(req)
 
   if (!canAccessAdmin(user)) {
-    delete (body as any).categoryType
-    delete (body as any).isRecommended
-    delete (body as any).status
-    delete (body as any).isPublic
+    delete body.categoryType
+    delete body.isRecommended
+    delete body.status
+    delete body.isPublic
   }
 
   const updated = await updateTrainingAndProblems(id, body)

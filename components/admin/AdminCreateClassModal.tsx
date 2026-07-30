@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Users, Globe, Lock, Check, Megaphone, AlertCircle, Edit } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
@@ -59,7 +60,7 @@ export default function AdminCreateClassModal({
     })
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open) return
 
     if (!isEdit || !classId) {

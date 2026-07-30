@@ -1,8 +1,7 @@
 import sharp from 'sharp'
 import { join, basename, extname } from 'path'
 import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'fs/promises'
-import { existsSync, createWriteStream, createReadStream } from 'fs'
-import { pipeline } from 'stream/promises'
+import { existsSync, createWriteStream } from 'fs'
 import { logger } from '@/lib/logger'
 import { ApiError } from '@/lib/api/errors'
 
@@ -65,7 +64,7 @@ const AVATAR_MAX_INPUT_PIXELS = 4096 * 4096
 export async function processAvatar(
   buffer: Buffer,
   userId: string,
-  originalName: string
+  _originalName: string
 ): Promise<ProcessAvatarResult> {
   await ensureUploadDirs()
 
@@ -100,10 +99,11 @@ export async function processAvatar(
       })
       .webp({ quality: 80 })
       .toFile(filepath)
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
     throw new ApiError(
       'INVALID_IMAGE',
-      err?.message?.includes('pixel') ? '图片分辨率过大' : '图片处理失败',
+      message.includes('pixel') ? '图片分辨率过大' : '图片处理失败',
       400
     )
   }

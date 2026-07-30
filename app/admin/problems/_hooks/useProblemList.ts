@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDialog } from '@/components/common/DialogProvider'
@@ -105,7 +106,7 @@ export function useProblemList() {
     return Array.from(sourceSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
   }, [problems])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     fetchProblems(true)
   }, [fetchProblems])
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUser } from '@/contexts/UserContext'
@@ -54,6 +55,7 @@ import {
   EntityInfoCard,
   EntityOverviewLayout,
 } from '@/components/entity'
+import type { Problem as ProblemModel } from '@/types/models'
 
 const languageOptions = [
  { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -89,6 +91,14 @@ interface ClassMember {
  avatar?: string
 }
 
+interface MemberSubmission {
+ problemId: string
+ status: string
+ score: number
+ submittedAt: string
+ timeElapsedMs: number
+}
+
 export default function AssignmentDetailPage() {
  const dialog = useDialog()
  const params = useParams()
@@ -117,7 +127,7 @@ const [editOpen, setEditOpen] = useState(false)
  // 中栏 Tab：与题库页一致（不含题解，作业场景）
  const [problemTab, setProblemTab] = useState<'description' | 'submissions' | 'code'>('description')
  const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
- const [problemDetail, setProblemDetail] = useState<any>(null)
+ const [problemDetail, setProblemDetail] = useState<ProblemModel & { _id?: string } | null>(null)
  const [problemLoading, setProblemLoading] = useState(false)
 
  const [code, setCode] = useState('')
@@ -125,12 +135,7 @@ const [editOpen, setEditOpen] = useState(false)
  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
  const [submitCooldown, setSubmitCooldown] = useState(false)
 
- useEffect(() => {
- fetchAssignment()
- fetchClassMembers()
- }, [params.id, params.assignmentId])
-
- useEffect(() => {
+ useDeferredEffect(() => {
    setViewTab(parseViewTab(searchParams.get('tab')))
  }, [searchParams])
 
@@ -139,16 +144,16 @@ const [editOpen, setEditOpen] = useState(false)
    className: classData?.name,
  })
 
- useEffect(() => {
+ useDeferredEffect(() => {
  if (!classMembers.length || !user) return
  const member = classMembers.find((m: ClassMember) => m.userId === user.id)
  if (member) {
  const r = normalizeClassRoleToApi(member.role)
  if (r !== userRole) setUserRole(r)
  }
- }, [user, classMembers])
+ }, [user, classMembers, userRole])
 
- useEffect(() => {
+ useDeferredEffect(() => {
  if (!user) {
  setCanManage(false)
  return
@@ -156,7 +161,7 @@ const [editOpen, setEditOpen] = useState(false)
  setCanManage(canManageContent(user))
  }, [user])
 
- const fetchAssignment = async () => {
+ const fetchAssignment = useCallback(async () => {
  try {
  setLoading(true)
  const response = await fetchWithCookie(`/api/classes/${params.id}/assignments/${params.assignmentId}`)
@@ -168,14 +173,14 @@ const [editOpen, setEditOpen] = useState(false)
  } else {
  setError(data.error || '获取作业失败')
  }
- } catch (err) {
+ } catch {
  setError('网络错误')
  } finally {
  setLoading(false)
  }
- }
+ }, [params.id, params.assignmentId])
 
- const fetchClassMembers = async () => {
+ const fetchClassMembers = useCallback(async () => {
  try {
  const response = await fetchWithCookie(`/api/classes/${params.id}/members`)
  const data = await response.json()
@@ -187,7 +192,12 @@ const [editOpen, setEditOpen] = useState(false)
  } catch (err) {
  logger.error('获取班级成员失败', err)
  }
- }
+ }, [params.id])
+
+ useDeferredEffect(() => {
+ void fetchAssignment()
+ void fetchClassMembers()
+ }, [fetchAssignment, fetchClassMembers])
 
  const fetchProblemDetail = useCallback(async (problemId: string) => {
  try {
@@ -199,14 +209,14 @@ const [editOpen, setEditOpen] = useState(false)
  } else {
  setProblemDetail(null)
  }
- } catch (err) {
- setProblemDetail(null)
+ } catch {
+   setProblemDetail(null)
  } finally {
- setProblemLoading(false)
+   setProblemLoading(false)
  }
  }, [])
 
- useEffect(() => {
+ useDeferredEffect(() => {
  // 仅在题目 Tab 拉题面；completion/info 不请求，避免无效流量
  if (assignment?.problems?.length && viewTab === 'problems') {
  const targetIndex = Math.min(selectedProblemIndex, assignment.problems.length - 1)
@@ -360,7 +370,7 @@ const [editOpen, setEditOpen] = useState(false)
      } else {
        setError(data.error || data.message || '删除失败')
      }
-   } catch (err) {
+   } catch {
      setError('删除失败，请重试')
    } finally {
      setLoading(false)
@@ -868,7 +878,7 @@ const [editOpen, setEditOpen] = useState(false)
  .filter((m) => isClassStudentApiRole(m.role))
  .map((member, index) => {
  const memberSubs = allSubmissions.filter(s => s.userId === member.userId)
- const submissionsMap: Record<string, any> = {}
+ const submissionsMap: Record<string, MemberSubmission> = {}
  let totalScore = 0
  let completedCount = 0
  let totalTimeMs = 0
@@ -888,7 +898,7 @@ const [editOpen, setEditOpen] = useState(false)
  }
  })
 
- Object.values(submissionsMap).forEach((sub: any) => {
+ Object.values(submissionsMap).forEach((sub: MemberSubmission) => {
  totalScore += sub.score || 0
  if (sub.status === 'AC') {
  completedCount++

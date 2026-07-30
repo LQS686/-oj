@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useCallback, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   Users,
@@ -158,18 +159,18 @@ function ClassDetailContent() {
     }
   }, [classId])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void fetchClassDetail()
   }, [fetchClassDetail])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!isManageTab) {
       void fetchAssignments()
       void fetchNotes()
     }
   }, [classId, isManageTab, fetchAssignments, fetchNotes])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (searchParams.get('createAssignment') === '1') {
       setCreateAssignmentOpen(true)
       router.replace(`/classes/${classId}`, { scroll: false })

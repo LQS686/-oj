@@ -3,6 +3,7 @@
  * 竞赛提交列表 + 代码提交入队评测
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { logger } from '@/lib/logger'
 import { ApiError } from '@/lib/api/errors'
@@ -34,7 +35,7 @@ export async function listContestSubmissionsPaged(
   const page = filter.page ?? 1
   const limit = filter.limit ?? 20
   // 与榜单一致：排除管理员角色的旁路测试提交
-  const where: any = {
+  const where: Prisma.SubmissionWhereInput = {
     contestId,
     user: { role: { notIn: ['SYSTEM_ADMIN', 'ADMIN'] } },
   }

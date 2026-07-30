@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
-import { JWTPayload } from '@/lib/auth'
+import type { JWTPayload } from '@/lib/auth'
 import { canAccessAdmin } from '@/lib/permissions'
-import { NextRequest } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { resolveClientIp } from '@/lib/http/client-ip'
 
 // 审计日志记录函数
@@ -11,11 +12,11 @@ async function logAccess(
   resource: string,
   userId?: string,
   req?: NextRequest,
-  details?: any
+  details?: Prisma.InputJsonValue
 ) {
   const ip = resolveClientIp(
     req?.headers.get('x-forwarded-for'),
-    req?.headers.get('x-real-ip') || (req as any)?.ip || null
+    req?.headers.get('x-real-ip') || null
   )
   const userAgent = req?.headers.get('user-agent') || 'unknown'
   
@@ -46,7 +47,7 @@ export async function checkContestAccess(
   allowed: boolean; 
   error?: string; 
   status?: number; 
-  contest?: any 
+  contest?: Prisma.ContestGetPayload<object>
 }> {
   const resourcePath = req?.nextUrl?.pathname || `/contests/${contestId}`
 

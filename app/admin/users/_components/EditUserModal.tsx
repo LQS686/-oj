@@ -36,7 +36,7 @@ export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess 
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '更新失败' })
       }
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setSaving(false)

@@ -56,5 +56,5 @@ export function removeNullBytes(str: string): string {
   if (!str || typeof str !== 'string') {
     return ''
   }
-  return str.replace(/\x00/g, '')
+  return str.split('\0').join('')
 }

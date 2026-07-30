@@ -44,7 +44,7 @@ export function BatchEditModal({
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '批量修改失败' })
       }
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setOperating(false)

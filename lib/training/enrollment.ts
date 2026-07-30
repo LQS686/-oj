@@ -76,7 +76,7 @@ export async function getUserEnrollments(userId: string) {
         },
       },
     })
-    return enrollments.map((e: any) => ({
+    return enrollments.map((e) => ({
       trainingId: e.trainingId,
       joinedAt: e.joinedAt,
       training: {

@@ -32,7 +32,7 @@ export async function listContestProblemsWithStatus(
     },
   })
 
-  const problemIds = contestProblems.map((cp: any) => cp.problemId)
+  const problemIds = contestProblems.map((cp) => cp.problemId)
   const userSubmissionStatus: Record<string, 'AC' | 'Attempted' | null> = {}
   const contestStats: Record<string, { accepted: number; submitted: number }> = {}
 
@@ -73,7 +73,7 @@ export async function listContestProblemsWithStatus(
     }),
   ])
 
-  const acceptedMap = new Map<any, any>(acceptedSubmissions.map((s: any) => [s.problemId, s._count._all]))
+  const acceptedMap = new Map(acceptedSubmissions.map((s) => [s.problemId, s._count._all]))
   for (const sub of contestSubmissions) {
     contestStats[sub.problemId] = {
       accepted: acceptedMap.get(sub.problemId) || 0,
@@ -81,7 +81,7 @@ export async function listContestProblemsWithStatus(
     }
   }
 
-  return contestProblems.map((cp: any) => {
+  return contestProblems.map((cp) => {
     const stats = contestStats[cp.problemId] || { accepted: 0, submitted: 0 }
     return {
       id: cp.problemId,

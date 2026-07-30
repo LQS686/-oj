@@ -4,9 +4,11 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { normalizeClassRoleToApi } from '@/lib/class/roles'
 import { ApiError } from '@/lib/api/errors'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
+import type { ClassPermissionFlags } from './permission-flags'
 
 /** 班级头像：允许站内路径或 http(s)；拒绝 javascript: 等危险协议 */
 function sanitizeClassAvatar(avatar: string | null | undefined): string | null | undefined {
@@ -42,7 +44,7 @@ export interface ClassDetailResult {
     nickname: string | null
     avatar: string | null
     role: string
-    permissions: Record<string, any>
+    permissions: ClassPermissionFlags
     joinedAt: Date
     lastActiveAt: Date | null
   }>
@@ -86,7 +88,7 @@ export async function getClassDetail(
     maxMembers: classData.maxMembers,
     ownerId: classData.ownerId,
     createdAt: classData.createdAt,
-    members: members.map((m: any) => ({
+    members: members.map((m) => ({
       id: m.id,
       userId: m.userId,
       username: m.user.username,
@@ -94,8 +96,8 @@ export async function getClassDetail(
       avatar: sanitizeAvatarUrl(m.user.avatar),
       role: normalizeClassRoleToApi(m.role),
       permissions: includePermissions
-        ? ((m.permissions || {}) as Record<string, any>)
-        : ({} as Record<string, any>),
+        ? ((m.permissions || {}) as ClassPermissionFlags)
+        : ({} as ClassPermissionFlags),
       joinedAt: m.joinedAt,
       lastActiveAt: m.lastActiveAt,
     })),
@@ -113,7 +115,7 @@ export interface ClassUpdateInput {
 }
 
 export async function updateClass(classId: string, data: ClassUpdateInput) {
-  const updateData: any = {}
+  const updateData: Prisma.ClassUpdateInput = {}
   if (data.name !== undefined) {
     const name = data.name.trim()
     if (!name || name.length > 100) {
@@ -215,7 +217,7 @@ export async function listClasses(filter: ListClassesFilter = {}) {
   const pageSize = Math.min(filter.pageSize ?? 20, 50)
   const { search, myClasses, userId } = filter
 
-  const where: any = {}
+  const where: Prisma.ClassWhereInput = {}
   if (!myClasses) where.isPublic = true
   if (search) {
     where.OR = [
@@ -241,7 +243,7 @@ export async function listClasses(filter: ListClassesFilter = {}) {
   ])
 
   // 班级私有题目数（Problem.classId 无反向关系，需单独聚合）
-  const classIds = classes.map((c: any) => c.id)
+  const classIds = classes.map((c) => c.id)
   const problemCountsRaw = classIds.length
     ? await prisma.problem.groupBy({
         by: ['classId'],
@@ -250,11 +252,11 @@ export async function listClasses(filter: ListClassesFilter = {}) {
       })
     : []
   const problemCountMap = new Map<string, number>(
-    problemCountsRaw.map((r: any) => [r.classId, r._count._all])
+    problemCountsRaw.map((r) => [r.classId as string, r._count._all])
   )
 
   return {
-    classes: classes.map((c: any) => ({
+    classes: classes.map((c) => ({
       id: c.id,
       name: c.name,
       description: c.description,

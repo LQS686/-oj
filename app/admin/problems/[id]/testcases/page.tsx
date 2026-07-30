@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 import {
@@ -30,6 +31,29 @@ import { VerifyModal } from './_components/VerifyModal'
 import { LogsModal } from './_components/LogsModal'
 
 type TestCase = EditableTestCase
+
+interface VerificationLog {
+  id: string
+  status: string
+  details?: {
+    passed?: number
+    failed?: number
+    fixedCount?: number
+    compileError?: string
+  } | null
+  createdAt: string
+}
+
+interface RawTestCase {
+  input?: string | null
+  output?: string | null
+  inputPreview?: string | null
+  outputPreview?: string | null
+  isSample?: boolean | null
+  score?: number | null
+  timeLimit?: number | null
+  memoryLimit?: number | null
+}
 
 function serializeCases(cases: TestCase[]): string {
   return JSON.stringify(
@@ -72,7 +96,7 @@ export default function ProblemTestCasesPage() {
   const [solutionLanguage, setSolutionLanguage] = useState('cpp')
 
   const [showLogsModal, setShowLogsModal] = useState(false)
-  const [logs, setLogs] = useState<any[]>([])
+  const [logs, setLogs] = useState<VerificationLog[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
 
   const successMsgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -118,7 +142,7 @@ export default function ProblemTestCasesPage() {
     }
   }, [problemId])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (showLogsModal) void fetchLogs()
   }, [showLogsModal, fetchLogs])
 
@@ -151,7 +175,7 @@ export default function ProblemTestCasesPage() {
       if (problem.stdCode) setSolutionCode(problem.stdCode)
       if (problem.stdLang) setSolutionLanguage(problem.stdLang)
 
-      const cases: TestCase[] = (problem.testCases || []).map((tc: any) => ({
+      const cases: TestCase[] = (problem.testCases || []).map((tc: RawTestCase) => ({
         input: tc.input || '',
         output: tc.output || '',
         isSample: !!tc.isSample,
@@ -167,7 +191,7 @@ export default function ProblemTestCasesPage() {
     }
   }, [problemId, applyCases])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void fetchProblemData()
   }, [fetchProblemData])
 
@@ -253,7 +277,7 @@ export default function ProblemTestCasesPage() {
 
       const uploaded = Array.isArray(data.data?.testCases) ? data.data.testCases : []
       const newTestCases: TestCase[] = ensureTotalScoreIs100(
-        uploaded.map((tc: any) => ({
+        uploaded.map((tc: RawTestCase) => ({
           input: tc.input ?? tc.inputPreview ?? '',
           output: tc.output ?? tc.outputPreview ?? '',
           isSample: false,

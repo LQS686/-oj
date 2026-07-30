@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { TrendingUp, Award, FileText, BarChart3, Clock, Target } from 'lucide-react'
@@ -78,7 +79,7 @@ export default function MemberActivityPage() {
     }
   }
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     fetchActivityStats()
   }, [classId, memberId])
 

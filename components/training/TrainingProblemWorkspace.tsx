@@ -4,6 +4,7 @@
  * 题单做题工作台（嵌入题单详情页，与作业三栏交互一致）
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -109,7 +110,7 @@ export default function TrainingProblemWorkspace({
   const selectedMeta = railProblems[selectedIndex] ?? null
   const selectedProblemId = selectedMeta?.id ?? null
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!initialProblemId || railProblems.length === 0) return
     const idx = railProblems.findIndex((p) => p.id === initialProblemId)
     if (idx >= 0) setSelectedIndex(idx)
@@ -127,7 +128,7 @@ export default function TrainingProblemWorkspace({
     [railProblems, onProblemChange]
   )
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!selectedProblemId) {
       setProblemDetail(null)
       return
@@ -162,7 +163,7 @@ export default function TrainingProblemWorkspace({
   )
   useProblemDocumentTitle(problemDetail?.title, titleContext)
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (typeof window === 'undefined' || !problemDetail?.id) return
     const codeKey = `code_training_${trainingId}_${problemDetail.id}`
     setCode(localStorage.getItem(codeKey) ?? '')
@@ -210,9 +211,9 @@ export default function TrainingProblemWorkspace({
     } finally {
       setSubmissionsLoading(false)
     }
-  }, [selectedProblemId, user?.id])
+  }, [selectedProblemId, user])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (problemTab === 'submissions') void fetchSubmissions()
   }, [problemTab, fetchSubmissions])
 

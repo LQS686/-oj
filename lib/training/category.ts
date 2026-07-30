@@ -23,7 +23,7 @@ export async function listRecommendedTrainings(limit = 3, userId: string | null 
         category: { select: { id: true, name: true } },
       },
     })
-    return trainings.map((t: any) => ({
+    return trainings.map((t) => ({
       id: t.id,
       title: t.title,
       description: t.description,
@@ -47,7 +47,7 @@ export async function listCategories(): Promise<TrainingCategory[]> {
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       include: { _count: { select: { trainings: true } } },
     })
-    return items.map((c: any) => ({
+    return items.map((c) => ({
       id: c.id,
       name: c.name,
       description: c.description,

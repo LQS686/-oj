@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
@@ -45,16 +46,7 @@ export default function DirectInviteDetailPage() {
   const [error, setError] = useState('')
   const [processing, setProcessing] = useState(false)
 
-  useEffect(() => {
-    if (authLoading) return
-    if (!user) {
-      router.push(loginPathFromLocation())
-      return
-    }
-    fetchInviteDetail()
-  }, [user, authLoading, inviteId])
-
-  const fetchInviteDetail = async () => {
+  const fetchInviteDetail = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -71,7 +63,16 @@ export default function DirectInviteDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [inviteId])
+
+  useDeferredEffect(() => {
+    if (authLoading) return
+    if (!user) {
+      router.push(loginPathFromLocation())
+      return
+    }
+    void fetchInviteDetail()
+  }, [user, authLoading, router, fetchInviteDetail])
 
   const handleAccept = async () => {
     const ok = await dialog.confirm({ message: '确定要接受此邀请吗？' })

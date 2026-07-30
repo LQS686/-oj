@@ -3,7 +3,7 @@
  * - GET  /api/problems  列表
  * - POST /api/problems  创建题目（管理员）
  */
-import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, readQuery, throw400, throw403, errorLike } from '@/lib/api/withApi'
 import { canManageContent } from '@/lib/permissions'
 import {
   createProblemWithTestcases,
@@ -44,7 +44,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     background?: string
     input?: string
     output?: string
-    samples?: any
+    samples?: Array<{ input?: string; output?: string }>
     hint?: string
     source?: string
     difficulty?: string
@@ -52,7 +52,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     timeLimit?: number
     memoryLimit?: number
     visibility?: 'public' | 'private' | 'contest'
-    testCases?: any[]
+    testCases?: Array<{ input?: string; output?: string; isSample?: boolean; score?: number }>
   }>(req)
 
   // 校验必填字段
@@ -62,7 +62,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   const problemTitle = body.title!
 
   // 测试用例处理
-  let processedTestCases: any[] | undefined
+  let processedTestCases: Array<{ input: string; output: string; isSample: boolean; score: number; orderIndex: number }> | undefined
   if (body.testCases && Array.isArray(body.testCases) && body.testCases.length > 0) {
     const withOrder = body.testCases.map((tc, index) => ({
       input: tc.input ?? '',
@@ -113,8 +113,9 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
       authorId: user.id,
     })
     return ok({ id: problem.id }, { status: 201 })
-  } catch (err: any) {
-    if (err?.code === 'P2002') {
+  } catch (err: unknown) {
+    const e = errorLike(err)
+    if (e.code === 'P2002') {
       throw400('TITLE_TAKEN', '已存在同名题目')
     }
     logger.error('Create problem failed:', err)

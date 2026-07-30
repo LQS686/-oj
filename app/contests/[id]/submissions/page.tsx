@@ -1,17 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { formatDateTime } from '@/lib/utils'
 import { loginPath } from '@/lib/navigation'
-import {
-  isNonFinalSubmissionStatus,
-  SubmissionStatus,
-} from '@/lib/constants/submission-status'
-
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 interface Submission {
  id: string
  problemId: string
@@ -43,21 +40,7 @@ export default function ContestSubmissionsPage() {
  const [page, setPage] = useState(1)
  const [totalPages, setTotalPages] = useState(1)
 
- // 鉴权：竞赛提交记录需登录后查看
- useEffect(() => {
- if (userLoading) return
- if (!user) {
-   router.replace(loginPath(`/contests/${params.id}/submissions`))
- }
- }, [userLoading, user, params.id, router])
-
- useEffect(() => {
- if (userLoading) return
- if (!user) return
- fetchSubmissions()
- }, [page, userLoading, user])
-
- const fetchSubmissions = async () => {
+ const fetchSubmissions = useCallback(async () => {
  try {
  setLoading(true)
  const res = await fetchWithCookie(`/api/contests/${params.id}/submissions?page=${page}&limit=20`)
@@ -71,14 +54,28 @@ export default function ContestSubmissionsPage() {
  setSubmissions([])
  setTotalPages(1)
  }
- } catch (err) {
+ } catch {
  setError('加载失败')
  setSubmissions([])
  setTotalPages(1)
  } finally {
  setLoading(false)
  }
+ }, [params.id, page])
+
+ // 鉴权：竞赛提交记录需登录后查看
+ useEffect(() => {
+ if (userLoading) return
+ if (!user) {
+   router.replace(loginPath(`/contests/${params.id}/submissions`))
  }
+ }, [userLoading, user, params.id, router])
+
+ useDeferredEffect(() => {
+ if (userLoading) return
+ if (!user) return
+ void fetchSubmissions()
+ }, [userLoading, user, fetchSubmissions])
 
  const getStatusColor = (status: string) => {
  switch (status) {

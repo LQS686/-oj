@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/lib/errors'
+import { errorLike } from '@/lib/api/errors'
 import { clearUserCache } from './profile'
 
 /** 旧邮箱保留期：期内不可被他人注册或抢注 */
@@ -154,9 +155,10 @@ export async function registerNewUser(input: {
         },
       })
     })
-  } catch (err: any) {
-    if (err?.code === 'P2002') {
-      const target = err.meta?.target as string[] | undefined
+  } catch (err: unknown) {
+    const e = errorLike(err)
+    if (e.code === 'P2002') {
+      const target = (err as { meta?: { target?: string[] } } | null)?.meta?.target
       if (target?.includes('username')) {
         throw AppError.badRequest('BAD_REQUEST', '用户名已被使用')
       }

@@ -6,7 +6,7 @@
  *      - 管理员：可查询任意 userId
  * POST 鉴权：提交代码（自动加入评测队列）
  */
-import { withApi, ok, readJson, readQuery, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, readQuery, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
 import { submitCode, listSubmissionsAdvanced } from '@/lib/submission/service'
 import { toInt } from '@/lib/api/validation'
 import { logger } from '@/lib/logger'
@@ -80,9 +80,9 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
       },
       { status: 201 }
     )
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error('提交代码失败', err)
-    if (err?.status === 404) throw404('资源不存在')
+    if (err instanceof ApiError && err.status === 404) throw404('资源不存在')
     throw err
   }
 })

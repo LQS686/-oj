@@ -99,7 +99,7 @@ const RECURSION_PATTERNS = [
   { pattern: /void\s+(\w+)\s*\([^)]*\)[^{]*\{[^}]*\1\s*\(/g, name: 'C/C++递归函数' },
 ];
 
-function estimateComplexity(code: string, language: string): 'low' | 'medium' | 'high' | 'very_high' {
+function estimateComplexity(code: string, _language: string): 'low' | 'medium' | 'high' | 'very_high' {
   let score = 0;
   const lines = code.split('\n').length;
   const nestedLoops = (code.match(/for\s*\(/g) || []).length + (code.match(/while\s*\(/g) || []).length;
@@ -138,7 +138,7 @@ function detectInfiniteLoops(code: string): string[] {
   return warnings;
 }
 
-function detectDeepRecursion(code: string, language: string): string[] {
+function detectDeepRecursion(code: string, _language: string): string[] {
   const warnings: string[] = [];
   
   RECURSION_PATTERNS.forEach(({ pattern, name }) => {

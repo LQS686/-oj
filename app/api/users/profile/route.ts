@@ -4,7 +4,7 @@
  * GET  鉴权：读取当前用户完整资料
  * PUT  鉴权：更新昵称/简介/头像
  */
-import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, ApiError } from '@/lib/api/withApi'
 import { getCurrentUserProfile, updateCurrentUserBasic } from '@/lib/user/service'
 
 export const GET = withApi.auth(async (_req, _ctx, { user }) => {
@@ -19,8 +19,8 @@ export const PUT = withApi.auth(async (req, _ctx, { user }) => {
   try {
     const updated = await updateCurrentUserBasic(user.id, parsed)
     return ok(updated)
-  } catch (err: any) {
-    if (err?.status === 400) throw400('VALIDATION', err.message)
+  } catch (err: unknown) {
+    if (err instanceof ApiError && err.status === 400) throw400('VALIDATION', err.message)
     throw err
   }
 })

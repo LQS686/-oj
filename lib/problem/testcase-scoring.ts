@@ -8,7 +8,6 @@ export const TOTAL_SCORE = 100
 
 export interface TestCaseScoreInput {
   score?: number
-  [key: string]: any
 }
 
 /**

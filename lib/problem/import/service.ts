@@ -6,6 +6,7 @@
  * 不绕过任何权限/字段校验。
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
 import { ApiError } from '@/lib/api/errors'
 import { isValidDifficulty, normalizeDifficulty, type Difficulty } from '@/lib/constants'
@@ -206,7 +207,7 @@ async function createOne(
       background: problem.background || null,
       input: problem.input || '',
       output: problem.output || '',
-      samples: problem.samples as any,
+      samples: problem.samples as unknown as Prisma.InputJsonValue,
       hint: problem.hint || null,
       source: problem.source || null,
       difficulty: problem.difficulty,
@@ -267,7 +268,7 @@ async function overwriteOne(
         background: problem.background || null,
         input: problem.input || '',
         output: problem.output || '',
-        samples: problem.samples as any,
+        samples: problem.samples as unknown as Prisma.InputJsonValue,
         hint: problem.hint || null,
         source: problem.source || null,
         difficulty: problem.difficulty,
@@ -391,17 +392,18 @@ export async function importOneProblem(
       title: problem.title,
       externalId,
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const e = err as { message?: string; code?: string }
     logger.warn(`[import] 题目导入失败: ${title}`, {
       externalId,
-      error: err?.message,
-      code: err?.code,
+      error: e.message,
+      code: e.code,
     })
     return {
       status: 'failed',
       title,
       externalId,
-      reason: err?.message || '未知错误',
+      reason: e.message || '未知错误',
     }
   }
 }

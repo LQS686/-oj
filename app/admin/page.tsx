@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { DataTable, type Column } from '@/components/admin'
@@ -71,7 +72,7 @@ export default function AdminDashboard() {
  }
  }, [router])
 
- useEffect(() => {
+ useDeferredEffect(() => {
  fetchDashboardData()
  }, [fetchDashboardData])
 
@@ -131,7 +132,7 @@ export default function AdminDashboard() {
  label: '用户',
  render: (value) => (
  <span className="text-sm text-foreground font-medium">
- {value?.username}
+ {(value as RecentSubmission['user'] | null | undefined)?.username}
  </span>
  ),
  },
@@ -139,7 +140,7 @@ export default function AdminDashboard() {
  key: 'problem',
  label: '题目',
  render: (value) => (
- <span className="text-sm text-foreground">{value?.title}</span>
+ <span className="text-sm text-foreground">{(value as RecentSubmission['problem'] | null | undefined)?.title}</span>
  ),
  },
  {
@@ -147,8 +148,8 @@ export default function AdminDashboard() {
  label: '状态',
  render: (value) => (
  <div className="flex items-center gap-2">
- {getStatusIcon(value)}
- <span className={`tag ${getStatusColor(value)}`}>{value}</span>
+ {getStatusIcon(value as string)}
+      <span className={`tag ${getStatusColor(value as string)}`}>{value as string}</span>
  </div>
  ),
  },
@@ -157,7 +158,7 @@ export default function AdminDashboard() {
  label: '提交时间',
  render: (value) => (
  <span className="text-sm text-muted-foreground">
- {formatDateTime(value)}
+ {formatDateTime(value as string)}
  </span>
  ),
  },

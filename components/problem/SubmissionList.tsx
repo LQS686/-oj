@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { createPortal } from 'react-dom'
 import {
   Clock,
@@ -426,7 +427,7 @@ export default function SubmissionList({
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
   const expandedStatus = submissions.find((s) => s.id === expandedId)?.status
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!expandedId) return
 
     let cancelled = false
@@ -467,10 +468,9 @@ export default function SubmissionList({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedId, expandedStatus])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!expandedId) return
     const listItem = submissions.find((s) => s.id === expandedId)
     if (!listItem) return

@@ -190,11 +190,22 @@ async function listRecentAssignments(userId: string, limit = 6): Promise<HomeAss
   return items.slice(0, limit)
 }
 
+type ContestListItem = {
+  id: string
+  title: string
+  type: string
+  startTime: Date
+  endTime: Date
+  duration?: number
+  _count?: { participants: number }
+  participantCount?: number
+}
+
 async function listUpcomingContests(userId: string, limit = 6): Promise<HomeContestItem[]> {
   const data = await listPublicContests({ page: 1, limit: 12, status: 'upcoming' }, userId)
   const contests = data.contests
 
-  return (contests as any[]).slice(0, limit).map((c) => {
+  return (contests as ContestListItem[]).slice(0, limit).map((c) => {
     const start = new Date(c.startTime)
     const end = c.endTime ? new Date(c.endTime) : null
     let durationLabel = '—'

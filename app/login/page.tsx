@@ -8,6 +8,7 @@ import { useUser } from '@/contexts/UserContext'
 import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
 import { resolveLoginRedirect } from '@/lib/navigation'
+import { errorLike } from '@/lib/api/errors'
 import { GuestAuthShell } from '@/components/common'
 
  export default function LoginPage() {
@@ -33,8 +34,9 @@ import { GuestAuthShell } from '@/components/common'
  const result = await authApi.login(formData.username, formData.password, rememberMe)
  login(result.user)
  router.replace(resolveLoginRedirect())
- } catch (err: any) {
- setError(err.message || '登录失败')
+ } catch (err: unknown) {
+ const e = errorLike(err)
+ setError(e.message || '登录失败')
  } finally {
  setLoading(false)
  }

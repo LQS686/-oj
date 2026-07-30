@@ -1,7 +1,7 @@
 /**
  * /api/trainings/[id]/problems - 训练题目管理（PATCH add/remove/reorder/update）
  */
-import { withApi, ok, readJson, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403, ApiError } from '@/lib/api/withApi'
 import {
   addTrainingProblems,
   removeTrainingProblems,
@@ -33,7 +33,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   const body = await readJson<TrainingProblemPatchInput>(req)
   if (!body || !body.action) throw400('VALIDATION', '缺少 action')
 
-  let result: any
+  let result: unknown
   switch (body.action) {
     case 'add':
       if (!body.problems || body.problems.length === 0) {

@@ -3,6 +3,7 @@
  * 竞赛基础 CRUD、报名、排名缓存
  */
 import { prisma } from '@/lib/prisma'
+import type { Contest, Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
 import { CacheKeys } from '@/lib/constants/cache-keys'
@@ -17,10 +18,10 @@ export interface ContestFilter {
 export async function listContests(
   filter: ContestFilter = {},
   options: ListOptions = {}
-): Promise<PaginatedResult<any>> {
+): Promise<PaginatedResult<Contest>> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const where: any = {}
+  const where: Prisma.ContestWhereInput = {}
   if (filter.keyword) {
     where.OR = [
       { title: { contains: filter.keyword, mode: 'insensitive' } },
@@ -58,12 +59,12 @@ export async function getContestById(id: string) {
   }, { ttl: 30_000 })
 }
 
-export async function createContest(data: any, authorId: string) {
+export async function createContest(data: Omit<Prisma.ContestUncheckedCreateInput, 'authorId'>, authorId: string) {
   cache.deleteByPrefix('contest:list:')
   return prisma.contest.create({ data: { ...data, authorId } })
 }
 
-export async function updateContest(id: string, data: any) {
+export async function updateContest(id: string, data: Prisma.ContestUncheckedUpdateInput) {
   cache.delete(CacheKeys.contest.byId(id))
   cache.deleteByPrefix('contest:list:')
   cache.deleteByPrefix('contest:rank')

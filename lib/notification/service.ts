@@ -3,12 +3,11 @@
  * 通知 CRUD、已读标记、推送
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 import { emitNotification } from '@/lib/websocket/server'
 import { logger } from '@/lib/logger'
-import { DEFAULT_PAGE_SIZE } from '@/lib/types/common'
-
 export interface NotificationFilter {
   userId: string
   unreadOnly?: boolean
@@ -28,7 +27,7 @@ export async function listNotifications(
 ) {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? 20
-  const where: any = { userId: filter.userId }
+  const where: Prisma.NotificationWhereInput = { userId: filter.userId }
   if (filter.unreadOnly) where.isRead = false
   const [items, total, unreadCount] = await Promise.all([
     prisma.notification.findMany({

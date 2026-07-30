@@ -2,7 +2,7 @@
  * /api/classes/[id]/members - 班级成员列表
  */
 import { withApi, ok, readQuery, throw400, throw404 } from '@/lib/api/withApi'
-import { listClassMembers } from '@/lib/class/member'
+import { listClassMembers, type MemberListFilter } from '@/lib/class/member'
 import { isObjectId } from '@/lib/api/validation'
 import { getUserFromRequest } from '@/lib/auth'
 import { getClassById, getCurrentClassMember } from '@/lib/class/service'
@@ -30,7 +30,7 @@ export const GET = withApi.public(async (req, ctx) => {
     role: q.role,
     search: q.search,
     active: q.active as 'true' | 'false' | undefined,
-    sortBy: q.sortBy as any,
+    sortBy: q.sortBy as MemberListFilter['sortBy'],
     sortOrder: q.sortOrder as 'asc' | 'desc' | undefined,
   })
 

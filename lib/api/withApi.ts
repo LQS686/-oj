@@ -33,13 +33,13 @@ import 'server-only'
 
 import type { NextRequest } from 'next/server'
 import { fail, serverError } from './response'
-import { logger } from '@/lib/logger'
 import { getUserFromRequest } from '@/lib/auth'
 import { getClassMembership, type ClassMembership } from '@/lib/class/auth'
 import { getCachedUser, type AuthUser, type ApiContext } from './handler'
 import { canAccessAdmin, isSystemAdmin } from '@/lib/permissions'
 import {
   ApiError,
+  errorLike,
   throw400,
   throw401,
   throw403,
@@ -51,6 +51,7 @@ import {
 export type { AuthUser, ApiContext }
 export {
   ApiError,
+  errorLike,
   throw400,
   throw401,
   throw403,
@@ -94,27 +95,28 @@ async function safeCall(
     // 路由函数直接返回数据时，自动包装为 ok()
     const { ok } = await import('./response')
     return ok(result)
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const e = errorLike(err)
     if (err instanceof ApiError) {
       return fail(err.code, err.message, err.status)
     }
-    if (err?.message === 'INVALID_JSON') {
+    if (e.message === 'INVALID_JSON') {
       return fail('INVALID_JSON', '请求体不是合法 JSON', 400)
     }
-    if (err?.name === 'ValidationError') {
-      return fail('VALIDATION', err.message || '参数不合法', 400)
+    if (e.name === 'ValidationError') {
+      return fail('VALIDATION', e.message || '参数不合法', 400)
     }
-    if (err?.code === 'P2002') {
+    if (e.code === 'P2002') {
       return fail('UNIQUE_VIOLATION', '数据已存在', 409)
     }
-    if (err?.code === 'P2025') {
+    if (e.code === 'P2025') {
       return fail('NOT_FOUND', '资源不存在', 404)
     }
     // 兜底：仅记录详细错误到日志，不向客户端透传 err.message（避免泄露内部结构）
-    logger.error(`[${errorCode}] ${err?.message || err}`, {
+    logger.error(`[${errorCode}] ${e.message || err}`, {
       url: req.url,
       method: req.method,
-      stack: err?.stack,
+      stack: e.stack,
     })
     return serverError('服务器错误')
   } finally {
@@ -130,13 +132,19 @@ async function safeCall(
  * 解析 Next.js 16 的 ctx.params（可能是 Promise），统一为对象。
  * 兼容 Next.js 14 同步 params 与 15/16 异步 params 两种形态。
  */
-async function resolveCtxParams(ctx: any): Promise<any> {
-  if (!ctx) return ctx
+function isPromise<T>(v: T | Promise<T>): v is Promise<T> {
+  return !!v && typeof (v as Promise<T>).then === 'function'
+}
+
+async function resolveCtxParams<P = Record<string, string>>(
+  ctx: { params: P | Promise<P> } | undefined
+): Promise<ApiContext<P>> {
+  if (!ctx) return { params: {} as P }
   const rawParams = ctx.params
-  if (rawParams && typeof rawParams.then === 'function') {
-    return { ...ctx, params: await rawParams }
+  if (isPromise(rawParams)) {
+    return { params: await rawParams }
   }
-  return ctx
+  return { params: rawParams }
 }
 
 async function assertWriteCsrf(req: NextRequest): Promise<void> {
@@ -150,12 +158,19 @@ export interface RouteHandler {
   (req: NextRequest, ctx: ApiContext): Promise<Response | unknown> | Response | unknown
 }
 
+/**
+ * Next.js 路由处理器的第二参数形态：params 可能是同步对象或 Promise（Next 15+）。
+ */
+type RouteContext<P = Record<string, string>> = {
+  params: P | Promise<P>
+}
+
 export const withApi = {
   /**
    * 公开路由：无需登录。写方法强制 CSRF（双提交 Cookie）。
    */
   public(handler: RouteHandler) {
-    return async (req: NextRequest, ctx: any) => {
+    return async (req: NextRequest, ctx: RouteContext) => {
       return safeCall(async () => {
         await assertWriteCsrf(req)
         const resolved = await resolveCtxParams(ctx)
@@ -167,17 +182,17 @@ export const withApi = {
   /**
    * 需登录：自动注入 user。写方法强制 CSRF。
    */
-  auth<P = any>(
+  auth<P = Record<string, string>>(
     handler: (req: NextRequest, ctx: ApiContext<P>, context: AuthContext) => Promise<Response | unknown> | Response | unknown
   ) {
-    return async (req: NextRequest, ctx: ApiContext<P>) => {
+    return async (req: NextRequest, ctx: RouteContext<P>) => {
       return safeCall(async () => {
         await assertWriteCsrf(req)
         const session = getUserFromRequest(req)
         if (!session?.userId) throw throw401()
         const user = await getCachedUser(session.userId, session.tokenVersion)
         if (!user) throw throw401('用户不存在或登录已失效')
-        const resolved = await resolveCtxParams(ctx)
+        const resolved = await resolveCtxParams<P>(ctx)
         return handler(req, resolved, { user })
       }, 'AUTH', req)
     }
@@ -189,7 +204,7 @@ export const withApi = {
   admin(
     handler: (req: NextRequest, ctx: ApiContext, context: AuthContext) => Promise<Response | unknown> | Response | unknown
   ) {
-    return async (req: NextRequest, ctx: any) => {
+    return async (req: NextRequest, ctx: RouteContext) => {
       return safeCall(async () => {
         await assertWriteCsrf(req)
         const session = getUserFromRequest(req)
@@ -211,7 +226,7 @@ export const withApi = {
   systemAdmin(
     handler: (req: NextRequest, ctx: ApiContext, context: AuthContext) => Promise<Response | unknown> | Response | unknown
   ) {
-    return async (req: NextRequest, ctx: any) => {
+    return async (req: NextRequest, ctx: RouteContext) => {
       return safeCall(async () => {
         await assertWriteCsrf(req)
         const session = getUserFromRequest(req)
@@ -234,7 +249,7 @@ export const withApi = {
     allowedRoles: Array<'owner' | 'assistant' | 'student'>,
     handler: (req: NextRequest, ctx: ApiContext, context: ClassContext) => Promise<Response | unknown> | Response | unknown
   ) {
-    return async (req: NextRequest, ctx: any) => {
+    return async (req: NextRequest, ctx: RouteContext) => {
       return safeCall(async () => {
         await assertWriteCsrf(req)
         const session = getUserFromRequest(req)
@@ -242,16 +257,14 @@ export const withApi = {
         const user = await getCachedUser(session.userId, session.tokenVersion)
         // 会话签名有效但账号封禁/tokenVersion 失效：403 而非 401，便于前端区分「未登录」与「无权限」
         if (!user) throw throw403('账号不可用或会话已失效')
-        const rawParams: any = ctx?.params
-        const resolvedParams = rawParams && typeof rawParams.then === 'function' ? await rawParams : rawParams
-        const classId = resolvedParams?.id
+        const resolved = await resolveCtxParams(ctx)
+        const classId = resolved.params?.id
         if (!classId) throw throw404('班级 ID 缺失')
         const membership = await getClassMembership(classId, user.id)
         if (!membership) throw throw403('不是班级成员')
         if (!allowedRoles.includes(membership.role)) {
           throw throw403('权限不足')
         }
-        const resolved = { ...ctx, params: resolvedParams }
         return handler(req, resolved, { user, membership, classId })
       }, 'CLASS_ROLE', req)
     }
@@ -261,8 +274,15 @@ export const withApi = {
 /**
  * 解析 JSON Body（可选用 zod schema 校验）
  */
-export async function readJson<T = any>(req: NextRequest, schema?: any): Promise<T> {
-  let body: any
+interface ValidationSchema {
+  safeParse: (data: unknown) => {
+    success: boolean
+    data?: unknown
+    error?: { issues?: Array<{ path?: PropertyKey[]; message?: string }> }
+  }
+}
+export async function readJson<T = unknown>(req: NextRequest, schema?: ValidationSchema): Promise<T> {
+  let body: unknown
   try {
     body = await req.json()
   } catch {
@@ -271,7 +291,7 @@ export async function readJson<T = any>(req: NextRequest, schema?: any): Promise
   if (schema && typeof schema.safeParse === 'function') {
     const r = schema.safeParse(body)
     if (!r.success) {
-      const first = r.error.issues?.[0]
+      const first = r.error?.issues?.[0]
       throw new ApiError(
         'VALIDATION',
         `${first?.path?.join('.') || '参数'}: ${first?.message || '不合法'}`,

@@ -59,7 +59,7 @@ export async function getTrainingWithProblemStatuses(
     })
     isJoined = !!enrollment
 
-    const problemIds = training.problems.map((p: any) => p.problemId)
+    const problemIds = training.problems.map((p) => p.problemId)
     if (problemIds.length > 0) {
       const submissions = await prisma.submission.findMany({
         where: { userId, problemId: { in: problemIds } },
@@ -77,7 +77,7 @@ export async function getTrainingWithProblemStatuses(
     }
   }
 
-  const problems: TrainingProblemItem[] = training.problems.map((p: any) => {
+  const problems: TrainingProblemItem[] = training.problems.map((p) => {
     const st = problemStatuses[p.problemId]
     return {
       id: p.id,
@@ -93,8 +93,8 @@ export async function getTrainingWithProblemStatuses(
   })
 
   const totalProblems = problems.length
-  const solvedCount = problems.filter((p: any) => p.status === 'AC').length
-  const attemptedCount = problems.filter((p: any) => p.status === 'AC' || p.status === 'ATTEMPTED').length
+  const solvedCount = problems.filter((p) => p.status === 'AC').length
+  const attemptedCount = problems.filter((p) => p.status === 'AC' || p.status === 'ATTEMPTED').length
 
   return {
     id: training.id,
@@ -150,7 +150,7 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
 
   const problemStatuses: Record<string, TrainingProblemStatus> = {}
   if (userId) {
-    const problemIds = trainingProblems.map((p: any) => p.problemId)
+    const problemIds = trainingProblems.map((p) => p.problemId)
     if (problemIds.length > 0) {
       const submissions = await prisma.submission.findMany({
         where: { userId, problemId: { in: problemIds } },
@@ -164,7 +164,7 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
     }
   }
 
-  const problems = trainingProblems.map((tp: any) => ({
+  const problems = trainingProblems.map((tp) => ({
     ...tp.problem,
     orderIndex: tp.orderIndex,
     score: tp.score,
@@ -253,7 +253,7 @@ export async function getUserTrainingProgressDetail(
   })
   if (!training) return null
 
-  const problemIds = training.problems.map((p: any) => p.problemId)
+  const problemIds = training.problems.map((p) => p.problemId)
   const totalProblems = problemIds.length
 
   const submissions = problemIds.length > 0 ? await prisma.submission.findMany({
@@ -304,7 +304,7 @@ export async function getUserTrainingProgressDetail(
       progressPercentage: totalProblems > 0 ? Math.round((solvedCount / totalProblems) * 100) : 0,
     },
     problemProgress,
-    recentSubmissions: recentSubmissions.map((s: any) => ({
+    recentSubmissions: recentSubmissions.map((s) => ({
       id: s.id,
       problemId: s.problemId,
       status: s.status,

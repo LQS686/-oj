@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Shield, AlertCircle, Info } from 'lucide-react'
@@ -78,11 +79,7 @@ export default function MemberPermissionsPage() {
   const [memberInfo, setMemberInfo] = useState<ClassMember | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState<string>('')
 
-  useEffect(() => {
-    fetchMemberInfo()
-  }, [classId, memberId, user?.id])
-
-  const fetchMemberInfo = async () => {
+  const fetchMemberInfo = useCallback(async () => {
     try {
       const response = await fetchWithCookie(`/api/classes/${classId}`)
 
@@ -119,7 +116,11 @@ export default function MemberPermissionsPage() {
       await dialog.alert({ tone: 'error', message: '获取成员信息失败' })
       setLoading(false)
     }
-  }
+  }, [classId, memberId, user, router, dialog])
+
+  useDeferredEffect(() => {
+    void fetchMemberInfo()
+  }, [fetchMemberInfo])
 
   const handleTogglePermission = (key: keyof Permissions) => {
     setPermissions((prev) => ({

@@ -4,17 +4,18 @@
  * app/admin/trainings/page.tsx
  * 管理后台 - 题单管理列表
  */
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useState, useCallback, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import {
-  Plus, Search, Edit, Trash2, Eye, Filter, AlertCircle, RefreshCw
+  Plus, Search, Edit, Trash2, Eye, AlertCircle, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
-import { PageLoading, useDialog, RouteSuspenseFallback } from '@/components/common'
+import { useDialog, RouteSuspenseFallback } from '@/components/common'
 import AdminCreateTrainingModal from '@/components/admin/AdminCreateTrainingModal'
 
 interface AdminTraining {
@@ -49,7 +50,7 @@ function AdminTrainingsPageContent() {
  const [pageSize, setPageSize] = useState(20)
  const [createOpen, setCreateOpen] = useState(false)
 
- useEffect(() => {
+ useDeferredEffect(() => {
  if (searchParams.get('create') === '1') {
  setCreateOpen(true)
  router.replace('/admin/trainings', { scroll: false })
@@ -81,7 +82,7 @@ function AdminTrainingsPageContent() {
  }
  }, [page, pageSize, keyword, statusFilter])
 
- useEffect(() => { fetchItems() }, [fetchItems])
+ useDeferredEffect(() => { fetchItems() }, [fetchItems])
 
  const handleDelete = async (id: string, title: string) => {
  if (!await dialog.confirm({
@@ -152,7 +153,7 @@ function AdminTrainingsPageContent() {
  {
  key: 'status',
  label: '状态',
- render: (value: string) => statusBadge(value),
+ render: (value) => statusBadge(value as string),
  },
  {
  key: 'category',
@@ -166,21 +167,21 @@ function AdminTrainingsPageContent() {
  {
  key: 'problemCount',
  label: '题数',
- render: (value: number) => <span className="text-foreground">{value}</span>,
+ render: (value) => <span className="text-foreground">{value as number}</span>,
  },
  {
  key: 'joinCount',
  label: '加入',
- render: (value: number) => <span className="text-foreground">{value}</span>,
+ render: (value) => <span className="text-foreground">{value as number}</span>,
  },
  {
  key: 'createdAt',
  label: '创建时间',
- render: (value: string) => (
- <span className="text-muted-foreground text-xs">
- {formatDate(value)}
- </span>
- ),
+ render: (value) => (
+			<span className="text-muted-foreground text-xs">
+				{formatDate(value as string)}
+			</span>
+		),
  },
  {
  key: 'id',

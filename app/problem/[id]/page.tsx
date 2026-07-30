@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, use, useMemo } from 'react'
+import { useState, useEffect, use, useMemo, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen,
@@ -42,6 +43,7 @@ import {
   useSubmissionResultFlow,
   type SubmissionListRow,
 } from '@/hooks/useSubmissionResultFlow'
+import type { Problem } from '@/types/models'
 
 const languageOptions = [
   { value: 'cpp', label: 'C++', version: 'C++17' },
@@ -73,9 +75,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const fromAssignment = searchParams.get('fromAssignment')
   const classId = searchParams.get('classId')
   const assignmentTitle = searchParams.get('assignmentTitle')
-  const returnTab = searchParams.get('returnTab') || 'info'
   const fromTraining = searchParams.get('from') === 'training'
-  const trainingId = searchParams.get('trainingId')
   const trainingTitle = searchParams.get('trainingTitle')
   const classNameParam = searchParams.get('className')
 
@@ -97,7 +97,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     return 'description'
   })
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (
       tabParam === 'solutions' ||
       tabParam === 'submissions' ||
@@ -109,7 +109,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     }
   }, [tabParam])
 
-  const [problem, setProblem] = useState<any>(null)
+  const [problem, setProblem] = useState<Problem | null>(null)
   const [problemLoading, setProblemLoading] = useState(true)
   const [problemError, setProblemError] = useState<string | null>(null)
 
@@ -169,7 +169,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         } else {
           setProblemError(data.error || '获取题目失败')
         }
-      } catch (error) {
+      } catch {
         setProblemError('网络错误')
       } finally {
         setProblemLoading(false)
@@ -179,7 +179,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     fetchProblem()
   }, [problemId])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (typeof window === 'undefined') return
     // 等 API 返回真实内部 id 后再读写 localStorage
     // 用 problem.id（ObjectId）而非 URL 中的 problemId（可能是题号 P1001），
@@ -213,7 +213,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     setLanguage(fallback)
   }, [problem?.id, classId, fromAssignment])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (isAssignmentContext && activeTab === 'solutions') {
       setActiveTab('description')
     }
@@ -286,7 +286,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (activeTab === 'submissions') {
       fetchSubmissions()
     }
@@ -316,7 +316,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       defaultMergeSubmissionList(prev, data, { language }),
   })
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!user) {
       router.push(loginPathFromLocation())
       return
@@ -385,7 +385,19 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       abortSubmitSession()
       toast.error('网络错误，请稍后重试')
     }
-  }
+  }, [
+    user,
+    router,
+    code,
+    language,
+    fromAssignment,
+    classId,
+    problemId,
+    beginSubmitSession,
+    isEpochCurrent,
+    bindSubmission,
+    abortSubmitSession,
+  ])
 
   const handleLanguageChange = (newLang: string) => {
     setLanguage(newLang)
@@ -406,9 +418,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [user, code])
-
-
+  }, [user, code, handleSubmit, submittingRef])
 
   if (problemLoading) {
     return (

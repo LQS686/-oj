@@ -3,6 +3,7 @@
  * 公开比赛列表 / 详情 / 密码校验 / 权限
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 
@@ -48,7 +49,7 @@ export async function listPublicContests(
   const limit = Math.min(filter.limit ?? 20, 50)
   const { status, keyword } = filter
 
-  const where: any = { isPublic: true }
+  const where: Prisma.ContestWhereInput = { isPublic: true }
   const now = new Date()
   if (keyword) {
     where.OR = [
@@ -81,25 +82,25 @@ export async function listPublicContests(
 
   let registeredSet = new Set<string>()
   if (currentUserId) {
-    const ids = contests.map((c: any) => c.id)
+    const ids = contests.map((c) => c.id)
     if (ids.length > 0) {
       const participations = await prisma.contestParticipant.findMany({
         where: { userId: currentUserId, contestId: { in: ids } },
         select: { contestId: true },
       })
-      registeredSet = new Set(participations.map((p: any) => p.contestId))
+      registeredSet = new Set(participations.map((p) => p.contestId))
     }
   }
 
   return {
-    contests: contests.map((c: any) => {
+    contests: contests.map((c) => {
       const { password, ...safe } = c
       return {
         ...safe,
         hasPassword: !!password,
         isRegistered: registeredSet.has(c.id),
       }
-    }) as any,
+    }),
     pagination: {
       page,
       limit,
@@ -202,7 +203,7 @@ export async function updateContestWithProblems(
   const updated = await prisma.$transaction(async (tx) => {
     const contest = await tx.contest.update({
       where: { id: contestId },
-      data: contestData as any,
+      data: contestData as Prisma.ContestUpdateInput,
     })
 
     if (Array.isArray(problemIds)) {

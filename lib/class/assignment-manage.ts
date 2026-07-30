@@ -48,12 +48,20 @@ export async function buildClassAssignmentDetail(
     .filter(Boolean) as typeof problemsRaw
 
   // 成员完成情况
-  const memberProgress: any[] = members
-    .map((m: any) => {
-      const us = submissions.filter((s: any) => s.userId === m.userId)
+  type MemberProgressRow = {
+    userId: string
+    username: string
+    nickname: string | null
+    avatar: string | null
+    role: string
+    progress: { solved: number; total: number; percentage: number }
+  }
+  const memberProgress = members
+    .map((m) => {
+      const us = submissions.filter((s) => s.userId === m.userId)
       if (us.length === 0) return null
-      const solved = new Set(us.filter((s: any) => s.status === 'AC').map((s: any) => s.problemId))
-      return {
+      const solved = new Set(us.filter((s) => s.status === 'AC').map((s) => s.problemId))
+      const row: MemberProgressRow = {
         userId: m.userId,
         username: m.user.username,
         nickname: m.user.nickname,
@@ -68,17 +76,18 @@ export async function buildClassAssignmentDetail(
               : 0,
         },
       }
+      return row
     })
-    .filter(Boolean)
-    .sort((a: any, b: any) => b.progress.solved - a.progress.solved)
+    .filter((row): row is MemberProgressRow => row != null)
+    .sort((a, b) => b.progress.solved - a.progress.solved)
 
-  const userSubmissions = submissions.filter((s: any) => s.userId === viewerUserId)
+  const userSubmissions = submissions.filter((s) => s.userId === viewerUserId)
   const viewerIsClassAdmin = isClassAdminApiRole(viewerRole)
   const viewerCanManageContent = await getUserCanManageContent(viewerUserId)
   const canViewAllSubmissions = viewerIsClassAdmin || viewerCanManageContent
 
   // 列表主键 = 主 Submission.id；assignmentSubmissionId 仅为作业记录元数据
-  const assignmentSubmissionIds = submissions.map((s: any) => s.id as string)
+  const assignmentSubmissionIds = submissions.map((s) => s.id)
   const linkedMainSubs =
     assignmentSubmissionIds.length > 0
       ? await prisma.submission.findMany({
@@ -92,7 +101,7 @@ export async function buildClassAssignmentDetail(
       .map((s) => [s.assignmentSubmissionId as string, s.id])
   )
 
-  const mapSubmissionRow = (s: any) => {
+  const mapSubmissionRow = (s: (typeof submissions)[number]) => {
     const mainId = mainIdByAssignmentSubId.get(s.id)
     if (!mainId) {
       // 作业提交必须有关联主 Submission；无关联则丢弃（数据不完整，无法用主 id 推送）
@@ -128,9 +137,9 @@ export async function buildClassAssignmentDetail(
     { submitCount: number; acceptedCount: number; acceptedUsers: Set<string> }
   > = {}
   assignment.problemIds.forEach((problemId: string) => {
-    const ps = submissions.filter((s: any) => s.problemId === problemId)
+    const ps = submissions.filter((s) => s.problemId === problemId)
     const accepted: Set<string> = new Set(
-      ps.filter((s: any) => s.status === 'AC').map((s: any) => s.userId as string)
+      ps.filter((s) => s.status === 'AC').map((s) => s.userId)
     )
     problemStats[problemId] = {
       submitCount: ps.length,
@@ -148,7 +157,7 @@ export async function buildClassAssignmentDetail(
       endTime: assignment.endTime,
       status: getAssignmentStatus(assignment.startTime, assignment.endTime),
       allowLateSubmission: assignment.allowLateSubmission,
-      problems: problems.map((p: any) => ({
+      problems: problems.map((p) => ({
         id: p.id,
         title: p.title,
         problemNumber: p.problemNumber || '',

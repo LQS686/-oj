@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import type { Socket } from 'socket.io-client'
 import {
   acquireAppSocket,
@@ -44,7 +45,7 @@ export function useNotificationSocket({
     userIdRef.current = userId
   }, [userId])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!enabled || !userId) {
       setIsConnected(false)
       notifiedJoinedRef.current = null

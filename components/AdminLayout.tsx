@@ -24,6 +24,7 @@ import {
   UserCircle
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useUser } from '@/contexts/UserContext'
 import type { Notification } from '@/types/models'
 import { getRoleLabel } from '@/lib/permissions'
@@ -75,7 +76,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, isLoading, logout } = useUser()
   const canAccess = canAccessAdmin(user)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [, setMounted] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
@@ -110,7 +111,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // 桌面端（≥ 768px）默认展开，移动端默认收起
   // 初始渲染使用 false（移动端友好），useEffect 中根据视口调整，避免水合不一致
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth >= 768) {
       setSidebarOpen(true)
     }
@@ -154,12 +155,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!user || !canAccess) return
     void fetchNotificationList()
   }, [user, canAccess, fetchNotificationList])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (notificationOpen) {
       void fetchNotificationList()
     }

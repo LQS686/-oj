@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Megaphone, Pin, ArrowLeft, Loader2 } from 'lucide-react'
+import { Megaphone, Pin, ArrowLeft } from 'lucide-react'
 import { EducationalPageShell, PageLoading } from '@/components/common'
 import type { PublicAnnouncementDetail } from '@/lib/announcement/service'
 import { fetchWithCookie } from '@/lib/api/base'

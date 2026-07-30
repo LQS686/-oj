@@ -183,7 +183,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
       } else {
         setError(data.error || '导入失败')
       }
-    } catch (err) {
+    } catch {
       setError('网络错误，请稍后重试')
     } finally {
       setSubmitting(false)
@@ -403,7 +403,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
               </label>
               <select
                 value={visibility}
-                onChange={e => setVisibility(e.target.value as any)}
+                onChange={e => setVisibility(e.target.value as 'public' | 'private' | 'contest')}
                 className="input text-sm"
               >
                 <option value="private">隐藏（推荐导入后再校对）</option>
@@ -431,7 +431,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
               </label>
               <select
                 value={onDuplicate}
-                onChange={e => setOnDuplicate(e.target.value as any)}
+                onChange={e => setOnDuplicate(e.target.value as 'skip' | 'overwrite' | 'duplicate')}
                 className="input text-sm"
               >
                 <option value="skip">跳过（推荐）</option>

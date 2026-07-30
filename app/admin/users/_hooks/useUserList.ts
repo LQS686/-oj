@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { User } from '../_utils'
@@ -34,14 +35,14 @@ export function useUserList() {
         setError(data.error || '获取用户列表失败')
         setUsers([])
       }
-    } catch (err) {
+    } catch {
       setError('网络错误')
     } finally {
       setLoading(false)
     }
   }, [router])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     fetchUsers()
   }, [fetchUsers])
 

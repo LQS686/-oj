@@ -22,6 +22,7 @@
  */
 import AdmZip from 'adm-zip'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
 import { deriveLuoguPid, makePackDirName } from '@/lib/problem/pack-ids'
 
@@ -56,7 +57,7 @@ const DSOJ_PACK_FORMAT_ID = 'dsoj-pack'
  * 从数据库加载完整题目数据（含测试用例、标程）
  */
 async function loadProblemsForExport(options: DsojExportOptions) {
-  const where: any = {}
+  const where: Prisma.ProblemWhereInput = {}
   if (options.problemIds && options.problemIds.length > 0) {
     where.id = { in: options.problemIds }
   }
@@ -83,6 +84,13 @@ async function loadProblemsForExport(options: DsojExportOptions) {
   }
 
   return problems
+}
+
+type ExportProblem = Awaited<ReturnType<typeof loadProblemsForExport>>[number]
+
+type ExportSample = {
+  input?: unknown
+  output?: unknown
 }
 
 /* ============================================================================
@@ -158,7 +166,7 @@ function makeProblemDirName(problem: {
  *   返回形如 [{ path: "problems/LP1001/problem.yaml", content: "..." }] 的列表
  */
 function serializeOneProblem(
-  problem: any,
+  problem: ExportProblem,
   options: DsojExportOptions
 ): Array<{ path: string; content: Buffer }> {
   const files: Array<{ path: string; content: Buffer }> = []
@@ -234,7 +242,7 @@ function serializeOneProblem(
 
   // 4. samples/（展示样例，从 problem.samples 字段导出）
   if (Array.isArray(problem.samples)) {
-    problem.samples.forEach((sample: any, idx: number) => {
+    ;(problem.samples as ExportSample[]).forEach((sample, idx) => {
       if (!sample || typeof sample !== 'object') return
       const num = idx + 1
       if (typeof sample.input === 'string') {
@@ -254,7 +262,7 @@ function serializeOneProblem(
 
   // 5. testcases/（完整测试点，从 TestCase 表导出）
   if (options.includeTestCases !== false && Array.isArray(problem.testCases)) {
-    problem.testCases.forEach((tc: any, idx: number) => {
+    problem.testCases.forEach((tc, idx) => {
       const num = idx + 1
       if (typeof tc.input === 'string') {
         files.push({
@@ -314,7 +322,7 @@ function serializeOneProblem(
       file: string
     }> = []
 
-    problem.solutions.forEach((sol: any, idx: number) => {
+    problem.solutions.forEach((sol, idx) => {
       if (!sol || typeof sol.content !== 'string' || !sol.content.trim()) return
       const lid = String(sol.id || `s${idx + 1}`).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || `s${idx + 1}`
       const fileName = `${lid}.md`
@@ -477,12 +485,12 @@ dsoj-pack.zip
         tags: Array.isArray(problem.tags) ? problem.tags : [],
       })
       successCount++
-    } catch (err: any) {
+    } catch (err: unknown) {
       failedCount++
       logger.warn('单题导出失败', {
         problemId: problem.id,
         title: problem.title,
-        error: err?.message,
+        error: err instanceof Error ? err.message : String(err),
       })
     }
   }

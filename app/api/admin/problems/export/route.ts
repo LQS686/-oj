@@ -65,7 +65,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
 
   // Generate CSV
   const headers = ['ID', 'Title', 'Source', 'Created At', 'Updated At', 'Submissions', 'Accepted']
-  const rows = problems.map((p: any) => [
+  const rows = problems.map((p) => [
     p.id,
     p.title,
     p.source || '',
@@ -77,7 +77,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
 
   const csvContent = [
     headers.join(','),
-    ...rows.map((r: any) => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(',')),
+    ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')),
   ].join('\n')
 
   // Return as download

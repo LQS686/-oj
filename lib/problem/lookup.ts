@@ -3,6 +3,7 @@
  * 题目详情 / 创建（含测试用例）
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
 import type { TestCaseInput } from '@/types/api'
 import { clearProblemCache } from './admin'
@@ -13,7 +14,7 @@ import { clearProblemCache } from './admin'
 
 /** 通过 ObjectId 或 problemNumber 解析题目 */
 export async function findProblemByIdOrNumber(idOrNumber: string) {
-  const where: any = isObjectIdLike(idOrNumber)
+  const where: Prisma.ProblemWhereInput = isObjectIdLike(idOrNumber)
     ? { id: idOrNumber }
     : { problemNumber: idOrNumber }
   return prisma.problem.findFirst({
@@ -38,7 +39,7 @@ export interface CreateProblemInput {
   background?: string
   input: string
   output: string
-  samples?: any
+  samples?: Array<{ input?: string; output?: string }> | null
   hint?: string
   source?: string
   difficulty: string

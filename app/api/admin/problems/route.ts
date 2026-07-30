@@ -38,7 +38,7 @@ export const GET = withApi.admin(async (req) => {
  * POST /api/admin/problems - 创建题目（管理员）
  */
 export const POST = withApi.admin(async (req, _ctx, { user }) => {
-  const body = await readJson<Record<string, any>>(req)
+  const body = await readJson<Record<string, unknown>>(req)
   const problem = await createAdminProblem(body, user.id)
   return ok({ problem, message: '题目创建成功' })
 })

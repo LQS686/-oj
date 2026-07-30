@@ -72,10 +72,10 @@ export function buildUserColumns({
     {
       key: 'createdAt',
       label: '注册时间',
-      render: (value: string) => (
+      render: (value) => (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Calendar className="w-4 h-4" />
-          {formatDate(value)}
+          {formatDate(value as string)}
         </div>
       ),
     },

@@ -109,7 +109,7 @@ export async function addTrainingProblems(
     select: { orderIndex: true },
   })
   let next = (latest[0]?.orderIndex ?? -1) + 1
-  const data = problems.map((p: any) => ({
+  const data = problems.map((p) => ({
     trainingId,
     problemId: p.problemId,
     orderIndex: p.orderIndex ?? next++,
@@ -160,7 +160,7 @@ export async function updateTrainingProblemItem(
 ) {
   cache.delete(byIdKey(trainingId))
   await prisma.$transaction(
-    updates.map((u: any) =>
+    updates.map((u) =>
       prisma.trainingProblem.update({
         where: { trainingId_problemId: { trainingId, problemId: u.problemId } },
         data: {

@@ -43,8 +43,8 @@ export function buildProblemColumns({
       label: '难度',
       sortable: true,
       render: (value) => (
-        <span className={`difficulty-tag ${getDifficultyClass(value)}`}>
-          {value}
+        <span className={`difficulty-tag ${getDifficultyClass(value as string)}`}>
+          {value as string}
         </span>
       ),
     },
@@ -83,7 +83,7 @@ export function buildProblemColumns({
       sortable: true,
       render: (value) => (
         <span className="text-sm text-muted-foreground">
-          {formatDate(value)}
+          {formatDate(value as string)}
         </span>
       ),
     },

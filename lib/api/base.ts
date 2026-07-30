@@ -4,7 +4,7 @@ import { CSRF_CONSTANTS } from '@/lib/security/csrf-constants'
 interface ClientApiError {
   message: string
   code?: string
-  details?: any
+  details?: unknown
 }
 
 interface ClientApiResponse<T> {
@@ -18,7 +18,6 @@ interface ClientApiResponse<T> {
 const REQUEST_TIMEOUT_MS = 30000
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
-let csrfTokenCache: string | null = null
 let csrfInflight: Promise<string> | null = null
 let csrfGeneration = 0
 
@@ -39,11 +38,9 @@ function readCsrfFromDocumentCookie(): string | null {
 export async function ensureCsrfToken(): Promise<string> {
   const fromCookie = readCsrfFromDocumentCookie()
   if (fromCookie) {
-    csrfTokenCache = fromCookie
     return fromCookie
   }
-  // Cookie 已清除（登出 / 跨标签同步）时禁止复用内存中的旧 token，否则会与空 Cookie 不匹配
-  csrfTokenCache = null
+  // Cookie 已清除时走重新签发，避免与空 Cookie 不匹配
   if (csrfInflight) return csrfInflight
 
   const gen = csrfGeneration
@@ -56,7 +53,6 @@ export async function ensureCsrfToken(): Promise<string> {
     if (gen !== csrfGeneration) {
       return ensureCsrfToken()
     }
-    csrfTokenCache = token
     return token
   })().finally(() => {
     csrfInflight = null
@@ -67,7 +63,6 @@ export async function ensureCsrfToken(): Promise<string> {
 
 export function clearCsrfTokenCache(): void {
   csrfGeneration++
-  csrfTokenCache = null
   csrfInflight = null
 }
 
@@ -206,7 +201,7 @@ class ApiClient {
     }
   }
 
-  async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+  async get<T>(endpoint: string, params?: Record<string, unknown>): Promise<T> {
     const cleanParams: Record<string, string> = {}
     if (params) {
       for (const [key, value] of Object.entries(params)) {
@@ -220,14 +215,14 @@ class ApiClient {
     return this.request<T>(`${endpoint}${queryString}`, { method: 'GET' })
   }
 
-  async post<T>(endpoint: string, data?: any): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: JSON.stringify(data ?? {}),
     })
   }
 
-  async put<T>(endpoint: string, data?: any): Promise<T> {
+  async put<T>(endpoint: string, data?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data ?? {}),

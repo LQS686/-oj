@@ -8,10 +8,18 @@ import { logger } from '@/lib/logger'
  * 在 client 未重新生成的环境（如 Windows 文件锁导致 generate 失败的临时态），
  * 该属性为 undefined，应做优雅降级。
  */
-export function getSolutionViewModel(): any | null {
-  const model = (prisma as any).solutionView
+export function getSolutionViewModel(): {
+  create: (args: {
+    data: { solutionId: string; userId?: string; viewerKey: string }
+  }) => Promise<unknown>
+} | null {
+  const model = (prisma as { solutionView?: { create?: unknown } }).solutionView
   if (model && typeof model.create === 'function') {
-    return model
+    return model as {
+      create: (args: {
+        data: { solutionId: string; userId?: string; viewerKey: string }
+      }) => Promise<unknown>
+    }
   }
   return null
 }
@@ -45,9 +53,13 @@ export async function recordUniqueView(
       }
     })
     return true
-  } catch (err: any) {
+  } catch (err: unknown) {
     // 唯一约束冲突 = 重复浏览
-    if (err?.code === 'P2002') return false
+    const code =
+      err && typeof err === 'object' && 'code' in err
+        ? String((err as { code: unknown }).code)
+        : ''
+    if (code === 'P2002') return false
     logger.error('记录题解浏览失败', err)
     return false
   }

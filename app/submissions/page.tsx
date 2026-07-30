@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -180,7 +181,7 @@ function SubmissionsContent() {
     isAdmin,
   ])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (userLoading) return
     if (requiresAuth && !user) return
     void fetchSubmissions()

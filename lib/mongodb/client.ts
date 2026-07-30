@@ -6,7 +6,7 @@
  * 通过 `import { getMongoClient, withRetry } from './client'` 复用本模块的能力。
  */
 
-import { MongoClient, ReadPreference, WriteConcern } from 'mongodb'
+import { MongoClient, ReadPreference } from 'mongodb'
 import { logger } from '@/lib/logger'
 
 function getDatabaseUrl(): string {
@@ -110,20 +110,21 @@ export async function withRetry<T>(
 ): Promise<T> {
   try {
     return await operation()
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { name?: string; code?: number; message?: string }
     const mayRetry =
       options.idempotent === true &&
       retries > 0 &&
-      (error.name === 'MongoNetworkError' ||
-        error.name === 'MongoTimeoutError' ||
-        error.code === 10107) // NotWritablePrimary
+      (err.name === 'MongoNetworkError' ||
+        err.name === 'MongoTimeoutError' ||
+        err.code === 10107) // NotWritablePrimary
 
     if (mayRetry) {
       logger.warn(`Database operation failed, retrying... (${retries} attempts left)`, {
-        error: error.message,
+        error: err.message,
       })
       await new Promise((resolve) => setTimeout(resolve, 1000))
-      if (error.code === 10107) {
+      if (err.code === 10107) {
         cachedClient = null
       }
       return withRetry(operation, retries - 1, options)

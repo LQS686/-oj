@@ -40,7 +40,7 @@ export function BatchDeleteModal({
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '批量删除失败' })
       }
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setOperating(false)

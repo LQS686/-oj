@@ -40,8 +40,10 @@ function getEncryptionKey(): Buffer {
 function tryGetEncryptionKey(): Buffer | null {
   try {
     return getEncryptionKey()
-  } catch (err: any) {
-    logger.warn('[crypto] 密钥不可用', { reason: err?.message })
+  } catch (err: unknown) {
+    logger.warn('[crypto] 密钥不可用', {
+      reason: err instanceof Error ? err.message : String(err),
+    })
     return null
   }
 }
@@ -111,8 +113,10 @@ export function maskApiKey(apiKey: string): string {
     const rawKey = decrypt(apiKey)
     if (rawKey.length < 8) return '********'
     return rawKey.slice(0, 3) + '****' + rawKey.slice(-4)
-  } catch (err: any) {
-    logger.warn('[maskApiKey] 解密失败', { reason: err?.message })
+  } catch (err: unknown) {
+    logger.warn('[maskApiKey] 解密失败', {
+      reason: err instanceof Error ? err.message : String(err),
+    })
     return '********'
   }
 }

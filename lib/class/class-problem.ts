@@ -5,6 +5,7 @@
 
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 /* ============================================================================
  * 班级题目（私有题库）
@@ -23,7 +24,7 @@ export async function listClassProblems(
 ) {
   const page = filter.page ?? 1
   const pageSize = filter.pageSize ?? 20
-  const where: any = { classId }
+  const where: Prisma.ProblemWhereInput = { classId }
   if (filter.difficulty) where.difficulty = filter.difficulty
   if (filter.search) {
     where.OR = [
@@ -44,7 +45,7 @@ export async function listClassProblems(
   ])
 
   return {
-    problems: problems.map((p: any) => ({
+    problems: problems.map((p) => ({
       id: p.id,
       title: p.title,
       problemNumber: p.problemNumber,
@@ -127,7 +128,7 @@ export async function cloneProblemToClass(
       isPublic: false,
       authorId,
       testCases: {
-        create: source.testCases.map((tc: any, idx: any) => ({
+        create: source.testCases.map((tc, idx) => ({
           input: tc.input,
           output: tc.output,
           isSample: tc.isSample,

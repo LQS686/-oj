@@ -79,10 +79,10 @@ export const GET = withApi.public(async (req, ctx) => {
   }
   const sortOrder = q.sortOrder === 'asc' ? 1 : -1
   members.sort((a, b) => {
-    let av: any, bv: any
+    let av: string | number, bv: string | number
     switch (q.sortBy) {
       case 'role': {
-        const order: any = { owner: 3, assistant: 2, student: 1 }
+        const order: Record<string, number> = { owner: 3, assistant: 2, student: 1 }
         av = order[a.role] || 0
         bv = order[b.role] || 0
         break

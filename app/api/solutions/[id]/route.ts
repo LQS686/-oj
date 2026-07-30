@@ -5,7 +5,7 @@
  * PATCH  鉴权：更新（作者 / 管理员 / 教师）
  * DELETE 鉴权：删除（作者 / 管理员 / 教师，级联删评论）
  */
-import { withApi, ok, fail, readJson, readQuery, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, fail, readJson, readQuery, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
 import { canAccessAdmin, canManageContent } from '@/lib/permissions'
 import { verifyToken } from '@/lib/auth'
 import { readAuthTokenFromRequest } from '@/lib/auth/cookie'
@@ -76,11 +76,13 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   try {
     const updated = await updateUserSolution(id, user.id, adminFlag, canManage, body)
     return ok(updated)
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error('更新题解失败', err)
-    if (err?.status === 400) throw400('VALIDATION', '请求参数不合法')
-    if (err?.status === 403) throw403('无权操作')
-    if (err?.status === 404) throw404('资源不存在')
+    if (err instanceof ApiError) {
+      if (err.status === 400) throw400('VALIDATION', '请求参数不合法')
+      if (err.status === 403) throw403('无权操作')
+      if (err.status === 404) throw404('资源不存在')
+    }
     throw err
   }
 })
@@ -96,10 +98,12 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   try {
     await deleteUserSolution(id, user.id, adminFlag, canManage)
     return ok({ message: '题解已删除' })
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error('删除题解失败', err)
-    if (err?.status === 403) throw403('无权操作')
-    if (err?.status === 404) throw404('资源不存在')
+    if (err instanceof ApiError) {
+      if (err.status === 403) throw403('无权操作')
+      if (err.status === 404) throw404('资源不存在')
+    }
     throw err
   }
 })

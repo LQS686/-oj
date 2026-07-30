@@ -1,7 +1,7 @@
 /**
  * POST /api/contests/[id]/register - 报名参加竞赛
  */
-import { withApi, ok, readJson, throw400, throw403, throw404, throw409 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403, throw404, throw409, errorLike } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import { registerContestParticipantDirect } from '@/lib/mongodb-direct'
 import { cache } from '@/lib/cache'
@@ -47,9 +47,10 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
       userId: user.id,
       inviteCode: body.inviteCode,
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     // 并发报名：唯一约束冲突视为已报名（幂等）
-    if (e?.message === 'Already registered' || e?.code === 11000) {
+    const err = errorLike(e)
+    if (err.message === 'Already registered' || Number(err.code) === 11000) {
       throw409('您已经报名过此竞赛')
     }
     throw e

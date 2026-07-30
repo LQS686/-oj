@@ -1,4 +1,7 @@
 import type { NextRequest } from 'next/server';
+import type * as Fs from 'fs';
+import type * as Path from 'path';
+import type * as AsyncHooks from 'node:async_hooks';
 import { resolveClientIp } from '@/lib/http/client-ip';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -31,29 +34,31 @@ export function formatLogTimestamp(date: Date = new Date()): string {
 export interface LogContext {
   requestId?: string;
   userId?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error'];
-let fs: any = null;
-let path: any = null;
+let fs: typeof Fs | null = null;
+let path: typeof Path | null = null;
 let LOG_DIR: string | null = null;
 
 // 只在服务器端环境中导入 Node.js 核心模块
 if (typeof window === 'undefined') {
   // 使用 ES 模块的动态导入
-  import('fs').then(module => {
-    fs = module.default;
-    import('path').then(pathModule => {
-      path = pathModule.default;
-      LOG_DIR = path.join(process.cwd(), 'logs');
-      
+  import('fs').then((module) => {
+    fs = (module as { default?: typeof Fs }).default ?? (module as typeof Fs)
+    import('path').then((pathModule) => {
+      path =
+        (pathModule as { default?: typeof Path }).default ??
+        (pathModule as typeof Path)
+      LOG_DIR = path.join(process.cwd(), 'logs')
+
       // 确保日志目录存在
       if (fs && LOG_DIR && !fs.existsSync(LOG_DIR)) {
-        fs.mkdirSync(LOG_DIR, { recursive: true });
+        fs.mkdirSync(LOG_DIR, { recursive: true })
       }
-    });
-  });
+    })
+  })
 }
 
 function parseLogLevel(level: string | undefined): LogLevel {
@@ -130,7 +135,7 @@ function resolveAsyncLocalStorageCtor():
   if (typeof process !== 'undefined' && process.versions?.node) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mod = require('node:async_hooks') as typeof import('node:async_hooks')
+      const mod = require('node:async_hooks') as typeof AsyncHooks
       return mod.AsyncLocalStorage as unknown as new <T>() => {
         getStore(): T | undefined
         enterWith(store: T): void
@@ -181,7 +186,7 @@ class Logger {
     }
   }
 
-  private formatMessage(level: LogLevel, message: string, meta?: any, context?: LogContext) {
+  private formatMessage(level: LogLevel, message: string, meta?: unknown, context?: LogContext) {
     const timestamp = formatLogTimestamp();
     const mergedContext = redactValue({ ...this.activeContext(), ...context });
     return {
@@ -189,11 +194,11 @@ class Logger {
       level,
       message,
       ...(Object.keys(mergedContext as object).length > 0 && { context: mergedContext }),
-      ...(meta && { meta: redactValue(meta) }),
+      ...(meta != null ? { meta: redactValue(meta) } : {}),
     };
   }
 
-  private writeToFile(level: LogLevel, message: string, meta?: any, context?: LogContext) {
+  private writeToFile(level: LogLevel, message: string, meta?: unknown, context?: LogContext) {
     // 只在服务器端环境中执行文件写入操作，并且确保 fs 和 path 已经加载
     if (typeof window === 'undefined' && fs && path && LOG_DIR) {
       const logMessage = this.formatMessage(level, message, meta, context);
@@ -214,15 +219,15 @@ class Logger {
     }
   }
 
-  debug(message: string, meta?: any, context?: LogContext) {
+  debug(message: string, meta?: unknown, context?: LogContext) {
     if (this.shouldLog('debug')) {
       const logMessage = this.formatMessage('debug', message, meta, context);
-      console.debug(JSON.stringify(logMessage));
+      console.info(JSON.stringify(logMessage));
       this.writeToFile('debug', message, meta, context);
     }
   }
 
-  info(message: string, meta?: any, context?: LogContext) {
+  info(message: string, meta?: unknown, context?: LogContext) {
     if (this.shouldLog('info')) {
       const logMessage = this.formatMessage('info', message, meta, context);
       console.info(JSON.stringify(logMessage));
@@ -230,7 +235,7 @@ class Logger {
     }
   }
 
-  warn(message: string, meta?: any, context?: LogContext) {
+  warn(message: string, meta?: unknown, context?: LogContext) {
     if (this.shouldLog('warn')) {
       const logMessage = this.formatMessage('warn', message, meta, context);
       console.warn(JSON.stringify(logMessage));
@@ -238,7 +243,7 @@ class Logger {
     }
   }
 
-  error(message: string, error?: any, context?: LogContext) {
+  error(message: string, error?: unknown, context?: LogContext) {
     if (this.shouldLog('error')) {
       let errorMeta: unknown = error;
       if (error instanceof Error) {
@@ -292,19 +297,19 @@ class Logger {
 class ContextualLogger {
   constructor(private logger: Logger, private context: LogContext) {}
 
-  debug(message: string, meta?: any) {
+  debug(message: string, meta?: unknown) {
     this.logger.debug(message, meta, this.context);
   }
 
-  info(message: string, meta?: any) {
+  info(message: string, meta?: unknown) {
     this.logger.info(message, meta, this.context);
   }
 
-  warn(message: string, meta?: any) {
+  warn(message: string, meta?: unknown) {
     this.logger.warn(message, meta, this.context);
   }
 
-  error(message: string, error?: any) {
+  error(message: string, error?: unknown) {
     this.logger.error(message, error, this.context);
   }
 

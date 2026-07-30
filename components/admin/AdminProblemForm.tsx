@@ -3,7 +3,8 @@
 /**
  * 管理后台 - 题目新建 / 编辑（全页表单，避免模态窗误关丢数据）
  */
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Plus, X, Database, ArrowLeft, Save } from 'lucide-react'
@@ -51,7 +52,7 @@ export default function AdminProblemForm({
 
   const [samples, setSamples] = useState<Sample[]>([{ input: '', output: '' }])
   const [savedSnapshot, setSavedSnapshot] = useState('')
-  const hydratedRef = useRef(false)
+  const [hydrated, setHydrated] = useState(false)
 
   const snapshot = useMemo(
     () =>
@@ -95,7 +96,7 @@ export default function AdminProblemForm({
     ]
   )
 
-  const dirty = hydratedRef.current && snapshot !== savedSnapshot
+  const dirty = hydrated && snapshot !== savedSnapshot
 
   const applyProblem = useCallback((problem: Record<string, unknown>) => {
     setProblemNumber(typeof problem.problemNumber === 'string' ? problem.problemNumber : '')
@@ -127,9 +128,9 @@ export default function AdminProblemForm({
     )
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!isEdit || !problemId) {
-      hydratedRef.current = true
+      setHydrated(true)
       setSavedSnapshot(snapshot)
       return
     }
@@ -164,16 +165,15 @@ export default function AdminProblemForm({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在 problemId 变化时加载
   }, [isEdit, problemId])
 
   // 编辑模式数据加载完成后打快照
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (loading) return
-    if (hydratedRef.current) return
-    hydratedRef.current = true
+    if (hydrated) return
+    setHydrated(true)
     setSavedSnapshot(snapshot)
-  }, [loading, snapshot])
+  }, [loading, snapshot, hydrated])
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -272,7 +272,7 @@ export default function AdminProblemForm({
 
       if (data.success) {
         setSavedSnapshot(snapshot)
-        hydratedRef.current = true
+        setHydrated(true)
         if (isEdit) {
           await dialog.alert({
             tone: 'success',

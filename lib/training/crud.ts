@@ -3,6 +3,7 @@
  * 训练计划基础 CRUD + 缓存 key 工具（跨模块共享）
  */
 import { prisma } from '@/lib/prisma'
+import type { Training, Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { DEFAULT_PAGE_SIZE, type ListOptions } from '@/lib/types/common'
 
@@ -16,9 +17,6 @@ const TRAINING_LIST_TTL = 30_000
 const TRAINING_DETAIL_TTL = 30_000
 
 /** 缓存 key 工具 */
-function listKey(filter: object, opts: object): string {
-  return `training:list:${cacheHash({ filter, opts })}`
-}
 export function byIdKey(id: string): string {
   return `training:byId:${id}`
 }
@@ -32,9 +30,6 @@ export function userEnrollmentsKey(userId: string): string {
 export function categoriesKey(): string {
   return 'training:categories:all'
 }
-function cacheHash(input: object): string {
-  return Buffer.from(JSON.stringify(input)).toString('base64url').slice(0, 32)
-}
 
 export { TRAINING_LIST_TTL, TRAINING_DETAIL_TTL }
 
@@ -45,10 +40,10 @@ export { TRAINING_LIST_TTL, TRAINING_DETAIL_TTL }
 export async function listTrainings(
   filter: TrainingFilter = {},
   options: ListOptions = {}
-): Promise<{ items: any[]; total: number; page: number; pageSize: number }> {
+): Promise<{ items: Training[]; total: number; page: number; pageSize: number }> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const where: any = {}
+  const where: Prisma.TrainingWhereInput = {}
   if (filter.keyword) {
     where.OR = [
       { title: { contains: filter.keyword, mode: 'insensitive' } },
@@ -78,11 +73,11 @@ export async function getTrainingById(id: string) {
   }, { ttl: TRAINING_DETAIL_TTL })
 }
 
-export async function createTraining(data: any) {
+export async function createTraining(data: Prisma.TrainingUncheckedCreateInput) {
   return prisma.training.create({ data })
 }
 
-export async function updateTraining(id: string, data: any) {
+export async function updateTraining(id: string, data: Prisma.TrainingUncheckedUpdateInput) {
   cache.delete(byIdKey(id))
   cache.deleteByPrefix('training:list:')
   return prisma.training.update({ where: { id }, data })

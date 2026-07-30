@@ -12,7 +12,7 @@ export const bodyParser = false
 /**
  * POST /api/admin/testcases/upload - 上传测试点压缩包
  */
-export const POST = withApi.admin(async (req, _ctx, { user }) => {
+export const POST = withApi.admin(async (req, _ctx, { user: _user }) => {
 
   logger.info('📥 收到测试点上传请求')
 

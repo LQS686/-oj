@@ -2,18 +2,18 @@
  * lib/submission/validation.ts
  * 提交参数校验
  */
-import { required, toInt, ValidationError } from '@/lib/api/validation'
-import { validateObjectId } from '@/lib/api/validation'
+import { required, toInt, ValidationError, validateObjectId, asRecord } from '@/lib/api/validation'
 
-export function parseSubmissionCreate(body: any) {
-  const code = required(body?.code, '代码')
+export function parseSubmissionCreate(body: unknown) {
+  const b = asRecord(body)
+  const code = required(b.code, '代码')
   if (code.length < 2) throw new ValidationError('代码内容不合法')
   return {
-    problemId: validateObjectId(body?.problemId, 'problemId'),
+    problemId: validateObjectId(b.problemId, 'problemId'),
     code,
-    language: required(body?.language, '语言'),
-    contestId: body?.contestId ? validateObjectId(body.contestId, 'contestId') : undefined,
-    assignmentId: body?.assignmentId ? validateObjectId(body.assignmentId, 'assignmentId') : undefined,
+    language: required(b.language, '语言'),
+    contestId: b.contestId ? validateObjectId(b.contestId, 'contestId') : undefined,
+    assignmentId: b.assignmentId ? validateObjectId(b.assignmentId, 'assignmentId') : undefined,
   }
 }
 

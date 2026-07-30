@@ -23,15 +23,23 @@ export function optional(value: unknown): string | undefined {
   return String(value)
 }
 
-export function toInt(value: string | undefined, name: string, def: number, min?: number): number {
+export function toInt(value: unknown, name: string, def: number, min?: number): number {
   if (value === undefined || value === null || value === '') return def
-  const n = parseInt(value, 10)
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10)
   if (isNaN(n)) return def
   return min !== undefined ? Math.max(min, n) : n
 }
 
 export function toBool(value: unknown): boolean {
   return value === true || value === 'true' || value === '1' || value === 1
+}
+
+/** 将请求 body 规范为普通对象，供校验函数使用 */
+export function asRecord(body: unknown): Record<string, unknown> {
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    return body as Record<string, unknown>
+  }
+  return {}
 }
 
 export function isObjectId(id: unknown): id is string {

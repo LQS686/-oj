@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import {
@@ -125,7 +126,7 @@ export default function ClassManageInlinePanel({
     }
   }, [loadMembershipData, loadSettings])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void load()
   }, [load])
 

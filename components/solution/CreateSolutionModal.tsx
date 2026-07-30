@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import {
   Lightbulb,
@@ -84,7 +85,7 @@ export default function CreateSolutionModal({
     })
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open) return
 
     if (!isEdit || !solutionId) {

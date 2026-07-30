@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { Users, Globe, Lock, Check, Megaphone } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -34,7 +35,7 @@ export default function CreateClassModal({
     setError('')
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open) return
     resetForm()
   }, [open, resetForm])

@@ -1,4 +1,5 @@
 import type { NextRequest} from 'next/server';
+import type Redis from 'ioredis';
 import { NextResponse } from 'next/server';
 import { logger } from './logger';
 import { isRedisConfigured } from './redis';
@@ -82,7 +83,7 @@ const memoryStore = new MemoryStore();
  * 未配置或连接失败时返回 null，由调用方回退内存。
  */
 class RedisRateLimiter {
-  private redis: import('ioredis').default | null = null;
+  private redis: Redis | null = null;
   private ready = false;
   private initPromise: Promise<boolean> | null = null;
 
@@ -186,7 +187,7 @@ function checkMemoryRateLimit(
   config: RateLimitConfig
 ): RateLimitResult {
   const now = Date.now();
-  let entry = memoryStore.get(key);
+  const entry = memoryStore.get(key);
   let count = 1;
   let resetTime = now + config.windowMs;
 

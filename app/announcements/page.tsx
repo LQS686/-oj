@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Megaphone, Pin, ChevronRight } from 'lucide-react'
-import { EducationalPageShell, PageLoading, ListEmptyState } from '@/components/common'
+import { EducationalPageShell, ListEmptyState } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 import { formatDate } from '@/lib/utils'

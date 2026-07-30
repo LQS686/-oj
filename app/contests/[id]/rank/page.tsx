@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams } from 'next/navigation'
 import { AlertCircle, Medal, RefreshCw, Download, Lock, Unlock } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -113,7 +114,7 @@ export default function ContestRankPage() {
       } else {
         if (!silent) setError(data.error)
       }
-    } catch (err) {
+    } catch {
       if (!silent) setError('加载失败')
     } finally {
       setLoading(false)
@@ -139,7 +140,7 @@ export default function ContestRankPage() {
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '解冻失败' })
       }
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setUnsealing(false)
@@ -157,7 +158,7 @@ export default function ContestRankPage() {
   }
 
   // 自动刷新（参考 HOJ 自动刷新开关，但增加"关闭"选项避免无谓请求）
-  useEffect(() => {
+  useDeferredEffect(() => {
     // 初次加载
     fetchRank()
 
@@ -242,7 +243,7 @@ export default function ContestRankPage() {
     })
 
     // CSV 转义：含逗号/引号/换行的字段用双引号包裹
-    const escape = (v: any) => {
+    const escape = (v: unknown) => {
       const s = String(v)
       if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
       return s

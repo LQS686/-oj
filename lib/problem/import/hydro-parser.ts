@@ -727,8 +727,9 @@ export function parseHydroZip(zipBuffer: Buffer): ImportedProblem[] {
   let zip: AdmZip
   try {
     zip = new AdmZip(zipBuffer)
-  } catch (e: any) {
-    throw new ApiError('INVALID_HYDRO_ZIP', `ZIP 解压失败: ${e.message}`, 400)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new ApiError('INVALID_HYDRO_ZIP', `ZIP 解压失败: ${msg}`, 400)
   }
 
   // 安全校验：所有 entry 文件名防路径穿越
@@ -755,7 +756,7 @@ export function parseHydroZip(zipBuffer: Buffer): ImportedProblem[] {
     for (const root of roots) {
       try {
         results.push(parseOneProblem(zip, root))
-      } catch (err: any) {
+      } catch (err: unknown) {
         // 单题失败不阻断其他题，错误信息记入下一题的 externalId
         // （Hydro 多题包常见，部分题目损坏不应整体失败）
         // 但若 problem.yaml 完全缺失，跳过该题
@@ -784,39 +785,58 @@ export function parseHydroZip(zipBuffer: Buffer): ImportedProblem[] {
  * 解析 Hydro JSON 格式（单题或多题数组）
  */
 export function parseHydroJson(jsonText: string): ImportedProblem[] {
-  let data: any
+  let data: unknown
   try {
     data = JSON.parse(jsonText)
-  } catch (e: any) {
-    throw new ApiError('INVALID_HYDRO_JSON', `JSON 解析失败: ${e.message}`, 400)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new ApiError('INVALID_HYDRO_JSON', `JSON 解析失败: ${msg}`, 400)
   }
-  const items: any[] = Array.isArray(data) ? data : [data]
-  return items.map((raw, idx) => ({
-    title: String(raw.title || `未命名题目 ${idx + 1}`),
-    description: String(raw.description || raw.content || ''),
-    input: String(raw.input || ''),
-    output: String(raw.output || ''),
-    samples: Array.isArray(raw.samples)
-      ? raw.samples.map((s: any) => ({
-          input: String(s.input ?? ''),
-          output: String(s.output ?? ''),
-        }))
-      : [],
-    hint: raw.hint || undefined,
-    source: raw.source || 'Hydro OJ',
-    difficulty: raw.difficulty || '入门',
-    tags: ['Hydro', ...cleanHydroTags(raw.tags as string | string[] | null | undefined)],
-    timeLimit: Number(raw.timeLimit || raw.time_limit) || 1000,
-    memoryLimit: Number(raw.memoryLimit || raw.memory_limit) || 128,
-    stdCode: raw.stdCode || raw.std_code || undefined,
-    stdLang: raw.stdCode || raw.std_code ? 'cpp' : undefined,
-    testCases: Array.isArray(raw.testCases || raw.tests)
-      ? (raw.testCases || raw.tests).map((t: any) => ({
-          input: String(t.input ?? ''),
-          output: String(t.output ?? ''),
-          isSample: false,
-        }))
-      : [],
-    externalId: String(raw.id || raw._id || `hydro-json-${idx + 1}`),
-  }))
+  const items: unknown[] = Array.isArray(data) ? data : [data]
+  return items.map((raw, idx) => {
+    const item = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+    const rawTests = item.testCases || item.tests
+    return {
+      title: String(item.title || `未命名题目 ${idx + 1}`),
+      description: String(item.description || item.content || ''),
+      input: String(item.input || ''),
+      output: String(item.output || ''),
+      samples: Array.isArray(item.samples)
+        ? item.samples.map((s) => {
+            const sample = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>
+            return {
+              input: String(sample.input ?? ''),
+              output: String(sample.output ?? ''),
+            }
+          })
+        : [],
+      hint: item.hint ? String(item.hint) : undefined,
+      source: item.source ? String(item.source) : 'Hydro OJ',
+      difficulty: item.difficulty ? String(item.difficulty) : '入门',
+      tags: [
+        'Hydro',
+        ...cleanHydroTags(item.tags as string | string[] | null | undefined),
+      ],
+      timeLimit: Number(item.timeLimit || item.time_limit) || 1000,
+      memoryLimit: Number(item.memoryLimit || item.memory_limit) || 128,
+      stdCode:
+        typeof item.stdCode === 'string'
+          ? item.stdCode
+          : typeof item.std_code === 'string'
+            ? item.std_code
+            : undefined,
+      stdLang: item.stdCode || item.std_code ? 'cpp' : undefined,
+      testCases: Array.isArray(rawTests)
+        ? rawTests.map((t) => {
+            const tc = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>
+            return {
+              input: String(tc.input ?? ''),
+              output: String(tc.output ?? ''),
+              isSample: false,
+            }
+          })
+        : [],
+      externalId: String(item.id || item._id || `hydro-json-${idx + 1}`),
+    }
+  })
 }

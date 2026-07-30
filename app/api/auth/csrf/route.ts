@@ -3,7 +3,7 @@
  * 前端在写操作前调用，将 token 填入 X-CSRF-Token。
  */
 import { NextResponse } from 'next/server'
-import { withApi, ok } from '@/lib/api/withApi'
+import { withApi } from '@/lib/api/withApi'
 import { generateCsrfToken, setCsrfCookie, readCsrfCookie } from '@/lib/security/csrf'
 
 export const GET = withApi.public(async (req) => {

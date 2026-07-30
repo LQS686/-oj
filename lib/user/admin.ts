@@ -168,7 +168,7 @@ export async function adminUpdateUser(
     isBanned?: boolean
     password?: string
   },
-  bcryptModule: typeof import('bcryptjs')
+  bcryptModule: { hash(data: string, saltOrRounds: number): Promise<string> }
 ) {
   const updateData: Record<string, unknown> = {}
   // 修改密码或封禁时需递增 tokenVersion，使旧 Token 失效

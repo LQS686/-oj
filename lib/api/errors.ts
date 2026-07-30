@@ -15,6 +15,28 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 把 unknown 的 catch 异常当作「带可选 message/code/name/stack 的对象」读取。
+ * 仅供 `catch (err: unknown)` 块做轻量字段访问，不做运行时变换。
+ * 用法：`const e = errorLike(err); if (e.code === 'P2002') ...`
+ */
+export function errorLike(err: unknown): {
+  message?: string
+  code?: string
+  name?: string
+  stack?: string
+} {
+  if (err && typeof err === 'object') {
+    return err as {
+      message?: string
+      code?: string
+      name?: string
+      stack?: string
+    }
+  }
+  return {}
+}
+
 export const throw400 = (code: string, msg: string): never => {
   throw new ApiError(code, msg, 400)
 }

@@ -86,7 +86,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     endTime: body.endTime ? new Date(body.endTime) : undefined,
     duration: body.duration,
     isPublic: body.isPublic,
-    password: hashedPassword as any,
+    password: hashedPassword,
     problemIds: body.problemIds,
     sealRankTime,
   })

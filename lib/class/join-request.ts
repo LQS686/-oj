@@ -86,7 +86,7 @@ export async function notifyAdminsAboutJoinRequest(
     // 含历史 role=admin，与 dbRolesMatchingApiFilter('assistant') 一致
     where: { classId, role: { in: ['owner', 'assistant', 'admin'] } },
   })
-  const notifications = adminMembers.map((member: any) => ({
+  const notifications = adminMembers.map((member) => ({
     userId: member.userId,
     type: 'class_join_request',
     title: '班级加入申请',
@@ -107,7 +107,7 @@ export async function listClassJoinRequestsDetailed(classId: string) {
       reviewer: { select: { id: true, username: true, nickname: true, avatar: true } },
     },
   })
-  return requests.map((r: any) => ({
+  return requests.map((r) => ({
     id: r.id,
     classId: r.classId,
     applicant: {

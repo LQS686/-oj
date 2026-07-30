@@ -8,7 +8,7 @@ export interface ErrorStats {
     timestamp: string;
     message: string;
     stack?: string;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
   }>;
 }
 
@@ -96,7 +96,7 @@ class ErrorMonitor {
     }
   }
 
-  private getErrorKey(error: Error | string, context?: Record<string, any>): string {
+  private getErrorKey(error: Error | string, context?: Record<string, unknown>): string {
     let key: string;
     if (typeof error === 'string') {
       key = error;
@@ -112,7 +112,7 @@ class ErrorMonitor {
     return key;
   }
 
-  async trackError(error: Error | string, context?: Record<string, any>) {
+  async trackError(error: Error | string, context?: Record<string, unknown>) {
     const key = this.getErrorKey(error, context);
     const now = formatLogTimestamp();
 
@@ -152,7 +152,7 @@ class ErrorMonitor {
     await this.checkThreshold(key, stats, context);
   }
 
-  private async checkThreshold(key: string, stats: ErrorStats, context?: Record<string, any>) {
+  private async checkThreshold(key: string, stats: ErrorStats, context?: Record<string, unknown>) {
     // 确定适用的阈值
     let threshold = this.thresholds.get('default');
     if (key.includes('database')) {
@@ -181,7 +181,7 @@ class ErrorMonitor {
     }
   }
 
-  private async handleThresholdExceeded(key: string, count: number, threshold: ErrorThreshold, context?: Record<string, any>) {
+  private async handleThresholdExceeded(key: string, count: number, threshold: ErrorThreshold, context?: Record<string, unknown>) {
     const message = `Error threshold exceeded: ${key} (${count} occurrences in ${threshold.timeWindow}s)`;
     
     switch (threshold.action) {

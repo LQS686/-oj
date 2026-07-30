@@ -2,8 +2,7 @@
  * lib/training/validation.ts
  * 训练计划参数校验
  */
-import { required, optional, toInt, toBool } from '@/lib/api/validation'
-import { validateObjectId } from '@/lib/api/validation'
+import { required, optional, toInt, toBool, asRecord } from '@/lib/api/validation'
 
 export function parseTrainingListQuery(q: Record<string, string>) {
   return {
@@ -14,11 +13,12 @@ export function parseTrainingListQuery(q: Record<string, string>) {
   }
 }
 
-export function parseTrainingCreate(body: any) {
+export function parseTrainingCreate(body: unknown) {
+  const b = asRecord(body)
   return {
-    title: required(body?.title, '训练标题'),
-    description: optional(body?.description),
-    isPublic: body?.isPublic ? toBool(body.isPublic) : true,
-    problems: body?.problems || [],
+    title: required(b.title, '训练标题'),
+    description: optional(b.description),
+    isPublic: b.isPublic ? toBool(b.isPublic) : true,
+    problems: Array.isArray(b.problems) ? b.problems : [],
   }
 }

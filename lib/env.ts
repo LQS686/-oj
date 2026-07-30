@@ -188,7 +188,7 @@ export function validateEnvironment(): EnvironmentCheckResult {
 
   validated = true
   // 校验 Prisma client 是否正确生成（warn 而非 throw：旧 client 仍可工作，仅功能降级）
-  if (!(prisma as any).solutionView) {
+  if (!(prisma as { solutionView?: unknown }).solutionView) {
     logger.warn('⚠️  Prisma client 未正确生成（缺少 solutionView 模型）。请运行: npx prisma generate')
   }
   logger.info('[env] 环境变量校验通过', {

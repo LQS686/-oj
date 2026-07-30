@@ -3,7 +3,7 @@
  * DELETE /api/notifications/[id] - 删除通知
  * 迁移到 withApi.auth 模式
  */
-import { withApi, readQuery, ok, throw404, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, throw404 } from '@/lib/api/withApi'
 import { markRead, deleteNotification } from '@/lib/notification/service'
 import { validateObjectId } from '@/lib/api/validation'
 

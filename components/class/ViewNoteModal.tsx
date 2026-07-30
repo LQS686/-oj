@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Calendar, Edit, FileText, Tag, Trash2, User, AlertCircle } from 'lucide-react'
 import { CreateModalShell, useDialog } from '@/components/common'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
@@ -66,7 +67,7 @@ export default function ViewNoteModal({
     }
   }, [classId, noteId])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open || !noteId) {
       setNote(null)
       setError('')

@@ -126,7 +126,7 @@ async function main() {
       },
     ]
 
-    const createdProblems: any[] = []
+    const createdProblems: Array<{ _id: unknown; title: string }> = []
     for (let i = 0; i < problems.length; i++) {
       const result = await db.collection('Problem').insertOne({
         ...problems[i],

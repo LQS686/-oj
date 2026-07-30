@@ -64,7 +64,7 @@ export function verifyToken(token: string): JWTPayload | null {
     return jwt.verify(token, JWT_SECRET, {
       algorithms: [JWT_ALGORITHM],
     }) as JWTPayload
-  } catch (error) {
+  } catch {
     return null
   }
 }

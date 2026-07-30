@@ -31,7 +31,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const currentMember = await getCurrentClassMember(classId, user.id)
   if (!currentMember) throw403('您不是班级成员')
   const currentMemberRole = currentMember!.role
-  const currentMemberPerms = (currentMember!.permissions as any) || {}
+  const currentMemberPerms = (currentMember!.permissions || {}) as Record<string, unknown>
 
   const isAdmin = isClassAdminRole(currentMemberRole)
   const hasInvitePermission = !!currentMemberPerms.canInviteMembers
@@ -86,7 +86,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   }
 
   const invites = await listClassDirectInvitesDetailed(classId)
-  const items = invites.map((invite: any) => ({
+  const items = invites.map((invite) => ({
     id: invite.id,
     classId: invite.classId,
     inviter: {

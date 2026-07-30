@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false)
@@ -19,7 +19,7 @@ export interface Column<T> {
   label: string
   sortable?: boolean
   className?: string
-  render?: (value: any, row: T) => ReactNode
+  render?: (value: unknown, row: T) => ReactNode
 }
 
 export interface DataTableProps<T> {
@@ -288,7 +288,7 @@ export default function DataTable<T>({
               )}
               {columns.map((column) => {
                 const value = typeof column.key === 'string' && column.key.includes('.')
-                  ? column.key.split('.').reduce((acc: any, key: any) => acc?.[key], row)
+                  ? column.key.split('.').reduce<unknown>((acc, key) => (acc as Record<string, unknown> | undefined | null)?.[key], row)
                   : row[column.key as keyof T]
                 return (
                   <td key={String(column.key)} className={`px-4 py-3 ${column.className || ''}`}>
@@ -399,7 +399,7 @@ export default function DataTable<T>({
                 <dl className="space-y-2">
                   {columns.map((column) => {
                     const value = typeof column.key === 'string' && column.key.includes('.')
-                      ? column.key.split('.').reduce((acc: any, key: any) => acc?.[key], row)
+                      ? column.key.split('.').reduce<unknown>((acc, key) => (acc as Record<string, unknown> | undefined | null)?.[key], row)
                       : row[column.key as keyof T]
                     return (
                       <div key={String(column.key)} className="flex items-start gap-3">

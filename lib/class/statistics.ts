@@ -88,7 +88,7 @@ export async function computeClassStatistics(
         select: { userId: true, problemId: true },
         distinct: ['userId', 'problemId'],
       })
-      const totalSolved = new Set(submissions.map((s: any) => `${s.userId}-${s.problemId}`)).size
+      const totalSolved = new Set(submissions.map((s) => `${s.userId}-${s.problemId}`)).size
       const memberCount = await prisma.classMember.count({ where: { classId } })
       return {
         totalSolved,
@@ -102,14 +102,14 @@ export async function computeClassStatistics(
           select: { userId: true },
           distinct: ['userId'],
         })
-        .then((s: any) => s.length),
+        .then((s) => s.length),
       prisma.classAssignmentSubmission
         .findMany({
           where: { assignment: { classId }, submittedAt: { gte: thirtyDaysAgo } },
           select: { userId: true },
           distinct: ['userId'],
         })
-        .then((s: any) => s.length),
+        .then((s) => s.length),
     ]),
     (async () => {
       const assignments = await prisma.classAssignment.findMany({
@@ -137,9 +137,9 @@ export async function computeClassStatistics(
   >()
   const problemMap = new Map<string, string>()
   if (recentSubmissions.length > 0) {
-    const userIds = [...new Set(recentSubmissions.map((s: any) => s.userId))]
+    const userIds = [...new Set(recentSubmissions.map((s) => s.userId))]
     const problemIds = [
-      ...new Set(recentSubmissions.map((s: any) => s.problemId).filter(Boolean) as string[]),
+      ...new Set(recentSubmissions.map((s) => s.problemId).filter(Boolean) as string[]),
     ]
     const [users, problems] = await Promise.all([
       userIds.length > 0
@@ -147,16 +147,23 @@ export async function computeClassStatistics(
             where: { id: { in: userIds } },
             select: { id: true, nickname: true, username: true, avatar: true },
           })
-        : Promise.resolve([] as any[]),
+        : Promise.resolve(
+            [] as Array<{
+              id: string
+              nickname: string | null
+              username: string
+              avatar: string | null
+            }>
+          ),
       problemIds.length > 0
         ? prisma.problem.findMany({
             where: { id: { in: problemIds } },
             select: { id: true, title: true },
           })
-        : Promise.resolve([] as any[]),
+        : Promise.resolve([] as Array<{ id: string; title: string }>),
     ])
-    users.forEach((u: any) => userMap.set(u.id, u))
-    problems.forEach((p: any) => problemMap.set(p.id, p.title))
+    users.forEach((u) => userMap.set(u.id, u))
+    problems.forEach((p) => problemMap.set(p.id, p.title))
   }
 
   const roleBreakdown: Record<string, number> = {}
@@ -181,7 +188,7 @@ export async function computeClassStatistics(
       overdue: assignmentStats.overdue,
       completed: assignmentStats.completed,
     },
-    recentActivity: recentSubmissions.map((sub: any) => {
+    recentActivity: recentSubmissions.map((sub) => {
       const u = userMap.get(sub.userId)
       return {
         id: sub.id,

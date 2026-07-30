@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
@@ -44,11 +45,7 @@ export default function AdminSettingsPage() {
 
  const judge: JudgeSettings = settings.judge ?? defaultJudgeSettings
 
- useEffect(() => {
- fetchSettings()
- }, [])
-
- const fetchSettings = async () => {
+ const fetchSettings = useCallback(async () => {
  try {
  const response = await fetchWithCookie('/api/admin/settings')
 
@@ -66,12 +63,16 @@ export default function AdminSettingsPage() {
    judge: { ...defaultJudgeSettings, ...(data.data.judge || {}) },
  }))
  }
- } catch (err) {
+ } catch {
  setError('网络错误')
  } finally {
  setLoading(false)
  }
- }
+ }, [router])
+
+ useDeferredEffect(() => {
+ void fetchSettings()
+ }, [fetchSettings])
 
  const handleSave = async () => {
  setSaving(true)
@@ -101,7 +102,7 @@ export default function AdminSettingsPage() {
  } else {
  setError(data.error || data.message || '保存失败')
  }
- } catch (err) {
+ } catch {
  setError('网络错误')
  } finally {
  setSaving(false)
@@ -127,7 +128,7 @@ export default function AdminSettingsPage() {
  } else {
  setTestResult({ type: 'error', msg: data.error || '发送失败' })
  }
- } catch (err) {
+ } catch {
  setTestResult({ type: 'error', msg: '网络错误' })
  } finally {
  setTestingEmail(false)

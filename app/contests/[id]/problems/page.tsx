@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -129,7 +130,7 @@ function ContestProblemsWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contestId])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (contestProblems.length === 0) return
     const q = searchParams.get('problem')
     if (!q) return
@@ -153,7 +154,7 @@ function ContestProblemsWorkspace() {
     [contestProblems, contestId, router]
   )
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!selectedProblemId) {
       setProblemDetail(null)
       return
@@ -191,7 +192,7 @@ function ContestProblemsWorkspace() {
   )
   useProblemDocumentTitle(problemDetail?.title, titleContext)
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (typeof window === 'undefined' || !problemDetail?.id) return
     const codeKey = `code_contest_${contestId}_${problemDetail.id}`
     const savedCode = localStorage.getItem(codeKey)
@@ -240,9 +241,9 @@ function ContestProblemsWorkspace() {
     } finally {
       setSubmissionsLoading(false)
     }
-  }, [contestId, selectedProblemId, user?.id])
+  }, [contestId, selectedProblemId, user])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (problemTab === 'submissions') void fetchSubmissions()
   }, [problemTab, fetchSubmissions])
 

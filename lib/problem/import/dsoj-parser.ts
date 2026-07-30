@@ -275,7 +275,7 @@ function isStrictSafePath(path: string): boolean {
   // 拒绝 .. 路径穿越（任意段为 ..）
   if (normalized === '..' || normalized.includes('../') || normalized.includes('/..')) return false
   // 拒绝控制字符（含 NUL）
-  if (/[\x00-\x1f]/.test(normalized)) return false
+  if ([...normalized].some((ch) => ch.charCodeAt(0) <= 0x1f)) return false
   // 拒绝 Unicode 路径分隔符（U+2028 / U+2029 / 全角斜杠）
   if (/[\u2028\u2029\uFF0F\uFF3C]/.test(normalized)) return false
   return true
@@ -1077,8 +1077,9 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
   let zip: AdmZip
   try {
     zip = new AdmZip(zipBuffer)
-  } catch (e: any) {
-    throw new ApiError('INVALID_DSOJ_ZIP', `ZIP 解压失败: ${e.message}`, 400)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new ApiError('INVALID_DSOJ_ZIP', `ZIP 解压失败: ${msg}`, 400)
   }
 
   for (const entry of zip.getEntries()) {
@@ -1147,9 +1148,13 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
   for (const job of problemJobs) {
     try {
       results.push(parseOneProblem(zip, job.dir, rootPrefix, job.meta))
-    } catch (err: any) {
+    } catch (err: unknown) {
       const reason =
-        err instanceof ApiError ? err.message : err?.message || '未知错误'
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : '未知错误'
       errors.push({ dir: job.dir, reason })
     }
   }

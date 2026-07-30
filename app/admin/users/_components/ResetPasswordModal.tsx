@@ -43,7 +43,7 @@ export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '重置失败' })
       }
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setResetting(false)

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Pencil, AlertCircle, Trash2 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { CreateModalShell, useDialog } from '@/components/common'
@@ -101,7 +102,7 @@ export default function EditAssignmentModal({
     }
   }, [classId, assignmentId])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open || !assignmentId) return
     void loadAssignment()
   }, [open, assignmentId, loadAssignment])

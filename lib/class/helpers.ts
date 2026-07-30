@@ -96,7 +96,7 @@ export async function hasFullScoreOnProblem(
     select: { score: true },
   })
   if (submissions.length === 0) return false
-  const maxScore = Math.max(...submissions.map((s: any) => s.score || 0))
+  const maxScore = Math.max(...submissions.map((s) => s.score || 0))
   return maxScore === 100
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import {
   computeContestCountdown,
   type ContestCountdownState,
@@ -21,13 +22,13 @@ export function useContestCountdown(
     [startTime, endTime, nowMs]
   )
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (Date.now() <= endMs) {
       setTicking(true)
     }
   }, [endMs, startTime])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (state.phase === 'ended') {
       setTicking(false)
     }

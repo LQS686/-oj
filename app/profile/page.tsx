@@ -3,7 +3,6 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
-import { Loader2 } from 'lucide-react'
 import { loginPathFromLocation } from '@/lib/navigation'
 
 export default function ProfilePage() {

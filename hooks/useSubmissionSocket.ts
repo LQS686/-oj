@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import type { Socket } from 'socket.io-client'
 import { logger } from '@/lib/logger'
 import {
@@ -106,7 +107,7 @@ export function useSubmissionSocket({
     }
   }, [watchSubmissionId])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!enabled || !userId) {
       setIsConnected(false)
       notifiedJoinedRef.current = null

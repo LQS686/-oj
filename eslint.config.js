@@ -42,6 +42,7 @@ export default [
       ...reactHooksPlugin.configs.recommended.rules,
 
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // 渐进收紧：先 warn；按模块清零后再对该目录升为 error
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
@@ -49,22 +50,21 @@ export default [
 
       'react-hooks/exhaustive-deps': 'warn',
       'react-hooks/rules-of-hooks': 'error',
-      // React Compiler 规则（hooks@7+ recommended 默认为 error）：
-      // 历史代码大量触达，暂降为 warn，与 set-state-in-effect 策略一致；避免 CI 被 30+ 风格性 error 阻塞
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/set-state-in-render': 'warn',
-      'react-hooks/refs': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/static-components': 'warn',
-      'react-hooks/use-memo': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
-      'react-hooks/globals': 'warn',
-      'react-hooks/error-boundaries': 'warn',
-      'react-hooks/config': 'warn',
-      'react-hooks/gating': 'warn',
-      'react-hooks/incompatible-library': 'warn',
-      'react-hooks/unsupported-syntax': 'warn',
+      // 挂载拉数等请用 useDeferredEffect；其余 Compiler 规则保持 error
+      'react-hooks/set-state-in-effect': 'error',
+      'react-hooks/set-state-in-render': 'error',
+      'react-hooks/refs': 'error',
+      'react-hooks/immutability': 'error',
+      'react-hooks/purity': 'error',
+      'react-hooks/static-components': 'error',
+      'react-hooks/use-memo': 'error',
+      'react-hooks/preserve-manual-memoization': 'error',
+      'react-hooks/globals': 'error',
+      'react-hooks/error-boundaries': 'error',
+      'react-hooks/config': 'error',
+      'react-hooks/gating': 'error',
+      'react-hooks/incompatible-library': 'error',
+      'react-hooks/unsupported-syntax': 'error',
 
       'react/prop-types': 'off',
       'react/react-in-jsx-scope': 'off',
@@ -103,6 +103,20 @@ export default [
     },
     rules: {
       '@typescript-eslint/consistent-type-imports': 'warn',
+    },
+  },
+  {
+    // 已收紧目录：禁止再引入 any（渐进扩大）
+    files: ['lib/problem/**/*.ts', 'lib/class/**/*.ts', 'lib/submission/**/*.ts', 'lib/logger.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
+  },
+  {
+    // 测试 mock 允许 any，避免为假对象写冗长类型
+    files: ['tests/**/*.ts', 'tests/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   {

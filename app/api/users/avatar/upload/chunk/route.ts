@@ -18,8 +18,6 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   let uploadId = ''
   let chunkIndex = NaN
   let fileBuffer: Buffer | null = null
-  let fileName = 'chunk'
-  let fileMime = 'application/octet-stream'
 
   try {
     const contentType = req.headers.get('content-type') || ''
@@ -63,7 +61,6 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     for (const part of parts) {
       const nameMatch = part.headers.match(/name="([^"]+)"/i)
       const filenameMatch = part.headers.match(/filename="([^"]*)"/i)
-      const mimeMatch = part.headers.match(/Content-Type:\s*([^\r\n]+)/i)
       const name = nameMatch?.[1]
 
       if (name === 'uploadId') {
@@ -72,8 +69,6 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
         chunkIndex = parseInt(part.data.toString('utf8').trim(), 10)
       } else if (name === 'file' && filenameMatch) {
         fileBuffer = part.data
-        fileName = filenameMatch[1] || 'chunk'
-        fileMime = mimeMatch?.[1]?.trim() || 'application/octet-stream'
       }
     }
   } catch (e) {

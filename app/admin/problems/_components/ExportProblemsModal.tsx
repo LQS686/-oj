@@ -84,7 +84,7 @@ export function ExportProblemsModal({
       setTimeout(() => {
         onClose()
       }, 500)
-    } catch (err) {
+    } catch {
       setError('网络错误，请稍后重试')
     } finally {
       setExporting(false)

@@ -3,6 +3,7 @@
  * 管理员视角：列出全部题目（含隐藏字段）/ 创建题目（含自动编号）/ 编辑/获取/删除题目
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 import { redistributeTestScores, deleteTestCaseFiles } from '@/lib/problem/testcase'
@@ -37,7 +38,7 @@ export async function listAllProblemsForAdmin(opts?: {
   // - 模糊查询时强制分页，避免无 q 时一次性返回全表
   const q = opts?.q?.trim()
   const tagIds = opts?.tagIds?.filter(Boolean)
-  const where: any = {}
+  const where: Record<string, unknown> = {}
   if (q) {
     where.OR = [
       { problemNumber: { contains: q, mode: 'insensitive' as const } },
@@ -101,7 +102,7 @@ export interface CreateAdminProblemInput {
   description?: string
   input?: string
   output?: string
-  samples?: any
+  samples?: unknown
   hint?: string
   source?: string
   difficulty?: string
@@ -109,8 +110,8 @@ export interface CreateAdminProblemInput {
   timeLimit?: number | string
   memoryLimit?: number | string
   visibility?: string
-  testCases?: any[]
-  [k: string]: any
+  testCases?: unknown[]
+  [k: string]: unknown
 }
 
 function parseLimit(value: unknown, fallback: number): number {
@@ -145,7 +146,7 @@ export async function ensureAdminProblemNumber(problemNumber?: string): Promise<
 }
 
 export async function createAdminProblem(
-  rawBody: Record<string, any>,
+  rawBody: Record<string, unknown>,
   authorId: string
 ) {
   const body = trimAll(rawBody)
@@ -258,7 +259,7 @@ export async function createAdminProblem(
   const timeLimitValue = parseLimit(timeLimit, 1000)
   const memoryLimitValue = parseLimit(memoryLimit, 128)
 
-  const problemData: any = {
+  const problemData: Prisma.ProblemCreateInput = {
     problemNumber: finalProblemNumber,
     title: sanitizedTitle,
     description: sanitizedDescription,
@@ -374,7 +375,7 @@ export async function getAdminProblemById(id: string) {
 
 export async function updateAdminProblem(
   id: string,
-  body: Record<string, any>,
+  body: Record<string, unknown>,
   operator?: { id: string; username: string; ip?: string }
 ) {
   const existingProblem = await prisma.problem.findUnique({ where: { id } })
@@ -479,9 +480,9 @@ export async function updateAdminProblem(
     visibility: existingProblem.visibility,
   }
 
-  const updateData: any = {}
+  const updateData: Prisma.ProblemUpdateInput = {}
   for (const field of ADMIN_PROBLEM_EDITABLE_FIELDS) {
-    if (field in body) updateData[field] = body[field]
+    if (field in body) (updateData as Record<string, unknown>)[field] = body[field]
   }
   // visibility 为唯一真相源；isPublic 仅派生写入以保持索引字段一致
   if (updateData.visibility) {
@@ -513,12 +514,12 @@ export async function updateAdminProblem(
       await tx.testCase.deleteMany({ where: { problemId: id } })
       if (body.testCases.length > 0) {
         await tx.testCase.createMany({
-          data: body.testCases.map((tc: any, idx: number) => ({
+          data: body.testCases.map((tc: Record<string, unknown>, idx: number) => ({
             problemId: id,
-            input: tc.input || '',
-            output: tc.output || '',
-            isSample: tc.isSample || false,
-            score: tc.score || 10,
+            input: (tc.input as string) || '',
+            output: (tc.output as string) || '',
+            isSample: Boolean(tc.isSample) || false,
+            score: (tc.score as number) || 10,
             timeLimit:
               tc.timeLimit === undefined || tc.timeLimit === null ? null : Number(tc.timeLimit),
             memoryLimit:
@@ -537,7 +538,7 @@ export async function updateAdminProblem(
     if (body.testCases.length > 0) {
       // 仅当总分不是 100 时均分，避免覆盖用户手动设定的分数
       const scoreSum = body.testCases.reduce(
-        (sum: number, tc: any) => sum + (Number(tc?.score) || 0),
+        (sum: number, tc) => sum + (Number(tc?.score) || 0),
         0
       )
       if (scoreSum !== 100) {
@@ -579,7 +580,7 @@ export async function updateAdminProblem(
   return prisma.problem.findUnique({
     where: { id },
     include: { testCases: { orderBy: { orderIndex: 'asc' } } },
-  }).then((result: any) => {
+  }).then((result) => {
     clearProblemCache(id)
     return result
   })

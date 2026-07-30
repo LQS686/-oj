@@ -17,7 +17,7 @@ import dotenv from 'dotenv'
 import { logger } from './lib/logger'
 import { saveChunk, isValidUploadId } from './lib/upload'
 import { assertAvatarUploadOwner } from './lib/avatar-upload-registry'
-import { ApiError } from '@/lib/api/errors'
+import { ApiError, errorLike } from '@/lib/api/errors'
 import { checkRateLimit, getClientIPFromHeaders } from './lib/rate-limit'
 import jwt from 'jsonwebtoken'
 import { isSecureAuthCookie, readAuthTokenFromCookieHeader } from './lib/auth/cookie'
@@ -121,7 +121,7 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
   if (!assertWriteSecurityRaw(req, res)) return true
 
   // 独立限流：绕过 Next middleware，需在此单独限制分片上传频率
-  const clientIp = getClientIPFromHeaders(req.headers as any)
+  const clientIp = getClientIPFromHeaders(req.headers)
   const rl = await checkRateLimit(`avatar-chunk:${clientIp}`, {
     maxRequests: 60,
     windowMs: 60_000,
@@ -157,12 +157,13 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
   try {
     body = await readBodyWithLimit(req, MAX_BODY_SIZE)
     logger.info('[chunk-direct] body read', { size: body.length })
-  } catch (e: any) {
-    if (e?.message === 'PAYLOAD_TOO_LARGE') {
+  } catch (err: unknown) {
+    const e = errorLike(err)
+    if (e.message === 'PAYLOAD_TOO_LARGE') {
       writeJson(res, 413, { success: false, code: 'PAYLOAD_TOO_LARGE', error: '请求体过大' })
       return true
     }
-    logger.error('读取 chunk body 失败', e instanceof Error ? e : new Error(String(e)))
+    logger.error('读取 chunk body 失败', err instanceof Error ? err : new Error(String(err)))
     writeJson(res, 500, { success: false, code: 'READ_FAILED', error: '读取请求失败' })
     return true
   }
@@ -245,9 +246,13 @@ async function getUserFromRawRequest(
   let userId: string | undefined
   let tokenVersion: number | undefined
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as any
-    userId = payload?.userId
-    tokenVersion = payload?.tokenVersion
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as
+      | { userId?: string; tokenVersion?: number }
+      | string
+    if (typeof payload === 'object' && payload) {
+      userId = payload.userId
+      tokenVersion = payload.tokenVersion
+    }
   } catch {
     return null
   }
@@ -339,8 +344,9 @@ async function handleProblemImportDirect(
   let body: Buffer
   try {
     body = await readBodyWithLimit(req, MAX_IMPORT_BODY_SIZE)
-  } catch (e: any) {
-    if (e?.message === 'PAYLOAD_TOO_LARGE') {
+  } catch (err: unknown) {
+    const e = errorLike(err)
+    if (e.message === 'PAYLOAD_TOO_LARGE') {
       writeJson(res, 413, {
         success: false,
         code: 'FILE_TOO_LARGE',
@@ -348,7 +354,7 @@ async function handleProblemImportDirect(
       })
       return true
     }
-    logger.error('读取题库导入 body 失败', e instanceof Error ? e : new Error(String(e)))
+    logger.error('读取题库导入 body 失败', err instanceof Error ? err : new Error(String(err)))
     writeJson(res, 500, { success: false, code: 'READ_FAILED', error: '读取请求失败' })
     return true
   }
@@ -412,7 +418,7 @@ async function handleProblemImportDirect(
     }
 
     const result = await executeProblemImport({
-      format: formatStr as any,
+      format: formatStr as typeof VALID_IMPORT_FORMATS[number],
       content,
       rawOptions,
       authorId: user.id,
@@ -648,7 +654,7 @@ app.prepare().then(async () => {
 
   // 修复 P0：注册全局未捕获异常 / Promise 拒绝处理器
   // 防止单次未捕获异常让 Node 进程进入未定义状态或泄漏文件描述符。
-  process.on('unhandledRejection', (reason, promise) => {
+  process.on('unhandledRejection', (reason, _promise) => {
     logger.error('Unhandled Promise Rejection', reason instanceof Error ? reason : new Error(String(reason)))
   })
   process.on('uncaughtException', (err, origin) => {

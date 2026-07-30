@@ -3,6 +3,7 @@
  * 题目提交列表（一律主 Submission.id；作业提交同样写入主表）
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { isObjectIdLike } from './lookup'
 
 export interface ListProblemSubmissionsFilter {
@@ -15,13 +16,15 @@ export async function listProblemSubmissions(
   idOrNumber: string,
   filter: ListProblemSubmissionsFilter = {}
 ) {
-  const where: any = isObjectIdLike(idOrNumber) ? { id: idOrNumber } : { problemNumber: idOrNumber }
+  const where: Prisma.ProblemWhereInput = isObjectIdLike(idOrNumber)
+    ? { id: idOrNumber }
+    : { problemNumber: idOrNumber }
   const problem = await prisma.problem.findFirst({ where, select: { id: true } })
   if (!problem) return null
 
   const page = filter.page ?? 1
   const limit = filter.pageSize ?? 20
-  const submissionWhere: Record<string, unknown> = {
+  const submissionWhere: Prisma.SubmissionWhereInput = {
     problemId: problem.id,
   }
   if (filter.userId) submissionWhere.userId = filter.userId

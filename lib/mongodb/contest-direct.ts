@@ -7,6 +7,7 @@
 import { ObjectId } from 'mongodb'
 import bcrypt from 'bcryptjs'
 import { getMongoClient } from './client'
+import { errorLike } from '@/lib/api/errors'
 
 /**
  * 直接创建竞赛及关联题目（绕过 Prisma 事务）
@@ -65,8 +66,9 @@ export async function createContestDirect(data: {
         }
       })
     })
-  } catch (error: any) {
-    if (error?.code !== 11000) throw error
+  } catch (error: unknown) {
+    const e = errorLike(error)
+    if (Number(e.code) !== 11000) throw error
   }
 
   return {
@@ -110,8 +112,9 @@ export async function registerContestParticipantDirect(data: {
 
   try {
     await db.collection('ContestParticipant').insertOne(participant)
-  } catch (error: any) {
-    if (error?.code === 11000) {
+  } catch (error: unknown) {
+    const e = errorLike(error)
+    if (Number(e.code) === 11000) {
       throw new Error('Already registered')
     }
     throw error

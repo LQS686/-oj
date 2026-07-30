@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { Lock, UserCheck, AlertCircle, LogIn, Play } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -31,16 +32,11 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
   const [clockActive, setClockActive] = useState(() => Date.now() < startMs)
   const nowMs = useWallClock(clockActive)
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (nowMs >= startMs) setClockActive(false)
   }, [nowMs, startMs])
 
-  useEffect(() => {
-    void checkStatus()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contest.id])
-
-  const checkStatus = async () => {
+  const checkStatus = useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetchWithCookie(`/api/contests/${contest.id}`)
@@ -53,7 +49,11 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [contest.id])
+
+  useDeferredEffect(() => {
+    void checkStatus()
+  }, [checkStatus])
 
   const handleRegister = async () => {
     try {

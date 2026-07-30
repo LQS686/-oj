@@ -3,6 +3,7 @@
  * 题目基础 CRUD、标签、状态统计
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
 import type { Difficulty } from '@/lib/constants'
@@ -25,9 +26,9 @@ export async function listProblemTags(): Promise<string[]> {
   })
 
   const tagSet = new Set<string>()
-  problems.forEach((p: any) => {
+  problems.forEach((p) => {
     if (Array.isArray(p.tags)) {
-      p.tags.forEach((tag: any) => {
+      p.tags.forEach((tag) => {
         if (tag && typeof tag === 'string' && tag.trim()) {
           tagSet.add(tag.trim())
         }
@@ -41,10 +42,10 @@ export async function listProblemTags(): Promise<string[]> {
 export async function listProblems(
   filter: ProblemListFilter = {},
   options: ListOptions = {}
-): Promise<PaginatedResult<any>> {
+): Promise<PaginatedResult<Prisma.ProblemGetPayload<object>>> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const where: any = {}
+  const where: Prisma.ProblemWhereInput = {}
   if (filter.keyword) {
     where.OR = [
       { title: { contains: filter.keyword, mode: 'insensitive' } },
@@ -52,7 +53,6 @@ export async function listProblems(
   }
   if (filter.difficulty) where.difficulty = filter.difficulty
   if (filter.visibility !== undefined) where.visibility = filter.visibility
-  if (filter.categoryId) where.categoryId = filter.categoryId
   if (filter.tagIds?.length) where.tags = { hasSome: filter.tagIds }
 
   const [items, total] = await Promise.all([
@@ -73,13 +73,16 @@ export async function getProblemById(id: string) {
   }, { ttl: 60_000 })
 }
 
-export async function createProblem(data: any, authorId: string) {
+export async function createProblem(
+  data: Prisma.ProblemUncheckedCreateInput,
+  authorId: string
+) {
   const problem = await prisma.problem.create({ data: { ...data, authorId } })
   clearProblemCache(problem.id)
   return problem
 }
 
-export async function updateProblem(id: string, data: any) {
+export async function updateProblem(id: string, data: Prisma.ProblemUpdateInput) {
   // LOGIC-09: 先写 DB 再清缓存，避免缓存清空后、DB 写入前出现缓存击穿读到旧值
   const result = await prisma.problem.update({ where: { id }, data })
   clearProblemCache(id)
@@ -124,7 +127,7 @@ export async function getProblemStatusCounts(problemId: string) {
       where: { problemId },
       _count: { status: true },
     })
-    return groups.reduce((acc: any, g: any) => {
+    return groups.reduce((acc: Record<string, number>, g) => {
       acc[g.status] = g._count.status
       return acc
     }, {} as Record<string, number>)
@@ -145,7 +148,7 @@ export async function getRandomPublicProblem(filter: {
   difficulty?: string
   tag?: string
 } = {}): Promise<{ id: string; problemNumber: string | null } | null> {
-  const where: any = { visibility: 'public' }
+  const where: Prisma.ProblemWhereInput = { visibility: 'public' }
   if (filter.search) {
     where.OR = [
       { title: { contains: filter.search, mode: 'insensitive' } },

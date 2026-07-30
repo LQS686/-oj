@@ -4,7 +4,8 @@
  * app/admin/trainings/categories/page.tsx
  * 管理后台 - 题单分类管理
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { DataTable, AdminPageShell, type Column } from '@/components/admin'
 import {
@@ -50,7 +51,7 @@ export default function TrainingCategoriesPage() {
  }
  }, [])
 
- useEffect(() => { loadCategories() }, [loadCategories])
+ useDeferredEffect(() => { loadCategories() }, [loadCategories])
 
  const handleCreate = async () => {
  if (!newName.trim()) { toast.error('请输入分类名'); return }

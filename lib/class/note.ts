@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export interface CreateClassNoteInput {
@@ -49,7 +50,7 @@ export async function listClassNotes(
 ) {
   const { category, search, onlyMine, authorId, skip = 0, take = 50 } = filter
 
-  const where: any = { classId }
+  const where: Prisma.ClassNoteWhereInput = { classId }
   if (category) where.category = category
   if (onlyMine && authorId) where.authorId = authorId
   else if (authorId) where.authorId = authorId
@@ -64,11 +65,11 @@ export async function listClassNotes(
   if (search) {
     const q = search.toLowerCase()
     return notes.filter(
-      (n: any) =>
+      (n) =>
         n.title.toLowerCase().includes(q) ||
         n.content.toLowerCase().includes(q) ||
         n.category.toLowerCase().includes(q) ||
-        n.tags.some((t: any) => t.toLowerCase().includes(q))
+        n.tags.some((t) => t.toLowerCase().includes(q))
     )
   }
   return notes
@@ -106,7 +107,7 @@ export interface ListClassNotesInput {
 export async function listClassNotesPaged(classId: string, filter: ListClassNotesInput = {}) {
   const page = filter.page ?? 1
   const pageSize = Math.min(filter.pageSize ?? 20, 100)
-  const where: any = { classId }
+  const where: Prisma.ClassNoteWhereInput = { classId }
   if (filter.category) where.category = filter.category
   if (filter.search) {
     where.OR = [
@@ -130,7 +131,7 @@ export async function listClassNotesPaged(classId: string, filter: ListClassNote
   ])
 
   return {
-    notes: notes.map((n: any) => ({
+    notes: notes.map((n) => ({
       id: n.id,
       title: n.title,
       content: n.content,

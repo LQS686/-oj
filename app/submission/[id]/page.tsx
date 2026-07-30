@@ -1,6 +1,7 @@
 'use client'
 
-import { use, useState, useEffect, useRef, useCallback } from 'react'
+import { use, useState, useRef, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -282,10 +283,9 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     }
   }, [id])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     fetchSubmission()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, fetchSubmission])
 
   useSubmissionSocket({
     userId: user?.id || '',
@@ -330,14 +330,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     },
   })
 
-  useEffect(() => {
-    if (submission) {
-      void fetchSubmissionHistory()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submission?.id])
-
-  const fetchSubmissionHistory = async () => {
+  const fetchSubmissionHistory = useCallback(async () => {
     if (!submission) return
 
     try {
@@ -357,7 +350,13 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     } finally {
       setHistoryLoading(false)
     }
-  }
+  }, [submission])
+
+  useDeferredEffect(() => {
+    if (submission) {
+      void fetchSubmissionHistory()
+    }
+  }, [submission, fetchSubmissionHistory])
 
   if (loading) {
     return (

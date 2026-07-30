@@ -37,9 +37,9 @@ const AUTH_INV_TTL_SEC = 120
 const AUTH_INV_PREFIX = 'auth:userinv:'
 
 const userCache: Map<string, CachedUser> = (() => {
-  const g = globalThis as any
+  const g = globalThis as typeof globalThis & { __userCache?: Map<string, CachedUser> }
   if (!g.__userCache) g.__userCache = new Map<string, CachedUser>()
-  return g.__userCache as Map<string, CachedUser>
+  return g.__userCache
 })()
 
 function authInvKey(userId: string): string {

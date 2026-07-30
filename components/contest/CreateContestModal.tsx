@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Trophy, Plus, Search, Trash2, AlertCircle, Loader2, Edit } from 'lucide-react'
 import { CreateModalShell } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -86,7 +87,7 @@ export default function CreateContestModal({
     setContestProblems(problems)
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open) return
 
     if (!isEdit || !contestId) {

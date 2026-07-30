@@ -12,6 +12,7 @@ import {
   canTransition as canSubmissionTransition,
 } from '@/lib/constants/submission-status'
 import { getMongoClient, withRetry } from './client'
+import { errorLike } from '@/lib/api/errors'
 
 /**
  * 检查用户在指定作业中是否首次 AC 此题（作业维度，区别于全局 isFirstAccepted）
@@ -80,8 +81,9 @@ export async function createClassAssignmentSubmissionDirect(data: {
 
   try {
     await db.collection('ClassAssignmentSubmission').insertOne(submission)
-  } catch (error: any) {
-    if (error?.code !== 11000) throw error
+  } catch (error: unknown) {
+    const e = errorLike(error)
+    if (Number(e.code) !== 11000) throw error
   }
 
   return {
@@ -186,7 +188,7 @@ export async function updateClassAssignmentDirect(
     const client = await getMongoClient()
     const db = client.db()
 
-    const updateData: any = { ...data }
+    const updateData: Record<string, unknown> = { ...data }
 
     if (data.problemIds) {
       updateData.problemIds = data.problemIds.map(id => new ObjectId(id))

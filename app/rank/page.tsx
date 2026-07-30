@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Trophy, TrendingUp, Minus, RefreshCw, AlertCircle, ChevronUp, Crown, Medal, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import io from 'socket.io-client'
 import { EducationalPageShell, ListEmptyState } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
+import { errorLike } from '@/lib/api/errors'
 import { PageContainer } from '@/components/layout'
 
 interface UserRanking {
@@ -63,8 +65,9 @@ export default function RankPage() {
  } else {
  throw new Error(data.error)
  }
- } catch (err: any) {
- setError(err.message)
+ } catch (err: unknown) {
+ const e = errorLike(err)
+ setError(e.message || '加载失败')
  } finally {
  loadingRef.current = false
  setLoading(false)
@@ -87,7 +90,7 @@ export default function RankPage() {
  }
  }, [])
 
- useEffect(() => {
+ useDeferredEffect(() => {
  pageRef.current = 1
  setRankings([])
  setHasMore(true)
@@ -265,7 +268,7 @@ export default function RankPage() {
  ref={containerRef}
  className="flex-1 card-static rounded-b-xl overflow-y-auto custom-scrollbar max-h-[calc(100vh-14rem)]"
  >
- {rankings.map((user, index) => {
+ {rankings.map((user, _index) => {
  const isTop3 = user.position <= 3
  const isCurrentUser = user.id === myRank?.userId
  

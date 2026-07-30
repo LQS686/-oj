@@ -69,7 +69,7 @@ const TOOLBAR_GROUPS: ToolbarAction[][] = [
  {
  icon: Bold,
  title: '粗体',
-  run: ({ selection, hasSelection }) => ({
+  run: ({ selection: _selection, hasSelection }) => ({
   before: '**',
   after: '**',
   placeholder: '粗体文本',

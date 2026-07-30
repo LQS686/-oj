@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { createNotification } from '@/lib/notification/service'
 import { ApiError } from '@/lib/api/errors'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
@@ -86,7 +87,10 @@ export async function findDirectInvite(classId: string, inviteeId: string) {
   })
 }
 
-export async function updateDirectInvite(inviteId: string, data: any) {
+export async function updateDirectInvite(
+  inviteId: string,
+  data: Prisma.ClassDirectInviteUncheckedUpdateInput
+) {
   return prisma.classDirectInvite.update({ where: { id: inviteId }, data })
 }
 

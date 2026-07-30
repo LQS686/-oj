@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, Code, X, FileCode, Copy, Check, Timer } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, X, FileCode, Copy, Check, Timer } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDateTime, formatDateTimeShort } from '@/lib/utils'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
@@ -108,15 +109,7 @@ function SubmissionModal({
  new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
  )
 
- useEffect(() => {
- if (sortedSubs.length > 0 && !selectedSubId) {
- const first = sortedSubs[0]
- setSelectedSubId(first.id)
- loadCode(first)
- }
- }, [])
-
- const loadCode = async (sub: RawSubmission) => {
+ const loadCode = useCallback(async (sub: RawSubmission) => {
  if (codeMap[sub.id]) return
 
  setLoadingIds(prev => new Set(prev).add(sub.id))
@@ -137,7 +130,15 @@ function SubmissionModal({
  return next
  })
  }
+ }, [codeMap])
+
+ useDeferredEffect(() => {
+ if (sortedSubs.length > 0 && !selectedSubId) {
+ const first = sortedSubs[0]
+ setSelectedSubId(first.id)
+ void loadCode(first)
  }
+ }, [sortedSubs, selectedSubId, loadCode])
 
  const handleSelectSubmission = (sub: RawSubmission) => {
  setSelectedSubId(sub.id)
@@ -280,7 +281,15 @@ function SubmissionModal({
  )
 }
 
-export default function StudentCompletionTable({ students, problems, assignmentTitle, onProblemClick, allSubmissions, classId, assignmentId }: StudentCompletionTableProps) {
+export default function StudentCompletionTable({
+  students,
+  problems,
+  assignmentTitle: _assignmentTitle,
+  onProblemClick,
+  allSubmissions,
+  classId: _classId,
+  assignmentId: _assignmentId,
+}: StudentCompletionTableProps) {
  const [searchTerm, setSearchTerm] = useState('')
  const [statusFilter, setStatusFilter] = useState('all')
  const [sortField, setSortField] = useState<'name' | 'score' | 'completed' | 'time'>('name')

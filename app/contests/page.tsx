@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useState, useMemo, useCallback, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import {
   Trophy,
   Plus,
@@ -46,37 +47,16 @@ function ContestsPageContent() {
 
   const canCreate = canCreateContest(user)
 
+  // 纯派生：不在 render/useMemo 里调 Date.now；列表非「已结束」且有赛程则开墙钟
   const needsLiveClock = useMemo(
     () =>
-      contests.some((c) => {
-        const now = Date.now()
-        const end = new Date(c.endTime).getTime()
-        return Number.isFinite(end) && now <= end
-      }),
-    [contests]
+      activeTab !== 'ended' &&
+      contests.some((c) => Number.isFinite(new Date(c.endTime).getTime())),
+    [contests, activeTab]
   )
   const nowMs = useWallClock(needsLiveClock)
 
-  useEffect(() => {
-    void fetchContests()
-  }, [activeTab, page])
-
-  useEffect(() => {
-    if (searchParams.get('create') === '1' && user && canCreate) {
-      setCreateOpen(true)
-      setEditContestId(null)
-    }
-    const editId = searchParams.get('edit')
-    if (editId && user && canCreate) {
-      setEditContestId(editId)
-      setCreateOpen(false)
-    }
-    if ((searchParams.get('create') === '1' || editId) && user && canCreate) {
-      router.replace('/contests', { scroll: false })
-    }
-  }, [searchParams, user, router, canCreate])
-
-  const fetchContests = async () => {
+  const fetchContests = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -118,7 +98,26 @@ function ContestsPageContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab, page, keyword])
+
+  useDeferredEffect(() => {
+    void fetchContests()
+  }, [fetchContests])
+
+  useDeferredEffect(() => {
+    if (searchParams.get('create') === '1' && user && canCreate) {
+      setCreateOpen(true)
+      setEditContestId(null)
+    }
+    const editId = searchParams.get('edit')
+    if (editId && user && canCreate) {
+      setEditContestId(editId)
+      setCreateOpen(false)
+    }
+    if ((searchParams.get('create') === '1' || editId) && user && canCreate) {
+      router.replace('/contests', { scroll: false })
+    }
+  }, [searchParams, user, router, canCreate])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()

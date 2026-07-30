@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -22,16 +23,7 @@ export default function NotificationsPage() {
  const [page, setPage] = useState(1)
  const [totalPages, setTotalPages] = useState(1)
 
- useEffect(() => {
- if (authLoading) return
- if (!user) {
- router.replace(loginPath('/notifications'))
- return
- }
- fetchNotifications()
- }, [filter, page, user, authLoading])
-
- const fetchNotifications = async () => {
+ const fetchNotifications = useCallback(async () => {
  setLoading(true)
  try {
  const params = new URLSearchParams({
@@ -64,7 +56,16 @@ export default function NotificationsPage() {
  } finally {
  setLoading(false)
  }
+ }, [filter, page, router])
+
+ useDeferredEffect(() => {
+ if (authLoading) return
+ if (!user) {
+ router.replace(loginPath('/notifications'))
+ return
  }
+ void fetchNotifications()
+ }, [filter, page, user, authLoading, router, fetchNotifications])
 
  const markAsRead = async (notificationId: string) => {
  try {

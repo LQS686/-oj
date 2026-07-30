@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -121,7 +122,7 @@ export default function SolutionTabPanel({
  const [solutions, setSolutions] = useState<SolutionListItem[]>([])
  const [solutionsLoading, setSolutionsLoading] = useState(false)
  const [solutionsError, setSolutionsError] = useState<string | null>(null)
- const [listVersion, setListVersion] = useState(0)
+ const [, setListVersion] = useState(0)
 
  // Phase 6 Task 32.4: 语言筛选 tab（'all' = 全部，'cpp' / 'python' / ... = 按语言过滤）
  const [languageFilter, setLanguageFilter] = useState<string>('all')
@@ -134,7 +135,7 @@ export default function SolutionTabPanel({
  const [detailError, setDetailError] = useState<string | null>(null)
 
  // 深链：?create=1 打开写题解；?solution=<id> 展开指定题解
- useEffect(() => {
+ useDeferredEffect(() => {
   if (searchParams.get('create') === '1') {
    setCreateOpen(true)
   }
@@ -198,7 +199,7 @@ export default function SolutionTabPanel({
  }
  }, [problemId, isAssignmentContext])
 
- useEffect(() => {
+ useDeferredEffect(() => {
  if (!permission?.allowed) {
  setSolutions([])
  return
@@ -337,7 +338,7 @@ export default function SolutionTabPanel({
  }, [solutions])
 
  // Phase 6 Task 32.4: 当前选中的语言若已无对应题解，回退到 'all'
- useEffect(() => {
+ useDeferredEffect(() => {
   if (languageFilter === 'all') return
   const stillExists = solutions.some(s => normalizeLanguage(s.codeLanguage) === languageFilter)
   if (!stillExists) setLanguageFilter('all')
@@ -350,7 +351,7 @@ export default function SolutionTabPanel({
  }, [solutions, languageFilter])
 
  // 筛选变化后，若展开项不在当前列表则收起
- useEffect(() => {
+ useDeferredEffect(() => {
   if (!expandedId) return
   const visible = filteredSolutions.some((s) => s.id === expandedId)
   if (!visible) {

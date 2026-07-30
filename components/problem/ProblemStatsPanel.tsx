@@ -116,7 +116,7 @@ export default function ProblemStatsPanel({
         } else {
           setError(data.error || '加载统计失败')
         }
-      } catch (err) {
+      } catch {
         if (cancelled) return
         setError('网络错误')
       } finally {

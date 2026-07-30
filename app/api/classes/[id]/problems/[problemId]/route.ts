@@ -53,7 +53,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
     tags: safeProblem.tags || [],
     timeLimit: safeProblem.timeLimit,
     memoryLimit: safeProblem.memoryLimit,
-    testCases: safeProblem.testCases.map((tc: any) => ({
+    testCases: safeProblem.testCases.map((tc) => ({
       id: tc.id,
       input: tc.input,
       expectedOutput: tc.output,
@@ -90,7 +90,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     memoryLimit?: number
   }>(req)
 
-  const updateData: any = {}
+  const updateData: typeof body = {}
   if (body.title !== undefined) updateData.title = body.title
   if (body.description !== undefined) updateData.description = body.description
   if (body.difficulty !== undefined) updateData.difficulty = body.difficulty

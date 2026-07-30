@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useCallback, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
 import { Plus, Search, Eye, EyeOff, Trash2 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import { PageLoading, useDialog, RouteSuspenseFallback } from '@/components/common'
+import { useDialog, RouteSuspenseFallback } from '@/components/common'
 import AdminCreateClassModal from '@/components/admin/AdminCreateClassModal'
 
 interface Class {
@@ -37,26 +38,7 @@ function AdminClassesPageContent() {
     return new URLSearchParams(window.location.search).get('edit')
   })
 
-  useEffect(() => {
-    fetchClasses()
-  }, [])
-
-  useEffect(() => {
-    if (searchParams.get('create') === '1') {
-      setCreateOpen(true)
-      setEditClassId(null)
-    }
-    const editId = searchParams.get('edit')
-    if (editId) {
-      setEditClassId(editId)
-      setCreateOpen(false)
-    }
-    if (searchParams.get('create') === '1' || editId) {
-      router.replace('/admin/classes', { scroll: false })
-    }
-  }, [searchParams, router])
-
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetchWithCookie('/api/admin/classes')
@@ -79,7 +61,26 @@ function AdminClassesPageContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useDeferredEffect(() => {
+    void fetchClasses()
+  }, [fetchClasses])
+
+  useDeferredEffect(() => {
+    if (searchParams.get('create') === '1') {
+      setCreateOpen(true)
+      setEditClassId(null)
+    }
+    const editId = searchParams.get('edit')
+    if (editId) {
+      setEditClassId(editId)
+      setCreateOpen(false)
+    }
+    if (searchParams.get('create') === '1' || editId) {
+      router.replace('/admin/classes', { scroll: false })
+    }
+  }, [searchParams, router])
 
   const handleToggleVisibility = async (classId: string, currentVisibility: boolean) => {
     try {
@@ -171,7 +172,7 @@ function AdminClassesPageContent() {
       label: '创建时间',
       sortable: true,
       render: (value) => (
-        <span className="text-sm text-muted-foreground">{formatDate(value)}</span>
+        <span className="text-sm text-muted-foreground">{formatDate(value as string)}</span>
       ),
     },
     {

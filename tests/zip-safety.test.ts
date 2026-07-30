@@ -22,7 +22,7 @@ describe('isSafeZipEntryName', () => {
 
   it('应拒绝绝对路径', () => {
     expect(isSafeZipEntryName('/etc/passwd')).toBe(false)
-    expect(isSafeZipEntryName('\\server\share')).toBe(false)
+    expect(isSafeZipEntryName('\\server\\share')).toBe(false)
     expect(isSafeZipEntryName('C:\\Windows\\System32')).toBe(false)
     expect(isSafeZipEntryName('D:/malware.exe')).toBe(false)
   })

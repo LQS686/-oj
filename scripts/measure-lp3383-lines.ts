@@ -11,7 +11,7 @@ async function main() {
     const outNl = (c.output.match(/\n/g) || []).length
     const inSample = JSON.stringify(c.input.slice(0, 60))
     const outSample = JSON.stringify(c.output.slice(0, 60))
-    console.log({
+    console.info({
       order: c.orderIndex,
       inLen: c.input.length,
       outLen: c.output.length,

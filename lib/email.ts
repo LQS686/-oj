@@ -119,8 +119,8 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
     const info = await sendOnce(transporter)
     logger.info('[email] 邮件发送成功', { to, subject: opts.subject, messageId: info.messageId })
     return { success: true, messageId: info.messageId }
-  } catch (err: any) {
-    const errMsg = err?.message || '发送失败'
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err || '发送失败')
     // 检测疑似 SSL/版本不匹配错误，切换 secure 重试一次
     const looksLikeSslError = /wrong version number|SSL|TLS|EBADNAME|EPROTO|ECONNRESET/i.test(errMsg)
     if (looksLikeSslError) {
@@ -136,8 +136,8 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
         const info2 = await sendOnce(retryTransporter)
         logger.info('[email] 切换 SSL 后发送成功', { to, subject: opts.subject, secure: flippedSecure })
         return { success: true, messageId: info2.messageId }
-      } catch (err2: any) {
-        const err2Msg = err2?.message || '发送失败'
+      } catch (err2: unknown) {
+        const err2Msg = err2 instanceof Error ? err2.message : String(err2 || '发送失败')
         logger.error('[email] 切换 SSL 重试仍失败', {
           to, subject: opts.subject,
           host: effectiveCfg.host, port: effectiveCfg.port,

@@ -4,7 +4,7 @@
  * GET  公开：按 problemId 列出题解（带权限校验、点赞状态）
  * POST 鉴权：创建题解
  */
-import { withApi, ok, fail, readJson, readQuery, throw400, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, fail, readJson, readQuery, throw400, throw404, ApiError } from '@/lib/api/withApi'
 import {
   listSolutionsWithPermission,
   createUserSolution,
@@ -56,10 +56,12 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   try {
     const solution = await createUserSolution(body, user.id)
     return ok(solution, { status: 201 })
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error('创建题解失败', err)
-    if (err?.status === 400) throw400('VALIDATION', '请求参数不合法')
-    if (err?.status === 404) throw404('资源不存在')
+    if (err instanceof ApiError) {
+      if (err.status === 400) throw400('VALIDATION', '请求参数不合法')
+      if (err.status === 404) throw404('资源不存在')
+    }
     throw err
   }
 })

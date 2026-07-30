@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
 import { useUser } from '@/contexts/UserContext'
@@ -86,7 +87,7 @@ function SettingsPageContent() {
     }
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     const tab = searchParams.get('tab')
     if (isSettingsTabId(tab)) setActiveTab(tab)
   }, [searchParams])
@@ -96,7 +97,7 @@ function SettingsPageContent() {
     router.replace(tab === 'profile' ? '/settings' : `/settings?tab=${tab}`, { scroll: false })
   }
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (contextUser) {
       setUserLocal(contextUser)
       setFormData((prev) => ({

@@ -8,7 +8,6 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import AdmZip from 'adm-zip'
 import path from 'path'
-import fs from 'fs'
 import { writeFile, mkdir, rm, access } from 'fs/promises'
 import { invalidateProblemTestCaseCache } from '@/lib/judge/testcase-loader'
 
@@ -81,7 +80,7 @@ export async function calculateScore(problemId: string, submissionOutputs: strin
   const testcases = await listTestcases(problemId)
   if (!testcases.length) return 0
   let total = 0
-  testcases.forEach((tc: any, idx: any) => {
+  testcases.forEach((tc, idx) => {
     if (submissionOutputs[idx]?.trim() === tc.output.trim()) {
       total += tc.score ?? 0
     }
@@ -103,7 +102,7 @@ export async function redistributeTestScores(problemId: string): Promise<void> {
     const totalScore = 100
     const baseScore = Math.floor(totalScore / testCases.length)
     const remainder = totalScore % testCases.length
-    const updates = testCases.map((tc: any, index: any) =>
+    const updates = testCases.map((tc, index) =>
       prisma.testCase.update({
         where: { id: tc.id },
         data: { score: baseScore + (index < remainder ? 1 : 0) },

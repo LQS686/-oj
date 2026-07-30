@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { AppError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
 import { clearUserCache } from './profile'
+import type crypto from 'crypto'
+import type path from 'path'
 
 /**
  * 头像上传校验 + 写入
@@ -19,8 +21,8 @@ export async function uploadUserAvatar(
   file: File,
   writeFile: (path: string, data: Buffer) => Promise<void>,
   uploadDir: string,
-  cryptoModule: typeof import('crypto'),
-  pathModule: typeof import('path')
+  cryptoModule: typeof crypto,
+  pathModule: typeof path
 ) {
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
     throw AppError.badRequest('INVALID_FILE_TYPE', '仅支持 JPG、PNG、GIF、WebP 格式的图片')

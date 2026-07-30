@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'
@@ -40,16 +41,7 @@ export default function ClassProblemDetailPage() {
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
 
- useEffect(() => {
- if (authLoading) return
- if (!user) {
- router.push(loginPathFromLocation())
- return
- }
- fetchProblem()
- }, [user, authLoading, params.id, params.problemId])
-
- const fetchProblem = async () => {
+ const fetchProblem = useCallback(async () => {
  try {
  setLoading(true)
  const response = await fetchWithCookie(`/api/classes/${params.id}/problems/${params.problemId}`)
@@ -61,12 +53,21 @@ export default function ClassProblemDetailPage() {
  } else {
  setError(data.error || '获取题目失败')
  }
- } catch (err) {
+ } catch {
  setError('获取题目失败')
  } finally {
  setLoading(false)
  }
+ }, [params.id, params.problemId])
+
+ useDeferredEffect(() => {
+ if (authLoading) return
+ if (!user) {
+ router.push(loginPathFromLocation())
+ return
  }
+ void fetchProblem()
+ }, [user, authLoading, router, fetchProblem])
 
  if (loading) {
  return (

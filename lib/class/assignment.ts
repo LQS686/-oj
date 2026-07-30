@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 export interface CreateClassAssignmentInput {
   classId: string
@@ -51,7 +52,7 @@ export async function listClassAssignmentSubmissions(
 ) {
   const { assignmentId, userId, problemId, status, skip = 0, take = 50 } = options
 
-  const where: any = {}
+  const where: Prisma.ClassAssignmentSubmissionWhereInput = {}
   if (assignmentId) where.assignmentId = assignmentId
   if (userId) where.userId = userId
   if (problemId) where.problemId = problemId

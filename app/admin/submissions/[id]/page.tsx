@@ -4,7 +4,8 @@
  * app/admin/submissions/[id]/page.tsx
  * 管理后台 - 提交详情（代码 / 评测结果 / 测试点 / 重测）
  */
-import { use, useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { use, useState, useRef, useCallback, type ReactNode } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -279,7 +280,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
     }
   }, [id, router])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     void fetchSubmission()
   }, [fetchSubmission])
 

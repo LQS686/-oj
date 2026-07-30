@@ -7,6 +7,7 @@ import { CheckCircle2, XCircle, User, Mail, Lock, Eye, EyeOff, Sparkles, Ban } f
 import { useUser } from '@/contexts/UserContext'
 import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
+import { errorLike } from '@/lib/api/errors'
 import { GuestAuthShell } from '@/components/common'
 
 export default function RegisterPage() {
@@ -78,8 +79,9 @@ export default function RegisterPage() {
       })
       login(result.user)
       router.push('/')
-    } catch (err: any) {
-      setError(err.message || '注册失败')
+    } catch (err: unknown) {
+      const e = errorLike(err)
+      setError(e.message || '注册失败')
     } finally {
       setLoading(false)
     }

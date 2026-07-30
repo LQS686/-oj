@@ -25,8 +25,19 @@ import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 const PENALTY_PER_WA = 20 * 60 * 1000
 
+interface ContestParticipantUser {
+  id: string
+  username: string
+  nickname: string | null
+  avatar: string | null
+  rating: number
+  rank: string
+  color: string
+  role: string
+}
+
 interface ContestUserStats {
-  user: any
+  user: ContestParticipantUser
   solved: number
   totalScore: number
   penalty: number
@@ -93,7 +104,7 @@ export async function computeContestRankings(
   //   管理员可绕过封榜看实时数据；
   //   比赛结束且 sealUnlocked=true 时，所有人都能看到完整数据。
   const viewerRole = options?.viewerRole
-  const viewerIsAdmin = viewerRole ? canAccessAdmin({ role: viewerRole } as any) : false
+  const viewerIsAdmin = viewerRole ? canAccessAdmin({ role: viewerRole }) : false
   const sealed = isContestSealed(contest)
   // 截止时间：封榜时普通用户只看到 sealRankTime 之前的提交；管理员或未封榜时看完整endTime
   const submissionCutoffTime = sealed && !viewerIsAdmin
@@ -120,7 +131,7 @@ export async function computeContestRankings(
   // 避免测试提交污染榜单。被排除的用户仍出现在参与者列表中（标记为 unranked）。
   const adminRoleSet = new Set(['SYSTEM_ADMIN', 'ADMIN'])
   const excludedUserIds = new Set<string>([contest.authorId])
-  for (const p of contest.participants as any[]) {
+  for (const p of contest.participants) {
     if (p.user && adminRoleSet.has(p.user.role)) {
       excludedUserIds.add(p.userId)
     }
@@ -129,7 +140,7 @@ export async function computeContestRankings(
   const userStatsMap = new Map<string, ContestUserStats>()
 
   // 预填充（管理员/系统账号不入榜，避免 0 分假排名）
-  contest.participants.forEach((p: any) => {
+  contest.participants.forEach((p) => {
     if (excludedUserIds.has(p.userId)) return
     const user = p.user
       ? { ...p.user, avatar: sanitizeAvatarUrl(p.user.avatar) }
@@ -143,7 +154,7 @@ export async function computeContestRankings(
     })
   })
 
-  submissions.forEach((sub: any) => {
+  submissions.forEach((sub) => {
     if (!userStatsMap.has(sub.userId)) return
     // 管理员/创建者提交不计入排名
     if (excludedUserIds.has(sub.userId)) return
@@ -211,7 +222,7 @@ export async function computeContestRankings(
   // 5. 赋予排名
   // 参考 HOJ：相同分同排名（standard competition ranking），避免名次跳跃。
   // 例如：3 人并列第 5 名 → 第 4 名后三名均记为第 5 名，下一名记为第 8 名。
-  const finalRankList: any[] = []
+  const finalRankList: Array<ContestUserStats & { rank: number; penaltyMinutes: number }> = []
   let currentRank = 0
   let prevKey = ''
   for (let i = 0; i < rankList.length; i++) {
@@ -233,7 +244,7 @@ export async function computeContestRankings(
   return {
     rankings: finalRankList,
     contestType: contest.type,
-    problems: contest.problems.map((cp: any) => ({
+    problems: contest.problems.map((cp) => ({
       id: cp.problem.id,
       title: cp.problem.title,
       problemNumber: cp.problem.problemNumber,
@@ -271,7 +282,7 @@ export async function finalizeContestRankings(contestId: string) {
 
   // 批量更新 rank 和 score
   await Promise.all(
-    rankList.map((entry: any) =>
+    rankList.map((entry) =>
       prisma.contestParticipant.update({
         where: { contestId_userId: { contestId, userId: entry.user.id } },
         data: {

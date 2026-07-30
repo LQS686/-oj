@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
@@ -66,7 +67,7 @@ export default function AdminAnnouncementsPage() {
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<AnnouncementRow | null>(null)
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (userLoading) return
     if (!canManageSystemAnnouncements(user)) {
       setError('需要系统管理员权限')
@@ -98,7 +99,7 @@ export default function AdminAnnouncementsPage() {
     }
   }, [router, user])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (userLoading || !canManageSystemAnnouncements(user)) return
     load()
   }, [load, user, userLoading])

@@ -10,7 +10,7 @@
  * 「Response body object should not be disturbed or locked」。
  * 因此 multipart 一律用 arrayBuffer + 自解析，且 server.ts 会对本路径做直通。
  */
-import { withApi, ok, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, throw400, errorLike } from '@/lib/api/withApi'
 import {
   executeProblemImport,
   VALID_IMPORT_FORMATS,
@@ -36,8 +36,8 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
       parts = await parseMultipartFromRequest(req, IMPORT_MAX_FILE_BYTES + 1024 * 1024, {
         maxPartBytes: IMPORT_MAX_FILE_BYTES,
       })
-    } catch (e: any) {
-      const msg = e?.message || ''
+    } catch (e: unknown) {
+      const msg = errorLike(e).message || ''
       if (msg === 'PAYLOAD_TOO_LARGE' || msg === 'PART_TOO_LARGE') {
         throw400('FILE_TOO_LARGE', '文件大小超过 50MB 限制')
       }

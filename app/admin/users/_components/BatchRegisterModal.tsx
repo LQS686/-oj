@@ -14,6 +14,24 @@ interface BatchRegisterModalProps {
   onSuccess: () => void
 }
 
+interface BatchErrorItem {
+  row?: number
+  error?: string
+  username?: string
+  email?: string
+}
+
+interface BatchRegisterResponse {
+  success?: boolean
+  error?: string
+  data?: {
+    succeeded?: number
+    failed?: number
+    total?: number
+    errors?: BatchErrorItem[]
+  }
+}
+
 /**
  * 批量注册用户对话框，含两个 Tab：
  * - 表单输入：逐行填写用户名/邮箱/密码/角色，支持统一密码
@@ -127,7 +145,7 @@ export function BatchRegisterModal({
         const result = data.data
         const newResults: BatchResult[] = []
         validUsers.forEach((u, i) => {
-          const error = result.errors.find((err: any) => err.row === i + 1)
+          const error = result.errors.find((err: BatchErrorItem) => err.row === i + 1)
           if (error) {
             newResults.push({
               success: false,
@@ -150,7 +168,7 @@ export function BatchRegisterModal({
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '批量注册失败' })
       }
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setBatchRegistering(false)
@@ -208,7 +226,7 @@ export function BatchRegisterModal({
 
       xhr.onload = async () => {
         try {
-          let data: any
+          let data: BatchRegisterResponse
           try {
             data = JSON.parse(xhr.responseText || '{}')
           } catch {
@@ -226,7 +244,7 @@ export function BatchRegisterModal({
                 user: { username: '汇总', email: '' },
               },
             ]
-            ;(result.errors || []).forEach((err: any) => {
+            ;(result.errors || []).forEach((err: BatchErrorItem) => {
               newResults.push({
                 success: false,
                 message: `第${err.row}行 - ${err.username || '未知'}: ${err.error}`,
@@ -256,7 +274,7 @@ export function BatchRegisterModal({
       // Token 通过 httpOnly cookie 自动携带（xhr.withCredentials = true）
       xhr.withCredentials = true
       xhr.send(formData)
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })
       setCsvUploading(false)
     }

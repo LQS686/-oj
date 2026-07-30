@@ -40,7 +40,7 @@ export const GET = withApi.admin(async (_req, ctx) => {
 export const PATCH = withApi.admin(async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
-  const body = await readJson<Record<string, any>>(req)
+  const body = await readJson<Record<string, unknown>>(req)
   const ip = auditIpFromReq(req)
   return ok(await updateAdminProblem(id, body, { id: user.id, username: user.username, ip }))
 })
@@ -51,7 +51,7 @@ export const PATCH = withApi.admin(async (req, ctx, { user }) => {
 export const PUT = withApi.admin(async (req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
-  const body = await readJson<Record<string, any>>(req)
+  const body = await readJson<Record<string, unknown>>(req)
   const ip = auditIpFromReq(req)
   return ok(await updateAdminProblem(id, body, { id: user.id, username: user.username, ip }))
 })

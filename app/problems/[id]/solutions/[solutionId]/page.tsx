@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useState, Suspense, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -74,29 +75,7 @@ function SolutionDetailPageContent() {
   const [canEditPerm, setCanEditPerm] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
 
-  useEffect(() => {
-    if (!pid || !sid) return
-    void fetchSolution()
-    void fetchProblem()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pid, sid])
-
-  useEffect(() => {
-    if (searchParams.get('edit') === '1') {
-      setEditOpen(true)
-      router.replace(`/problems/${pid}/solutions/${sid}`, { scroll: false })
-    }
-  }, [searchParams, router, pid, sid])
-
-  useEffect(() => {
-    if (!user) {
-      setCanEditPerm(false)
-      return
-    }
-    setCanEditPerm(canManageContent(user))
-  }, [user])
-
-  const fetchSolution = async () => {
+  const fetchSolution = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -120,9 +99,9 @@ function SolutionDetailPageContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [sid])
 
-  const fetchProblem = async () => {
+  const fetchProblem = useCallback(async () => {
     try {
       const response = await fetchWithCookie(`/api/problems/${pid}`)
       const data = await response.json().catch(() => null)
@@ -136,7 +115,28 @@ function SolutionDetailPageContent() {
     } catch {
       // 题目标题获取失败不影响主流程
     }
-  }
+  }, [pid])
+
+  useDeferredEffect(() => {
+    if (!pid || !sid) return
+    void fetchSolution()
+    void fetchProblem()
+  }, [pid, sid, fetchSolution, fetchProblem])
+
+  useDeferredEffect(() => {
+    if (searchParams.get('edit') === '1') {
+      setEditOpen(true)
+      router.replace(`/problems/${pid}/solutions/${sid}`, { scroll: false })
+    }
+  }, [searchParams, router, pid, sid])
+
+  useDeferredEffect(() => {
+    if (!user) {
+      setCanEditPerm(false)
+      return
+    }
+    setCanEditPerm(canManageContent(user))
+  }, [user])
 
   const handleDelete = async () => {
     if (!solution) return

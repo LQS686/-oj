@@ -6,7 +6,8 @@
 import type { Server as HTTPServer } from 'http'
 import type { Socket } from 'socket.io';
 import { Server as SocketIOServer } from 'socket.io'
-import { verifyToken, JWTPayload } from '@/lib/auth'
+import type { JWTPayload } from '@/lib/auth';
+import { verifyToken } from '@/lib/auth'
 import { canAccessAdmin } from '@/lib/permissions'
 import { logger } from '@/lib/logger'
 import { resolveClientIp } from '@/lib/http/client-ip'
@@ -40,18 +41,6 @@ function submissionRoom(submissionId: string) {
 }
 
 const connectionRateLimit = new Map<string, { count: number; resetAt: number }>()
-
-function parseCookies(cookieString: string): Record<string, string> {
-  const cookies: Record<string, string> = {}
-  if (!cookieString) return cookies
-  cookieString.split(';').forEach(cookie => {
-    const [name, value] = cookie.trim().split('=')
-    if (name && value) {
-      cookies[name] = decodeURIComponent(value)
-    }
-  })
-  return cookies
-}
 
 function cleanupRateLimit(): void {
   const now = Date.now()
@@ -214,7 +203,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
         connectedClients.set(socket.id, client)
       }
       
-      if (!ALLOWED_EVENT_TYPES.includes(eventName as any)) {
+      if (!ALLOWED_EVENT_TYPES.includes(eventName as typeof ALLOWED_EVENT_TYPES[number])) {
         logger.warn(`⚠️  未知消息类型: ${eventName}, Socket=${socket.id}`)
         return next()
       }
@@ -604,11 +593,11 @@ export function broadcastMessage(event: string, data: unknown) {
 /**
  * 显式加入公共广播房间（已认证用户默认自动加入）
  */
-export function joinPublicRoom(socket: any) {
+export function joinPublicRoom(socket: Socket) {
   if (!socket) return
   try {
     socket.join(BROADCAST_PUBLIC_ROOM)
-  } catch (e) {
+  } catch {
     // ignore
   }
 }

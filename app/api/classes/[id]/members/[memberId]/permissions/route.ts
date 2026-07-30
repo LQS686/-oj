@@ -23,7 +23,7 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
     throw400('INVALID_ID', '无效的ID')
   }
 
-  const body = await readJson<Record<string, any>>(req)
+  const body = await readJson<Record<string, unknown>>(req)
   if (!body || Object.keys(body).length === 0) {
     throw400('EMPTY_BODY', '权限位不能为空')
   }
@@ -36,6 +36,10 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
     throw403('助教无法修改班级创建人')
   }
 
-  const updated = await mergeClassMemberPermissions(id, memberId, body)
+  const updated = await mergeClassMemberPermissions(
+    id,
+    memberId,
+    body as Record<string, boolean>
+  )
   return ok({ permissions: updated?.permissions ?? body })
 })

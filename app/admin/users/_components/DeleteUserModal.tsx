@@ -29,7 +29,7 @@ export function DeleteUserModal({ user, onClose, onSuccess }: DeleteUserModalPro
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '删除失败' })
       }
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })
     } finally {
       setDeleting(false)

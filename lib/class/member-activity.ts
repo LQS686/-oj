@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
+import type { ClassPermissionFlags } from './permission-flags'
 
 /* ============================================================================
  * 班级成员 / 权限 / 活动
@@ -61,20 +62,23 @@ const ALLOWED_PERMISSION_KEYS = [
 export async function mergeClassMemberPermissions(
   classId: string,
   userId: string,
-  permissions: Record<string, any>
+  permissions: ClassPermissionFlags
 ) {
   const current = await prisma.classMember.findUnique({
     where: { classId_userId: { classId, userId } },
   })
   if (!current) return null
   // 仅允许白名单内的权限位写入，防止注入未知字段
-  const filtered: Record<string, any> = {}
+  const filtered: ClassPermissionFlags = {}
   for (const key of ALLOWED_PERMISSION_KEYS) {
     if (key in permissions) {
-      filtered[key] = permissions[key]
+      filtered[key] = Boolean(permissions[key])
     }
   }
-  const merged = { ...((current.permissions as any) || {}), ...filtered }
+  const merged = {
+    ...((current.permissions as ClassPermissionFlags | null) || {}),
+    ...filtered,
+  }
   return prisma.classMember.update({
     where: { classId_userId: { classId, userId } },
     data: { permissions: merged },
@@ -116,21 +120,21 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
   ])
 
   const recentActivities = [
-    ...submissions.map((s: any) => ({
-      type: 'submission',
+    ...submissions.map((s) => ({
+      type: 'submission' as const,
       title: `提交了作业 "${s.assignment.title}"`,
       status: s.status,
       score: s.score,
       createdAt: s.submittedAt,
     })),
-    ...notes.map((n: any) => ({
-      type: 'note',
+    ...notes.map((n) => ({
+      type: 'note' as const,
       title: `发布了笔记 "${n.title}"`,
       status: 'published',
       createdAt: n.createdAt,
     })),
   ]
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 20)
 
   return {

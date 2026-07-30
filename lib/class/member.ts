@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { ApiError } from '@/lib/api/errors'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 import {
@@ -14,6 +15,7 @@ import {
   type ClassMembership,
 } from './auth'
 import { normalizeClassRoleToApi, dbRolesMatchingApiFilter, isClassOwnerRole } from './roles'
+import type { ClassPermissionFlags } from './permission-flags'
 
 export interface MemberListFilter {
   role?: string
@@ -32,7 +34,7 @@ export async function listClassMembers(
 ) {
   const { role, search, active, sortBy = 'joinedAt', sortOrder = 'desc' } = filter
 
-  const where: any = { classId }
+  const where: Prisma.ClassMemberWhereInput = { classId }
   if (role) {
     const dbRoles = dbRolesMatchingApiFilter(role)
     where.role = dbRoles.length === 1 ? dbRoles[0] : { in: dbRoles }
@@ -53,7 +55,7 @@ export async function listClassMembers(
   }
 
   if (search) {
-    const searchOr = [
+    const searchOr: Prisma.ClassMemberWhereInput[] = [
       { user: { username: { contains: search, mode: 'insensitive' } } },
       { user: { nickname: { contains: search, mode: 'insensitive' } } },
       { remark: { contains: search, mode: 'insensitive' } },
@@ -66,7 +68,7 @@ export async function listClassMembers(
     }
   }
 
-  let orderBy: any
+  let orderBy: Prisma.ClassMemberOrderByWithRelationInput
   switch (sortBy) {
     case 'lastActiveAt':
       orderBy = { lastActiveAt: sortOrder }
@@ -88,7 +90,7 @@ export async function listClassMembers(
     orderBy,
   })
 
-  const details = members.map((m: any) => ({
+  const details = members.map((m) => ({
     id: m.id,
     userId: m.userId,
     username: m.user.username,
@@ -96,7 +98,7 @@ export async function listClassMembers(
     avatar: sanitizeAvatarUrl(m.user.avatar),
     role: normalizeClassRoleToApi(m.role),
     dbRole: m.role,
-    permissions: m.permissions || {},
+    permissions: (m.permissions || {}) as ClassPermissionFlags,
     joinedAt: m.joinedAt,
     lastActiveAt: m.lastActiveAt,
     remark: m.remark,
@@ -104,7 +106,7 @@ export async function listClassMembers(
 
   if (sortBy === 'role') {
     const order: Record<string, number> = { owner: 3, assistant: 2, student: 1 }
-    details.sort((a: any, b: any) => {
+    details.sort((a, b) => {
       const av = order[a.role] ?? 0
       const bv = order[b.role] ?? 0
       return sortOrder === 'asc' ? (av > bv ? 1 : -1) : av < bv ? 1 : -1
@@ -233,7 +235,7 @@ export async function transferClassOwnership(
 export async function updateClassMemberPermissions(
   classId: string,
   userId: string,
-  permissions: Record<string, any>
+  permissions: ClassPermissionFlags
 ) {
   return prisma.classMember.update({
     where: { classId_userId: { classId, userId } },

@@ -6,7 +6,8 @@
  * 由 app/admin/trainings/create/page.tsx 改造而来，
  * 使用 CreateModalShell (variant="admin") 作为统一外壳。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import { ListChecks, Plus, Search, X } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -65,7 +66,7 @@ export default function AdminCreateTrainingModal({
     setProblems([])
   }, [])
 
-  useEffect(() => {
+  useDeferredEffect(() => {
     if (!open) return
     resetForm()
     fetchWithCookie('/api/problems?pageSize=50', { cache: 'no-store' })

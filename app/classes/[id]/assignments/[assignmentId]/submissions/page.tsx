@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, use, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -122,7 +123,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  }
  }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus, isFromLeaderboard])
 
- useEffect(() => {
+ useDeferredEffect(() => {
  void fetchSubmissions()
  }, [fetchSubmissions])
 

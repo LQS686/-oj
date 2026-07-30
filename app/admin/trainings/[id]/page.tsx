@@ -5,7 +5,8 @@
  * 管理后台 - 编辑题单（题目增删改排序 + 题单属性）
  */
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
  ArrowLeft, Save, X, Plus, Trash2, Check, AlertCircle, RefreshCw,
@@ -56,7 +57,6 @@ const difficultyClass = (d: string) => {
 export default function EditTrainingPage() {
  const dialog = useDialog()
  const params = useParams<{ id: string }>()
- const router = useRouter()
  const id = params?.id || ''
 
  const [training, setTraining] = useState<TrainingDetail | null>(null)
@@ -123,7 +123,7 @@ export default function EditTrainingPage() {
  }
  }, [id])
 
- useEffect(() => { fetchDetail() }, [fetchDetail])
+ useDeferredEffect(() => { fetchDetail() }, [fetchDetail])
 
  // 搜索题目
  useEffect(() => {
@@ -181,7 +181,7 @@ export default function EditTrainingPage() {
  }
 
  // 题目操作（不自动 fetchDetail，由调用者决定是否刷新）
- const patchProblems = async (payload: any) => {
+ const patchProblems = async (payload: Record<string, unknown>) => {
  try {
  const res = await fetchWithCookie(`/api/trainings/${id}/problems`, {
  method: 'PATCH',

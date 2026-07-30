@@ -28,15 +28,15 @@ export async function listAllClassesForAdmin(opts?: { page?: number; pageSize?: 
       _count: { select: { members: true, assignments: true, notes: true } },
     },
   })
-  const ownerIds = [...new Set(classes.map((t: any) => t.ownerId))]
+  const ownerIds = [...new Set(classes.map((t) => t.ownerId))]
   const owners = ownerIds.length
     ? await prisma.user.findMany({
         where: { id: { in: ownerIds } },
         select: { id: true, username: true },
       })
     : []
-  const ownerMap = new Map<any, any>(owners.map((o: any) => [o.id, o.username]))
-  return classes.map((classData: any) => ({
+  const ownerMap = new Map(owners.map((o) => [o.id, o.username] as const))
+  return classes.map((classData) => ({
     ...classData,
     owner: { username: ownerMap.get(classData.ownerId) || '未知用户' },
   }))

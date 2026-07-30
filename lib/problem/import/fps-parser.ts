@@ -266,88 +266,116 @@ export function parseFpsXml(xml: string): ImportedProblem[] {
  *   2. [...] （直接是数组）
  */
 export function parseFpsJson(jsonText: string): ImportedProblem[] {
-  let data: any
+  let data: unknown
   try {
     data = JSON.parse(jsonText)
-  } catch (e: any) {
-    throw new ApiError('INVALID_FPS_JSON', `JSON 解析失败: ${e.message}`, 400)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new ApiError('INVALID_FPS_JSON', `JSON 解析失败: ${msg}`, 400)
   }
 
-  const items: any[] = Array.isArray(data)
+  const root = data && typeof data === 'object' ? (data as Record<string, unknown>) : null
+  const items: unknown[] = Array.isArray(data)
     ? data
-    : Array.isArray(data?.items)
-      ? data.items
-      : Array.isArray(data?.problems)
-        ? data.problems
+    : Array.isArray(root?.items)
+      ? (root.items as unknown[])
+      : Array.isArray(root?.problems)
+        ? (root.problems as unknown[])
         : []
 
   if (items.length === 0) {
     throw new ApiError('NO_FPS_ITEMS', 'FPS JSON 中未找到题目数组', 400)
   }
 
-  return items.map((raw: any, idx: number) => {
+  return items.map((raw: unknown, idx: number) => {
+    const item = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
     // 测试用例：兼容 test_cases / testCases / tests
-    const rawTests = raw.test_cases || raw.testCases || raw.tests || []
+    const rawTests = item.test_cases || item.testCases || item.tests || []
     const testCases: ImportedTestCase[] = Array.isArray(rawTests)
-      ? rawTests.map((t: any) => ({
-          input: String(t.input ?? ''),
-          output: String(t.output ?? ''),
-          isSample: false,
-          score: typeof t.score === 'number' ? t.score : undefined,
-        }))
+      ? rawTests.map((t) => {
+          const tc = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>
+          return {
+            input: String(tc.input ?? ''),
+            output: String(tc.output ?? ''),
+            isSample: false,
+            score: typeof tc.score === 'number' ? tc.score : undefined,
+          }
+        })
       : []
 
     // 样例：兼容 samples / sample_input
     let samples: ImportedProblem['samples'] = []
-    if (Array.isArray(raw.samples)) {
-      samples = raw.samples.map((s: any) => ({
-        input: String(s.input ?? ''),
-        output: String(s.output ?? ''),
-        explanation: s.explanation || s.note || undefined,
-      }))
-    } else if (raw.sample_input !== undefined || raw.sample_output !== undefined) {
+    if (Array.isArray(item.samples)) {
+      samples = item.samples.map((s) => {
+        const sample = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>
+        return {
+          input: String(sample.input ?? ''),
+          output: String(sample.output ?? ''),
+          explanation:
+            typeof sample.explanation === 'string'
+              ? sample.explanation
+              : typeof sample.note === 'string'
+                ? sample.note
+                : undefined,
+        }
+      })
+    } else if (item.sample_input !== undefined || item.sample_output !== undefined) {
       samples.push({
-        input: String(raw.sample_input ?? ''),
-        output: String(raw.sample_output ?? ''),
+        input: String(item.sample_input ?? ''),
+        output: String(item.sample_output ?? ''),
       })
     }
 
     // 时间/内存限制：FPS JSON 可能是 {unit, value} 或纯数字
-    const tl = raw.time_limit || raw.timeLimit
-    const ml = raw.memory_limit || raw.memoryLimit
+    const tl = item.time_limit || item.timeLimit
+    const ml = item.memory_limit || item.memoryLimit
+    const tlObj = tl && typeof tl === 'object' ? (tl as Record<string, unknown>) : null
+    const mlObj = ml && typeof ml === 'object' ? (ml as Record<string, unknown>) : null
     const timeLimit =
-      typeof tl === 'object' && tl
-        ? tl.unit === 's'
-          ? tl.value * 1000
-          : tl.value
+      tlObj
+        ? tlObj.unit === 's'
+          ? Number(tlObj.value) * 1000
+          : Number(tlObj.value)
         : typeof tl === 'number'
           ? tl
           : 1000
     const memoryLimit =
-      typeof ml === 'object' && ml
-        ? ml.unit === 'kb'
-          ? Math.max(1, Math.floor(ml.value / 1024))
-          : ml.value
+      mlObj
+        ? mlObj.unit === 'kb'
+          ? Math.max(1, Math.floor(Number(mlObj.value) / 1024))
+          : Number(mlObj.value)
         : typeof ml === 'number'
           ? ml
           : 128
 
     return {
-      title: String(raw.title || `未命名题目 ${idx + 1}`),
-      description: String(raw.description || ''),
-      input: String(raw.input || raw.input_format || ''),
-      output: String(raw.output || raw.output_format || ''),
+      title: String(item.title || `未命名题目 ${idx + 1}`),
+      description: String(item.description || ''),
+      input: String(item.input || item.input_format || ''),
+      output: String(item.output || item.output_format || ''),
       samples,
-      hint: raw.hint || undefined,
-      source: raw.source || undefined,
-      difficulty: raw.difficulty || '入门',
-      tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [],
+      hint: item.hint ? String(item.hint) : undefined,
+      source: item.source ? String(item.source) : undefined,
+      difficulty: item.difficulty ? String(item.difficulty) : '入门',
+      tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
       timeLimit,
       memoryLimit,
-      stdCode: raw.solution || raw.std_code || undefined,
-      stdLang: raw.solution_language || raw.std_lang || (raw.solution ? 'cpp' : undefined),
+      stdCode:
+        typeof item.solution === 'string'
+          ? item.solution
+          : typeof item.std_code === 'string'
+            ? item.std_code
+            : undefined,
+      stdLang:
+        typeof item.solution_language === 'string'
+          ? item.solution_language
+          : typeof item.std_lang === 'string'
+            ? item.std_lang
+            : item.solution
+              ? 'cpp'
+              : undefined,
       testCases,
-      externalId: raw.id || raw.url || `fps-json-${idx + 1}`,
+      externalId: String(item.id || item.url || `fps-json-${idx + 1}`),
     }
   })
 }

@@ -339,8 +339,9 @@ function extractPointsRatio(stdout: string, stderr: string, message: string): nu
 
 function pickSpjMessage(stdout: string, stderr: string): string {
   // Testlib 主信息在 stderr；stdout 可能只有 points
-  const err = stderr.replace(/\u001b\[[0-9;]*m/g, '').trim()
-  const out = stdout.replace(/\u001b\[[0-9;]*m/g, '').trim()
+  const ansiEscape = new RegExp(`${String.fromCharCode(0x1b)}\\[[0-9;]*m`, 'g')
+  const err = stderr.replace(ansiEscape, '').trim()
+  const out = stdout.replace(ansiEscape, '').trim()
   if (err) return err
   return out
 }

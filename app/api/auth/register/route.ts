@@ -36,10 +36,10 @@ export const POST = withApi.public(async (req) => {
     password: string
     nickname?: string
   }>(req)
-  const trimmedBody = trimAll(body as any)
+  const trimmedBody = trimAll(body)
   const { username, email, password, nickname } = trimmedBody
 
-  const requiredError = validateRequired(trimmedBody as any, ['username', 'email', 'password'])
+  const requiredError = validateRequired(trimmedBody, ['username', 'email', 'password'])
   if (requiredError) return fail('BAD_REQUEST', requiredError, 400)
 
   if (!validateUsername(username as string)) {

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
 import {
@@ -44,7 +45,7 @@ export default function ProblemsPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [totalProblems, setTotalProblems] = useState(0)
+  const [, setTotalProblems] = useState(0)
   const [availableTags, setAvailableTags] = useState<string[]>([])
 
   const [problemStatus, setProblemStatus] = useState<{ [problemId: string]: { score: number, submitted: boolean } }>({})
@@ -57,18 +58,7 @@ export default function ProblemsPage() {
   const difficultyRef = useRef<HTMLDivElement>(null)
   useClickOutside(difficultyRef, () => setDifficultyOpen(false))
 
-  useEffect(() => {
-    fetchProblems()
-    fetchTags()
-  }, [page])
-
-  useEffect(() => {
-    if (user && problems.length > 0) {
-      fetchProblemStatus()
-    }
-  }, [user, problems])
-
-  const fetchTags = async () => {
+  const fetchTags = useCallback(async () => {
     try {
       const response = await fetchWithCookie('/api/problems/tags')
       const data = await response.json()
@@ -78,7 +68,58 @@ export default function ProblemsPage() {
     } catch (error) {
       console.error('获取标签失败:', error)
     }
-  }
+  }, [])
+
+  const fetchProblems = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await fetchWithCookie(`/api/problems?page=${page}&limit=30`)
+      const data = await response.json()
+
+      if (data.success) {
+        setProblems(data.data.problems || [])
+        setTotalPages(data.data.pagination?.totalPages || 1)
+        setTotalProblems(data.data.pagination?.total || 0)
+      }
+    } catch (error) {
+      console.error('获取题目列表失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [page])
+
+  const fetchProblemStatus = useCallback(async () => {
+    if (!user) return
+
+    try {
+      setLoadingStatus(true)
+      const problemIds = problems.map(p => p.id).join(',')
+
+      const response = await fetchWithCookie(
+        `/api/problems/status?problemIds=${problemIds}`
+      )
+      const data = await response.json()
+
+      if (data.success && data.data) {
+        setProblemStatus(data.data)
+      }
+    } catch (error) {
+      console.error('获取题目状态失败:', error)
+    } finally {
+      setLoadingStatus(false)
+    }
+  }, [user, problems])
+
+  useDeferredEffect(() => {
+    void fetchProblems()
+    void fetchTags()
+  }, [fetchProblems, fetchTags])
+
+  useDeferredEffect(() => {
+    if (user && problems.length > 0) {
+      void fetchProblemStatus()
+    }
+  }, [user, problems, fetchProblemStatus])
 
   const filteredProblems = useMemo(() => {
     let filtered = [...problems]
@@ -104,46 +145,6 @@ export default function ProblemsPage() {
 
     return filtered
   }, [problems, searchQuery, selectedDifficulties, selectedTags])
-
-  const fetchProblems = async () => {
-    try {
-      setLoading(true)
-      const response = await fetchWithCookie(`/api/problems?page=${page}&limit=30`)
-      const data = await response.json()
-
-      if (data.success) {
-        setProblems(data.data.problems || [])
-        setTotalPages(data.data.pagination?.totalPages || 1)
-        setTotalProblems(data.data.pagination?.total || 0)
-      }
-    } catch (error) {
-      console.error('获取题目列表失败:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchProblemStatus = async () => {
-    if (!user) return
-
-    try {
-      setLoadingStatus(true)
-      const problemIds = problems.map(p => p.id).join(',')
-
-      const response = await fetchWithCookie(
-        `/api/problems/status?problemIds=${problemIds}`
-      )
-      const data = await response.json()
-
-      if (data.success && data.data) {
-        setProblemStatus(data.data)
-      }
-    } catch (error) {
-      console.error('获取题目状态失败:', error)
-    } finally {
-      setLoadingStatus(false)
-    }
-  }
 
   const hasFilters =
     !!searchQuery || selectedDifficulties.length > 0 || selectedTags.length > 0
@@ -174,7 +175,7 @@ export default function ProblemsPage() {
       } else {
         await dialog.alert({ tone: 'error', message: data.error || '没有符合条件的题目' })
       }
-    } catch (err) {
+    } catch {
       await dialog.alert({ tone: 'error', message: '网络错误，请稍后重试' })
     } finally {
       setRandomLoading(false)

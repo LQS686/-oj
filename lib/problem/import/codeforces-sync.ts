@@ -45,7 +45,7 @@ interface CfResponse {
   status: string
   result?: {
     problems: CfProblem[]
-    problemStatistics: any[]
+    problemStatistics: unknown[]
   }
   comment?: string
 }

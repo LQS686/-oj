@@ -476,7 +476,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       const safeStackMb = 8
       const commandPath =
         typeof runInfo.command === 'string' ? runInfo.command.split(/[\n\r;|&`$()<>]/)[0] : ''
-      if (!commandPath || !/^[a-zA-Z0-9_./\-]+$/.test(commandPath)) {
+      if (!commandPath || !/^[a-zA-Z0-9_./-]+$/.test(commandPath)) {
         throw new Error(`非法的 command 路径: ${runInfo.command}`)
       }
 

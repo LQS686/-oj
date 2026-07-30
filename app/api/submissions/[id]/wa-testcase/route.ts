@@ -21,7 +21,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
     ? `${data.problemNumber}_wa${data.caseIndex}.zip`
     : `submission_${id}_wa${data.caseIndex}.zip`
   // RFC 5987：ASCII 回退名消毒，避免 Content-Disposition 注入
-  const safeAscii = filename.replace(/[^\w.\-]+/g, '_').slice(0, 120) || 'wa.zip'
+  const safeAscii = filename.replace(/[^\w.-]+/g, '_').slice(0, 120) || 'wa.zip'
   const encoded = encodeURIComponent(filename).replace(/['()]/g, escape)
 
   const zipBlob = new Blob([new Uint8Array(zip.toBuffer())], { type: 'application/zip' })

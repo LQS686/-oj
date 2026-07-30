@@ -34,13 +34,19 @@ const VALID_VISIBILITIES = ['public', 'private', 'contest'] as const
 export const IMPORT_MAX_FILE_BYTES = 50 * 1024 * 1024
 
 export function parseImportOptions(raw: unknown, authorId: string): ImportOptions {
-  const opts = (raw && typeof raw === 'object' ? raw : {}) as Record<string, any>
-  const onDuplicate = VALID_DUPLICATE_POLICIES.includes(opts.onDuplicate)
-    ? opts.onDuplicate
-    : 'skip'
-  const visibility = VALID_VISIBILITIES.includes(opts.visibility)
-    ? opts.visibility
-    : 'private'
+  const opts = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const onDuplicateRaw = opts.onDuplicate
+  const onDuplicate =
+    typeof onDuplicateRaw === 'string' &&
+    (VALID_DUPLICATE_POLICIES as readonly string[]).includes(onDuplicateRaw)
+      ? (onDuplicateRaw as (typeof VALID_DUPLICATE_POLICIES)[number])
+      : 'skip'
+  const visibilityRaw = opts.visibility
+  const visibility =
+    typeof visibilityRaw === 'string' &&
+    (VALID_VISIBILITIES as readonly string[]).includes(visibilityRaw)
+      ? (visibilityRaw as (typeof VALID_VISIBILITIES)[number])
+      : 'private'
   const defaultDifficulty = isValidDifficulty(opts.defaultDifficulty)
     ? opts.defaultDifficulty
     : '入门'
