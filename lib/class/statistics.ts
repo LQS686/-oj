@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 /* ============================================================================
  * 班级统计
@@ -186,7 +187,7 @@ export async function computeClassStatistics(
         id: sub.id,
         userId: sub.userId,
         username: u?.nickname || u?.username || '未知用户',
-        avatar: u?.avatar || null,
+        avatar: sanitizeAvatarUrl(u?.avatar) || null,
         problemId: sub.problemId,
         problemTitle: problemMap.get(sub.problemId) || '未知题目',
         assignmentId: sub.assignmentId,

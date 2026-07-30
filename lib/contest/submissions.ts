@@ -115,6 +115,26 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
     if (!participant) {
       throw new ApiError('FORBIDDEN', '未报名该竞赛，无法提交', 403)
     }
+  } else {
+    // 管理员旁路提交：写审计，便于事后追溯测试提交
+    void prisma.auditLog
+      .create({
+        data: {
+          userId: input.userId,
+          action: 'ADMIN_BYPASS_SUBMIT',
+          resource: `contest:${input.contestId}`,
+          details: {
+            problemId: input.problemId,
+            language: input.language,
+            outsideWindow: now < contest.startTime || now > contest.endTime,
+          },
+        },
+      })
+      .catch((err) => {
+        logger.warn('管理员旁路提交审计写入失败', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
   }
 
   // 验证题目是否属于该竞赛

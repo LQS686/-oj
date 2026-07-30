@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { EducationalPageShell } from '@/components/common'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { useSettings } from '@/contexts/SettingsContext'
 
 const SECTIONS: { id: string; label: string }[] = [
   { id: 'quickstart', label: '快速上手' },
@@ -34,6 +35,8 @@ const QUICK_STEPS: {
   href: string
   linkLabel: string
   icon: LucideIcon
+  /** 仅在允许注册时展示注册入口；关闭时改为登录 */
+  registerGated?: boolean
 }[] = [
   {
     step: '1',
@@ -42,6 +45,7 @@ const QUICK_STEPS: {
     href: '/register',
     linkLabel: '去注册',
     icon: Rocket,
+    registerGated: true,
   },
   {
     step: '2',
@@ -108,6 +112,8 @@ function Section({
 
 export default function HelpPage() {
   useDocumentTitle('使用帮助')
+  const { settings } = useSettings()
+  const allowRegistration = settings.allowRegistration === true
 
   return (
     <EducationalPageShell width="standard" title="使用帮助" icon={CircleHelp}>
@@ -142,6 +148,16 @@ export default function HelpPage() {
           <ol className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {QUICK_STEPS.map((item) => {
               const Icon = item.icon
+              const href =
+                item.registerGated && !allowRegistration ? '/login' : item.href
+              const linkLabel =
+                item.registerGated && !allowRegistration ? '去登录' : item.linkLabel
+              const title =
+                item.registerGated && !allowRegistration ? '登录账号' : item.title
+              const desc =
+                item.registerGated && !allowRegistration
+                  ? '使用已有账号登录后即可提交代码、参加竞赛与加入班级。当前暂不开放自行注册。'
+                  : item.desc
               return (
                 <li
                   key={item.step}
@@ -153,16 +169,16 @@ export default function HelpPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 font-medium text-foreground">
                       <Icon className="w-3.5 h-3.5 text-muted-foreground" />
-                      {item.title}
+                      {title}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                      {item.desc}
+                      {desc}
                     </p>
                     <Link
-                      href={item.href}
+                      href={href}
                       className="inline-flex mt-2 text-xs font-medium text-primary-light hover:underline"
                     >
-                      {item.linkLabel} →
+                      {linkLabel} →
                     </Link>
                   </div>
                 </li>

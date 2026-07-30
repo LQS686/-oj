@@ -95,24 +95,20 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
       testResults: result.testResults
     })
 
-    // 失效提交详情缓存 + 题目状态统计缓存（状态变化后读旧缓存会拿到陈旧数据）
+    // 失效提交详情缓存 + 题目状态/详情缓存（任意终态都可能改变统计）
     cache.delete(`submission:byId:${result.submissionId}`)
     cache.delete(CacheKeys.problem.statusCounts(submission.problemId))
     cache.delete(CacheKeys.problem.stats(submission.problemId))
+    cache.delete(CacheKeys.problem.byId(submission.problemId))
 
-    // 如果AC，更新题目通过数
-    // 标记首次 AC（提升作用域，供后续作业计时使用）
+    // AC 率口径：totalAccepted / totalSubmit 均为「提交次数」
+    // 每次 AC 都 +1 totalAccepted；用户解题数 / 排行榜仅在全局首次 AC 时更新
     let isFirstAcGlobal = false
     if (result.status === 'AC') {
-      // 检查是否是该用户第一次AC此题
-      // 查找该用户在此题目上除了当前提交之外的AC记录
+      await incrementProblemAcceptedCount(submission.problemId)
+
       isFirstAcGlobal = await isFirstAccepted(submission.problemId, submission.userId, result.submissionId)
-
-      // 只有第一次AC才增加题目的totalAccepted
       if (isFirstAcGlobal) {
-        await incrementProblemAcceptedCount(submission.problemId)
-
-        // ✅ 增加用户解题数
         await prisma.user.update({
           where: { id: submission.userId },
           data: { solvedCount: { increment: 1 } }
@@ -120,7 +116,9 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
 
         logger.info(`用户首次AC题目`, { problemId: submission.problemId })
 
-        // 📢 广播排行榜更新
+        const { clearRankingCache } = await import('@/lib/ranking/service')
+        clearRankingCache()
+
         broadcastMessage('leaderboard:update', {
              type: 'update',
              userId: submission.userId,
@@ -152,13 +150,17 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
         const finalScore = result.score
 
         // ✅ 精确更新对应的作业提交记录
+        // 非 AC 时清除首次 AC 标记，避免重测 AC→WA 后仍显示徽章
         await updateClassAssignmentSubmissionDirect(submission.assignmentSubmissionId, {
             status: result.status,
             score: finalScore,
             time: result.time,
             memory: result.memory,
             passedTests: result.passedTests,
-            message: result.message
+            message: result.message,
+            ...(result.status !== 'AC'
+              ? { isFirstAc: false, timeElapsedMs: 0 }
+              : {}),
         })
 
         logger.info(`已更新作业提交记录`, { assignmentSubmissionId: submission.assignmentSubmissionId, status: result.status, score: finalScore })

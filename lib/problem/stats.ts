@@ -12,6 +12,8 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { CacheKeys } from '@/lib/constants/cache-keys'
+import { logger } from '@/lib/logger'
 
 export interface ProblemStats {
   /** 状态分布：{ 'AC': 100, 'WA': 50, ... } */
@@ -119,4 +121,52 @@ export async function getProblemStats(problemId: string): Promise<ProblemStats |
       avgMemoryKb: acAgg._avg.memory ? Math.round(acAgg._avg.memory) : 0,
     }
   }, { ttl: 30_000 })
+}
+
+/**
+ * 从 Submission 重算全部题目的 totalSubmit / totalAccepted（提交次数口径）。
+ * 用于修复历史「仅首次 AC 计入 totalAccepted」导致的 AC 率偏低。
+ */
+export async function recountAllProblemSubmissionStats(): Promise<{
+  problemCount: number
+  updatedCount: number
+}> {
+  const [problems, submitGroups, acGroups] = await Promise.all([
+    prisma.problem.findMany({ select: { id: true, totalSubmit: true, totalAccepted: true } }),
+    prisma.submission.groupBy({
+      by: ['problemId'],
+      _count: { _all: true },
+    }),
+    prisma.submission.groupBy({
+      by: ['problemId'],
+      where: { status: 'AC' },
+      _count: { _all: true },
+    }),
+  ])
+
+  const submitMap = new Map(submitGroups.map((g) => [g.problemId, g._count._all]))
+  const acMap = new Map(acGroups.map((g) => [g.problemId, g._count._all]))
+
+  let updatedCount = 0
+  for (const p of problems) {
+    const totalSubmit = submitMap.get(p.id) ?? 0
+    const totalAccepted = acMap.get(p.id) ?? 0
+    if (p.totalSubmit === totalSubmit && p.totalAccepted === totalAccepted) continue
+
+    await prisma.problem.update({
+      where: { id: p.id },
+      data: { totalSubmit, totalAccepted },
+    })
+    cache.delete(CacheKeys.problem.byId(p.id))
+    cache.delete(CacheKeys.problem.statusCounts(p.id))
+    cache.delete(CacheKeys.problem.stats(p.id))
+    updatedCount++
+  }
+
+  logger.info('题目提交统计重算完成', {
+    problemCount: problems.length,
+    updatedCount,
+  })
+
+  return { problemCount: problems.length, updatedCount }
 }

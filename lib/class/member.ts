@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { ApiError } from '@/lib/api/errors'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 import {
   getClassMembership,
   isClassOwner,
@@ -92,7 +93,7 @@ export async function listClassMembers(
     userId: m.userId,
     username: m.user.username,
     nickname: m.user.nickname,
-    avatar: m.user.avatar,
+    avatar: sanitizeAvatarUrl(m.user.avatar),
     role: normalizeClassRoleToApi(m.role),
     dbRole: m.role,
     permissions: m.permissions || {},

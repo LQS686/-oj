@@ -21,8 +21,12 @@ import { setAuthCookie } from '@/lib/auth/cookie'
 import { setCsrfCookie, generateCsrfToken } from '@/lib/security/csrf'
 
 export const POST = withApi.public(async (req) => {
+  // 首用户判定优先于「关闭注册」：空库必须允许创建第一个 SYSTEM_ADMIN
+  const userCount = await prisma.user.count()
+  const isFirstUser = userCount === 0
+
   const settings = await getSystemSettings()
-  if (!settings.allowRegistration) {
+  if (!settings.allowRegistration && !isFirstUser) {
     return fail('FORBIDDEN', '系统已关闭注册功能', 403)
   }
 
@@ -58,10 +62,6 @@ export const POST = withApi.public(async (req) => {
     : sanitizedUsername
 
   const hashedPassword = await bcrypt.hash(password as string, 12)
-
-  // 首用户判定：User 表为空时，该新用户自动成为 SYSTEM_ADMIN
-  const userCount = await prisma.user.count()
-  const isFirstUser = userCount === 0
 
   const user = await registerNewUser({
     sanitizedUsername,

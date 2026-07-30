@@ -105,7 +105,10 @@ export async function updateClassAssignmentSubmissionDirect(
     memory?: number
     passedTests?: number
     message?: string
-  }
+    isFirstAc?: boolean
+    timeElapsedMs?: number
+  },
+  options?: { forceStatus?: boolean }
 ) {
   return withRetry(
     async () => {
@@ -113,7 +116,16 @@ export async function updateClassAssignmentSubmissionDirect(
     const db = client.db()
 
     const sanitized: Record<string, unknown> = {}
-    const allowedFields = ['status', 'score', 'time', 'memory', 'passedTests', 'message']
+    const allowedFields = [
+      'status',
+      'score',
+      'time',
+      'memory',
+      'passedTests',
+      'message',
+      'isFirstAc',
+      'timeElapsedMs',
+    ]
     for (const key of allowedFields) {
       if (key in data && data[key as keyof typeof data] !== undefined) {
         sanitized[key] = data[key as keyof typeof data]
@@ -121,7 +133,8 @@ export async function updateClassAssignmentSubmissionDirect(
     }
 
     // 状态机守卫（与 updateSubmissionDirect 一致）
-    if (typeof sanitized.status === 'string') {
+    // forceStatus：管理员重测，允许终态 → PENDING
+    if (typeof sanitized.status === 'string' && !options?.forceStatus) {
       const current = await db.collection('ClassAssignmentSubmission').findOne(
         { _id: new ObjectId(submissionId) },
         { projection: { status: 1 } }

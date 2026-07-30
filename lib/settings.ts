@@ -29,6 +29,10 @@ function normalizeMerged(raw: Record<string, unknown>): SystemSettings {
   merged.siteName = (merged.siteName && merged.siteName.trim()) || defaultSettings.siteName
   merged.siteDescription =
     (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
+  // 历史脏数据可能含 java/javascript；与评测支持语言对齐
+  if (!['cpp', 'c', 'python'].includes(merged.defaultLanguage)) {
+    merged.defaultLanguage = defaultSettings.defaultLanguage
+  }
   return merged
 }
 
@@ -119,31 +123,36 @@ export async function saveSystemSettings(settings: Partial<SystemSettings>): Pro
       }
     }
 
+    // 仅当 smtpHost 相对已存值发生变化时做 DNS/SSRF 校验，
+    // 避免「只改允许注册」等无关开关时因 DNS 抖动导致整次保存失败。
     if ('smtpHost' in incoming && typeof incoming.smtpHost === 'string' && incoming.smtpHost) {
-      const host = incoming.smtpHost as string
-      // 禁止 IP / localhost；仅允许 FQDN，降低 SSRF/内网 SMTP 滥用面
-      if (
-        !/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(
-          host
-        ) ||
-        host.toLowerCase() === 'localhost' ||
-        host.endsWith('.local') ||
-        host.endsWith('.internal')
-      ) {
-        throw new Error('SMTP Host 必须是合法公网域名（禁止 IP / localhost）')
+      const host = (incoming.smtpHost as string).trim()
+      const prevHost = (currentRaw.smtpHost || '').trim()
+      if (host !== prevHost) {
+        // 禁止 IP / localhost；仅允许 FQDN，降低 SSRF/内网 SMTP 滥用面
+        if (
+          !/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(
+            host
+          ) ||
+          host.toLowerCase() === 'localhost' ||
+          host.endsWith('.local') ||
+          host.endsWith('.internal')
+        ) {
+          throw new Error('SMTP Host 必须是合法公网域名（禁止 IP / localhost）')
+        }
+        const dns = await import('dns')
+        const { ssrf } = await import('@/lib/security/safe-fetch')
+        let addresses: { address: string; family: number }[]
+        try {
+          addresses = await dns.promises.lookup(host, { all: true })
+        } catch {
+          throw new Error('SMTP Host DNS 解析失败')
+        }
+        if (!addresses.length || addresses.some((a) => ssrf.isPrivateIp(a.address))) {
+          throw new Error('SMTP Host 解析结果包含内网地址，已拒绝')
+        }
       }
-      // DNS 解析后拒绝内网地址（防将 smtpHost 指到内网服务做端口探测）
-      const dns = await import('dns')
-      const { ssrf } = await import('@/lib/security/safe-fetch')
-      let addresses: { address: string; family: number }[]
-      try {
-        addresses = await dns.promises.lookup(host, { all: true })
-      } catch {
-        throw new Error('SMTP Host DNS 解析失败')
-      }
-      if (!addresses.length || addresses.some((a) => ssrf.isPrivateIp(a.address))) {
-        throw new Error('SMTP Host 解析结果包含内网地址，已拒绝')
-      }
+      incoming.smtpHost = host
     }
 
     // 网站名称/描述：trim 后若为空，回退到默认值，避免前端显示空白
@@ -199,7 +208,9 @@ export async function saveSystemSettings(settings: Partial<SystemSettings>): Pro
     return true
   } catch (error) {
     logger.error('保存系统设置失败', error)
-    return false
+    // 向上抛出可读错误，避免管理端只看到笼统「保存设置失败」
+    if (error instanceof Error) throw error
+    throw new Error(String(error))
   }
 }
 

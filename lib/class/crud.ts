@@ -91,7 +91,7 @@ export async function getClassDetail(
       userId: m.userId,
       username: m.user.username,
       nickname: m.user.nickname,
-      avatar: m.user.avatar,
+      avatar: sanitizeAvatarUrl(m.user.avatar),
       role: normalizeClassRoleToApi(m.role),
       permissions: includePermissions
         ? ((m.permissions || {}) as Record<string, any>)

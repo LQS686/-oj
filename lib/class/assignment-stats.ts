@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { isAcceptedStatus, SubmissionStatus } from '@/lib/constants/submission-status'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 /** 统计/列表默认排除已从作业移除的提交 */
 const ACTIVE_SUBMISSION_WHERE = { status: { not: SubmissionStatus.REMOVED } }
@@ -304,7 +305,7 @@ export async function computeAssignmentStatistics(
       userId,
       username: m.user.username,
       nickname: m.user.nickname,
-      avatar: m.user.avatar,
+      avatar: sanitizeAvatarUrl(m.user.avatar),
       solved: solved.size,
       total: totalProblems,
       completionRate: accuracy,

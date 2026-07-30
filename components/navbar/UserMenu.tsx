@@ -14,6 +14,7 @@ import {
   CircleHelp,
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
+import { useSettings } from '@/contexts/SettingsContext'
 import { canAccessAdmin, getRoleLabel } from '@/lib/permissions'
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 import { loginPath } from '@/lib/navigation'
@@ -25,8 +26,10 @@ export default function UserMenu() {
   const pathname = usePathname()
   const [avatarError, setAvatarError] = useState(false)
   const { user, isLoading, logout: contextLogout } = useUser()
+  const { settings } = useSettings()
 
   const canAccessAdminUser = canAccessAdmin(user)
+  const allowRegistration = settings.allowRegistration === true
 
   const { unreadCount } = useUnreadNotifications({
     userId: user?.id,
@@ -69,10 +72,12 @@ export default function UserMenu() {
         <Link href={loginPath(pathname)} className="btn-ghost btn group">
           <span className="group-hover:text-primary-light transition-colors duration-300">登录</span>
         </Link>
-        <Link href="/register" className="btn-primary btn group">
-          <span className="hidden sm:inline transition-transform duration-300">免费注册</span>
-          <span className="sm:hidden transition-transform duration-300">注册</span>
-        </Link>
+        {allowRegistration && (
+          <Link href="/register" className="btn-primary btn group">
+            <span className="hidden sm:inline transition-transform duration-300">免费注册</span>
+            <span className="sm:hidden transition-transform duration-300">注册</span>
+          </Link>
+        )}
       </>
     )
   }

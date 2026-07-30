@@ -33,12 +33,14 @@ export const GET = withApi.public(async (req, ctx) => {
     { contestId }
   )
 
+  const statusCounts = (await getProblemStatusCounts(p.id)) as Record<string, number>
+  const liveTotal = Object.values(statusCounts).reduce((s, n) => s + n, 0)
+  const liveAc = statusCounts['AC'] || 0
+  // 优先用实时聚合，避免 denormalized 计数漂移导致详情页 AC 率与统计面板不一致
+  const totalSubmissions = liveTotal > 0 ? liveTotal : p.totalSubmit
+  const acCount = liveTotal > 0 ? liveAc : p.totalAccepted
   const acRate =
-    p.totalSubmit > 0
-      ? Math.round((p.totalAccepted / p.totalSubmit) * 100)
-      : 0
-
-  const statusCounts = await getProblemStatusCounts(p.id)
+    totalSubmissions > 0 ? Math.round((acCount / totalSubmissions) * 100) : 0
 
   return ok({
     id: p.id,
@@ -63,9 +65,12 @@ export const GET = withApi.public(async (req, ctx) => {
       expectedOutput: tc.output,
       isSample: tc.isSample,
     })),
+    // 列表页仍用 denormalized 字段；详情 stats 与统计面板统一为实时口径
+    totalSubmit: totalSubmissions,
+    totalAccepted: acCount,
     stats: {
-      acCount: p.totalAccepted,
-      totalSubmissions: p.totalSubmit,
+      acCount,
+      totalSubmissions,
       acRate,
       statusCounts,
     },

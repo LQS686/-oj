@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { createNotifications } from '@/lib/notification/service'
 import { isClassAdminRole } from '@/lib/class/roles'
 import { ApiError } from '@/lib/api/errors'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 /* ============================================================================
  * 加入申请
@@ -113,14 +114,14 @@ export async function listClassJoinRequestsDetailed(classId: string) {
       id: r.user.id,
       username: r.user.username,
       nickname: r.user.nickname,
-      avatar: r.user.avatar,
+      avatar: sanitizeAvatarUrl(r.user.avatar),
     },
     reviewer: r.reviewer
       ? {
           id: r.reviewer.id,
           username: r.reviewer.username,
           nickname: r.reviewer.nickname,
-          avatar: r.reviewer.avatar,
+          avatar: sanitizeAvatarUrl(r.reviewer.avatar),
         }
       : null,
     status: r.status,

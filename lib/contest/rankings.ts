@@ -15,6 +15,9 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { canAccessAdmin } from '@/lib/permissions'
 import { ApiError } from '@/lib/api/errors'
+import { cache } from '@/lib/cache'
+import { CacheKeys } from '@/lib/constants/cache-keys'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 /* ============================================================================
  * 竞赛排行榜（按 ACM / OI 规则计算 + 排名）
@@ -128,8 +131,11 @@ export async function computeContestRankings(
   // 预填充（管理员/系统账号不入榜，避免 0 分假排名）
   contest.participants.forEach((p: any) => {
     if (excludedUserIds.has(p.userId)) return
+    const user = p.user
+      ? { ...p.user, avatar: sanitizeAvatarUrl(p.user.avatar) }
+      : p.user
     userStatsMap.set(p.userId, {
-      user: p.user,
+      user,
       solved: 0,
       totalScore: 0,
       penalty: 0,
@@ -279,4 +285,5 @@ export async function finalizeContestRankings(contestId: string) {
   )
 
   logger.info(`竞赛 ${contestId} 排名已落库，共 ${rankList.length} 名参赛者`)
+  cache.deleteByPrefix(CacheKeys.contest.rankPrefix(contestId))
 }

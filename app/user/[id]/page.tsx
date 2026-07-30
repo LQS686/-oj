@@ -167,7 +167,6 @@ export default function UserProfilePage() {
               style={{ backgroundColor: user.color || undefined }}
             >
               {user.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={user.avatar} alt={displayName} className="w-full h-full object-cover" />
               ) : (
                 (user.username?.charAt(0) || '?').toUpperCase()

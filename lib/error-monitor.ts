@@ -41,11 +41,11 @@ class ErrorMonitor {
       action: 'alert'
     });
 
-    // 数据库错误阈值
+    // 数据库错误阈值（硬拦：与 auth 一致写 blockedUntil，供调用方 fail-closed）
     this.thresholds.set('database', {
       maxCount: 5,
       timeWindow: 60,
-      action: 'alert'
+      action: 'block'
     });
 
     // 认证错误阈值
@@ -59,7 +59,7 @@ class ErrorMonitor {
     this.thresholds.set('system', {
       maxCount: 3,
       timeWindow: 60,
-      action: 'alert'
+      action: 'block'
     });
   }
 

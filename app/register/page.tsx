@@ -1,292 +1,338 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, XCircle, User, Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react'
+import { CheckCircle2, XCircle, User, Mail, Lock, Eye, EyeOff, Sparkles, Ban } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
+import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
 import { GuestAuthShell } from '@/components/common'
 
- export default function RegisterPage() {
- const router = useRouter()
- const { login } = useUser()
- const [showPassword, setShowPassword] = useState(false)
- const [showConfirmPassword, setShowConfirmPassword] = useState(false)
- const [formData, setFormData] = useState({
- username: '',
- email: '',
- password: '',
- confirmPassword: '',
- nickname: '',
- })
- const [error, setError] = useState('')
- const [loading, setLoading] = useState(false)
- const [passwordStrength, setPasswordStrength] = useState(0)
+export default function RegisterPage() {
+  const router = useRouter()
+  const { login } = useUser()
+  const { settings, loading: settingsLoading, refreshSettings } = useSettings()
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    nickname: '',
+  })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [passwordStrength, setPasswordStrength] = useState(0)
 
- const validatePassword = (password: string) => {
- let strength = 0
- if (password.length >= 6) strength++
- if (password.length >= 8) strength++
- if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++
- if (/\d/.test(password)) strength++
- if (/[^a-zA-Z\d]/.test(password)) strength++
- setPasswordStrength(strength)
- }
+  // 进入注册页时刷新公开设置，避免沿用关闭注册前的缓存
+  useEffect(() => {
+    void refreshSettings()
+  }, [refreshSettings])
 
- const handlePasswordChange = (password: string) => {
- setFormData({ ...formData, password })
- validatePassword(password)
- }
+  const registrationClosed = !settingsLoading && settings.allowRegistration !== true
 
- const handleSubmit = async (e: React.FormEvent) => {
- e.preventDefault()
- setError('')
+  const validatePassword = (password: string) => {
+    let strength = 0
+    if (password.length >= 6) strength++
+    if (password.length >= 8) strength++
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++
+    if (/\d/.test(password)) strength++
+    if (/[^a-zA-Z\d]/.test(password)) strength++
+    setPasswordStrength(strength)
+  }
 
- if (formData.password !== formData.confirmPassword) {
- setError('两次输入的密码不一致')
- return
- }
+  const handlePasswordChange = (password: string) => {
+    setFormData({ ...formData, password })
+    validatePassword(password)
+  }
 
- if (formData.password.length < 6) {
- setError('密码长度至少为6位')
- return
- }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
 
- setLoading(true)
+    if (settings.allowRegistration !== true) {
+      setError('系统已关闭注册功能')
+      return
+    }
 
- try {
- const result = await authApi.register({
- username: formData.username,
- email: formData.email,
- password: formData.password,
- nickname: formData.nickname || formData.username,
- })
- login(result.user)
- router.push('/')
- } catch (err: any) {
- setError(err.message || '注册失败')
- } finally {
- setLoading(false)
- }
- }
+    if (formData.password !== formData.confirmPassword) {
+      setError('两次输入的密码不一致')
+      return
+    }
 
- const getPasswordStrengthText = () => {
- if (passwordStrength === 0) return { text: '太弱', color: 'text-muted-foreground' }
- if (passwordStrength <= 2) return { text: '弱', color: 'text-error' }
- if (passwordStrength === 3) return { text: '中等', color: 'text-accent' }
- if (passwordStrength === 4) return { text: '强', color: 'text-secondary-light' }
- return { text: '非常强', color: 'text-secondary-light' }
- }
+    if (formData.password.length < 6) {
+      setError('密码长度至少为6位')
+      return
+    }
 
- const getStrengthColor = () => {
- if (passwordStrength <= 2) return 'bg-error'
- if (passwordStrength === 3) return 'bg-accent'
- return 'bg-secondary'
- }
+    setLoading(true)
 
- const strengthInfo = getPasswordStrengthText()
- const strengthColor = getStrengthColor()
+    try {
+      const result = await authApi.register({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        nickname: formData.nickname || formData.username,
+      })
+      login(result.user)
+      router.push('/')
+    } catch (err: any) {
+      setError(err.message || '注册失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getPasswordStrengthText = () => {
+    if (passwordStrength === 0) return { text: '太弱', color: 'text-muted-foreground' }
+    if (passwordStrength <= 2) return { text: '弱', color: 'text-error' }
+    if (passwordStrength === 3) return { text: '中等', color: 'text-accent' }
+    if (passwordStrength === 4) return { text: '强', color: 'text-secondary-light' }
+    return { text: '非常强', color: 'text-secondary-light' }
+  }
+
+  const getStrengthColor = () => {
+    if (passwordStrength <= 2) return 'bg-error'
+    if (passwordStrength === 3) return 'bg-accent'
+    return 'bg-secondary'
+  }
+
+  const strengthInfo = getPasswordStrengthText()
+  const strengthColor = getStrengthColor()
 
   return (
-    <GuestAuthShell subtitle="加入我们，开启编程之旅">
-        <div className="card-static rounded-lg p-6 md:p-10 shadow-2xl transition-all duration-300 animate-modal-in">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-extrabold text-foreground">注册账号</h2>
-              <p className="text-sm text-muted-foreground">创建你的账号</p>
-            </div>
+    <GuestAuthShell subtitle={registrationClosed ? '注册暂未开放' : '加入我们，开启编程之旅'}>
+      <div className="card-static rounded-lg p-6 md:p-10 shadow-2xl transition-all duration-300 animate-modal-in">
+        {settingsLoading ? (
+          <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-icon-spin" />
+            <p className="text-sm">加载中…</p>
           </div>
-
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-error/10 border border-error/20 text-error flex items-center gap-3 animate-modal-in">
-              <XCircle className="w-5 h-5 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="reg-username" className="block text-sm font-semibold text-foreground mb-2.5">
-                用户名 <span className="text-error">*</span>
-              </label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
-                <input
-                  id="reg-username"
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  className="input pl-12 py-3 hover:border-primary/30 transition-all duration-200"
-                  placeholder="3-20位字母、数字或下划线"
-                  pattern="[a-zA-Z0-9_]{3,20}"
-                  required
-                />
+        ) : registrationClosed ? (
+          <>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                <Ban className="w-6 h-6 text-muted-foreground" />
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">用户名将用于登录和显示</p>
-            </div>
-
-            <div>
-              <label htmlFor="reg-email" className="block text-sm font-semibold text-foreground mb-2.5">
-                邮箱 <span className="text-error">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
-                <input
-                  id="reg-email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="input pl-12 py-3 hover:border-primary/30 transition-all duration-200"
-                  placeholder="your@email.com"
-                  required
-                />
+              <div>
+                <h2 className="text-2xl font-extrabold text-foreground">暂不开放注册</h2>
+                <p className="text-sm text-muted-foreground">管理员已关闭新用户注册</p>
               </div>
             </div>
-
-            <div>
-              <label htmlFor="reg-nickname" className="block text-sm font-semibold text-foreground mb-2.5">
-                昵称（可选）
-              </label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
-                <input
-                  id="reg-nickname"
-                  type="text"
-                  value={formData.nickname}
-                  onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
-                  className="input pl-12 py-3 hover:border-primary/30 transition-all duration-200"
-                  placeholder="显示名称，默认为用户名"
-                />
-              </div>
+            <div className="mb-8 p-4 rounded-xl bg-muted/60 border border-border text-muted-foreground text-sm leading-relaxed">
+              当前站点不允许自行注册账号。如需开通账号，请联系管理员；已有账号可直接登录。
             </div>
-
-            <div>
-              <label htmlFor="reg-password" className="block text-sm font-semibold text-foreground mb-2.5">
-                密码 <span className="text-error">*</span>
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
-                <input
-                  id="reg-password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={(e) => handlePasswordChange(e.target.value)}
-                  className="input pl-12 pr-12 py-3 hover:border-primary/30 transition-all duration-200"
-                  placeholder="至少6位密码"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-110"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {formData.password && (
-                <div className="mt-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-500 ease-out ${strengthColor}`}
-                        style={{ width: `${(passwordStrength / 5) * 100}%` }}
-                      />
-                    </div>
-                    <span className={`text-xs font-semibold ${strengthInfo.color}`}>
-                      {strengthInfo.text}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="reg-confirm-password" className="block text-sm font-semibold text-foreground mb-2.5">
-                确认密码 <span className="text-error">*</span>
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
-                <input
-                  id="reg-confirm-password"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className="input pl-12 pr-12 py-3 hover:border-primary/30 transition-all duration-200"
-                  placeholder="再次输入密码"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-110"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {formData.confirmPassword && (
-                <div className="mt-2 flex items-center gap-1.5 text-xs animate-fadeIn">
-                  {formData.password === formData.confirmPassword ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4 text-secondary-light" />
-                      <span className="text-secondary-light">密码匹配</span>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="w-4 h-4 text-error" />
-                      <span className="text-error">密码不匹配</span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-start gap-2.5">
-              <input
-                type="checkbox"
-                className="w-4 h-4 text-primary border-border rounded focus:ring-primary bg-muted accent-primary mt-0.5"
-                required
-              />
-              <label className="text-sm text-muted-foreground">
-                我已阅读并同意
-                <Link href="/terms" className="text-primary-light hover:text-primary mx-1 transition-colors duration-200 group">
-                  <span className="group-hover:underline">服务条款</span>
-                </Link>
-                和
-                <Link href="/privacy" className="text-primary-light hover:text-primary mx-1 transition-colors duration-200 group">
-                  <span className="group-hover:underline">隐私政策</span>
-                </Link>
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary btn w-full py-3.5 text-base group"
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-icon-spin" />
-                  注册中...
-                </>
-              ) : (
-                <span className="transition-transform duration-200 group-hover:scale-105">注册</span>
-              )}
-            </button>
-          </form>
-
-          <div className="mt-8 text-center">
-            <span className="text-muted-foreground">已有账号？</span>
-            <Link href="/login" className="text-primary-light hover:text-primary font-bold ml-1.5 transition-colors duration-200 group">
-              <span className="group-hover:underline">立即登录</span>
+            <Link href="/login" className="btn-primary btn w-full py-3.5 text-base">
+              前往登录
             </Link>
-          </div>
-        </div>
+            <div className="mt-6 text-center">
+              <Link href="/" className="text-sm text-muted-foreground hover:text-primary-light transition-colors">
+                返回首页
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-extrabold text-foreground">注册账号</h2>
+                <p className="text-sm text-muted-foreground">创建你的账号</p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mb-6 p-4 rounded-xl bg-error/10 border border-error/20 text-error flex items-center gap-3 animate-modal-in">
+                <XCircle className="w-5 h-5 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="reg-username" className="block text-sm font-semibold text-foreground mb-2.5">
+                  用户名 <span className="text-error">*</span>
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
+                  <input
+                    id="reg-username"
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    className="input pl-12 py-3 hover:border-primary/30 transition-all duration-200"
+                    placeholder="3-20位字母、数字或下划线"
+                    pattern="[a-zA-Z0-9_]{3,20}"
+                    required
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">用户名将用于登录和显示</p>
+              </div>
+
+              <div>
+                <label htmlFor="reg-email" className="block text-sm font-semibold text-foreground mb-2.5">
+                  邮箱 <span className="text-error">*</span>
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
+                  <input
+                    id="reg-email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="input pl-12 py-3 hover:border-primary/30 transition-all duration-200"
+                    placeholder="your@email.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="reg-nickname" className="block text-sm font-semibold text-foreground mb-2.5">
+                  昵称（可选）
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
+                  <input
+                    id="reg-nickname"
+                    type="text"
+                    value={formData.nickname}
+                    onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
+                    className="input pl-12 py-3 hover:border-primary/30 transition-all duration-200"
+                    placeholder="显示名称，默认为用户名"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="reg-password" className="block text-sm font-semibold text-foreground mb-2.5">
+                  密码 <span className="text-error">*</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
+                  <input
+                    id="reg-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => handlePasswordChange(e.target.value)}
+                    className="input pl-12 pr-12 py-3 hover:border-primary/30 transition-all duration-200"
+                    placeholder="至少6位密码"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-110"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {formData.password && (
+                  <div className="mt-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 ease-out ${strengthColor}`}
+                          style={{ width: `${(passwordStrength / 5) * 100}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-semibold ${strengthInfo.color}`}>
+                        {strengthInfo.text}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="reg-confirm-password" className="block text-sm font-semibold text-foreground mb-2.5">
+                  确认密码 <span className="text-error">*</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground transition-colors duration-200" />
+                  <input
+                    id="reg-confirm-password"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    className="input pl-12 pr-12 py-3 hover:border-primary/30 transition-all duration-200"
+                    placeholder="再次输入密码"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-110"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {formData.confirmPassword && (
+                  <div className="mt-2 flex items-center gap-1.5 text-xs animate-fadeIn">
+                    {formData.password === formData.confirmPassword ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-secondary-light" />
+                        <span className="text-secondary-light">密码匹配</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-4 h-4 text-error" />
+                        <span className="text-error">密码不匹配</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-primary border-border rounded focus:ring-primary bg-muted accent-primary mt-0.5"
+                  required
+                />
+                <label className="text-sm text-muted-foreground">
+                  我已阅读并同意
+                  <Link href="/terms" className="text-primary-light hover:text-primary mx-1 transition-colors duration-200 group">
+                    <span className="group-hover:underline">服务条款</span>
+                  </Link>
+                  和
+                  <Link href="/privacy" className="text-primary-light hover:text-primary mx-1 transition-colors duration-200 group">
+                    <span className="group-hover:underline">隐私政策</span>
+                  </Link>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary btn w-full py-3.5 text-base group"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-icon-spin" />
+                    注册中...
+                  </>
+                ) : (
+                  <span className="transition-transform duration-200 group-hover:scale-105">注册</span>
+                )}
+              </button>
+            </form>
+
+            <div className="mt-8 text-center">
+              <span className="text-muted-foreground">已有账号？</span>
+              <Link href="/login" className="text-primary-light hover:text-primary font-bold ml-1.5 transition-colors duration-200 group">
+                <span className="group-hover:underline">立即登录</span>
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
     </GuestAuthShell>
   )
 }

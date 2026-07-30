@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export interface CreateClassNoteInput {
   classId: string
@@ -139,7 +140,7 @@ export async function listClassNotesPaged(classId: string, filter: ListClassNote
         id: n.author.id,
         username: n.author.username,
         nickname: n.author.nickname,
-        avatar: n.author.avatar,
+        avatar: sanitizeAvatarUrl(n.author.avatar),
       },
       createdAt: n.createdAt,
       updatedAt: n.updatedAt,

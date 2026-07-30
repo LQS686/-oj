@@ -118,8 +118,12 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
           code,
           language,
           input: tc.input,
-          // 标程验证略放宽时限，避免卡在临界 TLE
-          timeLimit: Math.max(problem.timeLimit, tc.timeLimit ?? 0) * 2 || problem.timeLimit * 2,
+          // 标程验证略放宽时限；timeLimit=0 时不得落到 0ms（否则必假 TLE）
+          timeLimit:
+            Math.max(
+              problem.timeLimit > 0 ? problem.timeLimit : 1000,
+              tc.timeLimit && tc.timeLimit > 0 ? tc.timeLimit : 0
+            ) * 2,
           memoryLimit: tc.memoryLimit ?? problem.memoryLimit,
           compiledPath: compiledPath!,
         })

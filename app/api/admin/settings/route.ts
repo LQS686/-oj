@@ -29,10 +29,19 @@ export const PUT = withApi.systemAdmin(async (req) => {
     return // 满足类型收窄：throw400 抛错后不可达
   }
 
-  const saved = await saveSystemSettings(parsed as Partial<SystemSettings>)
-
-  if (!saved) {
-    throw500('保存设置失败')
+  try {
+    await saveSystemSettings(parsed as Partial<SystemSettings>)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '保存设置失败'
+    // 参数/SMTP 校验类错误用 400；密钥缺失等内部错误用 500
+    if (
+      msg.includes('ENCRYPTION_KEY') ||
+      msg.includes('解密失败') ||
+      msg.includes('必须为加密存储')
+    ) {
+      throw500(msg)
+    }
+    throw400('SETTINGS_SAVE', msg)
   }
 
   const newSettings = await getSystemSettings()

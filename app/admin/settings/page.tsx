@@ -12,6 +12,7 @@ import {
   type JudgeSettings,
   type FailFastMode,
 } from '@/lib/settings-defaults'
+import { useSettings } from '@/contexts/SettingsContext'
 
 function numOr(v: string, fallback: number): number {
   const n = parseFloat(v)
@@ -20,6 +21,7 @@ function numOr(v: string, fallback: number): number {
 
 export default function AdminSettingsPage() {
  const router = useRouter()
+ const { refreshSettings } = useSettings()
  const [loading, setLoading] = useState(true)
  const [saving, setSaving] = useState(false)
  const [error, setError] = useState('')
@@ -86,16 +88,18 @@ export default function AdminSettingsPage() {
  const data = await response.json()
  if (data.success) {
  setSuccess('设置已保存（评测配置已热更新）')
- if (data.data?.judge) {
+ if (data.data) {
    setSettings((prev) => ({
      ...prev,
      ...data.data,
-     judge: { ...defaultJudgeSettings, ...data.data.judge },
+     judge: { ...defaultJudgeSettings, ...(data.data.judge || {}) },
    }))
  }
+ // 同步公开设置上下文，使导航栏/注册页立即反映「允许注册」等开关
+ void refreshSettings()
  setTimeout(() => setSuccess(''), 3000)
  } else {
- setError(data.error || '保存失败')
+ setError(data.error || data.message || '保存失败')
  }
  } catch (err) {
  setError('网络错误')
@@ -208,16 +212,15 @@ export default function AdminSettingsPage() {
  <div>
  <label className="block text-sm font-medium text-muted-foreground mb-2">默认编程语言</label>
  <select
- value={settings.defaultLanguage}
+ value={['cpp', 'c', 'python'].includes(settings.defaultLanguage) ? settings.defaultLanguage : 'cpp'}
  onChange={(e) => setSettings({ ...settings, defaultLanguage: e.target.value })}
  className="input"
  >
  <option value="cpp">C++</option>
  <option value="c">C</option>
- <option value="java">Java</option>
  <option value="python">Python</option>
- <option value="javascript">JavaScript</option>
  </select>
+ <p className="mt-1.5 text-xs text-muted-foreground">与当前评测支持的语言一致</p>
  </div>
  </div>
  </div>
@@ -250,7 +253,7 @@ export default function AdminSettingsPage() {
  <div className="flex items-center justify-between p-4 rounded-lg bg-white/5">
  <div>
  <p className="text-foreground font-medium">允许游客提交</p>
- <p className="text-sm text-muted-foreground">允许未登录用户提交代码</p>
+ <p className="text-sm text-muted-foreground">预留开关（当前提交接口仍需登录）</p>
  </div>
  <label className="relative inline-flex items-center cursor-pointer">
  <input
@@ -267,10 +270,20 @@ export default function AdminSettingsPage() {
  <label className="block text-sm font-medium text-muted-foreground mb-2">最大提交代码大小 (KB)</label>
  <input
  type="number"
- value={settings.maxSubmissionSize}
- onChange={(e) => setSettings({ ...settings, maxSubmissionSize: parseInt(e.target.value) })}
+ min={1}
+ max={512}
+ value={Math.max(1, Math.round((settings.maxSubmissionSize || 65536) / 1024))}
+ onChange={(e) => {
+   const kb = parseInt(e.target.value, 10)
+   if (!Number.isFinite(kb)) return
+   setSettings({
+     ...settings,
+     maxSubmissionSize: Math.min(512 * 1024, Math.max(1024, kb * 1024)),
+   })
+ }}
  className="input"
  />
+ <p className="mt-1.5 text-xs text-muted-foreground">范围 1–512 KB（存库为字节）</p>
  </div>
  </div>
  </div>

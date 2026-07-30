@@ -11,6 +11,7 @@ import {
   isClassOwnerRole,
 } from '@/lib/class/roles'
 import { ApiError } from '@/lib/api/errors'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 import { getUserCanManageContent, validateAssignmentProblems } from './helpers'
 import { getClassAssignmentDetail, getAssignmentStatus } from './assignment-stats'
 
@@ -56,7 +57,7 @@ export async function buildClassAssignmentDetail(
         userId: m.userId,
         username: m.user.username,
         nickname: m.user.nickname,
-        avatar: m.user.avatar,
+        avatar: sanitizeAvatarUrl(m.user.avatar),
         role: normalizeClassRoleToApi(m.role),
         progress: {
           solved: solved.size,

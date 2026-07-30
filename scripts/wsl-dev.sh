@@ -85,6 +85,17 @@ patch_env() {
   else
     echo 'DATABASE_URL=mongodb://127.0.0.1:27017/oj-platform?replicaSet=rs0&directConnection=true' >> .env
   fi
+  # 开发环境保存 SMTP 等设置需要 ENCRYPTION_KEY；空值会导致 PUT /api/admin/settings 500
+  if ! grep -q '^ENCRYPTION_KEY=.' .env; then
+    local key
+    key="$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")"
+    if grep -q '^ENCRYPTION_KEY=' .env; then
+      sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=${key}|" .env
+    else
+      printf '\nENCRYPTION_KEY=%s\n' "$key" >> .env
+    fi
+    echo "==> 已自动生成 ENCRYPTION_KEY（开发用）"
+  fi
 }
 
 echo "==> 写入 WSL Mongo DATABASE_URL..."

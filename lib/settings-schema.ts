@@ -35,7 +35,9 @@ export const systemSettingsUpdateSchema = z
     siteDescription: z.string().max(500).optional(),
     allowRegistration: z.boolean().optional(),
     allowGuestSubmission: z.boolean().optional(),
+    // 与 lib/judge/compiler.ts languageConfigs 对齐（当前仅 cpp/c/python）
     defaultLanguage: z.enum(['cpp', 'c', 'python']).optional(),
+    /** 字节数；UI 以 KB 展示，提交前需换算 */
     maxSubmissionSize: z.number().int().min(1024).max(512 * 1024).optional(),
     smtpHost: z.string().max(253).optional(),
     smtpPort: z.number().int().min(1).max(65535).optional(),

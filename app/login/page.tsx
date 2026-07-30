@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff, Sparkles, AlertCircle } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
+import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
 import { resolveLoginRedirect } from '@/lib/navigation'
 import { GuestAuthShell } from '@/components/common'
@@ -12,6 +13,8 @@ import { GuestAuthShell } from '@/components/common'
  export default function LoginPage() {
  const router = useRouter()
  const { login } = useUser()
+ const { settings } = useSettings()
+ const allowRegistration = settings.allowRegistration === true
  const [showPassword, setShowPassword] = useState(false)
  const [rememberMe, setRememberMe] = useState(false)
  const [formData, setFormData] = useState({
@@ -134,10 +137,16 @@ import { GuestAuthShell } from '@/components/common'
           </form>
 
           <div className="mt-8 text-center">
-            <span className="text-muted-foreground">还没有账号？</span>
-            <Link href="/register" className="text-primary-light hover:text-primary font-bold ml-1.5 transition-colors duration-200 group">
-              <span className="group-hover:underline">立即注册</span>
-            </Link>
+            {allowRegistration ? (
+              <>
+                <span className="text-muted-foreground">还没有账号？</span>
+                <Link href="/register" className="text-primary-light hover:text-primary font-bold ml-1.5 transition-colors duration-200 group">
+                  <span className="group-hover:underline">立即注册</span>
+                </Link>
+              </>
+            ) : (
+              <span className="text-sm text-muted-foreground">当前暂不开放新用户注册，请使用已有账号登录</span>
+            )}
           </div>
 
           {/* 欢迎提示卡片：面向终端用户，不暴露后台管理员机制 */}

@@ -83,6 +83,7 @@ export function GuestView() {
   const { settings } = useSettings()
   const siteName = settings.siteName || '大山 OJ'
   const tagline = '代码如山·算法为径'
+  const allowRegistration = settings.allowRegistration === true
   const [announcements, setAnnouncements] = useState<PublicAnnouncementItem[]>([])
 
   useEffect(() => {
@@ -143,11 +144,19 @@ export function GuestView() {
 
             {/* CTA 按钮 */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center animate-fadeIn" style={{ animationDelay: '160ms' }}>
-              <Link href="/register" className="btn btn-primary text-base px-7 py-3 h-auto">
-                <Sparkles className="w-5 h-5" />
-                开始我的攀登
-                <ArrowRight className="w-5 h-5" />
-              </Link>
+              {allowRegistration ? (
+                <Link href="/register" className="btn btn-primary text-base px-7 py-3 h-auto">
+                  <Sparkles className="w-5 h-5" />
+                  开始我的攀登
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              ) : (
+                <Link href="/login" className="btn btn-primary text-base px-7 py-3 h-auto">
+                  <Sparkles className="w-5 h-5" />
+                  登录后开始
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              )}
               <Link href="/problems" className="btn btn-outline text-base px-7 py-3 h-auto">
                 <BookOpen className="w-5 h-5" />
                 探索题库
@@ -283,16 +292,26 @@ export function GuestView() {
             山顶的风景，值得每一位攀登者
           </h2>
           <p className="text-muted-foreground mb-8 leading-relaxed max-w-xl mx-auto text-sm md:text-base">
-            注册即拥有完整的学习轨迹、训练计划与竞赛入口。记录每一次 AC，见证每一段成长。
+            {allowRegistration
+              ? '注册即拥有完整的学习轨迹、训练计划与竞赛入口。记录每一次 AC，见证每一段成长。'
+              : '登录后即可使用完整的学习轨迹、训练计划与竞赛入口。记录每一次 AC，见证每一段成长。'}
           </p>
 
           {/* 按钮：平衡宽度 */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
-            <Link href="/register" className="btn btn-primary text-base px-8 py-3 h-auto min-w-[200px]">
-              <Sparkles className="w-5 h-5" />
-              免费注册
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+            {allowRegistration ? (
+              <Link href="/register" className="btn btn-primary text-base px-8 py-3 h-auto min-w-[200px]">
+                <Sparkles className="w-5 h-5" />
+                免费注册
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            ) : (
+              <Link href="/problems" className="btn btn-primary text-base px-8 py-3 h-auto min-w-[200px]">
+                <Sparkles className="w-5 h-5" />
+                先去逛逛题库
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            )}
             <Link href="/login" className="btn btn-outline text-base px-8 py-3 h-auto min-w-[200px]">
               已有账号？登录
             </Link>

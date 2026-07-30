@@ -22,6 +22,7 @@ import {
   deleteClassNoteSimple,
 } from '@/lib/class/service'
 import { isClassAdminRole } from '@/lib/class/roles'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const { id, noteId } = ctx.params
@@ -50,7 +51,7 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
       id: safeNote.author.id,
       username: safeNote.author.username,
       nickname: safeNote.author.nickname,
-      avatar: safeNote.author.avatar,
+      avatar: sanitizeAvatarUrl(safeNote.author.avatar),
     },
     createdAt: safeNote.createdAt,
     updatedAt: safeNote.updatedAt,

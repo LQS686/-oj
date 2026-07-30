@@ -3,6 +3,7 @@
 /**
  * 竞赛列表卡片：更宽信息密度（状态/时间轴/倒计时/题量/报名）
  */
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   Calendar,
@@ -86,8 +87,11 @@ interface ContestCardProps {
   nowMs?: number
 }
 
-export default function ContestCard({ contest, nowMs = Date.now() }: ContestCardProps) {
-  const countdown = computeContestCountdown(contest.startTime, contest.endTime, nowMs)
+export default function ContestCard({ contest, nowMs }: ContestCardProps) {
+  // 默认参数禁止 Date.now()（render 纯度）；仅无挂载时刻作无时钟兜底
+  const [fallbackNow] = useState(() => Date.now())
+  const effectiveNow = nowMs ?? fallbackNow
+  const countdown = computeContestCountdown(contest.startTime, contest.endTime, effectiveNow)
   const visual = statusVisual(countdown.phase)
   const StatusIcon = visual.icon
   const href =

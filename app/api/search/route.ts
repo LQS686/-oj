@@ -5,6 +5,7 @@
  */
 import { withApi, ok, readQuery } from '@/lib/api/withApi'
 import { prisma } from '@/lib/prisma'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export const GET = withApi.public(async (req) => {
   const q = readQuery<{ q?: string; limit?: string }>(req)
@@ -68,5 +69,9 @@ export const GET = withApi.public(async (req) => {
     }),
   ])
 
-  return ok({ problems, users, contests })
+  return ok({
+    problems,
+    users: users.map((u) => ({ ...u, avatar: sanitizeAvatarUrl(u.avatar) })),
+    contests,
+  })
 })

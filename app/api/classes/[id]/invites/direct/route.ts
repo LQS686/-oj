@@ -16,6 +16,7 @@ import {
   isUserClassMember,
 } from '@/lib/class/service'
 import { isClassAdminRole } from '@/lib/class/roles'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id: classId } = ctx.params
@@ -92,13 +93,13 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
       id: invite.inviter.id,
       username: invite.inviter.username,
       nickname: invite.inviter.nickname,
-      avatar: invite.inviter.avatar,
+      avatar: sanitizeAvatarUrl(invite.inviter.avatar),
     },
     invitee: {
       id: invite.invitee.id,
       username: invite.invitee.username,
       nickname: invite.invitee.nickname,
-      avatar: invite.invitee.avatar,
+      avatar: sanitizeAvatarUrl(invite.invitee.avatar),
     },
     status: invite.status,
     message: invite.message,

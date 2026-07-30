@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export type RankingType = 'global' | 'class' | 'contest' | 'weekly'
 
@@ -46,7 +47,7 @@ export async function getGlobalRanking(limit = 100): Promise<RankingItem[]> {
       userId: u.id,
       username: u.username,
       nickname: u.nickname,
-      avatar: u.avatar,
+      avatar: sanitizeAvatarUrl(u.avatar),
       score: u.rating,
       solvedCount: acMap.get(u.id) || 0,
       submissionCount: u._count.submissions,
@@ -87,7 +88,7 @@ export async function getClassRanking(classId: string, limit = 100): Promise<Ran
       userId: m.user.id,
       username: m.user.username,
       nickname: m.user.nickname,
-      avatar: m.user.avatar,
+      avatar: sanitizeAvatarUrl(m.user.avatar),
       score: m.user.rating,
       solvedCount: acMap.get(m.user.id) || 0,
       submissionCount: m.user._count.submissions,
@@ -160,6 +161,7 @@ export async function listRankingByType(type: 'rating' | 'solved', page: number,
 
     const rankedUsers: RankingUser[] = users.map((user, index) => ({
       ...user,
+      avatar: sanitizeAvatarUrl(user.avatar),
       position: (page - 1) * limit + index + 1,
       solvedProblems: user.solvedCount,
     }))

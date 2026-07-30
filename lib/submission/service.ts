@@ -8,8 +8,12 @@ import { AppError } from '@/lib/errors'
 import { addJudgeJob } from '@/lib/judge/queue'
 import {
   createSubmissionDirect,
+  decrementProblemAcceptedCount,
   decrementProblemSubmitCount,
+  incrementProblemAcceptedCount,
   incrementProblemSubmitCount,
+  isFirstAccepted,
+  updateClassAssignmentSubmissionDirect,
   updateSubmissionDirect,
 } from '@/lib/mongodb-direct'
 import { logger } from '@/lib/logger'
@@ -19,6 +23,8 @@ import { parseComparisonMode } from '@/lib/judge/types'
 import { mapTestCasesMeta, TESTCASE_META_SELECT } from '@/lib/judge/testcase-loader'
 import { canAccessAdmin } from '@/lib/permissions'
 import { assertCanAccessProblem } from '@/lib/problem/access'
+import { CacheKeys } from '@/lib/constants/cache-keys'
+import { clearRankingCache } from '@/lib/ranking/service'
 
 export interface SubmissionFilter {
   userId?: string
@@ -371,6 +377,14 @@ export async function rejudgeSubmission(submissionId: string) {
       code: true,
       language: true,
       status: true,
+      score: true,
+      time: true,
+      memory: true,
+      passedTests: true,
+      totalTests: true,
+      message: true,
+      testResults: true,
+      assignmentSubmissionId: true,
     },
   })
   if (!submission) {
@@ -395,6 +409,75 @@ export async function rejudgeSubmission(submissionId: string) {
     throw AppError.badRequest('JUDGING_IN_PROGRESS', '该提交正在评测中，请稍后再试')
   }
 
+  const wasAccepted = submission.status === SubmissionStatus.ACCEPTED
+  let wasOnlyAc = false
+  let assignmentSnapshot: {
+    status: string
+    score: number
+    time: number
+    memory: number
+    passedTests: number
+    message: string
+    isFirstAc: boolean
+    timeElapsedMs: number
+  } | null = null
+
+  // 重测前回滚 AC 计数：否则终态被清成 PENDING 后再次 AC 会双计 totalAccepted / solvedCount
+  if (wasAccepted) {
+    await decrementProblemAcceptedCount(submission.problemId)
+    cache.delete(CacheKeys.problem.byId(submission.problemId))
+    cache.delete(CacheKeys.problem.statusCounts(submission.problemId))
+    cache.delete(CacheKeys.problem.stats(submission.problemId))
+
+    wasOnlyAc = await isFirstAccepted(
+      submission.problemId,
+      submission.userId,
+      submission.id
+    )
+    if (wasOnlyAc) {
+      await prisma.user.updateMany({
+        where: { id: submission.userId, solvedCount: { gt: 0 } },
+        data: { solvedCount: { decrement: 1 } },
+      })
+      clearRankingCache()
+    }
+  }
+
+  if (submission.assignmentSubmissionId) {
+    try {
+      const row = await prisma.classAssignmentSubmission.findUnique({
+        where: { id: submission.assignmentSubmissionId },
+        select: {
+          status: true,
+          score: true,
+          time: true,
+          memory: true,
+          passedTests: true,
+          message: true,
+          isFirstAc: true,
+          timeElapsedMs: true,
+        },
+      })
+      if (row) {
+        assignmentSnapshot = {
+          status: row.status,
+          score: row.score,
+          time: row.time,
+          memory: row.memory,
+          passedTests: row.passedTests,
+          message: row.message || '',
+          isFirstAc: !!row.isFirstAc,
+          timeElapsedMs: row.timeElapsedMs || 0,
+        }
+      }
+    } catch (err) {
+      logger.warn('重测前读取作业提交快照失败', {
+        assignmentSubmissionId: submission.assignmentSubmissionId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
   await updateSubmissionDirect(
     submission.id,
     {
@@ -409,6 +492,31 @@ export async function rejudgeSubmission(submissionId: string) {
     },
     { forceStatus: true }
   )
+
+  // 同步作业提交行，避免主 Submission 已 PENDING 而作业行仍显示 AC / 首次 AC 徽章
+  if (submission.assignmentSubmissionId) {
+    try {
+      await updateClassAssignmentSubmissionDirect(
+        submission.assignmentSubmissionId,
+        {
+          status: SubmissionStatus.PENDING,
+          score: 0,
+          time: 0,
+          memory: 0,
+          passedTests: 0,
+          message: '',
+          isFirstAc: false,
+          timeElapsedMs: 0,
+        },
+        { forceStatus: true }
+      )
+    } catch (err) {
+      logger.warn('重测时同步作业提交状态失败', {
+        assignmentSubmissionId: submission.assignmentSubmissionId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   try {
     await addJudgeJob({
@@ -425,15 +533,46 @@ export async function rejudgeSubmission(submissionId: string) {
       testCases: mapProblemTestCases(problem.testCases),
     })
   } catch (queueError) {
-    logger.error('重测入队失败', queueError)
+    logger.error('重测入队失败，回滚提交状态与计数', queueError)
+    // 入队失败：恢复终态与 AC 计数，避免永久少计 / 作业行卡在 PENDING
     await updateSubmissionDirect(
       submission.id,
       {
-        status: SubmissionStatus.SYSTEM_ERROR,
-        message: '重测入队失败，请稍后重试',
+        status: submission.status,
+        score: submission.score,
+        time: submission.time,
+        memory: submission.memory,
+        passedTests: submission.passedTests,
+        totalTests: submission.totalTests,
+        message: submission.message,
+        testResults: Array.isArray(submission.testResults) ? submission.testResults : [],
       },
       { forceStatus: true }
     )
+    if (wasAccepted) {
+      await incrementProblemAcceptedCount(submission.problemId)
+      if (wasOnlyAc) {
+        await prisma.user.update({
+          where: { id: submission.userId },
+          data: { solvedCount: { increment: 1 } },
+        })
+        clearRankingCache()
+      }
+    }
+    if (submission.assignmentSubmissionId && assignmentSnapshot) {
+      try {
+        await updateClassAssignmentSubmissionDirect(
+          submission.assignmentSubmissionId,
+          assignmentSnapshot,
+          { forceStatus: true }
+        )
+      } catch (err) {
+        logger.warn('重测入队失败后恢复作业提交失败', {
+          assignmentSubmissionId: submission.assignmentSubmissionId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
     throw AppError.internal('重测入队失败')
   }
 

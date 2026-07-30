@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 /* ============================================================================
  * 班级成员 / 权限 / 活动
@@ -137,7 +138,7 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
       id: target.userId,
       username: target.user.username,
       nickname: target.user.nickname,
-      avatar: target.user.avatar,
+      avatar: sanitizeAvatarUrl(target.user.avatar),
       role: target.role,
       joinedAt: target.joinedAt,
     },

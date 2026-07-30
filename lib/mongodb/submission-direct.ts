@@ -166,6 +166,7 @@ export async function updateSubmissionDirect(
 
 /**
  * 直接更新题目通过数（绕过 Prisma 事务）
+ * 语义：每次 AC 提交 +1（与 totalSubmit 同为提交次数口径，用于 AC 率）
  */
 export async function incrementProblemAcceptedCount(problemId: string) {
   // $inc 非幂等：禁止 withRetry，避免网络重试双计
@@ -174,6 +175,16 @@ export async function incrementProblemAcceptedCount(problemId: string) {
   await db.collection('Problem').updateOne(
     { _id: new ObjectId(problemId) },
     { $inc: { totalAccepted: 1 } }
+  )
+}
+
+/** 重测回滚等路径：递减题目 AC 提交数（不低于 0） */
+export async function decrementProblemAcceptedCount(problemId: string) {
+  const client = await getMongoClient()
+  const db = client.db()
+  await db.collection('Problem').updateOne(
+    { _id: new ObjectId(problemId), totalAccepted: { $gt: 0 } },
+    { $inc: { totalAccepted: -1 } }
   )
 }
 

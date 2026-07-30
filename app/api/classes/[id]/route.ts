@@ -15,7 +15,6 @@ import {
   readQuery,
 } from '@/lib/api/withApi'
 import {
-  assertClassAdmin,
   getClassById,
   getClassDetail,
   getCurrentClassMember,
@@ -112,11 +111,9 @@ export const GET = withApi.public(async (req, ctx) => {
  * PATCH /api/classes/[id]
  * 教师/助教可更新班级信息
  */
-export const PATCH = withApi.auth(async (req, ctx, { user }) => {
+export const PATCH = withApi.classRole(['owner', 'assistant'], async (req, ctx) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
-
-  await assertClassAdmin(id, user.id, '需要管理员权限')
 
   const body = await readJson<{
     name?: string
@@ -135,13 +132,14 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
  * DELETE /api/classes/[id]
  * 仅班级创建人可解散
  */
-export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
+export const DELETE = withApi.classRole(['owner'], async (_req, ctx, { user }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const classDataResult = await getClassById(id)
   if (!classDataResult) throw404('班级不存在')
   const safeClassData = classDataResult!
+  // 双校验：成员角色 owner + Class.ownerId，防止角色脏数据误解散
   if (safeClassData.ownerId !== user.id) throw403('只有班级创建人可以解散班级')
 
   await deleteClass(id)

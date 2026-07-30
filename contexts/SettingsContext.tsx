@@ -15,6 +15,8 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SystemSettings>({
     ...defaultSettings,
+    // 与公开 API fail-closed 对齐：加载完成前默认关闭注册，避免闪现错误入口
+    allowRegistration: false,
     judge: { ...defaultSettings.judge },
   })
   const [loading, setLoading] = useState(true)
@@ -25,6 +27,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const merged: SystemSettings = {
         ...defaultSettings,
         ...settingsData,
+        // 公开接口未返回的字段保持默认；注册开关必须以 API 为准
+        allowRegistration: settingsData.allowRegistration === true,
         judge: { ...defaultSettings.judge },
       }
       // 防御：若 API 返回空字符串（绕过后端校验的脏数据），回退到默认品牌信息
@@ -33,7 +37,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
       setSettings(merged)
     } catch {
-      // 使用默认设置
+      // fail-closed：保持关闭注册
+      setSettings((prev) => ({ ...prev, allowRegistration: false }))
     } finally {
       setLoading(false)
     }
@@ -41,6 +46,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void fetchSettings()
+  }, [fetchSettings])
+
+  // 切回标签页时刷新，避免管理员关闭注册后本页仍显示入口
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void fetchSettings()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [fetchSettings])
 
   const value = useMemo(

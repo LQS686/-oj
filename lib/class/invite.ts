@@ -6,6 +6,7 @@
 import { prisma } from '@/lib/prisma'
 import { createNotification } from '@/lib/notification/service'
 import { ApiError } from '@/lib/api/errors'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 /* ============================================================================
  * 班级直接邀请（按用户名）
@@ -173,7 +174,7 @@ export async function getDirectInviteDetail(
           id: inviter.id,
           username: inviter.username,
           nickname: inviter.nickname,
-          avatar: inviter.avatar,
+          avatar: sanitizeAvatarUrl(inviter.avatar),
         }
       : null,
   }
