@@ -41,20 +41,21 @@ jobs:
             if (skip) core.notice('检测到 skip-cache 标记，将主动清理 npm 与 Next.js 缓存')
 
       - name: Setup Node.js
+        # 暂不启用 cache:npm，避免 restore-keys 命中旧缓存导致 npm ci 异常
+        # 勿设置 registry-url（会注入空的 _authToken，公共包安装秒失败）
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
-          registry-url: "https://registry.npmjs.org"
+          node-version: "22"
 
       - name: Clear npm cache (skip-cache only)
         if: steps.skip-cache.outputs.skip == 'true'
         run: npm cache clean --force
 
       - name: Install dependencies
-        # 不用 --prefer-offline：lockfile 大改 / restore-keys 命中旧缓存时会秒级失败
-        # --ignore-scripts：prepare(husky)/postinstall 延后，安装更稳；Prisma 下一步单独 generate
-        run: npm ci --no-audit --no-fund --ignore-scripts
+        run: |
+          echo "node=$(node -v) npm=$(npm -v) registry=$(npm config get registry)"
+          ls -la package.json package-lock.json
+          npm ci --no-audit --no-fund --ignore-scripts
 
       - name: Cache Next.js build
         uses: actions/cache@v4
