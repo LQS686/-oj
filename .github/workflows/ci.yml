@@ -13,6 +13,8 @@ env:
   DATABASE_URL: mongodb://localhost:27017/ci?replicaSet=rs0
   ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   NODE_ENV: test
+  # 跳过 husky prepare，避免 CI 里 git hooks 安装干扰 npm ci
+  HUSKY: "0"
 
 jobs:
   verify:
@@ -43,13 +45,16 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Clear npm cache (skip-cache only)
         if: steps.skip-cache.outputs.skip == 'true'
         run: npm cache clean --force
 
       - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit --no-fund
+        # 不用 --prefer-offline：lockfile 大改 / restore-keys 命中旧缓存时会秒级失败
+        # --ignore-scripts：prepare(husky)/postinstall 延后，安装更稳；Prisma 下一步单独 generate
+        run: npm ci --no-audit --no-fund --ignore-scripts
 
       - name: Cache Next.js build
         uses: actions/cache@v4
