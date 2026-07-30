@@ -54,6 +54,112 @@ require_cmd() {
   fi
 }
 
+# 宝塔 / OpenCloudOS 等常见：只有独立二进制 docker-compose，没有 compose 插件
+# 统一走 compose()，兼容：docker compose 插件 / docker-compose 独立程序
+COMPOSE_KIND=""
+COMPOSE_BIN=""
+
+compose() {
+  case "$COMPOSE_KIND" in
+    plugin) docker compose "$@" ;;
+    standalone) "$COMPOSE_BIN" "$@" ;;
+    *)
+      err "内部错误：Compose 未初始化"
+      return 1
+      ;;
+  esac
+}
+
+try_set_standalone() {
+  local bin="$1"
+  [[ -n "$bin" && -x "$bin" ]] || return 1
+  if "$bin" version &>/dev/null || "$bin" --version &>/dev/null; then
+    COMPOSE_KIND=standalone
+    COMPOSE_BIN="$bin"
+    info "Compose 独立程序: $("$bin" version --short 2>/dev/null || "$bin" --version 2>/dev/null | head -1) ($bin)"
+    return 0
+  fi
+  return 1
+}
+
+install_compose_standalone() {
+  local dest="/usr/local/bin/docker-compose"
+  local arch
+  arch="$(uname -m)"
+  case "$arch" in
+    x86_64|amd64) arch="x86_64" ;;
+    aarch64|arm64) arch="aarch64" ;;
+    *)
+      warn "未知架构 ${arch}，跳过自动安装 Compose"
+      return 1
+      ;;
+  esac
+
+  local ver="v2.29.7"
+  local name="docker-compose-linux-${arch}"
+  # 国内优先镜像，失败再回退 GitHub
+  local urls=(
+    "https://get.daocloud.io/docker/compose/releases/download/${ver}/${name}"
+    "https://github.com/docker/compose/releases/download/${ver}/${name}"
+  )
+
+  info "正在自动安装 docker-compose ${ver} → ${dest}"
+  local url tmp
+  tmp="$(mktemp)"
+  for url in "${urls[@]}"; do
+    echo "  尝试: $url"
+    if curl -fsSL --connect-timeout 15 --max-time 120 "$url" -o "$tmp"; then
+      if [[ -s "$tmp" ]] && head -c 4 "$tmp" | grep -q $'\x7fELF'; then
+        install -m 755 "$tmp" "$dest"
+        rm -f "$tmp"
+        try_set_standalone "$dest" && return 0
+      fi
+    fi
+  done
+  rm -f "$tmp"
+  return 1
+}
+
+detect_compose() {
+  # 1) 官方插件：docker compose
+  if docker compose version &>/dev/null; then
+    COMPOSE_KIND=plugin
+    info "Compose 插件: $(docker compose version --short 2>/dev/null || docker compose version | head -1)"
+    return 0
+  fi
+
+  # 2) PATH / 常见安装路径中的 docker-compose
+  local cand
+  for cand in \
+    "$(command -v docker-compose 2>/dev/null || true)" \
+    /usr/local/bin/docker-compose \
+    /usr/bin/docker-compose \
+    /www/server/docker/docker-compose \
+    /usr/libexec/docker/cli-plugins/docker-compose
+  do
+    if try_set_standalone "$cand"; then
+      return 0
+    fi
+  done
+
+  # 3) root 下尝试自动安装独立二进制（宝塔 OpenCloudOS 常见缺插件）
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    warn "未找到 Compose，尝试自动安装独立 docker-compose…"
+    if install_compose_standalone; then
+      return 0
+    fi
+  fi
+
+  err "未检测到 Docker Compose（插件与 docker-compose 均不可用）"
+  echo "  请任选一种方式后重试："
+  echo "  1) 宝塔 → Docker管理器 → 安装/启用 Compose"
+  echo "  2) 插件: dnf/yum install -y docker-compose-plugin   或   apt install -y docker-compose-plugin"
+  echo "  3) 一键装独立程序（推荐，OpenCloudOS/宝塔常用）:"
+  echo "       curl -fsSL https://get.daocloud.io/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose"
+  echo "       chmod +x /usr/local/bin/docker-compose && docker-compose version"
+  exit 1
+}
+
 env_get() {
   local key="$1"
   [[ -f .env ]] || return 1
@@ -119,18 +225,18 @@ check_disk() {
 dump_failure() {
   warn "部署未完全就绪，最近日志如下："
   echo ""
-  docker compose ps 2>/dev/null || true
+  compose ps 2>/dev/null || true
   echo ""
   echo "---- app (tail) ----"
-  docker compose logs --tail=80 app 2>/dev/null || true
+  compose logs --tail=80 app 2>/dev/null || true
   echo ""
   echo "---- mongo (tail) ----"
-  docker compose logs --tail=40 mongo 2>/dev/null || true
+  compose logs --tail=40 mongo 2>/dev/null || true
   echo ""
   echo "---- redis (tail) ----"
-  docker compose logs --tail=20 redis 2>/dev/null || true
+  compose logs --tail=20 redis 2>/dev/null || true
   echo ""
-  warn "排查: docker compose logs -f app"
+  warn "排查: compose logs -f app"
 }
 
 write_nginx_snippet() {
@@ -242,13 +348,8 @@ fi
 require_cmd docker
 require_cmd openssl
 require_cmd curl
-
-if ! docker compose version &>/dev/null; then
-  err "未检测到 docker compose 插件。请在宝塔「Docker管理器」中确认 Compose 可用，或安装 docker-compose-plugin"
-  exit 1
-fi
 info "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
-info "Compose $(docker compose version --short 2>/dev/null || echo ok)"
+detect_compose
 
 check_disk
 
@@ -452,7 +553,7 @@ export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
 step "拉取基础镜像"
-if ! docker compose pull mongo redis; then
+if ! compose pull mongo redis; then
   warn "基础镜像拉取失败，将尝试使用本地已有镜像继续"
 fi
 
@@ -460,7 +561,7 @@ if [[ "$NO_BUILD" -eq 1 ]]; then
   step "跳过构建（--no-build）"
 else
   step "构建应用镜像（首次约 5-10 分钟；BuildKit 缓存可大幅加速后续构建）"
-  if ! docker compose build app; then
+  if ! compose build app; then
     err "应用镜像构建失败"
     echo "  常见原因: 磁盘不足 / 镜像源超时 / 网络中断"
     echo "  清理: docker image prune -f && df -h"
@@ -481,15 +582,15 @@ info "Docker 垃圾已清理（保留近 7 天 BuildKit 缓存）"
 # 5. 启动服务（先依赖，再 app）
 # ============================================================
 step "启动服务"
-docker compose up -d mongo redis
+compose up -d mongo redis
 echo -n "等待 mongo/redis healthy"
 dep_ok=0
 # 从 .env 读 root 账号供回退探测（勿 export 到全局过久）
 MONGO_ROOT_USER="$(env_get MONGO_ROOT_USER || echo admin)"
 MONGO_ROOT_PASSWORD="$(env_get MONGO_ROOT_PASSWORD || true)"
 for i in $(seq 1 60); do
-  mongo_h="$(docker compose ps mongo --format '{{.Health}}' 2>/dev/null || true)"
-  redis_h="$(docker compose ps redis --format '{{.Health}}' 2>/dev/null || true)"
+  mongo_h="$(compose ps mongo --format '{{.Health}}' 2>/dev/null || true)"
+  redis_h="$(compose ps redis --format '{{.Health}}' 2>/dev/null || true)"
   if [[ "$mongo_h" == "healthy" && "$redis_h" == "healthy" ]]; then
     echo ""
     info "mongo / redis 已 healthy"
@@ -497,8 +598,8 @@ for i in $(seq 1 60); do
     break
   fi
   if [[ -n "$MONGO_ROOT_PASSWORD" ]] \
-     && docker compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping' 2>/dev/null | grep -q PONG \
-     && docker compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --eval 'db.adminCommand("ping").ok' 2>/dev/null | grep -q 1; then
+     && compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping' 2>/dev/null | grep -q PONG \
+     && compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --eval 'db.adminCommand("ping").ok' 2>/dev/null | grep -q 1; then
     echo ""
     info "mongo / redis 可连通（health 字段可能暂不可用）"
     dep_ok=1
@@ -510,10 +611,10 @@ done
 echo ""
 if [[ "$dep_ok" -ne 1 ]]; then
   warn "mongo/redis 等待超时，仍继续启动 app（查看下方日志）"
-  docker compose logs --tail=30 mongo redis || true
+  compose logs --tail=30 mongo redis || true
 fi
 
-docker compose up -d
+compose up -d
 
 # ============================================================
 # 6. 等待健康检查
@@ -533,7 +634,7 @@ for i in $(seq 1 90); do
     ready=1
     break
   fi
-  app_state="$(docker compose ps app --format '{{.State}}' 2>/dev/null || true)"
+  app_state="$(compose ps app --format '{{.State}}' 2>/dev/null || true)"
   if [[ "$app_state" == "exited" || "$app_state" == "dead" ]]; then
     echo ""
     err "app 容器已退出"
@@ -573,7 +674,7 @@ echo -e "  本机探测:   ${GREEN}${HEALTH_URL}${NC}"
 echo -e "  监听绑定:   ${APP_BIND}:${APP_PORT} → 容器 3000"
 echo ""
 echo -e "  容器状态:"
-docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || docker compose ps
+compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || compose ps
 echo ""
 echo -e "  ${BOLD}首次使用：浏览器打开站点 → 注册首个账号（自动成为系统管理员）${NC}"
 echo ""
@@ -598,8 +699,12 @@ echo -e "${CYAN}────────────────── 预览结
 echo ""
 echo -e "  ${BOLD}常用命令:${NC}"
 echo -e "    cd ${PROJECT_DIR}"
-echo -e "    docker compose logs -f app"
+echo -e "    compose logs -f app"
 echo -e "    sudo bash scripts/bt-deploy.sh                 # 升级（git pull 后）"
 echo -e "    sudo bash scripts/bt-deploy.sh --no-build      # 仅重启"
 echo -e "    sudo bash scripts/bt-deploy.sh https://域名    # 切域名并重建"
 echo ""
+if [[ "$COMPOSE_KIND" == "standalone" ]]; then
+  echo -e "  ${YELLOW}提示: 本机使用 docker-compose 独立程序；脚本已自动兼容。${NC}"
+  echo ""
+fi

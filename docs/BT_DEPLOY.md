@@ -106,13 +106,14 @@ sudo bash scripts/bt-deploy.sh --no-build
 ```bash
 cd /www/wwwroot/dashan-oj
 
-docker compose ps
-docker compose logs -f app
-docker compose restart app
+# 有 compose 插件用 docker compose；仅有独立程序则用 docker-compose
+docker compose ps 2>/dev/null || docker-compose ps
+docker compose logs -f app 2>/dev/null || docker-compose logs -f app
+docker compose restart app 2>/dev/null || docker-compose restart app
 
 # 停止 / 启动（数据在 volume，不会丢）
-docker compose down
-docker compose up -d
+docker compose down 2>/dev/null || docker-compose down
+docker compose up -d 2>/dev/null || docker-compose up -d
 ```
 
 ### 清理构建垃圾
@@ -131,17 +132,18 @@ docker builder prune -af --filter "until=168h"
 
 ## 常见问题
 
-| 问题                                 | 处理                                                                                                                              |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| 首次部署 app 起不来 / Cookie 登不上  | HTTP 必须用 `http://IP` 部署；脚本会设 `FORCE_SECURE_COOKIE=false`。HTTPS 必须为 `true`。                                         |
-| `FORCE_SECURE_COOKIE=false` 启动失败 | 旧版会在生产直接拒绝。请 `git pull` 后重跑脚本；HTTPS 站不要关 Secure。                                                           |
-| mongo 一直 unhealthy，app 起不来     | 已改为带账号的 healthcheck；仍失败时看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。                                |
-| `mongo-keyfile: no such file`        | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile` |
-| 构建 ENOSPC / 磁盘满                 | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                   |
-| 镜像拉取失败                         | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`                                                  |
-| 改域名后前端仍请求旧地址             | 必须重建：`sudo bash scripts/bt-deploy.sh https://新域名`（不要用 `--no-build`）                                                  |
-| API 502                              | `docker compose ps`；等健康检查通过；看 `docker compose logs -f app`                                                              |
-| 80/443 冲突                          | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                |
+| 问题                                 | 处理                                                                                                                                                                                                                                                                                                |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 未检测到 docker compose 插件         | OpenCloudOS/宝塔常只有独立 `docker-compose`。新脚本会自动检测并尝试安装。也可先手动：`curl -fsSL https://get.daocloud.io/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose && docker-compose version` |
+| 首次部署 app 起不来 / Cookie 登不上  | HTTP 必须用 `http://IP` 部署；脚本会设 `FORCE_SECURE_COOKIE=false`。HTTPS 必须为 `true`。                                                                                                                                                                                                           |
+| `FORCE_SECURE_COOKIE=false` 启动失败 | 旧版会在生产直接拒绝。请 `git pull` 后重跑脚本；HTTPS 站不要关 Secure。                                                                                                                                                                                                                             |
+| mongo 一直 unhealthy，app 起不来     | 已改为带账号的 healthcheck；仍失败时看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。                                                                                                                                                                                                  |
+| `mongo-keyfile: no such file`        | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile`                                                                                                                                                                   |
+| 构建 ENOSPC / 磁盘满                 | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                                                                                                                                                                                     |
+| 镜像拉取失败                         | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`                                                                                                                                                                                                                    |
+| 改域名后前端仍请求旧地址             | 必须重建：`sudo bash scripts/bt-deploy.sh https://新域名`（不要用 `--no-build`）                                                                                                                                                                                                                    |
+| API 502                              | `docker compose ps`；等健康检查通过；看 `docker compose logs -f app`                                                                                                                                                                                                                                |
+| 80/443 冲突                          | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                                                                                                                                                                                  |
 
 ---
 
