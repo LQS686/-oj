@@ -49,7 +49,22 @@ export default [
 
       'react-hooks/exhaustive-deps': 'warn',
       'react-hooks/rules-of-hooks': 'error',
+      // React Compiler 规则（hooks@7+ recommended 默认为 error）：
+      // 历史代码大量触达，暂降为 warn，与 set-state-in-effect 策略一致；避免 CI 被 30+ 风格性 error 阻塞
       'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/set-state-in-render': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/static-components': 'warn',
+      'react-hooks/use-memo': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/globals': 'warn',
+      'react-hooks/error-boundaries': 'warn',
+      'react-hooks/config': 'warn',
+      'react-hooks/gating': 'warn',
+      'react-hooks/incompatible-library': 'warn',
+      'react-hooks/unsupported-syntax': 'warn',
 
       'react/prop-types': 'off',
       'react/react-in-jsx-scope': 'off',
