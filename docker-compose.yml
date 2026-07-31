@@ -106,16 +106,16 @@ services:
         max-size: "10m"
         max-file: "5"
     healthcheck:
-      # 启用 --auth 后无凭证 ping 常失败，导致 app depends_on 一直等不到 healthy
+      # 启用 --auth 后无凭证 ping 常失败；且须要求 PRIMARY（仅 ping 在未 initiate 时也可能成功）
       test:
         [
           "CMD-SHELL",
-          'mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand(''ping'').ok" | grep -q 1',
+          'mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.hello().isWritablePrimary" | grep -q true',
         ]
       interval: 10s
       timeout: 10s
-      retries: 12
-      start_period: 60s
+      retries: 18
+      start_period: 90s
 
   redis:
     image: redis:7-alpine

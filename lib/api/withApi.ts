@@ -91,10 +91,18 @@ async function safeCall(
   })
   try {
     // fail-closed：database/system/auth 触发 block 后拒绝新请求
-    const { errorMonitor } = await import('@/lib/error-monitor')
-    for (const key of ['database', 'system', 'auth'] as const) {
-      if (await errorMonitor.isBlockedAsync(key)) {
-        return fail('SERVICE_UNAVAILABLE', '服务暂时不可用，请稍后重试', 503)
+    // 公开设置 / 健康检查除外：熔断时仍需返回 fail-closed 默认值或探活结果，避免整站白屏
+    const path = req.nextUrl?.pathname || ''
+    const skipCircuit =
+      path === '/api/settings/public' ||
+      path === '/api/health' ||
+      path.startsWith('/api/health/')
+    if (!skipCircuit) {
+      const { errorMonitor } = await import('@/lib/error-monitor')
+      for (const key of ['database', 'system', 'auth'] as const) {
+        if (await errorMonitor.isBlockedAsync(key)) {
+          return fail('SERVICE_UNAVAILABLE', '服务暂时不可用，请稍后重试', 503)
+        }
       }
     }
     const result = await fn()

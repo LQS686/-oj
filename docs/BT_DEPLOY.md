@@ -152,7 +152,8 @@ docker builder prune -af --filter "until=168h"
 | 未检测到 docker compose 插件                  | OpenCloudOS/宝塔常只有独立 `docker-compose`。新脚本会自动检测并尝试安装。也可先手动：`curl -fsSL https://get.daocloud.io/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose && docker-compose version` |
 | 首次部署 app 起不来 / Cookie 登不上           | HTTP 必须用 `http://IP` 部署；脚本会设 `FORCE_SECURE_COOKIE=false`。HTTPS 必须为 `true`。                                                                                                                                                                                                           |
 | `FORCE_SECURE_COOKIE=false` 启动失败          | 旧版会在生产直接拒绝。请 `git pull` 后重跑脚本；HTTPS 站不要关 Secure。                                                                                                                                                                                                                             |
-| mongo 一直 unhealthy，app 起不来              | 已改为带账号的 healthcheck；仍失败时看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。                                                                                                                                                                                                  |
+| mongo 一直 unhealthy，app 起不来              | 已改为要求 **PRIMARY** 的 healthcheck；看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。若日志有 `NotYetInitialized`，执行下方「修复副本集」。                                                                                                                                         |
+| API 全站 503 `SERVICE_UNAVAILABLE`            | 多为 Mongo 副本集未 PRIMARY，Prisma 连续失败触发熔断。先修副本集（见下），再 `docker compose restart app`；或等约 60s 熔断窗口结束。探针：`curl -sf http://127.0.0.1:3000/api/health/db`（需管理员）/ 看 `compose logs app`。                                                                       |
 | `mongo-keyfile: no such file`                 | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile`                                                                                                                                                                   |
 | 构建 ENOSPC / 磁盘满                          | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                                                                                                                                                                                     |
 | 镜像拉取失败                                  | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认不覆盖已有自定义 daemon；可用 `--skip-mirror` 跳过                                                                                                                                                        |
@@ -161,6 +162,30 @@ docker builder prune -af --filter "until=168h"
 | 80/443 冲突                                   | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                                                                                                                                                                                  |
 | 3000 端口被占用                               | 脚本会提示；可改 `.env` 的 `APP_HOST_PORT` 后重跑，并重新粘贴 `nginx/baota-proxy.conf`（端口已写入片段）                                                                                                                                                                                            |
 | 粘贴 Nginx 后 WebSocket 断线                  | 确认存在 `location /socket.io/`，且 `X-Forwarded-Proto` 与站点协议一致                                                                                                                                                                                                                              |
+
+### 修复 Mongo 副本集（API 503 / NotYetInitialized）
+
+`DATABASE_URL` 带 `replicaSet=rs0`。若数据卷在首次 `rs.initiate` 失败后已落盘，官方 `initdb` 不会再跑，节点会一直无 PRIMARY，Prisma 连续失败 → 熔断 → 全站 API 503。
+
+在项目目录执行（密码取自 `.env` 的 `MONGO_ROOT_PASSWORD`）：
+
+```bash
+# 查看是否 PRIMARY（应输出 true）
+docker compose exec -T mongo mongosh --quiet \
+  -u admin -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin \
+  --eval 'db.hello().isWritablePrimary'
+
+# 若为 false / 报 NotYetInitialized，手动初始化：
+docker compose exec -T mongo mongosh --quiet \
+  -u admin -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin \
+  --eval 'try { rs.status() } catch (e) { rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] }) }'
+
+# 等 PRIMARY 后再重启应用并清熔断缓存
+docker compose restart app
+docker compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli KEYS "error-block:*" | xargs -r redis-cli DEL'
+```
+
+新版 `scripts/mongo-init.sh` 会在**每次**启动时尝试 initiate / 修正 host；`git pull` 后执行 `docker compose up -d mongo`（或整站 `bt-deploy`）即可自愈。
 
 ---
 
