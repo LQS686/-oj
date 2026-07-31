@@ -189,6 +189,25 @@ service_health() {
     || echo "unknown"
 }
 
+# restart: always 时崩溃容器不会停在 exited，需看 Restarting / RestartCount
+service_crash_looping() {
+  local svc="$1"
+  local cid
+  cid="$(compose ps -q "$svc" 2>/dev/null | head -1 || true)"
+  [[ -n "$cid" ]] || return 1
+  local status restarts
+  status="$(docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' "$cid" 2>/dev/null || true)"
+  restarts="$(docker inspect -f '{{.RestartCount}}' "$cid" 2>/dev/null || echo 0)"
+  # Status=restarting，或短时间内多次重启且始终不健康
+  if echo "$status" | grep -qi 'restarting'; then
+    return 0
+  fi
+  if [[ "${restarts:-0}" -ge 3 ]] && ! curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
 check_host_port() {
   local bind="$1" port="$2"
   local listeners=""
@@ -746,6 +765,13 @@ for i in $(seq 1 90); do
   if [[ "$app_state" == "exited" || "$app_state" == "dead" ]]; then
     echo ""
     err "app 容器已退出"
+    dump_failure
+    exit 1
+  fi
+  # 第 3 轮起再判崩溃循环，避免误伤冷启动（start_period / 首次依赖就绪）
+  if [[ "$i" -ge 3 ]] && service_crash_looping app; then
+    echo ""
+    err "app 疑似崩溃重启循环（Status=restarting 或 RestartCount≥3），停止空等"
     dump_failure
     exit 1
   fi

@@ -1,8 +1,9 @@
 import 'server-only'
 
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
-export { Prisma }
+export type { Prisma }
 
 // 定义全局类型以防止开发环境热重载导致的多实例问题
 const globalForPrisma = globalThis as unknown as {

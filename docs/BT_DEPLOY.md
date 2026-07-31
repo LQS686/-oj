@@ -171,8 +171,9 @@ docker builder prune -af --filter "until=168h"
 3. **CSP 勿加 `upgrade-insecure-requests`**（HTTP 站静态资源会挂）。
 4. **监听 `0.0.0.0`** — Dockerfile 已设 `HOSTNAME=0.0.0.0`；compose 默认只把端口绑到 `127.0.0.1:3000` 给 Nginx。
 5. **runner 阶段必须 `npm ci --omit=dev`** — standalone 追不全自定义 `server.ts` 依赖；勿删。
-6. **须显式 COPY `server.ts` / `lib` / `prisma`** — 不要用 tracing 冒充。
-7. **健康检查用 `/healthcheck-static`** — 不要改回依赖动态路由的 `/api/health` 作容器探活。
-8. **`.env` 值不要包反引号**。
+6. **`.prisma` 必须在 `npm ci` 之后回拷** — `npm ci` 会清空 `node_modules`；若先 COPY 再 ci，生成客户端丢失，app 会以 `Prisma` named export 报错崩溃重启。
+7. **须显式 COPY `server.ts` / `lib` / `prisma`** — 不要用 tracing 冒充。
+8. **健康检查用 `/healthcheck-static`** — 不要改回依赖动态路由的 `/api/health` 作容器探活。
+9. **`.env` 值不要包反引号**。
 
 更细的编译 / 评测相关说明见仓库历史注释与 `Dockerfile`。

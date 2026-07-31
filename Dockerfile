@@ -54,7 +54,7 @@ FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 
 # 使用清华 TUNA 镜像源 + BuildKit 缓存
-# 关键：apk add 是构建中最慢的步骤（gcc/g++ 等大包 ~100MB+），缓存后下次 build 秒级完成
+# 注意：apk add 是构建中最慢的步骤（gcc/g++ 等大包 ~100MB+），缓存后下次 build 秒级完成
 # 注意：Alpine/musl 不提供 libasan / libubsan（glibc 专用）。评测默认关闭 ASan/UBSan
 # （JUDGE_ENABLE_ASAN / JUDGE_ENABLE_UBSAN，见 lib/judge/compiler.ts）；勿再 apk add 这两个包。
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
@@ -99,22 +99,25 @@ COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.server.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/tailwind.config.ts ./
 COPY --from=builder --chown=nextjs:nodejs /app/postcss.config.mjs ./
 
-# 复制node_modules中的prisma和tailwindcss
-# .prisma 是动态生成的，standalone 不追踪，必须单独 COPY
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+# 复制 tailwindcss（standalone 不追踪的 CSS 相关依赖）
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@tailwindcss ./node_modules/@tailwindcss
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_modules/tailwindcss
 
 # 安装生产依赖
-# 关键：standalone 模式只追踪 Next.js 构建图里的依赖，但 server.ts 动态 import 了
+# 注意：standalone 模式只追踪 Next.js 构建图里的依赖，但 server.ts 动态 import 了
 # 很多模块（dotenv、socket.io、ioredis、jsonwebtoken、mongodb、bcryptjs、adm-zip、
 # katex、nodemailer 等），这些可能没被完全追踪。必须运行 npm install --omit=dev 确保所有
 # 生产依赖都装上。tsx 现在在 dependencies 中（之前在 devDependencies），也会被装上。
 # BuildKit 缓存 /root/.npm，复用 builder 阶段已下载的 npm 包
 # 安装生产依赖：与 lockfile 对齐
+# --ignore-scripts：跳过 postinstall（prisma generate）。npm ci 会清空 node_modules，
+# 因此生成客户端必须在下方 npm ci 之后从 builder 回拷，不能提前 COPY。
 RUN --mount=type=cache,target=/root/.npm \
     npm config set registry https://registry.npmmirror.com && npm ci --omit=dev --ignore-scripts
+
+# .prisma 是 prisma generate 产物，standalone / npm ci 都不会保留，必须在 npm ci 之后回拷
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
 # 创建必要的目录并设置权限
 # 不再将 nextjs 加入 root 组（避免提权）。内存/CPU 硬限依赖 dsoj-watch + ulimit 软限制；
