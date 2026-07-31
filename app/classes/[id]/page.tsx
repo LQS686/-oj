@@ -31,7 +31,6 @@ import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
 import CreateNoteModal from '@/components/class/CreateNoteModal'
 import ViewNoteModal, { type ClassNoteDetail } from '@/components/class/ViewNoteModal'
-import CreateClassProblemModal from '@/components/class/CreateClassProblemModal'
 import { classRoleDisplayLabel, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDate } from '@/lib/utils'
 import { loginPathFromLocation } from '@/lib/navigation'
@@ -115,7 +114,6 @@ function ClassDetailContent() {
   const [createNoteOpen, setCreateNoteOpen] = useState(false)
   const [viewNoteId, setViewNoteId] = useState<string | null>(null)
   const [editNote, setEditNote] = useState<ClassNoteDetail | null>(null)
-  const [createProblemOpen, setCreateProblemOpen] = useState(false)
 
   useDocumentTitle(classData?.name)
 
@@ -190,8 +188,8 @@ function ClassDetailContent() {
       setViewNoteId(noteId)
       router.replace(`/classes/${classId}`, { scroll: false })
     }
+    // 旧「班级独立题」入口已废弃：跳回班级首页
     if (searchParams.get('createProblem') === '1') {
-      setCreateProblemOpen(true)
       router.replace(`/classes/${classId}`, { scroll: false })
     }
   }, [searchParams, classId, router])
@@ -426,9 +424,9 @@ function ClassDetailContent() {
                           key={f}
                           type="button"
                           onClick={() => setAssignmentFilter(f)}
-                          className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
+                          className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
                             assignmentFilter === f
-                              ? 'bg-primary text-white'
+                              ? 'bg-primary text-primary-foreground'
                               : 'bg-muted text-muted-foreground hover:text-foreground'
                           }`}
                         >
@@ -446,9 +444,9 @@ function ClassDetailContent() {
                           const status = getAssignmentStatus(a.startTime, a.endTime)
                           const statusInfo =
                             status === 'upcoming'
-                              ? { text: '未开始', cls: 'text-blue-400 bg-blue-500/10' }
+                              ? { text: '未开始', cls: 'text-muted-foreground bg-muted' }
                               : status === 'active'
-                                ? { text: '进行中', cls: 'text-secondary bg-secondary/10' }
+                                ? { text: '进行中', cls: 'text-primary bg-primary/10' }
                                 : { text: '已结束', cls: 'text-muted-foreground bg-muted' }
                           return (
                             <div
@@ -464,12 +462,12 @@ function ClassDetailContent() {
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <span className="font-medium truncate">{a.title}</span>
                                   <span
-                                    className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${statusInfo.cls}`}
+                                    className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${statusInfo.cls}`}
                                   >
                                     {statusInfo.text}
                                   </span>
                                 </div>
-                                <div className="mt-0.5 text-[11px] text-muted-foreground flex flex-wrap gap-x-2.5">
+                                <div className="mt-0.5 text-xs text-muted-foreground flex flex-wrap gap-x-2.5">
                                   <span className="inline-flex items-center gap-0.5">
                                     <Clock className="w-3 h-3" />
                                     {fmt(a.startTime)} – {fmt(a.endTime)}
@@ -531,7 +529,7 @@ function ClassDetailContent() {
                             className="w-full text-left px-2.5 py-2 rounded-lg border border-border hover:border-primary/30 text-sm transition-colors"
                           >
                             <h3 className="font-medium line-clamp-1">{n.title}</h3>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {n.author?.nickname || n.author?.username || '匿名'} ·{' '}
                               {formatDate(n.createdAt)}
                             </p>
@@ -571,10 +569,10 @@ function ClassDetailContent() {
                           <p className="font-medium text-foreground truncate text-[13px] leading-tight">
                             {m.nickname || m.username}
                             {m.role === 'owner' && (
-                              <Crown className="w-3 h-3 inline ml-1 text-amber-500 align-text-top" />
+                              <Crown className="w-3 h-3 inline ml-1 text-accent align-text-top" />
                             )}
                           </p>
-                          <p className="text-[11px] text-muted-foreground truncate">
+                          <p className="text-xs text-muted-foreground truncate">
                             {roleLabel(m.role)}
                             {m.joinedAt ? ` · ${formatDate(m.joinedAt)}` : null}
                           </p>
@@ -582,7 +580,7 @@ function ClassDetailContent() {
                         {showAdminActions && m.role !== 'owner' && (
                           <div className="flex items-center gap-0.5 shrink-0">
                             <select
-                              className="input py-0.5 px-1 text-[11px] w-[4.5rem] h-7"
+                              className="input py-0.5 px-1 text-xs w-[4.5rem] h-7"
                               value={m.role === 'assistant' ? 'assistant' : 'student'}
                               disabled={m.role === 'owner'}
                               onChange={(e) =>
@@ -716,14 +714,6 @@ function ClassDetailContent() {
         onEdit={(note) => {
           setViewNoteId(null)
           setEditNote(note)
-        }}
-      />
-      <CreateClassProblemModal
-        classId={classId}
-        open={createProblemOpen}
-        onClose={() => setCreateProblemOpen(false)}
-        onCreated={() => {
-          void fetchClassDetail()
         }}
       />
     </ClassWorkspaceShell>

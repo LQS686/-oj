@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PageLoading } from '@/components/common'
 
-/** 班级题目功能已移除 */
+/** 班级独立题库已移除：题目仅存在于主题库，班级通过作业引用 */
 export default function ClassProblemsRemovedPage() {
   const params = useParams()
   const router = useRouter()

@@ -63,18 +63,25 @@ export async function getClassDetail(
   const classData = await prisma.class.findUnique({ where: { id: classId } })
   if (!classData) return null
 
-  const [members, memberCount, assignmentCount, noteCount, problemCount] = await Promise.all([
-    prisma.classMember.findMany({
-      where: { classId },
-      include: {
-        user: { select: { username: true, nickname: true, avatar: true } },
-      },
-    }),
-    prisma.classMember.count({ where: { classId } }),
-    prisma.classAssignment.count({ where: { classId } }),
-    prisma.classNote.count({ where: { classId } }),
-    prisma.problem.count({ where: { classId } }),
-  ])
+  const [members, memberCount, assignmentCount, noteCount, assignmentProblemRefs] =
+    await Promise.all([
+      prisma.classMember.findMany({
+        where: { classId },
+        include: {
+          user: { select: { username: true, nickname: true, avatar: true } },
+        },
+      }),
+      prisma.classMember.count({ where: { classId } }),
+      prisma.classAssignment.count({ where: { classId } }),
+      prisma.classNote.count({ where: { classId } }),
+      // 题目数 = 作业引用的主题库题目去重，不再统计班级私有题库
+      prisma.classAssignment.findMany({
+        where: { classId },
+        select: { problemIds: true },
+      }),
+    ])
+
+  const problemCount = new Set(assignmentProblemRefs.flatMap((a) => a.problemIds)).size
 
   const includePermissions = options?.includePermissions === true
 
@@ -178,7 +185,7 @@ export async function deleteClass(classId: string) {
     await tx.classJoinRequest.deleteMany({ where: { classId } })
     await tx.classMember.deleteMany({ where: { classId } })
 
-    // 班级题库：解除 classId 关联（题目本身保留，避免误删公共题数据）
+    // 历史「班级私有题」遗留：解除 classId，题目保留以免误删
     await tx.problem.updateMany({
       where: { classId },
       data: { classId: null, isPublic: false, visibility: 'private' },
@@ -242,18 +249,23 @@ export async function listClasses(filter: ListClassesFilter = {}) {
     prisma.class.count({ where }),
   ])
 
-  // 班级私有题目数（Problem.classId 无反向关系，需单独聚合）
+  // 作业引用的主题库题目数（按班级去重）
   const classIds = classes.map((c) => c.id)
-  const problemCountsRaw = classIds.length
-    ? await prisma.problem.groupBy({
-        by: ['classId'],
+  const assignmentProblemRefs = classIds.length
+    ? await prisma.classAssignment.findMany({
         where: { classId: { in: classIds } },
-        _count: { _all: true },
+        select: { classId: true, problemIds: true },
       })
     : []
-  const problemCountMap = new Map<string, number>(
-    problemCountsRaw.map((r) => [r.classId as string, r._count._all])
-  )
+  const problemCountMap = new Map<string, Set<string>>()
+  for (const row of assignmentProblemRefs) {
+    let set = problemCountMap.get(row.classId)
+    if (!set) {
+      set = new Set()
+      problemCountMap.set(row.classId, set)
+    }
+    for (const pid of row.problemIds) set.add(pid)
+  }
 
   return {
     classes: classes.map((c) => ({
@@ -267,7 +279,7 @@ export async function listClasses(filter: ListClassesFilter = {}) {
       createdAt: c.createdAt,
       stats: {
         memberCount: c._count.members,
-        problemCount: problemCountMap.get(c.id) || 0,
+        problemCount: problemCountMap.get(c.id)?.size || 0,
         assignmentCount: c._count.assignments,
         noteCount: c._count.notes,
       },

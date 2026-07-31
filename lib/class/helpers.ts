@@ -61,13 +61,6 @@ export async function assertClassOwner(classId: string, userId: string, failMsg:
   return member
 }
 
-/** 按 id + classId 查题目（确保题目归属该班级） */
-export async function findClassProblem(problemId: string, classId: string) {
-  return prisma.problem.findUnique({
-    where: { id: problemId, classId },
-  })
-}
-
 /** 按 id + classId 查作业（确保作业归属该班级） */
 export async function findClassAssignment(assignmentId: string, classId: string) {
   return prisma.classAssignment.findUnique({
