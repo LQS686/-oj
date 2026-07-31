@@ -161,7 +161,6 @@ export async function createAnnouncement(input: {
   expiresAt?: Date | null
   authorId: string
 }) {
-  clearAnnouncementCache()
   const now = new Date()
   const published = input.isPublished ?? false
   const created = await prisma.systemAnnouncement.create({
@@ -175,6 +174,7 @@ export async function createAnnouncement(input: {
       authorId: input.authorId,
     },
   })
+  clearAnnouncementCache()
 
   // 实时推送：仅当公告已发布且在有效期内时推送 'published' 事件
   if (
@@ -206,7 +206,6 @@ export async function updateAnnouncement(
     expiresAt?: Date | null
   }
 ) {
-  clearAnnouncementCache()
   const existing = await prisma.systemAnnouncement.findUnique({ where: { id } })
   if (!existing) return null
 
@@ -229,6 +228,7 @@ export async function updateAnnouncement(
       ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
     },
   })
+  clearAnnouncementCache()
 
   // 实时推送：根据状态变化决定事件类型
   const now = new Date()
@@ -255,10 +255,10 @@ export async function updateAnnouncement(
 }
 
 export async function deleteAnnouncement(id: string) {
-  clearAnnouncementCache()
   // 先查询公告状态，删除后广播（删除已发布且可见的公告才需要通知前端刷新）
   const existing = await prisma.systemAnnouncement.findUnique({ where: { id } })
   await prisma.systemAnnouncement.delete({ where: { id } })
+  clearAnnouncementCache()
 
   if (existing) {
     const now = new Date()

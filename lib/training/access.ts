@@ -10,17 +10,10 @@ export type TrainingAccessRow = {
   status: string
   isPublic: boolean
   authorId: string | null
-  classId: string | null
-}
-
-/** 班级题单已下线；带 classId 的历史数据一律不可见 */
-export function isClassScopedTraining(training: { classId?: string | null }): boolean {
-  return Boolean(training.classId)
 }
 
 /**
  * 当前用户是否可查看该题单。
- * - 班级题单：否
  * - 公开已发布：是
  * - 草稿 / 私有：仅作者或管理员
  */
@@ -28,8 +21,6 @@ export async function canViewTraining(
   training: TrainingAccessRow,
   userId: string | null | undefined
 ): Promise<boolean> {
-  if (isClassScopedTraining(training)) return false
-
   if (training.isPublic && training.status === 'published') return true
 
   if (!userId) return false
@@ -50,7 +41,6 @@ export async function loadTrainingAccess(id: string): Promise<TrainingAccessRow 
       status: true,
       isPublic: true,
       authorId: true,
-      classId: true,
     },
   })
 }

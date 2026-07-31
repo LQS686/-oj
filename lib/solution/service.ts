@@ -8,10 +8,19 @@ import type { NextRequest } from 'next/server'
 import { cache } from '@/lib/cache'
 import { AppError } from '@/lib/errors'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 type SolutionWithAuthor = Prisma.SolutionGetPayload<{
   include: { author: { select: { id: true; username: true; nickname: true; avatar: true } } }
 }>
+
+function sanitizeSolutionAuthor<T extends { author?: { avatar?: string | null } | null }>(row: T): T {
+  if (!row.author) return row
+  return {
+    ...row,
+    author: { ...row.author, avatar: sanitizeAvatarUrl(row.author.avatar) },
+  }
+}
 
 export interface SolutionFilter {
   problemId?: string
@@ -40,20 +49,21 @@ export async function listSolutions(
     }),
     prisma.solution.count({ where }),
   ])
-  return { items, total, page, pageSize }
+  return { items: items.map(sanitizeSolutionAuthor), total, page, pageSize }
 }
 
 export async function getSolutionById(id: string) {
   return cache.get('solution:byId', [id], async () => {
-    return prisma.solution.findUnique({
+    const row = await prisma.solution.findUnique({
       where: { id },
       include: { author: { select: { id: true, username: true, nickname: true, avatar: true } } },
     })
+    return row ? sanitizeSolutionAuthor(row) : null
   }, { ttl: 30_000 })
 }
 
 export async function createSolution(data: Omit<Prisma.SolutionUncheckedCreateInput, 'authorId'>, authorId: string) {
-  cache.deleteByPrefix('solution:list:')
+  cache.deleteByPrefix('solution:list')
   return prisma.solution.create({ data: { ...data, authorId } })
 }
 
@@ -61,13 +71,13 @@ export async function updateSolution(id: string, data: Prisma.SolutionUncheckedU
   // LOGIC-09: 先写 DB 再清缓存；同时补清列表前缀，避免列表仍展示旧数据
   const result = await prisma.solution.update({ where: { id }, data })
   cache.delete(`solution:byId:${id}`)
-  cache.deleteByPrefix('solution:list:')
+  cache.deleteByPrefix('solution:list')
   return result
 }
 
 export async function deleteSolution(id: string) {
   cache.delete(`solution:byId:${id}`)
-  cache.deleteByPrefix('solution:list:')
+  cache.deleteByPrefix('solution:list')
   return prisma.solution.delete({ where: { id } })
 }
 
@@ -119,17 +129,12 @@ export interface SolutionViewUserPayload {
 export async function loadSolutionViewUser(
   request: NextRequest
 ): Promise<SolutionViewUserPayload | null> {
-  const { getUserFromRequest } = await import('@/lib/auth')
-  const payload = getUserFromRequest(request)
-  if (!payload) return null
-  const dbUser = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    select: { id: true, role: true },
-  })
-  if (!dbUser) return null
+  const { resolveViewerFromRequest } = await import('@/lib/api/handler')
+  const viewer = await resolveViewerFromRequest(request)
+  if (!viewer) return null
   return {
-    id: dbUser.id,
-    role: dbUser.role || 'STUDENT',
+    id: viewer.user.id,
+    role: viewer.user.role || 'STUDENT',
   }
 }
 
@@ -203,6 +208,22 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
   if (!realProblemId) {
     throw AppError.notFound('题目不存在')
   }
+  const problem = await prisma.problem.findUnique({
+    where: { id: realProblemId },
+    select: { id: true, visibility: true, authorId: true },
+  })
+  if (!problem) throw AppError.notFound('题目不存在')
+  if (problem.visibility !== 'public' && problem.authorId !== authorId) {
+    const author = await prisma.user.findUnique({
+      where: { id: authorId },
+      select: { role: true },
+    })
+    const { canManageContent } = await import('@/lib/permissions')
+    if (!canManageContent(author)) {
+      throw AppError.forbidden('仅可为公开题目创建题解')
+    }
+  }
+
   const result = await prisma.solution.create({
     data: {
       problemId: realProblemId,
@@ -220,8 +241,13 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
       },
     },
   })
-  cache.deleteByPrefix('solution:list:')
-  return result
+  cache.deleteByPrefix('solution:list')
+  return {
+    ...result,
+    author: result.author
+      ? { ...result.author, avatar: sanitizeAvatarUrl(result.author.avatar) }
+      : result.author,
+  }
 }
 
 /**
@@ -269,7 +295,7 @@ export async function getSolutionDetailWithPermission(
   return {
     found: true as const,
     allowed: true,
-    solution,
+    solution: sanitizeSolutionAuthor(solution),
     permission,
   }
 }
@@ -357,7 +383,7 @@ export async function deleteUserSolution(
   await prisma.solution.delete({ where: { id } })
   clearSolutionCache(id)
   // LOGIC-10: 补清列表缓存，避免列表仍展示已删除的题解
-  cache.deleteByPrefix('solution:list:')
+  cache.deleteByPrefix('solution:list')
 }
 
 /**

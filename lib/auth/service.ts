@@ -6,6 +6,7 @@ import 'server-only'
 
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export interface AuthUserInfo {
   id: string
@@ -37,7 +38,7 @@ export async function findUserById(userId: string): Promise<AuthUserInfo | null>
       id: u.id,
       username: u.username,
       nickname: u.nickname,
-      avatar: u.avatar,
+      avatar: sanitizeAvatarUrl(u.avatar),
       role: u.role || 'STUDENT',
       email: u.email,
     } satisfies AuthUserInfo

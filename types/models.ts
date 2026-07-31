@@ -44,7 +44,6 @@ export interface Problem {
   totalSubmit: number
   totalAccepted: number
   authorId: string
-  classId: string | null
   stdCode: string | null
   stdLang: string | null
   createdAt: string
@@ -176,7 +175,6 @@ export interface ClassMember {
 }
 
 export interface ClassPermissions {
-  canViewProblems: boolean
   canSubmit: boolean
   canViewNotes: boolean
   canCreateNotes: boolean

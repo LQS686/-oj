@@ -47,12 +47,21 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
 export async function getUserStats(userId: string) {
   return cache.get('user:stats', [userId], async () => {
-    const [solved, submissions, contests] = await Promise.all([
-      prisma.submission.count({ where: { userId, status: 'AC' } }),
+    const [solvedDistinct, submissions, contests, user] = await Promise.all([
+      prisma.submission.findMany({
+        where: { userId, status: 'AC' },
+        distinct: ['problemId'],
+        select: { problemId: true },
+      }),
       prisma.submission.count({ where: { userId } }),
       prisma.contestParticipant.count({ where: { userId } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { solvedCount: true } }),
     ])
-    return { solved, submissions, contests }
+    return {
+      solved: user?.solvedCount ?? solvedDistinct.length,
+      submissions,
+      contests,
+    }
   }, { ttl: 30_000 })
 }
 

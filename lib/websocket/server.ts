@@ -285,7 +285,11 @@ export function initWebSocketServer(httpServer: HTTPServer) {
           socket.emit('error', { event: 'leave', message: '缺少 userId 参数' })
           return
         }
-        
+        if (client.userId !== userId) {
+          socket.emit('error', { event: 'leave', message: '只能离开自己的房间' })
+          return
+        }
+
         const roomName = `user:${userId}`
         socket.leave(roomName)
         logger.info(`👋 用户 ${userId} 离开房间: ${roomName}`)

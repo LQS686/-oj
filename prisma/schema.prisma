@@ -111,12 +111,11 @@ model Problem {
   comparisonMode String     @default("default") // 输出比较模式：default/strict/ignore-spaces/real-number/special-judge
   realPrecision Int         @default(3) // 浮点数比较精度（小数位数），仅 real-number 模式生效
   isPublic      Boolean     @default(false)
-  visibility    String      @default("public") // 'public', 'private', 'contest'
+  visibility    String      @default("public") // 'public' | 'private'(后台隐藏草稿) | 'contest'
   totalSubmit   Int         @default(0)
   totalAccepted Int         @default(0)
   authorId      String      @db.ObjectId
   author        User        @relation(fields: [authorId], references: [id])
-  classId       String?     @db.ObjectId // 关联班级ID (如果是班级私有题目)
   
   // 标程（用于验证数据）
   stdCode       String?
@@ -142,7 +141,6 @@ model Problem {
   @@index([difficulty])
   @@index([visibility])
   @@index([authorId])
-  @@index([classId])
 }
 
 // 测试用例
@@ -278,7 +276,6 @@ model Class {
   assignments ClassAssignment[]
   notes       ClassNote[]
   directInvites ClassDirectInvite[]
-  trainings   Training[]
 }
 
 // 班级成员
@@ -291,8 +288,8 @@ model ClassMember {
   role      String   // owner | assistant | student
   remark    String?  // 成员备注
 
-  // 细粒度权限控制
-  permissions Json?    @default("{\"canViewProblems\":true,\"canSubmit\":true,\"canViewNotes\":true,\"canCreateNotes\":false,\"canManageAssignments\":false,\"canInviteMembers\":false}")
+  // 细粒度权限控制（题目统一走平台题库，无班级题库权限位）
+  permissions Json?    @default("{\"canSubmit\":true,\"canViewNotes\":true,\"canCreateNotes\":false,\"canManageAssignments\":false,\"canInviteMembers\":false}")
 
   // 活动统计
   lastActiveAt DateTime? // 最后活动时间
@@ -506,10 +503,6 @@ model Training {
   categoryId    String?           @db.ObjectId
   category      TrainingCategory? @relation(fields: [categoryId], references: [id])
 
-  // 班级私有题单：classId 不为空时仅在所属班级可见
-  classId       String?           @db.ObjectId
-  class         Class?            @relation(fields: [classId], references: [id], onDelete: Cascade)
-
   problems      TrainingProblem[]
   enrollments   TrainingEnrollment[]
 
@@ -518,7 +511,6 @@ model Training {
   @@index([categoryId])
   @@index([categoryType])
   @@index([authorId])
-  @@index([classId])
 }
 
 // 题单分类

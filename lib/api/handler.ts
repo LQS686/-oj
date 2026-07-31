@@ -9,6 +9,7 @@ import 'server-only'
 
 import { prisma } from '@/lib/prisma'
 import { isRedisConfigured } from '@/lib/redis'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export interface ApiContext<P = Record<string, string>> {
   params: P
@@ -117,7 +118,7 @@ export async function getCachedUser(
     id: dbUser.id,
     username: dbUser.username,
     nickname: dbUser.nickname,
-    avatar: dbUser.avatar,
+    avatar: sanitizeAvatarUrl(dbUser.avatar),
     role: dbUser.role || 'STUDENT',
     email: dbUser.email,
     tokenVersion: dbUser.tokenVersion,
@@ -131,6 +132,34 @@ export async function getCachedUser(
   }
   userCache.set(userId, { value, expiry: Date.now() + 60_000, cachedAt: Date.now() })
   return value
+}
+
+/**
+ * 从请求解析经 tokenVersion/ban 校验的查看者。
+ * 用于 withApi.public 路由中的「软登录」个性化，避免仅 verifyToken。
+ */
+export async function resolveViewerFromRequest(
+  req: { headers: Headers; cookies?: { get: (name: string) => { value: string } | undefined } }
+): Promise<{ user: AuthUser; tokenVersion: number } | null> {
+  const { getUserFromRequest } = await import('@/lib/auth')
+  const session = getUserFromRequest(req as Parameters<typeof getUserFromRequest>[0])
+  if (!session) return null
+  const user = await getCachedUser(session.userId, session.tokenVersion)
+  if (!user) return null
+  return { user, tokenVersion: session.tokenVersion }
+}
+
+/** SSR：从 Cookie 解析经 tokenVersion/ban 校验的查看者 */
+export async function resolveViewerFromCookies(): Promise<AuthUser | null> {
+  const { cookies } = await import('next/headers')
+  const { verifyToken } = await import('@/lib/auth')
+  const { readAuthTokenFromCookieStore } = await import('@/lib/auth/cookie')
+  const cookieStore = await cookies()
+  const token = readAuthTokenFromCookieStore(cookieStore)
+  if (!token) return null
+  const session = verifyToken(token)
+  if (!session) return null
+  return getCachedUser(session.userId, session.tokenVersion)
 }
 
 /**

@@ -7,7 +7,6 @@ import { isObjectId } from '@/lib/api/validation'
 import {
   findClassAssignment,
   getCurrentClassMember,
-  getUserCanManageContent,
   listAssignmentSubmissions,
 } from '@/lib/class/service'
 import { isClassAdminApiRole } from '@/lib/class/roles'
@@ -31,10 +30,9 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
     limit?: string
   }>(req)
 
-  // 判断是否为管理员（系统管理员 / 班级 owner / 班级 assistant）
-  const canManageContent = await getUserCanManageContent(user.id)
+  // 仅班级 staff 可看他人提交/代码；系统 TEACHER 以学生身份加入时不得越权
   const isClassStaff = isClassAdminApiRole(memberRole)
-  const isAdmin = canManageContent || isClassStaff
+  const isAdmin = isClassStaff
 
   // 非管理员强制 userId = user.id，仅能查看自己的提交
   let effectiveUserId = q.userId

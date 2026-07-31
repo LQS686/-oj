@@ -121,7 +121,7 @@ async function handleAvatarChunkDirect(req: IncomingMessage, res: ServerResponse
   if (!assertWriteSecurityRaw(req, res)) return true
 
   // 独立限流：绕过 Next middleware，需在此单独限制分片上传频率
-  const clientIp = getClientIPFromHeaders(req.headers)
+  const clientIp = getClientIPFromHeaders(req.headers, req.socket?.remoteAddress)
   const rl = await checkRateLimit(`avatar-chunk:${clientIp}`, {
     maxRequests: 60,
     windowMs: 60_000,
@@ -569,7 +569,8 @@ app.prepare().then(async () => {
       import('./lib/redis'),
       import('./lib/prisma'),
       import('./lib/mongodb/client'),
-    ]).then(([{ judgeQueue }, { disposeWorker }, { getRedisClient }, { prisma }, { closeMongoClient }]) => {
+      import('./lib/rate-limit'),
+    ]).then(([{ judgeQueue }, { disposeWorker }, { getRedisClient }, { prisma }, { closeMongoClient }, { destroyMemoryRateLimitStore }]) => {
       const tasks: Promise<void>[] = [
         // 1. 停止接收新请求，等待 in-flight 请求结束
         new Promise<void>((resolve) => {
@@ -604,6 +605,15 @@ app.prepare().then(async () => {
             logger.info('评测 Worker 定时器已清理')
           } catch (e) {
             logger.error('清理评测 Worker 定时器失败', e)
+          }
+        }),
+        // 4b. 清理内存限流定时器
+        Promise.resolve().then(() => {
+          try {
+            destroyMemoryRateLimitStore()
+            logger.info('内存限流 Store 已清理')
+          } catch (e) {
+            logger.error('清理内存限流 Store 失败', e)
           }
         }),
         // 5. 关闭 Redis 连接

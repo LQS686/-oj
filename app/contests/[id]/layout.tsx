@@ -1,10 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import ContestHeaderShell from './ContestHeaderShell'
-import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/auth'
-import { readAuthTokenFromCookieStore } from '@/lib/auth/cookie'
-import { canManageContent } from '@/lib/permissions'
+import { resolveViewerFromCookies } from '@/lib/api/withApi'
+import { canAccessAdmin } from '@/lib/permissions'
 import { formatPageDocumentTitle } from '@/lib/page-titles'
 import type { Metadata } from 'next'
 
@@ -16,79 +14,102 @@ export async function generateMetadata({
   const { id } = await params
   const contest = await prisma.contest.findUnique({
     where: { id },
-    select: { title: true },
+    select: { title: true, isPublic: true, authorId: true },
   })
+  if (!contest) {
+    return { title: formatPageDocumentTitle('竞赛详情') }
+  }
+  if (!contest.isPublic) {
+    const viewer = await resolveViewerFromCookies()
+    const isAuthor = !!viewer && viewer.id === contest.authorId
+    const isAdmin = canAccessAdmin(viewer)
+    let isRegistered = false
+    if (viewer && !isAuthor && !isAdmin) {
+      const p = await prisma.contestParticipant.findUnique({
+        where: { contestId_userId: { contestId: id, userId: viewer.id } },
+        select: { id: true },
+      })
+      isRegistered = !!p
+    }
+    if (!isAuthor && !isAdmin && !isRegistered) {
+      return { title: formatPageDocumentTitle('竞赛详情') }
+    }
+  }
   return {
-    title: formatPageDocumentTitle(contest?.title?.trim() || '竞赛详情'),
+    title: formatPageDocumentTitle(contest.title?.trim() || '竞赛详情'),
   }
 }
 
 export default async function ContestLayout({
- children,
- params
+  children,
+  params,
 }: {
- children: React.ReactNode
- params: Promise<{ id: string }>
+  children: React.ReactNode
+  params: Promise<{ id: string }>
 }) {
- const { id } = await params
- 
- const contest = await prisma.contest.findUnique({
- where: { id },
- select: {
- id: true,
- title: true,
- startTime: true,
- endTime: true,
- type: true,
- isPublic: true // Add isPublic
- }
- })
+  const { id } = await params
 
- if (!contest) {
- notFound()
- }
+  const contest = await prisma.contest.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      startTime: true,
+      endTime: true,
+      type: true,
+      isPublic: true,
+      authorId: true,
+    },
+  })
 
- // Permission check
- let canViewDetails = false
- const now = new Date()
- const isEnded = now > contest.endTime
- const isStarted = now >= contest.startTime
- 
- const cookieStore = await cookies()
- const token = readAuthTokenFromCookieStore(cookieStore)
- let user = null
- if (token) {
- user = verifyToken(token)
- }
+  if (!contest) {
+    notFound()
+  }
 
- if (user && canManageContent({ role: user.role })) {
- canViewDetails = true
- } else {
- // 1. Not Started -> False (Already default)
- 
- // 2. Ended & Public & LoggedIn -> True
- if (isEnded && contest.isPublic && user) {
- canViewDetails = true
- }
- // 3. Registered & Started -> True
- else if (user) {
- const participant = await prisma.contestParticipant.findUnique({
- where: {
- contestId_userId: {
- contestId: id,
- userId: user.userId
- }
- }
- })
- if (participant && isStarted) {
- canViewDetails = true
- }
- }
- }
+  const viewer = await resolveViewerFromCookies()
+  const now = new Date()
+  const isEnded = now > contest.endTime
+  const isStarted = now >= contest.startTime
 
- return (
- <ContestHeaderShell contest={contest} canViewDetails={canViewDetails}>
- {children}
- </ContestHeaderShell>
- )
+  let isRegistered = false
+  if (viewer) {
+    const participant = await prisma.contestParticipant.findUnique({
+      where: {
+        contestId_userId: {
+          contestId: id,
+          userId: viewer.id,
+        },
+      },
+      select: { id: true },
+    })
+    isRegistered = !!participant
+  }
+
+  // 非公开竞赛：仅作者 / 管理员 / 已报名可见（与 API 一致）
+  if (!contest.isPublic) {
+    const isAuthor = !!viewer && viewer.id === contest.authorId
+    const isAdmin = canAccessAdmin(viewer)
+    if (!isAuthor && !isAdmin && !isRegistered) {
+      notFound()
+    }
+  }
+
+  let canViewDetails = false
+  if (viewer && canAccessAdmin(viewer)) {
+    canViewDetails = true
+  } else if (viewer && viewer.id === contest.authorId) {
+    canViewDetails = true
+  } else if (isEnded && contest.isPublic && viewer) {
+    canViewDetails = true
+  } else if (viewer && isRegistered && isStarted) {
+    canViewDetails = true
+  }
+
+  const { authorId: _authorId, ...shellContest } = contest
+
+  return (
+    <ContestHeaderShell contest={shellContest} canViewDetails={canViewDetails}>
+      {children}
+    </ContestHeaderShell>
+  )
 }

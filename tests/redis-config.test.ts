@@ -1,21 +1,22 @@
 /**
  * tests/redis-config.test.ts
  * isRedisConfigured：多实例 cache / rate-limit 是否启用 Redis 的开关
+ *
+ * 注意：只测开关函数；勿在本文件触发 getRedisClient / redisCache（会连真 Redis）。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 describe('isRedisConfigured', () => {
   beforeEach(() => {
     vi.resetModules()
-    vi.stubEnv('REDIS_URL', '')
   })
 
   afterEach(() => {
     vi.unstubAllEnvs()
-    vi.resetModules()
   })
 
   it('未设置 REDIS_URL 时返回 false', async () => {
+    vi.stubEnv('REDIS_URL', '')
     const { isRedisConfigured } = await import('../lib/redis')
     expect(isRedisConfigured()).toBe(false)
   })

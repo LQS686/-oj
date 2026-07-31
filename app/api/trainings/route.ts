@@ -4,15 +4,13 @@
  * GET  公开：分页查询（仅公开、已发布）
  * POST 鉴权：仅管理员可创建（普通用户请通过后台管理页面）
  */
-import { withApi, ok, readJson, readQuery, throw400, throw403 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, readQuery, throw400, throw403, resolveViewerFromRequest } from '@/lib/api/withApi'
 import {
   createTrainingWithProblems,
   listPublicTrainingsAdvanced,
 } from '@/lib/training/service'
 import { toInt } from '@/lib/api/validation'
 import type { TrainingCategoryType } from '@/lib/training/types'
-import { verifyToken } from '@/lib/auth'
-import { readAuthTokenFromRequest } from '@/lib/auth/cookie'
 import { canAccessAdmin } from '@/lib/permissions'
 
 export const GET = withApi.public(async (req) => {
@@ -33,9 +31,8 @@ export const GET = withApi.public(async (req) => {
   if (limit < 1) limit = 20
   if (limit > 50) limit = 50
 
-  // 选登用户：解析 token 拿到 userId（未登录亦可）
-  const token = readAuthTokenFromRequest(req)
-  const userId = token ? verifyToken(token)?.userId ?? null : null
+  const viewer = await resolveViewerFromRequest(req)
+  const userId = viewer?.user.id ?? null
 
   const data = await listPublicTrainingsAdvanced(page, limit, {
     keyword: q.keyword,

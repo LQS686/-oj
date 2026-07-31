@@ -1,15 +1,6 @@
-/**
- * /api/contests/[id]/submissions - 竞赛代码提交 + 提交列表
- *
- * POST   提交竞赛代码（需登录）
- * GET    获取竞赛提交列表（按访问权限）
- *
- * 迁移到 withApi 中间件模式
- */
-import { withApi, ok, readJson, readQuery, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, readQuery, throw400, resolveViewerFromRequest } from '@/lib/api/withApi'
 import { isObjectId, toInt } from '@/lib/api/validation'
 import { canAccessAdmin } from '@/lib/permissions'
-import { getUserFromRequest } from '@/lib/auth'
 import { checkContestAccess } from '@/lib/contest-auth'
 import {
   submitContestCode,
@@ -40,20 +31,38 @@ export const GET = withApi.public(async (req, ctx) => {
   const { id: contestId } = ctx.params
   if (!isObjectId(contestId)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  // 验证访问权限
-  const currentUser = getUserFromRequest(req)
-  const access = await checkContestAccess(contestId!, currentUser, req)
+  const viewer = await resolveViewerFromRequest(req)
+  const currentUser = viewer?.user ?? null
+  const jwtForAccess = viewer
+    ? {
+        userId: viewer.user.id,
+        role: viewer.user.role,
+        email: '',
+        username: '',
+        tokenVersion: viewer.tokenVersion,
+      }
+    : null
+
+  const access = await checkContestAccess(contestId!, jwtForAccess, req)
   if (!access.allowed) {
     const { fail } = await import('@/lib/api/response')
     return fail('FORBIDDEN', access.error || '禁止访问', access.status || 403)
   }
 
   const q = readQuery<{ page?: string; limit?: string; userId?: string; problemId?: string }>(req)
+  const bypassSeal =
+    !!currentUser &&
+    (canAccessAdmin(currentUser) || access.contest?.authorId === currentUser.id)
+
   const result = await listContestSubmissionsPaged(contestId!, {
     page: toInt(q.page, 'page', 1),
     limit: toInt(q.limit, 'limit', 20),
-    userId: q.userId,
+    userId:
+      bypassSeal || (q.userId && currentUser?.id === q.userId) ? q.userId : undefined,
     problemId: q.problemId,
+    viewerUserId: currentUser?.id,
+    viewerRole: currentUser?.role,
+    viewerBypassSeal: bypassSeal,
   })
   return ok(result)
 })

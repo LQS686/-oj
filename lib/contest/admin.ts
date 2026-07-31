@@ -39,9 +39,14 @@ export async function adminUpdateContest(
     isPublic,
   }
 
-  // 仅在显式传入时更新密码；空串/null 表示清除，避免 undefined 被 ||null 误清
+  // 仅在显式传入时更新密码；空串/null 表示清除；明文写入前 bcrypt
   if (password !== undefined) {
-    updateData.password = password === '' || password === null ? null : password
+    if (password === '' || password === null) {
+      updateData.password = null
+    } else {
+      const bcrypt = (await import('bcryptjs')).default
+      updateData.password = await bcrypt.hash(password, 12)
+    }
   }
 
   if (startTime && endTime) {
@@ -92,16 +97,16 @@ export async function adminUpdateContest(
     if (problems.length > 0) {
       const found = await prisma.problem.findMany({
         where: { id: { in: problems } },
-        select: { id: true, visibility: true, classId: true },
+        select: { id: true, visibility: true },
       })
       if (found.length !== problems.length) {
         const foundIds = new Set(found.map((p) => p.id))
         const missing = problems.filter((id) => !foundIds.has(id))
         throw new ApiError('INVALID_PROBLEMS', `题目不存在: ${missing.slice(0, 5).join(', ')}`, 400)
       }
-      // 竞赛仅允许 public / contest 题；禁止 private 与班级私有题绕过可见性
+      // 竞赛仅允许 public / contest 题；禁止后台隐藏草稿绕过可见性
       const invalid = found.filter(
-        (p) => p.classId != null || (p.visibility !== 'public' && p.visibility !== 'contest')
+        (p) => p.visibility !== 'public' && p.visibility !== 'contest'
       )
       if (invalid.length > 0) {
         throw new ApiError(
@@ -120,7 +125,7 @@ export async function adminUpdateContest(
         data: problems.map((problemId: string, index: number) => ({
           contestId,
           problemId,
-          orderIndex: index + 1,
+          orderIndex: index,
           score: 100,
         })),
       })
@@ -132,7 +137,7 @@ export async function adminUpdateContest(
 }
 
 export async function adminGetContestWithProblems(contestId: string) {
-  return prisma.contest.findUnique({
+  const contest = await prisma.contest.findUnique({
     where: { id: contestId },
     include: {
       problems: {
@@ -149,6 +154,9 @@ export async function adminGetContestWithProblems(contestId: string) {
       },
     },
   })
+  if (!contest) return null
+  const { password: _pw, ...safe } = contest
+  return { ...safe, hasPassword: Boolean(_pw) }
 }
 
 export async function adminDeleteContest(contestId: string) {
@@ -170,7 +178,7 @@ export async function listAdminContests(opts?: { page?: number; pageSize?: numbe
     typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
   const take = usePaging ? (pageSize as number) : 100
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
-  return prisma.contest.findMany({
+  const rows = await prisma.contest.findMany({
     skip,
     take,
     orderBy: { startTime: 'desc' },
@@ -178,6 +186,10 @@ export async function listAdminContests(opts?: { page?: number; pageSize?: numbe
       author: { select: { username: true } },
       _count: { select: { problems: true, participants: true } },
     },
+  })
+  return rows.map((c) => {
+    const { password: _pw, ...safe } = c
+    return { ...safe, hasPassword: Boolean(_pw) }
   })
 }
 
@@ -206,19 +218,26 @@ export async function adminCreateContest(
     throw new ApiError('INVALID_TIME', '结束时间必须晚于开始时间', 400)
   }
 
-  // 封榜时间解析：空值/null 表示不封榜
+  // 封榜时间解析：空值/null 表示不封榜；非法或不在窗内直接抛错（与 update 对齐）
   let sealRankTime: Date | null = null
   if (input.sealRankTime) {
     const parsed = new Date(input.sealRankTime)
-    if (!isNaN(parsed.getTime())) {
-      // 封榜时间应在比赛时间范围内
-      if (parsed.getTime() > start.getTime() && parsed.getTime() < end.getTime()) {
-        sealRankTime = parsed
-      }
+    if (isNaN(parsed.getTime())) {
+      throw new ApiError('INVALID_SEAL_TIME', '封榜时间格式无效', 400)
     }
+    if (parsed.getTime() <= start.getTime() || parsed.getTime() >= end.getTime()) {
+      throw new ApiError('INVALID_SEAL_TIME', '封榜时间必须在比赛起止时间范围内', 400)
+    }
+    sealRankTime = parsed
   }
 
-  return prisma.contest.create({
+  let hashedPassword: string | null = null
+  if (input.password) {
+    const bcrypt = (await import('bcryptjs')).default
+    hashedPassword = await bcrypt.hash(input.password, 12)
+  }
+
+  const contest = await prisma.contest.create({
     data: {
       title: input.title,
       description: input.description,
@@ -227,7 +246,7 @@ export async function adminCreateContest(
       endTime: end,
       duration,
       isPublic: input.isPublic || false,
-      password: input.password || null,
+      password: hashedPassword,
       authorId,
       sealRankTime,
       problems: {
@@ -240,6 +259,9 @@ export async function adminCreateContest(
       },
     },
   })
+  // 响应不回传哈希密码
+  const { password: _pw, ...safe } = contest
+  return { ...safe, hasPassword: Boolean(_pw) }
 }
 
 /** 读竞赛信息（用于报名） */

@@ -50,10 +50,17 @@ export default function CreateAssignmentModal({
     description: '',
     startTime: defaultStartTime(),
     endTime: defaultEndTime(),
+    allowLateSubmission: false,
   })
 
   const resetForm = useCallback(() => {
-    setFormData({ title: '', description: '', startTime: defaultStartTime(), endTime: defaultEndTime() })
+    setFormData({
+      title: '',
+      description: '',
+      startTime: defaultStartTime(),
+      endTime: defaultEndTime(),
+      allowLateSubmission: false,
+    })
     setSelectedProblems([])
     setError('')
   }, [])
@@ -137,6 +144,7 @@ export default function CreateAssignmentModal({
           startTime: new Date(formData.startTime).toISOString(),
           endTime: new Date(formData.endTime).toISOString(),
           problemIds: selectedProblems,
+          allowLateSubmission: formData.allowLateSubmission,
         }),
       })
       const data = await response.json()
@@ -219,6 +227,22 @@ export default function CreateAssignmentModal({
               <p className="text-xs text-muted-foreground mt-1">超过此时间为逾期提交</p>
             </div>
           </div>
+          <label className="flex items-start gap-2.5 cursor-pointer rounded-lg border border-border bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={formData.allowLateSubmission}
+              onChange={(e) =>
+                setFormData({ ...formData, allowLateSubmission: e.target.checked })
+              }
+              className="mt-0.5"
+            />
+            <div className="flex-1">
+              <div className="text-sm font-medium text-foreground">允许逾期提交</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                开启后，作业结束后学生仍可提交，但提交记录会被标记为「逾期」。
+              </div>
+            </div>
+          </label>
         </div>
 
         <div className="px-5 py-3">

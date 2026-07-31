@@ -35,15 +35,24 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
   const member = await getCurrentClassMember(id, user.id)
   if (!classIsPublic && !member) throw403('无权访问该班级')
 
+  const { getClassMembership, hasClassPermission, isClassTeacher } = await import('@/lib/class/auth')
+  const membership = member ? await getClassMembership(id, user.id) : null
+  if (membership?.isStudent && !hasClassPermission(membership, 'canViewNotes')) {
+    throw403('当前账号无查看笔记权限')
+  }
+
   const q = readQuery<{ page?: string; pageSize?: string; category?: string; search?: string }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)
   const pageSize = Math.max(1, parseInt(q.pageSize || '20') || 20)
+  const isStaff = isClassTeacher(membership)
 
   const result = await listClassNotesPaged(id, {
     page,
     pageSize,
     category: q.category,
     search: q.search,
+    viewerUserId: user.id,
+    includePrivate: isStaff,
   })
   return ok(result)
 })

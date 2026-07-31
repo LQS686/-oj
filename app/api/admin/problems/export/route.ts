@@ -20,12 +20,21 @@ export const GET = withApi.admin(async (req, _ctx) => {
   const { searchParams } = new URL(req.url)
   const format = searchParams.get('format') || ''
 
-  // DSOJ 标准题包导出
+  // DSOJ 标准题包导出：必须指定 ids，避免全库打包 OOM
   if (format === 'dsoj') {
     const idsParam = searchParams.get('ids') || ''
     const problemIds = idsParam
-      ? idsParam.split(',').map(s => s.trim()).filter(Boolean)
-      : undefined
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (problemIds.length === 0) {
+      const { fail } = await import('@/lib/api/response')
+      return fail('MISSING_IDS', '题包导出请通过 ids 指定题目（逗号分隔）', 400)
+    }
+    if (problemIds.length > 200) {
+      const { fail } = await import('@/lib/api/response')
+      return fail('TOO_MANY_IDS', '单次题包导出最多 200 题', 400)
+    }
 
     const includeStdCode = searchParams.get('includeStdCode') !== 'false'
     const includeTestCases = searchParams.get('includeTestCases') !== 'false'
@@ -40,7 +49,6 @@ export const GET = withApi.admin(async (req, _ctx) => {
     })
 
     const dateStr = new Date().toISOString().split('T')[0]
-    // 用 Blob 包装 ZIP 字节流，避免 TS BodyInit 类型不兼容 Buffer/Uint8Array 的问题
     const zipBlob = new Blob([new Uint8Array(zipBuffer)], { type: 'application/zip' })
     return new Response(zipBlob, {
       headers: {
@@ -49,8 +57,16 @@ export const GET = withApi.admin(async (req, _ctx) => {
     })
   }
 
-  // 默认：CSV 报表导出（保持原行为）
+  // 默认：CSV 报表导出（硬顶 5000，可用 ids / limit 收窄）
+  const idsParam = searchParams.get('ids') || ''
+  const idFilter = idsParam
+    ? idsParam.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 5000)
+    : undefined
+  const limitRaw = parseInt(searchParams.get('limit') || '5000', 10)
+  const take = Math.min(5000, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 5000))
+
   const problems = await prisma.problem.findMany({
+    where: idFilter && idFilter.length > 0 ? { id: { in: idFilter } } : undefined,
     select: {
       id: true,
       title: true,
@@ -61,6 +77,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
       totalAccepted: true,
     },
     orderBy: { createdAt: 'desc' },
+    take,
   })
 
   // Generate CSV

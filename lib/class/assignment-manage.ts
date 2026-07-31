@@ -12,7 +12,7 @@ import {
 } from '@/lib/class/roles'
 import { ApiError } from '@/lib/api/errors'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
-import { getUserCanManageContent, validateAssignmentProblems } from './helpers'
+import { validateAssignmentProblems } from './helpers'
 import { getClassAssignmentDetail, getAssignmentStatus } from './assignment-stats'
 
 /* ============================================================================
@@ -59,7 +59,6 @@ export async function buildClassAssignmentDetail(
   const memberProgress = members
     .map((m) => {
       const us = submissions.filter((s) => s.userId === m.userId)
-      if (us.length === 0) return null
       const solved = new Set(us.filter((s) => s.status === 'AC').map((s) => s.problemId))
       const row: MemberProgressRow = {
         userId: m.userId,
@@ -78,13 +77,11 @@ export async function buildClassAssignmentDetail(
       }
       return row
     })
-    .filter((row): row is MemberProgressRow => row != null)
     .sort((a, b) => b.progress.solved - a.progress.solved)
 
   const userSubmissions = submissions.filter((s) => s.userId === viewerUserId)
   const viewerIsClassAdmin = isClassAdminApiRole(viewerRole)
-  const viewerCanManageContent = await getUserCanManageContent(viewerUserId)
-  const canViewAllSubmissions = viewerIsClassAdmin || viewerCanManageContent
+  const canViewAllSubmissions = viewerIsClassAdmin
 
   // 列表主键 = 主 Submission.id；assignmentSubmissionId 仅为作业记录元数据
   const assignmentSubmissionIds = submissions.map((s) => s.id)

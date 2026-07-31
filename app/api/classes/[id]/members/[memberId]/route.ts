@@ -9,6 +9,7 @@ import {
   readJson,
   throw400,
 } from '@/lib/api/withApi'
+import { ApiError } from '@/lib/api/errors'
 import { isObjectId } from '@/lib/api/validation'
 import {
   patchClassMember,
@@ -74,6 +75,21 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   const { id, memberId } = ctx.params
   if (!isObjectId(id) || !isObjectId(memberId)) {
     throw400('INVALID_ID', '无效的ID')
+  }
+
+  // 学生自退：允许删除自己（owner 不能退，须先转让）
+  if (memberId === user.id) {
+    const { getClassMembership } = await import('@/lib/class/auth')
+    const { isClassOwnerRole } = await import('@/lib/class/roles')
+    const self = await getClassMembership(id, user.id)
+    if (!self) {
+      throw new ApiError('NOT_FOUND', '你不是该班级成员', 404)
+    }
+    if (isClassOwnerRole(self.role)) {
+      throw400('OWNER_CANNOT_LEAVE', '班主任不能直接退出，请先转让班主任')
+    }
+    await removeClassMemberDirect(id, memberId)
+    return ok({ message: '已退出班级' })
   }
 
   const operator = await requireClassAdminRole(id, user.id)

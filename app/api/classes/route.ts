@@ -13,15 +13,15 @@ export const GET = withApi.public(async (req) => {
   const pageSize = Math.min(50, Math.max(1, parseInt(q.pageSize || '20') || 20))
   const myClasses = q.myClasses === 'true'
 
-  // myClasses 必须先登录
+  // myClasses 必须先登录（经 tokenVersion/ban）
   let userId: string | undefined
   if (myClasses) {
-    const { getUserFromRequest } = await import('@/lib/auth')
-    const session = getUserFromRequest(req)
-    if (session === null || session.userId === undefined) {
+    const { resolveViewerFromRequest } = await import('@/lib/api/withApi')
+    const viewer = await resolveViewerFromRequest(req)
+    if (!viewer) {
       throw400('UNAUTHORIZED', '请先登录')
     } else {
-      userId = session.userId
+      userId = viewer.user.id
     }
   }
 

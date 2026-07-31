@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import {
   Upload, X, Plus, FileText, AlertCircle, CheckCircle, Loader2, Download, Users,
 } from 'lucide-react'
-import { fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie, ensureCsrfToken } from '@/lib/api/base'
 import { useDialog } from '@/components/common/DialogProvider'
 import CreateModalShell from '@/components/common/CreateModalShell'
 import type { BatchUser, BatchResult } from '../_utils'
@@ -272,8 +272,9 @@ export function BatchRegisterModal({
       }
 
       xhr.open('POST', '/api/admin/users/batch-register')
-      // Token 通过 httpOnly cookie 自动携带（xhr.withCredentials = true）
       xhr.withCredentials = true
+      const csrf = await ensureCsrfToken()
+      xhr.setRequestHeader('X-CSRF-Token', csrf)
       xhr.send(formData)
     } catch {
       await dialog.alert({ tone: 'error', message: '网络错误' })

@@ -86,7 +86,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const fetchNotificationList = useCallback(async () => {
     try {
-      const response = await fetchWithCookie('/api/notifications?limit=10')
+      const response = await fetchWithCookie('/api/notifications?pageSize=10')
       const data = await response.json()
       if (data.success) {
         setNotifications(data.data?.notifications || data.data?.items || [])

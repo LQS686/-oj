@@ -90,6 +90,13 @@ async function safeCall(
     errorCode,
   })
   try {
+    // fail-closed：database/system/auth 触发 block 后拒绝新请求
+    const { errorMonitor } = await import('@/lib/error-monitor')
+    for (const key of ['database', 'system', 'auth'] as const) {
+      if (await errorMonitor.isBlockedAsync(key)) {
+        return fail('SERVICE_UNAVAILABLE', '服务暂时不可用，请稍后重试', 503)
+      }
+    }
     const result = await fn()
     if (result instanceof Response) return result
     // 路由函数直接返回数据时，自动包装为 ok()
@@ -118,6 +125,17 @@ async function safeCall(
       method: req.method,
       stack: e.stack,
     })
+    // 驱动 error-monitor 熔断：Prisma 码 → database，其余未预期 → system
+    try {
+      const { errorMonitor } = await import('@/lib/error-monitor')
+      const prismaCode = typeof e.code === 'string' && /^P\d{4}$/.test(e.code)
+      void errorMonitor.trackError(err instanceof Error ? err : new Error(String(e.message || err)), {
+        errorType: prismaCode ? 'database' : 'system',
+        operation: errorCode,
+      })
+    } catch {
+      // 监控失败不影响响应
+    }
     return serverError('服务器错误')
   } finally {
     logger.clearContext()
@@ -318,5 +336,5 @@ export function readQuery<T = Record<string, string>>(req: NextRequest): T {
 /* ============================================================================
  * 从 lib/api/handler.ts / response.ts 重新导出
  * ========================================================================== */
-export { getCachedUser, clearAuthUserCache } from './handler'
+export { getCachedUser, clearAuthUserCache, resolveViewerFromRequest, resolveViewerFromCookies } from './handler'
 export { fail, ok, serverError, unauthorized, forbidden, notFound, badRequest, conflict, tooManyRequests } from './response'

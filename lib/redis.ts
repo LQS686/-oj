@@ -178,5 +178,20 @@ class RedisCache {
   }
 }
 
-// 导出单例实例
-export const redisCache = new RedisCache()
+// 懒加载单例：避免仅 import isRedisConfigured 时就连 Redis（测试 / middleware 冷启动）
+let redisCacheSingleton: RedisCache | null = null
+
+function getRedisCache(): RedisCache {
+  if (!redisCacheSingleton) {
+    redisCacheSingleton = new RedisCache()
+  }
+  return redisCacheSingleton
+}
+
+export const redisCache: RedisCache = new Proxy({} as RedisCache, {
+  get(_target, prop, receiver) {
+    const instance = getRedisCache()
+    const value = Reflect.get(instance as object, prop, receiver)
+    return typeof value === 'function' ? value.bind(instance) : value
+  },
+})

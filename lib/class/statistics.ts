@@ -74,12 +74,22 @@ export async function computeClassStatistics(
     prisma.classMember.count({ where: { classId } }),
     prisma.classMember.groupBy({ by: ['role'], where: { classId }, _count: true }),
     Promise.all([
-      prisma.classAssignmentSubmission.count({ where: { assignment: { classId } } }),
       prisma.classAssignmentSubmission.count({
-        where: { assignment: { classId }, submittedAt: { gte: todayStart } },
+        where: { assignment: { classId }, status: { not: 'REMOVED' } },
       }),
       prisma.classAssignmentSubmission.count({
-        where: { assignment: { classId }, submittedAt: { gte: weekStart } },
+        where: {
+          assignment: { classId },
+          status: { not: 'REMOVED' },
+          submittedAt: { gte: todayStart },
+        },
+      }),
+      prisma.classAssignmentSubmission.count({
+        where: {
+          assignment: { classId },
+          status: { not: 'REMOVED' },
+          submittedAt: { gte: weekStart },
+        },
       }),
     ]),
     (async () => {
@@ -98,14 +108,22 @@ export async function computeClassStatistics(
     Promise.all([
       prisma.classAssignmentSubmission
         .findMany({
-          where: { assignment: { classId }, submittedAt: { gte: sevenDaysAgo } },
+          where: {
+            assignment: { classId },
+            status: { not: 'REMOVED' },
+            submittedAt: { gte: sevenDaysAgo },
+          },
           select: { userId: true },
           distinct: ['userId'],
         })
         .then((s) => s.length),
       prisma.classAssignmentSubmission
         .findMany({
-          where: { assignment: { classId }, submittedAt: { gte: thirtyDaysAgo } },
+          where: {
+            assignment: { classId },
+            status: { not: 'REMOVED' },
+            submittedAt: { gte: thirtyDaysAgo },
+          },
           select: { userId: true },
           distinct: ['userId'],
         })

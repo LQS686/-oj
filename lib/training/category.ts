@@ -5,6 +5,7 @@
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { categoriesKey, TRAINING_LIST_TTL } from './crud'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 import type { TrainingCategory } from './types'
 
 /* ============================================================================
@@ -14,7 +15,11 @@ import type { TrainingCategory } from './types'
 export async function listRecommendedTrainings(limit = 3, userId: string | null = null) {
   return cache.get('training:recommended', [limit, userId || 'guest'], async () => {
     const trainings = await prisma.training.findMany({
-      where: { isPublic: true, status: 'published', isRecommended: true },
+      where: {
+        isPublic: true,
+        status: 'published',
+        isRecommended: true,
+      },
       take: limit,
       orderBy: { updatedAt: 'desc' },
       include: {
@@ -34,7 +39,9 @@ export async function listRecommendedTrainings(limit = 3, userId: string | null 
       joinCount: t.joinCount,
       viewCount: t.viewCount,
       problemCount: t._count.problems,
-      author: t.author,
+      author: t.author
+        ? { ...t.author, avatar: sanitizeAvatarUrl(t.author.avatar) }
+        : t.author,
       category: t.category,
       createdAt: t.createdAt,
     }))

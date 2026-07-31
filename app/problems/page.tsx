@@ -73,7 +73,7 @@ export default function ProblemsPage() {
   const fetchProblems = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetchWithCookie(`/api/problems?page=${page}&limit=30`)
+      const response = await fetchWithCookie(`/api/problems?page=${page}&pageSize=30`)
       const data = await response.json()
 
       if (data.success) {

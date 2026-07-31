@@ -79,13 +79,15 @@ export async function createTraining(data: Prisma.TrainingUncheckedCreateInput) 
 
 export async function updateTraining(id: string, data: Prisma.TrainingUncheckedUpdateInput) {
   cache.delete(byIdKey(id))
-  cache.deleteByPrefix('training:list:')
+  cache.deleteByPrefix('training:list')
+  cache.deleteByPrefix('training:recommended')
   return prisma.training.update({ where: { id }, data })
 }
 
 export async function deleteTraining(id: string) {
   cache.delete(byIdKey(id))
-  cache.deleteByPrefix('training:list:')
+  cache.deleteByPrefix('training:list')
+  cache.deleteByPrefix('training:recommended')
   // 级联删除关联表（Prisma 关系未设 onDelete: Cascade，需手动）
   return prisma.$transaction([
     prisma.trainingProblem.deleteMany({ where: { trainingId: id } }),

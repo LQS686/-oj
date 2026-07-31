@@ -12,6 +12,7 @@ import {
 import type { JudgeStatusData } from '@/types/models'
 import type { SubmissionResultData } from '@/components/submission/SubmissionResultModal'
 import type { SubmissionListRow } from '@/hooks/useSubmissionResultFlow'
+import { fetchWithCookie } from '@/lib/api/base'
 
 export interface TrainingProblemItem {
   id: string
@@ -104,7 +105,7 @@ export function TrainingProblemWorkspaceProvider({
 
   const refreshTrainingProblems = useCallback(async () => {
     try {
-      const res = await fetch(`/api/trainings/${trainingId}/problem-list`, { cache: 'no-store' })
+      const res = await fetchWithCookie(`/api/trainings/${trainingId}/problem-list`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success && Array.isArray(data.data?.problems)) {
         setTrainingProblems(data.data.problems)

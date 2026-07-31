@@ -74,7 +74,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  const response = await fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`)
  const data = await response.json()
  if (data.success) {
- setAssignment(data.data)
+ setAssignment(data.data?.assignment ?? data.data)
  }
  } catch (error) {
  logger.error('获取作业信息失败', error)

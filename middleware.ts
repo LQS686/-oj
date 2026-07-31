@@ -20,6 +20,7 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/solutions': { maxRequests: 10, windowMs: 60000 },
   '/api/classes': { maxRequests: 20, windowMs: 60000 },
   '/api/search': { maxRequests: 30, windowMs: 60000 },
+  '/api/users/profile/password': { maxRequests: 5, windowMs: 60000 },
 }
 
 /**
@@ -29,6 +30,8 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
  */
 const REGEX_RATE_LIMITS: { pattern: RegExp; config: { maxRequests: number; windowMs: number } }[] = [
   { pattern: /^\/api\/contests\/[^/]+\/register$/, config: { maxRequests: 10, windowMs: 60000 } },
+  // 管理写操作加严：默认 100/min 对批处理过松
+  { pattern: /^\/api\/admin(?:\/|$)/, config: { maxRequests: 30, windowMs: 60000 } },
 ]
 
 /**
@@ -88,7 +91,7 @@ export async function middleware(request: NextRequest) {
   logger.setContext({ requestId })
 
   // 拦截 /admin/* 页面路由（不含 /api/admin/*）：
-  // 基于 JWT payload 中的 role 判定，仅 SYSTEM_ADMIN 和 ADMIN 可放行；
+  // 校验 JWT + tokenVersion/ban（getCachedUser），再用 DB 中的 role 判定；
   // 系统设置 / 系统公告等路径另需 SYSTEM_ADMIN。
   // /api/admin/* 由 API 路由的 withApi.admin / withApi.systemAdmin 处理，此处不拦截。
   if (pathname.startsWith('/admin') && !pathname.startsWith('/api/')) {
@@ -100,12 +103,21 @@ export async function middleware(request: NextRequest) {
       redirect.headers.set('x-request-id', requestId)
       return redirect
     }
-    if (!canAccessAdmin({ role: payload.role })) {
+    const { getCachedUser } = await import('@/lib/api/handler')
+    const user = await getCachedUser(payload.userId, payload.tokenVersion)
+    if (!user) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      const redirect = NextResponse.redirect(loginUrl)
+      redirect.headers.set('x-request-id', requestId)
+      return redirect
+    }
+    if (!canAccessAdmin({ role: user.role })) {
       const redirect = NextResponse.redirect(new URL('/403', request.url))
       redirect.headers.set('x-request-id', requestId)
       return redirect
     }
-    if (isSystemAdminOnlyPath(pathname) && !isSystemAdmin({ role: payload.role })) {
+    if (isSystemAdminOnlyPath(pathname) && !isSystemAdmin({ role: user.role })) {
       const redirect = NextResponse.redirect(new URL('/403', request.url))
       redirect.headers.set('x-request-id', requestId)
       return redirect

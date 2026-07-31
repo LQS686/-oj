@@ -16,20 +16,34 @@ export async function enrollTraining(trainingId: string, userId: string) {
     where: { trainingId_userId: { trainingId, userId } },
   })
   if (existing) return existing
-  const result = await prisma.$transaction(async (tx) => {
-    const enrollment = await tx.trainingEnrollment.create({
-      data: { trainingId, userId },
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const enrollment = await tx.trainingEnrollment.create({
+        data: { trainingId, userId },
+      })
+      await tx.training.update({
+        where: { id: trainingId },
+        data: { joinCount: { increment: 1 } },
+      })
+      return enrollment
     })
-    await tx.training.update({
-      where: { id: trainingId },
-      data: { joinCount: { increment: 1 } },
-    })
-    return enrollment
-  })
-  cache.delete(enrollmentKey(userId, trainingId))
-  cache.delete(userEnrollmentsKey(userId))
-  cache.deleteByPrefix('training:list:')
-  return result
+    cache.delete(enrollmentKey(userId, trainingId))
+    cache.delete(userEnrollmentsKey(userId))
+    cache.deleteByPrefix('training:list')
+    cache.deleteByPrefix('training:recommended')
+    return result
+  } catch (err: unknown) {
+    // 并发双加入：唯一约束冲突视为已加入
+    const code = (err as { code?: string })?.code
+    if (code === 'P2002') {
+      const again = await prisma.trainingEnrollment.findUnique({
+        where: { trainingId_userId: { trainingId, userId } },
+      })
+      if (again) return again
+    }
+    logger.error('enrollTraining failed', err instanceof Error ? err : new Error(String(err)))
+    throw err
+  }
 }
 
 export async function unenrollTraining(trainingId: string, userId: string) {
@@ -41,14 +55,15 @@ export async function unenrollTraining(trainingId: string, userId: string) {
     await tx.trainingEnrollment.delete({
       where: { trainingId_userId: { trainingId, userId } },
     })
-    await tx.training.update({
-      where: { id: trainingId },
-      data: { joinCount: { increment: -1 } },
+    await tx.training.updateMany({
+      where: { id: trainingId, joinCount: { gt: 0 } },
+      data: { joinCount: { decrement: 1 } },
     })
   })
   cache.delete(enrollmentKey(userId, trainingId))
   cache.delete(userEnrollmentsKey(userId))
-  cache.deleteByPrefix('training:list:')
+  cache.deleteByPrefix('training:list')
+  cache.deleteByPrefix('training:recommended')
   return existing
 }
 

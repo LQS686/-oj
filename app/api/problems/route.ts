@@ -1,10 +1,9 @@
 /**
  * 公共题库列表 / 创建
  * - GET  /api/problems  列表
- * - POST /api/problems  创建题目（管理员）
+ * - POST /api/problems  创建题目（仅管理员；与后台题库统一入口）
  */
-import { withApi, ok, readJson, readQuery, throw400, throw403, errorLike } from '@/lib/api/withApi'
-import { canManageContent } from '@/lib/permissions'
+import { withApi, ok, readJson, readQuery, throw400, errorLike } from '@/lib/api/withApi'
 import {
   createProblemWithTestcases,
   findProblemByTitle,
@@ -18,12 +17,20 @@ export const GET = withApi.public(async (req) => {
   const q = readQuery<{
     page?: string
     pageSize?: string
+    limit?: string
     search?: string
     difficulty?: string
     tag?: string
+    numbers?: string
   }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)
-  const pageSize = Math.min(50, Math.max(1, parseInt(q.pageSize || '20') || 20))
+  const pageSize = Math.min(
+    50,
+    Math.max(1, parseInt(q.pageSize || q.limit || '20') || 20)
+  )
+  const numbers = q.numbers
+    ? q.numbers.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean)
+    : undefined
 
   const result = await listPublicProblems({
     page,
@@ -31,13 +38,12 @@ export const GET = withApi.public(async (req) => {
     search: q.search,
     difficulty: q.difficulty,
     tag: q.tag,
+    numbers,
   })
   return ok(result)
 })
 
-export const POST = withApi.auth(async (req, _ctx, { user }) => {
-  if (!canManageContent(user)) throw throw403('无权限创建题目')
-
+export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const body = await readJson<{
     title?: string
     description?: string

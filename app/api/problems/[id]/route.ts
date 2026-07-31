@@ -27,7 +27,6 @@ export const GET = withApi.public(async (req, ctx) => {
       id: p.id,
       authorId: p.authorId,
       visibility: p.visibility,
-      classId: p.classId ?? null,
     },
     viewer,
     { contestId }

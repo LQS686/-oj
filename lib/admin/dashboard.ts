@@ -26,7 +26,6 @@ export interface DashboardData {
  * 仪表盘聚合数据：用户/题目/提交统计 + 增长率 + 最近 10 条提交
  */
 export async function computeAdminDashboard(now: Date = new Date()): Promise<DashboardData> {
-  // 总数（一次查询）
   const [totalUsers, totalProblems, totalSubmissions, recentSubmissionsRaw] = await Promise.all([
     prisma.user.count(),
     prisma.problem.count(),
@@ -44,45 +43,49 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
     }),
   ])
 
-  // 手动补全 user / problem 信息（避免 MongoDB include 触发 500）
-  const recentSubmissions: DashboardRecentSubmission[] = await Promise.all(
-    recentSubmissionsRaw.map(async (sub) => {
-      const [user, problem] = await Promise.all([
-        prisma.user.findUnique({
-          where: { id: sub.userId },
-          select: { username: true, nickname: true },
-        }),
-        prisma.problem.findUnique({
-          where: { id: sub.problemId },
-          select: { title: true, problemNumber: true },
-        }),
-      ])
-      return {
-        id: sub.id,
-        user: {
-          username: user?.nickname || user?.username || '未知用户',
-        },
-        problem: {
-          title: problem?.title || '题目已删除',
-          problemNumber: problem?.problemNumber || '',
-        },
-        status: sub.status,
-        submittedAt: sub.submittedAt,
-      }
-    })
-  )
+  // 批量补全 user / problem，避免 N+1
+  const userIds = [...new Set(recentSubmissionsRaw.map((s) => s.userId))]
+  const problemIds = [...new Set(recentSubmissionsRaw.map((s) => s.problemId))]
+  const [users, problems] = await Promise.all([
+    userIds.length > 0
+      ? prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, username: true, nickname: true },
+        })
+      : Promise.resolve([]),
+    problemIds.length > 0
+      ? prisma.problem.findMany({
+          where: { id: { in: problemIds } },
+          select: { id: true, title: true, problemNumber: true },
+        })
+      : Promise.resolve([]),
+  ])
+  const userMap = new Map(users.map((u) => [u.id, u]))
+  const problemMap = new Map(problems.map((p) => [p.id, p]))
 
-  // 今日 / 本周增量
+  const recentSubmissions: DashboardRecentSubmission[] = recentSubmissionsRaw.map((sub) => {
+    const user = userMap.get(sub.userId)
+    const problem = problemMap.get(sub.problemId)
+    return {
+      id: sub.id,
+      user: {
+        username: user?.nickname || user?.username || '未知用户',
+      },
+      problem: {
+        title: problem?.title || '题目已删除',
+        problemNumber: problem?.problemNumber || '',
+      },
+      status: sub.status,
+      submittedAt: sub.submittedAt,
+    }
+  })
+
   const today = new Date(now)
   today.setHours(0, 0, 0, 0)
   const lastWeek = new Date(now)
   lastWeek.setDate(lastWeek.getDate() - 7)
 
-  const [
-    todaySubmissions,
-    newUsersThisWeek,
-    newSubmissionsThisWeek,
-  ] = await Promise.all([
+  const [todaySubmissions, newUsersThisWeek, newSubmissionsThisWeek] = await Promise.all([
     prisma.submission.count({ where: { submittedAt: { gte: today } } }),
     prisma.user.count({ where: { createdAt: { gte: lastWeek } } }),
     prisma.submission.count({ where: { submittedAt: { gte: lastWeek } } }),

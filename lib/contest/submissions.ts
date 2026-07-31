@@ -16,6 +16,8 @@ import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { parseComparisonMode } from '@/lib/judge/types'
 import { mapTestCasesMeta, TESTCASE_META_SELECT } from '@/lib/judge/testcase-loader'
 import { CacheKeys } from '@/lib/constants/cache-keys'
+import { isContestSealed } from './rankings'
+import { canAccessAdmin } from '@/lib/permissions'
 
 /* ============================================================================
  * 竞赛提交列表（含 user/problem 关联）
@@ -26,6 +28,11 @@ export interface ListContestSubmissionsFilter {
   limit?: number
   userId?: string
   problemId?: string
+  /** 当前查看者（封榜裁剪 / 强制只看本人） */
+  viewerUserId?: string
+  viewerRole?: string
+  /** 是否为竞赛作者或站点管理员（可绕过封榜） */
+  viewerBypassSeal?: boolean
 }
 
 export async function listContestSubmissionsPaged(
@@ -34,14 +41,42 @@ export async function listContestSubmissionsPaged(
 ) {
   const page = filter.page ?? 1
   const limit = filter.limit ?? 20
+
+  const contest = await prisma.contest.findUnique({
+    where: { id: contestId },
+    select: {
+      sealRankTime: true,
+      sealUnlocked: true,
+      endTime: true,
+      authorId: true,
+    },
+  })
+
+  const bypassSeal =
+    !!filter.viewerBypassSeal ||
+    (!!filter.viewerRole && canAccessAdmin({ role: filter.viewerRole })) ||
+    (!!filter.viewerUserId && filter.viewerUserId === contest?.authorId)
+
+  const sealed = contest ? isContestSealed(contest) : false
+
   // 与榜单一致：排除管理员角色的旁路测试提交
   const where: Prisma.SubmissionWhereInput = {
     contestId,
     user: { role: { notIn: ['SYSTEM_ADMIN', 'ADMIN'] } },
   }
-  if (filter.userId) where.userId = filter.userId
   if (filter.problemId) where.problemId = filter.problemId
 
+  // 封榜期间普通用户：只能看自己的提交，且截断到 sealRankTime
+  if (sealed && !bypassSeal) {
+    if (filter.viewerUserId) {
+      where.userId = filter.viewerUserId
+    }
+    if (contest?.sealRankTime) {
+      where.submittedAt = { lte: contest.sealRankTime }
+    }
+  } else if (filter.userId) {
+    where.userId = filter.userId
+  }
   const [submissions, total] = await Promise.all([
     prisma.submission.findMany({
       where,
@@ -156,7 +191,6 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
       id: problem.id,
       authorId: problem.authorId,
       visibility: problem.visibility,
-      classId: problem.classId ?? null,
     },
     { id: input.userId, role: input.viewerRole },
     { contestId: input.contestId }

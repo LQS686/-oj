@@ -189,18 +189,23 @@ export default function CreateContestModal({
 
       if (data.success) {
         const foundProblems = (data.data.problems || []) as Problem[]
+        const requested = new Set(numbers.map((n) => n.toUpperCase()))
+        // 仅接受题号落在请求集合内的题目，防止 API 忽略 numbers 时误加整页
+        const matched = foundProblems.filter((p) =>
+          requested.has(String(p.problemNumber || '').toUpperCase())
+        )
         const newProblems: Problem[] = []
-        const foundNumbers = new Set(foundProblems.map(p => p.problemNumber))
+        const foundNumbers = new Set(matched.map((p) => p.problemNumber.toUpperCase()))
         const notFound: string[] = []
 
-        numbers.forEach(num => {
-          if (!foundNumbers.has(num)) {
+        numbers.forEach((num) => {
+          if (!foundNumbers.has(num.toUpperCase())) {
             notFound.push(num)
           }
         })
 
-        foundProblems.forEach(p => {
-          if (!contestProblems.find(cp => cp.id === p.id)) {
+        matched.forEach((p) => {
+          if (!contestProblems.find((cp) => cp.id === p.id)) {
             newProblems.push(p)
           }
         })

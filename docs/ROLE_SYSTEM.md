@@ -7,12 +7,12 @@
 
 系统采用四级固定角色，按权限从高到低排列：
 
-| 角色值           | 中文标签   | 说明                                                   |
-| ---------------- | ---------- | ------------------------------------------------------ |
-| `SYSTEM_ADMIN`   | 系统管理员 | 站点最高权限，唯一、不可剥夺/修改/删除                 |
-| `ADMIN`          | 管理员     | 除系统设置与系统公告外的后台功能                       |
-| `TEACHER`        | 教师       | 除后台管理外的所有前台内容管理功能                     |
-| `STUDENT`        | 学生       | 默认角色，仅参与能力（做题/参赛/加入班级）             |
+| 角色值         | 中文标签   | 说明                                       |
+| -------------- | ---------- | ------------------------------------------ |
+| `SYSTEM_ADMIN` | 系统管理员 | 站点最高权限，唯一、不可剥夺/修改/删除     |
+| `ADMIN`        | 管理员     | 除系统设置与系统公告外的后台功能           |
+| `TEACHER`      | 教师       | 除后台管理外的所有前台内容管理功能         |
+| `STUDENT`      | 学生       | 默认角色，仅参与能力（做题/参赛/加入班级） |
 
 - **类型定义**：`RoleCode`（[lib/permissions.ts](../lib/permissions.ts)）
 - **Schema 字段**：`User.role`（[prisma/schema.prisma](../prisma/schema.prisma)），`@default("STUDENT")`
@@ -23,16 +23,17 @@
 
 ## 2. 角色能力矩阵
 
-| 能力                | SYSTEM_ADMIN | ADMIN | TEACHER | STUDENT |
-| ------------------- | :----------: | :---: | :-----: | :-----: |
-| 系统设置（站点配置）|      ✅      |  ❌   |   ❌    |   ❌    |
-| 系统公告            |      ✅      |  ❌   |   ❌    |   ❌    |
-| 后台管理（/admin/*）|      ✅      |  ✅   |   ❌    |   ❌    |
-| 前台内容管理        |      ✅      |  ✅   |   ✅    |   ❌    |
-| 查看（公开内容）    |      ✅      |  ✅   |   ✅    |   ✅    |
-| 参与（做题/参赛）   |      ✅      |  ✅   |   ✅    |   ✅    |
+| 能力                 | SYSTEM_ADMIN | ADMIN | TEACHER | STUDENT |
+| -------------------- | :----------: | :---: | :-----: | :-----: |
+| 系统设置（站点配置） |      ✅      |  ❌   |   ❌    |   ❌    |
+| 系统公告             |      ✅      |  ❌   |   ❌    |   ❌    |
+| 后台管理（/admin/*） |      ✅      |  ✅   |   ❌    |   ❌    |
+| 前台内容管理         |      ✅      |  ✅   |   ✅    |   ❌    |
+| 查看（公开内容）     |      ✅      |  ✅   |   ✅    |   ✅    |
+| 参与（做题/参赛）    |      ✅      |  ✅   |   ✅    |   ✅    |
 
 说明：
+
 - **系统设置**：站点级配置（站点名称、SMTP、系统参数等），仅 `SYSTEM_ADMIN`。
 - **系统公告**：全站公告发布/编辑/删除，仅 `SYSTEM_ADMIN`（与「班级公告」无关）。
 - **后台管理**：访问一般 `/admin/*` 页面与 `/api/admin/*` 接口（用户管理、题目审核等）；系统设置与系统公告除外。
@@ -42,6 +43,7 @@
 ## 3. 各角色约束
 
 ### SYSTEM_ADMIN
+
 - **唯一**：全站仅一个 `SYSTEM_ADMIN`。
 - **首用户自动绑定**：注册时若数据库无用户（`prisma.user.count() === 0`），首用户自动赋予 `SYSTEM_ADMIN`，其余用户默认 `STUDENT`（见 [lib/user/service.ts](../lib/user/service.ts) 的 `registerNewUser`）。
 - **不可剥夺**：后台无法将 `SYSTEM_ADMIN` 降级为其他角色（`assertCanModifyUser` 拦截）。
@@ -50,15 +52,19 @@
 - **批量豁免**：批量操作（`filterUserIdsForBatchAction`）自动跳过 `SYSTEM_ADMIN`。
 
 ### ADMIN
+
 - 拥有除系统设置、系统公告外的后台管理功能。
 - 可访问一般后台（`/admin/*`、`/api/admin/*`）；不可访问 `/admin/settings`、`/admin/announcements`。
 - 可被 `SYSTEM_ADMIN` 在后台用户管理中授予 / 撤销。
 
 ### TEACHER
-- 拥有除后台管理外的所有前台内容管理功能（创建题目 / 竞赛 / 训练 / 班级 / 题解）。
+
+- 拥有除后台管理外的所有前台内容管理功能（创建竞赛 / 训练 / 班级 / 题解）。
 - **不能**访问 `/admin/*` 后台页面与 `/api/admin/*` 接口。
+- **不能**创建题目：题目一律由管理员在后台统一添加。
 
 ### STUDENT
+
 - 默认角色，仅具备查看与参与能力。
 - 不能创建公开内容，不能访问后台。
 
@@ -66,19 +72,19 @@
 
 所有角色判定**必须**调用以下函数，禁止在业务代码中硬编码 `role === 'XXX'`：
 
-| 函数                       | 路径                | 用途                                          |
-| -------------------------- | ------------------- | --------------------------------------------- |
-| `isSystemAdmin(user)`      | `@/lib/permissions` | 是否为系统管理员（`SYSTEM_ADMIN`）            |
-| `isAdmin(user)`            | `@/lib/permissions` | 是否为管理员（`ADMIN`）                       |
-| `isTeacher(user)`          | `@/lib/permissions` | 是否为教师（`TEACHER`）                       |
-| `isStudent(user)`          | `@/lib/permissions` | 是否为学生（`STUDENT`）                       |
-| `canAccessAdmin(user)`     | `@/lib/permissions` | 是否可访问后台（`SYSTEM_ADMIN` + `ADMIN`）    |
-| `canManageSystemSettings(user)` | `@/lib/permissions` | 是否可管理系统设置（仅 `SYSTEM_ADMIN`）  |
-| `canManageSystemAnnouncements(user)` | `@/lib/permissions` | 是否可管理系统公告（仅 `SYSTEM_ADMIN`） |
-| `isSystemAdminOnlyPath(pathname)` | `@/lib/permissions` | 是否为 SYSTEM_ADMIN 专属后台路径 |
-| `canManageContent(user)`   | `@/lib/permissions` | 是否可管理前台内容（`SYSTEM_ADMIN`+`ADMIN`+`TEACHER`） |
-| `canCreateContest(user)`   | `@/lib/permissions` | 是否可创建竞赛（等同 `canManageContent`）     |
-| `canCreateClass(user)`     | `@/lib/permissions` | 是否可创建班级（等同 `canManageContent`）     |
+| 函数                                 | 路径                | 用途                                                   |
+| ------------------------------------ | ------------------- | ------------------------------------------------------ |
+| `isSystemAdmin(user)`                | `@/lib/permissions` | 是否为系统管理员（`SYSTEM_ADMIN`）                     |
+| `isAdmin(user)`                      | `@/lib/permissions` | 是否为管理员（`ADMIN`）                                |
+| `isTeacher(user)`                    | `@/lib/permissions` | 是否为教师（`TEACHER`）                                |
+| `isStudent(user)`                    | `@/lib/permissions` | 是否为学生（`STUDENT`）                                |
+| `canAccessAdmin(user)`               | `@/lib/permissions` | 是否可访问后台（`SYSTEM_ADMIN` + `ADMIN`）             |
+| `canManageSystemSettings(user)`      | `@/lib/permissions` | 是否可管理系统设置（仅 `SYSTEM_ADMIN`）                |
+| `canManageSystemAnnouncements(user)` | `@/lib/permissions` | 是否可管理系统公告（仅 `SYSTEM_ADMIN`）                |
+| `isSystemAdminOnlyPath(pathname)`    | `@/lib/permissions` | 是否为 SYSTEM_ADMIN 专属后台路径                       |
+| `canManageContent(user)`             | `@/lib/permissions` | 是否可管理前台内容（`SYSTEM_ADMIN`+`ADMIN`+`TEACHER`） |
+| `canCreateContest(user)`             | `@/lib/permissions` | 是否可创建竞赛（等同 `canManageContent`）              |
+| `canCreateClass(user)`               | `@/lib/permissions` | 是否可创建班级（等同 `canManageContent`）              |
 
 ```ts
 // ✅ 正确
@@ -95,24 +101,24 @@ if (user.role === 'SYSTEM_ADMIN' || user.role === 'ADMIN') { ... }
 
 API 路由应使用 [lib/api/withApi.ts](../lib/api/withApi.ts) 提供的包装器，自动完成鉴权 + 错误处理：
 
-| 包装器              | 鉴权要求                                  | 典型场景                       |
-| ------------------- | ----------------------------------------- | ------------------------------ |
-| `withApi.public`    | 无                                        | 公开接口（登录、题目列表）     |
-| `withApi.auth`      | 已登录                                    | 任意登录用户接口               |
-| `withApi.admin`     | `canAccessAdmin`（`SYSTEM_ADMIN`+`ADMIN`）| 后台管理接口 `/api/admin/*`    |
-| `withApi.systemAdmin` | 仅 `SYSTEM_ADMIN`                       | 系统设置、系统公告等接口       |
-| `withApi.classRole` | 班级角色（owner/assistant/student）       | 班级内部操作（如作业列表/创建、笔记创建等） |
+| 包装器                | 鉴权要求                                   | 典型场景                                    |
+| --------------------- | ------------------------------------------ | ------------------------------------------- |
+| `withApi.public`      | 无                                         | 公开接口（登录、题目列表）                  |
+| `withApi.auth`        | 已登录                                     | 任意登录用户接口                            |
+| `withApi.admin`       | `canAccessAdmin`（`SYSTEM_ADMIN`+`ADMIN`） | 后台管理接口 `/api/admin/*`                 |
+| `withApi.systemAdmin` | 仅 `SYSTEM_ADMIN`                          | 系统设置、系统公告等接口                    |
+| `withApi.classRole`   | 班级角色（owner/assistant/student）        | 班级内部操作（如作业列表/创建、笔记创建等） |
 
 ```ts
 // 后台接口：SYSTEM_ADMIN / ADMIN 可访问
 export const GET = withApi.admin(async (req, { user }) => {
-  return ok(await listUsers())
-})
+  return ok(await listUsers());
+});
 
 // 系统设置接口：仅 SYSTEM_ADMIN
 export const PATCH = withApi.systemAdmin(async (req, { user }) => {
-  return ok(await updateSystemSettings(await readJson(req)))
-})
+  return ok(await updateSystemSettings(await readJson(req)));
+});
 ```
 
 ## 6. Middleware 拦截规则
@@ -137,7 +143,7 @@ export const PATCH = withApi.systemAdmin(async (req, { user }) => {
 - 历史数据若仍为 `admin` / `member`，由 `normalizeClassRoleToApi` 分别映射为 `assistant` / `student`。
 - **修改班级成员角色不会同步 `User.role`**：班级内是 `owner` 的用户，其系统角色仍可能是 `STUDENT`。
 - 反之亦然：系统角色为 `STUDENT` 的用户，可在班级内担任 `owner`。
-- 班级内的细粒度能力（`canViewProblems` / `canSubmit` / `canCreateNotes` 等）由 `ClassMember.permissions`（JSON）控制，与系统角色无关。
+- 班级内的细粒度能力（`canSubmit` / `canViewNotes` / `canCreateNotes` 等）由 `ClassMember.permissions`（JSON）控制，与系统角色无关。题目统一走平台题库，无班级独立题库权限。
 
 ## 8. 后台用户管理
 

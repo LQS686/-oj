@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { isSystemAdmin, isAdmin } from '@/lib/permissions'
 import { AppError } from '@/lib/errors'
 import { clearUserCache } from './profile'
+import { sanitizeAvatarUrl } from './avatar-url'
 
 /* ============================================================================
  * 管理员用户管理（原 /api/admin/users/* 路由）
@@ -81,7 +82,7 @@ export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: nu
     prisma.user.count(),
   ])
   return {
-    data,
+    data: data.map((u) => ({ ...u, avatar: sanitizeAvatarUrl(u.avatar) })),
     pagination: {
       page: usePaging ? (page as number) : 1,
       limit: take,
@@ -186,8 +187,13 @@ export async function adminUpdateUser(
     shouldInvalidateTokens = true
   }
   if (body.password) {
-    if (body.password.length < 8) {
-      throw AppError.badRequest('PASSWORD_TOO_SHORT', '密码长度至少为8位')
+    const { validatePassword } = await import('@/lib/api/validation')
+    const passwordValidation = validatePassword(body.password)
+    if (!passwordValidation.valid) {
+      throw AppError.badRequest(
+        'INVALID_PASSWORD',
+        passwordValidation.errors[0] || '密码不符合要求'
+      )
     }
     updateData.password = await bcryptModule.hash(body.password, 10)
     shouldInvalidateTokens = true

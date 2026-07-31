@@ -1,14 +1,14 @@
 /**
  * lib/problem/access.ts
- * 题目可见性统一鉴权（公开题库 / 班级题 / 竞赛题 / 作者与管理员）
+ * 题目可见性统一鉴权（公开题库 / 竞赛题 / 作者与管理员）
  *
  * 单一真相源：visibility（public | private | contest）。
  * 竞赛上下文必须显式传入 contestId，不做「扫描全部竞赛」兜底。
+ * 题目仅由后台统一维护；不存在班级私有题库。
  */
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/lib/errors'
 import { canAccessAdmin } from '@/lib/permissions'
-import { getClassMembership } from '@/lib/class/auth'
 import { checkContestAccess } from '@/lib/contest-auth'
 import type { RoleUser } from '@/lib/permissions'
 import type { JWTPayload } from '@/lib/auth'
@@ -17,7 +17,6 @@ export type ProblemAccessFields = {
   id: string
   authorId: string
   visibility: string
-  classId: string | null
 }
 
 export type ProblemAccessViewer = RoleUser & { id: string }
@@ -59,7 +58,7 @@ async function canAccessViaContest(
 
 /**
  * 断言当前用户可查看/使用该题目。
- * 不可访问时统一 404，避免私有题存在性探测。
+ * 不可访问时统一 404，避免非公开题存在性探测。
  */
 export async function assertCanAccessProblem(
   problem: ProblemAccessFields,
@@ -71,14 +70,16 @@ export async function assertCanAccessProblem(
   if (viewer && canAccessAdmin(viewer)) return
   if (viewer && viewer.id === problem.authorId) return
 
-  if (problem.classId) {
-    if (!viewer) throw AppError.notFound('题目不存在')
-    const membership = await getClassMembership(problem.classId, viewer.id)
-    if (membership) return
+  // contest 可见性：必须以竞赛路径校验
+  if (problem.visibility === 'contest') {
+    if (viewer && options.contestId) {
+      const viaContest = await canAccessViaContest(problem.id, viewer, options.contestId)
+      if (viaContest) return
+    }
     throw AppError.notFound('题目不存在')
   }
 
-  // 竞赛题 / 非公开题：必须带 contestId，经报名与时间窗校验
+  // 其它非公开题（含后台隐藏草稿）：带 contestId 时经报名与时间窗校验
   if (viewer && options.contestId) {
     const viaContest = await canAccessViaContest(problem.id, viewer, options.contestId)
     if (viaContest) return
@@ -98,7 +99,6 @@ export async function findProblemAccessFields(
       id: true,
       authorId: true,
       visibility: true,
-      classId: true,
     },
   })
 }

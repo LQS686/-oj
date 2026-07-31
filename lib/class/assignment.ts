@@ -14,6 +14,7 @@ export interface CreateClassAssignmentInput {
   startTime?: Date | null
   endTime?: Date | null
   createdBy: string
+  allowLateSubmission?: boolean
 }
 
 export async function createClassAssignment(input: CreateClassAssignmentInput) {
@@ -26,6 +27,7 @@ export async function createClassAssignment(input: CreateClassAssignmentInput) {
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,
       createdBy: input.createdBy,
+      allowLateSubmission: input.allowLateSubmission ?? false,
     },
   })
 }

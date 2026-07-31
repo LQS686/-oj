@@ -49,7 +49,8 @@ export async function createTrainingWithProblems(input: TrainingCreateInput) {
     }))
     await prisma.trainingProblem.createMany({ data: trainingProblems })
   }
-  cache.deleteByPrefix('training:list:')
+  cache.deleteByPrefix('training:list')
+  cache.deleteByPrefix('training:recommended')
   return training
 }
 
@@ -58,7 +59,8 @@ export async function updateTrainingAndProblems(
   input: TrainingUpdateInput
 ) {
   cache.delete(byIdKey(id))
-  cache.deleteByPrefix('training:list:')
+  cache.deleteByPrefix('training:list')
+  cache.deleteByPrefix('training:recommended')
   return prisma.training.update({
     where: { id },
     data: {

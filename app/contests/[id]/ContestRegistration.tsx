@@ -13,10 +13,11 @@ interface Contest {
   id: string
   title: string
   type: string
-  startTime: Date
-  endTime: Date
+  startTime: Date | string
+  endTime: Date | string
   isPublic: boolean
-  password?: string | null
+  /** 是否需要密码/邀请码报名（永不下发 password 原文/哈希） */
+  hasPassword?: boolean
 }
 
 export default function ContestRegistration({ contest }: { contest: Contest }) {
@@ -144,14 +145,14 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
     <div className="card-static rounded-xl p-4 space-y-3">
       <div>
         <h3 className="text-sm font-semibold text-foreground">报名参赛</h3>
-        {contest.type === 'Private' || contest.password ? (
+        {contest.hasPassword ? (
           <p className="text-xs text-muted-foreground mt-1">请输入竞赛密码后报名</p>
         ) : (
           <p className="text-xs text-muted-foreground mt-1">公开赛，确认后即可报名</p>
         )}
       </div>
 
-      {(contest.type === 'Private' || contest.password) && (
+      {contest.hasPassword && (
         <div className="relative">
           <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <input

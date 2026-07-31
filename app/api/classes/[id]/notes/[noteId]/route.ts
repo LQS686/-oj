@@ -41,12 +41,27 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const member = await getCurrentClassMember(id, user.id)
   if (!classIsPublic && !member) throw403('无权访问该班级')
 
+  const { getClassMembership, hasClassPermission, isClassTeacher } = await import('@/lib/class/auth')
+  const membership = member ? await getClassMembership(id, user.id) : null
+  if (membership?.isStudent && !hasClassPermission(membership, 'canViewNotes')) {
+    throw403('当前账号无查看笔记权限')
+  }
+  const isStaff = isClassTeacher(membership)
+  if (
+    !safeNote.isPublic &&
+    safeNote.authorId !== user.id &&
+    !isStaff
+  ) {
+    throw404('笔记不存在')
+  }
+
   return ok({
     id: safeNote.id,
     title: safeNote.title,
     content: safeNote.content,
     category: safeNote.category,
     tags: safeNote.tags || [],
+    isPublic: safeNote.isPublic,
     author: {
       id: safeNote.author.id,
       username: safeNote.author.username,

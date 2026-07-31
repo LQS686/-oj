@@ -4,11 +4,10 @@
 import { prisma } from '@/lib/prisma'
 import { listPublicContests } from '@/lib/contest/service'
 import { listPublicAnnouncements, type PublicAnnouncementItem } from '@/lib/announcement/service'
-
-const AC_STATUSES = new Set(['AC', 'ACCEPTED', 'Accepted'])
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 
 function isAccepted(status: string): boolean {
-  return AC_STATUSES.has(status)
+  return status === SubmissionStatus.ACCEPTED || status === 'AC'
 }
 
 function startOfDay(d: Date): Date {
@@ -68,30 +67,32 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
   const prevWeekStart = new Date(weekStart)
   prevWeekStart.setDate(prevWeekStart.getDate() - 7)
 
-  const submissions = await prisma.submission.findMany({
-    where: { userId },
-    select: { problemId: true, status: true, submittedAt: true },
-    orderBy: { submittedAt: 'desc' },
-  })
+  // 仅拉取近两周提交做周通过率；今日/累计 AC 用聚合，避免拉全量历史
+  const [weekSubs, prevWeekSubs, todayAcGroups, distinctAc] = await Promise.all([
+    prisma.submission.findMany({
+      where: { userId, submittedAt: { gte: weekStart } },
+      select: { status: true },
+    }),
+    prisma.submission.findMany({
+      where: { userId, submittedAt: { gte: prevWeekStart, lt: weekStart } },
+      select: { status: true },
+    }),
+    prisma.submission.groupBy({
+      by: ['problemId'],
+      where: {
+        userId,
+        status: SubmissionStatus.ACCEPTED,
+        submittedAt: { gte: todayStart },
+      },
+    }),
+    prisma.submission.findMany({
+      where: { userId, status: SubmissionStatus.ACCEPTED },
+      distinct: ['problemId'],
+      select: { problemId: true },
+    }),
+  ])
 
-  const acSubs = submissions.filter((s) => isAccepted(s.status))
-
-  const todayAcProblems = new Set<string>()
-  for (const s of acSubs) {
-    if (new Date(s.submittedAt) >= todayStart) todayAcProblems.add(s.problemId)
-  }
-
-  const acByProblem = new Map<string, Date>()
-  for (const s of acSubs) {
-    if (!acByProblem.has(s.problemId)) acByProblem.set(s.problemId, new Date(s.submittedAt))
-  }
-  const totalSolved = acByProblem.size
-
-  const weekSubs = submissions.filter((s) => new Date(s.submittedAt) >= weekStart)
-  const prevWeekSubs = submissions.filter((s) => {
-    const t = new Date(s.submittedAt)
-    return t >= prevWeekStart && t < weekStart
-  })
+  const totalSolved = distinctAc.length
 
   const weekRate =
     weekSubs.length > 0
@@ -104,7 +105,7 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
   const weeklyPassRateDelta = prevRate !== null ? weekRate - prevRate : null
 
   return {
-    todaySolved: todayAcProblems.size,
+    todaySolved: todayAcGroups.length,
     weeklyPassRate: weekRate,
     weeklyPassRateDelta,
     totalSolved: user?.solvedCount || totalSolved,

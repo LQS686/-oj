@@ -26,6 +26,7 @@ import { canAccessAdmin } from '@/lib/permissions'
 import { assertCanAccessProblem } from '@/lib/problem/access'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 import { clearRankingCache } from '@/lib/ranking/service'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export interface SubmissionFilter {
   userId?: string
@@ -100,10 +101,15 @@ export async function listSubmissions(
 
 export async function getSubmissionById(id: string) {
   return cache.get('submission:byId', [id], async () => {
-    return prisma.submission.findUnique({
+    const row = await prisma.submission.findUnique({
       where: { id },
       include: { user: { select: { id: true, username: true, nickname: true, avatar: true } } },
     })
+    if (!row?.user) return row
+    return {
+      ...row,
+      user: { ...row.user, avatar: sanitizeAvatarUrl(row.user.avatar) },
+    }
   }, { ttl: 30_000 })
 }
 
@@ -145,12 +151,16 @@ export async function updateSubmissionStatus(
 }
 
 export async function getProblemSubmissions(problemId: string, limit = 20) {
-  return prisma.submission.findMany({
+  const rows = await prisma.submission.findMany({
     where: { problemId },
     take: limit,
     orderBy: { submittedAt: 'desc' },
     include: { user: { select: { id: true, username: true, nickname: true, avatar: true } } },
   })
+  return rows.map((row) => ({
+    ...row,
+    user: { ...row.user, avatar: sanitizeAvatarUrl(row.user.avatar) },
+  }))
 }
 
 /* ============================================================================
@@ -208,7 +218,6 @@ export async function submitCode(
       id: problem.id,
       authorId: problem.authorId,
       visibility: problem.visibility,
-      classId: problem.classId ?? null,
     },
     { id: userId, role: viewerRole }
   )
@@ -627,7 +636,6 @@ export async function getFirstWaTestCaseForDownload(
       id: true,
       authorId: true,
       visibility: true,
-      classId: true,
     },
   })
   if (!problem) throw AppError.notFound('题目不存在')
@@ -636,6 +644,17 @@ export async function getFirstWaTestCaseForDownload(
     { id: requester.id, role: requester.role },
     { contestId: detail.contestId ?? undefined }
   )
+
+  // 竞赛进行中禁止下载隐藏测例（防 WA 神谕）；管理员除外
+  if (detail.contestId && !canAccessAdmin(requester)) {
+    const contest = await prisma.contest.findUnique({
+      where: { id: detail.contestId },
+      select: { endTime: true, authorId: true },
+    })
+    if (contest && new Date() < contest.endTime && contest.authorId !== requester.id) {
+      throw AppError.forbidden('竞赛进行中不可下载测试点')
+    }
+  }
 
   const waIndex = detail.testResults.findIndex(
     (r) => r.status === SubmissionStatus.WRONG_ANSWER

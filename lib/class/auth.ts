@@ -77,15 +77,23 @@ export function isClassOwner(membership: ClassMembership | null): boolean {
 
 /**
  * 检查权限位（如 canManageAssignments / canViewNotes）
+ * owner/assistant（isTeacher）始终 true。
+ * 学生：显式 false 拒绝；未配置时对基础位（提交/看笔记）默认 true。
  */
+const DEFAULT_TRUE_PERMISSIONS = new Set([
+  'canSubmit',
+  'canViewNotes',
+])
+
 export function hasClassPermission(
   membership: ClassMembership | null,
   key: string
 ): boolean {
   if (!membership) return false
-  if (membership.isTeacher) return true
-  if (!membership.permissions) return false
-  return !!membership.permissions[key]
+  if (membership.isTeacher || membership.isAssistant) return true
+  const flags = membership.permissions
+  if (flags && key in flags) return !!flags[key]
+  return DEFAULT_TRUE_PERMISSIONS.has(key)
 }
 
 /**

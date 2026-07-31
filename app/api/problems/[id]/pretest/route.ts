@@ -58,7 +58,6 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
       id: true,
       authorId: true,
       visibility: true,
-      classId: true,
       timeLimit: true,
       memoryLimit: true,
       comparisonMode: true,
@@ -77,7 +76,6 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
       id: safeProblem.id,
       authorId: safeProblem.authorId,
       visibility: safeProblem.visibility,
-      classId: safeProblem.classId ?? null,
     },
     user,
     { contestId }

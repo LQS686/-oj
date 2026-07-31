@@ -48,7 +48,6 @@ export async function patchClassMember(
 
 /** 合法权限位白名单 */
 const ALLOWED_PERMISSION_KEYS = [
-  'canViewProblems',
   'canSubmit',
   'canViewNotes',
   'canCreateNotes',
@@ -68,16 +67,18 @@ export async function mergeClassMemberPermissions(
     where: { classId_userId: { classId, userId } },
   })
   if (!current) return null
-  // 仅允许白名单内的权限位写入，防止注入未知字段
+  // 仅允许白名单内的权限位写入，并丢弃历史废弃位（如 canViewProblems）
   const filtered: ClassPermissionFlags = {}
   for (const key of ALLOWED_PERMISSION_KEYS) {
     if (key in permissions) {
       filtered[key] = Boolean(permissions[key])
     }
   }
-  const merged = {
-    ...((current.permissions as ClassPermissionFlags | null) || {}),
-    ...filtered,
+  const base = (current.permissions as ClassPermissionFlags | null) || {}
+  const merged: ClassPermissionFlags = {}
+  for (const key of ALLOWED_PERMISSION_KEYS) {
+    if (key in filtered) merged[key] = filtered[key]
+    else if (key in base) merged[key] = Boolean(base[key])
   }
   return prisma.classMember.update({
     where: { classId_userId: { classId, userId } },

@@ -1,8 +1,7 @@
-import { prisma } from '@/lib/prisma'
+import { notFound } from 'next/navigation'
 import ContestRegistration from './ContestRegistration'
-import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/auth'
-import { readAuthTokenFromCookieStore } from '@/lib/auth/cookie'
+import { resolveViewerFromCookies } from '@/lib/api/withApi'
+import { getContestDetailWithRegistration } from '@/lib/contest/service'
 import { canManageContent } from '@/lib/permissions'
 import Link from 'next/link'
 import {
@@ -28,29 +27,20 @@ export default async function ContestOverviewPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const viewer = await resolveViewerFromCookies()
+  const contest = await getContestDetailWithRegistration(
+    id,
+    viewer ? { id: viewer.id, role: viewer.role } : null
+  )
 
-  const contest = await prisma.contest.findUnique({
-    where: { id },
-    include: {
-      author: { select: { id: true, username: true, nickname: true } },
-      _count: { select: { participants: true, problems: true } },
-    },
-  })
+  if (!contest) notFound()
 
-  if (!contest) return null
-
-  const cookieStore = await cookies()
-  const token = readAuthTokenFromCookieStore(cookieStore)
   let canEdit = false
-
-  if (token) {
-    const payload = verifyToken(token)
-    if (payload) {
-      if (payload.userId === contest.authorId || canManageContent({ role: payload.role })) {
-        const now = new Date()
-        if (now < contest.startTime) {
-          canEdit = true
-        }
+  if (viewer) {
+    if (viewer.id === contest.authorId || canManageContent(viewer)) {
+      const now = new Date()
+      if (now < contest.startTime) {
+        canEdit = true
       }
     }
   }
@@ -65,7 +55,17 @@ export default async function ContestOverviewPage({
         : 0
 
   const authorName = contest.author?.nickname || contest.author?.username || '—'
-  const needsPassword = !!(contest.password || contest.type === 'Private')
+  const needsPassword = !!contest.hasPassword
+
+  const registrationContest = {
+    id: contest.id,
+    title: contest.title,
+    type: contest.type,
+    startTime: contest.startTime,
+    endTime: contest.endTime,
+    isPublic: contest.isPublic,
+    hasPassword: needsPassword,
+  }
 
   const infoItems = [
     {
@@ -124,7 +124,7 @@ export default async function ContestOverviewPage({
       }
       aside={
         <>
-          <ContestRegistration contest={contest} />
+          <ContestRegistration contest={registrationContest} />
           <EntityInfoCard title="竞赛信息" items={infoItems} />
         </>
       }

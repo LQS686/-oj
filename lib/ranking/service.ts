@@ -232,5 +232,6 @@ export function clearRankingCache() {
   cache.deleteByPrefix('ranking:global')
   cache.deleteByPrefix('ranking:class')
   cache.deleteByPrefix('ranking:myRank')
+  cache.deleteByPrefix('ranking:myRankAdvanced')
   cache.deleteByPrefix('ranking:list')
 }

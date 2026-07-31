@@ -7,7 +7,7 @@
  *
  * 迁移到 withApi 中间件模式
  */
-import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403, throw404, resolveViewerFromRequest } from '@/lib/api/withApi'
 import { canManageContent, canAccessAdmin } from '@/lib/permissions'
 import { isObjectId } from '@/lib/api/validation'
 import bcrypt from 'bcryptjs'
@@ -17,15 +17,14 @@ import {
   getContestDetailWithRegistration,
   updateContestWithProblems,
 } from '@/lib/contest/service'
-import { getUserFromRequest } from '@/lib/auth'
 
 // GET /api/contests/[id] - 获取竞赛详情
 export const GET = withApi.public(async (req, ctx) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的竞赛ID')
 
-  const session = getUserFromRequest(req)
-  const contest = await getContestDetailWithRegistration(id!, session?.userId)
+  const viewer = await resolveViewerFromRequest(req)
+  const contest = await getContestDetailWithRegistration(id!, viewer?.user ?? null)
   if (!contest) throw404('竞赛不存在')
   return ok(contest)
 })

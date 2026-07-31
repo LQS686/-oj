@@ -102,19 +102,35 @@ export interface ListClassNotesInput {
   pageSize?: number
   category?: string
   search?: string
+  /** 非 staff 时只看公开笔记 + 本人草稿 */
+  viewerUserId?: string
+  includePrivate?: boolean
 }
 
 export async function listClassNotesPaged(classId: string, filter: ListClassNotesInput = {}) {
   const page = filter.page ?? 1
   const pageSize = Math.min(filter.pageSize ?? 20, 100)
-  const where: Prisma.ClassNoteWhereInput = { classId }
-  if (filter.category) where.category = filter.category
+  const and: Prisma.ClassNoteWhereInput[] = []
+  if (filter.category) and.push({ category: filter.category })
   if (filter.search) {
-    where.OR = [
-      { title: { contains: filter.search, mode: 'insensitive' } },
-      { content: { contains: filter.search, mode: 'insensitive' } },
-      { tags: { has: filter.search } },
-    ]
+    and.push({
+      OR: [
+        { title: { contains: filter.search, mode: 'insensitive' } },
+        { content: { contains: filter.search, mode: 'insensitive' } },
+        { tags: { has: filter.search } },
+      ],
+    })
+  }
+  if (!filter.includePrivate) {
+    and.push(
+      filter.viewerUserId
+        ? { OR: [{ isPublic: true }, { authorId: filter.viewerUserId }] }
+        : { isPublic: true }
+    )
+  }
+  const where: Prisma.ClassNoteWhereInput = {
+    classId,
+    ...(and.length > 0 ? { AND: and } : {}),
   }
 
   const [notes, total] = await Promise.all([

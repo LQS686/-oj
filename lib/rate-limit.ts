@@ -78,6 +78,11 @@ class MemoryStore implements RateLimitStore {
 
 const memoryStore = new MemoryStore();
 
+/** 优雅关闭时清理内存限流定时器，避免 process 挂起 */
+export function destroyMemoryRateLimitStore(): void {
+  memoryStore.destroy();
+}
+
 /**
  * Redis 限流：仅在 REDIS_URL 配置时启用；用 INCR + PEXPIRE 做跨实例原子计数。
  * 未配置或连接失败时返回 null，由调用方回退内存。
@@ -371,9 +376,10 @@ export const apiRateLimiter = rateLimit({
 export { checkRateLimit, getClientIP };
 export type { RateLimitConfig, RateLimitResult };
 
-/** 供自定义 server（IncomingMessage）限流使用 */
+/** 供自定义 server（IncomingMessage）限流使用；可传 socket.remoteAddress 作无代理回退 */
 export function getClientIPFromHeaders(
-  headers: { get?(name: string): string | null; [key: string]: unknown }
+  headers: { get?(name: string): string | null; [key: string]: unknown },
+  socketFallback?: string | null
 ): string {
   const fwd =
     typeof headers.get === 'function'
@@ -385,5 +391,5 @@ export function getClientIPFromHeaders(
       : (headers['x-real-ip'] as string | string[] | undefined)
   const forwarded = Array.isArray(fwd) ? fwd[0] : fwd
   const realIP = Array.isArray(real) ? real[0] : real
-  return resolveClientIp(forwarded, realIP, TRUSTED_PROXIES)
+  return resolveClientIp(forwarded, realIP || socketFallback || null, TRUSTED_PROXIES)
 }

@@ -241,7 +241,6 @@ export async function respondDirectInvite(
               userId: currentUserId,
               role: 'student',
               permissions: {
-                canViewProblems: true,
                 canSubmit: true,
                 canViewNotes: true,
                 canCreateNotes: false,

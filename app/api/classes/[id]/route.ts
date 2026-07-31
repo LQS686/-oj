@@ -13,6 +13,7 @@ import {
   throw403,
   throw404,
   readQuery,
+  resolveViewerFromRequest,
 } from '@/lib/api/withApi'
 import {
   getClassById,
@@ -22,7 +23,6 @@ import {
   deleteClass,
 } from '@/lib/class/service'
 import { isObjectId } from '@/lib/api/validation'
-import { getUserFromRequest } from '@/lib/auth'
 import { normalizeClassRoleToApi } from '@/lib/class/roles'
 
 /**
@@ -34,7 +34,8 @@ export const GET = withApi.public(async (req, ctx) => {
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
   const q = readQuery<{ sortBy?: string; sortOrder?: string; role?: string; active?: string; search?: string }>(req)
-  const auth = getUserFromRequest(req)
+  const viewer = await resolveViewerFromRequest(req)
+  const authUserId = viewer?.user.id
 
   // 先读轻量字段做私有班级鉴权，避免未授权时加载成员列表（侧信道）
   const basic = await getClassById(id)
@@ -42,16 +43,15 @@ export const GET = withApi.public(async (req, ctx) => {
     throw404('班级不存在')
   }
   if (!basic!.isPublic) {
-    const uid = auth?.userId
-    if (!uid) {
+    if (!authUserId) {
       throw404('私有班级，只有受邀成员可访问')
       return
     }
-    const member = await getCurrentClassMember(id, uid)
+    const member = await getCurrentClassMember(id, authUserId)
     if (!member) throw404('私有班级，只有受邀成员可访问')
   }
 
-  const viewerMember = auth?.userId ? await getCurrentClassMember(id, auth.userId) : null
+  const viewerMember = authUserId ? await getCurrentClassMember(id, authUserId) : null
   const detailResult = await getClassDetail(id, {
     // 仅班级管理员可见成员 permissions，避免公开访客探测权限位
     includePermissions: !!(

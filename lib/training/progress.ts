@@ -4,6 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 import type {
   TrainingCategoryType,
   TrainingDetail,
@@ -19,6 +20,18 @@ import type {
 function statusFromSubmission(status: string): TrainingProblemStatus {
   if (status === 'AC') return 'AC'
   return 'ATTEMPTED'
+}
+
+/** 0→A … 25→Z，26→AA（Excel 风格） */
+function orderIndexToLabel(orderIndex: number): string {
+  let n = Math.max(0, orderIndex) + 1
+  let label = ''
+  while (n > 0) {
+    n -= 1
+    label = String.fromCharCode(65 + (n % 26)) + label
+    n = Math.floor(n / 26)
+  }
+  return label
 }
 
 export async function getTrainingWithProblemStatuses(
@@ -66,12 +79,24 @@ export async function getTrainingWithProblemStatuses(
         select: { problemId: true, status: true, submittedAt: true },
         orderBy: { submittedAt: 'desc' },
       })
+      // 与 listTrainingProblemsWithStatus 一致：任意历史 AC 即视为通过
+      const byProblem = new Map<string, { statuses: Set<string>; lastStatus: string; submittedAt: Date }>()
       for (const sub of submissions) {
-        if (problemStatuses[sub.problemId]) continue
-        problemStatuses[sub.problemId] = {
-          status: statusFromSubmission(sub.status),
-          lastStatus: sub.status,
-          submittedAt: sub.submittedAt,
+        let entry = byProblem.get(sub.problemId)
+        if (!entry) {
+          entry = { statuses: new Set(), lastStatus: sub.status, submittedAt: sub.submittedAt }
+          byProblem.set(sub.problemId, entry)
+        }
+        entry.statuses.add(sub.status)
+      }
+      for (const [pid, entry] of byProblem) {
+        const preferred = entry.statuses.has(SubmissionStatus.ACCEPTED)
+          ? SubmissionStatus.ACCEPTED
+          : entry.lastStatus
+        problemStatuses[pid] = {
+          status: statusFromSubmission(preferred),
+          lastStatus: preferred,
+          submittedAt: entry.submittedAt,
         }
       }
     }
@@ -111,7 +136,9 @@ export async function getTrainingWithProblemStatuses(
     viewCount: training.viewCount,
     createdAt: training.createdAt,
     updatedAt: training.updatedAt,
-    author: training.author,
+    author: training.author
+      ? { ...training.author, avatar: sanitizeAvatarUrl(training.author.avatar) }
+      : training.author,
     category: training.category,
     problems,
     isJoined,
@@ -230,7 +257,7 @@ export async function listTrainingProblemsWithStatus(
   const problems = trainingProblems.map((tp) => ({
     id: tp.problemId,
     orderIndex: tp.orderIndex,
-    label: String.fromCharCode(65 + tp.orderIndex),
+    label: orderIndexToLabel(tp.orderIndex),
     title: tp.problem.title,
     problemNumber: tp.problem.problemNumber,
     difficulty: tp.problem.difficulty,

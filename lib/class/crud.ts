@@ -185,15 +185,6 @@ export async function deleteClass(classId: string) {
     await tx.classJoinRequest.deleteMany({ where: { classId } })
     await tx.classMember.deleteMany({ where: { classId } })
 
-    // 历史「班级私有题」遗留：解除 classId，题目保留以免误删
-    await tx.problem.updateMany({
-      where: { classId },
-      data: { classId: null, isPublic: false, visibility: 'private' },
-    })
-
-    // Training 在 schema 上声明了 onDelete: Cascade，仍显式清理以保证一致
-    await tx.training.deleteMany({ where: { classId } })
-
     await tx.class.delete({ where: { id: classId } })
   })
 }

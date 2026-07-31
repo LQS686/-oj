@@ -47,6 +47,7 @@ export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, {
     startTime?: string | Date
     endTime?: string | Date
     problemIds?: string[]
+    allowLateSubmission?: boolean
   }>(req)
 
   if (!body.title || !body.endTime || !body.problemIds || body.problemIds.length === 0) {
@@ -108,6 +109,7 @@ export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, {
     startTime: finalStartTime,
     endTime: finalEndDate,
     createdBy: user.id,
+    allowLateSubmission: !!body.allowLateSubmission,
   })
 
   return ok({ id: assignment.id }, { status: 201 })

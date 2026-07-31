@@ -114,9 +114,13 @@ export async function listClassAssignmentsWithStats(
       solved.add(sub.problemId)
     })
 
+    let completedMembersCount = 0
     let totalCompletedProblems = 0
     memberSolvedProblems.forEach((solved) => {
       totalCompletedProblems += solved.size
+      if (problemCount > 0 && solved.size >= problemCount) {
+        completedMembersCount += 1
+      }
     })
 
     const totalProblems = memberCount * problemCount
@@ -132,7 +136,10 @@ export async function listClassAssignmentsWithStats(
       problemCount,
       stats: {
         totalMembers: memberCount,
-        completedMembers: totalCompletedProblems,
+        /** 完成全部题目的成员数 */
+        completedMembers: completedMembersCount,
+        /** 全体成员已完成的「成员×题目」实例总数（用于 completionRate） */
+        completedProblemInstances: totalCompletedProblems,
         completionRate,
       },
       createdAt: a.createdAt,
@@ -216,15 +223,17 @@ export async function computeAssignmentStatistics(
     (s) => s.size === totalProblems
   ).length
 
-  // 平均分 / 正确率
+  // 平均分 / 正确率：按「每题最高分」汇总（逾期记 0）
   const memberScores = Array.from(memberCompletionMap.entries()).map(
     ([userId, solvedSet]) => {
       const ms = submissions.filter((s) => s.userId === userId)
-      const totalScore = ms.reduce((sum, s) => {
-        const isLate = s.isLate || false
-        return sum + (isLate ? 0 : s.score || 0)
-      }, 0)
-      const avgScore = ms.length > 0 ? totalScore / ms.length : 0
+      const bestByProblem = new Map<string, number>()
+      for (const s of ms) {
+        const score = s.isLate ? 0 : s.score || 0
+        bestByProblem.set(s.problemId, Math.max(bestByProblem.get(s.problemId) || 0, score))
+      }
+      const totalScore = Array.from(bestByProblem.values()).reduce((a, b) => a + b, 0)
+      const avgScore = totalProblems > 0 ? totalScore / totalProblems : 0
       const accuracy = totalProblems > 0 ? (solvedSet.size / totalProblems) * 100 : 0
       return { avgScore, accuracy }
     }
@@ -247,11 +256,17 @@ export async function computeAssignmentStatistics(
     const acs = ps.filter((s) => s.status === 'AC')
     const uniqueUsers = new Set(ps.map((s) => s.userId))
     const acUsers = new Set(acs.map((s) => s.userId))
-    const totalScore = ps.reduce((sum, s) => {
-      const isLate = s.isLate || false
-      return sum + (isLate ? 0 : s.score || 0)
-    }, 0)
-    const avgProblemScore = ps.length > 0 ? totalScore / ps.length : 0
+    const totalScore = (() => {
+      const best = new Map<string, number>()
+      for (const s of ps) {
+        const score = s.isLate ? 0 : s.score || 0
+        best.set(s.userId, Math.max(best.get(s.userId) || 0, score))
+      }
+      // 按提交用户取该题最高分后再平均
+      const vals = Array.from(best.values())
+      return vals.reduce((a, b) => a + b, 0)
+    })()
+    const avgProblemScore = uniqueUsers.size > 0 ? totalScore / uniqueUsers.size : 0
     return {
       problemId,
       title: info?.title,
@@ -270,11 +285,13 @@ export async function computeAssignmentStatistics(
     const userId = m.userId
     const us = submissions.filter((s) => s.userId === userId)
     const solved = memberCompletionMap.get(userId) || new Set()
-    const totalUserScore = us.reduce((sum, s) => {
-      const isLate = s.isLate || false
-      return sum + (isLate ? 0 : s.score || 0)
-    }, 0)
-    const avgUserScore = us.length > 0 ? totalUserScore / us.length : 0
+    const bestByProblem = new Map<string, number>()
+    for (const s of us) {
+      const score = s.isLate ? 0 : s.score || 0
+      bestByProblem.set(s.problemId, Math.max(bestByProblem.get(s.problemId) || 0, score))
+    }
+    const totalUserScore = Array.from(bestByProblem.values()).reduce((a, b) => a + b, 0)
+    const avgUserScore = totalProblems > 0 ? totalUserScore / totalProblems : 0
     const accuracy = totalProblems > 0 ? (solved.size / totalProblems) * 100 : 0
     const lateSubmissions = us.filter((s) => {
       return s.isLate || false

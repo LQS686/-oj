@@ -3,7 +3,10 @@
  * 竞赛题目列表（含个人提交状态 + 整体统计）
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
+import { isContestSealed } from './rankings'
+import { canAccessAdmin } from '@/lib/permissions'
 
 /* ============================================================================
  * 竞赛题目列表（含个人提交状态 + 整体统计）原 /api/contests/[id]/problems
@@ -11,8 +14,25 @@ import { SubmissionStatus } from '@/lib/constants/submission-status'
 
 export async function listContestProblemsWithStatus(
   contestId: string,
-  currentUserId: string | null
+  currentUserId: string | null,
+  viewerRole?: string | null
 ) {
+  const contest = await prisma.contest.findUnique({
+    where: { id: contestId },
+    select: {
+      sealRankTime: true,
+      sealUnlocked: true,
+      authorId: true,
+    },
+  })
+
+  const bypassSeal =
+    (!!viewerRole && canAccessAdmin({ role: viewerRole })) ||
+    (!!currentUserId && currentUserId === contest?.authorId)
+  const sealed = contest ? isContestSealed(contest) : false
+  const sealCutoff =
+    sealed && !bypassSeal && contest?.sealRankTime ? contest.sealRankTime : null
+
   const contestProblems = await prisma.contestProblem.findMany({
     where: { contestId },
     orderBy: { orderIndex: 'asc' },
@@ -36,9 +56,17 @@ export async function listContestProblemsWithStatus(
   const userSubmissionStatus: Record<string, 'AC' | 'Attempted' | null> = {}
   const contestStats: Record<string, { accepted: number; submitted: number }> = {}
 
+  const baseWhere: Prisma.SubmissionWhereInput = {
+    contestId,
+    problemId: { in: problemIds },
+  }
+  if (sealCutoff) {
+    baseWhere.submittedAt = { lte: sealCutoff }
+  }
+
   if (currentUserId) {
     const submissions = await prisma.submission.findMany({
-      where: { contestId, problemId: { in: problemIds }, userId: currentUserId },
+      where: { ...baseWhere, userId: currentUserId },
       select: { problemId: true, status: true },
     })
     const problemSubmissionMap = new Map<string, Set<string>>()
@@ -63,12 +91,12 @@ export async function listContestProblemsWithStatus(
   const [contestSubmissions, acceptedSubmissions] = await Promise.all([
     prisma.submission.groupBy({
       by: ['problemId'],
-      where: { contestId, problemId: { in: problemIds } },
+      where: baseWhere,
       _count: { _all: true },
     }),
     prisma.submission.groupBy({
       by: ['problemId'],
-      where: { contestId, problemId: { in: problemIds }, status: 'AC' },
+      where: { ...baseWhere, status: 'AC' },
       _count: { _all: true },
     }),
   ])

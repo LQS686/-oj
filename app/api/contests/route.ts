@@ -6,12 +6,11 @@
  *
  * 迁移到 withApi 中间件模式
  */
-import { withApi, ok, readJson, readQuery, throw403 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, readQuery, throw403, resolveViewerFromRequest } from '@/lib/api/withApi'
 import { canManageContent } from '@/lib/permissions'
 import { toInt } from '@/lib/api/validation'
 import { createContestDirect } from '@/lib/mongodb-direct'
 import { listPublicContests } from '@/lib/contest/service'
-import { getUserFromRequest } from '@/lib/auth'
 
 // GET /api/contests - 获取竞赛列表
 export const GET = withApi.public(async (req) => {
@@ -21,11 +20,11 @@ export const GET = withApi.public(async (req) => {
   const status = q.status as 'ongoing' | 'upcoming' | 'ended' | undefined
   const keyword = q.keyword
 
-  // 公开路由不强制登录，但若用户已登录则附带 isRegistered
-  const session = getUserFromRequest(req)
+  // 公开路由不强制登录，但若用户已登录则附带 isRegistered（经 tokenVersion/ban）
+  const viewer = await resolveViewerFromRequest(req)
   const data = await listPublicContests(
     { page, limit, status, keyword },
-    session?.userId
+    viewer?.user.id
   )
   return ok(data)
 })

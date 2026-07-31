@@ -73,8 +73,17 @@ export async function createContestDirect(data: {
 
   return {
     id: contest._id.toString(),
-    ...contest,
+    title: contest.title,
+    description: contest.description,
+    type: contest.type,
+    startTime: contest.startTime,
+    endTime: contest.endTime,
+    duration: contest.duration,
+    isPublic: contest.isPublic,
     authorId: contest.authorId.toString(),
+    createdAt: contest.createdAt,
+    updatedAt: contest.updatedAt,
+    hasPassword: Boolean(hashedPassword),
   }
 }
 

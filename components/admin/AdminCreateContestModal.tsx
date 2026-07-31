@@ -55,6 +55,8 @@ export default function AdminCreateContestModal({
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Problem[]>([])
   const [batchInput, setBatchInput] = useState('')
+  /** 编辑态：库中已有参赛密码（表单留空表示保持） */
+  const [existingHasPassword, setExistingHasPassword] = useState(false)
 
   const resetForm = useCallback(() => {
     setFormData(defaultForm())
@@ -65,9 +67,11 @@ export default function AdminCreateContestModal({
     setError('')
     setSubmitting(false)
     setLoading(false)
+    setExistingHasPassword(false)
   }, [])
 
   const applyContest = useCallback((contest: Record<string, unknown>) => {
+    const hasPassword = !!contest.hasPassword || (typeof contest.password === 'string' && contest.password.length > 0)
     setFormData({
       title: typeof contest.title === 'string' ? contest.title : '',
       description: typeof contest.description === 'string' ? contest.description : '',
@@ -79,11 +83,13 @@ export default function AdminCreateContestModal({
         ? new Date(contest.endTime as string).toISOString().slice(0, 16)
         : '',
       isPublic: !!contest.isPublic,
-      password: typeof contest.password === 'string' ? contest.password : '',
+      // 绝不把 bcrypt 哈希填入表单；编辑时留空表示保持原密码
+      password: '',
       sealRankTime: contest.sealRankTime
         ? new Date(contest.sealRankTime as string).toISOString().slice(0, 16)
         : '',
     })
+    setExistingHasPassword(hasPassword)
     const problems = Array.isArray(contest.problems)
       ? (contest.problems as { problem: Problem }[]).map((p) => p.problem)
       : []
@@ -209,11 +215,23 @@ export default function AdminCreateContestModal({
     }
   }
 
-  const buildPayload = () => ({
-    ...formData,
-    password: formData.isPublic ? undefined : formData.password,
-    problems: contestProblems.map(p => p.id),
-  })
+  const buildPayload = () => {
+    const payload: Record<string, unknown> = {
+      ...formData,
+      problems: contestProblems.map((p) => p.id),
+    }
+    if (formData.isPublic) {
+      payload.password = null
+    } else if (formData.password.trim()) {
+      payload.password = formData.password
+    } else if (isEdit && existingHasPassword) {
+      // 留空：不传 password，服务端保持原哈希
+      delete payload.password
+    } else {
+      payload.password = formData.password
+    }
+    return payload
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -223,7 +241,7 @@ export default function AdminCreateContestModal({
       setError('结束时间必须晚于开始时间')
       return
     }
-    if (!formData.isPublic && !formData.password.trim()) {
+    if (!formData.isPublic && !formData.password.trim() && !(isEdit && existingHasPassword)) {
       setError('私有竞赛请设置参赛密码')
       return
     }
@@ -381,15 +399,20 @@ export default function AdminCreateContestModal({
             {!formData.isPublic && (
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  参赛密码 <span className="text-error">*</span>
+                  参赛密码{' '}
+                  {!(isEdit && existingHasPassword) && <span className="text-error">*</span>}
                 </label>
                 <input
                   type="text"
-                  required
+                  required={!(isEdit && existingHasPassword)}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="input w-full"
-                  placeholder="请设置参赛密码"
+                  placeholder={
+                    isEdit && existingHasPassword
+                      ? '已设置密码，留空表示保持不变'
+                      : '请设置参赛密码'
+                  }
                 />
               </div>
             )}

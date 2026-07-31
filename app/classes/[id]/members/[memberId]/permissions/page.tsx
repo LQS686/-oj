@@ -17,13 +17,9 @@ import { loginPathFromLocation } from '@/lib/navigation'
 type Permissions = ClassPermissions
 
 const permissionDescriptions: Record<keyof Permissions, { title: string; description: string }> = {
-  canViewProblems: {
-    title: '查看题目',
-    description: '允许成员查看班级共享的题目',
-  },
   canSubmit: {
     title: '提交代码',
-    description: '允许成员提交代码到题目',
+    description: '允许成员提交代码到作业题目',
   },
   canViewNotes: {
     title: '查看笔记',
@@ -65,7 +61,6 @@ export default function MemberPermissionsPage() {
   const { user } = useUser()
 
   const [permissions, setPermissions] = useState<Permissions>({
-    canViewProblems: true,
     canSubmit: true,
     canViewNotes: true,
     canCreateNotes: false,
@@ -97,7 +92,16 @@ export default function MemberPermissionsPage() {
         if (member) {
           setMemberInfo(member)
           if (member.permissions) {
-            setPermissions(member.permissions)
+            const p = member.permissions
+            setPermissions({
+              canSubmit: p.canSubmit ?? true,
+              canViewNotes: p.canViewNotes ?? true,
+              canCreateNotes: p.canCreateNotes ?? false,
+              canManageAssignments: p.canManageAssignments ?? false,
+              canInviteMembers: p.canInviteMembers ?? false,
+              canManageMembers: p.canManageMembers ?? false,
+              canViewStats: p.canViewStats ?? false,
+            })
           }
         }
 
@@ -144,9 +148,9 @@ export default function MemberPermissionsPage() {
       const response = await fetchWithCookie(
         `/api/classes/${classId}/members/${memberId}/permissions`,
         {
-          method: 'PUT',
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ permissions }),
+          body: JSON.stringify(permissions),
         }
       )
 
@@ -155,12 +159,12 @@ export default function MemberPermissionsPage() {
         return
       }
 
-      if (response.ok) {
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.success) {
         await dialog.alert({ tone: 'success', message: '权限更新成功！' })
         router.push(`/classes/${classId}/members`)
       } else {
-        const data = await response.json()
-        await dialog.alert({ tone: 'error', message: data.error || '权限更新失败' })
+        await dialog.alert({ tone: 'error', message: data?.error || '权限更新失败' })
       }
     } catch (error) {
       logger.error('权限更新失败', error)

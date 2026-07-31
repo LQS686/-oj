@@ -14,7 +14,6 @@
  */
 import crypto from 'crypto'
 import { withApi, ok, fail, readJson } from '@/lib/api/withApi'
-import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { findUserByEmail, hashPassword } from '@/lib/auth/service'
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/email'
@@ -40,16 +39,7 @@ export const POST = withApi.public(async (req) => {
     return fail('VALIDATION', '邮箱格式不正确', 400)
   }
 
-  // IP 级别限流：每分钟最多 3 次找回密码请求
-  const ip = getClientIP(req)
-  const rl = await checkRateLimit(`forgot-pwd:${ip}`, {
-    maxRequests: 3,
-    windowMs: 60_000,
-    keyPrefix: 'forgot-pwd'
-  })
-  if (!rl.success) {
-    return fail('RATE_LIMITED', '请求过于频繁，请稍后再试', 429)
-  }
+  // IP 限流由 middleware 统一处理（3/5min），此处不再二次计数
 
   const user = await findUserByEmail(email.toLowerCase())
 

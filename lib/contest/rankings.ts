@@ -64,11 +64,11 @@ export function isContestSealed(contest: { sealRankTime?: Date | null; sealUnloc
  * 拉取题目+参赛者+提交，并计算排行榜
  *
  * @param options.viewerRole - 查看者角色，管理员可绕过封榜看到实时数据
- *                              （未传则视为普通用户，封榜时返回封榜快照）
+ * @param options.viewerUserId - 查看者 ID；竞赛作者与管理员一样可绕过封榜
  */
 export async function computeContestRankings(
   contestId: string,
-  options?: { viewerRole?: string }
+  options?: { viewerRole?: string; viewerUserId?: string }
 ) {
   const contest = await prisma.contest.findUnique({
     where: { id: contestId },
@@ -101,10 +101,12 @@ export async function computeContestRankings(
 
   // 封榜逻辑：
   //   普通用户在封榜期间，只能看到 sealRankTime 之前的提交；
-  //   管理员可绕过封榜看实时数据；
+  //   管理员与竞赛作者可绕过封榜看实时数据；
   //   比赛结束且 sealUnlocked=true 时，所有人都能看到完整数据。
   const viewerRole = options?.viewerRole
-  const viewerIsAdmin = viewerRole ? canAccessAdmin({ role: viewerRole }) : false
+  const viewerIsAdmin =
+    (viewerRole ? canAccessAdmin({ role: viewerRole }) : false) ||
+    (!!options?.viewerUserId && options.viewerUserId === contest.authorId)
   const sealed = isContestSealed(contest)
   // 截止时间：封榜时普通用户只看到 sealRankTime 之前的提交；管理员或未封榜时看完整endTime
   const submissionCutoffTime = sealed && !viewerIsAdmin

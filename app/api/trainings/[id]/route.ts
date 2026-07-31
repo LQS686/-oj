@@ -1,7 +1,7 @@
 /**
  * /api/trainings/[id] - 训练计划详情
  */
-import { withApi, ok, readJson, throw400, throw403, ApiError } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403, ApiError, resolveViewerFromRequest } from '@/lib/api/withApi'
 import {
   getTrainingWithProblemStatuses,
   updateTrainingAndProblems,
@@ -10,8 +10,6 @@ import {
 } from '@/lib/training/service'
 import { canViewTraining, loadTrainingAccess } from '@/lib/training/access'
 import { isObjectId } from '@/lib/api/validation'
-import { verifyToken } from '@/lib/auth'
-import { readAuthTokenFromRequest } from '@/lib/auth/cookie'
 import { prisma } from '@/lib/prisma'
 import { canAccessAdmin, canManageContent } from '@/lib/permissions'
 
@@ -19,8 +17,8 @@ export const GET = withApi.public(async (req, ctx) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的训练计划ID')
 
-  const token = readAuthTokenFromRequest(req)
-  const userId = token ? verifyToken(token)?.userId ?? null : null
+  const viewer = await resolveViewerFromRequest(req)
+  const userId = viewer?.user.id ?? null
 
   const access = await loadTrainingAccess(id)
   if (!access || !(await canViewTraining(access, userId))) {
@@ -40,9 +38,9 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
 
   const found = await prisma.training.findUnique({
     where: { id },
-    select: { authorId: true, classId: true },
+    select: { authorId: true },
   })
-  if (!found || found.classId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
+  if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
 
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
   const canEdit =
@@ -82,9 +80,9 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
 
   const found = await prisma.training.findUnique({
     where: { id },
-    select: { authorId: true, classId: true },
+    select: { authorId: true },
   })
-  if (!found || found.classId) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
+  if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
 
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
   const canDelete =

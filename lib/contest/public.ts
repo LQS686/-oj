@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { CacheKeys } from '@/lib/constants/cache-keys'
+import { canAccessAdmin } from '@/lib/permissions'
 
 /* ============================================================================
  * 列表 / 详情 / 创建 / 更新 / 删除 业务层封装
@@ -112,7 +113,7 @@ export async function listPublicContests(
 
 export async function getContestDetailWithRegistration(
   contestId: string,
-  currentUserId?: string
+  viewer?: { id: string; role?: string | null } | null
 ) {
   const contest = await prisma.contest.findUnique({
     where: { id: contestId },
@@ -124,14 +125,22 @@ export async function getContestDetailWithRegistration(
   if (!contest) return null
 
   let isRegistered = false
-  if (currentUserId) {
+  if (viewer?.id) {
     const participant = await prisma.contestParticipant.findUnique({
       where: {
-        contestId_userId: { contestId, userId: currentUserId },
+        contestId_userId: { contestId, userId: viewer.id },
       },
     })
     isRegistered = !!participant
   }
+
+  // 非公开竞赛：仅作者 / 管理员 / 已报名可见（防 ID 枚举）
+  if (!contest.isPublic) {
+    const isAuthor = !!viewer?.id && viewer.id === contest.authorId
+    const isAdmin = canAccessAdmin(viewer ?? null)
+    if (!isAuthor && !isAdmin && !isRegistered) return null
+  }
+
   // 永不向公开 API 返回 password 哈希
   const { password, ...safe } = contest
   return { ...safe, hasPassword: !!password, isRegistered }
@@ -166,14 +175,14 @@ export async function updateContestWithProblems(
   if (Array.isArray(problemIds) && problemIds.length > 0) {
     const found = await prisma.problem.findMany({
       where: { id: { in: problemIds } },
-      select: { id: true, visibility: true, classId: true },
+      select: { id: true, visibility: true },
     })
     if (found.length !== problemIds.length) {
       const { ApiError } = await import('@/lib/api/withApi')
       throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
     }
     const invalid = found.filter(
-      (p) => p.classId != null || (p.visibility !== 'public' && p.visibility !== 'contest')
+      (p) => p.visibility !== 'public' && p.visibility !== 'contest'
     )
     if (invalid.length > 0) {
       const { ApiError } = await import('@/lib/api/withApi')
@@ -223,7 +232,8 @@ export async function updateContestWithProblems(
   })
   cache.delete(CacheKeys.contest.byId(contestId))
   cache.deleteByPrefix('contest:rank')
-  return updated
+  const { password: _pw, ...safe } = updated
+  return { ...safe, hasPassword: Boolean(_pw) }
 }
 
 /** 校验密码竞赛报名所需的密码 / 邀请码 */

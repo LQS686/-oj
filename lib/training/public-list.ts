@@ -4,22 +4,12 @@
  */
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 import type {
   TrainingListItem,
   PaginatedResponse,
   TrainingCategoryType,
 } from './types'
-
-/**
- * 排除班级私有题单。
- * MongoDB/Prisma：单独的 `classId: null` 匹配不到「字段未写入」的文档，
- * 会导致公开题单被全部滤空。
- */
-function whereNotClassScoped(): Prisma.TrainingWhereInput {
-  return {
-    OR: [{ classId: null }, { classId: { isSet: false } }],
-  }
-}
 
 /* ============================================================================
  * 高级查询：公开列表（带分类/标签/作者/题目计数/用户进度）
@@ -39,8 +29,7 @@ export async function listPublicTrainingsAdvanced(
     joinedOnly?: boolean
   }
 ): Promise<PaginatedResponse<TrainingListItem>> {
-  // 公开题单：isPublic + published + 非班级私有
-  // 登录用户：额外可看到自己创建的私有/草稿题单（仍排除班级私有）
+  // 公开题单：isPublic + published；登录用户额外可看到自己创建的私有/草稿
   const visibility: Prisma.TrainingWhereInput = filter.userId
     ? {
         OR: [
@@ -50,24 +39,25 @@ export async function listPublicTrainingsAdvanced(
       }
     : { isPublic: true, status: 'published' }
 
-  const baseScope: Prisma.TrainingWhereInput = {
-    AND: [visibility, whereNotClassScoped()],
-  }
+  const baseScope: Prisma.TrainingWhereInput = { ...visibility }
 
-  // joinedOnly：限定为当前用户加入的题单（仍排除班级私有）
-  if (filter.joinedOnly && filter.userId) {
+  // joinedOnly：限定为当前用户加入的题单；未登录时返回空集
+  if (filter.joinedOnly) {
+    if (!filter.userId) {
+      return {
+        items: [],
+        total: 0,
+        page,
+        pageSize: limit,
+        totalPages: 0,
+      }
+    }
     const joinedIds = await prisma.trainingEnrollment.findMany({
       where: { userId: filter.userId },
       select: { trainingId: true },
     })
     const joinedTrainingIds = joinedIds.map((e: { trainingId: string }) => e.trainingId)
-    const visibleJoined = await prisma.training.findMany({
-      where: {
-        AND: [{ id: { in: joinedTrainingIds } }, whereNotClassScoped()],
-      },
-      select: { id: true },
-    })
-    baseScope.id = { in: visibleJoined.map((t: { id: string }) => t.id) }
+    baseScope.id = { in: joinedTrainingIds }
   }
   const extra: Prisma.TrainingWhereInput[] = []
   if (filter.keyword) {
@@ -175,7 +165,9 @@ export async function listPublicTrainingsAdvanced(
       problemCount: problemTotal,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
-      author: t.author,
+      author: t.author
+        ? { ...t.author, avatar: sanitizeAvatarUrl(t.author.avatar) }
+        : t.author,
       category: t.category,
       userProgress: p
         ? {

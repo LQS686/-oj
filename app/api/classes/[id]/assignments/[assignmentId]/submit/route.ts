@@ -26,6 +26,12 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以提交代码')
 
+  const { getClassMembership, hasClassPermission } = await import('@/lib/class/auth')
+  const membership = await getClassMembership(id, user.id)
+  if (membership && !hasClassPermission(membership, 'canSubmit') && membership.isStudent) {
+    throw403('当前账号无提交权限')
+  }
+
   const result = await submitAssignmentCode({
     classId: id,
     assignmentId,

@@ -28,8 +28,44 @@ export async function listPublicProblems(filter: {
   search?: string
   difficulty?: string
   tag?: string
+  /** 按题号精确批量查询（竞赛批量加题）；存在时忽略分页过滤语义，最多 100 个 */
+  numbers?: string[]
 }): Promise<ListPublicProblemsResult> {
-  const { page, pageSize, search, difficulty, tag } = filter
+  const { page, pageSize, search, difficulty, tag, numbers } = filter
+
+  if (numbers && numbers.length > 0) {
+    const unique = [...new Set(numbers.map((n) => n.trim()).filter(Boolean))].slice(0, 100)
+    const items = await prisma.problem.findMany({
+      where: {
+        visibility: 'public',
+        OR: [
+          { problemNumber: { in: unique } },
+          { problemNumber: { in: unique.map((n) => n.toUpperCase()) } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    })
+    // 按请求顺序去重（大小写不敏感）
+    const byNumber = new Map(
+      items
+        .filter((p) => !!p.problemNumber)
+        .map((p) => [p.problemNumber!.toUpperCase(), p])
+    )
+    const ordered = unique
+      .map((n) => byNumber.get(n.toUpperCase()))
+      .filter((p): p is (typeof items)[number] => !!p)
+    return {
+      problems: ordered,
+      pagination: {
+        total: ordered.length,
+        page: 1,
+        pageSize: ordered.length || 1,
+        totalPages: 1,
+      },
+    }
+  }
+
   const where: Prisma.ProblemWhereInput = { visibility: 'public' }
   if (search) {
     where.OR = [

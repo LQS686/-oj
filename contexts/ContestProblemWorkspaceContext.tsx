@@ -11,6 +11,7 @@ import {
 } from 'react'
 import type { JudgeStatusData } from '@/types/models'
 import type { SubmissionListRow } from '@/hooks/useSubmissionResultFlow'
+import { fetchWithCookie } from '@/lib/api/base'
 
 export interface ContestProblemItem {
   id: string
@@ -105,7 +106,7 @@ export function ContestProblemWorkspaceProvider({
 
   const refreshContestProblems = useCallback(async () => {
     try {
-      const res = await fetch(`/api/contests/${contestId}/problems`, { cache: 'no-store' })
+      const res = await fetchWithCookie(`/api/contests/${contestId}/problems`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success && Array.isArray(data.data)) {
         setContestProblems(data.data)

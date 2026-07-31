@@ -23,22 +23,18 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   const alreadyRegistered = await isUserRegistered(id, user.id)
   if (alreadyRegistered) throw409('您已经报名过此竞赛')
 
+  // type 字段是赛制（ACM/OI），密码门以 password 字段是否存在为准
+  if (contest.endTime && new Date() > contest.endTime) {
+    throw403('竞赛已结束，无法报名')
+  }
+
   const body = await readJson<{ password?: string; inviteCode?: string }>(req)
 
-  if (contest.type === 'password') {
-    if (!contest.password) {
-      throw400('PASSWORD_NOT_SET', '竞赛未设置密码，请联系管理员')
-    }
-    if (!body.password) throw400('MISSING_PASSWORD', '请输入竞赛密码')
-    const passwordValid = await verifyContestPassword(body.password!, contest.password)
-    if (!passwordValid) throw403('密码错误')
-  } else if (contest.type === 'invite') {
-    if (!contest.password) {
-      throw400('PASSWORD_NOT_SET', '竞赛未设置邀请码，请联系管理员')
-    }
-    if (!body.inviteCode) throw400('MISSING_INVITE_CODE', '请输入邀请码')
-    const inviteValid = await verifyContestPassword(body.inviteCode!, contest.password)
-    if (!inviteValid) throw403('邀请码无效')
+  if (contest.password) {
+    const secret = (body.password || body.inviteCode || '').trim()
+    if (!secret) throw400('MISSING_PASSWORD', '请输入竞赛密码或邀请码')
+    const passwordValid = await verifyContestPassword(secret, contest.password)
+    if (!passwordValid) throw403('密码或邀请码错误')
   }
 
   try {
