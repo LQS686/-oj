@@ -319,14 +319,7 @@ export default function RegisterPage() {
                   required
                 />
                 <label className="text-sm text-muted-foreground">
-                  我已阅读并同意
-                  <Link href="/terms" className="text-primary-light hover:text-primary mx-1 transition-colors duration-200 group">
-                    <span className="group-hover:underline">服务条款</span>
-                  </Link>
-                  和
-                  <Link href="/privacy" className="text-primary-light hover:text-primary mx-1 transition-colors duration-200 group">
-                    <span className="group-hover:underline">隐私政策</span>
-                  </Link>
+                  我已阅读并同意本站的相关使用条款与隐私政策
                 </label>
               </div>
 

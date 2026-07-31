@@ -142,5 +142,45 @@ else
   fi
 fi
 
+# ============================================================
+# 确保 oj_platform 应用用户存在（每次启动都校验，幂等）
+# 背景：docker-entrypoint-initdb.d/init-mongo.js 仅在空数据卷首次执行；
+#       若首启时副本集尚未 PRIMARY、或卷已存在残留数据，ojuser 不会被创建，
+#       导致 Prisma 抛 SCRAM AuthenticationFailed → 全站 500/503。
+#       此处由 mongo-init.sh 每次启动后兜底补建。
+# ============================================================
+if [[ -n "${MONGO_INITDB_ROOT_USERNAME:-}" && -n "${MONGO_INITDB_ROOT_PASSWORD:-}" \
+      && -n "${MONGO_APP_USER:-}" && -n "${MONGO_APP_PASSWORD:-}" ]]; then
+  ENSURE_APP_USER_JS='
+(function () {
+  const appDb = db.getSiblingDB("oj_platform");
+  const appUser = process.env.MONGO_APP_USER;
+  const appPwd = process.env.MONGO_APP_PASSWORD;
+  // 幂等：已存在则 updateUser，否则 createUser
+  const existing = appDb.getUser(appUser);
+  if (existing) {
+    appDb.updateUser(appUser, { pwd: appPwd, roles: [{ role: "readWrite", db: "oj_platform" }] });
+    print("[mongo-init] app user updated: " + appUser);
+  } else {
+    appDb.createUser({
+      user: appUser,
+      pwd: appPwd,
+      roles: [{ role: "readWrite", db: "oj_platform" }]
+    });
+    print("[mongo-init] app user created: " + appUser);
+  }
+})();
+'
+  if mongosh --quiet \
+    -u "$MONGO_INITDB_ROOT_USERNAME" \
+    -p "$MONGO_INITDB_ROOT_PASSWORD" \
+    --authenticationDatabase admin \
+    --eval "$ENSURE_APP_USER_JS" 2>&1 | grep -E "app user (created|updated)"; then
+    :
+  else
+    echo "[mongo-init] WARN: failed to ensure app user (may need PRIMARY); app may fail until next restart"
+  fi
+fi
+
 trap - EXIT INT TERM
 wait "$mongo_pid"
