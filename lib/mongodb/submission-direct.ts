@@ -92,8 +92,16 @@ export async function decrementProblemSubmitCount(problemId: string) {
   )
 }
 
+export type UpdateSubmissionDirectResult = {
+  matched: boolean
+  modified: boolean
+}
+
 /**
  * 直接更新提交记录（绕过 Prisma 事务）
+ *
+ * @param options.onlyFromStatuses 原子条件：仅当当前 status ∈ 集合时更新。
+ *   用于 active→JUDGING 与 completed→终态竞态，避免慢一步的 JUDGING 覆盖终态。
  */
 export async function updateSubmissionDirect(
   submissionId: string,
@@ -107,8 +115,8 @@ export async function updateSubmissionDirect(
     message?: string | null
     testResults?: unknown
   },
-  options?: { forceStatus?: boolean }
-) {
+  options?: { forceStatus?: boolean; onlyFromStatuses?: string[] }
+): Promise<UpdateSubmissionDirectResult> {
   return withRetry(
     async () => {
     const client = await getMongoClient()
@@ -131,12 +139,21 @@ export async function updateSubmissionDirect(
       }
     }
 
-    // 状态机守卫：
+    const filter: Record<string, unknown> = { _id: new ObjectId(submissionId) }
+    if (options?.onlyFromStatuses && options.onlyFromStatuses.length > 0) {
+      filter.status = { $in: options.onlyFromStatuses }
+    }
+
+    // 状态机守卫（仅在非条件更新路径做读-改；onlyFromStatuses 已原子约束源状态）：
     //   1) 若要更新 status，先读当前状态
     //   2) 通过 canTransition 校验合法转换
     //   3) 仅在 PENDING/JUDGING/RUNNING 下允许非合法转换（recover / 竞态）
     //   4) forceStatus：管理员重测，允许终态 → PENDING
-    if (typeof sanitized.status === 'string' && !options?.forceStatus) {
+    if (
+      typeof sanitized.status === 'string' &&
+      !options?.forceStatus &&
+      !options?.onlyFromStatuses?.length
+    ) {
       const current = await db.collection('Submission').findOne(
         { _id: new ObjectId(submissionId) },
         { projection: { status: 1 } }
@@ -156,10 +173,14 @@ export async function updateSubmissionDirect(
       }
     }
 
-    await db.collection('Submission').updateOne(
-      { _id: new ObjectId(submissionId) },
+    const result = await db.collection('Submission').updateOne(
+      filter,
       { $set: sanitized }
     )
+    return {
+      matched: result.matchedCount > 0,
+      modified: result.modifiedCount > 0,
+    }
   },
     3,
     { idempotent: true }

@@ -297,6 +297,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
       if (data.id !== id) return
       setSubmission((prev) => {
         if (!prev) return prev
+        // 终态后忽略迟到的 JUDGING（worker active/completed 竞态）
         if (isFinalStatus(prev.status) && !isFinalStatus(data.status)) {
           return prev
         }

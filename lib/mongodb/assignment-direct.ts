@@ -95,8 +95,15 @@ export async function createClassAssignmentSubmissionDirect(data: {
   }
 }
 
+export type UpdateClassAssignmentSubmissionDirectResult = {
+  matched: boolean
+  modified: boolean
+}
+
 /**
  * 直接更新班级作业提交记录（绕过 Prisma 事务）
+ *
+ * @param options.onlyFromStatuses 原子条件：仅当当前 status ∈ 集合时更新（防 active/completed 竞态）
  */
 export async function updateClassAssignmentSubmissionDirect(
   submissionId: string,
@@ -110,8 +117,8 @@ export async function updateClassAssignmentSubmissionDirect(
     isFirstAc?: boolean
     timeElapsedMs?: number
   },
-  options?: { forceStatus?: boolean }
-) {
+  options?: { forceStatus?: boolean; onlyFromStatuses?: string[] }
+): Promise<UpdateClassAssignmentSubmissionDirectResult> {
   return withRetry(
     async () => {
     const client = await getMongoClient()
@@ -134,9 +141,18 @@ export async function updateClassAssignmentSubmissionDirect(
       }
     }
 
+    const filter: Record<string, unknown> = { _id: new ObjectId(submissionId) }
+    if (options?.onlyFromStatuses && options.onlyFromStatuses.length > 0) {
+      filter.status = { $in: options.onlyFromStatuses }
+    }
+
     // 状态机守卫（与 updateSubmissionDirect 一致）
     // forceStatus：管理员重测，允许终态 → PENDING
-    if (typeof sanitized.status === 'string' && !options?.forceStatus) {
+    if (
+      typeof sanitized.status === 'string' &&
+      !options?.forceStatus &&
+      !options?.onlyFromStatuses?.length
+    ) {
       const current = await db.collection('ClassAssignmentSubmission').findOne(
         { _id: new ObjectId(submissionId) },
         { projection: { status: 1 } }
@@ -159,10 +175,14 @@ export async function updateClassAssignmentSubmissionDirect(
       }
     }
 
-    await db.collection('ClassAssignmentSubmission').updateOne(
-      { _id: new ObjectId(submissionId) },
+    const result = await db.collection('ClassAssignmentSubmission').updateOne(
+      filter,
       { $set: sanitized }
     )
+    return {
+      matched: result.matchedCount > 0,
+      modified: result.modifiedCount > 0,
+    }
   },
     3,
     { idempotent: true }

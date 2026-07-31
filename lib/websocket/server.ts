@@ -512,27 +512,19 @@ export function emitSubmissionUpdate(userId: string, data: {
   ioInstance.to(roomName).emit('submission:update', data)
   ioInstance.to(subRoom).emit('submission:update', data)
 
-  // 异步核对房间人数，便于发现「推了但无人在房」的回归
-  void ioInstance.in(roomName).fetchSockets().then((sockets) => {
-    logger.info(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
-      id: data.id,
-      status: data.status,
-      score: data.score,
-      time: data.time,
-      memory: data.memory,
-      roomSize: sockets.length,
-    })
-    if (sockets.length === 0) {
-      logger.warn(`⚠️  提交更新推送时用户房间为空: ${roomName}，客户端可能未入房`)
-    }
-  }).catch(() => {
-    logger.info(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
-      id: data.id,
-      status: data.status,
-      score: data.score,
-    })
+  // 热路径只打轻量日志；fetchSockets 会遍历适配器，高频终态/进度推送时成本偏高
+  logger.info(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
+    id: data.id,
+    status: data.status,
+    score: data.score,
+    time: data.time,
+    memory: data.memory,
   })
 }
+
+/** 同提交进度推送节流，避免多测点并行时打爆 WebSocket */
+const progressThrottle = new Map<string, number>()
+const PROGRESS_THROTTLE_MS = 150
 
 /**
  * 发送评测进度到指定用户
@@ -546,11 +538,25 @@ export function emitJudgeProgress(userId: string, data: {
   const ioInstance = getIO()
   if (!ioInstance) return
 
+  const now = Date.now()
+  const isTerminalProgress =
+    data.currentTest <= 0 ||
+    (data.totalTests > 0 && data.currentTest >= data.totalTests)
+  const lastAt = progressThrottle.get(data.submissionId) ?? 0
+  if (!isTerminalProgress && now - lastAt < PROGRESS_THROTTLE_MS) {
+    return
+  }
+  if (isTerminalProgress && data.currentTest >= data.totalTests && data.totalTests > 0) {
+    progressThrottle.delete(data.submissionId)
+  } else {
+    progressThrottle.set(data.submissionId, now)
+  }
+
   const roomName = `user:${userId}`
   const subRoom = submissionRoom(data.submissionId)
   ioInstance.to(roomName).emit('judge:progress', data)
   ioInstance.to(subRoom).emit('judge:progress', data)
-  logger.info(`📊 推送评测进度到 ${roomName} / ${subRoom}: ${data.currentTest}/${data.totalTests}`)
+  logger.debug(`📊 推送评测进度到 ${roomName} / ${subRoom}: ${data.currentTest}/${data.totalTests}`)
 }
 
 /**

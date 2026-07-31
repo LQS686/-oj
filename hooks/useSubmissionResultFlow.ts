@@ -129,6 +129,8 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
   const onRefreshRef = useRef(onRefreshAfterFinal)
   const onFinalAppliedRef = useRef(onFinalApplied)
   const mergeListRef = useRef(mergeListOnUpdate)
+  /** bindSubmission 前到达的 WS 更新（CE/小数据题常见竞态） */
+  const earlyUpdatesRef = useRef<Map<string, SubmissionSocketPayload>>(new Map())
 
   useEffect(() => {
     currentSubmissionIdRef.current = currentSubmissionId
@@ -160,6 +162,7 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
       currentSubmissionIdRef.current = null
       showResultModalRef.current = false
       lastResultRef.current = null
+      earlyUpdatesRef.current.clear()
       setSubmitting(false)
       setCurrentSubmissionId(null)
       setJudgeStatus(null)
@@ -181,7 +184,26 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
     if (!result.submissionId || result.submissionId !== currentSubmissionIdRef.current) return
     if (!showResultModalRef.current && !submittingRef.current) return
     const prev = lastResultRef.current
-    if (prev?.submissionId === result.submissionId && prev.status === result.status) return
+    if (prev?.submissionId === result.submissionId && prev.status === result.status) {
+      // 同状态重复推送（如补 timeElapsedMs）仍合并字段
+      if (
+        result.timeElapsedMs != null &&
+        prev.timeElapsedMs !== result.timeElapsedMs
+      ) {
+        const merged = { ...prev, timeElapsedMs: result.timeElapsedMs }
+        lastResultRef.current = merged
+        setLastResult(merged)
+      }
+      return
+    }
+    // 已有终态时忽略迟到的非终态（active 竞态推送的 JUDGING）
+    if (
+      prev?.submissionId === result.submissionId &&
+      isFinalSubmissionStatus(prev.status) &&
+      !isFinalSubmissionStatus(result.status)
+    ) {
+      return
+    }
     submittingRef.current = false
     setSubmitting(false)
     setJudgeProgress(null)
@@ -190,11 +212,19 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
     onFinalAppliedRef.current?.(result)
   }, [])
 
-  /** 断线重连并确认入房后：补上断连窗口内可能已发出的终态 */
+  /** 断线重连 / bind 后：补上可能已发出的终态 */
   const syncCurrentSubmission = useCallback(async () => {
     const watchedId = currentSubmissionIdRef.current
     const epoch = submitEpochRef.current
-    if (!watchedId || !submittingRef.current) return
+    if (!watchedId) return
+    // 已出终态则无需再拉；仍允许 submitting 或弹窗打开时同步
+    if (
+      lastResultRef.current?.submissionId === watchedId &&
+      isFinalSubmissionStatus(lastResultRef.current.status)
+    ) {
+      return
+    }
+    if (!submittingRef.current && !showResultModalRef.current) return
     try {
       const res = await fetchWithCookie(`/api/submissions/${watchedId}`, { cache: 'no-store' })
       const data = await res.json()
@@ -229,22 +259,18 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
     }
   }, [applyModalFinalResult])
 
-  const { isConnected } = useSubmissionSocket({
-    userId: userId || '',
-    enabled: enabled && !!userId,
-    onConnected: () => {
-      void syncCurrentSubmission()
-    },
-    onSubmissionUpdate: (payload) => {
-      if (payload?.id && setSubmissions && mergeListRef.current) {
-        setSubmissions((prev) => {
-          if (!Array.isArray(prev)) return prev
-          const next = mergeListRef.current!(prev, payload)
-          return next ?? prev
-        })
-      }
-
+  const applySocketPayload = useCallback(
+    (payload: SubmissionSocketPayload) => {
       if (payload.id !== currentSubmissionIdRef.current) return
+
+      // 已展示终态后，忽略迟到的 JUDGING/PENDING（服务端 active 竞态）
+      if (
+        lastResultRef.current?.submissionId === payload.id &&
+        isFinalSubmissionStatus(lastResultRef.current.status) &&
+        !isFinalSubmissionStatus(payload.status)
+      ) {
+        return
+      }
 
       if (isFinalSubmissionStatus(payload.status)) {
         applyModalFinalResult(payloadToResult(payload))
@@ -259,30 +285,92 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
         })
       }
     },
-    onJudgeProgress: (data) => {
-      if (data?.submissionId === currentSubmissionIdRef.current) {
-        setJudgeProgress({
-          currentTest: data.currentTest,
-          totalTests: data.totalTests,
-        })
-        setJudgeStatus((prev) =>
-          prev ?? {
-            submissionId: data.submissionId,
-            status: SubmissionStatus.JUDGING,
-            passedTests: 0,
-            totalTests: data.totalTests,
-            testResults: [],
+    [applyModalFinalResult]
+  )
+
+  const { isConnected } = useSubmissionSocket({
+    userId: userId || '',
+    enabled: enabled && !!userId,
+    onConnected: () => {
+      void syncCurrentSubmission()
+    },
+    onSubmissionUpdate: (payload) => {
+      if (payload?.id && setSubmissions && mergeListRef.current) {
+        // 列表：终态后忽略回退到非终态的推送
+        setSubmissions((prev) => {
+          if (!Array.isArray(prev)) return prev
+          const idx = prev.findIndex((s) => s?.id === payload.id)
+          if (
+            idx !== -1 &&
+            isFinalSubmissionStatus(prev[idx].status) &&
+            !isFinalSubmissionStatus(payload.status)
+          ) {
+            return prev
           }
-        )
+          const next = mergeListRef.current!(prev, payload)
+          return next ?? prev
+        })
       }
+
+      if (!payload?.id) return
+
+      // 提交中但尚未 bind：缓存更新，避免 CE 等快评测丢事件
+      if (
+        submittingRef.current &&
+        !currentSubmissionIdRef.current
+      ) {
+        earlyUpdatesRef.current.set(payload.id, payload)
+        return
+      }
+
+      if (payload.id !== currentSubmissionIdRef.current) {
+        if (submittingRef.current) {
+          earlyUpdatesRef.current.set(payload.id, payload)
+        }
+        return
+      }
+
+      applySocketPayload(payload)
+    },
+    onJudgeProgress: (data) => {
+      if (data?.submissionId !== currentSubmissionIdRef.current) return
+      if (
+        lastResultRef.current?.submissionId === data.submissionId &&
+        isFinalSubmissionStatus(lastResultRef.current.status)
+      ) {
+        return
+      }
+      setJudgeProgress({
+        currentTest: data.currentTest,
+        totalTests: data.totalTests,
+      })
+      setJudgeStatus((prev) =>
+        prev ?? {
+          submissionId: data.submissionId,
+          status: SubmissionStatus.JUDGING,
+          passedTests: 0,
+          totalTests: data.totalTests,
+          testResults: [],
+        }
+      )
     },
   })
+
+  // 评测弹窗打开期间轻量兜底：仅在仍非终态时拉取，弥补偶发丢包（非主路径）
+  useEffect(() => {
+    if (!submitting || !currentSubmissionId) return
+    const timer = window.setInterval(() => {
+      void syncCurrentSubmission()
+    }, 2500)
+    return () => window.clearInterval(timer)
+  }, [submitting, currentSubmissionId, syncCurrentSubmission])
 
   const beginSubmitSession = useCallback((): number => {
     if (submittingRef.current) return -1
     submittingRef.current = true
     const epoch = ++submitEpochRef.current
     currentSubmissionIdRef.current = null
+    earlyUpdatesRef.current.clear()
     setCurrentSubmissionId(null)
     setSubmitting(true)
     setJudgeStatus(null)
@@ -300,8 +388,20 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
     if (epoch !== submitEpochRef.current) return false
     currentSubmissionIdRef.current = submissionId
     setCurrentSubmissionId(submissionId)
+    const early = earlyUpdatesRef.current.get(submissionId)
+    earlyUpdatesRef.current.delete(submissionId)
+    if (early) {
+      // 微任务中应用，确保 state 已绑定
+      Promise.resolve().then(() => {
+        if (currentSubmissionIdRef.current === submissionId) {
+          applySocketPayload(early)
+        }
+      })
+    } else {
+      void syncCurrentSubmission()
+    }
     return true
-  }, [])
+  }, [applySocketPayload, syncCurrentSubmission])
 
   const abortSubmitSession = useCallback(() => {
     submittingRef.current = false

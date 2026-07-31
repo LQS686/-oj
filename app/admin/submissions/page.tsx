@@ -274,7 +274,7 @@ export default function AdminSubmissionsPage() {
               }}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 statusFilter === group.key
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >

@@ -111,8 +111,8 @@ class JudgeQueue extends EventEmitter {
       this.startDeadJobChecker()
     }
     // 并发升高时立刻尝试调度等待中的任务
-    if (this.maxConcurrent > prev.maxConcurrent && !this.isProcessing) {
-      void this.processQueue()
+    if (this.maxConcurrent > prev.maxConcurrent) {
+      this.scheduleProcess()
     }
     logger.info('评测队列运行时配置已更新', {
       prev,
@@ -184,6 +184,7 @@ class JudgeQueue extends EventEmitter {
     } catch (e) {
       logger.error(`清理死任务时出错`, e, { jobId: job.id })
     }
+    this.scheduleProcess()
   }
 
   // 死任务检测（备份）：定时器漏触发时仍能 abort + 释放槽位
@@ -221,6 +222,14 @@ class JudgeQueue extends EventEmitter {
     this.abortControllers.clear()
   }
 
+  /** 事件驱动调度：有空位且有等待任务时启动，避免 100ms 忙等空转 */
+  private scheduleProcess() {
+    if (this.isProcessing) return
+    if (this.queue.length === 0) return
+    if (this.processing.size >= this.maxConcurrent) return
+    this.scheduleProcess()
+  }
+
   // 添加任务到队列
   async add(data: JudgeJob): Promise<string> {
     const job: QueuedJob = {
@@ -235,21 +244,17 @@ class JudgeQueue extends EventEmitter {
     
     logger.info(`任务已加入队列`, { jobId: job.id, queueLength: this.queue.length })
     
-    // 触发处理
-    if (!this.isProcessing) {
-      this.processQueue()
-    }
+    this.scheduleProcess()
 
     return job.id
   }
 
-  // 处理队列
+  // 处理队列：一次填满空闲槽位后退出；任务结束时再 scheduleProcess
   private async processQueue() {
     if (this.isProcessing) return
     this.isProcessing = true
 
-    while (this.queue.length > 0 || this.processing.size > 0) {
-      // 启动新任务（如果有空闲槽位）
+    try {
       while (this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
         const job = this.queue.shift()
         if (!job) break
@@ -261,32 +266,35 @@ class JudgeQueue extends EventEmitter {
         this.emit('active', job)
         logger.info(`开始评测`, { jobId: job.id })
 
-        // 异步执行评测（不等待）
-        this.executeJob(job, signal).catch((error: Error) => {
-          logger.error(`评测执行错误`, error, { jobId: job.id })
-          this.clearJobGuards(job.id)
-          // 补全：确保 job 不永久占槽位
-          if (job.status === 'failed' || job.status === 'completed') return
-          try {
-            job.status = 'failed'
-            job.error = error instanceof Error ? error.message : String(error)
-            job.completedAt = new Date()
-            this.processing.delete(job.id)
-            this.completed.set(job.id, job)
-            this.emit('failed', job, error)
-          } catch (e) {
-            logger.error(`补全失败状态时出错`, e, { jobId: job.id })
-          }
-        })
+        // 异步执行评测（不等待）；结束后释放槽位并继续调度
+        this.executeJob(job, signal)
+          .catch((error: Error) => {
+            logger.error(`评测执行错误`, error, { jobId: job.id })
+            this.clearJobGuards(job.id)
+            if (job.status === 'failed' || job.status === 'completed') return
+            try {
+              job.status = 'failed'
+              job.error = error instanceof Error ? error.message : String(error)
+              job.completedAt = new Date()
+              this.processing.delete(job.id)
+              this.completed.set(job.id, job)
+              this.emit('failed', job, error)
+            } catch (e) {
+              logger.error(`补全失败状态时出错`, e, { jobId: job.id })
+            }
+          })
+          .finally(() => {
+            this.scheduleProcess()
+          })
       }
-
-      // 等待一小段时间再检查
-      await new Promise(resolve => setTimeout(resolve, 100))
+    } finally {
+      this.isProcessing = false
+      if (this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
+        this.scheduleProcess()
+      }
     }
-
-    this.isProcessing = false
   }
-
+  
   // 执行单个评测任务
   private async executeJob(job: QueuedJob, signal: AbortSignal) {
     try {

@@ -653,15 +653,15 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
             <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
               <div className="text-center">
                 <div className="text-lg font-bold text-secondary tabular-nums">{submission.passedTests}</div>
-                <div className="text-[11px] text-muted-foreground">通过</div>
+                <div className="text-xs text-muted-foreground">通过</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold text-error tabular-nums">{failedCount}</div>
-                <div className="text-[11px] text-muted-foreground">未通过</div>
+                <div className="text-xs text-muted-foreground">未通过</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold text-primary tabular-nums">{submission.totalTests}</div>
-                <div className="text-[11px] text-muted-foreground">总计</div>
+                <div className="text-xs text-muted-foreground">总计</div>
               </div>
             </div>
           </section>
