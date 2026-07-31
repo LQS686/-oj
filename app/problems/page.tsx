@@ -21,7 +21,7 @@ import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useClickOutside } from '@/hooks/useClickOutside'
-import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState, useDialog, Modal } from '@/components/common'
+import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState, useDialog, Modal, ListToolbar } from '@/components/common'
 
 interface Problem {
   id: string
@@ -432,20 +432,14 @@ export default function ProblemsPage() {
         title="题库"
         icon={BookOpen}
         toolbar={
-          <div className="card-static rounded-lg border border-border p-2 relative z-10">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <div className="relative flex-1 min-w-0 flex items-center">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="输入题号、标题或来源"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-md border-0 bg-transparent text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-0"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0 border-t sm:border-t-0 sm:border-l border-border pt-2 sm:pt-0 sm:pl-2">
+          <ListToolbar
+            search={{
+              value: searchQuery,
+              onChange: setSearchQuery,
+              placeholder: '输入题号、标题或来源',
+            }}
+            trailing={
+              <>
                 <div className="relative" ref={difficultyRef}>
                   <button
                     type="button"
@@ -477,7 +471,9 @@ export default function ProblemsPage() {
                           >
                             <span
                               className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                                checked ? 'bg-primary border-primary text-white' : 'border-border'
+                                checked
+                                  ? 'bg-primary border-primary text-primary-foreground'
+                                  : 'border-border'
                               }`}
                             >
                               {checked && <Check className="w-3 h-3" />}
@@ -525,9 +521,9 @@ export default function ProblemsPage() {
                   <Shuffle className={`w-4 h-4 ${randomLoading ? 'animate-pulse' : ''}`} />
                   <span className="hidden sm:inline">随机一题</span>
                 </button>
-              </div>
-            </div>
-          </div>
+              </>
+            }
+          />
         }
       >
         {renderContent()}

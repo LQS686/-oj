@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
-import { EducationalPageShell, PageLoading, ListEmptyState, useDialog } from '@/components/common'
+import { EducationalPageShell, PageLoading, ListEmptyState, useDialog, ListToolbar, ListToolbarTabs } from '@/components/common'
 import { DataTable, type Column } from '@/components/admin'
 import type { Notification } from '@/types/models'
 import { formatDate } from '@/lib/utils'
@@ -258,36 +258,25 @@ export default function NotificationsPage() {
  ) : undefined
  }
  toolbar={
- <div className="card-static rounded-lg p-4 border border-border">
- <div className="flex flex-wrap gap-2">
- <button
- onClick={() => {
- setFilter('all')
+ <ListToolbar
+ leading={
+ <ListToolbarTabs
+ ariaLabel="通知筛选"
+ value={filter}
+ onChange={(key) => {
+ setFilter(key as typeof filter)
  setPage(1)
  }}
- className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
- filter === 'all'
- ? 'bg-primary text-primary-foreground shadow-lg'
- : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
- }`}
- >
- 全部
- </button>
- <button
- onClick={() => {
- setFilter('unread')
- setPage(1)
- }}
- className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
- filter === 'unread'
- ? 'bg-primary text-primary-foreground shadow-lg'
- : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
- }`}
- >
- 未读 {unreadCount > 0 && `(${unreadCount})`}
- </button>
- </div>
- </div>
+ items={[
+ { key: 'all', label: '全部' },
+ {
+ key: 'unread',
+ label: unreadCount > 0 ? `未读 (${unreadCount})` : '未读',
+ },
+ ]}
+ />
+ }
+ />
  }
  >
  {showSkeleton ? (

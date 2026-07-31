@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Trophy, TrendingUp, Minus, RefreshCw, AlertCircle, ChevronUp, Crown, Medal, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import io from 'socket.io-client'
-import { EducationalPageShell, ListEmptyState } from '@/components/common'
+import { EducationalPageShell, ListEmptyState, ListToolbar, ListToolbarTabs } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import { errorLike } from '@/lib/api/errors'
 import { PageContainer } from '@/components/layout'
@@ -190,25 +190,19 @@ export default function RankPage() {
   </button>
   }
   toolbar={
-  <div className="flex items-center gap-1 card-static p-1 rounded-lg w-fit border border-border">
-  {[
+  <ListToolbar
+  leading={
+  <ListToolbarTabs
+  ariaLabel="排行榜类型"
+  value={activeTab}
+  onChange={(key) => setActiveTab(key as typeof activeTab)}
+  items={[
   { key: 'rating', label: 'Rating 排行榜' },
   { key: 'solved', label: 'AC 刷题榜' },
-  ].map((tab) => (
-  <button
-  key={tab.key}
-  type="button"
-  onClick={() => setActiveTab(tab.key as typeof activeTab)}
-  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-  activeTab === tab.key
-  ? 'bg-primary text-primary-foreground shadow-sm'
-  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-  }`}
-  >
-  {tab.label}
-  </button>
-  ))}
-  </div>
+  ]}
+  />
+  }
+  />
   }
   className="flex flex-col"
   >

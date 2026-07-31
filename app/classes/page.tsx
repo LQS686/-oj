@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
-import { Users, Search, Plus, Calendar, TrendingUp, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
+import { Users, Plus, Calendar, TrendingUp, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
@@ -11,7 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
 import { formatDate } from '@/lib/utils'
 import CreateClassModal from '@/components/class/CreateClassModal'
-import { EducationalPageShell, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback, Modal } from '@/components/common'
+import { EducationalPageShell, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback, Modal, ListToolbar, ListToolbarTabs } from '@/components/common'
 import { loginPathFromLocation } from '@/lib/navigation'
 
 interface Class {
@@ -186,52 +186,29 @@ function ClassesPageContent() {
         ) : undefined
       }
       toolbar={
-        <div className="card-static rounded-lg p-4 border border-border">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-            <div className="flex-1 relative min-w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="搜索班级名称或描述..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all text-sm"
-                />
-              </div>
-            </div>
-            {user && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setShowMyClasses(true)
-                    setPage(1)
-                  }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    showMyClasses
-                      ? 'bg-primary text-primary-foreground shadow-md'
-                      : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
-                  }`}
-                >
-                  我的班级
-                </button>
-                <button
-                  onClick={() => {
-                    setShowMyClasses(false)
-                    setPage(1)
-                  }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    !showMyClasses
-                      ? 'bg-primary text-primary-foreground shadow-md'
-                      : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
-                  }`}
-                >
-                  所有班级
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <ListToolbar
+          search={{
+            value: searchQuery,
+            onChange: setSearchQuery,
+            placeholder: '搜索班级名称或描述...',
+          }}
+          trailing={
+            user ? (
+              <ListToolbarTabs
+                ariaLabel="班级范围"
+                value={showMyClasses ? 'mine' : 'all'}
+                onChange={(key) => {
+                  setShowMyClasses(key === 'mine')
+                  setPage(1)
+                }}
+                items={[
+                  { key: 'mine', label: '我的班级' },
+                  { key: 'all', label: '所有班级' },
+                ]}
+              />
+            ) : undefined
+          }
+        />
       }
     >
         {initialLoading ? (

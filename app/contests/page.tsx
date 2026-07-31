@@ -5,7 +5,6 @@ import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import {
   Trophy,
   Plus,
-  Search,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +18,8 @@ import {
   EducationalPageShell,
   ListEmptyState,
   RouteSuspenseFallback,
+  ListToolbar,
+  ListToolbarTabs,
 } from '@/components/common'
 import CreateContestModal from '@/components/contest/CreateContestModal'
 import ContestCard, { type ContestCardData } from '@/components/contest/ContestCard'
@@ -118,12 +119,6 @@ function ContestsPageContent() {
       router.replace('/contests', { scroll: false })
     }
   }, [searchParams, user, router, canCreate])
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setPage(1)
-    void fetchContests()
-  }
 
   const handleTabChange = (tab: typeof activeTab) => {
     setActiveTab(tab)
@@ -257,47 +252,29 @@ function ContestsPageContent() {
         ) : undefined
       }
       toolbar={
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center gap-1 card-static p-1 rounded-lg overflow-x-auto border border-border shrink-0">
-            {(
-              [
+        <ListToolbar
+          search={{
+            value: keyword,
+            onChange: (value) => {
+              setKeyword(value)
+              setPage(1)
+            },
+            placeholder: '搜索竞赛标题或简介...',
+          }}
+          trailing={
+            <ListToolbarTabs
+              ariaLabel="竞赛状态"
+              value={activeTab}
+              onChange={(key) => handleTabChange(key as typeof activeTab)}
+              items={[
                 { key: 'all', label: '全部' },
                 { key: 'ongoing', label: '进行中' },
                 { key: 'upcoming', label: '即将开始' },
                 { key: 'ended', label: '已结束' },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={`px-3.5 py-2 rounded-md text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                  activeTab === tab.key
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-                onClick={() => handleTabChange(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-0 sm:max-w-md">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="搜索竞赛标题或简介..."
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                className="input pl-10 py-2.5 rounded-lg w-full"
-              />
-            </div>
-            <button type="submit" className="btn-ghost btn px-4 shrink-0">
-              搜索
-            </button>
-          </form>
-        </div>
+              ]}
+            />
+          }
+        />
       }
     >
       {renderContent()}
