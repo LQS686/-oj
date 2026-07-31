@@ -14,7 +14,6 @@ import {
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
-  assertClassAdmin,
   assertClassOwner,
   buildClassAssignmentDetail,
   deleteClassAssignment,
@@ -41,6 +40,11 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   if (!isObjectId(id) || !isObjectId(assignmentId)) {
     throw400('INVALID_ID', '无效的ID')
   }
+  const { getClassMembership, hasClassPermission } = await import('@/lib/class/auth')
+  const membership = await getClassMembership(id, user.id)
+  if (!membership || !hasClassPermission(membership, 'canManageAssignments')) {
+    throw403('当前账号无管理作业权限')
+  }
   const body = await readJson<{
     title?: string
     description?: string
@@ -49,7 +53,6 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     problemIds?: string[]
     allowLateSubmission?: boolean
   }>(req)
-  await assertClassAdmin(id, user.id, '只有管理员可以更新作业')
   return ok(await updateClassAssignment(id, assignmentId, body))
 })
 

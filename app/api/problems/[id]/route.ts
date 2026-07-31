@@ -32,10 +32,13 @@ export const GET = withApi.public(async (req, ctx) => {
     { contestId }
   )
 
-  const statusCounts = (await getProblemStatusCounts(p.id)) as Record<string, number>
+  const statusCounts = (await getProblemStatusCounts(p.id, {
+    contestId,
+    viewer,
+  })) as Record<string, number>
   const liveTotal = Object.values(statusCounts).reduce((s, n) => s + n, 0)
   const liveAc = statusCounts['AC'] || 0
-  // 优先用实时聚合，避免 denormalized 计数漂移导致详情页 AC 率与统计面板不一致
+  // 优先用实时聚合（已按封榜截断）；无数据时回退 denormalized
   const totalSubmissions = liveTotal > 0 ? liveTotal : p.totalSubmit
   const acCount = liveTotal > 0 ? liveAc : p.totalAccepted
   const acRate =

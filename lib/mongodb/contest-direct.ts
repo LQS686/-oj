@@ -24,10 +24,48 @@ export async function createContestDirect(data: {
   password?: string
   authorId: string
   problemIds?: string[]
+  sealRankTime?: Date | null
 }) {
   const _id = new ObjectId()
   const client = await getMongoClient()
   const db = client.db()
+
+  // 竞赛仅允许 public / contest 可见性题目
+  if (data.problemIds && data.problemIds.length > 0) {
+    const { prisma } = await import('@/lib/prisma')
+    const { ApiError } = await import('@/lib/api/withApi')
+    const found = await prisma.problem.findMany({
+      where: { id: { in: data.problemIds } },
+      select: { id: true, visibility: true },
+    })
+    if (found.length !== data.problemIds.length) {
+      throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
+    }
+    const invalid = found.filter(
+      (p) => p.visibility !== 'public' && p.visibility !== 'contest'
+    )
+    if (invalid.length > 0) {
+      throw new ApiError(
+        'INVALID_PROBLEMS',
+        '竞赛只能添加公开或竞赛可见题目',
+        400
+      )
+    }
+  }
+
+  let sealRankTime: Date | null = null
+  if (data.sealRankTime) {
+    const seal = data.sealRankTime instanceof Date ? data.sealRankTime : new Date(data.sealRankTime)
+    if (isNaN(seal.getTime())) {
+      const { ApiError } = await import('@/lib/api/withApi')
+      throw new ApiError('INVALID_SEAL_TIME', '封榜时间格式无效', 400)
+    }
+    if (seal.getTime() <= data.startTime.getTime() || seal.getTime() >= data.endTime.getTime()) {
+      const { ApiError } = await import('@/lib/api/withApi')
+      throw new ApiError('INVALID_SEAL_TIME', '封榜时间必须在比赛起止时间范围内', 400)
+    }
+    sealRankTime = seal
+  }
 
   const hashedPassword = data.password ? await bcrypt.hash(data.password, 12) : null
 
@@ -42,6 +80,7 @@ export async function createContestDirect(data: {
     isPublic: data.isPublic,
     password: hashedPassword,
     authorId: new ObjectId(data.authorId),
+    sealRankTime,
     createdAt: new Date(),
     updatedAt: new Date(),
   }

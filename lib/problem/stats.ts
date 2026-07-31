@@ -45,31 +45,43 @@ function formatDateLocal(d: Date): string {
 }
 
 /**
- * 获取题目统计信息（含缓存）
+ * 获取题目统计信息（含缓存；封榜期间剔除封榜后竞赛提交）
  */
-export async function getProblemStats(problemId: string): Promise<ProblemStats | null> {
-  return cache.get('problem:stats', [problemId], async () => {
-    // 并行查询：状态分布、语言分布、近 7 天提交、AC 平均耗时/内存
+export async function getProblemStats(
+  problemId: string,
+  options: {
+    contestId?: string
+    viewer?: { id: string; role?: string | null } | null
+  } = {}
+): Promise<ProblemStats | null> {
+  const { buildProblemSubmissionWhere } = await import('@/lib/contest/seal-stats')
+  const baseWhere = await buildProblemSubmissionWhere(problemId, options)
+  const cacheKey = [problemId, options.contestId || '', options.viewer?.id || 'guest']
+
+  return cache.get('problem:stats', cacheKey, async () => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const recentWhere = {
+      AND: [baseWhere, { submittedAt: { gte: sevenDaysAgo } }],
+    }
+    const acWhere = { AND: [baseWhere, { status: 'AC' as const }] }
+
     const [statusGroups, languageGroups, recentSubmissions, acAgg] = await Promise.all([
       prisma.submission.groupBy({
         by: ['status'],
-        where: { problemId },
+        where: baseWhere,
         _count: { status: true },
       }),
       prisma.submission.groupBy({
         by: ['language'],
-        where: { problemId },
+        where: baseWhere,
         _count: { language: true },
       }),
       prisma.submission.findMany({
-        where: {
-          problemId,
-          submittedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-        },
+        where: recentWhere,
         select: { status: true, submittedAt: true },
       }),
       prisma.submission.aggregate({
-        where: { problemId, status: 'AC' },
+        where: acWhere,
         _avg: { time: true, memory: true },
       }),
     ])
@@ -86,7 +98,6 @@ export async function getProblemStats(problemId: string): Promise<ProblemStats |
       ? Math.round((acCount / totalSubmissions) * 1000) / 10
       : 0
 
-    // 近 7 天趋势：按日期聚合（确保 7 天都有数据点）
     const trendMap = new Map<string, { count: number; acCount: number }>()
     for (let i = 6; i >= 0; i--) {
       const d = new Date()
@@ -120,7 +131,22 @@ export async function getProblemStats(problemId: string): Promise<ProblemStats |
       avgTimeMs: acAgg._avg.time ? Math.round(acAgg._avg.time) : 0,
       avgMemoryKb: acAgg._avg.memory ? Math.round(acAgg._avg.memory) : 0,
     }
-  }, { ttl: 30_000 })
+  }, { ttl: 10_000 })
+}
+
+/** 重算单题 denormalized totalSubmit / totalAccepted */
+export async function recountProblemSubmissionStats(problemId: string): Promise<void> {
+  const [submitCount, acCount] = await Promise.all([
+    prisma.submission.count({ where: { problemId } }),
+    prisma.submission.count({ where: { problemId, status: 'AC' } }),
+  ])
+  await prisma.problem.update({
+    where: { id: problemId },
+    data: { totalSubmit: submitCount, totalAccepted: acCount },
+  })
+  cache.deleteByPrefix('problem:stats')
+  cache.deleteByPrefix('problem:statusCounts')
+  cache.deleteByPrefix('problem:sealedCutoffs')
 }
 
 /**

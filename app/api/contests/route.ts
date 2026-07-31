@@ -43,6 +43,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     isPublic?: boolean
     password?: string
     problemIds?: string[]
+    sealRankTime?: string | null
   }>(req)
 
   // Use direct helper to avoid Prisma transaction issues on non-replica set MongoDB
@@ -57,6 +58,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     password: body.password,
     authorId: user.id,
     problemIds: body.problemIds,
+    sealRankTime: body.sealRankTime ? new Date(body.sealRankTime) : null,
   })
 
   return ok(contest, { status: 201 })

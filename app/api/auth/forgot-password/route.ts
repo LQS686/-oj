@@ -1,16 +1,10 @@
 /**
  * POST /api/auth/forgot-password - 忘记密码：发送临时新密码到邮箱
  *
- * 流程：
- *   1. 校验邮箱格式 + IP 限流（防滥用）
- *   2. 查找用户：为避免泄露邮箱是否注册，无论是否存在都返回相同成功信息
- *   3. 生成临时新密码，bcrypt 哈希后入库
- *   4. 通过 SMTP 发送含新密码的邮件
- *
- * 安全说明：
- *   - 临时密码仅返回到邮箱，接口本身不返回明文密码
- *   - 用户不存在时静默成功（不发送邮件），防止枚举探测
- *   - SMTP 未配置时返回 503 提示联系管理员
+ * 安全：
+ *   - 无论邮箱是否注册、发信是否成功（SMTP 未配置除外的业务路径），对外文案一致，防枚举
+ *   - SMTP 全局未配置时统一 503（不依赖邮箱是否存在）
+ *   - IP 限流由 middleware（3/5min）；另加按邮箱限流降低重置 DoS
  */
 import crypto from 'crypto'
 import { withApi, ok, fail, readJson } from '@/lib/api/withApi'
@@ -19,9 +13,10 @@ import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/email'
 import { getSystemSettings } from '@/lib/settings'
 import { clearUserCache } from '@/lib/user/profile'
+import { checkRateLimit } from '@/lib/rate-limit'
 
-// 可读字符集（去除易混淆的 0/O/1/l/I）
 const PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+const GENERIC_OK = '如果该邮箱已注册，你将收到包含新密码的邮件'
 
 function generateTempPassword(length = 12): string {
   const bytes = crypto.randomBytes(length)
@@ -39,25 +34,38 @@ export const POST = withApi.public(async (req) => {
     return fail('VALIDATION', '邮箱格式不正确', 400)
   }
 
-  // IP 限流由 middleware 统一处理（3/5min），此处不再二次计数
+  const normalized = email.toLowerCase().trim()
 
-  const user = await findUserByEmail(email.toLowerCase())
-
-  // 用户不存在：静默返回成功，防止枚举探测邮箱
-  if (!user) {
-    return ok({ message: '如果该邮箱已注册，你将收到包含新密码的邮件' })
+  // 按邮箱限流（与 IP middleware 叠加），降低对已知邮箱的重置轰炸
+  const emailRl = await checkRateLimit(`forgot-email:${normalized}`, {
+    maxRequests: 3,
+    windowMs: 300_000,
+    keyPrefix: 'forgot-password-email',
+  })
+  if (!emailRl.success) {
+    return fail('RATE_LIMITED', '请求过于频繁，请稍后再试', 429)
   }
 
-  // 检查 SMTP 是否已配置
+  // 先检查 SMTP：未配置时对所有人返回 503，避免「仅已注册邮箱才 503」枚举
+  const { getSmtpConfig } = await import('@/lib/settings')
+  const smtp = await getSmtpConfig()
+  if (!smtp) {
+    return fail('EMAIL_ERROR', '邮件服务暂不可用，请联系管理员', 503)
+  }
+
   const settings = await getSystemSettings()
   const siteName = settings.siteName || '大山 OJ'
+
+  const user = await findUserByEmail(normalized)
+  if (!user) {
+    return ok({ message: GENERIC_OK })
+  }
 
   const tempPassword = generateTempPassword()
   const username = user.username
 
-  // 先发信，成功后再落库：避免发信失败但密码已被重置导致用户无法登录
   const result = await sendMail({
-    to: email,
+    to: normalized,
     subject: `[${siteName}] 密码重置 - 临时新密码`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
@@ -77,10 +85,10 @@ export const POST = withApi.public(async (req) => {
   })
 
   if (!result.success) {
-    return fail('EMAIL_ERROR', result.error || '邮件发送失败，请稍后重试或联系管理员', 503)
+    // 发信失败也不区分「邮箱是否存在」文案，避免侧信道
+    return ok({ message: GENERIC_OK })
   }
 
-  // 发信成功后再将新密码哈希入库；递增 tokenVersion 使旧会话立即失效
   const hashed = await hashPassword(tempPassword)
   await prisma.user.update({
     where: { id: user.id },
@@ -88,5 +96,5 @@ export const POST = withApi.public(async (req) => {
   })
   clearUserCache(user.id)
 
-  return ok({ message: '新密码已发送至邮箱，请查收' })
+  return ok({ message: GENERIC_OK })
 })

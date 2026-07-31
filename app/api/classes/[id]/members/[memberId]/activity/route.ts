@@ -18,7 +18,13 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
 
   const isOwnerOrAdmin = isClassAdminRole(memberRole)
   const isSelf = memberId === user.id
-  if (!isOwnerOrAdmin && !isSelf) throw403('只有管理员或本人可查看该成员活动')
+  if (!isOwnerOrAdmin && !isSelf) {
+    const { getClassMembership, hasClassPermission } = await import('@/lib/class/auth')
+    const membership = await getClassMembership(id, user.id)
+    if (!membership || !hasClassPermission(membership, 'canViewStats')) {
+      throw403('只有管理员、具备统计权限的成员或本人可查看该成员活动')
+    }
+  }
 
   const activity = await getClassMemberActivity(id, memberId)
   if (!activity) throw404('成员不存在')

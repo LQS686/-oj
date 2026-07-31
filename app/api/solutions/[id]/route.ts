@@ -32,7 +32,8 @@ export const GET = withApi.public(async (req, ctx) => {
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题解ID')
 
   const q = readQuery<{ isAssignmentContext?: string }>(req)
-  const isAssignmentContext = q.isAssignmentContext === 'true'
+  const isAssignmentContext =
+    q.isAssignmentContext === 'true' || q.isAssignmentContext === '1'
 
   // 提取 viewer（user）
   const viewer = await loadSolutionViewUser(req)

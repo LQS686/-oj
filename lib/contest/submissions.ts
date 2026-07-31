@@ -66,13 +66,10 @@ export async function listContestSubmissionsPaged(
   }
   if (filter.problemId) where.problemId = filter.problemId
 
-  // 封榜期间普通用户：只能看自己的提交，且截断到 sealRankTime
+  // 封榜期间普通用户：只能看自己的提交（含封榜后本人提交）；不可窥他人
   if (sealed && !bypassSeal) {
     if (filter.viewerUserId) {
       where.userId = filter.viewerUserId
-    }
-    if (contest?.sealRankTime) {
-      where.submittedAt = { lte: contest.sealRankTime }
     }
   } else if (filter.userId) {
     where.userId = filter.userId
@@ -207,8 +204,11 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
     totalTests: problem.testCases.length,
   })
 
-  // 更新题目总提交数
-  await incrementProblemSubmitCount(problem.id)
+  // 封榜期间不写全局 totalSubmit（解冻后重算）；非封榜照常 +1
+  const sealedNow = isContestSealed(contest)
+  if (!sealedNow) {
+    await incrementProblemSubmitCount(problem.id)
+  }
 
   // 5. 加入评测队列；失败时事务回滚（删除 submission + 计数减一）
   try {
@@ -228,15 +228,18 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
     logger.info(`竞赛提交 ${submission.id} 已加入评测队列`)
   } catch (queueError) {
     logger.error('加入评测队列失败，回滚提交记录与计数', queueError instanceof Error ? queueError : new Error(String(queueError)))
-    // L-3 修复：事务回滚 - 删除提交记录 + 计数减一，避免 Problem.totalSubmit 虚高
     try {
-      await prisma.$transaction([
-        prisma.submission.delete({ where: { id: submission.id } }),
-        prisma.problem.update({
-          where: { id: problem.id },
-          data: { totalSubmit: { decrement: 1 } },
-        }),
-      ])
+      if (sealedNow) {
+        await prisma.submission.delete({ where: { id: submission.id } })
+      } else {
+        await prisma.$transaction([
+          prisma.submission.delete({ where: { id: submission.id } }),
+          prisma.problem.update({
+            where: { id: problem.id },
+            data: { totalSubmit: { decrement: 1 } },
+          }),
+        ])
+      }
     } catch (rollbackError) {
       logger.error(
         `提交回滚失败 (submissionId=${submission.id}, problemId=${problem.id})，可能存在计数不一致`,

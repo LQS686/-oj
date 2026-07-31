@@ -2,8 +2,8 @@
  * 题解查看权限控制工具
  *
  * 规则优先级：
- *   1. 管理员/教师（SYSTEM_ADMIN / TEACHER）始终允许
- *   2. 作业场景（isAssignmentContext=true）一律隐藏
+ *   1. 管理员/教师（SYSTEM_ADMIN / ADMIN / TEACHER）始终允许
+ *   2. 作业场景 / 进行中竞赛场景一律隐藏（服务端强制，不信任客户端 flag）
  *   3. 其他情况下查询该用户在该题的最高分，达到 90 分即可查看
  */
 
@@ -19,12 +19,15 @@ export type SolutionViewReason =
   | 'TEACHER'
   | 'ENOUGH_SCORE'
   | 'ASSIGNMENT_CONTEXT'
+  | 'CONTEST_CONTEXT'
   | 'NO_SUBMISSION'
   | 'LOW_SCORE'
 
 /** canViewSolutions 的可选参数 */
 export interface CanViewOptions {
   isAssignmentContext?: boolean
+  /** 用户正在参与含该题的进行中竞赛 */
+  isContestContext?: boolean
 }
 
 /** canViewSolutions 的返回结果 */
@@ -68,6 +71,48 @@ export async function getUserBestScore(
   return submission?.score ?? 0
 }
 
+/** 用户是否仍在含该题、未结束的作业中（成员身份） */
+export async function isUserInActiveAssignmentForProblem(
+  userId: string,
+  problemId: string
+): Promise<boolean> {
+  const now = new Date()
+  const hit = await prisma.classAssignmentProblem.findFirst({
+    where: {
+      problemId,
+      assignment: {
+        AND: [
+          { OR: [{ startTime: null }, { startTime: { lte: now } }] },
+          { OR: [{ endTime: null }, { endTime: { gte: now } }] },
+          { class: { members: { some: { userId } } } },
+        ],
+      },
+    },
+    select: { id: true },
+  })
+  return !!hit
+}
+
+/** 用户是否已报名含该题的进行中竞赛 */
+export async function isUserInOngoingContestForProblem(
+  userId: string,
+  problemId: string
+): Promise<boolean> {
+  const now = new Date()
+  const hit = await prisma.contestProblem.findFirst({
+    where: {
+      problemId,
+      contest: {
+        startTime: { lte: now },
+        endTime: { gte: now },
+        participants: { some: { userId } },
+      },
+    },
+    select: { id: true },
+  })
+  return !!hit
+}
+
 /**
  * 基于已知的最高分做最终决策
  * （会通过 canManageContent 校验内容管理权限）
@@ -91,6 +136,15 @@ export async function decideSolutionView(
     return {
       allowed: false,
       reason: 'ASSIGNMENT_CONTEXT',
+      requiredScore: REQUIRED_SOLUTION_SCORE
+    }
+  }
+
+  // 2b) 进行中竞赛场景下隐藏
+  if (options.isContestContext === true) {
+    return {
+      allowed: false,
+      reason: 'CONTEST_CONTEXT',
       requiredScore: REQUIRED_SOLUTION_SCORE
     }
   }
@@ -125,11 +179,6 @@ export async function decideSolutionView(
 
 /**
  * 判断用户是否可以查看某题目的题解
- *
- * 使用方式：
- *   - 路由处理函数中先用 `getUserFromRequest` 解析 JWT，得到 payload
- *   - 若 payload 中无 role 字段（例如没有预查询 User），可以传入完整的 User 对象
- *   - 然后调用本函数
  */
 export async function canViewSolutions(
   user: SolutionViewUser | null,
@@ -145,11 +194,18 @@ export async function canViewSolutions(
     }
   }
 
-  // 2) 作业场景下隐藏
+  // 2) 作业 / 竞赛场景下隐藏
   if (options.isAssignmentContext === true) {
     return {
       allowed: false,
       reason: 'ASSIGNMENT_CONTEXT',
+      requiredScore: REQUIRED_SOLUTION_SCORE
+    }
+  }
+  if (options.isContestContext === true) {
+    return {
+      allowed: false,
+      reason: 'CONTEST_CONTEXT',
       requiredScore: REQUIRED_SOLUTION_SCORE
     }
   }

@@ -165,7 +165,7 @@ export default function SolutionTabPanel({
 
  const params = new URLSearchParams({ problemId })
  if (isAssignmentContext) {
- params.set('isAssignmentContext', '1')
+ params.set('isAssignmentContext', 'true')
  }
 
   const response = await fetchWithCookie(
@@ -214,7 +214,7 @@ export default function SolutionTabPanel({
 
  const params = new URLSearchParams({ problemId })
  if (isAssignmentContext) {
- params.set('isAssignmentContext', '1')
+ params.set('isAssignmentContext', 'true')
  }
 
   const response = await fetchWithCookie(`/api/solutions?${params.toString()}`)

@@ -793,13 +793,14 @@ const [editOpen, setEditOpen] = useState(false)
 
  memberSubs.forEach(sub => {
  if (!sub.problemId) return
+ // 逾期提交不计分（完成情况表与评分口径一致）
+ const rawScore = sub.isLate ? 0 : (sub.score ?? 0)
  const existing = submissionsMap[sub.problemId]
- const score = sub.score ?? 0
- if (!existing || score > (existing.score || 0)) {
+ if (!existing || rawScore > (existing.score || 0)) {
  submissionsMap[sub.problemId] = {
  problemId: sub.problemId,
- status: sub.status,
- score,
+ status: sub.isLate ? (sub.status === 'AC' ? 'LATE' : sub.status) : sub.status,
+ score: rawScore,
  submittedAt: sub.submittedAt,
  timeElapsedMs: sub.timeElapsedMs || 0,
  }

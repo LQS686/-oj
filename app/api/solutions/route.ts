@@ -23,7 +23,8 @@ export const GET = withApi.public(async (req) => {
 
   if (!q.problemId) throw400('VALIDATION', 'problemId 不能为空')
 
-  const isAssignmentContext = q.isAssignmentContext === 'true'
+  const isAssignmentContext =
+    q.isAssignmentContext === 'true' || q.isAssignmentContext === '1'
   const page = Math.max(1, toInt(q.page, 'page', 1))
   const pageSize = Math.max(1, Math.min(100, toInt(q.pageSize, 'pageSize', 20)))
 

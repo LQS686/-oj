@@ -22,7 +22,7 @@ export const GET = withApi.public(async (req, ctx) => {
 
   const contestId = req.nextUrl.searchParams.get('contestId') || undefined
   const problem = await requireAccessibleProblem(id, viewer, { contestId })
-  const stats = await getProblemStats(problem.id)
+  const stats = await getProblemStats(problem.id, { contestId, viewer })
   if (!stats) throw400('INVALID_ID', '题目不存在')
 
   return ok(stats)

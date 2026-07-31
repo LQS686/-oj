@@ -8,7 +8,8 @@ export const GET = withApi.public(async (req) => {
   const q = readQuery<{ problemId?: string; isAssignmentContext?: string }>(req)
   if (!q.problemId) throw400('VALIDATION', 'problemId 不能为空')
 
-  const isAssignmentContext = q.isAssignmentContext === 'true'
+  const isAssignmentContext =
+    q.isAssignmentContext === 'true' || q.isAssignmentContext === '1'
   const viewer = await loadSolutionViewUser(req)
 
   try {

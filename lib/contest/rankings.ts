@@ -57,7 +57,8 @@ interface ContestUserStats {
 export function isContestSealed(contest: { sealRankTime?: Date | null; sealUnlocked?: boolean }, now: Date = new Date()): boolean {
   if (!contest.sealRankTime) return false
   if (contest.sealUnlocked) return false
-  return contest.sealRankTime.getTime() < now.getTime()
+  // 到达封榜时刻即封榜（含等于 sealRankTime）
+  return contest.sealRankTime.getTime() <= now.getTime()
 }
 
 /**

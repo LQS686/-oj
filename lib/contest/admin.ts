@@ -84,6 +84,7 @@ export async function adminUpdateContest(
   }
 
   // 管理员手动解冻
+  const unlockingSeal = sealUnlocked === true
   if (sealUnlocked !== undefined) {
     updateData.sealUnlocked = !!sealUnlocked
   }
@@ -91,6 +92,15 @@ export async function adminUpdateContest(
   // 改为非事务处理以兼容 standalone MongoDB
   // 1. 更新基本信息
   await prisma.contest.update({ where: { id: contestId }, data: updateData })
+
+  // 解冻：补齐封榜期间延迟的全局题目计数与用户 solvedCount
+  if (unlockingSeal) {
+    const { applyDeferredGlobalStatsAfterSealUnlock } = await import('./seal-stats')
+    const { logger } = await import('@/lib/logger')
+    void applyDeferredGlobalStatsAfterSealUnlock(contestId).catch((err) => {
+      logger.error('封榜解冻后补齐全局统计失败', err)
+    })
+  }
 
   // 2. 如果提供了题目列表，校验题目存在且可见性允许挂入竞赛后再更新关联
   if (problems && Array.isArray(problems)) {
@@ -235,6 +245,32 @@ export async function adminCreateContest(
   if (input.password) {
     const bcrypt = (await import('bcryptjs')).default
     hashedPassword = await bcrypt.hash(input.password, 12)
+  }
+
+  // 创建时同样校验题目可见性（与 update 对齐）
+  if (input.problems && input.problems.length > 0) {
+    const found = await prisma.problem.findMany({
+      where: { id: { in: input.problems } },
+      select: { id: true, visibility: true },
+    })
+    if (found.length !== input.problems.length) {
+      const foundIds = new Set(found.map((p) => p.id))
+      const missing = input.problems.filter((id) => !foundIds.has(id))
+      throw new ApiError('INVALID_PROBLEMS', `题目不存在: ${missing.slice(0, 5).join(', ')}`, 400)
+    }
+    const invalid = found.filter(
+      (p) => p.visibility !== 'public' && p.visibility !== 'contest'
+    )
+    if (invalid.length > 0) {
+      throw new ApiError(
+        'INVALID_PROBLEMS',
+        `竞赛只能添加公开或竞赛可见题目: ${invalid
+          .slice(0, 5)
+          .map((p) => p.id)
+          .join(', ')}`,
+        400
+      )
+    }
   }
 
   const contest = await prisma.contest.create({

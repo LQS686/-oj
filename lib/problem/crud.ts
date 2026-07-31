@@ -120,18 +120,32 @@ export async function listTags() {
   }, { ttl: 5 * 60_000 })
 }
 
-export async function getProblemStatusCounts(problemId: string) {
-  return cache.get('problem:statusCounts', [problemId], async () => {
+export async function getProblemStatusCounts(
+  problemId: string,
+  options: {
+    contestId?: string
+    viewer?: { id: string; role?: string | null } | null
+  } = {}
+) {
+  const { buildProblemSubmissionWhere } = await import('@/lib/contest/seal-stats')
+  const where = await buildProblemSubmissionWhere(problemId, options)
+  const cacheKey = [
+    problemId,
+    options.contestId || '',
+    options.viewer?.id || 'guest',
+    // 封榜状态约 10s 变化；短 TTL
+  ]
+  return cache.get('problem:statusCounts', cacheKey, async () => {
     const groups = await prisma.submission.groupBy({
       by: ['status'],
-      where: { problemId },
+      where,
       _count: { status: true },
     })
     return groups.reduce((acc: Record<string, number>, g) => {
       acc[g.status] = g._count.status
       return acc
     }, {} as Record<string, number>)
-  }, { ttl: 30_000 })
+  }, { ttl: 10_000 })
 }
 
 /**

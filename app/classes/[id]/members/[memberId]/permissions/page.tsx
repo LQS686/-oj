@@ -39,11 +39,11 @@ const permissionDescriptions: Record<keyof Permissions, { title: string; descrip
   },
   canManageMembers: {
     title: '管理成员',
-    description: '允许成员管理其他成员的权限（仅班主任/助教）',
+    description: '允许成员移除其他成员、修改备注（不可改角色/转让班主任）',
   },
   canViewStats: {
     title: '查看统计',
-    description: '允许成员查看班级统计数据',
+    description: '允许成员查看其他成员的活动统计',
   },
 }
 

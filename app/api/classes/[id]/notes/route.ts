@@ -1,10 +1,7 @@
 /**
  * 班级笔记管理
  * - GET  /api/classes/[id]/notes  笔记列表
- * - POST /api/classes/[id]/notes  创建笔记
- *
- * GET：公开班任意登录用户可读；私有班需成员（classRole 全角色）。
- * POST：仅 owner / assistant。
+ * - POST /api/classes/[id]/notes  创建笔记（staff 或具备 canCreateNotes 的学生）
  */
 import {
   withApi,
@@ -57,9 +54,14 @@ export const GET = withApi.auth(async (req, ctx, { user }) => {
   return ok(result)
 })
 
-export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, { user }) => {
+export const POST = withApi.classRole(['owner', 'assistant', 'student'], async (req, ctx, { user, membership }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
+
+  const { hasClassPermission } = await import('@/lib/class/auth')
+  if (!hasClassPermission(membership, 'canCreateNotes')) {
+    throw403('当前账号无创建笔记权限')
+  }
 
   const body = await readJson<{
     title?: string

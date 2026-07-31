@@ -9,6 +9,7 @@ import {
   readJson,
   readQuery,
   throw400,
+  throw403,
   throw404,
 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
@@ -37,9 +38,14 @@ export const GET = withApi.classRole(
   return ok(result)
 })
 
-export const POST = withApi.classRole(['owner', 'assistant'], async (req, ctx, { user }) => {
+export const POST = withApi.classRole(['owner', 'assistant', 'student'], async (req, ctx, { user, membership }) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
+
+  const { hasClassPermission } = await import('@/lib/class/auth')
+  if (!hasClassPermission(membership, 'canManageAssignments')) {
+    throw403('当前账号无管理作业权限')
+  }
 
   const body = await readJson<{
     title?: string

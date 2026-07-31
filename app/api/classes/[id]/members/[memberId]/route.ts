@@ -13,7 +13,6 @@ import { ApiError } from '@/lib/api/errors'
 import { isObjectId } from '@/lib/api/validation'
 import {
   patchClassMember,
-  requireClassAdminRole,
   requireManageableTarget,
 } from '@/lib/class/service'
 import {
@@ -45,8 +44,21 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
     })
   }
 
-  const operator = await requireClassAdminRole(id, user.id)
-  await requireManageableTarget(id, memberId, operator.role)
+  // 管理他人：班主任/助教，或具备 canManageMembers 的成员
+  const { getClassMembership, hasClassPermission } = await import('@/lib/class/auth')
+  const membership = await getClassMembership(id, user.id)
+  if (!membership) {
+    throw new ApiError('FORBIDDEN', '不是班级成员', 403)
+  }
+  const isStaff = membership.isOwner || membership.isAssistant
+  if (!isStaff && !hasClassPermission(membership, 'canManageMembers')) {
+    throw new ApiError('FORBIDDEN', '当前账号无管理成员权限', 403)
+  }
+  // 改角色仅 staff；有 canManageMembers 的学生只能改备注
+  if ((body.role === 'student' || body.role === 'assistant') && !isStaff) {
+    throw new ApiError('FORBIDDEN', '仅班主任/助教可修改成员角色', 403)
+  }
+  await requireManageableTarget(id, memberId, membership.role)
 
   let updated
   if (body.role === 'student' || body.role === 'assistant') {
@@ -92,8 +104,16 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
     return ok({ message: '已退出班级' })
   }
 
-  const operator = await requireClassAdminRole(id, user.id)
-  await requireManageableTarget(id, memberId, operator.role)
+  const { getClassMembership, hasClassPermission } = await import('@/lib/class/auth')
+  const membership = await getClassMembership(id, user.id)
+  if (!membership) {
+    throw new ApiError('FORBIDDEN', '不是班级成员', 403)
+  }
+  const isStaff = membership.isOwner || membership.isAssistant
+  if (!isStaff && !hasClassPermission(membership, 'canManageMembers')) {
+    throw new ApiError('FORBIDDEN', '当前账号无管理成员权限', 403)
+  }
+  await requireManageableTarget(id, memberId, membership.role)
 
   await removeClassMemberDirect(id, memberId)
   return ok({ message: '成员已移除' })

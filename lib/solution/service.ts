@@ -138,6 +138,26 @@ export async function loadSolutionViewUser(
   }
 }
 
+async function resolveSolutionHideFlags(
+  viewer: SolutionViewUserPayload | null,
+  problemId: string,
+  clientAssignmentFlag: boolean
+): Promise<{ isAssignmentContext: boolean; isContestContext: boolean }> {
+  const {
+    isUserInActiveAssignmentForProblem,
+    isUserInOngoingContestForProblem,
+  } = await import('./permissions')
+  let isAssignmentContext = clientAssignmentFlag
+  let isContestContext = false
+  if (viewer) {
+    if (!isAssignmentContext) {
+      isAssignmentContext = await isUserInActiveAssignmentForProblem(viewer.id, problemId)
+    }
+    isContestContext = await isUserInOngoingContestForProblem(viewer.id, problemId)
+  }
+  return { isAssignmentContext, isContestContext }
+}
+
 /**
  * 题解列表（带权限校验）
  */
@@ -153,7 +173,9 @@ export async function listSolutionsWithPermission(
 
   const realProblemId = await resolveProblemId(problemId)
   if (!realProblemId) return { found: false as const }
-  const permission = await canViewSolutions(viewer, realProblemId, { isAssignmentContext })
+
+  const flags = await resolveSolutionHideFlags(viewer, realProblemId, isAssignmentContext)
+  const permission = await canViewSolutions(viewer, realProblemId, flags)
   if (!permission.allowed) {
     return { found: true as const, allowed: false, permission }
   }
@@ -274,7 +296,8 @@ export async function getSolutionDetailWithPermission(
   })
   if (!solution) return { found: false as const }
 
-  const permission = await canViewSolutions(viewer, solution.problemId, { isAssignmentContext })
+  const flags = await resolveSolutionHideFlags(viewer, solution.problemId, isAssignmentContext)
+  const permission = await canViewSolutions(viewer, solution.problemId, flags)
   if (!permission.allowed) return { found: true as const, allowed: false, permission }
 
   // 浏览数 +1（按 userId/IP 去重）
@@ -400,7 +423,11 @@ export async function checkSolutionPermission(
   if (!realProblemId) {
     throw AppError.notFound('题目不存在')
   }
-  const result = await canViewSolutions(viewer, realProblemId, { isAssignmentContext })
+  const result = await canViewSolutions(
+    viewer,
+    realProblemId,
+    await resolveSolutionHideFlags(viewer, realProblemId, isAssignmentContext)
+  )
   return {
     allowed: result.allowed,
     reason: result.reason,

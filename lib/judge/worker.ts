@@ -152,29 +152,49 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
 
     // AC 率口径：totalAccepted / totalSubmit 均为「提交次数」
     // 每次 AC 都 +1 totalAccepted；用户解题数 / 排行榜仅在全局首次 AC 时更新
+    // 封榜期间竞赛 AC 不写入全局计数，解冻后再补齐，避免封榜侧信道
     if (result.status === 'AC') {
       try {
-        await incrementProblemAcceptedCount(submission.problemId)
-        const isFirstAcGlobal = await isFirstAccepted(
-          submission.problemId,
-          submission.userId,
-          result.submissionId,
-        )
-        if (isFirstAcGlobal) {
-          await prisma.user.update({
-            where: { id: submission.userId },
-            data: { solvedCount: { increment: 1 } },
+        let deferGlobalAc = false
+        if (submission.contestId) {
+          const { isContestSealed } = await import('@/lib/contest/rankings')
+          const contest = await prisma.contest.findUnique({
+            where: { id: submission.contestId },
+            select: { sealRankTime: true, sealUnlocked: true },
           })
+          if (contest && isContestSealed(contest)) {
+            deferGlobalAc = true
+          }
+        }
 
-          logger.info(`用户首次AC题目`, { problemId: submission.problemId })
+        if (!deferGlobalAc) {
+          await incrementProblemAcceptedCount(submission.problemId)
+          const isFirstAcGlobal = await isFirstAccepted(
+            submission.problemId,
+            submission.userId,
+            result.submissionId,
+          )
+          if (isFirstAcGlobal) {
+            await prisma.user.update({
+              where: { id: submission.userId },
+              data: { solvedCount: { increment: 1 } },
+            })
 
-          const { clearRankingCache } = await import('@/lib/ranking/service')
-          clearRankingCache()
+            logger.info(`用户首次AC题目`, { problemId: submission.problemId })
 
-          broadcastMessage('leaderboard:update', {
-            type: 'update',
-            userId: submission.userId,
-            problemId: submission.problemId,
+            const { clearRankingCache } = await import('@/lib/ranking/service')
+            clearRankingCache()
+
+            broadcastMessage('leaderboard:update', {
+              type: 'update',
+              userId: submission.userId,
+              problemId: submission.problemId,
+            })
+          }
+        } else {
+          logger.info('封榜期间跳过全局 AC 计数', {
+            submissionId: result.submissionId,
+            contestId: submission.contestId,
           })
         }
       } catch (acErr) {
