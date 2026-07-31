@@ -44,28 +44,12 @@ function isActive(now: Date, publishedAt: Date | null, expiresAt: Date | null): 
 export async function listPublicAnnouncements(limit = 8): Promise<PublicAnnouncementItem[]> {
   return cache.get('announcement:public', [limit], async () => {
     const now = new Date()
+    // 避免 Mongo optional DateTime 上 null + isSet 组合过滤在部分环境下抛错；
+    // 公告量小，先取已发布再在内存按有效期裁剪。
     const rows = await prisma.systemAnnouncement.findMany({
-      where: {
-        isPublished: true,
-        AND: [
-          {
-            OR: [
-              { publishedAt: null },
-              { publishedAt: { isSet: false } },
-              { publishedAt: { lte: now } },
-            ],
-          },
-          {
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { isSet: false } },
-              { expiresAt: { gte: now } },
-            ],
-          },
-        ],
-      },
-      orderBy: [{ isPinned: 'desc' }, { publishedAt: 'desc' }, { createdAt: 'desc' }],
-      take: limit,
+      where: { isPublished: true },
+      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+      take: Math.min(Math.max(limit * 3, 24), 100),
       select: {
         id: true,
         title: true,
@@ -79,6 +63,13 @@ export async function listPublicAnnouncements(limit = 8): Promise<PublicAnnounce
 
     return rows
       .filter((r) => isActive(now, r.publishedAt, r.expiresAt))
+      .sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
+        const ap = a.publishedAt?.getTime() ?? a.createdAt.getTime()
+        const bp = b.publishedAt?.getTime() ?? b.createdAt.getTime()
+        return bp - ap
+      })
+      .slice(0, limit)
       .map((r) => ({
         id: r.id,
         title: r.title,
@@ -87,46 +78,38 @@ export async function listPublicAnnouncements(limit = 8): Promise<PublicAnnounce
         publishedAt: r.publishedAt?.toISOString() ?? null,
         createdAt: r.createdAt.toISOString(),
       }))
-  }, { ttl: PUBLIC_LIST_TTL })
+  }, { ttl: PUBLIC_LIST_TTL }).catch((error) => {
+    logger.error('[announcement] listPublicAnnouncements failed', error)
+    return [] as PublicAnnouncementItem[]
+  })
 }
 
 /** 公开公告详情（仅已发布且在有效期内） */
 export async function getPublicAnnouncementById(id: string): Promise<PublicAnnouncementDetail | null> {
   const now = new Date()
-  const row = await prisma.systemAnnouncement.findFirst({
-    where: {
-      id,
-      isPublished: true,
-      AND: [
-        {
-          OR: [
-            { publishedAt: null },
-            { publishedAt: { isSet: false } },
-            { publishedAt: { lte: now } },
-          ],
-        },
-        {
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { isSet: false } },
-            { expiresAt: { gte: now } },
-          ],
-        },
-      ],
-    },
-    include: {
-      author: { select: { username: true, nickname: true } },
-    },
-  })
-  if (!row || !isActive(now, row.publishedAt, row.expiresAt)) return null
-  return {
-    id: row.id,
-    title: row.title,
-    content: row.content,
-    isPinned: row.isPinned,
-    publishedAt: row.publishedAt?.toISOString() ?? null,
-    createdAt: row.createdAt.toISOString(),
-    authorName: row.author.nickname || row.author.username,
+  try {
+    const row = await prisma.systemAnnouncement.findFirst({
+      where: {
+        id,
+        isPublished: true,
+      },
+      include: {
+        author: { select: { username: true, nickname: true } },
+      },
+    })
+    if (!row || !isActive(now, row.publishedAt, row.expiresAt)) return null
+    return {
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      isPinned: row.isPinned,
+      publishedAt: row.publishedAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+      authorName: row.author?.nickname || row.author?.username || '未知',
+    }
+  } catch (error) {
+    logger.error('[announcement] getPublicAnnouncementById failed', error)
+    return null
   }
 }
 

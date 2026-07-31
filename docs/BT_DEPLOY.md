@@ -154,6 +154,7 @@ docker builder prune -af --filter "until=168h"
 | `FORCE_SECURE_COOKIE=false` 启动失败          | 旧版会在生产直接拒绝。请 `git pull` 后重跑脚本；HTTPS 站不要关 Secure。                                                                                                                                                                                                                             |
 | mongo 一直 unhealthy，app 起不来              | 已改为要求 **PRIMARY** 的 healthcheck；看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。若日志有 `NotYetInitialized`，执行下方「修复副本集」。                                                                                                                                         |
 | API 全站 503 `SERVICE_UNAVAILABLE`            | 多为 Mongo 副本集未 PRIMARY，Prisma 连续失败触发熔断。先修副本集（见下），再 `docker compose restart app`；或等约 60s 熔断窗口结束。探针：`curl -sf http://127.0.0.1:3000/api/health/db`（需管理员）/ 看 `compose logs app`。                                                                       |
+| 登录页无注册入口                              | 查 `curl -s https://你的域名/api/settings/public`：`needsBootstrap=true` 应显示「创建管理员」；二者皆 false 表示库中已有用户且关闭了开放注册。管理员登录后在后台打开「开放注册」，或见下方 mongosh 开启。                                                                                           |
 | `mongo-keyfile: no such file`                 | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile`                                                                                                                                                                   |
 | 构建 ENOSPC / 磁盘满                          | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                                                                                                                                                                                     |
 | 镜像拉取失败                                  | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认不覆盖已有自定义 daemon；可用 `--skip-mirror` 跳过                                                                                                                                                        |
@@ -186,6 +187,42 @@ docker compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli KE
 ```
 
 新版 `scripts/mongo-init.sh` 会在**每次**启动时尝试 initiate / 修正 host；`git pull` 后执行 `docker compose up -d mongo`（或整站 `bt-deploy`）即可自愈。
+
+### 确认是否真有用户（空库应无注册用户）
+
+公开接口 `needsBootstrap=false` 表示当时 `User.count()>0`。全新部署按设计应为空库；若你确认不该有用户，先查：
+
+```bash
+docker compose exec -T mongo mongosh --quiet \
+  -u admin -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin \
+  --eval 'db.getSiblingDB("oj_platform").User.find({}, {username:1,email:1,role:1,createdAt:1}).toArray()'
+```
+
+- **有文档**：多半是此前短暂注册成功残留（mongo volume 会保留）。要重新走「首个管理员」可删用户（慎用）：
+  `db.getSiblingDB("oj_platform").User.deleteMany({})`
+- **无文档**仍显示「暂不开放」：旧版在读库/计数失败时会把 `needsBootstrap` 错写成 `false`；升级后失败时改为 `true`，仍展示「创建管理员账号」。
+
+### 开启开放注册（库中已有用户）
+
+```bash
+# 确认当前公开设置
+curl -s http://127.0.0.1:3000/api/settings/public
+
+# 在 Mongo 中打开 allowRegistration（集合名以 Prisma @@map 为准，一般为 SystemConfig）
+docker compose exec -T mongo mongosh --quiet \
+  -u admin -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin \
+  --eval '
+    const app = db.getSiblingDB("oj_platform");
+    const doc = app.SystemConfig.findOne({ key: "system_settings" });
+    if (!doc) { print("no system_settings row"); quit(1); }
+    const v = doc.value || {};
+    v.allowRegistration = true;
+    app.SystemConfig.updateOne({ _id: doc._id }, { $set: { value: v } });
+    printjson(v.allowRegistration);
+  '
+
+docker compose restart app
+```
 
 ---
 

@@ -91,10 +91,12 @@ async function safeCall(
   })
   try {
     // fail-closed：database/system/auth 触发 block 后拒绝新请求
-    // 公开设置 / 健康检查除外：熔断时仍需返回 fail-closed 默认值或探活结果，避免整站白屏
+    // 公开设置 / 健康检查 / 首页公开读除外：熔断时仍需可用，避免整站白屏
+    // （DB 已恢复时 Redis 里残留的 error-block:* 不应继续挡公开内容）
     const path = req.nextUrl?.pathname || ''
     const skipCircuit =
       path === '/api/settings/public' ||
+      path === '/api/announcements' ||
       path === '/api/health' ||
       path.startsWith('/api/health/')
     if (!skipCircuit) {
