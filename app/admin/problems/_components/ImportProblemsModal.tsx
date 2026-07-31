@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   XCircle,
   SkipForward,
-  X,
   Globe,
   Sparkles,
   Download,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { DIFFICULTIES } from '@/lib/constants'
+import CreateModalShell from '@/components/common/CreateModalShell'
 
 type Format = 'dsoj' | 'fps' | 'hydro' | 'syzoj' | 'csv' | 'codeforces'
 
@@ -198,31 +198,17 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
   const currentFormat = FORMAT_OPTIONS.find(f => f.id === format)!
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4">
-      <div className="card max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10">
-              <Upload className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-foreground">批量导入题库</h3>
-              <p className="text-xs text-muted-foreground">
-                支持 DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            disabled={submitting}
-            className="p-2 hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-5">
+    <CreateModalShell
+      open
+      onClose={handleClose}
+      title="批量导入题库"
+      icon={Upload}
+      labelledById="import-problems-modal-title"
+      variant="admin"
+      maxWidthClass="max-w-3xl"
+    >
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
           {/* Format Selector */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
@@ -528,8 +514,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
           )}
         </div>
 
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-background border-t border-border px-6 py-4 flex justify-end gap-3">
+        <div className="shrink-0 border-t border-border px-5 py-4 flex justify-end gap-3">
           <button
             onClick={handleClose}
             disabled={submitting}
@@ -556,6 +541,6 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
           </button>
         </div>
       </div>
-    </div>
+    </CreateModalShell>
   )
 }

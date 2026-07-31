@@ -313,7 +313,7 @@ export default function EditTrainingPage() {
  <p className="text-foreground mb-4">{error}</p>
  <button
  onClick={fetchDetail}
- className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-white shadow-md hover:shadow-lg hover:from-primary-light hover:to-primary transition-all"
+ className="btn btn-primary inline-flex items-center gap-2"
  >
  <RefreshCw className="w-4 h-4" /> 重试
  </button>
@@ -348,7 +348,7 @@ export default function EditTrainingPage() {
  <button
  onClick={saveMeta}
  disabled={saving}
- className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-lg bg-primary text-white shadow-md hover:shadow-lg hover:from-primary-light hover:to-primary transition-all disabled:opacity-50"
+ className="btn btn-primary btn-sm inline-flex items-center gap-1.5 disabled:opacity-50"
  >
  <Save className="w-4 h-4" />
  {saving ? '保存中...' : '保存修改'}
@@ -516,7 +516,7 @@ export default function EditTrainingPage() {
  <button
  onClick={saveAllProblemChanges}
  disabled={savingProblems}
- className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md bg-primary text-white shadow-sm hover:shadow hover:from-primary-light hover:to-primary transition-all disabled:opacity-50"
+ className="btn btn-primary btn-sm inline-flex items-center gap-1.5 disabled:opacity-50"
  >
  <Check className="w-3.5 h-3.5" />
  {savingProblems ? '保存中...' : '保存修改'}
@@ -528,7 +528,7 @@ export default function EditTrainingPage() {
 
  <button
  onClick={() => setSearchOpen(!searchOpen)}
- className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-lg bg-primary text-white shadow-md hover:shadow-lg hover:from-primary-light hover:to-primary transition-all"
+ className="btn btn-primary btn-sm inline-flex items-center gap-1.5"
  >
  <Plus className="w-4 h-4" />
  {searchOpen ? '收起搜索' : '添加题目'}

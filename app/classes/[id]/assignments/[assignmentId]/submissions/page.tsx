@@ -12,7 +12,7 @@ import { formatDateTime, formatTime, formatMemory } from '@/lib/utils'
 import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
 import type { Assignment } from '@/types/models'
-import { ClassWorkspaceShell } from '@/components/common'
+import { ClassWorkspaceShell, CreateModalShell } from '@/components/common'
 
 interface Submission {
  id: string
@@ -169,65 +169,65 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  case 'AC':
  return {
  icon: <CheckCircle className="w-5 h-5" />,
- color: 'text-green-400',
- bg: 'bg-secondary/100/20',
+ color: 'text-secondary',
+ bg: 'bg-secondary/20',
  label: 'AC'
  }
  case 'WA':
  return {
  icon: <XCircle className="w-5 h-5" />,
- color: 'text-red-400',
- bg: 'bg-error/100/20',
+ color: 'text-error',
+ bg: 'bg-error/20',
  label: 'WA'
  }
  case 'TLE':
  return {
  icon: <Clock className="w-5 h-5" />,
- color: 'text-accent-light',
- bg: 'bg-yellow-500/20',
+ color: 'text-accent',
+ bg: 'bg-accent/20',
  label: 'TLE'
  }
  case 'MLE':
  return {
  icon: <AlertCircle className="w-5 h-5" />,
- color: 'text-orange-400',
- bg: 'bg-orange-500/20',
+ color: 'text-accent',
+ bg: 'bg-accent/20',
  label: 'MLE'
  }
  case 'RE':
  return {
  icon: <XCircle className="w-5 h-5" />,
- color: 'text-purple-400',
- bg: 'bg-purple-500/20',
+ color: 'text-error',
+ bg: 'bg-error/20',
  label: 'RE'
  }
  case 'SE':
  return {
  icon: <AlertCircle className="w-5 h-5" />,
  color: 'text-muted-foreground',
- bg: 'bg-gray-500/20',
+ bg: 'bg-muted',
  label: '系统错误'
  }
  case 'removed':
  return {
  icon: <XCircle className="w-5 h-5" />,
  color: 'text-muted-foreground',
- bg: 'bg-gray-500/20',
+ bg: 'bg-muted',
  label: '题目已移除'
  }
  default:
  if (score > 0 && score < 100) {
  return {
  icon: <AlertCircle className="w-5 h-5" />,
- color: 'text-accent-light',
- bg: 'bg-yellow-500/20',
+ color: 'text-accent',
+ bg: 'bg-accent/20',
  label: `${score}分`
  }
  }
  return {
  icon: <XCircle className="w-5 h-5" />,
  color: 'text-muted-foreground',
- bg: 'bg-gray-500/20',
+ bg: 'bg-muted',
  label: status
  }
  }
@@ -380,7 +380,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
  {formatDateTime(submission.submittedAt)}
  {submission.isLate && (
- <span className="ml-2 text-xs text-red-400">(逾期)</span>
+ <span className="ml-2 text-xs text-error">(逾期)</span>
  )}
  </td>
  <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
@@ -418,9 +418,9 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  <td className="px-6 py-4 whitespace-nowrap text-sm">
  <span className={`px-2 py-1 rounded text-sm font-medium ${
  submission.score === 100
- ? 'bg-secondary/100/20 text-green-400'
+ ? 'bg-secondary/20 text-secondary'
  : submission.score > 0
- ? 'bg-yellow-500/20 text-accent-light'
+ ? 'bg-accent/20 text-accent'
  : 'bg-muted text-muted-foreground'
  }`}>
  {submission.score}
@@ -433,7 +433,7 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  <td className="px-6 py-4 whitespace-nowrap text-sm">
  <button
  onClick={() => viewCode(submission)}
- className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-medium"
+ className="flex items-center gap-1 text-primary hover:text-primary-light font-medium"
  >
  <Code className="w-4 h-4" />
  查看代码
@@ -449,33 +449,27 @@ export default function AssignmentSubmissionsPage({ params }: { params: Promise<
  </div>
 
  {showCodeModal && selectedSubmission && (
- <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4">
- <div className="card max-w-4xl w-full max-h-[90vh] overflow-hidden">
- <div className="p-6 border-b border-border">
- <div className="flex items-center justify-between">
- <h3 className="text-xl font-bold text-foreground">提交代码</h3>
- <button
- onClick={() => setShowCodeModal(false)}
- className="text-muted-foreground hover:text-foreground"
+ <CreateModalShell
+ open
+ onClose={() => setShowCodeModal(false)}
+ title="提交代码"
+ icon={Code}
+ labelledById="assignment-submission-code-modal"
+ maxWidthClass="max-w-4xl"
  >
- <XCircle className="w-6 h-6" />
- </button>
- </div>
- <div className="mt-2 text-sm text-muted-foreground">
+ <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
+ <div className="text-sm text-muted-foreground space-y-1">
  <div>题目：{selectedSubmission.problem.title}</div>
  <div>用户：{selectedSubmission.user.nickname || selectedSubmission.user.username}</div>
  <div>语言：{selectedSubmission.language}</div>
  <div>状态：{getStatusInfo(selectedSubmission.status, selectedSubmission.score).label}</div>
  <div>得分：{selectedSubmission.score} / 100</div>
  </div>
- </div>
- <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
  <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
  <code className="text-sm text-foreground">{selectedSubmission.code}</code>
  </pre>
  </div>
- </div>
- </div>
+ </CreateModalShell>
  )}
  </ClassWorkspaceShell>
  )

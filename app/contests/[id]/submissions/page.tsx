@@ -80,21 +80,21 @@ export default function ContestSubmissionsPage() {
  const getStatusColor = (status: string) => {
  switch (status) {
  case SubmissionStatus.ACCEPTED:
- return 'bg-secondary/100/20 text-green-400'
+ return 'bg-secondary/20 text-secondary'
  case SubmissionStatus.WRONG_ANSWER:
- return 'bg-error/100/20 text-red-400'
+ return 'bg-error/20 text-error'
  case SubmissionStatus.TIME_LIMIT_EXCEEDED:
- return 'bg-orange-500/20 text-orange-400'
+ return 'bg-accent/20 text-accent'
  case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
- return 'bg-purple-500/20 text-purple-400'
+ return 'bg-accent/20 text-accent'
  case SubmissionStatus.RUNTIME_ERROR:
- return 'bg-yellow-500/20 text-accent-light'
+ return 'bg-error/20 text-error'
  case SubmissionStatus.COMPILE_ERROR:
  return 'bg-muted text-muted-foreground'
  case SubmissionStatus.PENDING:
  case SubmissionStatus.JUDGING:
  case SubmissionStatus.RUNNING:
- return 'bg-indigo-500/20 text-indigo-400'
+ return 'bg-primary/20 text-primary'
  default:
  return 'bg-muted text-muted-foreground'
  }
@@ -124,7 +124,7 @@ export default function ContestSubmissionsPage() {
  )
 
  if (error) return (
- <div className="card p-8 text-center text-red-400">
+ <div className="card p-8 text-center text-error">
  {error}
  </div>
  )
@@ -153,7 +153,7 @@ export default function ContestSubmissionsPage() {
  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
  <Link 
  href={`/contests/${params.id}/problems?problem=${encodeURIComponent(sub.problemId)}`}
- className="text-indigo-400 hover:text-indigo-300"
+ className="text-primary hover:text-primary-light"
  >
  {sub.problem.problemNumber || 'P?'} {sub.problem.title}
  </Link>

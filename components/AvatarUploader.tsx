@@ -354,19 +354,19 @@ export default function AvatarUploader({
  </div>
 
  {error && (
- <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-md">
+ <div className="flex items-center gap-2 text-error text-sm bg-error/10 p-3 rounded-md">
  <AlertCircle size={16} />
  {error}
  </div>
  )}
 
  {file && (
- <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+ <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
  <div className="flex items-center justify-between mb-2">
- <span className="text-sm font-medium text-blue-900 truncate max-w-[200px]">{file.name}</span>
+ <span className="text-sm font-medium text-foreground truncate max-w-[200px]">{file.name}</span>
  <button 
  onClick={() => { setFile(null); setPreview(null); setError(null); }}
- className="text-blue-400 hover:text-blue-600"
+ className="text-muted-foreground hover:text-foreground"
  >
  <X size={16} />
  </button>
@@ -374,13 +374,13 @@ export default function AvatarUploader({
  
  {uploading ? (
  <div className="space-y-1">
- <div className="flex justify-between text-xs text-blue-600">
+ <div className="flex justify-between text-xs text-primary">
  <span>上传中...</span>
  <span>{progress}%</span>
  </div>
- <div className="h-2 bg-blue-200 rounded-full overflow-hidden">
+ <div className="h-2 bg-muted rounded-full overflow-hidden">
  <div 
- className="h-full bg-blue-600 transition-all duration-300"
+ className="h-full bg-primary transition-all duration-300"
  style={{ width: `${progress}%` }}
  />
  </div>
@@ -394,7 +394,7 @@ export default function AvatarUploader({
  handleUpload();
  }
  }}
- className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+ className="w-full flex items-center justify-center gap-2 btn btn-primary py-2 px-4 text-sm font-medium"
  aria-label="确认上传头像"
  >
  <Upload size={16} />
@@ -453,7 +453,7 @@ export default function AvatarUploader({
  />
  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" aria-hidden="true" />
  <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
- <div className="bg-white p-1 rounded-full shadow-sm text-blue-600">
+ <div className="bg-background p-1 rounded-full shadow-sm text-primary">
  <Check size={12} />
  </div>
  </div>
@@ -462,7 +462,7 @@ export default function AvatarUploader({
  type="button"
  disabled={deletingId === item.id}
  onClick={(e) => handleHistoryDelete(e, item)}
- className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-1.5 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+ className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity bg-error hover:bg-error/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground p-1.5 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-error focus:ring-offset-1"
  title="删除该历史头像"
  aria-label={`删除历史头像 ${item.filename}`}
  >

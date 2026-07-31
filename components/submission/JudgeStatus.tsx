@@ -44,7 +44,7 @@ export default function JudgeStatus({
  case SubmissionStatus.TIME_LIMIT_EXCEEDED:
  return <Clock className="w-5 h-5 text-accent" />
  case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
- return <AlertCircle className="w-5 h-5 text-purple-400" />
+ return <AlertCircle className="w-5 h-5 text-accent" />
  case SubmissionStatus.RUNTIME_ERROR:
  return <AlertCircle className="w-5 h-5 text-error" />
  case SubmissionStatus.PRESENTATION_ERROR:
@@ -73,7 +73,7 @@ export default function JudgeStatus({
  case SubmissionStatus.TIME_LIMIT_EXCEEDED:
  return 'bg-accent/10 border-accent/30'
  case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
- return 'bg-purple-500/10 border-purple-500/30'
+ return 'bg-accent/10 border-accent/30'
  case SubmissionStatus.RUNTIME_ERROR:
  return 'bg-error/10 border-error/30'
  case SubmissionStatus.PRESENTATION_ERROR:
@@ -125,7 +125,7 @@ export default function JudgeStatus({
  case SubmissionStatus.OUTPUT_LIMIT_EXCEEDED:
  return 'text-accent'
  case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
- return 'text-purple-400'
+ return 'text-accent'
  case SubmissionStatus.PARTLY_CORRECT:
  return 'text-primary-light'
  case SubmissionStatus.PENDING:

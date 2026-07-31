@@ -577,7 +577,7 @@ export default function SolutionTabPanel({
             附件代码
            </div>
            {detail.codeLanguage && (
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+            <span className="text-xs text-muted-foreground uppercase tracking-wide">
              {detail.codeLanguage}
             </span>
            )}

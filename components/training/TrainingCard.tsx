@@ -48,14 +48,14 @@ interface TrainingCardProps {
 /** 分类对应的色条/徽标 */
 const CATEGORY_STYLE: Record<string, { bar: string; badge: string; icon: typeof BookOpen; label: string }> = {
  official: {
- bar: 'bg-gradient-to-b from-blue-500 to-blue-600',
- badge: 'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
+ bar: 'bg-primary',
+ badge: 'bg-primary/10 text-primary',
  icon: BookOpen,
  label: '官方',
  },
  contest: {
- bar: 'bg-gradient-to-b from-amber-500 to-orange-500',
- badge: 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400',
+ bar: 'bg-accent',
+ badge: 'bg-accent/10 text-accent',
  icon: Trophy,
  label: '竞赛',
  },
@@ -74,7 +74,7 @@ export function TrainingCard({ training, variant = 'default' }: TrainingCardProp
  >
  <div className={LIST_GRID_CARD_META_ROW}>
  {cat && CatIcon ? (
- <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${cat.badge}`}>
+ <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded ${cat.badge}`}>
  <CatIcon className="w-3 h-3" />
  {cat.label}
  </span>
@@ -134,7 +134,7 @@ export function TrainingCard({ training, variant = 'default' }: TrainingCardProp
  </span>
  )}
  {cat && CatIcon && (
- <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${cat.badge} flex-shrink-0`}>
+ <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded ${cat.badge} flex-shrink-0`}>
  <CatIcon className="w-3 h-3" />
  {cat.label}
  </span>

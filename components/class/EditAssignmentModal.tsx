@@ -208,10 +208,10 @@ export default function EditAssignmentModal({
               {assignmentStatus && (
                 <div className={`rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${
                   assignmentStatus === 'upcoming'
-                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                    ? 'border-border bg-muted text-muted-foreground'
                     : assignmentStatus === 'active'
-                    ? 'border-green-500/30 bg-green-500/10 text-green-400'
-                    : 'border-orange-500/30 bg-orange-500/10 text-orange-400'
+                    ? 'border-secondary/30 bg-secondary/10 text-secondary'
+                    : 'border-accent/30 bg-accent/10 text-accent'
                 }`}>
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>

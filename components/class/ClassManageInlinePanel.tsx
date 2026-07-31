@@ -317,7 +317,7 @@ export default function ClassManageInlinePanel({
                   </div>
                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed -mt-1">
+              <p className="text-xs text-muted-foreground leading-relaxed -mt-1">
                 公开：学生可在班级列表申请加入；私有：仅能通过用户名邀请加入。
               </p>
 
@@ -425,7 +425,7 @@ export default function ClassManageInlinePanel({
                         @{inv.invitee.username}
                       </span>
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {formatDateTime(inv.createdAt)}
                       {inv.message ? ` · ${inv.message}` : ''}
                     </p>
@@ -445,7 +445,7 @@ export default function ClassManageInlinePanel({
               <ClipboardList className="w-4 h-4 text-primary-light" />
               加入申请
               {pending.length > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium tabular-nums">
+                <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium tabular-nums">
                   {pending.length}
                 </span>
               )}
@@ -465,7 +465,7 @@ export default function ClassManageInlinePanel({
                     <p className="font-medium text-foreground truncate">
                       {req.applicant.nickname || req.applicant.username}
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {formatDateTime(req.createdAt)}
                       {req.message ? ` · ${req.message}` : ''}
                     </p>

@@ -21,7 +21,7 @@ export function SiteFooter({ siteName, siteDescription }: { siteName: string; si
             </div>
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-foreground text-sm leading-tight">{siteName}</span>
-              <span className="text-[11px] text-muted-foreground leading-snug mt-0.5">{siteDescription}</span>
+              <span className="text-xs text-muted-foreground leading-snug mt-0.5">{siteDescription}</span>
             </div>
           </div>
 
@@ -60,7 +60,7 @@ export function SiteFooter({ siteName, siteDescription }: { siteName: string; si
             href="https://beian.miit.gov.cn/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-center text-[11px] text-muted-foreground/60 hover:text-primary transition-colors"
+            className="text-center text-xs text-muted-foreground/60 hover:text-primary transition-colors"
           >
             蜀ICP备2026040117号-1
           </a>

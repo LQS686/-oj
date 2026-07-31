@@ -267,7 +267,7 @@ export default function NotificationsPage() {
  }}
  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
  filter === 'all'
- ? 'bg-primary text-white shadow-lg'
+ ? 'bg-primary text-primary-foreground shadow-lg'
  : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
  }`}
  >
@@ -280,7 +280,7 @@ export default function NotificationsPage() {
  }}
  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
  filter === 'unread'
- ? 'bg-primary text-white shadow-lg'
+ ? 'bg-primary text-primary-foreground shadow-lg'
  : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
  }`}
  >
@@ -394,7 +394,7 @@ export default function NotificationsPage() {
  onClick={() => setPage(pageNum)}
  className={`w-10 h-10 rounded-lg font-semibold transition-all ${
  page === pageNum
- ? 'bg-primary text-white shadow-lg'
+ ? 'bg-primary text-primary-foreground shadow-lg'
  : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
  }`}
  >
@@ -409,7 +409,7 @@ export default function NotificationsPage() {
  onClick={() => setPage(totalPages)}
  className={`w-10 h-10 rounded-lg font-semibold transition-all ${
  page === totalPages
- ? 'bg-primary text-white shadow-lg'
+ ? 'bg-primary text-primary-foreground shadow-lg'
  : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
  }`}
  >

@@ -64,7 +64,7 @@ export function TestCaseCard({
           </span>
         </button>
         <div className="flex items-center gap-1.5 shrink-0">
-          <label className="text-[11px] text-muted-foreground">分</label>
+          <label className="text-xs text-muted-foreground">分</label>
           <input
             type="number"
             value={tc.score}

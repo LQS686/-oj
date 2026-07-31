@@ -102,13 +102,13 @@ export default function SolutionCard({
             {title}
           </h3>
           {isOfficial && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500 text-amber-950 flex-shrink-0">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-accent text-primary-foreground flex-shrink-0">
               <span aria-hidden="true">⭐</span>
               <span>标程</span>
             </span>
           )}
           <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-white ${getLanguageClass(
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold text-primary-foreground ${getLanguageClass(
               codeLanguage
             )} flex-shrink-0`}
           >

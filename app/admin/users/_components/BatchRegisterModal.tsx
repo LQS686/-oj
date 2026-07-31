@@ -2,10 +2,11 @@
 
 import { useState, useRef } from 'react'
 import {
-  Upload, X, Plus, FileText, AlertCircle, CheckCircle, Loader2, Download,
+  Upload, X, Plus, FileText, AlertCircle, CheckCircle, Loader2, Download, Users,
 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDialog } from '@/components/common/DialogProvider'
+import CreateModalShell from '@/components/common/CreateModalShell'
 import type { BatchUser, BatchResult } from '../_utils'
 
 interface BatchRegisterModalProps {
@@ -281,19 +282,17 @@ export function BatchRegisterModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] overflow-y-auto py-4">
-      <div className="card p-6 max-w-2xl w-full mx-4 my-auto max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-bold text-foreground">批量注册用户</h3>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-muted rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="flex border-b border-slate-200 mb-6">
+    <CreateModalShell
+      open
+      onClose={onClose}
+      title="批量注册用户"
+      icon={Users}
+      labelledById="batch-register-modal-title"
+      variant="admin"
+    >
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+        <div className="flex border-b border-border mb-6">
           <button
             onClick={() => { setActiveTab('form'); setCsvFile(null); setCsvResults([]); }}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -421,7 +420,7 @@ export function BatchRegisterModal({
               </div>
             )}
 
-            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+            <div className="flex gap-3 justify-end pt-4 border-t border-border">
               <button onClick={onClose} className="btn btn-ghost">
                 取消
               </button>
@@ -516,7 +515,7 @@ export function BatchRegisterModal({
               </div>
             )}
 
-            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+            <div className="flex gap-3 justify-end pt-4 border-t border-border">
               <button onClick={onClose} className="btn btn-ghost">
                 取消
               </button>
@@ -531,7 +530,8 @@ export function BatchRegisterModal({
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </CreateModalShell>
   )
 }

@@ -49,7 +49,7 @@ export function UserRowActions({
           className={`p-2.5 rounded-lg transition-colors ${
             !canReset
               ? 'text-muted-foreground cursor-not-allowed'
-              : 'text-yellow-600 hover:bg-yellow-600/10'
+              : 'text-accent hover:bg-accent/10'
           }`}
           title={!canReset ? '系统管理员密码不可重置' : '重置密码'}
         >

@@ -8,6 +8,7 @@ import { AdminPageShell } from '@/components/admin'
 import { Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
 import { formatDateTime, toLocalDatetimeInput } from '@/lib/utils'
 import { useDialog } from '@/components/common/DialogProvider'
+import Modal from '@/components/common/Modal'
 import { useUser } from '@/contexts/UserContext'
 import { canManageSystemAnnouncements } from '@/lib/permissions'
 
@@ -39,18 +40,18 @@ function getPublicStatus(row: AnnouncementRow): { label: string; className: stri
   if (row.expiresAt && new Date(row.expiresAt).getTime() < now) {
     return {
       label: '已过期',
-      className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+      className: 'bg-accent/10 text-accent',
     }
   }
   if (row.publishedAt && new Date(row.publishedAt).getTime() > now) {
     return {
       label: '定时发布',
-      className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      className: 'bg-primary/10 text-primary',
     }
   }
   return {
     label: '展示中',
-    className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    className: 'bg-secondary/10 text-secondary',
   }
 }
 
@@ -253,7 +254,7 @@ export default function AdminAnnouncementsPage() {
                     </button>
                     <button
                       type="button"
-                      className="p-2 rounded-lg hover:bg-muted text-red-600"
+                      className="p-2 rounded-lg hover:bg-muted text-error"
                       onClick={() => setDeleteTarget(row)}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -266,53 +267,15 @@ export default function AdminAnnouncementsPage() {
         )}
 
         {modalOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-background rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
-              <h2 className="text-lg font-bold mb-4">{editing ? '编辑公告' : '新建公告'}</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">标题</label>
-                  <input
-                    className="input w-full mt-1"
-                    value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">内容</label>
-                  <textarea
-                    className="input w-full mt-1 min-h-[160px]"
-                    value={form.content}
-                    onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">过期时间（可选）</label>
-                  <input
-                    type="datetime-local"
-                    className="input w-full mt-1"
-                    value={form.expiresAt}
-                    onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
-                  />
-                </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.isPinned}
-                    onChange={(e) => setForm((f) => ({ ...f, isPinned: e.target.checked }))}
-                  />
-                  置顶
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.isPublished}
-                    onChange={(e) => setForm((f) => ({ ...f, isPublished: e.target.checked }))}
-                  />
-                  立即发布
-                </label>
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
+          <Modal
+            open
+            onClose={() => setModalOpen(false)}
+            title={editing ? '编辑公告' : '新建公告'}
+            size="lg"
+            closeOnOverlayClick={!saving}
+            closeOnEsc={!saving}
+            footer={
+              <div className="flex justify-end gap-2 w-full">
                 <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)}>
                   取消
                 </button>
@@ -320,24 +283,73 @@ export default function AdminAnnouncementsPage() {
                   {saving ? '保存中…' : '保存'}
                 </button>
               </div>
+            }
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">标题</label>
+                <input
+                  className="input w-full mt-1"
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">内容</label>
+                <textarea
+                  className="input w-full mt-1 min-h-[160px]"
+                  value={form.content}
+                  onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">过期时间（可选）</label>
+                <input
+                  type="datetime-local"
+                  className="input w-full mt-1"
+                  value={form.expiresAt}
+                  onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.isPinned}
+                  onChange={(e) => setForm((f) => ({ ...f, isPinned: e.target.checked }))}
+                />
+                置顶
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.isPublished}
+                  onChange={(e) => setForm((f) => ({ ...f, isPublished: e.target.checked }))}
+                />
+                立即发布
+              </label>
             </div>
-          </div>
+          </Modal>
         )}
 
         {deleteTarget && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-background rounded-xl p-6 max-w-sm w-full">
-              <p className="mb-4">确定删除公告「{deleteTarget.title}」？</p>
-              <div className="flex justify-end gap-2">
+          <Modal
+            open
+            onClose={() => setDeleteTarget(null)}
+            title="确认删除"
+            size="sm"
+            footer={
+              <div className="flex justify-end gap-2 w-full">
                 <button type="button" className="btn btn-outline" onClick={() => setDeleteTarget(null)}>
                   取消
                 </button>
-                <button type="button" className="btn btn-primary bg-red-600 hover:bg-red-700" onClick={handleDelete}>
+                <button type="button" className="btn btn-destructive" onClick={handleDelete}>
                   删除
                 </button>
               </div>
-            </div>
-          </div>
+            }
+          >
+            <p className="text-muted-foreground">确定删除公告「{deleteTarget.title}」？</p>
+          </Modal>
         )}
       </AdminPageShell>
   )

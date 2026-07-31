@@ -190,8 +190,8 @@ export default function ProblemDescription({
  {!hideTags && problem.tags && problem.tags.length > 0 && (
  <section className="animate-fadeIn">
  <div className="flex items-center gap-2.5 mb-4">
- <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
- <Tag className="w-4 h-4 text-purple-400" />
+ <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+ <Tag className="w-4 h-4 text-primary" />
  </div>
  <h3 className="text-lg font-bold text-foreground">标签</h3>
  </div>

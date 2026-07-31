@@ -83,7 +83,7 @@ export default function AnnouncementsListPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold text-foreground truncate">{item.title}</h3>
-                    <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">
+                    <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
                       {item.publishedAt
                         ? formatDate(item.publishedAt)
                         : formatDate(item.createdAt)}

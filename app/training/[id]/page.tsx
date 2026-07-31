@@ -53,14 +53,12 @@ const CATEGORY_TYPE_LABEL: Record<
 > = {
   official: {
     label: '官方题单',
-    className:
-      'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800',
+    className: 'bg-primary/10 text-primary border-primary/20',
     icon: BookOpen,
   },
   contest: {
     label: '竞赛/考级',
-    className:
-      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+    className: 'bg-accent/10 text-accent border-accent/20',
     icon: Trophy,
   },
 }
@@ -306,7 +304,7 @@ function TrainingDetailPageContent() {
             <>
               {catType && CatIcon && (
                 <span
-                  className={`shrink-0 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border ${catType.className}`}
+                  className={`shrink-0 inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${catType.className}`}
                 >
                   <CatIcon className="w-3 h-3" />
                   {catType.label}
@@ -361,7 +359,7 @@ function TrainingDetailPageContent() {
                         {training.tags.map((t) => (
                           <span
                             key={t}
-                            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded"
                           >
                             <Tag className="w-3 h-3" />
                             {t}
@@ -407,10 +405,10 @@ function TrainingDetailPageContent() {
                           >
                             <span className="font-mono font-bold">{letter}</span>
                             {item.required && (
-                              <span className="text-[10px] opacity-80">必做</span>
+                              <span className="text-xs opacity-80">必做</span>
                             )}
                             {item.problem?.difficulty && (
-                              <span className="text-[10px] opacity-70">
+                              <span className="text-xs opacity-70">
                                 {item.problem.difficulty}
                               </span>
                             )}

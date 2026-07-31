@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDialog } from '@/components/common/DialogProvider'
+import Modal from '@/components/common/Modal'
 import type { User } from '../_utils'
 
 interface EditUserModalProps {
@@ -44,10 +45,25 @@ export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-      <div className="card p-6 max-w-md w-full mx-4">
-        <h3 className="text-lg font-bold text-foreground mb-4">编辑用户角色</h3>
-        <div className="mb-4">
+    <Modal
+      open
+      onClose={onClose}
+      title="编辑用户角色"
+      closeOnOverlayClick={!saving}
+      closeOnEsc={!saving}
+      footer={
+        <div className="flex gap-3 justify-end w-full">
+          <button onClick={onClose} className="btn btn-ghost" disabled={saving}>
+            取消
+          </button>
+          <button onClick={handleSave} className="btn btn-primary" disabled={saving}>
+            保存
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
           <label className="block text-sm font-medium text-muted-foreground mb-2">用户名</label>
           <input
             type="text"
@@ -56,7 +72,7 @@ export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess 
             className="input opacity-50 cursor-not-allowed"
           />
         </div>
-        <div className="mb-6">
+        <div>
           <label className="block text-sm font-medium text-muted-foreground mb-2">角色</label>
           <select
             value={editRole}
@@ -68,15 +84,7 @@ export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess 
             {operatorIsSystemAdmin && <option value="ADMIN">管理员</option>}
           </select>
         </div>
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="btn btn-ghost" disabled={saving}>
-            取消
-          </button>
-          <button onClick={handleSave} className="btn btn-primary" disabled={saving}>
-            保存
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   )
 }

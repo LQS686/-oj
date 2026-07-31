@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Loader2,
   Mountain,
+  LayoutDashboard,
+  BookOpen,
 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { HomeDashboardData } from '@/lib/home/dashboard'
@@ -160,20 +162,40 @@ export function DashboardView() {
             />
           </svg>
         </div>
-        <div className="relative flex items-center gap-3.5 px-4 py-4 md:px-5">
-          <div className="w-11 h-11 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shadow-sm shrink-0">
-            <Mountain className="w-5 h-5" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center gap-3.5 px-4 py-4 md:px-5">
+          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+            <div className="w-11 h-11 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shadow-sm shrink-0">
+              <Mountain className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg md:text-xl font-bold text-foreground tracking-tight truncate">
+                {welcomeTitle}
+              </h1>
+              <p className="text-xs md:text-sm text-muted-foreground mt-0.5 truncate">
+                {roleOrRank}
+                <span className="mx-1.5 text-border">·</span>
+                {welcomeHint}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg md:text-xl font-bold text-foreground tracking-tight truncate">
-              {welcomeTitle}
-            </h1>
-            <p className="text-xs md:text-sm text-muted-foreground mt-0.5 truncate">
-              {roleOrRank}
-              <span className="mx-1.5 text-border">·</span>
-              {welcomeHint}
-            </p>
-          </div>
+          {isStaff && (
+            <div className="flex items-center gap-2 shrink-0 sm:pl-2">
+              <Link
+                href="/admin"
+                className="btn btn-primary btn-sm inline-flex items-center gap-1.5"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                管理后台
+              </Link>
+              <Link
+                href="/admin/problems"
+                className="btn btn-outline btn-sm inline-flex items-center gap-1.5"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                题目管理
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
@@ -206,8 +228,8 @@ export function DashboardView() {
 
         <div className="card-static rounded-xl p-4">
           <div className="flex items-center gap-2.5 mb-2.5">
-            <div className="w-9 h-9 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-              <TrendingUp className="w-[18px] h-[18px] text-green-600 dark:text-green-400" />
+            <div className="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center">
+              <TrendingUp className="w-[18px] h-[18px] text-secondary" />
             </div>
             <span className="text-sm text-muted-foreground font-medium">本周通过率</span>
           </div>
@@ -215,11 +237,13 @@ export function DashboardView() {
             {stats.weeklyPassRate}
             <span className="text-sm font-normal text-muted-foreground">%</span>
           </div>
-          {stats.weeklyPassRateDelta !== null ? (
+          {stats.weeklySubmissions === 0 ? (
+            <div className="text-xs text-muted-foreground mt-1">本周暂无提交</div>
+          ) : stats.weeklyPassRateDelta !== null ? (
             <div
               className={`text-xs mt-1 ${
                 stats.weeklyPassRateDelta >= 0
-                  ? 'text-green-600 dark:text-green-400'
+                  ? 'text-secondary'
                   : 'text-muted-foreground'
               }`}
             >
@@ -227,19 +251,19 @@ export function DashboardView() {
               {stats.weeklyPassRateDelta}%
             </div>
           ) : (
-            <div className="text-xs text-muted-foreground mt-1">本周暂无提交</div>
+            <div className="text-xs text-muted-foreground mt-1">暂无上周对比</div>
           )}
         </div>
 
         <div className="card-static rounded-xl p-4">
           <div className="flex items-center gap-2.5 mb-2.5">
-            <div className="w-9 h-9 rounded-lg bg-sky-100 dark:bg-sky-900/20 flex items-center justify-center">
-              <BarChart3 className="w-[18px] h-[18px] text-sky-600 dark:text-sky-400" />
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <BarChart3 className="w-[18px] h-[18px] text-primary" />
             </div>
             <span className="text-sm text-muted-foreground font-medium">Rating</span>
           </div>
           <div className="text-2xl font-bold text-foreground tabular-nums">{stats.rating}</div>
-          <div className="text-xs text-sky-600 dark:text-sky-400 mt-1">
+          <div className="text-xs text-primary mt-1">
             {isStaff ? '竞赛积分' : stats.rank}
           </div>
         </div>

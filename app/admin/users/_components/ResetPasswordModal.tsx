@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDialog } from '@/components/common/DialogProvider'
+import Modal from '@/components/common/Modal'
 import type { User } from '../_utils'
 
 interface ResetPasswordModalProps {
@@ -51,40 +52,37 @@ export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-      <div className="card p-6 max-w-md w-full mx-4">
-        <h3 className="text-lg font-bold text-foreground mb-1">重置密码</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          为用户 <span className="text-foreground font-medium">{user.username}</span> 设置新密码
-        </p>
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-muted-foreground mb-2">新密码</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="至少6位"
-            className="input"
-            autoComplete="new-password"
-          />
-        </div>
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onClose}
-            disabled={resetting}
-            className="btn btn-ghost"
-          >
+    <Modal
+      open
+      onClose={onClose}
+      title="重置密码"
+      closeOnOverlayClick={!resetting}
+      closeOnEsc={!resetting}
+      footer={
+        <div className="flex gap-3 justify-end w-full">
+          <button onClick={onClose} disabled={resetting} className="btn btn-ghost">
             取消
           </button>
-          <button
-            onClick={handleReset}
-            disabled={resetting}
-            className="btn btn-primary"
-          >
+          <button onClick={handleReset} disabled={resetting} className="btn btn-primary">
             {resetting ? '重置中...' : '确认重置'}
           </button>
         </div>
+      }
+    >
+      <p className="text-sm text-muted-foreground mb-4">
+        为用户 <span className="text-foreground font-medium">{user.username}</span> 设置新密码
+      </p>
+      <div>
+        <label className="block text-sm font-medium text-muted-foreground mb-2">新密码</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="至少6位"
+          className="input"
+          autoComplete="new-password"
+        />
       </div>
-    </div>
+    </Modal>
   )
 }

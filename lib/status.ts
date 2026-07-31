@@ -91,16 +91,16 @@ const STATUS_CONFIGS: Record<string, StatusConfig> = {
   PE: {
     icon: 'alert-triangle',
     className: 'status-pe',
-    iconBg: 'bg-amber-50',
+    iconBg: 'bg-accent/10',
     text: 'Presentation Error',
-    color: 'text-amber-600',
+    color: 'text-accent',
   },
   OLE: {
     icon: 'alert-triangle',
     className: 'status-ole',
-    iconBg: 'bg-amber-50',
+    iconBg: 'bg-accent/10',
     text: 'Output Limit Exceeded',
-    color: 'text-amber-600',
+    color: 'text-accent',
   },
   PC: {
     icon: 'alert-circle',

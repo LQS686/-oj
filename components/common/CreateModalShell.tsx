@@ -25,6 +25,8 @@ export interface CreateModalShellProps {
   labelledById: string
   /** 默认 'user'；admin 后台传 'admin' */
   variant?: CreateModalShellVariant
+  /** 面板最大宽度，默认 max-w-2xl */
+  maxWidthClass?: string
   children: React.ReactNode
 }
 
@@ -45,6 +47,7 @@ export default function CreateModalShell({
   icon: Icon,
   labelledById,
   variant = 'user',
+  maxWidthClass = 'max-w-2xl',
   children,
 }: CreateModalShellProps) {
   useEffect(() => {
@@ -70,7 +73,7 @@ export default function CreateModalShell({
       role="presentation"
     >
       <div
-        className={`card-static rounded-xl w-full max-w-2xl ${CONTAINER_MAX_H[variant]} flex flex-col shadow-xl border border-border overflow-hidden`}
+        className={`card-static rounded-xl w-full ${maxWidthClass} ${CONTAINER_MAX_H[variant]} flex flex-col shadow-xl border border-border overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

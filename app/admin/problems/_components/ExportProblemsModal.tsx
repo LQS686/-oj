@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Download, FileCode, FileText, X, Loader2, Check } from 'lucide-react'
+import { useState } from 'react'
+import { Download, FileCode, FileText, Loader2, Check } from 'lucide-react'
+import CreateModalShell from '@/components/common/CreateModalShell'
 
 interface ExportProblemsModalProps {
   onClose: () => void
@@ -35,28 +36,9 @@ export function ExportProblemsModal({
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
 
-  // ESC 键关闭弹窗（导出中不允许）
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !exporting) {
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [exporting, onClose])
-
   const handleClose = () => {
     if (exporting) return
     onClose()
-  }
-
-  // 点击遮罩关闭（导出中不允许）
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (exporting) return
-    if (e.target === e.currentTarget) {
-      onClose()
-    }
   }
 
   const handleExport = async () => {
@@ -98,34 +80,16 @@ export function ExportProblemsModal({
     (mode === 'csv' && totalCount === 0)
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4"
-      onClick={handleOverlayClick}
+    <CreateModalShell
+      open
+      onClose={handleClose}
+      title="批量导出题目"
+      icon={Download}
+      labelledById="export-problems-modal-title"
+      variant="admin"
     >
-      <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10">
-              <Download className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-foreground">批量导出题目</h3>
-              <p className="text-xs text-muted-foreground">
-                DSOJ 标准题包 ZIP / CSV 报表
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            disabled={exporting}
-            className="p-2 hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-5">
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
           {/* 模式选择 */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
@@ -330,8 +294,7 @@ export function ExportProblemsModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-background border-t border-border px-6 py-4 flex justify-end gap-3">
+        <div className="shrink-0 border-t border-border px-5 py-4 flex justify-end gap-3">
           <button
             onClick={handleClose}
             disabled={exporting}
@@ -358,6 +321,6 @@ export function ExportProblemsModal({
           </button>
         </div>
       </div>
-    </div>
+    </CreateModalShell>
   )
 }

@@ -56,12 +56,12 @@ export function buildProblemColumns({
         return (
           <div className="flex flex-wrap items-center gap-1">
             {tags.slice(0, 3).map((tag, idx) => (
-              <span key={idx} className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded">
+              <span key={idx} className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                 {tag}
               </span>
             ))}
             {tags.length > 3 && (
-              <span className="text-[10px] text-muted-foreground">+{tags.length - 3}</span>
+              <span className="text-xs text-muted-foreground">+{tags.length - 3}</span>
             )}
           </div>
         )

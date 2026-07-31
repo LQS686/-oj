@@ -272,7 +272,7 @@ function ContestsPageContent() {
                 type="button"
                 className={`px-3.5 py-2 rounded-md text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                   activeTab === tab.key
-                    ? 'bg-primary text-white shadow-sm'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
                 onClick={() => handleTabChange(tab.key)}

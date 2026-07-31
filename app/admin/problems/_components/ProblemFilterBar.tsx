@@ -129,7 +129,7 @@ function MultiSelectDropdown({ label, options, selected, onChange, placeholder }
                   >
                     <span
                       className={`w-4 h-4 border rounded flex items-center justify-center ${
-                        isSelected ? 'border-primary bg-primary text-white' : 'border-border'
+                        isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-border'
                       }`}
                     >
                       {isSelected && <Check className="w-3 h-3" />}
@@ -233,7 +233,7 @@ export function ProblemFilterBar({
                   type="button"
                   onClick={() => onFiltersChange({ visibility: opt.v })}
                   className={`px-3 py-1.5 text-sm transition-colors ${
-                    selected ? 'bg-primary text-white' : 'bg-background text-muted-foreground hover:bg-muted'
+                    selected ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {opt.l}
@@ -285,7 +285,7 @@ export function ProblemFilterBar({
                   type="button"
                   onClick={() => onFiltersChange({ completeness: opt.v })}
                   className={`px-3 py-1.5 text-sm transition-colors ${
-                    selected ? 'bg-primary text-white' : 'bg-background text-muted-foreground hover:bg-muted'
+                    selected ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   {opt.l}

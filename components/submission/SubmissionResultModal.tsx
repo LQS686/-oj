@@ -122,10 +122,10 @@ function getStatusMeta(status: string): StatusMeta {
         text: '超内存',
         description: '程序内存使用超出限制',
         icon: 'alert',
-        color: 'text-purple-400',
-        bg: 'bg-purple-500/10',
-        border: 'border-purple-500/30',
-        textCls: 'text-purple-400',
+        color: 'text-accent',
+        bg: 'bg-accent/10',
+        border: 'border-accent/30',
+        textCls: 'text-accent',
       }
     case 'RE':
       return {

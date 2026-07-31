@@ -21,7 +21,7 @@ import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useClickOutside } from '@/hooks/useClickOutside'
-import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState, useDialog } from '@/components/common'
+import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState, useDialog, Modal } from '@/components/common'
 
 interface Problem {
   id: string
@@ -346,7 +346,7 @@ export default function ProblemsPage() {
                                    'bg-muted'
                     return (
                       <div className="w-full max-w-[100px]">
-                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-0.5">
                           <span className="font-mono tabular-nums">{rate}%</span>
                           <span className="font-mono tabular-nums">{accepted}/{total}</span>
                         </div>
@@ -534,25 +534,27 @@ export default function ProblemsPage() {
       </EducationalPageShell>
 
       {tagModalOpen && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4 animate-backdrop-in"
-          onClick={() => setTagModalOpen(false)}
-        >
-          <div
-            className="bg-background rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col border border-border animate-modal-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">选择标签</h2>
+        <Modal
+          open
+          onClose={() => setTagModalOpen(false)}
+          title="选择标签"
+          size="lg"
+          footer={
+            <div className="flex items-center justify-between gap-2 w-full">
               <button
                 type="button"
-                onClick={() => setTagModalOpen(false)}
-                className="p-2 rounded-md hover:bg-muted text-muted-foreground"
+                onClick={() => setSelectedTags([])}
+                className="text-sm text-muted-foreground hover:text-foreground"
               >
-                <X className="w-5 h-5" />
+                清空已选
+              </button>
+              <button type="button" onClick={() => setTagModalOpen(false)} className="btn btn-primary">
+                确定
               </button>
             </div>
-            <div className="p-4 border-b border-border">
+          }
+        >
+            <div className="pb-4 border-b border-border -mt-1 mb-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -579,7 +581,7 @@ export default function ProblemsPage() {
                 </div>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div>
               {filteredTagOptions.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">暂无匹配标签</p>
               ) : (
@@ -605,20 +607,7 @@ export default function ProblemsPage() {
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between gap-2 p-4 border-t border-border">
-              <button
-                type="button"
-                onClick={() => setSelectedTags([])}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                清空已选
-              </button>
-              <button type="button" onClick={() => setTagModalOpen(false)} className="btn btn-primary">
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </>
   )

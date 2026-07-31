@@ -201,7 +201,7 @@ export default function RankPage() {
   onClick={() => setActiveTab(tab.key as typeof activeTab)}
   className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 whitespace-nowrap ${
   activeTab === tab.key
-  ? 'bg-primary text-white shadow-sm'
+  ? 'bg-primary text-primary-foreground shadow-sm'
   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
   }`}
   >

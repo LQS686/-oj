@@ -286,7 +286,7 @@ export default function UserProfilePage() {
                           </td>
                           <td className="py-2.5 px-2">
                             <span
-                              className={`tag text-[11px] ${statusTagClass(submission.status)}`}
+                              className={`tag text-xs ${statusTagClass(submission.status)}`}
                             >
                               {submission.status}
                             </span>
@@ -418,7 +418,7 @@ export default function UserProfilePage() {
 function StatCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-muted/25 px-3 py-2.5 text-center">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-lg font-bold text-foreground tabular-nums mt-0.5">{value}</div>
     </div>
   )

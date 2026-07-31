@@ -25,7 +25,7 @@ export function MessageBanner({ message }: MessageBannerProps) {
         {isSuccess ? (
           <Check className="w-4 h-4 text-secondary-light" />
         ) : (
-          <X className="w-4 h-4 text-red-400" />
+          <X className="w-4 h-4 text-error" />
         )}
       </div>
       <span className="text-foreground font-medium">{message.text}</span>

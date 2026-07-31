@@ -7,6 +7,7 @@ import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
 import { useDialog, RouteSuspenseFallback } from '@/components/common'
+import Modal from '@/components/common/Modal'
 import AdminCreateContestModal from '@/components/admin/AdminCreateContestModal'
 import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
@@ -346,14 +347,15 @@ function AdminContestsPageContent() {
  </AdminPageShell>
 
  {showDeleteModal && selectedContest && (
- <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
- <div className="card p-6 max-w-md w-full mx-4">
- <h3 className="text-lg font-bold text-foreground mb-4">确认删除</h3>
- <p className="text-muted-foreground mb-6">
- 确定要删除竞赛 <span className="text-foreground font-medium">{selectedContest.title}</span> 吗？
- 此操作无法撤销。
- </p>
- <div className="flex gap-3 justify-end">
+ <Modal
+ open
+ onClose={() => {
+ setShowDeleteModal(false)
+ setSelectedContest(null)
+ }}
+ title="确认删除"
+ footer={
+ <div className="flex gap-3 justify-end w-full">
  <button
  onClick={() => {
  setShowDeleteModal(false)
@@ -370,8 +372,13 @@ function AdminContestsPageContent() {
  确认删除
  </button>
  </div>
- </div>
- </div>
+ }
+ >
+ <p className="text-muted-foreground">
+ 确定要删除竞赛 <span className="text-foreground font-medium">{selectedContest.title}</span> 吗？
+ 此操作无法撤销。
+ </p>
+ </Modal>
  )}
 
  <AdminCreateContestModal

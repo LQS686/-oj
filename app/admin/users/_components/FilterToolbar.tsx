@@ -52,7 +52,7 @@ export function FilterToolbar({
             onClick={() => onRoleFilterChange(tab.id)}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
               roleFilter === tab.id
-                ? 'bg-primary text-foreground'
+                ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >

@@ -21,7 +21,7 @@ export default function Logo() {
         <span className="text-sm font-bold text-foreground tracking-tight group-hover:text-primary transition-colors duration-200">
           {settings.siteName}
         </span>
-        <span className="text-[10px] text-muted-foreground -mt-0.5">
+        <span className="text-xs text-muted-foreground -mt-0.5">
           {settings.siteDescription}
         </span>
       </div>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDialog } from '@/components/common/DialogProvider'
+import Modal from '@/components/common/Modal'
 
 interface BatchDeleteModalProps {
   /** 选中的用户 ID 集合（用于提交） */
@@ -48,14 +49,14 @@ export function BatchDeleteModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-      <div className="card p-6 max-w-md w-full mx-4">
-        <h3 className="text-lg font-bold text-foreground mb-4">批量删除用户</h3>
-        <p className="text-muted-foreground mb-6">
-          确定要删除选中的 <span className="text-foreground font-medium">{userIds.size}</span> 个用户吗？
-          此操作无法撤销。
-        </p>
-        <div className="flex gap-3 justify-end">
+    <Modal
+      open
+      onClose={onClose}
+      title="批量删除用户"
+      closeOnOverlayClick={!operating}
+      closeOnEsc={!operating}
+      footer={
+        <div className="flex gap-3 justify-end w-full">
           <button onClick={onClose} className="btn btn-ghost" disabled={operating}>
             取消
           </button>
@@ -68,7 +69,12 @@ export function BatchDeleteModal({
             确认删除
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <p className="text-muted-foreground">
+        确定要删除选中的 <span className="text-foreground font-medium">{userIds.size}</span> 个用户吗？
+        此操作无法撤销。
+      </p>
+    </Modal>
   )
 }

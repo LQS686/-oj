@@ -267,7 +267,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                           sidebarOpen ? 'px-4 gap-3' : 'justify-center px-2 gap-0'
                         } ${
                           isActive
-                            ? 'bg-primary text-white'
+                            ? 'bg-primary text-primary-foreground'
                             : 'text-foreground hover:bg-muted'
                         }`}
                       >

@@ -2,10 +2,11 @@
 
 import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, X, FileCode, Copy, Check, Timer } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, FileCode, Copy, Check, Timer } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDateTime, formatDateTimeShort } from '@/lib/utils'
 import { formatDurationMs } from '@/components/class/ProblemTimer'
+import CreateModalShell from '@/components/common/CreateModalShell'
 import {
   isAcceptedStatus,
   isNonFinalSubmissionStatus,
@@ -159,34 +160,15 @@ function SubmissionModal({
  const currentLang = sortedSubs.find((s: RawSubmission) => s.id === selectedSubId)?.language
 
  return (
- <div
- className="fixed inset-0 z-[110] flex items-center justify-center p-4"
- onClick={onClose}
+ <CreateModalShell
+ open
+ onClose={onClose}
+ title={`${LETTERS[problemIndex]}. ${problem.title} — ${studentName}`}
+ icon={FileCode}
+ labelledById="student-completion-submission-modal"
+ maxWidthClass="max-w-3xl"
  >
- <div className="absolute inset-0 bg-black/50" />
-
- <div
- className="relative bg-background rounded-xl border border-border shadow-xl w-full max-w-3xl h-[70vh] flex flex-col overflow-hidden"
- onClick={(e) => e.stopPropagation()}
- >
- <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
- <div className="flex items-center gap-2.5 min-w-0">
- <span className="shrink-0 w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center font-mono text-sm font-bold text-primary-light">
- {LETTERS[problemIndex]}
- </span>
- <h3 className="font-semibold text-foreground truncate text-sm">{problem.title}</h3>
- <span className="shrink-0 text-muted-foreground">—</span>
- <span className="shrink-0 font-medium text-foreground text-sm truncate">{studentName}</span>
- </div>
- <button
- onClick={onClose}
- className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0 ml-2"
- >
- <X className="w-4 h-4 text-muted-foreground" />
- </button>
- </div>
-
- <div className="flex flex-1 min-h-0 overflow-hidden">
+ <div className="flex flex-1 min-h-0 overflow-hidden h-[min(60vh,28rem)]">
  <div className="w-[240px] shrink-0 border-r border-border overflow-y-auto">
  <div className="px-4 py-2.5 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border">
  提交记录 ({sortedSubs.length})
@@ -216,7 +198,7 @@ function SubmissionModal({
  {sub.score ?? 0}分
  </span>
  </div>
- <div className="text-[11px] text-muted-foreground tabular-nums">
+ <div className="text-xs text-muted-foreground tabular-nums">
  {formatDateTime(sub.submittedAt)}
  </div>
  </button>
@@ -259,13 +241,13 @@ function SubmissionModal({
  </button>
  )}
  </div>
- <div className="flex-1 overflow-auto p-4 bg-slate-950/50">
+ <div className="flex-1 overflow-auto p-4 bg-muted/40">
  {isLoading ? (
  <div className="flex items-center justify-center h-full">
  <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
  </div>
  ) : currentCode ? (
- <pre className="bg-slate-900 rounded-lg p-4 text-sm font-mono text-slate-100 leading-relaxed whitespace-pre-wrap break-all min-h-full">
+ <pre className="bg-background-secondary rounded-lg p-4 text-sm font-mono text-foreground leading-relaxed whitespace-pre-wrap break-all min-h-full border border-border">
  <code>{currentCode}</code>
  </pre>
  ) : (
@@ -276,8 +258,7 @@ function SubmissionModal({
  </div>
  </div>
  </div>
- </div>
- </div>
+ </CreateModalShell>
  )
 }
 
@@ -368,7 +349,7 @@ export default function StudentCompletionTable({
      return (
        <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem]">
          <Clock className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
-         <span className="text-[10px] text-muted-foreground">评测中</span>
+         <span className="text-xs text-muted-foreground">评测中</span>
        </div>
      )
    }
@@ -378,11 +359,11 @@ export default function StudentCompletionTable({
      return (
        <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem] cursor-pointer hover:opacity-90 transition-opacity">
          <span className={`text-xs font-semibold tabular-nums ${scoreClass}`}>{submission.score} 分</span>
-         <span className={`text-[10px] font-medium flex items-center gap-0.5 ${cfg?.iconColor || 'text-muted-foreground'}`}>
+         <span className={`text-xs font-medium flex items-center gap-0.5 ${cfg?.iconColor || 'text-muted-foreground'}`}>
            <Timer className="w-2.5 h-2.5" />
            {formatDurationMs(submission.timeElapsedMs)} 通过
          </span>
-         <span className="text-[10px] text-muted-foreground tabular-nums leading-tight">
+         <span className="text-xs text-muted-foreground tabular-nums leading-tight">
            {formatDateTimeShort(submission.submittedAt ?? '')}
          </span>
        </div>
@@ -392,8 +373,8 @@ export default function StudentCompletionTable({
    return (
      <div className="flex flex-col items-center gap-0.5 min-w-[4.5rem] cursor-pointer hover:opacity-90 transition-opacity">
        <span className={`text-xs font-semibold tabular-nums ${scoreClass}`}>{submission.score} 分</span>
-       <span className={`text-[10px] font-medium ${cfg?.iconColor || 'text-muted-foreground'}`}>{statusLabel}</span>
-       <span className="text-[10px] text-muted-foreground tabular-nums leading-tight">
+       <span className={`text-xs font-medium ${cfg?.iconColor || 'text-muted-foreground'}`}>{statusLabel}</span>
+       <span className="text-xs text-muted-foreground tabular-nums leading-tight">
          {formatDateTimeShort(submission.submittedAt ?? '')}
        </span>
      </div>

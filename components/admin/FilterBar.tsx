@@ -37,7 +37,7 @@ export default function FilterBar({ children, activeCount = 0, onReset, onApply 
           <Filter className="w-5 h-5" />
           <span className="text-sm font-medium">筛选</span>
           {activeCount > 0 && (
-            <span className="badge-primary badge min-w-[20px] h-[20px] text-[11px]">
+            <span className="badge-primary badge min-w-[20px] h-[20px] text-xs">
               {activeCount}
             </span>
           )}

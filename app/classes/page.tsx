@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
-import { Users, Search, Plus, Calendar, TrendingUp, X, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
+import { Users, Search, Plus, Calendar, TrendingUp, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
@@ -11,7 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
 import { formatDate } from '@/lib/utils'
 import CreateClassModal from '@/components/class/CreateClassModal'
-import { EducationalPageShell, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback } from '@/components/common'
+import { EducationalPageShell, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback, Modal } from '@/components/common'
 import { loginPathFromLocation } from '@/lib/navigation'
 
 interface Class {
@@ -209,7 +209,7 @@ function ClassesPageContent() {
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     showMyClasses
-                      ? 'bg-primary text-white shadow-md'
+                      ? 'bg-primary text-primary-foreground shadow-md'
                       : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
                   }`}
                 >
@@ -222,7 +222,7 @@ function ClassesPageContent() {
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     !showMyClasses
-                      ? 'bg-primary text-white shadow-md'
+                      ? 'bg-primary text-primary-foreground shadow-md'
                       : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
                   }`}
                 >
@@ -300,7 +300,7 @@ function ClassesPageContent() {
                           onClick={() => setPage(pageNum)}
                           className={`w-10 h-10 rounded-lg font-semibold transition-all ${
                             page === pageNum
-                              ? 'bg-primary text-white shadow-lg'
+                              ? 'bg-primary text-primary-foreground shadow-lg'
                               : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
                           }`}
                         >
@@ -315,7 +315,7 @@ function ClassesPageContent() {
                           onClick={() => setPage(totalPages)}
                           className={`w-10 h-10 rounded-lg font-semibold transition-all ${
                             page === totalPages
-                              ? 'bg-primary text-white shadow-lg'
+                              ? 'bg-primary text-primary-foreground shadow-lg'
                               : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
                           }`}
                         >
@@ -420,19 +420,26 @@ function ClassDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4" onClick={onClose}>
-      <div className="card-static rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h3 className="text-lg font-semibold text-foreground">班级详情</h3>
+    <Modal
+      open
+      onClose={onClose}
+      title="班级详情"
+      size="lg"
+      closeOnOverlayClick={!loading}
+      closeOnEsc={!loading}
+      footer={
+        <div className="flex justify-end w-full">
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-primary-light transition-colors"
+            disabled={loading}
+            className="btn btn-outline"
           >
-            <X className="w-5 h-5" />
+            关闭
           </button>
         </div>
-
-        <div className="p-6 space-y-6">
+      }
+    >
+        <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-start gap-4">
             {classData.avatar ? (
               <img
@@ -442,7 +449,7 @@ function ClassDetailModal({
               />
             ) : (
               <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                <Users className="w-10 h-10 text-white" />
+                <Users className="w-10 h-10 text-primary-foreground" />
               </div>
             )}
             <div className="flex-1">
@@ -479,7 +486,7 @@ function ClassDetailModal({
             </div>
             <div className="card-static p-4 rounded-xl text-center">
               <div className="text-2xl font-bold text-secondary-light">{classData.stats?.problemCount || 0}</div>
-              <div className="text-sm text-muted-foreground">题目数</div>
+              <div className="text-sm text-muted-foreground">作业题目</div>
             </div>
             <div className="card-static p-4 rounded-xl text-center">
               <div className="text-2xl font-bold text-accent-light">{classData.stats?.assignmentCount || 0}</div>
@@ -536,18 +543,7 @@ function ClassDetailModal({
             </div>
           )}
         </div>
-
-        <div className="flex items-center justify-end p-6 border-t border-border">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="btn btn-outline"
-          >
-            关闭
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

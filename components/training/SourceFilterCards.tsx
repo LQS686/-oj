@@ -4,7 +4,7 @@
  * components/training/SourceFilterCards.tsx
  * 题单 3 大来源分类卡片
  *
- * 视觉差异化：渐变背景 + 大图标容器 + 主题色系（官方蓝/竞赛金/收藏绿）
+ * 视觉差异化：大图标容器 + 语义色系（官方 primary / 竞赛 accent / 收藏 secondary）
  */
 import { BookOpen, Trophy, Bookmark, type LucideIcon } from 'lucide-react'
 
@@ -40,10 +40,10 @@ const SOURCES: SourceMeta[] = [
     desc1: '由平台官方发布',
     desc2: '系统学习路径',
     icon: BookOpen,
-    activeBg: 'bg-gradient-to-br from-blue-500 to-blue-600',
-    idleBg: 'bg-blue-50 dark:bg-blue-950/40',
-    hoverIconBg: 'group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50',
-    activeText: 'text-blue-600 dark:text-blue-400',
+    activeBg: 'bg-primary',
+    idleBg: 'bg-primary/10',
+    hoverIconBg: 'group-hover:bg-primary/15',
+    activeText: 'text-primary',
   },
   {
     key: 'contest',
@@ -51,10 +51,10 @@ const SOURCES: SourceMeta[] = [
     desc1: '汇集各类真题',
     desc2: 'CSP/NOIP/ICPC 等',
     icon: Trophy,
-    activeBg: 'bg-gradient-to-br from-amber-500 to-orange-500',
-    idleBg: 'bg-amber-50 dark:bg-amber-950/40',
-    hoverIconBg: 'group-hover:bg-amber-100 dark:group-hover:bg-amber-900/50',
-    activeText: 'text-amber-600 dark:text-amber-400',
+    activeBg: 'bg-accent',
+    idleBg: 'bg-accent/10',
+    hoverIconBg: 'group-hover:bg-accent/15',
+    activeText: 'text-accent',
   },
   {
     key: 'mine',
@@ -62,10 +62,10 @@ const SOURCES: SourceMeta[] = [
     desc1: '我加入的题单',
     desc2: '点击题单右上角收藏',
     icon: Bookmark,
-    activeBg: 'bg-gradient-to-br from-emerald-500 to-emerald-600',
-    idleBg: 'bg-emerald-50 dark:bg-emerald-950/40',
-    hoverIconBg: 'group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/50',
-    activeText: 'text-emerald-600 dark:text-emerald-400',
+    activeBg: 'bg-secondary',
+    idleBg: 'bg-secondary/10',
+    hoverIconBg: 'group-hover:bg-secondary/15',
+    activeText: 'text-secondary',
   },
 ]
 
@@ -96,7 +96,7 @@ export function SourceFilterCards({ active, onChange, isLoggedIn }: SourceFilter
               <div
                 className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
                   isActive
-                    ? `${s.activeBg} text-white shadow-md`
+                    ? `${s.activeBg} text-primary-foreground shadow-md`
                     : `${s.idleBg} ${s.hoverIconBg} text-muted-foreground`
                 }`}
               >
