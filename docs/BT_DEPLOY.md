@@ -49,16 +49,24 @@ sudo bash scripts/bt-deploy.sh http://你的服务器IP
 脚本会自动：
 
 1. 检查 Docker / Compose / 磁盘（至少约 4GB 可用）
-2. 配置国内镜像加速（如尚未配置）
+2. 配置国内镜像加速（如尚未配置；**不会覆盖**已有自定义 `daemon.json`，必要时用 python 合并）
 3. 生成 `.env`（含 JWT / ENCRYPTION_KEY / Redis·Mongo 密码）
 4. 按 URL 协议设置 `FORCE_SECURE_COOKIE`（HTTP→false，HTTPS→true）
 5. 生成 `mongo-keyfile`
 6. 拉取基础镜像并构建应用（首次约 5–10 分钟）
 7. 先拉起 mongo/redis，再启动 app，并做健康检查
-8. 写出 Nginx 片段：`nginx/baota-proxy.conf`
+8. 写出 Nginx 片段：`nginx/baota-proxy.conf`（端口与 `APP_HOST_PORT` 一致）
 
 > **说明**：HTTP 临时站可在 `NODE_ENV=production` 下运行（脚本已兼容）。  
 > 切勿在 HTTPS 站点关闭 Secure Cookie。
+
+常用可选参数：
+
+```bash
+sudo bash scripts/bt-deploy.sh --no-build          # 仅重启，不重建镜像
+sudo bash scripts/bt-deploy.sh --prune             # 升级时顺带清理 7 天前 BuildKit 缓存
+sudo bash scripts/bt-deploy.sh --skip-mirror       # 不改 /etc/docker/daemon.json
+```
 
 ### 4. 配置宝塔网站
 
@@ -97,6 +105,12 @@ sudo bash scripts/bt-deploy.sh https://dsoj.run
 
 ```bash
 sudo bash scripts/bt-deploy.sh --no-build
+```
+
+磁盘紧张时升级并清理旧构建缓存：
+
+```bash
+sudo bash scripts/bt-deploy.sh --prune
 ```
 
 ---
@@ -141,10 +155,12 @@ docker builder prune -af --filter "until=168h"
 | mongo 一直 unhealthy，app 起不来              | 已改为带账号的 healthcheck；仍失败时看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。                                                                                                                                                                                                  |
 | `mongo-keyfile: no such file`                 | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile`                                                                                                                                                                   |
 | 构建 ENOSPC / 磁盘满                          | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                                                                                                                                                                                     |
-| 镜像拉取失败                                  | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`                                                                                                                                                                                                                    |
+| 镜像拉取失败                                  | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认不覆盖已有自定义 daemon；可用 `--skip-mirror` 跳过                                                                                                                                                        |
 | 改域名后前端仍请求旧地址                      | 必须重建：`sudo bash scripts/bt-deploy.sh https://新域名`（不要用 `--no-build`）                                                                                                                                                                                                                    |
 | API 502                                       | `docker compose ps`；等健康检查通过；看 `docker compose logs -f app`                                                                                                                                                                                                                                |
 | 80/443 冲突                                   | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                                                                                                                                                                                  |
+| 3000 端口被占用                               | 脚本会提示；可改 `.env` 的 `APP_HOST_PORT` 后重跑，并重新粘贴 `nginx/baota-proxy.conf`（端口已写入片段）                                                                                                                                                                                            |
+| 粘贴 Nginx 后 WebSocket 断线                  | 确认存在 `location /socket.io/`，且 `X-Forwarded-Proto` 与站点协议一致                                                                                                                                                                                                                              |
 
 ---
 

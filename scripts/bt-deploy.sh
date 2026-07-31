@@ -8,6 +8,8 @@
 #   升级更新：          sudo bash scripts/bt-deploy.sh
 #   切换域名：          sudo bash scripts/bt-deploy.sh https://新域名
 #   仅重启不重建：      sudo bash scripts/bt-deploy.sh --no-build
+#   深度清理构建缓存：  sudo bash scripts/bt-deploy.sh --prune
+#   跳过镜像加速配置：  sudo bash scripts/bt-deploy.sh --skip-mirror
 # ============================================================
 set -euo pipefail
 
@@ -22,6 +24,8 @@ err()   { echo -e "${RED}[✗]${NC} $1"; }
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 FRONTEND_URL_ARG=""
 NO_BUILD=0
+DO_PRUNE=0
+SKIP_MIRROR=0
 
 usage() {
   cat <<USAGE
@@ -29,6 +33,8 @@ usage() {
 
   站点URL           https://dsoj.run 或 http://IP（首次必填；升级时可省略）
   --no-build        跳过镜像构建，仅 up -d + 健康检查（配置热更适用）
+  --prune           构建后清理 7 天前的 BuildKit 缓存（默认仅清悬空镜像）
+  --skip-mirror     不写入 /etc/docker/daemon.json 镜像加速
   -h, --help        显示帮助
 USAGE
 }
@@ -36,6 +42,8 @@ USAGE
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-build) NO_BUILD=1; shift ;;
+    --prune) DO_PRUNE=1; shift ;;
+    --skip-mirror) SKIP_MIRROR=1; shift ;;
     -h|--help) usage; exit 0 ;;
     http://*|https://*) FRONTEND_URL_ARG="$1"; shift ;;
     *)
@@ -160,6 +168,135 @@ detect_compose() {
   exit 1
 }
 
+compose_cli() {
+  if [[ "$COMPOSE_KIND" == "plugin" ]]; then
+    echo "docker compose"
+  else
+    echo "docker-compose"
+  fi
+}
+
+# 用 docker inspect 读健康状态，兼容旧版 compose 无 --format '{{.Health}}'
+service_health() {
+  local svc="$1"
+  local cid
+  cid="$(compose ps -q "$svc" 2>/dev/null | head -1 || true)"
+  if [[ -z "$cid" ]]; then
+    echo "missing"
+    return 0
+  fi
+  docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null \
+    || echo "unknown"
+}
+
+check_host_port() {
+  local bind="$1" port="$2"
+  local listeners=""
+  if command -v ss &>/dev/null; then
+    listeners="$(ss -ltn 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$" {print $4}' || true)"
+  elif command -v netstat &>/dev/null; then
+    listeners="$(netstat -ltn 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$" {print $4}' || true)"
+  else
+    return 0
+  fi
+  [[ -z "$listeners" ]] && return 0
+
+  # 本项目 compose 已占用则忽略
+  if compose ps -q app 2>/dev/null | grep -q .; then
+    local app_ports
+    app_ports="$(compose port app 3000 2>/dev/null || true)"
+    if [[ "$app_ports" == *":${port}"* ]] || [[ "$app_ports" == *" ${port}"* ]]; then
+      return 0
+    fi
+  fi
+
+  warn "检测到端口 ${port} 已被占用（绑定目标 ${bind}:${port}）："
+  echo "$listeners" | sed 's/^/    /'
+  warn "若非本项目容器，请修改 .env 中 APP_HOST_PORT，或停止占用进程后再部署"
+}
+
+ensure_docker_mirrors() {
+  if [[ "$SKIP_MIRROR" -eq 1 ]]; then
+    info "已跳过镜像加速配置（--skip-mirror）"
+    return 0
+  fi
+  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+    warn "非 root，跳过写入镜像加速；若拉镜像失败请用 sudo 重跑本脚本"
+    return 0
+  fi
+
+  mkdir -p /etc/docker
+  local conf="/etc/docker/daemon.json"
+
+  if [[ -f "$conf" ]] && grep -q "registry-mirrors" "$conf" 2>/dev/null; then
+    info "Docker 镜像加速已存在"
+    return 0
+  fi
+
+  if [[ -f "$conf" ]]; then
+    # 已有自定义 daemon.json：尝试用 python 合并，避免整文件覆盖
+    if command -v python3 &>/dev/null; then
+      if python3 - "$conf" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+except Exception:
+    sys.exit(2)
+mirrors = data.get("registry-mirrors") or []
+wanted = ["https://docker.1ms.run", "https://docker.xuanyuan.me"]
+for m in wanted:
+    if m not in mirrors:
+        mirrors.append(m)
+data["registry-mirrors"] = mirrors
+data.setdefault("log-driver", "json-file")
+opts = data.setdefault("log-opts", {})
+opts.setdefault("max-size", "10m")
+opts.setdefault("max-file", "3")
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PY
+      then
+        info "已向现有 daemon.json 合并 registry-mirrors"
+      else
+        warn "现有 /etc/docker/daemon.json 无法自动合并，请手动添加 registry-mirrors（未覆盖原文件）"
+        return 0
+      fi
+    else
+      warn "已有 /etc/docker/daemon.json 且无 python3，跳过写入以免覆盖自定义配置"
+      warn "请手动添加 registry-mirrors 后: systemctl restart docker"
+      return 0
+    fi
+  else
+    cat > "$conf" <<'DOCKERCONF'
+{
+  "registry-mirrors": [
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me"
+  ],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+DOCKERCONF
+    info "已写入 Docker 镜像加速配置"
+  fi
+
+  if systemctl restart docker; then
+    info "Docker 已重启以应用镜像加速"
+    for _ in $(seq 1 30); do
+      docker info &>/dev/null && break
+      sleep 1
+    done
+  else
+    warn "Docker 重启失败，请手动检查 /etc/docker/daemon.json"
+  fi
+}
+
 env_get() {
   local key="$1"
   [[ -f .env ]] || return 1
@@ -253,10 +390,31 @@ write_nginx_snippet() {
 
   mkdir -p "$PROJECT_DIR/nginx"
   local out="$PROJECT_DIR/nginx/baota-proxy.conf"
+  local app_port
+  app_port="$(env_get APP_HOST_PORT 2>/dev/null || echo 3000)"
+  [[ -n "${app_port// }" ]] || app_port=3000
+
+  # 公共反代片段（WebSocket + Next）
+  local proxy_common
+  proxy_common=$(cat <<PROXY
+        proxy_pass http://127.0.0.1:${app_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${proto_header};
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_buffering off;
+PROXY
+)
 
   if [[ "$protocol" == "https" ]]; then
     cat > "$out" <<NGINX
 # 宝塔：网站 → 设置 → 配置文件（先申请 Let's Encrypt 证书）
+# 若证书路径不同，以面板「SSL」页显示为准
 server {
     listen 80;
     server_name ${domain};
@@ -273,26 +431,13 @@ server {
     client_max_body_size 50M;
 
     location /socket.io/ {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto ${proto_header};
+${proxy_common}
         proxy_read_timeout 86400;
     }
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto ${proto_header};
+${proxy_common}
+        proxy_read_timeout 300s;
         proxy_cache_bypass \$http_upgrade;
     }
 }
@@ -307,26 +452,13 @@ server {
     client_max_body_size 50M;
 
     location /socket.io/ {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto ${proto_header};
+${proxy_common}
         proxy_read_timeout 86400;
     }
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto ${proto_header};
+${proxy_common}
+        proxy_read_timeout 300s;
         proxy_cache_bypass \$http_upgrade;
     }
 }
@@ -357,37 +489,7 @@ check_disk
 # 配置 Docker 镜像加速（国内服务器必需）
 # ========================================================
 step "配置 Docker 镜像加速"
-if [[ ! -f /etc/docker/daemon.json ]] || ! grep -q "registry-mirrors" /etc/docker/daemon.json 2>/dev/null; then
-  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
-    mkdir -p /etc/docker
-    cat > /etc/docker/daemon.json <<'DOCKERCONF'
-{
-  "registry-mirrors": [
-    "https://docker.1ms.run",
-    "https://docker.xuanyuan.me"
-  ],
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-DOCKERCONF
-    if systemctl restart docker; then
-      info "Docker 镜像加速已配置（docker.1ms.run + docker.xuanyuan.me）"
-      for _ in $(seq 1 30); do
-        docker info &>/dev/null && break
-        sleep 1
-      done
-    else
-      warn "Docker 重启失败，请手动检查 /etc/docker/daemon.json"
-    fi
-  else
-    warn "非 root，跳过写入镜像加速；若拉镜像失败请用 sudo 重跑本脚本"
-  fi
-else
-  info "Docker 镜像加速已存在"
-fi
+ensure_docker_mirrors
 
 cd "$PROJECT_DIR"
 
@@ -572,16 +674,24 @@ fi
 # ============================================================
 # 4. 清理 Docker 构建垃圾（防止磁盘被撑满）
 # ============================================================
-step "清理 Docker 构建缓存"
+step "清理 Docker 悬空资源"
 docker image prune -f >/dev/null || true
 docker container prune -f >/dev/null || true
-docker builder prune -af --filter "until=168h" >/dev/null 2>&1 || true
-info "Docker 垃圾已清理（保留近 7 天 BuildKit 缓存）"
+if [[ "$DO_PRUNE" -eq 1 ]]; then
+  docker builder prune -af --filter "until=168h" >/dev/null 2>&1 || true
+  info "已清理悬空镜像/容器，并清理 7 天前 BuildKit 缓存（--prune）"
+else
+  info "已清理悬空镜像/容器（保留 BuildKit 缓存；需要深度清理请加 --prune）"
+fi
 
 # ============================================================
 # 5. 启动服务（先依赖，再 app）
 # ============================================================
 step "启动服务"
+APP_PORT="$(env_get APP_HOST_PORT || echo 3000)"
+APP_BIND="$(env_get APP_HOST_BIND || echo 127.0.0.1)"
+check_host_port "$APP_BIND" "$APP_PORT"
+
 compose up -d mongo redis
 echo -n "等待 mongo/redis healthy"
 dep_ok=0
@@ -589,8 +699,8 @@ dep_ok=0
 MONGO_ROOT_USER="$(env_get MONGO_ROOT_USER || echo admin)"
 MONGO_ROOT_PASSWORD="$(env_get MONGO_ROOT_PASSWORD || true)"
 for i in $(seq 1 60); do
-  mongo_h="$(compose ps mongo --format '{{.Health}}' 2>/dev/null || true)"
-  redis_h="$(compose ps redis --format '{{.Health}}' 2>/dev/null || true)"
+  mongo_h="$(service_health mongo)"
+  redis_h="$(service_health redis)"
   if [[ "$mongo_h" == "healthy" && "$redis_h" == "healthy" ]]; then
     echo ""
     info "mongo / redis 已 healthy"
@@ -601,7 +711,7 @@ for i in $(seq 1 60); do
      && compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping' 2>/dev/null | grep -q PONG \
      && compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --eval 'db.adminCommand("ping").ok' 2>/dev/null | grep -q 1; then
     echo ""
-    info "mongo / redis 可连通（health 字段可能暂不可用）"
+    info "mongo / redis 可连通（health 字段可能暂不可用：mongo=${mongo_h} redis=${redis_h}）"
     dep_ok=1
     break
   fi
@@ -610,7 +720,7 @@ for i in $(seq 1 60); do
 done
 echo ""
 if [[ "$dep_ok" -ne 1 ]]; then
-  warn "mongo/redis 等待超时，仍继续启动 app（查看下方日志）"
+  warn "mongo/redis 等待超时（mongo=$(service_health mongo) redis=$(service_health redis)），仍继续启动 app"
   compose logs --tail=30 mongo redis || true
 fi
 
@@ -620,8 +730,6 @@ compose up -d
 # 6. 等待健康检查
 # ============================================================
 step "等待应用就绪"
-APP_PORT="$(env_get APP_HOST_PORT || echo 3000)"
-APP_BIND="$(env_get APP_HOST_BIND || echo 127.0.0.1)"
 HEALTH_URL="http://127.0.0.1:${APP_PORT}/healthcheck-static"
 DB_HEALTH_URL="http://127.0.0.1:${APP_PORT}/api/health/db"
 
@@ -634,7 +742,7 @@ for i in $(seq 1 90); do
     ready=1
     break
   fi
-  app_state="$(compose ps app --format '{{.State}}' 2>/dev/null || true)"
+  app_state="$(service_health app)"
   if [[ "$app_state" == "exited" || "$app_state" == "dead" ]]; then
     echo ""
     err "app 容器已退出"
@@ -663,6 +771,7 @@ fi
 # ============================================================
 SNIPPET="$(write_nginx_snippet "$FRONTEND_URL")"
 DOMAIN="$(domain_from_url "$FRONTEND_URL")"
+COMPOSE_HINT="$(compose_cli)"
 
 echo ""
 echo -e "${BOLD}========================================${NC}"
@@ -692,6 +801,7 @@ else
 fi
 echo ""
 echo -e "  配置文件已写入: ${CYAN}${SNIPPET}${NC}"
+echo -e "  ${YELLOW}注意: 反代端口为 ${APP_PORT}（与 .env APP_HOST_PORT 一致）${NC}"
 echo -e "${CYAN}────────────────── 配置预览 ──────────────────${NC}"
 cat "$SNIPPET"
 echo -e "${CYAN}────────────────── 预览结束 ──────────────────${NC}"
@@ -699,9 +809,10 @@ echo -e "${CYAN}────────────────── 预览结
 echo ""
 echo -e "  ${BOLD}常用命令:${NC}"
 echo -e "    cd ${PROJECT_DIR}"
-echo -e "    compose logs -f app"
+echo -e "    ${COMPOSE_HINT} logs -f app"
 echo -e "    sudo bash scripts/bt-deploy.sh                 # 升级（git pull 后）"
 echo -e "    sudo bash scripts/bt-deploy.sh --no-build      # 仅重启"
+echo -e "    sudo bash scripts/bt-deploy.sh --prune         # 升级并深度清理构建缓存"
 echo -e "    sudo bash scripts/bt-deploy.sh https://域名    # 切域名并重建"
 echo ""
 if [[ "$COMPOSE_KIND" == "standalone" ]]; then
