@@ -17,6 +17,7 @@ import {
 import { EducationalPageShell } from '@/components/common'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { useSettings } from '@/contexts/SettingsContext'
+import { isSelfRegistrationOpen } from '@/lib/auth/registration-open'
 
 const SECTIONS: { id: string; label: string }[] = [
   { id: 'quickstart', label: '快速上手' },
@@ -112,8 +113,11 @@ function Section({
 
 export default function HelpPage() {
   useDocumentTitle('使用帮助')
-  const { settings } = useSettings()
-  const allowRegistration = settings.allowRegistration === true
+  const { settings, needsBootstrap } = useSettings()
+  const allowRegistration = isSelfRegistrationOpen({
+    allowRegistration: settings.allowRegistration,
+    needsBootstrap,
+  })
 
   return (
     <EducationalPageShell width="standard" title="使用帮助" icon={CircleHelp}>

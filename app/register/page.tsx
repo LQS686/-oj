@@ -8,12 +8,13 @@ import { useUser } from '@/contexts/UserContext'
 import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
 import { errorLike } from '@/lib/api/errors'
+import { isSelfRegistrationOpen } from '@/lib/auth/registration-open'
 import { GuestAuthShell } from '@/components/common'
 
 export default function RegisterPage() {
   const router = useRouter()
   const { login } = useUser()
-  const { settings, loading: settingsLoading, refreshSettings } = useSettings()
+  const { settings, loading: settingsLoading, needsBootstrap, refreshSettings } = useSettings()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formData, setFormData] = useState({
@@ -32,7 +33,11 @@ export default function RegisterPage() {
     void refreshSettings()
   }, [refreshSettings])
 
-  const registrationClosed = !settingsLoading && settings.allowRegistration !== true
+  const registrationOpen = isSelfRegistrationOpen({
+    allowRegistration: settings.allowRegistration,
+    needsBootstrap,
+  })
+  const registrationClosed = !settingsLoading && !registrationOpen
 
   const validatePassword = (password: string) => {
     let strength = 0
@@ -53,7 +58,10 @@ export default function RegisterPage() {
     e.preventDefault()
     setError('')
 
-    if (settings.allowRegistration !== true) {
+    if (!isSelfRegistrationOpen({
+      allowRegistration: settings.allowRegistration,
+      needsBootstrap,
+    })) {
       setError('系统已关闭注册功能')
       return
     }
@@ -105,7 +113,15 @@ export default function RegisterPage() {
   const strengthColor = getStrengthColor()
 
   return (
-    <GuestAuthShell subtitle={registrationClosed ? '注册暂未开放' : '加入我们，开启编程之旅'}>
+    <GuestAuthShell
+      subtitle={
+        registrationClosed
+          ? '注册暂未开放'
+          : needsBootstrap
+            ? '完成首次部署，创建管理员账号'
+            : '加入我们，开启编程之旅'
+      }
+    >
       <div className="card-static rounded-lg p-6 md:p-10 shadow-2xl transition-all duration-300 animate-modal-in">
         {settingsLoading ? (
           <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -142,8 +158,12 @@ export default function RegisterPage() {
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-extrabold text-foreground">注册账号</h2>
-                <p className="text-sm text-muted-foreground">创建你的账号</p>
+                <h2 className="text-2xl font-extrabold text-foreground">
+                  {needsBootstrap ? '创建管理员账号' : '注册账号'}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {needsBootstrap ? '首个注册用户将自动成为系统管理员' : '创建你的账号'}
+                </p>
               </div>
             </div>
 

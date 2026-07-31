@@ -18,6 +18,7 @@ import {
   GitBranch,
 } from 'lucide-react'
 import { useSettings } from '@/contexts/SettingsContext'
+import { isSelfRegistrationOpen } from '@/lib/auth/registration-open'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 import { AnnouncementsGrid } from '@/app/_components/AnnouncementsGrid'
@@ -80,10 +81,13 @@ const climbPath = [
 ]
 
 export function GuestView() {
-  const { settings } = useSettings()
+  const { settings, needsBootstrap } = useSettings()
   const siteName = settings.siteName || '大山 OJ'
   const tagline = '代码如山·算法为径'
-  const allowRegistration = settings.allowRegistration === true
+  const allowRegistration = isSelfRegistrationOpen({
+    allowRegistration: settings.allowRegistration,
+    needsBootstrap,
+  })
   const [announcements, setAnnouncements] = useState<PublicAnnouncementItem[]>([])
 
   useEffect(() => {

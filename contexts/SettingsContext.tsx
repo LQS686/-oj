@@ -7,6 +7,8 @@ import { defaultSettings, type SystemSettings } from '@/lib/settings-defaults'
 
 interface SettingsContextType {
   settings: SystemSettings
+  /** 空库待创建首个管理员（与 register API 首用户例外对齐） */
+  needsBootstrap: boolean
   loading: boolean
   refreshSettings: () => Promise<void>
 }
@@ -20,6 +22,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     allowRegistration: false,
     judge: { ...defaultSettings.judge },
   })
+  const [needsBootstrap, setNeedsBootstrap] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const fetchSettings = useCallback(async () => {
@@ -37,9 +40,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       merged.siteDescription =
         (merged.siteDescription && merged.siteDescription.trim()) || defaultSettings.siteDescription
       setSettings(merged)
+      setNeedsBootstrap(settingsData.needsBootstrap === true)
     } catch {
       // fail-closed：保持关闭注册
       setSettings((prev) => ({ ...prev, allowRegistration: false }))
+      setNeedsBootstrap(false)
     } finally {
       setLoading(false)
     }
@@ -61,10 +66,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       settings,
+      needsBootstrap,
       loading,
       refreshSettings: fetchSettings,
     }),
-    [settings, loading, fetchSettings],
+    [settings, needsBootstrap, loading, fetchSettings],
   )
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>

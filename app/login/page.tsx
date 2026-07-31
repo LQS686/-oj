@@ -9,13 +9,17 @@ import { useSettings } from '@/contexts/SettingsContext'
 import { authApi } from '@/lib/api/auth'
 import { resolveLoginRedirect } from '@/lib/navigation'
 import { errorLike } from '@/lib/api/errors'
+import { isSelfRegistrationOpen } from '@/lib/auth/registration-open'
 import { GuestAuthShell } from '@/components/common'
 
  export default function LoginPage() {
  const router = useRouter()
  const { login } = useUser()
- const { settings } = useSettings()
- const allowRegistration = settings.allowRegistration === true
+ const { settings, needsBootstrap } = useSettings()
+ const allowRegistration = isSelfRegistrationOpen({
+   allowRegistration: settings.allowRegistration,
+   needsBootstrap,
+ })
  const [showPassword, setShowPassword] = useState(false)
  const [rememberMe, setRememberMe] = useState(false)
  const [formData, setFormData] = useState({
@@ -141,9 +145,13 @@ import { GuestAuthShell } from '@/components/common'
           <div className="mt-8 text-center">
             {allowRegistration ? (
               <>
-                <span className="text-muted-foreground">还没有账号？</span>
+                <span className="text-muted-foreground">
+                  {needsBootstrap ? '首次部署？' : '还没有账号？'}
+                </span>
                 <Link href="/register" className="text-primary-light hover:text-primary font-bold ml-1.5 transition-colors duration-200 group">
-                  <span className="group-hover:underline">立即注册</span>
+                  <span className="group-hover:underline">
+                    {needsBootstrap ? '创建管理员账号' : '立即注册'}
+                  </span>
                 </Link>
               </>
             ) : (

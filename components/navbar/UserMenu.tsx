@@ -18,6 +18,7 @@ import { useSettings } from '@/contexts/SettingsContext'
 import { canAccessAdmin, getRoleLabel } from '@/lib/permissions'
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 import { loginPath } from '@/lib/navigation'
+import { isSelfRegistrationOpen } from '@/lib/auth/registration-open'
 import Image from 'next/image'
 import Dropdown from '../common/Dropdown'
 
@@ -26,10 +27,13 @@ export default function UserMenu() {
   const pathname = usePathname()
   const [avatarError, setAvatarError] = useState(false)
   const { user, isLoading, logout: contextLogout } = useUser()
-  const { settings } = useSettings()
+  const { settings, needsBootstrap } = useSettings()
 
   const canAccessAdminUser = canAccessAdmin(user)
-  const allowRegistration = settings.allowRegistration === true
+  const allowRegistration = isSelfRegistrationOpen({
+    allowRegistration: settings.allowRegistration,
+    needsBootstrap,
+  })
 
   const { unreadCount } = useUnreadNotifications({
     userId: user?.id,

@@ -813,6 +813,7 @@ echo -e "  容器状态:"
 compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || compose ps
 echo ""
 echo -e "  ${BOLD}首次使用：浏览器打开站点 → 注册首个账号（自动成为系统管理员）${NC}"
+echo -e "  ${YELLOW}说明: 空库时即使后台关闭了「开放注册」，登录页仍会显示「创建管理员账号」入口${NC}"
 echo ""
 
 if is_https_url "$FRONTEND_URL"; then
