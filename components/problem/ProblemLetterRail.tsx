@@ -4,6 +4,8 @@
  * 题号轨：作业 / 竞赛 / 题单三栏布局共用
  * 桌面竖排窄栏，移动端横滑；点击仅切换选中，不跳转路由。
  */
+import type { ReactNode } from 'react'
+
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 export type ProblemLetterStatus = 'AC' | 'Attempted' | null
@@ -22,6 +24,12 @@ interface ProblemLetterRailProps {
   selectedIndex: number
   onSelect: (index: number) => void
   ariaLabel?: string
+  /** 每题字母块下方的扩展区（如作业计时器） */
+  renderItemExtra?: (
+    problem: ProblemLetterRailItem,
+    index: number,
+    isSelected: boolean
+  ) => ReactNode
 }
 
 export default function ProblemLetterRail({
@@ -29,6 +37,7 @@ export default function ProblemLetterRail({
   selectedIndex,
   onSelect,
   ariaLabel = '题目列表',
+  renderItemExtra,
 }: ProblemLetterRailProps) {
   if (problems.length === 0) {
     return (
@@ -62,7 +71,7 @@ export default function ProblemLetterRail({
             <span
               className={`relative w-8 h-8 rounded-md font-mono font-bold text-sm flex items-center justify-center border transition-colors ${
                 isSelected
-                  ? 'bg-primary text-white border-primary shadow-sm'
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                   : status === 'AC'
                     ? 'bg-secondary/10 text-secondary border-secondary/30'
                     : status === 'Attempted'
@@ -77,7 +86,7 @@ export default function ProblemLetterRail({
             </span>
             {problem.subtitle != null && problem.subtitle !== '' && (
               <span
-                className={`text-[10px] font-semibold tabular-nums leading-none ${
+                className={`text-xs font-semibold tabular-nums leading-none ${
                   status === 'AC'
                     ? 'text-secondary'
                     : status === 'Attempted'
@@ -88,6 +97,7 @@ export default function ProblemLetterRail({
                 {problem.subtitle}
               </span>
             )}
+            {renderItemExtra?.(problem, index, isSelected)}
           </button>
         )
       })}

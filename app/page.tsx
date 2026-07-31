@@ -15,7 +15,7 @@ export default function Home() {
   const siteDescription = settings.siteDescription || '代码如山·算法为径·陪你从入门到顶峰'
 
   return (
-    <div className="min-h-[calc(100vh-56px)] flex flex-col">
+    <div className="min-h-[calc(100vh-var(--navbar-height))] flex flex-col">
       {isLoading ? (
         <PageContainer className="py-4 md:py-6 flex-1">
           <div className="space-y-4 animate-pulse" aria-hidden="true">

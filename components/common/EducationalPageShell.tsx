@@ -34,6 +34,11 @@ export interface EducationalPageShellProps {
   children: ReactNode
   width?: EducationalPageWidth
   className?: string
+  /**
+   * 桌面端默认不重复渲染与顶栏同名的 H1；
+   * 实体页（班级名、用户名等）请设为 true，避免桌面端丢失页面身份。
+   */
+  showTitle?: boolean
 }
 
 const WIDTH_TO_VARIANT: Record<
@@ -55,8 +60,8 @@ function isBleed(width: EducationalPageWidth): boolean {
  * 教学向页面外壳：统一宽度、边距与信息密度。
  *
  * 标题策略：
- * - 桌面端：顶部导航已高亮当前页，不重复渲染 H1
- * - 移动端：显示 H1（sm:hidden）
+ * - 默认：桌面端不重复渲染与顶栏同名的 H1，仅移动端显示
+ * - showTitle：班级/用户等实体页始终显示标题
  */
 export function EducationalPageShell({
   title,
@@ -70,6 +75,7 @@ export function EducationalPageShell({
   children,
   width = 'default',
   className = '',
+  showTitle = false,
 }: EducationalPageShellProps) {
   const body = (
     <>
@@ -82,7 +88,11 @@ export function EducationalPageShell({
         </Link>
       )}
 
-      <h1 className="sm:hidden text-lg font-bold text-foreground mb-3">{title}</h1>
+      <h1
+        className={`${showTitle ? 'block' : 'sm:hidden'} text-lg font-bold text-foreground mb-3 truncate`}
+      >
+        {title}
+      </h1>
 
       {(toolbar || actions) && (
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">

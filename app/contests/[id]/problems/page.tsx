@@ -3,16 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  AlertCircle,
-  BookOpen,
-  ListChecks,
-  FileText,
-  History,
-  Code as CodeIcon,
-  Send,
-} from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
@@ -22,9 +13,18 @@ import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import ProblemLetterRail from '@/components/problem/ProblemLetterRail'
 import SubmissionList from '@/components/problem/SubmissionList'
-import PretestPanel from '@/components/problem/PretestPanel'
+import ProblemSubmitColumn, {
+  ProblemSubmitColumnHeader,
+  WORKSPACE_LANGUAGE_OPTIONS,
+} from '@/components/problem/ProblemSubmitColumn'
+import {
+  ProblemWorkspaceDesktopTabs,
+  ProblemWorkspaceMobileTabs,
+  ProblemWorkspaceSelectedTitle,
+  WORKSPACE_PRESETS,
+  type WorkspaceTab,
+} from '@/components/problem/ProblemWorkspaceTabs'
 import SubmissionResultModal from '@/components/submission/SubmissionResultModal'
-import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { loginPath } from '@/lib/navigation'
 import {
   createPendingListRow,
@@ -34,14 +34,11 @@ import {
 } from '@/hooks/useSubmissionResultFlow'
 import type { Problem } from '@/types/models'
 import { RouteSuspenseFallback } from '@/components/common'
+import { AlertCircle } from 'lucide-react'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-
-const languageOptions = [
-  { value: 'cpp', label: 'C++', version: 'C++17' },
-  { value: 'c', label: 'C', version: 'C11' },
-  { value: 'python', label: 'Python', version: 'Python 3.10' },
-]
+const PRESET = WORKSPACE_PRESETS.contest
+const languageOptions = WORKSPACE_LANGUAGE_OPTIONS
 
 interface ContestProblemRow {
   id: string
@@ -65,9 +62,7 @@ function ContestProblemsWorkspace() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [problemDetail, setProblemDetail] = useState<Problem | null>(null)
   const [problemLoading, setProblemLoading] = useState(false)
-  const [problemTab, setProblemTab] = useState<'description' | 'submissions' | 'code'>(
-    'description'
-  )
+  const [problemTab, setProblemTab] = useState<WorkspaceTab>('description')
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('cpp')
   const [submissions, setSubmissions] = useState<SubmissionListRow[]>([])
@@ -368,6 +363,7 @@ function ContestProblemsWorkspace() {
       <ProblemWorkspaceShell
         dense
         codeMode={problemTab === 'code'}
+        className="pb-20 lg:pb-0"
         leftSelector={
           <ProblemLetterRail
             ariaLabel="竞赛题目"
@@ -382,54 +378,21 @@ function ContestProblemsWorkspace() {
           />
         }
         leftHeader={
-          <>
-            {selectedProblem && (
-              <div className="hidden lg:flex items-center gap-2 px-4 py-2.5 border-r border-border min-w-0 max-w-[40%] shrink">
-                <span className="shrink-0 w-6 h-6 rounded-md bg-primary/10 text-primary-light font-mono text-xs font-bold flex items-center justify-center">
-                  {selectedProblem.label || LETTERS[selectedIndex]}
-                </span>
-                <span
-                  className="truncate text-sm font-medium text-foreground"
+          <ProblemWorkspaceDesktopTabs
+            tabs={PRESET.desktopTabs}
+            activeTab={problemTab}
+            onChange={setProblemTab}
+            layoutId="contest-problem-tab-indicator"
+            dense={PRESET.dense}
+            leading={
+              selectedProblem ? (
+                <ProblemWorkspaceSelectedTitle
+                  letter={selectedProblem.label || LETTERS[selectedIndex]}
                   title={selectedProblem.title}
-                >
-                  {selectedProblem.title}
-                </span>
-              </div>
-            )}
-            {(
-              [
-                { key: 'description' as const, label: '题目描述', icon: BookOpen },
-                { key: 'submissions' as const, label: '提交记录', icon: ListChecks },
-              ] as const
-            ).map((tab) => {
-              const Icon = tab.icon
-              const isActive = problemTab === tab.key
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setProblemTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all duration-300 relative cursor-pointer group whitespace-nowrap ${
-                    isActive
-                      ? 'text-primary-light'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="contest-problem-tab-indicator"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    />
-                  )}
-                  <Icon
-                    className={`w-3.5 h-3.5 transition-transform duration-300 ${isActive ? 'rotate-3' : ''}`}
-                  />
-                  {tab.label}
-                </button>
-              )
-            })}
-          </>
+                />
+              ) : null
+            }
+          />
         }
         leftPanel={
           <AnimatePresence mode="wait">
@@ -447,7 +410,10 @@ function ContestProblemsWorkspace() {
                     <span className="text-sm text-muted-foreground">加载题目内容...</span>
                   </div>
                 ) : problemDetail ? (
-                  <ProblemDescription problem={problemDetail} hideTags />
+                  <ProblemDescription
+                    problem={problemDetail}
+                    hideTags={PRESET.hideDescriptionTags}
+                  />
                 ) : (
                   <div className="p-10 text-center text-sm text-muted-foreground">
                     题目内容加载失败
@@ -480,90 +446,30 @@ function ContestProblemsWorkspace() {
             <ProblemMetaHeader
               timeLimit={problemDetail.timeLimit}
               memoryLimit={problemDetail.memoryLimit}
-              hideDifficultyAndTags
+              hideDifficultyAndTags={PRESET.hideDifficultyAndTags}
             />
           ) : null
         }
-        rightHeader={
-          <>
-            <CodeIcon className="w-4 h-4 text-primary-light" />
-            <h3 className="text-sm font-medium text-foreground">提交代码</h3>
-          </>
-        }
+        rightHeader={<ProblemSubmitColumnHeader />}
         rightPanel={
-          <>
-            {!user && (
-              <div className="p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-xs flex items-center gap-2">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                请先登录后再提交代码
-              </div>
-            )}
-            <div className="flex items-center justify-between gap-3">
-              <label className="text-xs font-medium text-foreground whitespace-nowrap">语言</label>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="px-2.5 py-1 rounded-md border border-border bg-background text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-              >
-                {languageOptions.map((lang) => (
-                  <option key={lang.value} value={lang.value}>
-                    {lang.label} ({lang.version})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <CodeEditor
-              value={code}
-              onChange={setCode}
-              language={language as CodeLanguage}
-              placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
-              height="min(28rem, calc(100vh - 22rem))"
-              maxLength={65536}
-              onSubmit={() => void handleSubmit()}
-            />
-            <div className="flex items-center gap-2 pt-0.5">
-              <button
-                type="button"
-                onClick={() => void handleSubmit()}
-                disabled={submitting || !user || !code.trim()}
-                title={!user ? '请先登录' : submitting ? '正在评测中...' : ''}
-                className="btn-primary btn flex-1 max-w-xs h-9 text-sm"
-              >
-                {submitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    评测中...
-                  </>
-                ) : !user ? (
-                  <>
-                    <Send className="w-4 h-4" />
-                    请先登录
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    提交代码
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setCode('')}
-                className="btn-ghost btn cursor-pointer h-9 text-sm"
-              >
-                清空
-              </button>
-            </div>
-            {selectedProblemId && (
-              <PretestPanel
-                problemId={selectedProblemId}
-                code={code}
-                language={language}
-                disabled={!user || submitting}
-                contestId={contestId}
-              />
-            )}
-          </>
+          <ProblemSubmitColumn
+            user={user}
+            code={code}
+            language={language}
+            onCodeChange={setCode}
+            onLanguageChange={setLanguage}
+            onSubmit={() => void handleSubmit()}
+            submitting={submitting}
+            problemId={selectedProblemId}
+            contestId={contestId}
+          />
+        }
+        bottomBar={
+          <ProblemWorkspaceMobileTabs
+            tabs={PRESET.mobileTabs}
+            activeTab={problemTab}
+            onChange={setProblemTab}
+          />
         }
       />
 
@@ -586,41 +492,6 @@ function ContestProblemsWorkspace() {
           setExpandedSubmissionId(submissionId)
         }}
       />
-
-      <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">
-        <div className="grid grid-cols-3">
-          <button
-            type="button"
-            onClick={() => setProblemTab('description')}
-            className={`flex flex-col items-center justify-center py-3 gap-1 ${
-              problemTab === 'description' ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            <FileText className="w-5 h-5" />
-            <span className="text-xs">题面</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setProblemTab('code')}
-            className={`flex flex-col items-center justify-center py-3 gap-1 ${
-              problemTab === 'code' ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            <CodeIcon className="w-5 h-5" />
-            <span className="text-xs">代码</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setProblemTab('submissions')}
-            className={`flex flex-col items-center justify-center py-3 gap-1 ${
-              problemTab === 'submissions' ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            <History className="w-5 h-5" />
-            <span className="text-xs">提交</span>
-          </button>
-        </div>
-      </div>
     </>
   )
 }

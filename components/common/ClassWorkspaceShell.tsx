@@ -95,6 +95,7 @@ export function ClassWorkspaceShell({
       actions={actions}
       backHref={showBack ? '/classes' : undefined}
       backLabel="返回班级列表"
+      showTitle
       toolbar={
         <div className="space-y-3">
           {nav}

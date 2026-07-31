@@ -72,7 +72,7 @@ export default function TrainingProblemMainHeader() {
           <span>内存限制: {problem.memoryLimit}MB</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <CheckCircle2 className="w-4 h-4 text-green-400" />
+          <CheckCircle2 className="w-4 h-4 text-secondary" />
           <span>通过率 {acceptRate}%</span>
         </div>
         <div className="flex items-center gap-1.5">

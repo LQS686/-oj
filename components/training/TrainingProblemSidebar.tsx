@@ -61,7 +61,7 @@ export default function TrainingProblemSidebar() {
                 })}
                 className={`relative w-10 h-10 rounded-lg font-mono font-bold text-sm transition-all duration-200 border flex items-center justify-center ${
                   isActive
-                    ? 'bg-primary text-white border-primary shadow-md scale-105'
+                    ? 'bg-primary text-primary-foreground border-primary shadow-md scale-105'
                     : isAccepted
                       ? 'bg-secondary/10 text-secondary border-secondary/30 hover:border-secondary/50'
                       : isAttempted
@@ -104,7 +104,7 @@ export default function TrainingProblemSidebar() {
 
         <div className="p-4 space-y-3">
           {!user && (
-            <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-accent-light text-sm flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 text-accent text-sm flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>请先登录后再提交代码</span>
             </div>

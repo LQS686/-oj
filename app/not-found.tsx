@@ -1,5 +1,9 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { Home, Search, AlertTriangle } from 'lucide-react'
+import { pageMetadata } from '@/lib/metadata'
+
+export const metadata: Metadata = pageMetadata('页面未找到')
 
 export default function NotFound() {
   return (
@@ -24,8 +28,8 @@ export default function NotFound() {
           </span>
         </div>
 
-        <div className="w-20 h-20 rounded-lg bg-amber-500 flex items-center justify-center mx-auto mb-6">
-          <AlertTriangle className="w-10 h-10 text-white" />
+        <div className="w-20 h-20 rounded-lg bg-accent flex items-center justify-center mx-auto mb-6">
+          <AlertTriangle className="w-10 h-10 text-primary-foreground" />
         </div>
 
         <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">

@@ -59,7 +59,7 @@ export default function ProblemMetaHeader({
           {visibleTags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] bg-muted/60 text-muted-foreground"
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted/60 text-muted-foreground"
             >
               {tag}
             </span>
@@ -68,7 +68,7 @@ export default function ProblemMetaHeader({
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="inline-flex items-center gap-0.5 text-[11px] text-primary-light hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+              className="inline-flex items-center gap-0.5 text-xs text-primary-light hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
             >
               {expanded ? (
                 <>

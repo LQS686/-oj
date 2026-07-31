@@ -13,13 +13,8 @@ import {
   Trash2,
   FileText,
   BarChart3,
-  Send,
   AlertCircle,
   FileCode,
-  BookOpen,
-  ListChecks,
-  History,
-  Code as CodeIcon,
   Info,
   Calendar,
 } from 'lucide-react'
@@ -29,7 +24,17 @@ import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import AssignmentProblemProgressList from '@/components/class/AssignmentProblemProgressList'
 import SubmissionList from '@/components/problem/SubmissionList'
-import PretestPanel from '@/components/problem/PretestPanel'
+import ProblemSubmitColumn, {
+  ProblemSubmitColumnHeader,
+  WORKSPACE_LANGUAGE_OPTIONS,
+} from '@/components/problem/ProblemSubmitColumn'
+import {
+  ProblemWorkspaceDesktopTabs,
+  ProblemWorkspaceMobileTabs,
+  ProblemWorkspaceSelectedTitle,
+  WORKSPACE_PRESETS,
+  type WorkspaceTab,
+} from '@/components/problem/ProblemWorkspaceTabs'
 import { logger } from '@/lib/logger'
 import { useClass } from '@/hooks/useClass'
 import {
@@ -44,7 +49,6 @@ import { canManageContent } from '@/lib/permissions'
 import { isClassAdminApiRole, isClassStudentApiRole, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDateTime } from '@/lib/utils'
 import SubmissionResultModal from '@/components/submission/SubmissionResultModal'
-import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { PageContainer } from '@/components/layout'
 import { loginPathFromLocation } from '@/lib/navigation'
 import { useDialog } from '@/components/common'
@@ -57,11 +61,8 @@ import {
 } from '@/components/entity'
 import type { Problem as ProblemModel } from '@/types/models'
 
-const languageOptions = [
- { value: 'cpp', label: 'C++', version: 'C++17' },
- { value: 'c', label: 'C', version: 'C11' },
- { value: 'python', label: 'Python', version: 'Python 3.10' },
-]
+const PRESET = WORKSPACE_PRESETS.assignment
+const languageOptions = WORKSPACE_LANGUAGE_OPTIONS
 
 interface Problem {
  id: string
@@ -124,8 +125,8 @@ const [editOpen, setEditOpen] = useState(false)
    return 'info'
  }
  const [viewTab, setViewTab] = useState<ViewTab>(() => parseViewTab(searchParams.get('tab')))
- // 中栏 Tab：与题库页一致（不含题解，作业场景）
- const [problemTab, setProblemTab] = useState<'description' | 'submissions' | 'code'>('description')
+ // 中栏 Tab：作业预设不含题解/统计
+ const [problemTab, setProblemTab] = useState<WorkspaceTab>('description')
  const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
  const [problemDetail, setProblemDetail] = useState<ProblemModel & { _id?: string } | null>(null)
  const [problemLoading, setProblemLoading] = useState(false)
@@ -379,10 +380,10 @@ const [editOpen, setEditOpen] = useState(false)
 
  const getStatusConfig = (status: string) => {
  switch (status) {
- case 'active': return { label: '进行中', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' }
- case 'upcoming': return { label: '未开始', color: 'text-blue-600 bg-blue-50 border-blue-200' }
- case 'ended': return { label: '已结束', color: 'text-slate-500 bg-slate-50 border-slate-200' }
- default: return { label: status, color: 'text-slate-500 bg-slate-50 border-slate-200' }
+ case 'active': return { label: '进行中', color: 'text-secondary bg-secondary/10 border-secondary/20' }
+ case 'upcoming': return { label: '未开始', color: 'text-primary bg-primary/10 border-primary/20' }
+ case 'ended': return { label: '已结束', color: 'text-muted-foreground bg-muted border-border' }
+ default: return { label: status, color: 'text-muted-foreground bg-muted border-border' }
  }
  }
 
@@ -613,6 +614,7 @@ const [editOpen, setEditOpen] = useState(false)
  <ProblemWorkspaceShell
  dense
  codeMode={problemTab === 'code'}
+ className="pb-20 lg:pb-0"
  leftSelector={
  <AssignmentProblemProgressList
  problems={assignment.problems || []}
@@ -629,46 +631,21 @@ const [editOpen, setEditOpen] = useState(false)
  />
  }
  leftHeader={
- <>
- {selectedProblem && (
- <div className="hidden lg:flex items-center gap-2 px-4 py-2.5 border-r border-border min-w-0 max-w-[40%] shrink">
- <span className="shrink-0 w-6 h-6 rounded-md bg-primary/10 text-primary-light font-mono text-xs font-bold flex items-center justify-center">
- {String.fromCharCode(65 + selectedProblemIndex)}
- </span>
- <span className="truncate text-sm font-medium text-foreground" title={selectedProblem.title}>
- {selectedProblem.title}
- </span>
- </div>
- )}
- {[
- { key: 'description' as const, label: '题目描述', icon: BookOpen },
- { key: 'submissions' as const, label: '提交记录', icon: ListChecks },
- ].map((tab) => {
- const Icon = tab.icon
- const isActive = problemTab === tab.key
- return (
- <button
- key={tab.key}
- onClick={() => setProblemTab(tab.key)}
- className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all duration-300 relative cursor-pointer group whitespace-nowrap ${
- isActive
- ? 'text-primary-light'
- : 'text-muted-foreground hover:text-foreground'
- }`}
- >
- {isActive && (
- <motion.div
+ <ProblemWorkspaceDesktopTabs
+ tabs={PRESET.desktopTabs}
+ activeTab={problemTab}
+ onChange={setProblemTab}
  layoutId="assignment-problem-tab-indicator"
- className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
- transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+ dense={PRESET.dense}
+ leading={
+ selectedProblem ? (
+ <ProblemWorkspaceSelectedTitle
+ letter={String.fromCharCode(65 + selectedProblemIndex)}
+ title={selectedProblem.title}
  />
- )}
- <Icon className={`w-3.5 h-3.5 transition-transform duration-300 ${isActive ? 'rotate-3' : ''}`} />
- {tab.label}
- </button>
- )
- })}
- </>
+ ) : null
+ }
+ />
  }
  leftPanel={
  <AnimatePresence mode="wait">
@@ -686,7 +663,10 @@ const [editOpen, setEditOpen] = useState(false)
  <span className="text-sm text-muted-foreground">加载题目内容...</span>
  </div>
  ) : problemDetail ? (
- <ProblemDescription problem={problemDetail} hideTags />
+ <ProblemDescription
+ problem={problemDetail}
+ hideTags={PRESET.hideDescriptionTags}
+ />
  ) : (
  <div className="p-10 text-center text-sm text-muted-foreground">题目内容加载失败</div>
  )}
@@ -718,158 +698,86 @@ const [editOpen, setEditOpen] = useState(false)
  <ProblemMetaHeader
  timeLimit={problemDetail.timeLimit}
  memoryLimit={problemDetail.memoryLimit}
- tags={problemDetail.tags}
- difficulty={problemDetail.difficulty}
+ tags={PRESET.hideDifficultyAndTags ? undefined : problemDetail.tags}
+ difficulty={
+ PRESET.hideDifficultyAndTags ? undefined : problemDetail.difficulty
+ }
+ hideDifficultyAndTags={PRESET.hideDifficultyAndTags}
  />
  ) : null
  }
- rightHeader={
- <>
- <CodeIcon className="w-4 h-4 text-primary-light" />
- <h3 className="text-sm font-medium text-foreground">提交代码</h3>
- </>
- }
+ rightHeader={<ProblemSubmitColumnHeader />}
  rightPanel={
+ <ProblemSubmitColumn
+ user={user}
+ code={code}
+ language={language}
+ onCodeChange={setCode}
+ onLanguageChange={setLanguage}
+ onSubmit={() => void handleSubmit()}
+ submitting={submitting}
+ problemId={String(
+ problemDetail?.id || problemDetail?._id || selectedProblem?.id || '',
+ ) || null}
+ statusBanner={
  <>
- {!user && (
- <div className="p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-xs flex items-center gap-2">
- <AlertCircle className="w-3.5 h-3.5 shrink-0" />
- 请先登录后再提交代码
- </div>
- )}
  {user && assignment.status === 'upcoming' && (
- <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs flex items-center gap-2">
+ <div className="p-2.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs flex items-center gap-2">
  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
  作业尚未开始，{assignment.startTime ? `将在 ${formatDateTime(assignment.startTime)} 开放提交` : '暂不可提交'}
  </div>
  )}
  {user && assignment.status === 'ended' && !assignment.allowLateSubmission && (
- <div className="p-2.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs flex items-center gap-2">
+ <div className="p-2.5 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs flex items-center gap-2">
  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
  作业已结束，不再接受新提交
  </div>
  )}
  {user && assignment.status === 'ended' && assignment.allowLateSubmission && (
- <div className="p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-accent text-xs flex items-center gap-2">
+ <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/20 text-accent text-xs flex items-center gap-2">
  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
  作业已结束（允许逾期提交，分数会被标记为逾期）
  </div>
  )}
-
- <div className="flex items-center justify-between gap-3">
- <label className="text-xs font-medium text-foreground whitespace-nowrap">语言</label>
- <select
- value={language}
- onChange={(e) => setLanguage(e.target.value)}
- className="px-2.5 py-1 rounded-md border border-border bg-background text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
- >
- {languageOptions.map((lang) => (
- <option key={lang.value} value={lang.value}>
- {lang.label} ({lang.version})
- </option>
- ))}
- </select>
- </div>
-
- <CodeEditor
- value={code}
- onChange={setCode}
- language={language as CodeLanguage}
- placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
- height="min(28rem, calc(100vh - 22rem))"
- onSubmit={handleSubmit}
- />
-
- <div className="flex items-center gap-2 pt-0.5">
- <button
- onClick={handleSubmit}
- disabled={submitting || submitCooldown || !user || assignment.status === 'upcoming' || (assignment.status === 'ended' && !assignment.allowLateSubmission)}
- title={
- !user ? '请先登录' :
- assignment.status === 'upcoming' ? '作业尚未开始' :
- assignment.status === 'ended' && !assignment.allowLateSubmission ? '作业已结束' :
- submitting ? '正在评测中...' :
- submitCooldown ? '请稍后再试' : ''
- }
- className="btn-primary btn flex-1 max-w-xs h-9 text-sm"
- >
- {submitting ? (
- <>
- <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
- 评测中...
- </>
- ) : submitCooldown ? (
- <>
- <Clock className="w-4 h-4" />
- 请稍候...
- </>
- ) : !user ? (
- <>
- <Send className="w-4 h-4" />
- 请先登录
- </>
- ) : assignment.status === 'upcoming' ? (
- <>
- <Clock className="w-4 h-4" />
- 未开始
- </>
- ) : assignment.status === 'ended' && !assignment.allowLateSubmission ? (
- <>
- <Clock className="w-4 h-4" />
- 已结束
- </>
- ) : (
- <>
- <Send className="w-4 h-4" />
- 提交代码
- </>
- )}
- </button>
- <button onClick={() => setCode('')} className="btn-ghost btn cursor-pointer h-9 text-sm">
- 清空
- </button>
- </div>
-
- {(problemDetail?.id || problemDetail?._id || selectedProblem?.id) && (
- <PretestPanel
- problemId={String(problemDetail?.id || problemDetail?._id || selectedProblem?.id)}
- code={code}
- language={language}
- disabled={!user || submitting}
- />
- )}
  </>
  }
+ submitDisabled={
+ submitCooldown ||
+ assignment.status === 'upcoming' ||
+ (assignment.status === 'ended' && !assignment.allowLateSubmission)
+ }
+ submitDisabledTitle={
+ !user
+ ? '请先登录'
+ : assignment.status === 'upcoming'
+ ? '作业尚未开始'
+ : assignment.status === 'ended' && !assignment.allowLateSubmission
+ ? '作业已结束'
+ : submitting
+ ? '正在评测中...'
+ : submitCooldown
+ ? '请稍后再试'
+ : ''
+ }
+ submitLabel={
+ submitCooldown
+ ? '请稍候...'
+ : assignment.status === 'upcoming'
+ ? '未开始'
+ : assignment.status === 'ended' && !assignment.allowLateSubmission
+ ? '已结束'
+ : '提交代码'
+ }
  />
- )}
-
- {/* 移动端底部 Tab Bar：题面 / 代码 / 提交 */}
- {effectiveViewTab === 'problems' && (
- <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">
- <div className="grid grid-cols-3">
- <button
- onClick={() => setProblemTab('description')}
- className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'description' ? 'text-primary' : 'text-muted-foreground'}`}
- >
- <FileText className="w-5 h-5" />
- <span className="text-xs">题面</span>
- </button>
- <button
- onClick={() => setProblemTab('code')}
- className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'code' ? 'text-primary' : 'text-muted-foreground'}`}
- >
- <CodeIcon className="w-5 h-5" />
- <span className="text-xs">代码</span>
- </button>
- <button
- onClick={() => setProblemTab('submissions')}
- className={`flex flex-col items-center justify-center py-3 gap-1 ${problemTab === 'submissions' ? 'text-primary' : 'text-muted-foreground'}`}
- >
- <History className="w-5 h-5" />
- <span className="text-xs">提交</span>
- </button>
- </div>
- </div>
+ }
+ bottomBar={
+ <ProblemWorkspaceMobileTabs
+ tabs={PRESET.mobileTabs}
+ activeTab={problemTab}
+ onChange={setProblemTab}
+ />
+ }
+ />
  )}
 
  {effectiveViewTab === 'completion' && isAdminOrOwner && (

@@ -4,19 +4,11 @@ import { useState, useEffect, use, useMemo, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  BookOpen,
-  Send,
   AlertCircle,
   Wifi,
-  Code as CodeIcon,
   CheckCircle2,
   FileCode,
-  FileText,
-  History,
-  MessageSquare,
-  ListChecks,
   Edit3,
-  BarChart3
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
@@ -26,7 +18,16 @@ import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import ProblemStatsPanel from '@/components/problem/ProblemStatsPanel'
-import PretestPanel from '@/components/problem/PretestPanel'
+import ProblemSubmitColumn, {
+  ProblemSubmitColumnHeader,
+  WORKSPACE_LANGUAGE_OPTIONS,
+} from '@/components/problem/ProblemSubmitColumn'
+import {
+  ProblemWorkspaceDesktopTabs,
+  ProblemWorkspaceMobileTabs,
+  WORKSPACE_PRESETS,
+  type WorkspaceTab,
+} from '@/components/problem/ProblemWorkspaceTabs'
 import SubmissionResultModal from '@/components/submission/SubmissionResultModal'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
@@ -34,7 +35,6 @@ import { canManageContent } from '@/lib/permissions'
 import Link from 'next/link'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import toast from 'react-hot-toast'
-import CodeEditor, { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { PageContainer } from '@/components/layout'
 import { loginPathFromLocation } from '@/lib/navigation'
 import {
@@ -45,11 +45,8 @@ import {
 } from '@/hooks/useSubmissionResultFlow'
 import type { Problem } from '@/types/models'
 
-const languageOptions = [
-  { value: 'cpp', label: 'C++', version: 'C++17' },
-  { value: 'c', label: 'C', version: 'C11' },
-  { value: 'python', label: 'Python', version: 'Python 3.10' },
-]
+const PRESET = WORKSPACE_PRESETS.library
+const languageOptions = WORKSPACE_LANGUAGE_OPTIONS
 
 function getStorageKey(problemId: string, classId: string | null, assignmentId: string | null): string {
   if (classId && assignmentId) {
@@ -84,7 +81,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
   const [code, setCode] = useState('')
   const [language, setLanguage] = useState('cpp')
-  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'submissions' | 'stats' | 'code'>(() => {
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
     if (
       tabParam === 'solutions' ||
       tabParam === 'submissions' ||
@@ -96,6 +93,12 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     }
     return 'description'
   })
+
+  const desktopTabs = useMemo(
+    () =>
+      PRESET.desktopTabs.filter((tab) => !(isAssignmentContext && tab === 'solutions')),
+    [isAssignmentContext]
+  )
 
   useDeferredEffect(() => {
     if (
@@ -399,14 +402,6 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     abortSubmitSession,
   ])
 
-  const handleLanguageChange = (newLang: string) => {
-    setLanguage(newLang)
-  }
-
-  const handleClearCode = () => {
-    setCode('')
-  }
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -474,7 +469,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
         <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <CheckCircle2 className="w-4 h-4 text-green-400 transition-transform duration-300" />
+            <CheckCircle2 className="w-4 h-4 text-secondary transition-transform duration-300" />
             <span>通过率 {acceptRate}%</span>
           </div>
           <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
@@ -482,7 +477,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             <span>{problem.totalSubmit?.toLocaleString() || '0'} 提交</span>
           </div>
           {user && isConnected && (
-            <div className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 transition-colors duration-300 group">
+            <div className="flex items-center gap-1.5 text-xs text-secondary hover:text-secondary-light transition-colors duration-300 group">
               <Wifi className="w-3.5 h-3.5 transition-transform duration-300" />
               <span>实时连接</span>
             </div>
@@ -491,6 +486,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
 
         <ProblemWorkspaceShell
           codeMode={activeTab === 'code'}
+          className="pb-20 lg:pb-0"
           metaHeader={
             <ProblemMetaHeader
               timeLimit={problem.timeLimit}
@@ -500,40 +496,13 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
             />
           }
           leftHeader={
-            <>
-              {[
-                { key: 'description', label: '题目描述', icon: BookOpen },
-                { key: 'solutions', label: '题解', icon: MessageSquare },
-                { key: 'submissions', label: '提交记录', icon: ListChecks },
-                { key: 'stats', label: '统计', icon: BarChart3 },
-              ]
-                .filter((tab) => !(isAssignmentContext && tab.key === 'solutions'))
-                .map((tab) => {
-                  const Icon = tab.icon
-                  const isActive = activeTab === tab.key
-                  return (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key as typeof activeTab)}
-                      className={`flex items-center gap-2 px-5 py-3.5 font-medium transition-all duration-300 relative cursor-pointer group whitespace-nowrap ${
-                        isActive
-                          ? 'text-primary-light'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {isActive && (
-                        <motion.div
-                          layoutId="problem-tab-indicator"
-                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
-                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                        />
-                      )}
-                      <Icon className={`w-4 h-4 transition-transform duration-300 ${isActive ? 'rotate-3' : ''}`} />
-                      {tab.label}
-                    </button>
-                  )
-                })}
-            </>
+            <ProblemWorkspaceDesktopTabs
+              tabs={desktopTabs}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              layoutId="problem-tab-indicator"
+              dense={PRESET.dense}
+            />
           }
           leftPanel={
             <AnimatePresence mode="wait">
@@ -596,83 +565,26 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
               )}
             </AnimatePresence>
           }
-          rightHeader={
-            <>
-              <CodeIcon className="w-4 h-4 text-primary-light" />
-              <h3 className="font-medium text-foreground">提交代码</h3>
-            </>
-          }
+          rightHeader={<ProblemSubmitColumnHeader />}
           rightPanel={
-            <>
-              {!user && (
-                <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-accent-light hover:bg-yellow-500/15 hover:border-yellow-500/30 transition-all duration-300">
-                  <div className="flex items-center gap-2 text-sm">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>请先登录后再提交代码</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between gap-2">
-                <label htmlFor="language-select" className="text-sm font-medium text-foreground">语言</label>
-                <select
-                  id="language-select"
-                  value={language}
-                  onChange={(e) => handleLanguageChange(e.target.value)}
-                  className="input w-auto min-w-[140px] py-1.5 text-sm hover:border-primary/30 transition-colors duration-300"
-                >
-                  {languageOptions.map((lang) => (
-                    <option key={lang.value} value={lang.value} className="bg-muted text-foreground">
-                      {lang.label} ({lang.version})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <CodeEditor
-                value={code}
-                onChange={setCode}
-                language={language as CodeLanguage}
-                placeholder="在此粘贴或输入代码... (Ctrl+Enter 提交)"
-                height="420px"
-                maxLength={65536}
-                onSubmit={handleSubmit}
-              />
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting || !user}
-                  className="btn-primary btn flex-1 cursor-pointer group"
-                >
-                  {submitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      评测中...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" />
-                      提交
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleClearCode}
-                  className="btn-ghost btn cursor-pointer group"
-                >
-                  <span className="transition-colors duration-300 group-hover:text-primary-light">清空</span>
-                </button>
-              </div>
-
-              {/* 在线测试（样例）：在正式提交前用题目样例运行代码，不影响提交记录 */}
-              <PretestPanel
-                problemId={problemId}
-                code={code}
-                language={language}
-                disabled={!user || submitting}
-              />
-            </>
+            <ProblemSubmitColumn
+              user={user}
+              code={code}
+              language={language}
+              onCodeChange={setCode}
+              onLanguageChange={setLanguage}
+              onSubmit={() => void handleSubmit()}
+              submitting={submitting}
+              problemId={problemId}
+              editorHeight="420px"
+            />
+          }
+          bottomBar={
+            <ProblemWorkspaceMobileTabs
+              tabs={PRESET.mobileTabs}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+            />
           }
         />
       </PageContainer>
@@ -696,40 +608,6 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
           setExpandedSubmissionId(submissionId)
         }}
       />
-
-      {/* 移动端底部 Tab Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">
-        <div className="grid grid-cols-4">
-          <button
-            onClick={() => setActiveTab('description')}
-            className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'description' ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            <FileText className="w-5 h-5" />
-            <span className="text-xs">题面</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('code')}
-            className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'code' ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            <CodeIcon className="w-5 h-5" />
-            <span className="text-xs">代码</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('submissions')}
-            className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'submissions' ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            <History className="w-5 h-5" />
-            <span className="text-xs">提交</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('stats')}
-            className={`flex flex-col items-center justify-center py-3 gap-1 ${activeTab === 'stats' ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            <BarChart3 className="w-5 h-5" />
-            <span className="text-xs">统计</span>
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

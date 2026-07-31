@@ -144,12 +144,33 @@ function AdminProblemsPageContent() {
 
   if (initialLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">加载中...</p>
+      <AdminPageShell width="list" className="space-y-6">
+        <div className="flex items-center justify-end gap-2">
+          <div className="h-10 w-24 rounded-lg bg-muted animate-pulse" />
+          <div className="h-10 w-24 rounded-lg bg-muted animate-pulse" />
+          <div className="h-10 w-28 rounded-lg bg-muted animate-pulse" />
         </div>
-      </div>
+        <div className="h-12 rounded-xl bg-muted/70 animate-pulse" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-20 rounded-xl bg-muted/50 animate-pulse" />
+          ))}
+        </div>
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="h-11 bg-muted/60 border-b border-border" />
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-12 border-b border-border last:border-0 bg-card flex items-center gap-4 px-4"
+            >
+              <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+              <div className="h-4 flex-1 max-w-md rounded bg-muted/70 animate-pulse" />
+              <div className="h-4 w-16 rounded bg-muted/50 animate-pulse ml-auto" />
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-sm text-muted-foreground">正在加载题目列表…</p>
+      </AdminPageShell>
     )
   }
 

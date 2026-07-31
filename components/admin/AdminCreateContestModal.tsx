@@ -23,7 +23,7 @@ const defaultForm = () => ({
   type: 'OI',
   startTime: '',
   endTime: '',
-  isPublic: false,
+  isPublic: true,
   password: '',
   sealRankTime: ''
 })
@@ -211,13 +211,24 @@ export default function AdminCreateContestModal({
 
   const buildPayload = () => ({
     ...formData,
+    password: formData.isPublic ? undefined : formData.password,
     problems: contestProblems.map(p => p.id),
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitting(true)
     setError('')
+
+    if (new Date(formData.endTime) <= new Date(formData.startTime)) {
+      setError('结束时间必须晚于开始时间')
+      return
+    }
+    if (!formData.isPublic && !formData.password.trim()) {
+      setError('私有竞赛请设置参赛密码')
+      return
+    }
+
+    setSubmitting(true)
 
     try {
       const response = await fetchWithCookie(
@@ -285,15 +296,14 @@ export default function AdminCreateContestModal({
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
-                竞赛描述 <span className="text-error">*</span>
+                竞赛描述
               </label>
               <textarea
-                required
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={4}
                 className="input w-full resize-none"
-                placeholder="支持 Markdown 格式..."
+                placeholder="请输入竞赛规则、说明等信息（支持 Markdown）"
               />
             </div>
 
@@ -316,17 +326,14 @@ export default function AdminCreateContestModal({
                 <label className="block text-sm font-medium text-foreground mb-1.5">
                   可见性
                 </label>
-                <div className="flex items-center gap-4 mt-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.isPublic}
-                      onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
-                      className="w-4 h-4 text-primary rounded focus:ring-primary"
-                    />
-                    <span className="text-foreground">公开竞赛</span>
-                  </label>
-                </div>
+                <select
+                  value={formData.isPublic ? 'public' : 'private'}
+                  onChange={(e) => setFormData({ ...formData, isPublic: e.target.value === 'public' })}
+                  className="input w-full"
+                >
+                  <option value="public">公开 (所有人可见)</option>
+                  <option value="private">私有 (需要密码)</option>
+                </select>
               </div>
 
               <div>
@@ -369,26 +376,29 @@ export default function AdminCreateContestModal({
                   到达此时刻后，普通用户看到的是封榜快照；管理员可绕过封榜查看实时数据。留空表示不封榜。
                 </p>
               </div>
+            </div>
 
+            {!formData.isPublic && (
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  访问密码 (可选)
+                  参赛密码 <span className="text-error">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="input w-full"
-                  placeholder="留空则无需密码"
+                  placeholder="请设置参赛密码"
                 />
               </div>
-            </div>
+            )}
 
             {/* 题目管理区 */}
             <div className="card-static p-4 rounded-xl space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <h3 className="text-sm font-bold text-foreground">题目管理</h3>
-                <span className="tag">已添加 {contestProblems.length} 个</span>
+                <span className="tag">已添加 {contestProblems.length} 题</span>
               </div>
 
               {/* 批量添加 */}

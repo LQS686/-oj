@@ -29,7 +29,7 @@ import {
 } from '@/lib/constants/submission-status'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
-import { EducationalPageShell, PageLoading, RouteSuspenseFallback } from '@/components/common'
+import { EducationalPageShell, PageLoading, RouteSuspenseFallback, Modal } from '@/components/common'
 import { loginPath } from '@/lib/navigation'
 import { canAccessAdmin } from '@/lib/permissions'
 
@@ -395,9 +395,15 @@ function SubmissionsContent() {
                 submissions.map((submission) => (
                   <tr key={submission.id} className="hover:bg-muted/60 transition-colors">
                     <td className="px-4 py-2.5">
-                      <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                        {submission.id.slice(0, 8)}
-                      </code>
+                      <Link
+                        href={`/submission/${submission.id}`}
+                        className="inline-flex"
+                        title={submission.id}
+                      >
+                        <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded hover:text-primary-light transition-colors">
+                          {submission.id.slice(0, 8)}
+                        </code>
+                      </Link>
                     </td>
                     <td className="px-4 py-2.5">
                       <Link
@@ -456,11 +462,7 @@ function SubmissionsContent() {
                         </button>
                       ) : (
                         <Link
-                          href={
-                            isAdmin
-                              ? `/admin/submissions/${submission.id}`
-                              : `/submission/${submission.id}`
-                          }
+                          href={`/submission/${submission.id}`}
                           className="p-1.5 rounded-lg text-muted-foreground hover:text-primary-light hover:bg-muted transition-colors inline-flex"
                           title="查看详情"
                           aria-label="查看详情"
@@ -504,29 +506,17 @@ function SubmissionsContent() {
       </div>
 
       {selectedSubmission && assignmentId && (
-        <div
-          className="fixed inset-0 bg-background/80 flex items-center justify-center p-4 z-[110]"
-          onClick={() => setSelectedSubmission(null)}
+        <Modal
+          open
+          onClose={() => setSelectedSubmission(null)}
+          title={
+            <span className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              提交详情
+            </span>
+          }
+          size="lg"
         >
-          <div
-            className="card-static rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-4 py-2.5 border-b border-border bg-muted flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                提交详情
-              </h3>
-              <button
-                type="button"
-                onClick={() => setSelectedSubmission(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="关闭"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] custom-scrollbar">
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="rounded-lg border border-border p-4">
                   <p className="text-sm text-muted-foreground mb-1">提交用户</p>
@@ -596,9 +586,7 @@ function SubmissionsContent() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </EducationalPageShell>
   )

@@ -16,6 +16,7 @@ const config: Config = {
           light: 'var(--primary-light)',
           50: 'var(--primary-50)',
           100: 'var(--primary-100)',
+          foreground: 'var(--primary-foreground)',
         },
         secondary: {
           DEFAULT: 'var(--secondary)',
