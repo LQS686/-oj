@@ -198,11 +198,12 @@ service_crash_looping() {
   local status restarts
   status="$(docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' "$cid" 2>/dev/null || true)"
   restarts="$(docker inspect -f '{{.RestartCount}}' "$cid" 2>/dev/null || echo 0)"
-  # Status=restarting，或短时间内多次重启且始终不健康
+  # Status=restarting：明确处于重启中
   if echo "$status" | grep -qi 'restarting'; then
     return 0
   fi
-  if [[ "${restarts:-0}" -ge 3 ]] && ! curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
+  # RestartCount 阈值略高，避免冷启动偶发重启误判；且必须仍探活失败
+  if [[ "${restarts:-0}" -ge 5 ]] && ! curl -sf "${HEALTH_URL:-}" >/dev/null 2>&1; then
     return 0
   fi
   return 1
@@ -768,10 +769,10 @@ for i in $(seq 1 90); do
     dump_failure
     exit 1
   fi
-  # 第 3 轮起再判崩溃循环，避免误伤冷启动（start_period / 首次依赖就绪）
-  if [[ "$i" -ge 3 ]] && service_crash_looping app; then
+  # 第 5 轮起再判崩溃循环，避免误伤冷启动（start_period / 首次依赖就绪）
+  if [[ "$i" -ge 5 ]] && service_crash_looping app; then
     echo ""
-    err "app 疑似崩溃重启循环（Status=restarting 或 RestartCount≥3），停止空等"
+    err "app 疑似崩溃重启循环（Status=restarting 或 RestartCount≥5），停止空等"
     dump_failure
     exit 1
   fi

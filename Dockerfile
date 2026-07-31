@@ -139,5 +139,7 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # 启动命令 - 使用 tsx 运行 server.ts（自定义 server，包含 socket.io）
+# 必须带 --conditions=react-server：与 package.json 的 start/dev 一致。
+# 否则 import 'server-only'（如 lib/prisma.ts）会解析到抛错的 index.js，而非 empty.js。
 # tsx 已在 dependencies 中，npm install --omit=dev 会安装，npx 可直接本地解析。
-CMD ["npx", "tsx", "server.ts"]
+CMD ["npx", "tsx", "--conditions=react-server", "server.ts"]
