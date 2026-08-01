@@ -58,7 +58,8 @@ async function bootJudgeSystem() {
     const { spawnSync } = await import('node:child_process')
     const probe = spawnSync(
       'bwrap',
-      ['--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--unshare-all', '--die-with-parent', '--new-session', 'true'],
+      // --unshare-all 必须置于挂载参数之前（bwrap 顺序敏感），与 runner.sh 正式命令保持一致
+      ['--unshare-all', '--die-with-parent', '--new-session', '--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', 'true'],
       { encoding: 'utf8', timeout: 5000 },
     )
     if (probe.error || probe.status !== 0) {

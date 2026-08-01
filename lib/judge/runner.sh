@@ -162,9 +162,11 @@ run_with_dsoj_watch() {
   # 重定向继承给 watch → fork 后的选手进程
   if [[ "$USE_BWRAP" == "1" ]]; then
     # 最小权限 bubblewrap：新 mount/pid/net/uts/ipc 命名空间，只读根，可写工作目录
-    bwrap --ro-bind / / --dev /dev --proc /proc \
+    # 注意：--unshare-all 必须放在所有挂载参数之前（bwrap 顺序敏感），
+    # 否则 --proc 会在 pid ns 创建前挂载宿主 procfs → "Can't mount proc: Operation not permitted"
+    bwrap --unshare-all --die-with-parent --new-session \
+      --ro-bind / / --dev /dev --proc /proc \
       --tmpfs /tmp --dir "$PWD" --bind "$PWD" "$PWD" --chdir "$PWD" \
-      --unshare-all --die-with-parent --new-session \
       "$WATCH_BIN" "$mem_out" "$time_out" "$cpu_limit" "$wall_limit" "$ole_limit" "$stdout_path" -- "$@" \
       <"$in" >"$out" 2>"$err"
   else
