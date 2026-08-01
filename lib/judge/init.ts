@@ -52,14 +52,19 @@ async function bootJudgeSystem() {
 
   // 启动自检：bubblewrap（bwrap）命名空间隔离可用性。
   // 云评测镜像已内置 bubblewrap，评测由 runner.sh 走命名空间隔离（mount/pid/net 等）；
-  // 本地（如 WSL）若未安装 bwrap，runner.sh 将自动降级为纯 ulimit，资源隔离强度下降。
-  // 此处仅告警不阻断，便于日志直接暴露环境差异。
+  // Docker 容器默认 seccomp 会阻止创建 userns（"No permissions to create new namespace"），
+  // 已通过 ./seccomp-oj.json 放行；此处功能探测确认配置生效，不可用则告警暴露配置/内核问题。
   try {
     const { spawnSync } = await import('node:child_process')
-    const probe = spawnSync('bwrap', ['--version'], { encoding: 'utf8', timeout: 5000 })
+    const probe = spawnSync(
+      'bwrap',
+      ['--ro-bind', '/', '/', '--dev', '/dev', '--proc', '/proc', '--unshare-all', '--die-with-parent', '--new-session', 'true'],
+      { encoding: 'utf8', timeout: 5000 },
+    )
     if (probe.error || probe.status !== 0) {
-      logger.warn('⚠️ 未检测到 bubblewrap (bwrap)：评测沙箱将降级为纯 ulimit（无命名空间隔离）。', {
-        fix: '本地开发请安装 bubblewrap（WSL: sudo apt install bubblewrap；macOS: brew install bubblewrap）；云评测镜像已内置，可设 DSOJ_USE_BWRAP=0 关闭。',
+      logger.warn('⚠️ bubblewrap 命名空间隔离不可用：评测沙箱无法创建用户命名空间。', {
+        detail: (probe.stderr || '').trim() || (probe.error ? probe.error.message : `exit ${probe.status}`),
+        fix: '容器部署请确认 docker-compose.yml 已引用 ./seccomp-oj.json（放行 unshare/userns），且宿主内核允许非特权 userns（sysctl kernel.unprivileged_userns_clone=1）；本地 WSL 可 sudo apt install bubblewrap 启用。',
       })
     }
   } catch (e) {

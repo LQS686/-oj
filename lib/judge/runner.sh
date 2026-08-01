@@ -36,11 +36,15 @@ ulimit -u "${DSOJ_NPROC_LIMIT:-4096}" 2>/dev/null
 ulimit -f 1048576 2>/dev/null
 ulimit -n 1024 2>/dev/null
 
-# 可选：若宿主机提供 bubblewrap，则启用命名空间隔离（无则回退纯 ulimit）
-# 镜像已内置 bubblewrap，生产建议保持默认启用（DSOJ_USE_BWRAP=1）
+# 可选：若宿主机提供 bubblewrap 且能创建用户命名空间，则启用命名空间隔离。
+# 注意：Docker 容器默认 seccomp 会阻止 userns（bwrap 报 "No permissions to create new namespace"），
+# 不能仅用 command -v 判断存在性，必须功能探测；容器部署已用 ./seccomp-oj.json 放行，
+# 若此处仍探测失败说明 seccomp/宿主内核未配置（见 init.ts 告警），本地无 bwrap 时回退纯 ulimit。
 USE_BWRAP=0
 if command -v bwrap >/dev/null 2>&1 && [[ "${DSOJ_USE_BWRAP:-1}" == "1" ]]; then
-  USE_BWRAP=1
+  if bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all --die-with-parent --new-session true >/dev/null 2>&1; then
+    USE_BWRAP=1
+  fi
 fi
 
 export ASAN_OPTIONS="${ASAN_OPTIONS:-}":halt_on_error=1:abort_on_error=1:detect_leaks=0:print_stacktrace=0:allocator_may_return_null=1

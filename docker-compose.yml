@@ -42,6 +42,10 @@ services:
     mem_limit: 2.5g
     cpus: "3"
     pids_limit: 512
+    # 评测沙箱（runner.sh + bwrap）需要创建用户命名空间；
+    # Docker 默认 seccomp 阻止 unshare/userns，必须放行（见 ./seccomp-oj.json）
+    security_opt:
+      - seccomp=./seccomp-oj.json
     networks:
       - oj-network
     volumes:

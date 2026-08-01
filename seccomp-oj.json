@@ -1,0 +1,38 @@
+{
+  "comment": "大山 OJ 评测容器 seccomp profile：放行 bwrap 所需系统调用（unshare/mount/umount2），禁用高危逃逸/资源滥用项。容器内进程为非 root（nextjs uid 1001），mount/unshare 在初始用户命名空间内无 CAP_SYS_ADMIN，权限层仍受限；仅 bwrap 创建的用户命名空间内 root 可挂载自身可见资源。",
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "archMap": [
+    { "architecture": "SCMP_ARCH_X86_64", "subArchitectures": ["SCMP_ARCH_X86", "SCMP_ARCH_X32"] },
+    { "architecture": "SCMP_ARCH_AARCH64", "subArchitectures": ["SCMP_ARCH_ARM"] }
+  ],
+  "syscalls": [
+    {
+      "names": [
+        "acct",
+        "add_key",
+        "bpf",
+        "clock_settime",
+        "delete_module",
+        "fanotify_init",
+        "finit_module",
+        "init_module",
+        "ioperm",
+        "iopl",
+        "kexec_file_load",
+        "kexec_load",
+        "perf_event_open",
+        "pivot_root",
+        "process_vm_readv",
+        "process_vm_writev",
+        "ptrace",
+        "reboot",
+        "request_key",
+        "setns",
+        "settimeofday",
+        "swapoff",
+        "swapon"
+      ],
+      "action": "SCMP_ACT_ERRNO"
+    }
+  ]
+}
