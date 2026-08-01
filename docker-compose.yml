@@ -49,6 +49,7 @@ services:
       - app_temp:/app/temp
       - app_logs:/app/logs
       - app_uploads:/app/public/uploads
+      - app_testdata:/app/data/testdata
     logging:
       driver: "json-file"
       options:
@@ -153,6 +154,7 @@ volumes:
   app_temp:
   app_logs:
   app_uploads:
+  app_testdata:
 
 networks:
   oj-network:

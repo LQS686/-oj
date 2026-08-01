@@ -39,6 +39,11 @@ const MAX_BODY_SIZE = 3 * 1024 * 1024 // 比 MAX_CHUNK_SIZE 多 1MB 余量
 /** 题库导入 multipart 上限（与 IMPORT_MAX_FILE_BYTES 对齐，另留表单余量） */
 const MAX_IMPORT_BODY_SIZE = 51 * 1024 * 1024
 
+/** stdout/stderr 被外部管道关闭时，Node 会在 console.* 写入时抛出 EPIPE。 */
+function isEpPipeError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false
+  return (err as { code?: unknown }).code === 'EPIPE'
+}
 
 /**
  * 前置路由：直接用 Node 原生方式服务 /uploads/ 静态文件。
@@ -668,6 +673,8 @@ app.prepare().then(async () => {
     logger.error('Unhandled Promise Rejection', reason instanceof Error ? reason : new Error(String(reason)))
   })
   process.on('uncaughtException', (err, origin) => {
+    // 管道关闭不是应用状态损坏，忽略后可让容器继续服务；避免每次写日志又触发 EPIPE。
+    if (isEpPipeError(err)) return
     logger.error(`Uncaught Exception (origin: ${origin})`, err)
     // 生产环境触发 graceful shutdown，避免在不一致状态下继续运行
     if (process.env.NODE_ENV === 'production') {

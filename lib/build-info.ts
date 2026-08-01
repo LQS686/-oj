@@ -12,8 +12,11 @@
  *   - arch：CPU 架构
  *   - startTime：进程启动时间戳（ms）
  *   - env：NODE_ENV 值
+ *   - libc：glibc 版本（如 "ldd (Debian GLIBC 2.36-9+deb12u7) 2.36"），非 Linux/失败为 "unknown"
+ *   - cpuCount：可用 CPU 核数（容器内为宿主机核数）
  */
 import { execSync } from 'child_process'
+import { cpus } from 'os'
 import { logger } from '@/lib/logger'
 
 interface BuildInfo {
@@ -24,6 +27,8 @@ interface BuildInfo {
   arch: string
   startTime: number
   env: string
+  libc: string
+  cpuCount: number
 }
 
 let cachedInfo: BuildInfo | null = null
@@ -37,6 +42,7 @@ export function getBuildInfo(): BuildInfo {
 
   let gitHash = 'unknown'
   let gitDirty = false
+  let libc = 'unknown'
 
   try {
     // 短 commit hash（HEAD）
@@ -59,6 +65,25 @@ export function getBuildInfo(): BuildInfo {
     })
   }
 
+  // libc 版本：核验线上镜像是否为 debian-slim（glibc）；非 Linux 或命令失败降级为 unknown
+  if (process.platform === 'linux') {
+    try {
+      // ldd 输出首行形如 "ldd (Debian GLIBC 2.36-9+deb12u7) 2.36"
+      libc = execSync('ldd --version', {
+        encoding: 'utf-8',
+        timeout: 2000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+        .split('\n')[0]
+        .trim()
+    } catch (err) {
+      logger.debug('[build-info] libc 版本采集失败', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+  const cpuCount = cpus()?.length || 0
+
   cachedInfo = {
     gitHash,
     gitDirty,
@@ -67,6 +92,8 @@ export function getBuildInfo(): BuildInfo {
     arch: process.arch,
     startTime: Date.now(),
     env: process.env.NODE_ENV || 'development',
+    libc,
+    cpuCount,
   }
   return cachedInfo
 }
@@ -78,5 +105,5 @@ export function formatStartupBanner(): string {
   const info = getBuildInfo()
   const memMB = Math.round(process.memoryUsage().rss / 1024 / 1024)
   const dirtyMark = info.gitDirty ? '-dirty' : ''
-  return `[build] git=${info.gitHash}${dirtyMark} node=${info.nodeVersion} platform=${info.platform}/${info.arch} env=${info.env} rss=${memMB}MB`
+  return `[build] git=${info.gitHash}${dirtyMark} node=${info.nodeVersion} platform=${info.platform}/${info.arch} env=${info.env} rss=${memMB}MB libc=${info.libc} cpus=${info.cpuCount}`
 }

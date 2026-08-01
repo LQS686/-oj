@@ -235,10 +235,10 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
       const status = sub.status as string
       if (!status || isNonFinalSubmissionStatus(status)) {
         if (typeof sub.passedTests === 'number' && typeof sub.totalTests === 'number') {
-          setJudgeProgress({
-            currentTest: sub.passedTests,
+          setJudgeProgress((prev) => ({
+            currentTest: Math.max(prev?.currentTest ?? 0, sub.passedTests),
             totalTests: sub.totalTests,
-          })
+          }))
         }
         return
       }
@@ -340,9 +340,18 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
       ) {
         return
       }
-      setJudgeProgress({
-        currentTest: data.currentTest,
-        totalTests: data.totalTests,
+      setJudgeProgress((prev) => {
+        if (
+          prev &&
+          prev.totalTests === data.totalTests &&
+          data.currentTest <= prev.currentTest
+        ) {
+          return prev
+        }
+        return {
+          currentTest: data.currentTest,
+          totalTests: data.totalTests,
+        }
       })
       setJudgeStatus((prev) =>
         prev ?? {
@@ -447,6 +456,8 @@ export function defaultMergeSubmissionList(
   data: SubmissionSocketPayload,
   _extras?: Partial<SubmissionListRow>
 ): SubmissionListRow[] {
+  // 是否为非终态推送（PENDING/JUDGING/RUNNING），用于单调保护
+  const isNextNonFinal = isNonFinalSubmissionStatus(data.status)
   if (!Array.isArray(prev)) return prev
   const idx = prev.findIndex((s) => s?.id === data.id)
   if (idx === -1) return prev
@@ -458,9 +469,20 @@ export function defaultMergeSubmissionList(
     score: typeof data.score === 'number' ? data.score : cur.score,
     time: typeof data.time === 'number' ? data.time : cur.time,
     memory: typeof data.memory === 'number' ? data.memory : cur.memory,
+    // 非终态时 passedTests 只增不减（WS 乱序 / 轮询兜底读到旧 DB 值不回退）；终态直接覆盖
     passedTests:
-      typeof data.passedTests === 'number' ? data.passedTests : cur.passedTests,
-    totalTests: typeof data.totalTests === 'number' ? data.totalTests : cur.totalTests,
+      typeof data.passedTests !== 'number'
+        ? cur.passedTests
+        : isNextNonFinal
+          ? Math.max(cur.passedTests ?? 0, data.passedTests)
+          : data.passedTests,
+    // totalTests 同理：非终态取较大值，终态直接采用
+    totalTests:
+      typeof data.totalTests !== 'number'
+        ? cur.totalTests
+        : isNextNonFinal
+          ? Math.max(cur.totalTests ?? 0, data.totalTests ?? 0)
+          : data.totalTests,
     message: data.message ?? cur.message,
     assignmentSubmissionId: data.assignmentSubmissionId ?? cur.assignmentSubmissionId,
     testResults:

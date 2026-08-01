@@ -301,13 +301,21 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         if (isFinalStatus(prev.status) && !isFinalStatus(data.status)) {
           return prev
         }
+        // 非终态推送的 passedTests 只增不减，避免 WS 乱序 / 轮询兜底读到旧 DB 值导致进度回退
+        const incomingPassed = typeof data.passedTests === 'number' ? data.passedTests : null
+        const isNextNonFinal = isNonFinalSubmissionStatus(data.status)
         return {
           ...prev,
           status: data.status,
           score: data.score ?? prev.score,
           time: data.time ?? prev.time,
           memory: data.memory ?? prev.memory,
-          passedTests: data.passedTests ?? prev.passedTests,
+          passedTests:
+            incomingPassed === null
+              ? prev.passedTests
+              : isNextNonFinal
+                ? Math.max(prev.passedTests ?? 0, incomingPassed)
+                : incomingPassed,
           totalTests: data.totalTests ?? prev.totalTests,
           message: data.message ?? prev.message,
           testResults:

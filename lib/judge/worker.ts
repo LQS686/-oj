@@ -4,7 +4,12 @@ import { cleanupOldTempFiles } from './judger'
 import { prisma } from '@/lib/prisma'
 import type { JudgeJob, JudgeResult, QueuedJob } from './queue'
 import type { ComparisonMode } from './types'
-import { emitSubmissionUpdate, emitJudgeProgress, broadcastMessage } from '@/lib/websocket/server'
+import {
+  emitSubmissionUpdate,
+  emitJudgeProgress,
+  broadcastMessage,
+  cleanupJudgeProgress,
+} from '@/lib/websocket/server'
 import {
   updateSubmissionDirect,
   updateClassAssignmentSubmissionDirect,
@@ -22,20 +27,53 @@ import { mapTestCasesMeta, TESTCASE_META_SELECT } from './testcase-loader'
 // 任务进入 active：立刻写 JUDGING，避免刷新后仍显示 PENDING、看起来像卡死
 // 必须用 onlyFromStatuses=PENDING：CE/小数据题可能在本回调跑完前已写出终态，
 // 若无条件覆盖会把 AC/WA/CE 写回 JUDGING，前端表现为「偶发不刷新 / 一直评测中」。
+// 顺序修复（评测进度回退根因）：先同步推送 JUDGING + currentTest: 0，
+// 再走慢查询（DB 写入 / prisma.findUnique）。队列 emit('active') 后立即开始评测
+// 并推送 1/N、2/N，若 0/N 在慢查询之后才推送会迟到，导致前端进度回退。
 if (judgeQueue.listenerCount('active') === 0) {
   judgeQueue.on('active', async (job: QueuedJob) => {
     try {
       const totalTests = job.data.testCases?.length ?? 0
+
+      // 第一步：先同步推送 JUDGING 进度（0/N），不等待任何慢查询
+      if (job.data.userId) {
+        try {
+          emitJudgeProgress(job.data.userId, {
+            submissionId: job.id,
+            currentTest: 0,
+            totalTests,
+            status: SubmissionStatus.JUDGING,
+          })
+          emitSubmissionUpdate(job.data.userId, {
+            id: job.id,
+            status: SubmissionStatus.JUDGING,
+            score: 0,
+            time: 0,
+            memory: 0,
+            passedTests: 0,
+            totalTests,
+            problemId: job.data.problemId,
+          })
+        } catch (wsErr) {
+          logger.warn('评测开始时推送 JUDGING 失败', {
+            jobId: job.id,
+            error: wsErr instanceof Error ? wsErr.message : String(wsErr),
+          })
+        }
+      }
+
+      // 第二步：同步 DB 中间态（passedTests/totalTests 一并写入，保持进度字段初始一致）
       const judgingWrite = await updateSubmissionDirect(
         job.id,
-        { status: SubmissionStatus.JUDGING },
+        { status: SubmissionStatus.JUDGING, passedTests: 0, totalTests },
         { onlyFromStatuses: [SubmissionStatus.PENDING] },
       )
       if (!judgingWrite.matched) {
         logger.debug('跳过 JUDGING 写入：提交已离开 PENDING', { jobId: job.id })
         return
       }
-      // 作业提交同步中间态（失败不阻断）
+
+      // 第三步：慢查询（作业提交同步中间态，失败不阻断；进度已在第一步推过，不再重复推送）
       try {
         const submission = await prisma.submission.findUnique({
           where: { id: job.id },
@@ -48,27 +86,8 @@ if (judgeQueue.listenerCount('active') === 0) {
             { onlyFromStatuses: [SubmissionStatus.PENDING] },
           )
         }
-        if (submission?.userId) {
-          emitJudgeProgress(submission.userId, {
-            submissionId: job.id,
-            currentTest: 0,
-            totalTests,
-            status: 'JUDGING',
-          })
-          emitSubmissionUpdate(submission.userId, {
-            id: job.id,
-            status: SubmissionStatus.JUDGING,
-            score: 0,
-            time: 0,
-            memory: 0,
-            passedTests: 0,
-            totalTests,
-            problemId: job.data.problemId,
-            assignmentSubmissionId: submission.assignmentSubmissionId ?? undefined,
-          })
-        }
       } catch (wsErr) {
-        logger.warn('评测开始时推送 JUDGING 失败', {
+        logger.warn('评测开始时作业提交同步失败', {
           jobId: job.id,
           error: wsErr instanceof Error ? wsErr.message : String(wsErr),
         })
@@ -122,6 +141,9 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
       })
       return
     }
+
+    // 终态已落库，清理进度节流条目（防止长跑服务 progressThrottle 内存泄漏）
+    cleanupJudgeProgress(result.submissionId)
 
     // 失效提交详情缓存 + 题目状态/详情缓存（任意终态都可能改变统计）
     cache.delete(`submission:byId:${result.submissionId}`)
@@ -353,6 +375,9 @@ if (judgeQueue.listenerCount('failed') === 0) judgeQueue.on('failed', async (job
       logger.warn('跳过 SE 写入：提交已不在评测中', { jobId: job.id })
       return
     }
+
+    // 失败已落库为 SE，清理进度节流条目（防止长跑服务 progressThrottle 内存泄漏）
+    cleanupJudgeProgress(job.id)
 
     // 同步更新班级作业提交表（如果关联了作业）
     if (submission?.assignmentSubmissionId) {

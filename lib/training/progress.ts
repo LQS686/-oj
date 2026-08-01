@@ -184,9 +184,17 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
         select: { problemId: true, status: true },
         orderBy: { submittedAt: 'desc' },
       })
+      const statusesByProblem = new Map<string, Set<string>>()
       for (const sub of submissions) {
-        if (problemStatuses[sub.problemId]) continue
-        problemStatuses[sub.problemId] = statusFromSubmission(sub.status)
+        if (!statusesByProblem.has(sub.problemId)) {
+          statusesByProblem.set(sub.problemId, new Set())
+        }
+        statusesByProblem.get(sub.problemId)!.add(sub.status)
+      }
+      for (const [pid, statuses] of statusesByProblem) {
+        problemStatuses[pid] = statuses.has(SubmissionStatus.ACCEPTED)
+          ? 'AC'
+          : 'ATTEMPTED'
       }
     }
   }
@@ -291,8 +299,15 @@ export async function getUserTrainingProgressDetail(
 
   const problemStatusMap = new Map<string, { status: string; submittedAt: Date }>()
   for (const sub of submissions) {
-    if (!problemStatusMap.has(sub.problemId)) {
-      problemStatusMap.set(sub.problemId, { status: sub.status, submittedAt: sub.submittedAt })
+    const existing = problemStatusMap.get(sub.problemId)
+    if (!existing) {
+      problemStatusMap.set(sub.problemId, {
+        status: sub.status,
+        submittedAt: sub.submittedAt,
+      })
+    } else if (sub.status === SubmissionStatus.ACCEPTED && existing.status !== SubmissionStatus.ACCEPTED) {
+      existing.status = sub.status
+      existing.submittedAt = sub.submittedAt
     }
   }
 

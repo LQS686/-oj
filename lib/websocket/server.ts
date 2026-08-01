@@ -47,11 +47,16 @@ function setStaleConnTimer(value: ReturnType<typeof setInterval> | null): void {
 
 const MAX_MESSAGE_SIZE = 1 * 1024 * 1024
 const RATE_LIMIT_WINDOW = 60 * 1000
-// 开发环境放宽连接限流：Next.js HMR / Turbopack 每次保存都触发客户端重连，
-// 加上多个 socket hook（useSubmissionSocket / useNotificationSocket / useAnnouncementSocket）
-// 各自建立独立连接，10次/分钟会频繁触发"连接过于频繁"误报。
-// 生产环境保持 10 次/分钟严格限流，防御恶意客户端。
-const RATE_LIMIT_MAX_CONNECTIONS = process.env.NODE_ENV === 'development' ? 100 : 10
+// 单 IP 每分钟最大连接数；可通过 WS_MAX_CONNECTIONS_PER_MIN 覆盖。
+// 默认 30（生产）/ 100（开发）——兼容校园 NAT 多人共享出口 IP，同时防御恶意刷连接。
+const RATE_LIMIT_MAX_CONNECTIONS = (() => {
+  const v = process.env.WS_MAX_CONNECTIONS_PER_MIN
+  if (v !== undefined && v !== '') {
+    const n = parseInt(v, 10)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return process.env.NODE_ENV === 'development' ? 100 : 30
+})()
 const MAX_HEARTBEATS_PER_MINUTE = 30
 
 const ALLOWED_EVENT_TYPES = [
@@ -549,7 +554,7 @@ export function emitSubmissionUpdate(userId: string, data: {
   ioInstance.to(subRoom).emit('submission:update', data)
 
   // 热路径只打轻量日志；fetchSockets 会遍历适配器，高频终态/进度推送时成本偏高
-  logger.info(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
+  logger.debug(`📤 推送提交更新到 ${roomName} / ${subRoom}:`, {
     id: data.id,
     status: data.status,
     score: data.score,
@@ -593,6 +598,11 @@ export function emitJudgeProgress(userId: string, data: {
   ioInstance.to(roomName).emit('judge:progress', data)
   ioInstance.to(subRoom).emit('judge:progress', data)
   logger.debug(`📊 推送评测进度到 ${roomName} / ${subRoom}: ${data.currentTest}/${data.totalTests}`)
+}
+
+/** 清理指定提交的进度节流条目（终态/失败时调用，防止长跑服务内存泄漏） */
+export function cleanupJudgeProgress(submissionId: string): void {
+  progressThrottle.delete(submissionId)
 }
 
 /**

@@ -105,7 +105,13 @@ export default async function ContestLayout({
     canViewDetails = true
   }
 
-  const { authorId: _authorId, ...shellContest } = contest
+  const shellContest = {
+    id: contest.id,
+    title: contest.title,
+    startTime: contest.startTime,
+    endTime: contest.endTime,
+    type: contest.type,
+  }
 
   return (
     <ContestHeaderShell contest={shellContest} canViewDetails={canViewDetails}>

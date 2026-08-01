@@ -26,6 +26,11 @@ yarn-error.log*
 .env
 .env*.local
 
+# local browser/debug artifacts
+/.playwright-mcp/
+/.tmp-audit-*
+/cookies.txt
+
 # MongoDB 副本集 keyfile（部署脚本生成，勿提交）
 mongo-keyfile
 

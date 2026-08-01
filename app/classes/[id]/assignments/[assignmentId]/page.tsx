@@ -26,7 +26,6 @@ import AssignmentProblemProgressList from '@/components/class/AssignmentProblemP
 import SubmissionList from '@/components/problem/SubmissionList'
 import ProblemSubmitColumn, {
   ProblemSubmitColumnHeader,
-  WORKSPACE_LANGUAGE_OPTIONS,
 } from '@/components/problem/ProblemSubmitColumn'
 import {
   ProblemWorkspaceDesktopTabs,
@@ -62,7 +61,6 @@ import {
 import type { Problem as ProblemModel } from '@/types/models'
 
 const PRESET = WORKSPACE_PRESETS.assignment
-const languageOptions = WORKSPACE_LANGUAGE_OPTIONS
 
 interface Problem {
  id: string

@@ -10,6 +10,7 @@ import type { ResultState } from './types'
 import { join } from 'path'
 import { logger } from '@/lib/logger'
 import { emitJudgeProgress } from '@/lib/websocket/server'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { materializeTestCaseToDisk, cleanupMaterializedTestCase } from './testcase-loader'
 import { computeExtraTime } from './process-stats'
 import {
@@ -27,6 +28,44 @@ import {
   ensureUserOutputFile,
   isSpecialJudgeMode,
 } from './spj'
+
+// 评测进度 DB 持久化节流：评测中定期把已完成测点数写入 Submission.passedTests，
+// 使刷新页面/轮询兜底能读到真实进度（而非恒为 0）。
+// 仅从非终态写入，终态写入（worker completed）不受影响。
+const progressDbThrottle = new Map<string, number>()
+const PROGRESS_DB_THROTTLE_MS = 500
+
+function persistJudgeProgressThrottled(
+  submissionId: string,
+  passedTests: number,
+  totalTests: number
+): void {
+  const now = Date.now()
+  const last = progressDbThrottle.get(submissionId) ?? 0
+  if (now - last < PROGRESS_DB_THROTTLE_MS && passedTests < totalTests) return
+  progressDbThrottle.set(submissionId, now)
+  if (passedTests >= totalTests && totalTests > 0) {
+    progressDbThrottle.delete(submissionId) // 终态后不再需要节流状态
+  }
+  void import('@/lib/mongodb-direct').then(({ updateSubmissionDirect }) =>
+    updateSubmissionDirect(
+      submissionId,
+      { passedTests, totalTests },
+      {
+        onlyFromStatuses: [
+          SubmissionStatus.PENDING,
+          SubmissionStatus.JUDGING,
+          SubmissionStatus.RUNNING,
+        ],
+      }
+    )
+  ).catch((err) => {
+    logger.warn('持久化评测进度失败', {
+      submissionId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  })
+}
 
 type CaseVerdict = {
   testId: string
@@ -527,12 +566,7 @@ export async function executeJudge(
       failFast: failFastMode,
     })
 
-    emitJudgeProgress(job.userId, {
-      submissionId: job.submissionId,
-      currentTest: 0,
-      totalTests: job.testCases.length,
-      status: 'JUDGING',
-    })
+    // 初始进度（0/N）已由 worker active 处理器推送，这里不再重复推送
 
     // 始终持有 AbortController：fail-fast 与整单超时（queue signal）均可中止在跑进程
     const abortController = new AbortController()
@@ -568,6 +602,7 @@ export async function executeJudge(
               totalTests: job.testCases.length,
               status: 'JUDGING',
             })
+            persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
             return {
               testId: testCase.id,
               status: 'SE' as const,
@@ -592,6 +627,7 @@ export async function executeJudge(
                 totalTests: job.testCases.length,
                 status: 'JUDGING',
               })
+              persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
               return {
                 testId: testCase.id,
                 status: 'SE' as const,
@@ -617,6 +653,7 @@ export async function executeJudge(
                   totalTests: job.testCases.length,
                   status: 'JUDGING',
                 })
+                persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
                 return {
                   testId: testCase.id,
                   status: 'SE' as const,
@@ -654,6 +691,7 @@ export async function executeJudge(
               totalTests: job.testCases.length,
               status: 'JUDGING',
             })
+            persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
             if (verdict.skipped) {
               // abort 中途结束的并行测点
             } else if (verdict.status === 'AC') {
@@ -686,6 +724,7 @@ export async function executeJudge(
               totalTests: job.testCases.length,
               status: 'JUDGING',
             })
+            persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
             logger.error(`测试执行错误`, error)
             if (
               !abortController.signal.aborted &&

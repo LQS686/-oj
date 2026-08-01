@@ -75,7 +75,9 @@ export function getJudgeConfig(): ResolvedJudgeConfig {
     caseConcurrency = Math.min(16, db.caseConcurrency)
   } else {
     const n = cpus()?.length || 4
-    caseConcurrency = Math.min(8, Math.max(4, n))
+    // 容器内 os.cpus() 读到的是宿主机核数，会高估可用核（docker-compose 限 cpus:"3"）。
+    // 留 1 核给 Next.js 主进程与编译，4 核部署推荐 caseConcurrency=2。
+    caseConcurrency = Math.min(8, Math.max(2, n - 1))
   }
 
   const largeCaseConcurrency = Math.min(

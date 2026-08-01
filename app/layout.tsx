@@ -12,7 +12,13 @@ import NavigationProgress from "@/components/common/NavigationProgress"
 import { DialogProvider } from "@/components/common/DialogProvider"
 import { getServerSessionUser } from "@/lib/auth/server-session"
 
+const siteBaseUrl =
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  process.env.FRONTEND_URL ||
+  "http://localhost:3000"
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteBaseUrl),
   title: `首页 - ${SITE_TITLE_SUFFIX}`,
   description: "代码如山·算法为径。大山 OJ 是一站式在线编程学习与竞赛平台，从入门到顶峰的清晰成长路径。",
   keywords: ["大山 OJ", "OJ", "编程", "算法", "竞赛", "题库", "在线评测", "学习平台", "训练"],
