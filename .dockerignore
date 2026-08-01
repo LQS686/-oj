@@ -65,6 +65,10 @@ tmp
 *.tmp
 /_tmp_*
 
+# 评测测点磁盘缓存（本地生成，不入镜像；容器内由 app_testdata 卷承载）
+/data
+/data/
+
 # 本地审计/浏览器调试产物
 /.tmp-audit-*
 /.playwright-mcp

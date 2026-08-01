@@ -746,6 +746,23 @@ if [[ "$dep_ok" -ne 1 ]]; then
   compose logs --tail=30 mongo redis || true
 fi
 
+# 重启前检测进行中的评测（app 重启会清空内存队列，进行中的提交将被标记为 SE）
+# 仅当 app 已在运行且 DB 可查时检测；非交互模式不阻塞，仅警告
+if compose ps -q app 2>/dev/null | grep -q .; then
+  ACTIVE_CNT="$(compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" \
+    --authenticationDatabase admin --eval 'try { print(db.getSiblingDB("oj_platform").Submission.countDocuments({status:{$in:["PENDING","JUDGING","RUNNING"]}})) } catch(e) { print("?") }' 2>/dev/null | tr -d '\r' || true)"
+  if [[ "$ACTIVE_CNT" =~ ^[0-9]+$ ]] && [[ "$ACTIVE_CNT" -gt 0 ]]; then
+    warn "检测到 ${ACTIVE_CNT} 个进行中的评测；重启 app 将中断它们并标记为 SE（系统错误），需用户重新提交"
+    if [[ -t 0 ]]; then
+      read -r -p "确认继续重启？(y/N) " ans
+      if [[ ! "$ans" =~ ^[yY]$ ]]; then
+        info "已取消部署"
+        exit 0
+      fi
+    fi
+  fi
+fi
+
 compose up -d
 
 # ============================================================
@@ -786,6 +803,16 @@ echo ""
 if [[ "$ready" -ne 1 ]]; then
   dump_failure
   exit 1
+fi
+
+# 修复评测卷属主（幂等）：卷首次挂载时目录属主为 root，评测进程（nextjs uid=1001）
+# 无法写入 data/testdata 缓存，导致大测点每次回源 Mongo、性能异常。
+# 直接以 root 在 app 容器内对可写卷目录 chown（app 镜像已装 coreutils，无需额外镜像）。
+if compose exec -T -u root app chown -R 1001:1001 /app/data /app/temp /app/public/uploads 2>/dev/null; then
+  info "已修复评测卷属主（app_testdata / app_temp / app_uploads → nextjs 1001）"
+else
+  warn "自动修复评测卷属主失败，请手动执行："
+  echo "  docker compose exec -u root app chown -R 1001:1001 /app/data /app/temp /app/public/uploads"
 fi
 
 if curl -sf "$DB_HEALTH_URL" >/dev/null 2>&1; then

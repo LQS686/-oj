@@ -134,8 +134,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 # 生产建议 USE_DOCKER=true 使用容器沙箱。
 # public/uploads/avatars: 头像持久化目录，docker-compose 会挂载 volume 到此处，
 # 预创建并 chown 确保 nextjs 用户有写权限（volume 首次挂载时属主为 root，需要显式赋权）
-RUN mkdir -p /app/temp /app/logs /app/public/uploads/avatars && \
-    chown -R nextjs:nodejs /app/temp /app/logs /app/public/uploads
+# data/testdata: 测点磁盘缓存（洛谷式），docker-compose 挂载 app_testdata 卷。
+# 若不在镜像内预创建并赋权，卷首次挂载时目录属主为 root，评测进程（nextjs，uid 1001）
+# 无法写入，materializeTestCaseToDisk 缓存写失败 → 每次评测回源 Mongo 拉百万行字符串，
+# 大测点性能异常（本地可写、容器不可写的直接原因）。
+RUN mkdir -p /app/temp /app/logs /app/public/uploads/avatars /app/data/testdata && \
+    chown -R nextjs:nodejs /app/temp /app/logs /app/public/uploads /app/data
 
 # 预编译评测监视器：同步密采样 RssAnon，避免 /usr/bin/time 总 RSS 虚高与后台轮询竞态
 RUN cc -O2 -o /app/lib/judge/dsoj-watch /app/lib/judge/dsoj-watch.c && \
