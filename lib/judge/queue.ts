@@ -227,7 +227,7 @@ class JudgeQueue extends EventEmitter {
     if (this.isProcessing) return
     if (this.queue.length === 0) return
     if (this.processing.size >= this.maxConcurrent) return
-    this.scheduleProcess()
+    void this.processQueue()
   }
 
   // 添加任务到队列
