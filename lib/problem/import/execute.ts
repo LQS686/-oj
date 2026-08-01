@@ -12,6 +12,9 @@ import {
   parseCsvProblems,
   fetchCodeforcesProblems,
   parseDsojZip,
+  parseDsojArchive,
+  parseTarXzBuffer,
+  detectArchiveFormat,
   importProblems,
   type ImportFormat,
   type ImportOptions,
@@ -107,10 +110,20 @@ export async function parseImportByFormat(
       })
     case 'dsoj': {
       const buf = typeof content === 'string' ? Buffer.from(content) : content
-      if (buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) {
-        throw new ApiError('INVALID_DSOJ_FORMAT', 'DSOJ 标准格式必须是 ZIP 文件', 400)
+      // 按魔数分派：ZIP（0x50 0x4B "PK"）走 AdmZip，XZ（\xFD7zXZ\x00）走 tar.xz 适配器
+      const kind = detectArchiveFormat(buf)
+      if (kind === 'tar.xz') {
+        const archive = await parseTarXzBuffer(buf)
+        return parseDsojArchive(archive)
       }
-      return parseDsojZip(buf)
+      if (kind === 'zip') {
+        return parseDsojZip(buf)
+      }
+      throw new ApiError(
+        'INVALID_DSOJ_FORMAT',
+        'DSOJ 标准格式必须是 ZIP 或 tar.xz 文件',
+        400
+      )
     }
     default:
       throw new ApiError('INVALID_FORMAT', `不支持的格式: ${format}`, 400)

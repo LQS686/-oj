@@ -30,7 +30,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
     || sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list \
-    || true
+    || true; \
+    apt-get update && apt-get install -y --no-install-recommends \
+    liblzma-dev \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+# liblzma-dev：node-gyp 编译 lzma-native（题包 tar.xz 压缩支持）需要 LZMA 头文件
+# python3 / make / g++：node-gyp 通用编译工具链
 
 # 安装依赖（使用淘宝镜像）
 # BuildKit 缓存 /root/.npm，下次 build 时复用已下载的 npm 包
@@ -75,10 +83,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     gcc \
     libasan8 \
     libubsan1 \
+    liblzma5 \
     wget \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+# liblzma5：lzma-native 运行期 native binding 加载依赖
+# libasan8 / libubsan1：可选 ASan/UBSan 评测用，默认关闭
 
 # 设置环境变量
 ENV NODE_ENV=production

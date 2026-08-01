@@ -52,8 +52,8 @@ const FORMAT_OPTIONS: {
   {
     id: 'dsoj',
     label: 'DSOJ',
-    desc: 'DSOJ 标准题包 v2（ZIP：pack.yaml + index.json + problems/<题号>/）',
-    accept: '.zip',
+    desc: 'DSOJ 标准题包 v2（ZIP / tar.xz：pack.yaml + index.json + problems/<题号>/）',
+    accept: '.zip,.tar.xz,.txz',
     icon: Package,
   },
   {

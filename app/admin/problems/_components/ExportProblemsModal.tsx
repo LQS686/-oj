@@ -31,6 +31,7 @@ export function ExportProblemsModal({
   const [scope, setScope] = useState<'selected' | 'all' | 'filtered'>(
     selectedIds.length > 0 ? 'selected' : 'all'
   )
+  const [archive, setArchive] = useState<'zip' | 'tar.xz'>('zip')
   const [includeStdCode, setIncludeStdCode] = useState(true)
   const [includeTestCases, setIncludeTestCases] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -58,6 +59,9 @@ export function ExportProblemsModal({
         // scope === 'all' 或 'filtered' 都不传 ids（导出全部）
         params.set('includeStdCode', String(includeStdCode))
         params.set('includeTestCases', String(includeTestCases))
+        if (archive === 'tar.xz') {
+          params.set('archive', 'tar.xz')
+        }
         url = `/api/admin/problems/export?${params.toString()}`
       }
       // 触发浏览器下载
@@ -119,11 +123,11 @@ export function ExportProblemsModal({
                     }`}
                   />
                   <span className="font-medium text-foreground text-sm">
-                    DSOJ 题包 ZIP
+                    DSOJ 题包
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  完整题包格式，含题面、测试点、标程
+                  完整题包格式，含题面、测试点、标程（ZIP / tar.xz 可选）
                 </p>
               </button>
 
@@ -272,6 +276,52 @@ export function ExportProblemsModal({
                       包含测试点 (testcases/)
                     </span>
                   </label>
+                </div>
+              </div>
+
+              {/* 压缩格式 */}
+              <div className="border-t border-border pt-3">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  压缩格式
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* ZIP */}
+                  <button
+                    type="button"
+                    onClick={() => setArchive('zip')}
+                    className={`relative p-2.5 rounded-lg border text-left transition-all ${
+                      archive === 'zip'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:bg-muted'
+                    }`}
+                  >
+                    {archive === 'zip' && (
+                      <Check className="absolute top-2 right-2 w-3.5 h-3.5 text-primary" />
+                    )}
+                    <div className="font-medium text-foreground text-sm">ZIP</div>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                      zlib 压缩，速度快，兼容性最好
+                    </p>
+                  </button>
+
+                  {/* tar.xz */}
+                  <button
+                    type="button"
+                    onClick={() => setArchive('tar.xz')}
+                    className={`relative p-2.5 rounded-lg border text-left transition-all ${
+                      archive === 'tar.xz'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:bg-muted'
+                    }`}
+                  >
+                    {archive === 'tar.xz' && (
+                      <Check className="absolute top-2 right-2 w-3.5 h-3.5 text-primary" />
+                    )}
+                    <div className="font-medium text-foreground text-sm">tar.xz (LZMA2)</div>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                      体积再降 20-35%，压缩慢解压快
+                    </p>
+                  </button>
                 </div>
               </div>
             </div>

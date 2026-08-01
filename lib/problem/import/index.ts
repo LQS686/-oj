@@ -48,7 +48,20 @@ export { fetchCodeforcesProblems } from './codeforces-sync'
 // DSOJ 标准格式（自主可控，推荐用于爬虫批量采集和题库迁移）
 export {
   parseDsojZip,
+  parseDsojArchive,
   isDsojPack,
+  isDsojPackArchive,
   DSOJ_PACK_VERSION,
   DSOJ_PACK_FORMAT_ID,
+  type ArchiveEntry,
+  type ArchiveLike,
 } from './dsoj-parser'
+
+// DSOJ tar.xz 题包解压适配器（lzma-native + tar-stream）
+//   - detectArchiveFormat：按魔数分派 zip / tar.xz
+//   - parseTarXzBuffer：解压 tar.xz 为 InMemoryArchive，复用 parseDsojArchive 解析
+export {
+  parseTarXzBuffer,
+  detectArchiveFormat,
+  type DsojArchiveKind,
+} from './tarxz-archive'

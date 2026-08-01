@@ -43,6 +43,41 @@ import { isValidDifficulty } from '@/lib/constants'
 import type { ImportedProblem, ImportedSolution, ImportedTestCase } from './types'
 
 /* ============================================================================
+ * 归档抽象
+ * ========================================================================== */
+
+/**
+ * 归档条目（ZIP entry 的最小子集）
+ *
+ * 仅暴露 dsoj-parser 用到的三个字段：entryName / isDirectory / getData()。
+ * 这样除了 AdmZip（ZIP 后端），其他归档后端（tar.xz 适配器）只需实现这个接口
+ * 即可复用 parseDsojArchive 主体逻辑，无需重构 dsoj-parser 的所有内部函数。
+ */
+export interface ArchiveEntry {
+  /** 完整路径（路径分隔符统一为 /，与 ZIP 一致） */
+  entryName: string
+  /** 是否目录条目 */
+  isDirectory: boolean
+  /** 读取条目数据为 Buffer（UTF-8 文本由 readEntryText 包装） */
+  getData(): Buffer
+}
+
+/**
+ * 归档对象的最小接口
+ *
+ * dsoj-parser 内部所有函数依赖的方法仅这两个：
+ *   - getEntries()：列出所有条目（含目录）
+ *   - getEntry(name)：按完整 entryName 精确查找
+ *
+ * AdmZip 实例天然满足，无需改造；
+ * 其他归档后端（如 InMemoryArchive）实现这两个方法即可。
+ */
+export interface ArchiveLike {
+  getEntries(): ArchiveEntry[]
+  getEntry(name: string): ArchiveEntry | null
+}
+
+/* ============================================================================
  * 常量定义
  * ========================================================================== */
 
@@ -288,7 +323,7 @@ function isStrictSafePath(path: string): boolean {
  * 返回形如 ["problems/LP1001/", "problems/LB3939/"] 的列表（不含 rootPrefix），
  * 已按目录名排序；v2 若有 index.json 则改由 listProblemDirsFromIndex 决定顺序。
  */
-function listProblemDirs(zip: AdmZip, rootPrefix = ''): string[] {
+function listProblemDirs(zip: ArchiveLike, rootPrefix = ''): string[] {
   const all = zip.getEntries()
   const problemsPrefix = rootPrefix + PROBLEMS_DIR
   const dirs = new Set<string>()
@@ -311,7 +346,7 @@ function listProblemDirs(zip: AdmZip, rootPrefix = ''): string[] {
  * 检测 ZIP 是否被单层目录包裹（如 dsoj-pack/pack.yaml）
  * 扁平 ZIP（pack.yaml 在根）返回空串。
  */
-function detectZipRootPrefix(zip: AdmZip): string {
+function detectZipRootPrefix(zip: ArchiveLike): string {
   const names = zip.getEntries().map((e) => e.entryName.replace(/\\/g, '/'))
   if (names.some((n) => n === 'pack.yaml' || n.startsWith(PROBLEMS_DIR))) {
     return ''
@@ -333,7 +368,7 @@ function detectZipRootPrefix(zip: AdmZip): string {
   return ''
 }
 
-function getZipEntry(zip: AdmZip, rootPrefix: string, relativePath: string): AdmZip.IZipEntry | null {
+function getZipEntry(zip: ArchiveLike, rootPrefix: string, relativePath: string): ArchiveEntry | null {
   const entry = zip.getEntry(rootPrefix + relativePath)
   if (!entry || entry.isDirectory) return null
   return entry
@@ -354,7 +389,7 @@ interface PackIndexProblem {
  * 无效 / 缺失时返回 null，由调用方回退到目录扫描。
  */
 function listProblemDirsFromIndex(
-  zip: AdmZip,
+  zip: ArchiveLike,
   rootPrefix: string,
   indexFileName: string
 ): PackIndexProblem[] | null {
@@ -397,11 +432,11 @@ function listProblemDirsFromIndex(
  *   返回 entry 或 null
  */
 function findFileUnderProblemDir(
-  zip: AdmZip,
+  zip: ArchiveLike,
   problemDir: string,
   candidates: readonly string[],
   rootPrefix = ''
-): AdmZip.IZipEntry | null {
+): ArchiveEntry | null {
   const all = zip.getEntries()
   for (const c of candidates) {
     const path = rootPrefix + problemDir + c
@@ -421,7 +456,7 @@ function findFileUnderProblemDir(
  *                    testcases 默认只要直接子文件，避免误扫过程产物目录
  */
 function findSubdirUnderProblemDir(
-  zip: AdmZip,
+  zip: ArchiveLike,
   problemDir: string,
   candidates: readonly string[],
   rootPrefix = '',
@@ -446,7 +481,7 @@ function findSubdirUnderProblemDir(
 }
 
 /** 读取 entry 文本内容（UTF-8） */
-function readEntryText(entry: AdmZip.IZipEntry | null): string {
+function readEntryText(entry: ArchiveEntry | null): string {
   if (!entry) return ''
   return entry.getData().toString('utf-8')
 }
@@ -470,14 +505,14 @@ function readEntryText(entry: AdmZip.IZipEntry | null): string {
  * 返回按编号排序的测试用例列表
  */
 function extractTestcases(
-  zip: AdmZip,
+  zip: ArchiveLike,
   testcasesDir: string
 ): ImportedTestCase[] {
   const all = zip.getEntries()
   const prefix = testcasesDir
 
   // 收集目录下所有文件
-  const files: Array<{ name: string; entry: AdmZip.IZipEntry }> = []
+  const files: Array<{ name: string; entry: ArchiveEntry }> = []
   for (const entry of all) {
     if (entry.isDirectory) continue
     const fullName = entryPath(entry.entryName)
@@ -603,7 +638,7 @@ function parseSampleFileRole(
  *   - 1/in.txt + 1/out.txt
  */
 function extractSamples(
-  zip: AdmZip,
+  zip: ArchiveLike,
   samplesDir: string
 ): Array<{ input: string; output: string }> {
   const all = zip.getEntries()
@@ -649,7 +684,7 @@ function extractSamples(
  * 优先读 solutions/index.json，按 thumb_up 降序截断；忽略 _runnable/ 等 AI 缓存。
  */
 function extractSolutions(
-  zip: AdmZip,
+  zip: ArchiveLike,
   problemDir: string,
   rootPrefix = ''
 ): ImportedSolution[] {
@@ -825,7 +860,7 @@ function mergeJudgeConfig(
  *   indexMeta 来自 index.json（可选，用于补全题号/标题）
  */
 function parseOneProblem(
-  zip: AdmZip,
+  zip: ArchiveLike,
   problemDir: string,
   rootPrefix = '',
   indexMeta?: PackIndexProblem
@@ -1074,30 +1109,45 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
     throw new ApiError('INVALID_DSOJ_ZIP', 'DSOJ 题包内容为空', 400)
   }
 
-  let zip: AdmZip
+  let zip: ArchiveLike
   try {
-    zip = new AdmZip(zipBuffer)
+    zip = new AdmZip(zipBuffer) as unknown as ArchiveLike
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
     throw new ApiError('INVALID_DSOJ_ZIP', `ZIP 解压失败: ${msg}`, 400)
   }
 
-  for (const entry of zip.getEntries()) {
+  return parseDsojArchive(zip)
+}
+
+/**
+ * 解析 DSOJ 标准题包归档对象（zip / tar.xz 等统一入口）
+ *
+ * 与 parseDsojZip 的区别：parseDsojZip 接受 ZIP Buffer 并自行 new AdmZip；
+ * 本函数接受任意实现了 ArchiveLike 接口的归档对象（如 ZIP、tar.xz 适配器），
+ * 便于支持多种归档格式，复用主体解析逻辑。
+ *
+ * @param archive 已打开的归档对象
+ * @returns ImportedProblem[] 已解析的题目列表
+ * @throws ApiError 格式错误、文件缺失、安全校验失败等
+ */
+export function parseDsojArchive(archive: ArchiveLike): ImportedProblem[] {
+  for (const entry of archive.getEntries()) {
     if (entry.isDirectory) continue
     if (!isStrictSafePath(entry.entryName)) {
       throw new ApiError(
         'UNSAFE_ZIP_ENTRY',
-        `ZIP 内文件名不安全: ${entry.entryName}`,
+        `归档内文件名不安全: ${entry.entryName}`,
         400
       )
     }
   }
 
-  const rootPrefix = detectZipRootPrefix(zip)
+  const rootPrefix = detectZipRootPrefix(archive)
 
   // pack.yaml：校验 format / version，读取 index 文件名
   let indexFileName = 'index.json'
-  const packEntry = getZipEntry(zip, rootPrefix, 'pack.yaml')
+  const packEntry = getZipEntry(archive, rootPrefix, 'pack.yaml')
   if (packEntry) {
     const packYaml = parseDsojYaml(readEntryText(packEntry))
     const format = typeof packYaml.format === 'string' ? packYaml.format : ''
@@ -1126,13 +1176,13 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
   }
 
   // v2：优先 index.json；失败则扫描 problems/*
-  const indexed = listProblemDirsFromIndex(zip, rootPrefix, indexFileName)
+  const indexed = listProblemDirsFromIndex(archive, rootPrefix, indexFileName)
   const problemJobs: Array<{ dir: string; meta?: PackIndexProblem }> = indexed
     ? indexed.map((item) => ({
         dir: PROBLEMS_DIR + item.dir.replace(/^\/+|\/+$/g, '') + '/',
         meta: item,
       }))
-    : listProblemDirs(zip, rootPrefix).map((dir) => ({ dir }))
+    : listProblemDirs(archive, rootPrefix).map((dir) => ({ dir }))
 
   if (problemJobs.length === 0) {
     throw new ApiError(
@@ -1147,7 +1197,7 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
 
   for (const job of problemJobs) {
     try {
-      results.push(parseOneProblem(zip, job.dir, rootPrefix, job.meta))
+      results.push(parseOneProblem(archive, job.dir, rootPrefix, job.meta))
     } catch (err: unknown) {
       const reason =
         err instanceof ApiError
@@ -1177,9 +1227,21 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
  */
 export function isDsojPack(zipBuffer: Buffer): boolean {
   try {
-    const zip = new AdmZip(zipBuffer)
-    const rootPrefix = detectZipRootPrefix(zip)
-    const packEntry = getZipEntry(zip, rootPrefix, 'pack.yaml')
+    const zip = new AdmZip(zipBuffer) as unknown as ArchiveLike
+    return isDsojPackArchive(zip)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 检测一个归档对象是否是 DSOJ 标准题包（zip / tar.xz 通用）
+ *   通过 pack.yaml.format 字段判断（兼容单层包裹）
+ */
+export function isDsojPackArchive(archive: ArchiveLike): boolean {
+  try {
+    const rootPrefix = detectZipRootPrefix(archive)
+    const packEntry = getZipEntry(archive, rootPrefix, 'pack.yaml')
     if (!packEntry) return false
     const packYaml = parseDsojYaml(readEntryText(packEntry))
     return packYaml.format === DSOJ_FORMAT_ID
