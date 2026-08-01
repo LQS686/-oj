@@ -68,6 +68,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     || true; \
     apt-get update && apt-get install -y --no-install-recommends \
     bash \
+    bubblewrap \
     coreutils \
     python3 \
     make \
@@ -83,9 +84,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # 设置环境变量
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-# USE_DOCKER=false: 在容器内直接执行评测更简单可靠（容器内已装 g++/gcc）。
-# sibling 容器卷挂载复杂（评测容器看不到宿主文件），如需 Docker 沙箱需另配 docker.sock + 卷挂载。
-ENV USE_DOCKER=false
 
 # 创建非root用户
 RUN groupadd --system --gid 1001 nodejs && \
@@ -131,7 +129,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 
 # 创建必要的目录并设置权限
 # 不再将 nextjs 加入 root 组（避免提权）。内存/CPU 硬限依赖 dsoj-watch + ulimit 软限制；
-# 生产建议 USE_DOCKER=true 使用容器沙箱。
 # public/uploads/avatars: 头像持久化目录，docker-compose 会挂载 volume 到此处，
 # 预创建并 chown 确保 nextjs 用户有写权限（volume 首次挂载时属主为 root，需要显式赋权）
 # data/testdata: 测点磁盘缓存（洛谷式），docker-compose 挂载 app_testdata 卷。

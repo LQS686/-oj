@@ -50,6 +50,24 @@ async function bootJudgeSystem() {
     })
   }
 
+  // 启动自检：bubblewrap（bwrap）命名空间隔离可用性。
+  // 云评测镜像已内置 bubblewrap，评测由 runner.sh 走命名空间隔离（mount/pid/net 等）；
+  // 本地（如 WSL）若未安装 bwrap，runner.sh 将自动降级为纯 ulimit，资源隔离强度下降。
+  // 此处仅告警不阻断，便于日志直接暴露环境差异。
+  try {
+    const { spawnSync } = await import('node:child_process')
+    const probe = spawnSync('bwrap', ['--version'], { encoding: 'utf8', timeout: 5000 })
+    if (probe.error || probe.status !== 0) {
+      logger.warn('⚠️ 未检测到 bubblewrap (bwrap)：评测沙箱将降级为纯 ulimit（无命名空间隔离）。', {
+        fix: '本地开发请安装 bubblewrap（WSL: sudo apt install bubblewrap；macOS: brew install bubblewrap）；云评测镜像已内置，可设 DSOJ_USE_BWRAP=0 关闭。',
+      })
+    }
+  } catch (e) {
+    logger.warn('检测 bubblewrap 失败，沙箱隔离状态未知', {
+      error: e instanceof Error ? e.message : String(e),
+    })
+  }
+
   await import('./worker')
   logger.info('评测系统已初始化')
 }

@@ -37,7 +37,7 @@ ulimit -f 1048576 2>/dev/null
 ulimit -n 1024 2>/dev/null
 
 # 可选：若宿主机提供 bubblewrap，则启用命名空间隔离（无则回退纯 ulimit）
-# 生产仍推荐 USE_DOCKER=true（seccomp + cgroup + 无网络）
+# 镜像已内置 bubblewrap，生产建议保持默认启用（DSOJ_USE_BWRAP=1）
 USE_BWRAP=0
 if command -v bwrap >/dev/null 2>&1 && [[ "${DSOJ_USE_BWRAP:-1}" == "1" ]]; then
   USE_BWRAP=1

@@ -310,10 +310,9 @@ export async function compileCode(code: string, language: string): Promise<Compi
 
     const outputPath = join(tempDir, compiledBasename)
 
-    // Linux 非容器模式下编译走 runner.sh 沙箱（限制内存/CPU/栈/文件描述符）
+    // 编译统一走 runner.sh 沙箱（限制内存/CPU/栈/文件描述符）
     const isLinux = process.platform === 'linux'
-    const useDocker = process.env.USE_DOCKER === 'true'
-    const useSandbox = isLinux && !useDocker
+    const useSandbox = isLinux
 
     // 构建编译参数
     let spawnCmd: string
@@ -337,7 +336,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
       spawnCmd = 'bash'
       spawnArgs = [runnerPath, compileMemMb, '15', '64', compiler, ...compileArgs]
     } else {
-      // 非沙箱模式（Docker 容器内直接调用编译器）
+      // 非沙箱模式（非 Linux 宿主直接调用编译器）
       if (language === 'cpp') {
         spawnCmd = 'g++'
         spawnArgs = buildCompileArgs('g++', 'c++17', sourcePath, outputPath)

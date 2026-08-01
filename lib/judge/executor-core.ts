@@ -1,23 +1,14 @@
 import { spawn, spawnSync } from 'child_process'
 import { writeFile, unlink, open as fsOpen } from 'fs/promises'
-import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
+import { existsSync, mkdirSync, statSync } from 'fs'
 import { join } from 'path'
 import * as crypto from 'crypto'
 import { constants as osConstants } from 'os'
 import { logger } from '@/lib/logger'
 import type { ExecuteArtifacts, ExecuteOptions, ExecuteResult } from './executor-types'
 import { computeExtraTime, readMemFileKB, readTimeFileMs, readTimeFilePair } from './process-stats'
-import {
-  assertDockerJudgeEnabled,
-  getRunInfo,
-  getDockerImage,
-  ensureDockerImage,
-  getDockerRunCommand,
-} from './docker'
 import { shouldForceUlimitV } from './compiler'
 import { getJudgeConfig } from './config'
-
-const USE_DOCKER = process.env.USE_DOCKER === 'true' || false
 
 /** 输出硬上限 256 MiB（防止恶意无限刷盘撑爆磁盘/堆） */
 export const DEFAULT_MAX_OUTPUT_BYTES = 256 * 1024 * 1024
@@ -131,9 +122,38 @@ function assertLinuxJudgeHost(): void {
   }
 }
 
+/** Linux 运行命令（WSL / 容器）；已移除 Windows 宿主路径。 */
+function getRunInfo(language: string, compiledPath: string): { command: string, args: string[] } {
+  const relativeCompiledPath = compiledPath.split('\\').pop() || compiledPath.split('/').pop() || ''
+  // 无斜杠的本地二进制必须带 ./，否则 PATH 不含「.」时会 command not found
+  const localBin = relativeCompiledPath.includes('/')
+    ? relativeCompiledPath
+    : `./${relativeCompiledPath}`
+
+  const commands: Record<string, { command: string, args: string[] }> = {
+    cpp: {
+      command: localBin,
+      args: [],
+    },
+    c: {
+      command: localBin,
+      args: [],
+    },
+    python: {
+      command: 'python3',
+      args: [relativeCompiledPath],
+    },
+  }
+
+  const cmdInfo = commands[language] || { command: localBin, args: [] }
+  return {
+    command: cmdInfo.command,
+    args: cmdInfo.args,
+  }
+}
+
 export async function executeCode(options: ExecuteOptions): Promise<ExecuteResult> {
   // 安全校验：真正执行评测时才拦截，避免构建阶段误触发
-  assertDockerJudgeEnabled()
   assertLinuxJudgeHost()
 
   const {
@@ -233,518 +253,159 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     let endTime = 0
     let retainArtifacts = false
 
-    if (USE_DOCKER) {
-      const containerId = `judge_${timestamp}_${randomId}`
-      const baseImage = getDockerImage(language)
-      const statsPath = join(tempDir, `stats_${timestamp}_${randomId}.txt`)
+    // 本地 Linux 评测：仅 runner.sh（WSL / 容器内）
+    if (process.platform !== 'linux') {
+      throw new Error(`本地评测仅支持 Linux，当前平台: ${process.platform}`)
+    }
+    if (!['cpp', 'c', 'python'].includes(language)) {
+      throw new Error(`不支持的评测语言: ${language}`)
+    }
 
-      // 首次评测前确保镜像已拉取，避免 docker run 隐式拉取被 hardTimeoutMs 杀死
-      await ensureDockerImage(baseImage)
+    const runInfo = getRunInfo(language, compiledPath)
+    const memFilePath = join(tempDir, `mem_${timestamp}_${randomId}.txt`)
+    const timeFilePath = join(tempDir, `time_${timestamp}_${randomId}.txt`)
+    const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
+    const safeMem = Math.min(Math.max(16, Number(memoryLimit) || 256), 4096)
+    // RLIMIT_CPU 跟 CPU 窗口（timeLimit+extra），不能跟墙钟/ioSlack，
+    // 否则大输出题暴力解会把 ulimit -t 跑满才死，评测极慢。
+    const safeCpu = Math.min(
+      Math.max(1, Math.ceil(Number(cpuTimeLimitMs) / 1000) || 1),
+      300,
+    )
+    const safeStackMb = 8
+    const commandPath =
+      typeof runInfo.command === 'string' ? runInfo.command.split(/[\n\r;|&`$()<>]/)[0] : ''
+    if (!commandPath || !/^[a-zA-Z0-9_./-]+$/.test(commandPath)) {
+      throw new Error(`非法的 command 路径: ${runInfo.command}`)
+    }
 
-      // 内层命令：选手程序 stdout+stderr → output 文件
-      const innerCmd = `cd /app/temp && ${getDockerRunCommand(language, compiledPath, workingInputPath)} > output_${timestamp}_${randomId}.txt 2>&1`
-      // /usr/bin/time -v 包裹内层命令，统计信息重定向到独立 stats 文件
-      // 注：/usr/bin/time 在部分基础镜像（如 ubuntu:22.04、openjdk:17 基于 oraclelinux）未安装，
-      // 此时直接执行内层命令，避免选手输出文件不被写入而误判 WA
-      const escapedInner = innerCmd.replace(/'/g, "'\\''")
-      const wrappedCmd = `if command -v /usr/bin/time >/dev/null 2>&1; then /usr/bin/time -v sh -c '${escapedInner}' 2> /tmp/time_stats.txt; else sh -c '${escapedInner}'; fi; exit $?`
+    const command = 'bash'
+    const args = [
+      runnerPath,
+      String(safeMem),
+      String(safeCpu),
+      String(safeStackMb),
+      commandPath,
+      ...runInfo.args,
+    ]
+    // 禁止继承应用环境：选手程序可读 process.env / getenv，会泄露 JWT_SECRET 等
+    const spawnEnv: NodeJS.ProcessEnv = {
+      PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+      HOME: tempDir,
+      LANG: process.env.LANG || 'C.UTF-8',
+      TZ: process.env.TZ || 'UTC',
+      NODE_ENV: 'production',
+      DSOJ_MEM_FILE: memFilePath,
+      DSOJ_TIME_FILE: timeFilePath,
+      DSOJ_STDIN_FILE: workingInputPath,
+      DSOJ_STDOUT_FILE: outputPath,
+      DSOJ_STDERR_FILE: errorPath,
+      DSOJ_OUTPUT_LIMIT_BYTES: String(Math.max(1024, outputLimitBytes)),
+      DSOJ_CPU_LIMIT_MS: String(Math.max(1, cpuTimeLimitMs)),
+      // runner 内墙钟硬杀：比 Node setTimeout 更及时（事件循环忙碌时也生效）
+      DSOJ_WALL_LIMIT_MS: String(Math.max(1, hardTimeoutMs)),
+    }
+    if (shouldForceUlimitV()) {
+      spawnEnv.DSOJ_FORCE_ULIMIT_V = '1'
+    }
 
-      // 移除 --rm，改为手动管理，以便在 exit 后 docker cp 读取 stats 文件
-      // Sanitizer 运行时选项（与 runner.sh 保持一致，仅对启用 sanitizer 的二进制生效）：
-      //   - halt_on_error=1 + abort_on_error=1：第一个错误立即 abort() → 退出码 134 → RE
-      //   - detect_leaks=0：禁用 leak detection（OJ 不关心泄漏，开销大）
-      //   - print_stacktrace=0：避免 stderr 污染选手输出文件
-      //   - allocator_may_return_null=1：malloc 失败返回 NULL 而非 crash（容错）
-      const sanitizerEnv = [
-        '-e', 'ASAN_OPTIONS=halt_on_error=1:abort_on_error=1:detect_leaks=0:print_stacktrace=0:allocator_may_return_null=1',
-        '-e', 'UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_stacktrace=0',
-      ]
-      // CPU ulimit 跟 cpuTimeLimit（非墙钟）：大 I/O 题暴力解不应跑满 ioSlack 墙钟
-      const dockerCpuSec = Math.min(
-        Math.max(1, Math.ceil(cpuTimeLimitMs / 1000) || 1),
-        300,
-      )
-      // 137 可能是 OOM 也可能是 CPU hard ulimit；等采到 stats 后再区分
-      let dockerSigkill = false
-      // 根因：宿主机编译产物与测点在 temp/judge，容器内 --tmpfs /app/temp 是空目录。
-      // 必须 bind mount 同一目录，选手程序与输入文件才能在容器内可见。
-      const dockerRunCommand = [
-        'run', '--name', containerId,
-        '--memory', `${memoryLimit}m`,
-        '--memory-swap', `${memoryLimit * 2}m`,
-        '--cpus', '1',
-        '--network', 'none',
-        '--security-opt', 'no-new-privileges',
-        '--cap-drop', 'ALL',
-        '--read-only',
-        '--tmpfs', '/tmp',
-        '-v', `${tempDir}:/app/temp:rw`,
-        '--user', 'nobody',
-        '--pids-limit', '100',
-        '--ulimit', 'nofile=1024:1024',
-        '--ulimit', `cpu=${dockerCpuSec}:${dockerCpuSec}`,
-        ...sanitizerEnv,
-        baseImage,
-        'bash', '-c',
-        wrappedCmd
-      ]
+    logger.debug(`执行命令`, { command, args, extraTime, hardTimeoutMs })
 
-      logger.debug(`执行Docker命令`, { command: dockerRunCommand.join(' ') })
+    const childProcess = spawn(command, args, {
+      cwd: tempDir,
+      stdio: 'ignore',
+      detached: false,
+      env: spawnEnv,
+    })
 
-      const dockerProcess = spawn('docker', dockerRunCommand, {
-        timeout: hardTimeoutMs,
-        stdio: 'inherit'
-      })
+    const maxMemoryBytes = memoryLimit * 1024 * 1024
+    let timeoutId: NodeJS.Timeout | null = null
+    let processKilled = false
+    let forceKilled = false
 
-      // 仅在进程已 spawn、即将被等待时计时
-      startTime = Date.now()
+    // 内存/CPU 由 runner.sh 写出；原生重定向，不经 Node 管道
+    startTime = Date.now()
 
-      await new Promise<void>((resolve) => {
-        const timeoutId = setTimeout(() => {
-          logger.debug(`Docker执行超时，强制终止容器`)
-          timeout = true
-          spawn('docker', ['rm', '-f', containerId], { detached: true, stdio: 'ignore' })
-          dockerProcess.kill()
-          endTime = Date.now()
-          resolve()
-        }, hardTimeoutMs)
+    await new Promise<void>((resolve) => {
+      let resolved = false
+      let exited = false
+      let savedExitCode: number | null = 0
+      /** Node 原始 exit code；用于区分「真·正常退出 0」与「code=null 被归一成 0」 */
+      let rawExitCode: number | null = 0
+      let savedForceKilled = false
+      let savedTimeout = false
+      let fallbackTimer: NodeJS.Timeout | null = null
 
-        const onAbort = () => {
-          if (abortedBySignal) return
-          abortedBySignal = true
-          logger.debug(`AbortSignal：终止 Docker 评测容器`)
-          spawn('docker', ['rm', '-f', containerId], { detached: true, stdio: 'ignore' })
+      timeoutId = setTimeout(() => {
+        logger.debug(`执行超时，强制终止进程`, { hardTimeoutMs })
+        timeout = true
+        forceKilled = true
+
+        if (!processKilled) {
+          processKilled = true
+          killJudgeTree(childProcess.pid)
           try {
-            dockerProcess.kill()
+            childProcess.kill('SIGKILL')
           } catch {
             /* ignore */
           }
         }
-        if (signal) {
-          if (signal.aborted) onAbort()
-          else signal.addEventListener('abort', onAbort, { once: true })
-        }
 
-        dockerProcess.on('exit', (code, signalName) => {
-          clearTimeout(timeoutId)
-          signal?.removeEventListener('abort', onAbort)
-          endTime = Date.now()
-          const normalized = normalizeChildExitCode(code, signalName)
-          exitCode = normalized
-          // 状态判定优先级：TLE > MLE > RE（参考 HOJ DefaultJudge.java:54-81）
-          if (abortedBySignal) {
-            // fail-fast 中止，不记 TLE
-          } else if (timeout) {
-            // 已由墙钟超时定时器标记，保持 timeout = true
-          } else if (normalized === 152) {
-            // SIGXCPU：Docker --ulimit cpu 软限制
-            timeout = true
-          } else if (normalized === 137) {
-            // SIGKILL：OOM 或 CPU hard ulimit —— 等 stats 后再区分
-            dockerSigkill = true
-          } else if (normalized === 124 || normalized === 143) {
-            // 124 = GNU timeout；143 = SIGTERM
-            timeout = true
-          } else if (normalized !== 0) {
-            runtimeError = true
-          }
-          resolve()
-        })
+        // 不在此处 resolve，等待 close 事件统一收尾
+        // （close 在所有 stdio 流关闭后触发，确保输出已完整刷盘）
+      }, hardTimeoutMs)
 
-        dockerProcess.on('error', (err) => {
-          clearTimeout(timeoutId)
-          signal?.removeEventListener('abort', onAbort)
-          endTime = Date.now()
-          runtimeError = true
-          cannotStart = true
-          error = err.message
-          resolve()
-        })
-      })
-
-      // 评测后从容器中读取 /usr/bin/time 的统计文件
-      // 容器尚未被删除（已移除 --rm），可 docker cp
-      try {
-        // P2 安全修复：改为 spawnSync 数组形式，避免命令拼接注入风险
-        const cpResult = spawnSync('docker', ['cp', `${containerId}:/tmp/time_stats.txt`, statsPath], { timeout: 5000 })
-        if (cpResult.status !== 0) {
-          throw new Error(`docker cp 退出码: ${cpResult.status}`)
-        }
-        const statsContent = readFileSync(statsPath, 'utf-8')
-        // 解析 Maximum resident set size (kbytes): NNN
-        const memMatch = statsContent.match(/Maximum resident set size \(kbytes\): (\d+)/)
-        if (memMatch) peakMemoryKB = parseInt(memMatch[1], 10)
-        // 解析 CPU 时间 = User time + System time（秒 → 毫秒）
-        // 注：Elapsed (wall clock) time 是墙钟时间，包含 I/O 等待，不应作为 cpuTime
-        const userMatch = statsContent.match(/User time \(seconds\): ([\d.]+)/)
-        const sysMatch = statsContent.match(/System time \(seconds\): ([\d.]+)/)
-        if (userMatch && sysMatch) {
-          cpuTimeMs = Math.round((parseFloat(userMatch[1]) + parseFloat(sysMatch[1])) * 1000)
-        } else {
-          // 回退：解析 Elapsed (wall clock) time 作为 cpuTimeMs（不精确但优于 0）
-          const timeMatch = statsContent.match(/Elapsed \(wall clock\) time.*?: (.+)/)
-          if (timeMatch) {
-            const t = timeMatch[1].trim()
-            // 格式如 0:01.23 或 1:23.45
-            const parts = t.split(':')
-            if (parts.length === 2) {
-              const sec = parseFloat(parts[0]) * 60 + parseFloat(parts[1])
-              cpuTimeMs = Math.round(sec * 1000)
-            }
+      const onAbort = () => {
+        if (abortedBySignal) return
+        abortedBySignal = true
+        forceKilled = true
+        logger.debug(`AbortSignal：强制终止选手进程树`)
+        if (!processKilled) {
+          processKilled = true
+          killJudgeTree(childProcess.pid)
+          try {
+            childProcess.kill('SIGKILL')
+          } catch {
+            /* ignore */
           }
         }
-      } catch (err) {
-        logger.debug('Docker 资源统计解析失败，回退为默认值', { error: err instanceof Error ? err.message : String(err) })
-      } finally {
-        // 清理容器
-        spawn('docker', ['rm', '-f', containerId], { detached: true, stdio: 'ignore' })
-        // 清理 stats 文件
-        try {
-          if (existsSync(statsPath)) await unlink(statsPath)
-        } catch {
-          // 忽略清理错误
-        }
+      }
+      if (signal) {
+        if (signal.aborted) onAbort()
+        else signal.addEventListener('abort', onAbort, { once: true })
       }
 
-      const outputFile = join(tempDir, `output_${timestamp}_${randomId}.txt`)
-      try {
-        // 仅读预览，禁止整文件进堆（大数据 AC 会 OOM）
-        if (existsSync(outputFile)) {
-          const sz = statSync(outputFile).size
-          if (sz > outputLimitBytes) {
-            outputLimitExceeded = true
-          }
-          output = await readFilePreview(outputFile, OUTPUT_PREVIEW_BYTES)
-        }
-      } catch (err) {
-        logger.error(`读取Docker输出失败`, err)
-      }
+      // 统一收尾函数：close/error/墙超时收尾共用
+      const finishResolve = () => {
+        if (resolved) return
+        resolved = true
+        if (timeoutId) clearTimeout(timeoutId)
+        if (fallbackTimer) clearTimeout(fallbackTimer)
+        signal?.removeEventListener('abort', onAbort)
+        processKilled = true
+        // close 事件触发时所有 stdio 流已关闭，输出已完整刷盘
+        endTime = Date.now()
+        const finalCode = savedExitCode ?? 0
+        exitCode = finalCode
 
-      if (peakMemoryKB === 0) {
-        logger.debug(`Docker模式: 资源统计未采集到（/usr/bin/time 可能未安装或容器已被超时清理）`)
-      }
-
-      // SIGKILL(137)：用 CPU/内存统计区分 CPU hard ulimit vs OOM
-      if (dockerSigkill && !abortedBySignal && !timeout) {
-        const memLimitBytes = memoryLimit * 1024 * 1024
-        if (cpuTimeMs > timeLimit) {
-          timeout = true
-          if (cpuTimeMs > cpuTimeLimitMs) {
-            exceedsTimeLimit = false
-          } else {
-            exceedsTimeLimit = true
-          }
-        } else if (peakMemoryKB > 0 && peakMemoryKB * 1024 >= memLimitBytes) {
-          memoryExceeded = true
-        } else {
-          // 无可靠 CPU/内存证据时保持历史默认：OOM → MLE
-          memoryExceeded = true
-        }
-      }
-
-      // Docker 模式 CPU TLE 二次判定（参考 HOJ DefaultJudge.java:57）
-      // 沙箱返回正常退出（exitCode=0），但 CPU 时间超过 timeLimit → 判 TLE
-      if (!timeout && !memoryExceeded && !runtimeError && cpuTimeMs > timeLimit) {
-        logger.debug(`Docker模式 CPU TLE: cpuTime=${cpuTimeMs}ms > timeLimit=${timeLimit}ms`)
-        timeout = true
-        if (cpuTimeMs > cpuTimeLimitMs) {
+        if (abortedBySignal) {
+          timeout = false
+          memoryExceeded = false
+          outputLimitExceeded = false
+          runtimeError = false
           exceedsTimeLimit = false
-        } else {
-          exceedsTimeLimit = true
-        }
-      }
-    } else {
-      // 本地 Linux 评测：仅 runner.sh（WSL / 容器内）
-      if (process.platform !== 'linux') {
-        throw new Error(`本地评测仅支持 Linux，当前平台: ${process.platform}`)
-      }
-      if (!['cpp', 'c', 'python'].includes(language)) {
-        throw new Error(`不支持的评测语言: ${language}`)
-      }
-
-      const runInfo = getRunInfo(language, compiledPath)
-      const memFilePath = join(tempDir, `mem_${timestamp}_${randomId}.txt`)
-      const timeFilePath = join(tempDir, `time_${timestamp}_${randomId}.txt`)
-      const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
-      const safeMem = Math.min(Math.max(16, Number(memoryLimit) || 256), 4096)
-      // RLIMIT_CPU 跟 CPU 窗口（timeLimit+extra），不能跟墙钟/ioSlack，
-      // 否则大输出题暴力解会把 ulimit -t 跑满才死，评测极慢。
-      const safeCpu = Math.min(
-        Math.max(1, Math.ceil(Number(cpuTimeLimitMs) / 1000) || 1),
-        300,
-      )
-      const safeStackMb = 8
-      const commandPath =
-        typeof runInfo.command === 'string' ? runInfo.command.split(/[\n\r;|&`$()<>]/)[0] : ''
-      if (!commandPath || !/^[a-zA-Z0-9_./-]+$/.test(commandPath)) {
-        throw new Error(`非法的 command 路径: ${runInfo.command}`)
-      }
-
-      const command = 'bash'
-      const args = [
-        runnerPath,
-        String(safeMem),
-        String(safeCpu),
-        String(safeStackMb),
-        commandPath,
-        ...runInfo.args,
-      ]
-      // 禁止继承应用环境：选手程序可读 process.env / getenv，会泄露 JWT_SECRET 等
-      const spawnEnv: NodeJS.ProcessEnv = {
-        PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
-        HOME: tempDir,
-        LANG: process.env.LANG || 'C.UTF-8',
-        TZ: process.env.TZ || 'UTC',
-        NODE_ENV: 'production',
-        DSOJ_MEM_FILE: memFilePath,
-        DSOJ_TIME_FILE: timeFilePath,
-        DSOJ_STDIN_FILE: workingInputPath,
-        DSOJ_STDOUT_FILE: outputPath,
-        DSOJ_STDERR_FILE: errorPath,
-        DSOJ_OUTPUT_LIMIT_BYTES: String(Math.max(1024, outputLimitBytes)),
-        DSOJ_CPU_LIMIT_MS: String(Math.max(1, cpuTimeLimitMs)),
-        // runner 内墙钟硬杀：比 Node setTimeout 更及时（事件循环忙碌时也生效）
-        DSOJ_WALL_LIMIT_MS: String(Math.max(1, hardTimeoutMs)),
-      }
-      if (shouldForceUlimitV()) {
-        spawnEnv.DSOJ_FORCE_ULIMIT_V = '1'
-      }
-
-      logger.debug(`执行命令`, { command, args, extraTime, hardTimeoutMs })
-
-      const childProcess = spawn(command, args, {
-        cwd: tempDir,
-        stdio: 'ignore',
-        detached: false,
-        env: spawnEnv,
-      })
-
-      const maxMemoryBytes = memoryLimit * 1024 * 1024
-      let timeoutId: NodeJS.Timeout | null = null
-      let processKilled = false
-      let forceKilled = false
-
-      // 内存/CPU 由 runner.sh 写出；原生重定向，不经 Node 管道
-      startTime = Date.now()
-
-      await new Promise<void>((resolve) => {
-        let resolved = false
-        let exited = false
-        let savedExitCode: number | null = 0
-        /** Node 原始 exit code；用于区分「真·正常退出 0」与「code=null 被归一成 0」 */
-        let rawExitCode: number | null = 0
-        let savedForceKilled = false
-        let savedTimeout = false
-        let fallbackTimer: NodeJS.Timeout | null = null
-
-        timeoutId = setTimeout(() => {
-          logger.debug(`执行超时，强制终止进程`, { hardTimeoutMs })
-          timeout = true
-          forceKilled = true
-
-          if (!processKilled) {
-            processKilled = true
-            killJudgeTree(childProcess.pid)
-            try {
-              childProcess.kill('SIGKILL')
-            } catch {
-              /* ignore */
-            }
-          }
-
-          // 不在此处 resolve，等待 close 事件统一收尾
-          // （close 在所有 stdio 流关闭后触发，确保输出已完整刷盘）
-        }, hardTimeoutMs)
-
-        const onAbort = () => {
-          if (abortedBySignal) return
-          abortedBySignal = true
-          forceKilled = true
-          logger.debug(`AbortSignal：强制终止选手进程树`)
-          if (!processKilled) {
-            processKilled = true
-            killJudgeTree(childProcess.pid)
-            try {
-              childProcess.kill('SIGKILL')
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-        if (signal) {
-          if (signal.aborted) onAbort()
-          else signal.addEventListener('abort', onAbort, { once: true })
-        }
-
-        // 统一收尾函数：close/error/墙超时收尾共用
-        const finishResolve = () => {
-          if (resolved) return
-          resolved = true
-          if (timeoutId) clearTimeout(timeoutId)
-          if (fallbackTimer) clearTimeout(fallbackTimer)
-          signal?.removeEventListener('abort', onAbort)
-          processKilled = true
-          // close 事件触发时所有 stdio 流已关闭，输出已完整刷盘
-          endTime = Date.now()
-          const finalCode = savedExitCode ?? 0
-          exitCode = finalCode
-
-          if (abortedBySignal) {
-            timeout = false
-            memoryExceeded = false
-            outputLimitExceeded = false
-            runtimeError = false
-            exceedsTimeLimit = false
-            resolve()
-            return
-          }
-
-          // wrapper 写出的峰值内存（RssAnon）/ CPU·墙钟（wait4 + monotonic）
-          const fileMem = readMemFileKB(memFilePath)
-          if (fileMem > 0 && fileMem > peakMemoryKB) peakMemoryKB = fileMem
-          const timePair = readTimeFilePair(timeFilePath)
-          if (timePair) {
-            // 真实 CPU（可为 0）；墙钟单独保留，不把墙钟冒充成 CPU
-            cpuTimeMs = Math.max(0, timePair.cpuMs)
-            wrapperWallMs = Math.max(0, timePair.wallMs)
-            cpuSampledFromWrapper = true
-          } else {
-            const fileCpu = readTimeFileMs(timeFilePath)
-            if (fileCpu >= 0) {
-              cpuTimeMs = fileCpu
-              cpuSampledFromWrapper = true
-            }
-          }
-
-          // 退出后若峰值已超限，补判 MLE
-          if (!memoryExceeded && peakMemoryKB > 0 && peakMemoryKB * 1024 > maxMemoryBytes) {
-            memoryExceeded = true
-            logger.debug(`退出后检测内存超限`, {
-              current: Math.round(peakMemoryKB / 1024),
-              limit: memoryLimit,
-            })
-          }
-
-          // 不再用 Node 外包墙钟冒充 CPU（含 spawn/bash 开销，非真实选手时间）
-
-          // 信号分类（HOJ SandboxRun 信号表）：
-          //   152 = SIGXCPU → CPU TLE（ulimit -t / runner CPU 轮询）
-          //   153 = SIGXFSZ → OLE（输出超限）
-          //   137 = SIGKILL → 墙钟强杀 / ulimit -v；用峰值、CPU、墙钟区分 MLE vs TLE
-          const wallMs = wrapperWallMs > 0 ? wrapperWallMs : Math.max(0, endTime - startTime)
-
-          // 选手已正常退出(0)：墙钟定时器晚到的竞态不得改判 TLE
-          if (rawExitCode === 0) {
-            savedTimeout = false
-            timeout = false
-          }
-
-          if (finalCode === 153 || outputLimitExceeded) {
-            outputLimitExceeded = true
-            memoryExceeded = false
-            savedTimeout = false
-          } else if (finalCode === 152) {
-            savedTimeout = true
-          } else if (finalCode === 137) {
-            if (savedForceKilled || savedTimeout) {
-              savedTimeout = true
-            } else if (peakMemoryKB > 0 && peakMemoryKB * 1024 >= maxMemoryBytes) {
-              memoryExceeded = true
-            } else if (cpuTimeMs > timeLimit || wallMs >= hardTimeoutMs * 0.95) {
-              savedTimeout = true
-            } else if (peakMemoryKB === 0 && wallMs < hardTimeoutMs * 0.5) {
-              // 早死且无峰值文件：更像 RLIMIT_AS（ulimit -v）
-              memoryExceeded = true
-            } else {
-              savedTimeout = true
-            }
-          } else if (rawExitCode === null && (savedForceKilled || savedTimeout)) {
-            // 强杀且 Node 未给出 code（也无 signal 映射）→ 按超时，避免误报 RE
-            savedTimeout = true
-          }
-
-          // 必须回写 timeout：judger 只看 executeResult.timeout
-          if (savedTimeout) {
-            timeout = true
-            memoryExceeded = false
-          }
-
-          // 状态判定优先级：TLE > OLE > MLE > RE（null 已归一化，勿用 !== 0 误伤）
-          if (!savedTimeout && !outputLimitExceeded && !memoryExceeded && finalCode !== 0) {
-            runtimeError = true
-          }
-
-          if (!savedForceKilled && !savedTimeout && !memoryExceeded && !outputLimitExceeded && cpuTimeMs > timeLimit) {
-            exceedsTimeLimit = true
-          }
-
-          if (!savedTimeout && !memoryExceeded && !runtimeError && !outputLimitExceeded && cpuTimeMs > cpuTimeLimitMs) {
-            savedTimeout = true
-            timeout = true
-          }
-
           resolve()
+          return
         }
 
-        childProcess.on('exit', (code, signalName) => {
-          if (exited) return
-          exited = true
-          // 仅保存状态，不执行 endTime/resolve，等待 close 事件
-          // （close 在所有 stdio 流关闭后触发，确保 stdout 已刷盘）
-          // SIGKILL 时 code=null，必须映射为 128+signo，否则 null!==0 会误报 RE
-          rawExitCode = code
-          savedExitCode = normalizeChildExitCode(code, signalName)
-          savedForceKilled = forceKilled
-          savedTimeout = timeout
-          // P1-5: exit 比 close 更早触发；启动兜底定时器，
-          // 若 close 因孙进程继承 stdout fd 而永不触发，则在 2s 后强制 resolve
-          fallbackTimer = setTimeout(() => {
-            if (!resolved) {
-              logger.debug(`close 事件超时未触发，强制 resolve（孙进程可能持有 fd）`)
-              finishResolve()
-            }
-          }, closeFallbackMs)
-        })
-
-        childProcess.on('close', () => {
-          finishResolve()
-        })
-
-        childProcess.on('error', (err) => {
-          if (resolved) return
-          resolved = true
-          if (timeoutId) clearTimeout(timeoutId)
-          if (fallbackTimer) clearTimeout(fallbackTimer)
-          signal?.removeEventListener('abort', onAbort)
-          processKilled = true
-          endTime = Date.now()
-          runtimeError = true
-          cannotStart = true
-          error = err.message
-          resolve()
-        })
-      })
-
-      try {
-        // 禁止整文件 readFile 进堆：仅预览；完整输出留给 artifacts 供磁盘流式比对
-        if (existsSync(outputPath)) {
-          const sz = statSync(outputPath).size
-          if (sz > outputLimitBytes) {
-            outputLimitExceeded = true
-          }
-          // TLE/MLE/OLE 时仍可读小预览，但不要为比对加载全文
-          output = await readFilePreview(outputPath, OUTPUT_PREVIEW_BYTES)
-        }
-        if (existsSync(errorPath)) {
-          error = await readFilePreview(errorPath, ERROR_PREVIEW_BYTES)
-        }
-        // 再次合并 mem/time 文件（close 后文件应已刷盘）
+        // wrapper 写出的峰值内存（RssAnon）/ CPU·墙钟（wait4 + monotonic）
         const fileMem = readMemFileKB(memFilePath)
         if (fileMem > 0 && fileMem > peakMemoryKB) peakMemoryKB = fileMem
         const timePair = readTimeFilePair(timeFilePath)
         if (timePair) {
+          // 真实 CPU（可为 0）；墙钟单独保留，不把墙钟冒充成 CPU
           cpuTimeMs = Math.max(0, timePair.cpuMs)
-          if (timePair.wallMs > 0) wrapperWallMs = timePair.wallMs
+          wrapperWallMs = Math.max(0, timePair.wallMs)
           cpuSampledFromWrapper = true
         } else {
           const fileCpu = readTimeFileMs(timeFilePath)
@@ -753,15 +414,152 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
             cpuSampledFromWrapper = true
           }
         }
-        if (existsSync(memFilePath)) {
-          await unlink(memFilePath).catch(() => {})
+
+        // 退出后若峰值已超限，补判 MLE
+        if (!memoryExceeded && peakMemoryKB > 0 && peakMemoryKB * 1024 > maxMemoryBytes) {
+          memoryExceeded = true
+          logger.debug(`退出后检测内存超限`, {
+            current: Math.round(peakMemoryKB / 1024),
+            limit: memoryLimit,
+          })
         }
-        if (existsSync(timeFilePath)) {
-          await unlink(timeFilePath).catch(() => {})
+
+        // 不再用 Node 外包墙钟冒充 CPU（含 spawn/bash 开销，非真实选手时间）
+
+        // 信号分类（HOJ SandboxRun 信号表）：
+        //   152 = SIGXCPU → CPU TLE（ulimit -t / runner CPU 轮询）
+        //   153 = SIGXFSZ → OLE（输出超限）
+        //   137 = SIGKILL → 墙钟强杀 / ulimit -v；用峰值、CPU、墙钟区分 MLE vs TLE
+        const wallMs = wrapperWallMs > 0 ? wrapperWallMs : Math.max(0, endTime - startTime)
+
+        // 选手已正常退出(0)：墙钟定时器晚到的竞态不得改判 TLE
+        if (rawExitCode === 0) {
+          savedTimeout = false
+          timeout = false
         }
-      } catch (err) {
-        logger.error(`读取输出失败`, err)
+
+        if (finalCode === 153 || outputLimitExceeded) {
+          outputLimitExceeded = true
+          memoryExceeded = false
+          savedTimeout = false
+        } else if (finalCode === 152) {
+          savedTimeout = true
+        } else if (finalCode === 137) {
+          if (savedForceKilled || savedTimeout) {
+            savedTimeout = true
+          } else if (peakMemoryKB > 0 && peakMemoryKB * 1024 >= maxMemoryBytes) {
+            memoryExceeded = true
+          } else if (cpuTimeMs > timeLimit || wallMs >= hardTimeoutMs * 0.95) {
+            savedTimeout = true
+          } else if (peakMemoryKB === 0 && wallMs < hardTimeoutMs * 0.5) {
+            // 早死且无峰值文件：更像 RLIMIT_AS（ulimit -v）
+            memoryExceeded = true
+          } else {
+            savedTimeout = true
+          }
+        } else if (rawExitCode === null && (savedForceKilled || savedTimeout)) {
+          // 强杀且 Node 未给出 code（也无 signal 映射）→ 按超时，避免误报 RE
+          savedTimeout = true
+        }
+
+        // 必须回写 timeout：judger 只看 executeResult.timeout
+        if (savedTimeout) {
+          timeout = true
+          memoryExceeded = false
+        }
+
+        // 状态判定优先级：TLE > OLE > MLE > RE（null 已归一化，勿用 !== 0 误伤）
+        if (!savedTimeout && !outputLimitExceeded && !memoryExceeded && finalCode !== 0) {
+          runtimeError = true
+        }
+
+        if (!savedForceKilled && !savedTimeout && !memoryExceeded && !outputLimitExceeded && cpuTimeMs > timeLimit) {
+          exceedsTimeLimit = true
+        }
+
+        if (!savedTimeout && !memoryExceeded && !runtimeError && !outputLimitExceeded && cpuTimeMs > cpuTimeLimitMs) {
+          savedTimeout = true
+          timeout = true
+        }
+
+        resolve()
       }
+
+      childProcess.on('exit', (code, signalName) => {
+        if (exited) return
+        exited = true
+        // 仅保存状态，不执行 endTime/resolve，等待 close 事件
+        // （close 在所有 stdio 流关闭后触发，确保 stdout 已刷盘）
+        // SIGKILL 时 code=null，必须映射为 128+signo，否则 null!==0 会误报 RE
+        rawExitCode = code
+        savedExitCode = normalizeChildExitCode(code, signalName)
+        savedForceKilled = forceKilled
+        savedTimeout = timeout
+        // P1-5: exit 比 close 更早触发；启动兜底定时器，
+        // 若 close 因孙进程继承 stdout fd 而永不触发，则在 2s 后强制 resolve
+        fallbackTimer = setTimeout(() => {
+          if (!resolved) {
+            logger.debug(`close 事件超时未触发，强制 resolve（孙进程可能持有 fd）`)
+            finishResolve()
+          }
+        }, closeFallbackMs)
+      })
+
+      childProcess.on('close', () => {
+        finishResolve()
+      })
+
+      childProcess.on('error', (err) => {
+        if (resolved) return
+        resolved = true
+        if (timeoutId) clearTimeout(timeoutId)
+        if (fallbackTimer) clearTimeout(fallbackTimer)
+        signal?.removeEventListener('abort', onAbort)
+        processKilled = true
+        endTime = Date.now()
+        runtimeError = true
+        cannotStart = true
+        error = err.message
+        resolve()
+      })
+    })
+
+    try {
+      // 禁止整文件 readFile 进堆：仅预览；完整输出留给 artifacts 供磁盘流式比对
+      if (existsSync(outputPath)) {
+        const sz = statSync(outputPath).size
+        if (sz > outputLimitBytes) {
+          outputLimitExceeded = true
+        }
+        // TLE/MLE/OLE 时仍可读小预览，但不要为比对加载全文
+        output = await readFilePreview(outputPath, OUTPUT_PREVIEW_BYTES)
+      }
+      if (existsSync(errorPath)) {
+        error = await readFilePreview(errorPath, ERROR_PREVIEW_BYTES)
+      }
+      // 再次合并 mem/time 文件（close 后文件应已刷盘）
+      const fileMem = readMemFileKB(memFilePath)
+      if (fileMem > 0 && fileMem > peakMemoryKB) peakMemoryKB = fileMem
+      const timePair = readTimeFilePair(timeFilePath)
+      if (timePair) {
+        cpuTimeMs = Math.max(0, timePair.cpuMs)
+        if (timePair.wallMs > 0) wrapperWallMs = timePair.wallMs
+        cpuSampledFromWrapper = true
+      } else {
+        const fileCpu = readTimeFileMs(timeFilePath)
+        if (fileCpu >= 0) {
+          cpuTimeMs = fileCpu
+          cpuSampledFromWrapper = true
+        }
+      }
+      if (existsSync(memFilePath)) {
+        await unlink(memFilePath).catch(() => {})
+      }
+      if (existsSync(timeFilePath)) {
+        await unlink(timeFilePath).catch(() => {})
+      }
+    } catch (err) {
+      logger.error(`读取输出失败`, err)
     }
 
     // 保留输出文件供 judger 流式比对（调用方 cleanupExecuteArtifacts）
@@ -824,7 +622,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     }
 
     // 内存采集失败时返回 0（不再使用伪造值），并记录警告
-    if (peakMemoryKB === 0 && !USE_DOCKER) {
+    if (peakMemoryKB === 0) {
       logger.warn(`内存采集失败，记为 0`, {
         language,
         platform: process.platform,

@@ -500,11 +500,6 @@ declare global {
 if (!global.__judgeWorkerInitialized) {
   global.__judgeWorkerInitialized = true
 
-  // P0 Security: 生产环境未启用 Docker 评测沙箱告警（不阻塞启动）
-  if (process.env.NODE_ENV === 'production' && process.env.USE_DOCKER !== 'true') {
-    logger.warn('生产环境未启用 Docker 评测沙箱，选手代码可能访问进程资源，建议设置 USE_DOCKER=true')
-  }
-
   // 定期输出队列状态
   statsInterval = setInterval(async () => {
     try {
