@@ -36,17 +36,6 @@ ulimit -u "${DSOJ_NPROC_LIMIT:-4096}" 2>/dev/null
 ulimit -f 1048576 2>/dev/null
 ulimit -n 1024 2>/dev/null
 
-# 可选：若宿主机提供 bubblewrap 且能创建用户命名空间，则启用命名空间隔离。
-# 注意：Docker 容器默认 seccomp 会阻止 userns（bwrap 报 "No permissions to create new namespace"），
-# 不能仅用 command -v 判断存在性，必须功能探测；容器部署已用 ./seccomp-oj.json 放行，
-# 若此处仍探测失败说明 seccomp/宿主内核未配置（见 init.ts 告警），本地无 bwrap 时回退纯 ulimit。
-USE_BWRAP=0
-if command -v bwrap >/dev/null 2>&1 && [[ "${DSOJ_USE_BWRAP:-1}" == "1" ]]; then
-  if bwrap --unshare-all --die-with-parent --new-session --ro-bind / / --dev /dev --proc /proc true >/dev/null 2>&1; then
-    USE_BWRAP=1
-  fi
-fi
-
 export ASAN_OPTIONS="${ASAN_OPTIONS:-}":halt_on_error=1:abort_on_error=1:detect_leaks=0:print_stacktrace=0:allocator_may_return_null=1
 export UBSAN_OPTIONS="${UBSAN_OPTIONS:-}":halt_on_error=1:abort_on_error=1:print_stacktrace=0
 
@@ -160,19 +149,8 @@ run_with_dsoj_watch() {
   local err="${DSOJ_STDERR_FILE:-/dev/null}"
 
   # 重定向继承给 watch → fork 后的选手进程
-  if [[ "$USE_BWRAP" == "1" ]]; then
-    # 最小权限 bubblewrap：新 mount/pid/net/uts/ipc 命名空间，只读根，可写工作目录
-    # 注意：--unshare-all 必须放在所有挂载参数之前（bwrap 顺序敏感），
-    # 否则 --proc 会在 pid ns 创建前挂载宿主 procfs → "Can't mount proc: Operation not permitted"
-    bwrap --unshare-all --die-with-parent --new-session \
-      --ro-bind / / --dev /dev --proc /proc \
-      --tmpfs /tmp --dir "$PWD" --bind "$PWD" "$PWD" --chdir "$PWD" \
-      "$WATCH_BIN" "$mem_out" "$time_out" "$cpu_limit" "$wall_limit" "$ole_limit" "$stdout_path" -- "$@" \
-      <"$in" >"$out" 2>"$err"
-  else
-    "$WATCH_BIN" "$mem_out" "$time_out" "$cpu_limit" "$wall_limit" "$ole_limit" "$stdout_path" -- "$@" \
-      <"$in" >"$out" 2>"$err"
-  fi
+  "$WATCH_BIN" "$mem_out" "$time_out" "$cpu_limit" "$wall_limit" "$ole_limit" "$stdout_path" -- "$@" \
+    <"$in" >"$out" 2>"$err"
   return $?
 }
 

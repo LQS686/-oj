@@ -68,7 +68,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     || true; \
     apt-get update && apt-get install -y --no-install-recommends \
     bash \
-    bubblewrap \
     coreutils \
     python3 \
     make \
