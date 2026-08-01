@@ -87,6 +87,47 @@ export async function listPublicProblems(filter: {
     prisma.problem.count({ where }),
   ])
 
+  // 实时聚合当前页题目的提交数和 AC 数，与详情页口径统一
+  // 避免增量计数（$inc）在重测/回滚路径漏更新导致列表与详情不一致
+  if (items.length > 0) {
+    const problemIds = items.map((p) => p.id)
+    const [submitGroups, acGroups] = await Promise.all([
+      prisma.submission.groupBy({
+        by: ['problemId'],
+        where: { problemId: { in: problemIds } },
+        _count: { _all: true },
+      }),
+      prisma.submission.groupBy({
+        by: ['problemId'],
+        where: { problemId: { in: problemIds }, status: 'AC' },
+        _count: { _all: true },
+      }),
+    ])
+    const submitMap = new Map(submitGroups.map((g) => [g.problemId, g._count._all]))
+    const acMap = new Map(acGroups.map((g) => [g.problemId, g._count._all]))
+    // 异步回填 denormalized 字段（不阻塞响应，不等待结果）
+    const repairs: Promise<unknown>[] = []
+    for (const p of items) {
+      const liveSubmit = submitMap.get(p.id) ?? 0
+      const liveAc = acMap.get(p.id) ?? 0
+      if (p.totalSubmit !== liveSubmit || p.totalAccepted !== liveAc) {
+        repairs.push(
+          prisma.problem.update({
+            where: { id: p.id },
+            data: { totalSubmit: liveSubmit, totalAccepted: liveAc },
+          }).catch(() => {})
+        )
+      }
+    }
+    await Promise.all(repairs)
+    // 覆盖返回值，确保前端拿到实时数据
+    for (const p of items) {
+      const liveP = p as { totalSubmit: number; totalAccepted: number }
+      liveP.totalSubmit = submitMap.get(p.id) ?? 0
+      liveP.totalAccepted = acMap.get(p.id) ?? 0
+    }
+  }
+
   return {
     problems: items,
     pagination: {

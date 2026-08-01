@@ -1,6 +1,5 @@
-// 简化版评测队列系统（基于内存队列，适合开发/小规模使用）
-// 生产环境建议使用 BullMQ + Redis
-// Linux-only：任务超时必须 abort 并杀掉选手进程树，避免占槽位后仍空转。
+// 评测队列系统（基于内存队列 + EventEmitter，单实例部署）
+// worker 事件驱动，任务超时 abort 并杀掉选手进程树，避免占槽位后仍空转。
 
 import { EventEmitter } from 'events'
 import { logger } from '@/lib/logger'

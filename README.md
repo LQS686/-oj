@@ -117,7 +117,7 @@ ENCRYPTION_KEY=
 > 可在后台管理题目、竞赛、班级等。
 > 详见 `app/api/auth/register/route.ts` 的 `isFirstUser` 判定逻辑。
 
-> ⚠️ **生产环境强制校验**（`lib/env.ts` 启动时检查）：`JWT_SECRET`（≥32）、`REDIS_URL`、`ENCRYPTION_KEY`；禁止 `FORCE_SECURE_COOKIE=false`。生产评测建议 `USE_DOCKER=true`，或使用本仓库 `docker compose`（应用容器内 `USE_DOCKER=false`，依赖容器隔离）。**请勿在 Windows 宿主上直接跑评测。**
+> ⚠️ **生产环境强制校验**（`lib/env.ts` 启动时检查）：`JWT_SECRET`（≥32）、`REDIS_URL`、`ENCRYPTION_KEY`；禁止 `FORCE_SECURE_COOKIE=false`。生产评测统一走 `docker compose`（应用容器内 runner.sh + dsoj-watch 沙箱隔离）。**请勿在 Windows 宿主上直接跑评测。**
 ## Docker 部署
 
 **推荐（按环境选择脚本）：**

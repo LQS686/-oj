@@ -3,6 +3,9 @@
 > 审查时间:2026-07-28
 > 审查范围:`e:\桌面\dsoj` 全部源代码(基于前两轮报告的修复复核)
 > 审查方式:静态阅读,与 `CODE_REVIEW_REPORT.md`、`CODE_REVIEW_REPORT_2.md` 对照,本轮**未修改任何代码**
+>
+> ⚠️ **历史快照注记**：报告中提及的 `USE_DOCKER` 开关于 2026-08 移除，
+> 评测统一走 `runner.sh + dsoj-watch` 单一路径。
 > 修改概况:100+ 文件二次修改,新增 `lib/settings-schema.ts`(Zod schema),新增多模块细化改动
 
 ---

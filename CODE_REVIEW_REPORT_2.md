@@ -3,6 +3,9 @@
 > 审查时间:2026-07-28
 > 审查范围:`e:\桌面\dsoj` 全部源代码(基于第一轮报告的修复复核)
 > 审查方式:静态阅读,与 `CODE_REVIEW_REPORT.md` 对照,本轮**未修改任何代码**
+>
+> ⚠️ **历史快照注记**：报告中提及的 `USE_DOCKER` 开关于 2026-08 移除，
+> 评测统一走 `runner.sh + dsoj-watch` 单一路径。
 > 修改概况:用户提交了 100+ 文件的修改,新增 `lib/auth/cookie.ts`、`lib/http/client-ip.ts`、`lib/problem/access.ts`、`lib/judge/config.ts`、`lib/judge/ensure-watch.ts`、`lib/judge/dsoj-watch.c`、`lib/settings-defaults.ts`、`app/api/auth/csrf/` 等关键模块
 
 ---

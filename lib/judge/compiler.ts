@@ -1,4 +1,4 @@
-// 代码编译器（简化版 - 实际应在Docker中执行）
+// 代码编译器：接收选手源代码，通过 runner.sh 沙箱编译，返回编译产物路径或错误信息
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import { spawn } from 'child_process'
 import { join } from 'path'
@@ -169,6 +169,10 @@ function buildCompileArgs(
 ): string[] {
   const args = [
     '-O2',
+    // -march=native：让 gcc 利用宿主 CPU 的 AVX2/AVX-512 指令集自动向量化，
+    // 对循环/数组密集型代码提升 10-20%。容器内编译时 gcc 读取 /proc/cpuinfo，
+    // 能正确检测宿主 CPU 特性。所有评测在同一台服务器，无可移植性问题。
+    '-march=native',
     `-std=${std}`,
     '-w',
     '-fmax-errors=3',
@@ -336,7 +340,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
       spawnCmd = 'bash'
       spawnArgs = [runnerPath, compileMemMb, '15', '64', compiler, ...compileArgs]
     } else {
-      // 非沙箱模式（非 Linux 宿主直接调用编译器）
+      // 非 Linux 宿主（如 Windows 开发）：直接调用编译器，无 runner.sh 沙箱保护
       if (language === 'cpp') {
         spawnCmd = 'g++'
         spawnArgs = buildCompileArgs('g++', 'c++17', sourcePath, outputPath)

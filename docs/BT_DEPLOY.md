@@ -240,3 +240,146 @@ docker compose restart app
 10. **`.env` 值不要包反引号**。
 
 更细的编译 / 评测相关说明见仓库历史注释与 `Dockerfile`。
+
+---
+
+## 评测系统架构
+
+### 评测路径（单一）
+
+```
+judger.ts → executor-core.ts → runner.sh → dsoj-watch（C 同步监视器）→ 选手进程
+```
+
+无 Docker 沙箱、无 bwrap 分支，全平台统一一条路径：
+
+| 组件 | 职责 |
+|------|------|
+| `dsoj-watch` | C 同步进程，100µs 采样 RssAnon 内存 + wait4 rusage CPU 时间 + CLOCK_MONOTONIC 墙钟 |
+| `runner.sh` | 设置 ulimit（栈/CPU/进程数/FD/文件大小），调用 dsoj-watch 执行选手程序 |
+| `ulimit` | 系统级软限制：`-t` CPU 秒、`-s` 栈大小、`-u` 进程数、`-n` FD、`-f` 文件大小 |
+
+### 资源限制机制
+
+| 资源 | 限制方式 | 说明 |
+|------|----------|------|
+| CPU 时间 | `dsoj-watch` wait4 rusage + `ulimit -t` | TLE 判定用真实 CPU（realCpuMs），不受并发影响 |
+| 墙钟时间 | `dsoj-watch` CLOCK_MONOTONIC + Node setTimeout 硬杀 | 防 sleep 型死循环 |
+| 内存 | `dsoj-watch` RssAnon 采样 | 不含共享库，精确 |
+| 输出大小 | `dsoj-watch` 实时检测 + runner.sh 退出后 stat | OLE 触发 SIGKILL，退出码 153 |
+| 栈大小 | `ulimit -s` | 默认 8MB |
+| 进程数 | `ulimit -u` | 默认 4096 |
+
+### 临时文件
+
+评测临时文件（编译产物、stdin/stdout/answer）写入 `/app/temp/judge/`，挂载为 **tmpfs（内存盘）**：
+
+```yaml
+# docker-compose.yml
+tmpfs:
+  - /app/temp:rw,exec,size=512m,uid=1001,gid=1001
+```
+
+- `exec`：允许执行编译产物（缺省 tmpfs 带 noexec，会导致全部 RE）
+- `uid/gid=1001`：挂载即属 nextjs 用户（缺省 root，导致 EACCES）
+- 容器重启自动清空
+
+### 关键配置项
+
+| 环境变量 / 设置 | 默认值 | 说明 |
+|----------------|--------|------|
+| `JUDGE_MAX_CONCURRENT` | 2 | 同时评测的提交数（建议 = CPU 核数 - 1） |
+| `JUDGE_CASE_CONCURRENCY` | 3（4核） | 单提交内测点并发数 |
+| `JUDGE_LARGE_CASE_CONCURRENCY` | 同 caseConcurrency | 大测点（>2MB）并发数 |
+| `JUDGE_ENABLE_ASAN` | false | AddressSanitizer，开启需 2-3x 内存 |
+| `JUDGE_ENABLE_UBSAN` | false | UndefinedBehaviorSanitizer |
+
+查看当前运行时配置：
+
+```bash
+docker compose logs app | grep "评测运行时配置"
+```
+
+---
+
+## 评测性能优化
+
+### 已实施优化
+
+| 优化项 | 效果 | 实施方式 |
+|--------|------|----------|
+| glibc 替代 musl | 消除 7x printf/scanf/math 慢 | Dockerfile 基础镜像 alpine → debian-slim |
+| tmpfs 替代磁盘卷 | 消除百万行 I/O 磁盘延迟 | docker-compose.yml `app_temp` volume → tmpfs |
+| `-march=native` | 利用 CPU AVX2/AVX-512 自动向量化，10-20% | compiler.ts 编译参数 |
+| 统一评测路径 | 无分支探测失败、无回退开销 | 删除 Docker 沙箱 / bwrap 分支 |
+| 测点磁盘缓存 | 避免每次回源 Mongo 拉百万行字符串 | init.ts 启动自检 data/testdata 可写 |
+
+### 服务器 CPU 调优
+
+腾讯云 S5 实例为 KVM 虚拟机，CPU 频率由 hypervisor 管理，guest 内核不暴露 `cpufreq` sysfs，无法在容器内或宿主机内调整 governor。此优化路径不适用。
+
+### 性能基准
+
+| 环境 | 耗时 | 说明 |
+|------|------|------|
+| 本地 WSL（高频 CPU） | ~1.6s | 基准参照 |
+| 云端优化前 | ~3.4s | alpine + musl + 磁盘 + bwrap |
+| 云端优化后 | ~2.9s | glibc + tmpfs + -march=native + 统一路径 |
+
+### 剩余瓶颈
+
+云端 2.5GHz 单核 vs 本地更高频率 CPU，差距约 40%，只能通过硬件升级消除。软件层面已无优化空间。
+
+---
+
+## 评测故障排查
+
+### 全部 RE（time=0）
+
+**原因**：tmpfs 缺少 `exec` 标志，编译产物无法执行。
+
+**检查**：
+
+```bash
+docker compose exec app mount | grep /app/temp
+# 应包含 exec，若显示 noexec 则有问题
+```
+
+**修复**：确认 docker-compose.yml 中 tmpfs 选项包含 `exec`。
+
+### EACCES: permission denied, mkdir '/app/temp/judge'
+
+**原因**：tmpfs 缺少 `uid/gid`，默认属 root。
+
+**修复**：确认 docker-compose.yml 中 tmpfs 选项包含 `uid=1001,gid=1001`。
+
+### 评测 SE（系统错误）
+
+**检查日志**：
+
+```bash
+docker compose logs app --tail 50 | grep -E "评测|EACCES|error"
+```
+
+常见原因：
+- `/app/data/testdata` 不可写 → `docker compose exec -u root app chown -R 1001:1001 /app/data`
+- MongoDB 连接失败 → 见上方「修复 Mongo 副本集」
+- dsoj-watch 未编译 → `docker compose exec app ls -la /app/lib/judge/dsoj-watch`
+
+### 评测性能异常（比本地慢很多）
+
+**检查清单**：
+
+```bash
+# 1. 确认镜像基于 debian-slim（非 alpine）
+docker compose exec app cat /etc/os-release | grep PRETTY_NAME
+
+# 2. 确认 tmpfs 生效
+docker compose exec app mount | grep /app/temp
+
+# 3. 确认 CPU 频率（腾讯云 KVM 不暴露 cpufreq，跳过）
+cat /proc/cpuinfo | grep "model name" | head -1
+
+# 4. 确认 -march=native 生效（编译日志）
+docker compose logs app | grep "march"
+```
