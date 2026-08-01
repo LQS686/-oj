@@ -42,7 +42,7 @@ ulimit -n 1024 2>/dev/null
 # 若此处仍探测失败说明 seccomp/宿主内核未配置（见 init.ts 告警），本地无 bwrap 时回退纯 ulimit。
 USE_BWRAP=0
 if command -v bwrap >/dev/null 2>&1 && [[ "${DSOJ_USE_BWRAP:-1}" == "1" ]]; then
-  if bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all --die-with-parent --new-session true >/dev/null 2>&1; then
+  if bwrap --unshare-all --die-with-parent --new-session --ro-bind / / --dev /dev --proc /proc true >/dev/null 2>&1; then
     USE_BWRAP=1
   fi
 fi
