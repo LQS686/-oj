@@ -10,10 +10,10 @@ export const defaultJudgeSettings = {
   jobTimeout: 300,
   /** fail-fast：off | hard | all */
   failFast: 'off' as FailFastMode,
-  /** 跨提交并发 */
-  maxConcurrent: 1,
-  /** 同提交测点并行度；0 = 按 CPU 自动 */
-  caseConcurrency: 0,
+  /** 跨提交并发（4 核服务器默认 2：留 2 核给 Next.js 主进程与编译） */
+  maxConcurrent: 2,
+  /** 同提交测点并行度；0 = 按 CPU 自动（容器内会读到宿主机核数，易偏高） */
+  caseConcurrency: 2,
   /** 大 I/O 测点并行度 */
   largeCaseConcurrency: 2,
   /** 临界 TLE 重测次数 */
