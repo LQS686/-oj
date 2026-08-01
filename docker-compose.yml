@@ -46,15 +46,10 @@ services:
     networks:
       - oj-network
     volumes:
+      - app_temp:/app/temp
       - app_logs:/app/logs
       - app_uploads:/app/public/uploads
       - app_testdata:/app/data/testdata
-    # 评测临时目录用 tmpfs（内存盘）：
-    # - IO 密集题（百万行输出）读写走内存，消除 fsync/页缓存回写延迟
-    # - 容器重启自动清空，避免临时文件堆积
-    # - 占用容器内存（512m 上限），3 路并发评测临时文件通常 < 200MB
-    tmpfs:
-      - /app/temp:rw,size=512m,uid=1001,gid=1001
     logging:
       driver: "json-file"
       options:
@@ -156,6 +151,7 @@ volumes:
   mongo_data:
   mongo_config:
   redis_data:
+  app_temp:
   app_logs:
   app_uploads:
   app_testdata:
