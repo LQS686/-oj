@@ -12,8 +12,10 @@ export const defaultJudgeSettings = {
   failFast: 'off' as FailFastMode,
   /** 跨提交并发（4 核服务器默认 2：留 2 核给 Next.js 主进程与编译） */
   maxConcurrent: 2,
-  /** 同提交测点并行度；0 = 按 CPU 自动（容器内会读到宿主机核数，易偏高） */
-  caseConcurrency: 2,
+  /** 同提交测点并行度；0 = 按 CPU 自动（容器内会读到宿主机核数，易偏高）。
+   *  注意：这是评测实际总并行度（mapPool worker 数），大测点槽位在其内部再限流，
+   *  若 caseConcurrency < largeCaseConcurrency 则 large 槽位不生效。4 核推荐 3。 */
+  caseConcurrency: 3,
   /** 大 I/O 测点并行度（4 核服务器 3：百万行测点 input>2MB 全走此槽位，2 路会严重排队） */
   largeCaseConcurrency: 3,
   /** 临界 TLE 重测次数 */
