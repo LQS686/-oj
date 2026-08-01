@@ -46,9 +46,10 @@ services:
       - oj-network
     # tmpfs：评测临时文件（编译产物、stdin/stdout/answer）全部走内存，
     # 消除百万行 I/O 的磁盘延迟。512m 足够 3 并发测点（单测点峰值 ~100MB）。
-    # uid/gid=1001 确保挂载即属 nextjs 用户，无需 chown；容器重启自动清空。
+    # uid/gid=1001 确保挂载即属 nextjs 用户，无需 chown；exec 允许执行编译产物。
+    # 容器重启自动清空，无持久化需求。
     tmpfs:
-      - /app/temp:rw,size=512m,uid=1001,gid=1001
+      - /app/temp:rw,exec,size=512m,uid=1001,gid=1001
     volumes:
       - app_logs:/app/logs
       - app_uploads:/app/public/uploads
