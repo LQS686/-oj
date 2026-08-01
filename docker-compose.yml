@@ -44,8 +44,12 @@ services:
     pids_limit: 512
     networks:
       - oj-network
+    # tmpfs：评测临时文件（编译产物、stdin/stdout/answer）全部走内存，
+    # 消除百万行 I/O 的磁盘延迟。512m 足够 3 并发测点（单测点峰值 ~100MB）。
+    # 容器重启自动清空，无持久化需求。
+    tmpfs:
+      - /app/temp:rw,size=512m
     volumes:
-      - app_temp:/app/temp
       - app_logs:/app/logs
       - app_uploads:/app/public/uploads
       - app_testdata:/app/data/testdata
@@ -150,7 +154,6 @@ volumes:
   mongo_data:
   mongo_config:
   redis_data:
-  app_temp:
   app_logs:
   app_uploads:
   app_testdata:
