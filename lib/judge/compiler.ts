@@ -169,10 +169,8 @@ function buildCompileArgs(
 ): string[] {
   const args = [
     '-O2',
-    // -march=native：让 gcc 利用宿主 CPU 的 AVX2/AVX-512 指令集自动向量化，
-    // 对循环/数组密集型代码提升 10-20%。容器内编译时 gcc 读取 /proc/cpuinfo，
-    // 能正确检测宿主 CPU 特性。所有评测在同一台服务器，无可移植性问题。
-    '-march=native',
+    // 不使用 -march=native：Intel Xeon 启用 AVX-512 后会触发降频保护，
+    // 反而比 SSE2 慢 20%+。保持默认 -march（x86-64 SSE2）最稳定。
     `-std=${std}`,
     '-w',
     '-fmax-errors=3',
