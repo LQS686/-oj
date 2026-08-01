@@ -419,6 +419,10 @@ export async function executeJudge(
 ): Promise<JudgeResult> {
   const startTime = Date.now()
   const jobSignal = options?.signal
+  /** 编译结束时间点（编译 + SPJ 编译之后、测点执行之前），用于拆分评测耗时 */
+  let compileEndMs = startTime
+  /** 测点执行开始时间点（首个测点落盘前），用于拆分评测耗时 */
+  let casesStartMs = startTime
 
   const cfgConcurrency = resolveCaseConcurrency()
   const cfgLargeConcurrency = resolveLargeCaseConcurrency()
@@ -532,6 +536,10 @@ export async function executeJudge(
     }
 
     logger.debug(`编译成功`)
+
+    // 编译（含 SPJ）结束，记录时间点；后续为测点执行阶段
+    compileEndMs = Date.now()
+    casesStartMs = compileEndMs
 
     // 第三步: 统一并发队列；落盘后若体积大则再受「大测点槽位」限制（规则对所有题相同，无预热）
     const compiledPath = compileResult.compiledPath!
@@ -697,10 +705,13 @@ export async function executeJudge(
             } else if (verdict.status === 'AC') {
               logger.debug(`通过`, { time: verdict.time, memory: verdict.memory, testId: testCase.id })
             } else {
-              logger.debug(`测试失败`, {
+              // 非 AC 测点打 info（含 message），便于在服务端日志直接定位 TLE/MLE/RE 成因
+              logger.info(`测试失败`, {
                 status: verdict.status,
                 message: verdict.message,
                 testId: testCase.id,
+                time: verdict.time,
+                memory: verdict.memory,
               })
               if (
                 !verdict.skipped &&
@@ -846,7 +857,11 @@ export async function executeJudge(
 
   const endTime = Date.now()
   logger.info(`评测耗时`, {
+    submissionId: job.submissionId,
     duration: endTime - startTime,
+    // 拆分耗时构成：编译（含 SPJ）+ 测点执行（含落盘/运行/比对），便于定位大测点慢在哪一段
+    compileMs: compileEndMs - startTime,
+    casesMs: endTime - casesStartMs,
     caseConcurrency: cfgConcurrency,
     largeCaseConcurrency: cfgLargeConcurrency,
     failFast: failFastMode,

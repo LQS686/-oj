@@ -14,8 +14,8 @@ export const defaultJudgeSettings = {
   maxConcurrent: 2,
   /** 同提交测点并行度；0 = 按 CPU 自动（容器内会读到宿主机核数，易偏高） */
   caseConcurrency: 2,
-  /** 大 I/O 测点并行度 */
-  largeCaseConcurrency: 2,
+  /** 大 I/O 测点并行度（4 核服务器 3：百万行测点 input>2MB 全走此槽位，2 路会严重排队） */
+  largeCaseConcurrency: 3,
   /** 临界 TLE 重测次数 */
   rejudgeTimes: 1,
   /** 超时容差比例 */

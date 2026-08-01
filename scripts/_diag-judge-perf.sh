@@ -4,11 +4,28 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-APP_CID="$(docker compose ps -q app 2>/dev/null | head -1 || true)"
+# 兼容 docker compose 插件 与 docker-compose 独立程序（宝塔/OpenCloudOS 常见后者）
+if docker compose version &>/dev/null; then
+  DC="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DC="docker-compose"
+else
+  echo "错误：未找到 docker compose / docker-compose"; exit 1
+fi
+echo "使用 compose 命令: $DC"
+
+APP_CID="$($DC ps -q app 2>/dev/null | head -1 || true)"
+
+echo "================ 0. 容器运行状态 ================"
+$DC ps -a 2>/dev/null || docker ps -a 2>/dev/null | head -10
+if [[ -z "$APP_CID" ]]; then
+  echo ""
+  echo "!! app 容器未运行，以下项目无法探测。请先执行：$DC up -d"
+fi
 
 echo "================ 1. 测点磁盘缓存是否生效 ================"
 if [[ -n "$APP_CID" ]]; then
-  docker compose exec -T app sh -c '
+  $DC exec -T app sh -c '
     echo "缓存测点目录数: $(ls /app/data/testdata 2>/dev/null | wc -l)"
     echo "缓存 input.txt 文件数: $(find /app/data/testdata -name input.txt 2>/dev/null | wc -l)"
     echo "--- 缓存目录内容（前 5 个）---"
@@ -18,13 +35,13 @@ if [[ -n "$APP_CID" ]]; then
   ' 2>/dev/null
   echo "（缓存目录数=0 → 缓存从未写入，仍每次回源 Mongo，这是最大嫌疑）"
 else
-  echo "app 容器未运行，跳过"
+  echo "app 未运行，跳过"
 fi
 
 echo ""
 echo "================ 2. 磁盘写吞吐（评测临时目录 /app/temp）================"
 if [[ -n "$APP_CID" ]]; then
-  docker compose exec -T -u root app sh -c '
+  $DC exec -T -u root app sh -c '
     dd if=/dev/zero of=/app/temp/.dtest bs=1M count=200 2>&1 | tail -1
     rm -f /app/temp/.dtest
   ' 2>/dev/null || echo "dd 失败"
@@ -34,7 +51,7 @@ fi
 echo ""
 echo "================ 3. 磁盘读吞吐（缓存目录 /app/data）================"
 if [[ -n "$APP_CID" ]]; then
-  docker compose exec -T -u root app sh -c '
+  $DC exec -T -u root app sh -c '
     F=$(find /app/data/testdata -name input.txt 2>/dev/null | head -1)
     if [[ -n "$F" ]]; then
       dd if="$F" of=/dev/null bs=1M 2>&1 | tail -1
@@ -50,12 +67,12 @@ fi
 echo ""
 echo "================ 4. CPU 信息（容器视角）================"
 if [[ -n "$APP_CID" ]]; then
-  docker compose exec -T app sh -c '
+  $DC exec -T app sh -c '
     echo "可用核数: $(nproc)"
     grep -m1 "model name" /proc/cpuinfo
     grep -m1 "cpu MHz" /proc/cpuinfo
   ' 2>/dev/null || echo "无法读取"
-  echo "--- 宿主 CPU（共享核/降频嫌疑）---"
+  echo "--- 容器资源限制 ---"
   docker inspect "$APP_CID" -f 'NanoCpus(纳核,1e9=1核): {{.HostConfig.NanoCpus}}  Mem: {{.HostConfig.Memory}}' 2>/dev/null || true
 fi
 
@@ -66,13 +83,13 @@ free -h
 echo ""
 echo "================ 6. 最近一次评测耗时（区分 CPU 时间 vs 总耗时）================"
 if [[ -n "$APP_CID" ]]; then
-  docker compose logs app --tail=500 2>/dev/null | grep -E '评测耗时|duration|测试执行错误' | tail -5 || true
+  $DC logs app --tail=500 2>/dev/null | grep -E '评测耗时|duration|测试执行错误' | tail -5 || true
 fi
 
 echo ""
 echo "================ 7. 启动横幅（确认 debian-slim/glibc 生效）================"
 if [[ -n "$APP_CID" ]]; then
-  docker compose logs app 2>/dev/null | grep -m1 'libc=' || true
+  $DC logs app 2>/dev/null | grep -m1 'libc=' || true
 fi
 
 echo ""
