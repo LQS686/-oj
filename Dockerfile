@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1.4
-# 启用 BuildKit 缓存：apk / npm / next build 三处慢操作使用 --mount=type=cache，
+# 启用 BuildKit 缓存：apt / npm / next build 三处慢操作使用 --mount=type=cache，
 # 即使 docker compose build --no-cache 也能复用 host 上的包缓存，大幅缩短构建时间。
 
 # 构建阶段 - 固定次要版本，避免 floating tag 漂移
-# 可通过 ARG 覆盖并固定 digest，例如：
-#   --build-arg NODE_IMAGE=node:20.20-alpine3.22@sha256:<digest>
-ARG NODE_IMAGE=node:20.20-alpine3.22
+# 使用 debian-slim（glibc）而非 alpine（musl）：
+# musl 的 printf/scanf/math 比 glibc 慢 5-8 倍，导致评测耗时严重放大。
+# 实测同一份代码：glibc 0.15s vs musl 1.17s（7.6x 慢）。
+ARG NODE_IMAGE=node:20.20-slim
 FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
@@ -23,10 +24,13 @@ ENV DATABASE_URL=${DATABASE_URL}
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
 
-# 使用清华 TUNA 镜像源（比 aliyun 更稳定，gcc/g++ 等大包下载不易卡住）
-# BuildKit 缓存 /var/cache/apk，下次 build 时直接复用已下载的 .apk 包
-RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
-    sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
+# 使用阿里云 debian 镜像源（比默认 deb.debian.org 快）
+# BuildKit 缓存 /var/cache/apt，下次 build 时直接复用已下载的 .deb 包
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    || sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list \
+    || true
 
 # 安装依赖（使用淘宝镜像）
 # BuildKit 缓存 /root/.npm，下次 build 时复用已下载的 npm 包
@@ -48,27 +52,33 @@ RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 
 # 生产阶段
-ARG NODE_IMAGE=node:20.20-alpine3.22
+ARG NODE_IMAGE=node:20.20-slim
 FROM ${NODE_IMAGE} AS runner
 
 WORKDIR /app
 
-# 使用清华 TUNA 镜像源 + BuildKit 缓存
-# 注意：apk add 是构建中最慢的步骤（gcc/g++ 等大包 ~100MB+），缓存后下次 build 秒级完成
-# 注意：Alpine/musl 不提供 libasan / libubsan（glibc 专用）。评测默认关闭 ASan/UBSan
-# （JUDGE_ENABLE_ASAN / JUDGE_ENABLE_UBSAN，见 lib/judge/compiler.ts）；勿再 apk add 这两个包。
-RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
-    sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-    apk add --no-cache \
+# 使用阿里云 debian 镜像源 + BuildKit 缓存
+# 注意：apt install 是构建中最慢的步骤（g++ 等大包 ~200MB+），缓存后下次 build 秒级完成
+# debian-slim 自带 glibc，选手代码在 glibc 下编译运行，与本地开发环境一致
+# glibc 版的 libasan / libubsan 可用（apt install libasan8 libubsan1），但默认仍关闭以节省空间
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    || sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list \
+    || true; \
+    apt-get update && apt-get install -y --no-install-recommends \
     bash \
     coreutils \
     python3 \
     make \
     g++ \
     gcc \
-    musl-dev \
+    libasan8 \
+    libubsan1 \
     wget \
-    curl
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # 设置环境变量
 ENV NODE_ENV=production
@@ -78,8 +88,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV USE_DOCKER=false
 
 # 创建非root用户
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --home-dir /app --shell /bin/bash nextjs
 
 # 复制 standalone 产物（Next.js 构建输出 + 追踪到的依赖）
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
