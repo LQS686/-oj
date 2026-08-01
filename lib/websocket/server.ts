@@ -13,10 +13,37 @@ import { logger } from '@/lib/logger'
 import { resolveClientIp } from '@/lib/http/client-ip'
 import { readAuthTokenFromCookieHeader } from '@/lib/auth/cookie'
 
-let io: SocketIOServer | null = null
-// 定时器引用：优雅关闭时 clearInterval，避免资源泄漏
-let rateLimitCleanupTimer: ReturnType<typeof setInterval> | null = null
-let staleConnectionCleanupTimer: ReturnType<typeof setInterval> | null = null
+/**
+ * WebSocket 实例必须通过 globalThis 共享，避免 Next.js standalone 模式下
+ * server.ts（相对路径 import）与 API route（@/ 别名 import）加载成
+ * 两个独立模块实例，导致 API route 持有的 io 永远为 null。
+ */
+type WSGlobal = typeof globalThis & {
+  __wsIo?: SocketIOServer | null
+  __wsRateLimitTimer?: ReturnType<typeof setInterval> | null
+  __wsStaleConnTimer?: ReturnType<typeof setInterval> | null
+}
+
+const _g = globalThis as WSGlobal
+
+function getIo(): SocketIOServer | null {
+  return _g.__wsIo ?? null
+}
+function setIo(value: SocketIOServer | null): void {
+  _g.__wsIo = value
+}
+function getRateLimitTimer(): ReturnType<typeof setInterval> | null {
+  return _g.__wsRateLimitTimer ?? null
+}
+function setRateLimitTimer(value: ReturnType<typeof setInterval> | null): void {
+  _g.__wsRateLimitTimer = value
+}
+function getStaleConnTimer(): ReturnType<typeof setInterval> | null {
+  return _g.__wsStaleConnTimer ?? null
+}
+function setStaleConnTimer(value: ReturnType<typeof setInterval> | null): void {
+  _g.__wsStaleConnTimer = value
+}
 
 const MAX_MESSAGE_SIZE = 1 * 1024 * 1024
 const RATE_LIMIT_WINDOW = 60 * 1000
@@ -51,7 +78,7 @@ function cleanupRateLimit(): void {
   }
 }
 
-rateLimitCleanupTimer = setInterval(cleanupRateLimit, 60 * 1000)
+setRateLimitTimer(setInterval(cleanupRateLimit, 60 * 1000))
 
 async function authenticateSocket(socket: Socket): Promise<JWTPayload | null> {
   try {
@@ -112,14 +139,14 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
  * 初始化 WebSocket 服务器
  */
 export function initWebSocketServer(httpServer: HTTPServer) {
-  if (io) {
+  if (getIo()) {
     logger.info('⚠️  WebSocket 服务器已存在')
-    return io
+    return getIo()!
   }
 
   logger.info('🔧 正在初始化 WebSocket 服务器...')
-  
-  io = new SocketIOServer(httpServer, {
+
+  const ioInstance = new SocketIOServer(httpServer, {
     cors: {
       // P2 安全修复：开发环境不再使用通配 '*'，仅允许本地 Next.js 默认端口访问
       origin: process.env.NODE_ENV === 'production'
@@ -150,7 +177,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     watchedSubmissionId: string | null
   }>()
 
-  io.on('connection', async (socket) => {
+  ioInstance.on('connection', async (socket) => {
     const clientIP = getClientIP(socket)
     
     const rateCheck = checkRateLimit(clientIP)
@@ -427,25 +454,26 @@ export function initWebSocketServer(httpServer: HTTPServer) {
   })
 
   // 仅清理长时间无心跳的僵尸连接（Engine.IO ping 已覆盖正常超时；此处兜底）
-  staleConnectionCleanupTimer = setInterval(() => {
+  setStaleConnTimer(setInterval(() => {
     const now = Date.now()
     const idleThreshold = 5 * 60 * 1000
 
     for (const [socketId, clientInfo] of connectedClients.entries()) {
       if (now - clientInfo.lastSeenAt > idleThreshold) {
         logger.warn(`⚠️  清理空闲连接: ${socketId}`)
-        const targetSocket = io?.sockets.sockets.get(socketId)
+        const targetSocket = getIo()?.sockets.sockets.get(socketId)
         if (targetSocket) {
           targetSocket.disconnect(true)
         }
         connectedClients.delete(socketId)
       }
     }
-  }, 60 * 1000)
+  }, 60 * 1000))
 
+  setIo(ioInstance)
   logger.info('WebSocket 服务器已启动')
-  logger.info(`WebSocket 实例状态: ${io ? '已初始化' : '未初始化'}`)
-  return io
+  logger.info(`WebSocket 实例状态: ${getIo() ? '已初始化' : '未初始化'}`)
+  return ioInstance
 }
 
 /**
@@ -453,21 +481,24 @@ export function initWebSocketServer(httpServer: HTTPServer) {
  * 供 server.ts 优雅关闭时调用：clearInterval 两个定时器 + io.close()
  */
 export function closeWebSocket(): void {
-  if (rateLimitCleanupTimer) {
-    clearInterval(rateLimitCleanupTimer)
-    rateLimitCleanupTimer = null
+  const rateTimer = getRateLimitTimer()
+  if (rateTimer) {
+    clearInterval(rateTimer)
+    setRateLimitTimer(null)
   }
-  if (staleConnectionCleanupTimer) {
-    clearInterval(staleConnectionCleanupTimer)
-    staleConnectionCleanupTimer = null
+  const staleTimer = getStaleConnTimer()
+  if (staleTimer) {
+    clearInterval(staleTimer)
+    setStaleConnTimer(null)
   }
-  if (io) {
+  const ioInstance = getIo()
+  if (ioInstance) {
     try {
-      io.close()
+      ioInstance.close()
     } catch (e) {
       logger.error('关闭 WebSocket 服务器失败', e)
     }
-    io = null
+    setIo(null)
   }
 }
 
@@ -475,11 +506,12 @@ export function closeWebSocket(): void {
  * 获取 WebSocket 服务器实例
  */
 export function getIO(): SocketIOServer | null {
-  if (!io) {
+  const ioInstance = getIo()
+  if (!ioInstance) {
     logger.warn('⚠️  WebSocket 服务器尚未初始化')
     return null
   }
-  return io
+  return ioInstance
 }
 
 /**
