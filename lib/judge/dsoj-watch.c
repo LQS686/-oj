@@ -155,6 +155,8 @@ int main(int argc, char **argv) {
   long long t0 = now_ns();
 
   for (;;) {
+    long elapsed_ms = (long)((now_ns() - t0) / 1000000LL);
+
     long m = read_mem_kb(pid);
     if (m > peak_mem) peak_mem = m;
 
@@ -168,7 +170,6 @@ int main(int argc, char **argv) {
       }
     }
     if (wall_limit_ms > 0) {
-      long elapsed_ms = (long)((now_ns() - t0) / 1000000LL);
       if (elapsed_ms > wall_limit_ms) {
         tle_hit = 1;
         kill(pid, SIGKILL);
@@ -192,7 +193,13 @@ int main(int argc, char **argv) {
       break;
     }
 
-    struct timespec ts = { .tv_sec = 0, .tv_nsec = 100000L }; /* 100µs */
+    /* 自适应采样间隔（D+G 优化）：
+     * - 前 300ms 用 100µs 密采样：捕获短程序内存峰值与 OLE
+     * - 300ms 后降为 1ms：长测点减少 /proc 读取与 lseek 系统调用挤占选手 CPU
+     *   3 路并发时系统调用 10.8 万/s → 1.08 万/s，降低 cache 抖动
+     *   内存变化在 ms 级，1ms 采样精度足够；最终 CPU 用 wait4 不受影响 */
+    long interval_ns = elapsed_ms < 300 ? 100000L : 1000000L; /* 100µs / 1ms */
+    struct timespec ts = { .tv_sec = 0, .tv_nsec = interval_ns };
     nanosleep(&ts, NULL);
   }
 
