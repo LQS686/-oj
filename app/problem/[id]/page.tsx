@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use, useMemo, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'motion/react'
 import {
   AlertCircle,
   Wifi,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion } from 'motion/react'
 import { Mail, Lock, Shield, Eye, EyeOff, ChevronDown } from 'lucide-react'
 import type { EmailChangeState, SettingsFormData, SettingsUser, ShowPasswordsState } from '../_types'
 

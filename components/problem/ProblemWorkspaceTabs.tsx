@@ -11,7 +11,7 @@ import {
   ListChecks,
   MessageSquare,
 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion } from 'motion/react'
 
 /** 做题工作区桌面 Tab（不含移动端专属 code） */
 export type WorkspaceDesktopTab = 'description' | 'solutions' | 'submissions' | 'stats'
@@ -123,7 +123,7 @@ export function ProblemWorkspaceDesktopTabs({
   tabs: WorkspaceDesktopTab[]
   activeTab: WorkspaceTab
   onChange: (tab: WorkspaceDesktopTab) => void
-  /** framer-motion layoutId，各入口需唯一以免动画串扰 */
+  /** motion layoutId，各入口需唯一以免动画串扰 */
   layoutId: string
   leading?: ReactNode
   dense?: boolean

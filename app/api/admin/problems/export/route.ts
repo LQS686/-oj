@@ -27,8 +27,7 @@ import {
   type DsojArchiveFormat,
 } from '@/lib/problem/export/dsoj-exporter'
 import { prisma } from '@/lib/prisma'
-import { PassThrough } from 'node:stream'
-import { Readable } from 'node:stream'
+import { Readable, type PassThrough } from 'node:stream'
 import { logger } from '@/lib/logger'
 
 /** 单次题包导出上限（流式后可放开，仍设上限避免极端值拖垮服务器） */
@@ -73,7 +72,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
 
     // 创建归档写入器
     //   - ZipArchiveWriter：archiver + zlib level=1
-    //   - TarXzArchiveWriter：tar-stream + lzma-native preset=1
+    //   - TarXzArchiveWriter：tar-stream + 系统 xz 命令 preset=1
     // 两者均通过 DsojArchiveWriter 接口统一，输出 PassThrough 作为 Response body
     const writer = createDsojArchiveWriter(archiveFormat)
     const passthrough: PassThrough = writer.output

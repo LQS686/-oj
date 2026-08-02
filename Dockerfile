@@ -33,20 +33,23 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     || sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list \
     || true; \
     apt-get update && apt-get install -y --no-install-recommends \
-    liblzma-dev \
     python3 \
     make \
     g++ \
     && rm -rf /var/lib/apt/lists/*
-# liblzma-dev：node-gyp 编译 lzma-native（题包 tar.xz 压缩支持）需要 LZMA 头文件
-# python3 / make / g++：node-gyp 通用编译工具链
+# python3 / make / g++：node-gyp 通用编译工具链（sharp 等纯 JS native addon 仍可能需要）
+# 不再需要 liblzma-dev：题包 tar.xz 压缩/解压改用系统 xz 命令（见 runner 阶段 xz-utils）
 
 # 安装依赖（使用淘宝镜像）
 # BuildKit 缓存 /root/.npm，下次 build 时复用已下载的 npm 包
 COPY package*.json ./
 # 使用 npm ci 保证与 package-lock.json 完全一致（可复现构建）
+# --ignore-scripts：跳过 postinstall（prisma generate 在下方单独执行）
 RUN --mount=type=cache,target=/root/.npm \
     npm config set registry https://registry.npmmirror.com && npm ci --ignore-scripts
+
+# 注：不再需要编译 lzma-native 原生绑定。
+# 题包 tar.xz 压缩/解压改用系统 xz 命令（runner 阶段安装 xz-utils），无 native 编译开销。
 
 # 复制Prisma schema并生成客户端
 COPY prisma ./prisma/
@@ -84,12 +87,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     gcc \
     libasan8 \
     libubsan1 \
-    liblzma5 \
+    xz-utils \
     wget \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-# liblzma5：lzma-native 运行期 native binding 加载依赖
+# xz-utils：题包 tar.xz 压缩/解压（spawn('xz') 调用，替代 lzma-native native binding）
 # libasan8 / libubsan1：可选 ASan/UBSan 评测用，默认关闭
 
 # 设置环境变量
@@ -137,6 +140,9 @@ RUN --mount=type=cache,target=/root/.npm \
 # .prisma 是 prisma generate 产物，standalone / npm ci 都不会保留，必须在 npm ci 之后回拷
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
+# 注：不再需要 COPY lzma-native 编译产物。
+# 题包 tar.xz 压缩/解压改用系统 xz 命令（xz-utils 已在 runner 阶段安装）。
 
 # 创建必要的目录并设置权限
 # 不再将 nextjs 加入 root 组（避免提权）。内存/CPU 硬限依赖 dsoj-watch + ulimit 软限制；

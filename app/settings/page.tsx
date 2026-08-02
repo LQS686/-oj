@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'motion/react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import type {

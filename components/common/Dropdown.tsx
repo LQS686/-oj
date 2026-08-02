@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, type ReactNode } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'motion/react'
 import { useClickOutside } from '@/hooks/useClickOutside'
 
 interface DropdownProps {

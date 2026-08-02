@@ -2,8 +2,28 @@
 
 import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
+
+// 按需注册 Prism 语言包，避免加载全部 ~280 种语言（包体积从 2.19MB 降至 ~200KB）
+// 项目实际只展示 OJ 相关的 8 种语言；text/plaintext 不注册，PrismLight 自动降级为纯文本
+import cpp from 'react-syntax-highlighter/dist/esm/languages/prism/cpp'
+import c from 'react-syntax-highlighter/dist/esm/languages/prism/c'
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python'
+import java from 'react-syntax-highlighter/dist/esm/languages/prism/java'
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript'
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript'
+import go from 'react-syntax-highlighter/dist/esm/languages/prism/go'
+import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust'
+
+SyntaxHighlighter.registerLanguage('cpp', cpp)
+SyntaxHighlighter.registerLanguage('c', c)
+SyntaxHighlighter.registerLanguage('python', python)
+SyntaxHighlighter.registerLanguage('java', java)
+SyntaxHighlighter.registerLanguage('javascript', javascript)
+SyntaxHighlighter.registerLanguage('typescript', typescript)
+SyntaxHighlighter.registerLanguage('go', go)
+SyntaxHighlighter.registerLanguage('rust', rust)
 
 const LANGUAGE_LABELS: Record<string, string> = {
   cpp: 'C++',

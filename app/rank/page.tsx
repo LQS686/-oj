@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'motion/react'
 import { Trophy, TrendingUp, Minus, RefreshCw, AlertCircle, ChevronUp, Crown, Medal, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import io from 'socket.io-client'

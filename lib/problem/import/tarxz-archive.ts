@@ -5,10 +5,10 @@
  * 将 tar.xz buffer 解压为内存中的文件列表，包装为 ArchiveLike 接口，
  * 复用 dsoj-parser 的 parseDsojArchive 主体逻辑，无需为 tar.xz 重复实现解析。
  *
- * 链路：Buffer → lzma Decompressor → tar Extract → InMemoryArchiveEntry[]
+ * 链路：Buffer → spawn('xz -d') stdin → stdout → tar Extract → InMemoryArchiveEntry[]
  *
  * 依赖：
- *   - lzma-native（native binding，运行时需 liblzma5，编译时需 liblzma-dev）
+ *   - 系统 xz 命令（debian-slim 自带 xz-utils；避免 lzma-native native 编译开销）
  *   - tar-stream v3（entry 回调风格：header, stream, next）
  *
  * 内存模型：
@@ -16,9 +16,9 @@
  *   - 与 AdmZip 一致：getData() 可重复调用且无解码开销（直接返回持有的 Buffer）
  */
 import { Readable } from 'node:stream'
+import { spawn } from 'node:child_process'
 import { extract as tarExtract } from 'tar-stream'
 import type { Headers as TarHeaders } from 'tar-stream'
-import { createDecompressor } from 'lzma-native'
 import { ApiError } from '@/lib/api/errors'
 import type { ArchiveEntry, ArchiveLike } from './dsoj-parser'
 
@@ -131,7 +131,7 @@ export async function parseTarXzBuffer(buffer: Buffer): Promise<ArchiveLike> {
     throw new ApiError('INVALID_DSOJ_TARXZ', 'DSOJ tar.xz 题包内容为空', 400)
   }
 
-  // 魔数校验：防止误传非 xz 文件给 lzma native 解码器，避免 native 崩溃或乱报错
+  // 魔数校验：防止误传非 xz 文件给 xz 进程，避免解码失败抛出含糊错误
   if (buffer.length < XZ_MAGIC.length || !buffer.subarray(0, XZ_MAGIC.length).equals(XZ_MAGIC)) {
     throw new ApiError('INVALID_DSOJ_TARXZ', '不是有效的 tar.xz 文件（缺少 XZ 魔数）', 400)
   }
@@ -139,7 +139,11 @@ export async function parseTarXzBuffer(buffer: Buffer): Promise<ArchiveLike> {
   const entries: ArchiveEntry[] = []
 
   await new Promise<void>((resolve, reject) => {
-    const lzma = createDecompressor()
+    // xz -d: 解压到 stdout；-c: 写入 stdout（与 dsoj-exporter 的 -c 对称）
+    // 注意：xz 单独 -d 默认就地解压到文件，必须显式 -c 输出到 stdout
+    const xz = spawn('xz', ['-d', '-c'], {
+      stdio: ['pipe', 'pipe', 'inherit'],
+    })
     const tar = tarExtract()
 
     let settled = false
@@ -149,7 +153,11 @@ export async function parseTarXzBuffer(buffer: Buffer): Promise<ArchiveLike> {
       // 用 destroy 而非 removeAllListeners：destroy 让流安全关闭，
       // 避免 pipe 链中残留 error 事件因无 listener 而抛 uncaught exception；
       // destroy 不传参时只触发 'close'，不触发 'error'，也不会让 tar 卡在等 next()
-      lzma.destroy()
+      try {
+        xz.kill('SIGKILL')
+      } catch {
+        // ignore kill errors on already-exited process
+      }
       tar.destroy()
       reject(err)
     }
@@ -178,11 +186,37 @@ export async function parseTarXzBuffer(buffer: Buffer): Promise<ArchiveLike> {
       })
     })
 
-    tar.on('finish', done)
-    tar.on('error', fail)
-    lzma.on('error', fail)
+    // 完成条件：tar 流结束 AND xz 进程退出码 0
+    // 不能只看 tar 'finish' 就 resolve：xz 可能还没退出，若随后异常退出，
+    // fail() 会因 settled=true 被吞，导致静默产出不完整数据。
+    // 也不能只看 xz 'close' 就 resolve：tar 可能还在异步处理最后几个 entry。
+    let tarFinished = false
+    let xzExitCode: number | null | undefined = undefined
+    const tryComplete = (): void => {
+      if (tarFinished && xzExitCode !== undefined) {
+        if (xzExitCode === 0) done()
+        else fail(new Error(`xz 解压进程异常退出，exit code: ${xzExitCode}`))
+      }
+    }
 
-    Readable.from([buffer]).pipe(lzma).pipe(tar)
+    tar.on('finish', () => {
+      tarFinished = true
+      tryComplete()
+    })
+    tar.on('error', fail)
+    xz.on('error', fail)
+    // xz 进程退出：exit code 0 = 成功，非 0 = 解码失败（数据损坏、非 xz 内容等）
+    xz.on('close', (code: number | null) => {
+      xzExitCode = code
+      tryComplete()
+    })
+
+    // 输入：buffer → xz stdin；输出：xz stdout → tar
+    // xz.stdin 在数据写完后 end，触发 xz 处理并输出到 stdout
+    xz.stdin.on('error', fail)
+    xz.stdout!.on('error', fail)
+    xz.stdout!.pipe(tar)
+    Readable.from([buffer]).pipe(xz.stdin)
   })
 
   return new InMemoryArchive(entries)

@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion } from 'motion/react'
 import { Bell, Code2, SlidersHorizontal } from 'lucide-react'
 import type { NotificationPreferences, Preferences } from '../_types'
 import { CODE_LANGUAGE_OPTIONS, NOTIFICATION_ITEMS } from '../_utils'

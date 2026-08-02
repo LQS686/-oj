@@ -57,7 +57,7 @@ export {
   type ArchiveLike,
 } from './dsoj-parser'
 
-// DSOJ tar.xz 题包解压适配器（lzma-native + tar-stream）
+// DSOJ tar.xz 题包解压适配器（系统 xz 命令 + tar-stream）
 //   - detectArchiveFormat：按魔数分派 zip / tar.xz
 //   - parseTarXzBuffer：解压 tar.xz 为 InMemoryArchive，复用 parseDsojArchive 解析
 export {

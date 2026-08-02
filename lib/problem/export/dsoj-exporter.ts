@@ -7,7 +7,7 @@
  *
  * 支持两种归档格式：
  *   - zip（默认）：archiver + zlib level=1，速度快
- *   - tar.xz：tar-stream + lzma-native，体积比 zip 再降 20-35%，但压缩慢 5-10 倍
+ *   - tar.xz：tar-stream + 系统 xz 命令，体积比 zip 再降 20-35%，但压缩慢 5-10 倍
  *
  * 导出包结构：
  *   dsoj-pack.{zip|tar.xz}
@@ -34,7 +34,7 @@ import { ZipArchive } from 'archiver'
 import type { Archiver } from 'archiver'
 import { pack as tarPack } from 'tar-stream'
 import type { Pack as TarPack, Headers as TarHeaders } from 'tar-stream'
-import { createCompressor as createLzmaCompressor } from 'lzma-native'
+import { spawn } from 'node:child_process'
 import { PassThrough } from 'node:stream'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
@@ -151,33 +151,36 @@ export class ZipArchiveWriter implements DsojArchiveWriter {
 }
 
 /**
- * tar.xz 写入器：tar-stream.Pack → lzma-native.createCompressor → PassThrough
+ * tar.xz 写入器：tar-stream.Pack → spawn('xz -c') → PassThrough
  *
- * LZMA preset=1 速度优先（xz 默认 preset=6 慢 5-10 倍）
- * 题包测试点多为文本，preset=1 已能取得 20-35% 体积收益
+ * 用系统 xz 命令而非 lzma-native npm 包：
+ *   - 无需 native 编译，Docker / CI / 本地零编译开销
+ *   - xz 是 C 实现，性能优于 JS 绑定
+ *   - -T0 自动多线程压缩，充分利用多核
+ *   - -1 速度优先（preset 1），题包文本数据已能取得 20-35% 体积收益
  *
  * 链路：
  *   tarPack.entry(header, buffer, cb)  # 写 tar entry
- *   → tarPack (Readable) → lzma Compressor (Transform) → PassThrough (Readable)
+ *   → tarPack (Readable) → xz stdin → xz stdout → PassThrough (Readable)
  *
  * 调用方拿到 this.output 直接转 Web ReadableStream 作为 Response body
  */
 export class TarXzArchiveWriter implements DsojArchiveWriter {
   private readonly tar: TarPack
-  readonly lzma: ReturnType<typeof createLzmaCompressor>
+  private readonly xz: ReturnType<typeof spawn>
   readonly output: PassThrough
 
   constructor(preset: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 = 1) {
     this.tar = tarPack()
-    this.lzma = createLzmaCompressor({
-      preset,
-      // CRC64 是 xz 默认校验，CRC32 兼容性更广但校验强度弱
-      check: 'CHECK_CRC64',
-      // 多线程编码（如有可用核心）减少压缩耗时
-      threads: 0,
+    // xz -c: 压缩到 stdout；-T0: 多线程；-<preset>: 压缩等级
+    this.xz = spawn('xz', ['-c', '-T0', `-${preset}`], {
+      stdio: ['pipe', 'pipe', 'inherit'],
     })
     this.output = new PassThrough()
-    this.tar.pipe(this.lzma).pipe(this.output)
+    // stdio: ['pipe', 'pipe', 'inherit'] 已显式声明 stdin/stdout 为 pipe，
+    // 类型上仍为 Writable | null / Readable | null，这里用 ! 断言非空
+    this.tar.pipe(this.xz.stdin!)
+    this.xz.stdout!.pipe(this.output)
   }
 
   async append(content: Buffer, name: string): Promise<void> {
@@ -198,12 +201,14 @@ export class TarXzArchiveWriter implements DsojArchiveWriter {
 
   async finalize(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      // tar-stream 的 finalize 是同步的，但压缩链需要 drain
       this.output.on('error', reject)
       this.tar.on('error', reject)
-      this.lzma.on('error', reject)
-      // lzma 流 end 后表示压缩完成
-      this.lzma.on('end', () => resolve())
+      this.xz.on('error', reject)
+      // xz 进程退出后表示压缩完成（exit code 0 = 成功）
+      this.xz.on('close', (code: number) => {
+        if (code === 0) resolve()
+        else reject(new Error(`xz 进程异常退出，exit code: ${code}`))
+      })
       this.tar.finalize()
     })
   }
