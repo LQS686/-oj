@@ -368,7 +368,7 @@ export async function updateUserSolution(
 ) {
   const solution = await prisma.solution.findUnique({
     where: { id },
-    select: { id: true, authorId: true },
+    select: { id: true, authorId: true, status: true },
   })
   if (!solution) {
     throw AppError.notFound('题解不存在')
@@ -377,7 +377,19 @@ export async function updateUserSolution(
   if (!isAuthor && !isAdmin && !isTeacher) {
     throw AppError.forbidden('无权修改此题解')
   }
+  // 安全合规：作者重新编辑被驳回/下架的题解时，重置为待审核，重新进入审核队列；
+  // 管理员/教师编辑不重置（他们可直接通过/驳回）
+  const isManagerEdit = isAdmin || isTeacher
+  const shouldRequeue =
+    isAuthor &&
+    !isManagerEdit &&
+    (solution.status === 'rejected' || solution.status === 'hidden')
   const data: Prisma.SolutionUncheckedUpdateInput = {}
+  if (shouldRequeue) {
+    data.status = 'pending'
+    data.reviewNote = null
+    data.reviewedAt = null
+  }
   if (input.title !== undefined) {
     if (typeof input.title !== 'string' || input.title.length < 1 || input.title.length > 100) {
       throw AppError.badRequest('VALIDATION', '标题长度需在 1-100 字符之间')
