@@ -71,6 +71,9 @@ model User {
 
   systemAnnouncements SystemAnnouncement[]
 
+  // 内容举报（安全合规：投诉举报机制，举报人侧）
+  reports ContentReport[] @relation("ReportReporter")
+
   // 班级作业题目计时进度（非游戏化奖励）
   problemProgress        ClassAssignmentProblemProgress[]
 
@@ -448,6 +451,12 @@ model Solution {
   code          String?
   codeLanguage  String?
   codePython    String?
+  // 审核状态（安全合规：违法有害信息防范处置，发布前审核）
+  // pending 待审核 / approved 已通过 / rejected 已驳回 / hidden 已下架（管理员隐藏）
+  // 默认 approved 以兼容存量数据；普通用户新提交由代码显式置为 pending
+  status        String    @default("approved")
+  reviewNote    String?   // 审核备注（驳回原因 / 下架原因）
+  reviewedAt    DateTime?
   qualityScore  Float?    // 题解质量评分（0-5，由 scoreSolutionQuality 写入）
   views         Int       @default(0)
   isOfficial    Boolean   @default(false)            // 是否标程题解（置顶展示）
@@ -460,6 +469,28 @@ model Solution {
   @@index([problemId, isOfficial])
   @@index([problemId, createdAt])
   @@index([authorId])
+  @@index([status])
+}
+
+// 内容举报（安全合规：投诉举报机制）
+model ContentReport {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  targetType  String   // SOLUTION / ANNOUNCEMENT / CLASS_NOTE（当前接入 SOLUTION）
+  targetId    String   @db.ObjectId
+  targetTitle String?  // 冗余快照，后台列表免二次查询
+  reason      String   // 举报原因（预设分类）
+  detail      String?  // 补充说明
+  reporterId  String   @db.ObjectId
+  reporter    User     @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  status      String   @default("pending") // pending 待处理 / resolved 已处理 / dismissed 已驳回
+  handleNote  String?  // 处理备注
+  handlerId   String?  @db.ObjectId
+  handledAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@index([targetType, targetId])
+  @@index([reporterId])
 }
 
 // 题解浏览记录（用于"单账户/IP 只统计一次"的 views 去重）

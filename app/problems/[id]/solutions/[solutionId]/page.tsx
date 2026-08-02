@@ -13,6 +13,8 @@ import {
   Trash2,
   AlertCircle,
   FileCode,
+  Flag,
+  ShieldAlert,
 } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -21,6 +23,7 @@ import { canManageContent } from '@/lib/permissions'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { PageContainer } from '@/components/layout'
 import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
+import ReportModal from '@/components/report/ReportModal'
 import { RouteSuspenseFallback } from '@/components/common'
 import { useDialog } from '@/components/common/DialogProvider'
 
@@ -35,6 +38,8 @@ interface SolutionDetail {
   views: number
   isOfficial: boolean
   sourceType: string
+  status?: string
+  reviewNote?: string | null
   createdAt: string
   updatedAt: string
   author: {
@@ -43,6 +48,12 @@ interface SolutionDetail {
     nickname?: string
     avatar?: string | null
   }
+}
+
+const SOLUTION_STATUS_TEXT: Record<string, string> = {
+  pending: '这篇题解正在审核中，审核通过后将对其他用户可见',
+  rejected: '这篇题解未通过审核，请根据提示修改后重新提交',
+  hidden: '这篇题解已被管理员下架，其他用户不可见',
 }
 
 interface ProblemSummary {
@@ -74,6 +85,7 @@ function SolutionDetailPageContent() {
   const [deleting, setDeleting] = useState(false)
   const [canEditPerm, setCanEditPerm] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const fetchSolution = useCallback(async () => {
     try {
@@ -286,7 +298,31 @@ function SolutionDetailPageContent() {
                   </button>
                 </div>
               )}
+              {!!user && !canEditOrDelete && (
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(true)}
+                  className="btn btn-ghost btn-sm inline-flex items-center gap-1.5 text-muted-foreground hover:text-error shrink-0"
+                  aria-label="举报题解"
+                  title="举报违规内容"
+                >
+                  <Flag className="w-4 h-4" />
+                  <span className="hidden sm:inline">举报</span>
+                </button>
+              )}
             </div>
+
+            {solution.status && solution.status !== 'approved' && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg bg-warning/10 border border-warning/20 px-3 py-2.5 text-sm text-warning">
+                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <p>{SOLUTION_STATUS_TEXT[solution.status] || '该题解当前不可对他人公开'}</p>
+                  {solution.reviewNote && (
+                    <p className="mt-0.5 text-warning/80">审核备注：{solution.reviewNote}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="mt-5 flex items-center gap-3 flex-wrap text-sm text-muted-foreground">
               <Link
@@ -369,6 +405,14 @@ function SolutionDetailPageContent() {
         onSaved={() => {
           void fetchSolution()
         }}
+      />
+
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="SOLUTION"
+        targetId={sid}
+        targetTitle={solution.title}
       />
     </div>
   )

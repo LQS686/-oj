@@ -21,7 +21,9 @@ import {
   Megaphone,
   ChevronDown,
   BookOpen,
-  UserCircle
+  UserCircle,
+  ShieldCheck,
+  Flag,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
@@ -49,6 +51,8 @@ const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
     items: [
       { icon: LayoutDashboard, label: '仪表盘', href: '/admin' },
       { icon: FileText, label: '题目管理', href: '/admin/problems' },
+      { icon: ShieldCheck, label: '题解审核', href: '/admin/reviews' },
+      { icon: Flag, label: '举报管理', href: '/admin/reports' },
     ]
   },
   {

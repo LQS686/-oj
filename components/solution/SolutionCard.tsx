@@ -15,6 +15,16 @@ export interface SolutionListItem {
   views: number
   codeLanguage: string
   isOfficial: boolean
+  /** 审核状态：pending / approved / rejected / hidden（未通过内容仅作者本人/管理员可见） */
+  status?: string
+}
+
+/** 审核状态徽标 */
+export const SOLUTION_STATUS_META: Record<string, { label: string; className: string }> = {
+  pending: { label: '待审核', className: 'bg-warning/10 text-warning' },
+  approved: { label: '已通过', className: 'bg-secondary/10 text-secondary' },
+  rejected: { label: '已驳回', className: 'bg-error/10 text-error' },
+  hidden: { label: '已下架', className: 'bg-muted text-muted-foreground' },
 }
 
 interface SolutionCardProps {
@@ -56,7 +66,8 @@ export default function SolutionCard({
   expanded = false,
   children,
 }: SolutionCardProps) {
-  const { title, author, createdAt, views, codeLanguage, isOfficial } = solution
+  const { title, author, createdAt, views, codeLanguage, isOfficial, status } = solution
+  const statusMeta = (status && SOLUTION_STATUS_META[status]) || null
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!onClick) return
@@ -101,6 +112,11 @@ export default function SolutionCard({
           <h3 className="text-sm font-semibold text-foreground line-clamp-1 group-hover:text-primary-light transition-colors flex-1 min-w-0">
             {title}
           </h3>
+          {statusMeta && (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusMeta.className} flex-shrink-0`}>
+              {statusMeta.label}
+            </span>
+          )}
           {isOfficial && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-accent text-primary-foreground flex-shrink-0">
               <span aria-hidden="true">⭐</span>

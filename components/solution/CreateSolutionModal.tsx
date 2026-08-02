@@ -19,6 +19,8 @@ import MarkdownEditor from '@/components/solution/MarkdownEditor'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useDialog } from '@/components/common/DialogProvider'
+import { useUser } from '@/contexts/UserContext'
+import { canManageContent } from '@/lib/permissions'
 
 const CODE_LANGUAGES = [
   { value: 'cpp', label: 'C++' },
@@ -57,6 +59,7 @@ export default function CreateSolutionModal({
 }) {
   const router = useRouter()
   const dialog = useDialog()
+  const { user } = useUser()
   const isEdit = !!solutionId
 
   const [loading, setLoading] = useState(false)
@@ -193,6 +196,13 @@ export default function CreateSolutionModal({
         if (res.ok && data?.success) {
           const newId = data?.data?.id
           if (newId) {
+            // 安全合规：普通用户发布的题解进入待审核，提交后给出明确提示
+            if (!isEdit && !canManageContent(user)) {
+              await dialog.alert({
+                tone: 'info',
+                message: '题解已提交，管理员审核通过后将展示给其他用户。你可以在下方列表查看自己的题解。',
+              })
+            }
             onCreated?.(newId)
             onClose()
             // 调用方（题目页题解 Tab）会行内展开；否则回题目页并展开

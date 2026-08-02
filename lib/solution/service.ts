@@ -7,6 +7,7 @@ import type { Prisma } from '@prisma/client'
 import type { NextRequest } from 'next/server'
 import { cache } from '@/lib/cache'
 import { AppError } from '@/lib/errors'
+import { canManageContent } from '@/lib/permissions'
 import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
@@ -107,6 +108,7 @@ const SOLUTION_LIST_SELECT = {
   views: true,
   isOfficial: true,
   sourceType: true,
+  status: true,
   createdAt: true,
   author: {
     select: {
@@ -180,7 +182,18 @@ export async function listSolutionsWithPermission(
     return { found: true as const, allowed: false, permission }
   }
 
-  const where = { problemId: realProblemId }
+  // 审核状态过滤（安全合规：发布前审核）：
+  // - 管理员/教师：全部可见
+  // - 普通登录用户：已通过 + 自己的全部状态（待审核/驳回/下架仅自己可见）
+  // - 未登录：仅已通过
+  const where: Prisma.SolutionWhereInput = { problemId: realProblemId }
+  if (viewer && canManageContent(viewer)) {
+    // 全部可见，不追加过滤
+  } else if (viewer) {
+    where.OR = [{ status: 'approved' }, { authorId: viewer.id }]
+  } else {
+    where.status = 'approved'
+  }
   const [items, total] = await Promise.all([
     prisma.solution.findMany({
       where,
@@ -235,16 +248,18 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
     select: { id: true, visibility: true, authorId: true },
   })
   if (!problem) throw AppError.notFound('题目不存在')
+  const author = await prisma.user.findUnique({
+    where: { id: authorId },
+    select: { role: true },
+  })
+  if (!author) throw AppError.notFound('用户不存在')
   if (problem.visibility !== 'public' && problem.authorId !== authorId) {
-    const author = await prisma.user.findUnique({
-      where: { id: authorId },
-      select: { role: true },
-    })
-    const { canManageContent } = await import('@/lib/permissions')
     if (!canManageContent(author)) {
       throw AppError.forbidden('仅可为公开题目创建题解')
     }
   }
+  // 安全合规：发布前审核。管理员/教师创建的题解直接通过，普通用户提交进入待审核
+  const isManager = canManageContent(author)
 
   const result = await prisma.solution.create({
     data: {
@@ -256,6 +271,8 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
       code: input.code ?? null,
       isOfficial: false,
       sourceType: 'USER',
+      status: isManager ? 'approved' : 'pending',
+      reviewedAt: isManager ? new Date() : null,
     },
     include: {
       author: {
@@ -295,6 +312,15 @@ export async function getSolutionDetailWithPermission(
     },
   })
   if (!solution) return { found: false as const }
+
+  // 审核状态过滤：非「已通过」内容仅作者本人或管理员/教师可见
+  if (solution.status !== 'approved') {
+    const isManager = viewer && canManageContent(viewer)
+    const isAuthor = viewer && solution.authorId === viewer.id
+    if (!isManager && !isAuthor) {
+      return { found: false as const }
+    }
+  }
 
   const flags = await resolveSolutionHideFlags(viewer, solution.problemId, isAssignmentContext)
   const permission = await canViewSolutions(viewer, solution.problemId, flags)
@@ -434,4 +460,84 @@ export async function checkSolutionPermission(
     bestScore: result.bestScore,
     requiredScore: REQUIRED_SOLUTION_SCORE,
   }
+}
+
+/* ============================================================================
+ * 管理端：题解审核（安全合规：发布前审核）
+ * ========================================================================== */
+
+export interface ReviewFilter {
+  status?: string // pending / approved / rejected / all
+}
+
+/**
+ * 管理后台：分页列出题解（按审核状态过滤，默认待审核）
+ */
+export async function listSolutionsForReview(
+  filter: ReviewFilter = {},
+  options: ListOptions = {}
+): Promise<PaginatedResult<unknown>> {
+  const page = options.page ?? 1
+  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
+  const where: Prisma.SolutionWhereInput = {}
+  if (filter.status && filter.status !== 'all') {
+    where.status = filter.status
+  }
+  const [items, total] = await Promise.all([
+    prisma.solution.findMany({
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        reviewNote: true,
+        codeLanguage: true,
+        views: true,
+        createdAt: true,
+        problem: { select: { id: true, problemNumber: true, title: true } },
+        author: {
+          select: { id: true, username: true, nickname: true, avatar: true },
+        },
+      },
+    }),
+    prisma.solution.count({ where }),
+  ])
+  return { items: items.map(sanitizeSolutionAuthor), total, page, pageSize }
+}
+
+export type SolutionReviewAction = 'approve' | 'reject' | 'hide'
+
+/**
+ * 管理后台：审核题解（通过 / 驳回 / 下架），写入审核备注并清缓存
+ */
+export async function reviewSolution(
+  id: string,
+  action: SolutionReviewAction,
+  note?: string
+) {
+  const solution = await prisma.solution.findUnique({
+    where: { id },
+    select: { id: true },
+  })
+  if (!solution) throw AppError.notFound('题解不存在')
+
+  const statusMap: Record<SolutionReviewAction, string> = {
+    approve: 'approved',
+    reject: 'rejected',
+    hide: 'hidden',
+  }
+  const updated = await prisma.solution.update({
+    where: { id },
+    data: {
+      status: statusMap[action],
+      reviewNote: note?.trim() ? note.trim().slice(0, 500) : null,
+      reviewedAt: new Date(),
+    },
+  })
+  cache.delete(`solution:byId:${id}`)
+  cache.deleteByPrefix('solution:list')
+  return updated
 }
