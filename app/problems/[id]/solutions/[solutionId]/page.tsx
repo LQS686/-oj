@@ -359,7 +359,6 @@ function SolutionDetailPageContent() {
           <div className="px-5 sm:px-8 py-6 sm:py-8">
             <MarkdownRenderer
               content={solution.content || ''}
-              preprocessContent={false}
               className="solution-article"
             />
           </div>

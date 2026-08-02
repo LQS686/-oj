@@ -450,7 +450,7 @@ export default function MarkdownEditor({
  style={{ minHeight }}
  >
  {debouncedValue.trim() ? (
- <MarkdownRenderer content={debouncedValue} preprocessContent={false} />
+ <MarkdownRenderer content={debouncedValue} />
  ) : (
  <p className="text-sm text-muted-foreground italic">实时预览将显示在这里…</p>
  )}

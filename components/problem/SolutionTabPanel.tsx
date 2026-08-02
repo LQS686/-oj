@@ -584,7 +584,6 @@ export default function SolutionTabPanel({
         <div className="max-h-[min(60vh,520px)] overflow-y-auto pr-1">
          <MarkdownRenderer
           content={detail.content || ''}
-          preprocessContent={false}
          />
         </div>
         {detail.code && (
