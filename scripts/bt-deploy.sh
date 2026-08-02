@@ -5,11 +5,12 @@
 # 用法：
 #   初次部署（HTTPS）：sudo bash scripts/bt-deploy.sh https://dsoj.run
 #   初次部署（HTTP/IP）：sudo bash scripts/bt-deploy.sh http://服务器IP
-#   升级更新：          sudo bash scripts/bt-deploy.sh
+#   升级更新：          sudo bash scripts/bt-deploy.sh --yes
 #   切换域名：          sudo bash scripts/bt-deploy.sh https://新域名
 #   仅重启不重建：      sudo bash scripts/bt-deploy.sh --no-build
 #   深度清理构建缓存：  sudo bash scripts/bt-deploy.sh --prune
 #   跳过镜像加速配置：  sudo bash scripts/bt-deploy.sh --skip-mirror
+#   跳过交互确认：      sudo bash scripts/bt-deploy.sh --yes （宝塔终端推荐）
 # ============================================================
 set -euo pipefail
 
@@ -26,6 +27,7 @@ FRONTEND_URL_ARG=""
 NO_BUILD=0
 DO_PRUNE=0
 SKIP_MIRROR=0
+ASSUME_YES=0
 
 usage() {
   cat <<USAGE
@@ -35,6 +37,7 @@ usage() {
   --no-build        跳过镜像构建，仅 up -d + 健康检查（配置热更适用）
   --prune           构建后清理 7 天前的 BuildKit 缓存（默认仅清悬空镜像）
   --skip-mirror     不写入 /etc/docker/daemon.json 镜像加速
+  -y, --yes         跳过所有交互确认（宝塔终端推荐使用，避免 read 阻塞卡死终端）
   -h, --help        显示帮助
 USAGE
 }
@@ -44,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     --no-build) NO_BUILD=1; shift ;;
     --prune) DO_PRUNE=1; shift ;;
     --skip-mirror) SKIP_MIRROR=1; shift ;;
+    -y|--yes) ASSUME_YES=1; shift ;;
     -h|--help) usage; exit 0 ;;
     http://*|https://*) FRONTEND_URL_ARG="$1"; shift ;;
     *)
@@ -521,8 +525,15 @@ if [[ ! -f ".env" ]]; then
 
   FRONTEND_URL="${FRONTEND_URL_ARG:-}"
   if [[ -z "$FRONTEND_URL" ]]; then
-    if [[ -t 0 ]]; then
-      read -rp "请输入站点完整 URL（如 https://dsoj.run 或 http://IP）: " FRONTEND_URL
+    if [[ "$ASSUME_YES" -eq 1 ]]; then
+      err "首次部署必须传入站点 URL：sudo bash scripts/bt-deploy.sh https://你的域名"
+      exit 1
+    elif [[ -t 0 ]]; then
+      # 宝塔终端等 Web 终端下 read 会阻塞；加 120s 超时避免永久卡死
+      if ! read -r -t 120 -p "请输入站点完整 URL（如 https://dsoj.run 或 http://IP）: " FRONTEND_URL; then
+        err "输入超时（120s）。请以参数形式传入：sudo bash scripts/bt-deploy.sh https://你的域名"
+        exit 1
+      fi
     else
       err "首次部署必须传入站点 URL：sudo bash scripts/bt-deploy.sh https://你的域名"
       exit 1
@@ -730,8 +741,8 @@ for i in $(seq 1 60); do
     break
   fi
   if [[ -n "$MONGO_ROOT_PASSWORD" ]] \
-     && compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping' 2>/dev/null | grep -q PONG \
-     && compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --eval 'db.adminCommand("ping").ok' 2>/dev/null | grep -q 1; then
+     && timeout 10 compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping' 2>/dev/null | grep -q PONG \
+     && timeout 15 compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --eval 'db.adminCommand("ping").ok' 2>/dev/null | grep -q 1; then
     echo ""
     info "mongo / redis 可连通（health 字段可能暂不可用：mongo=${mongo_h} redis=${redis_h}）"
     dep_ok=1
@@ -747,14 +758,21 @@ if [[ "$dep_ok" -ne 1 ]]; then
 fi
 
 # 重启前检测进行中的评测（app 重启会清空内存队列，进行中的提交将被标记为 SE）
-# 仅当 app 已在运行且 DB 可查时检测；非交互模式不阻塞，仅警告
+# 仅当 app 已在运行且 DB 可查时检测
 if compose ps -q app 2>/dev/null | grep -q .; then
-  ACTIVE_CNT="$(compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" \
+  ACTIVE_CNT="$(timeout 30 compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" \
     --authenticationDatabase admin --eval 'try { print(db.getSiblingDB("oj_platform").Submission.countDocuments({status:{$in:["PENDING","JUDGING","RUNNING"]}})) } catch(e) { print("?") }' 2>/dev/null | tr -d '\r' || true)"
   if [[ "$ACTIVE_CNT" =~ ^[0-9]+$ ]] && [[ "$ACTIVE_CNT" -gt 0 ]]; then
     warn "检测到 ${ACTIVE_CNT} 个进行中的评测；重启 app 将中断它们并标记为 SE（系统错误），需用户重新提交"
-    if [[ -t 0 ]]; then
-      read -r -p "确认继续重启？(y/N) " ans
+    if [[ "$ASSUME_YES" -eq 1 ]]; then
+      info "已自动确认继续（--yes）"
+    elif [[ -t 0 ]]; then
+      # 宝塔终端等 Web 终端下 read 无超时会永久阻塞，导致终端卡死
+      # 60s 超时后默认取消（安全侧），避免意外中断评测
+      if ! read -r -t 60 -p "确认继续重启？(y/N) " ans; then
+        warn "输入超时（60s），已取消部署。如需自动确认请使用: sudo bash scripts/bt-deploy.sh --yes"
+        exit 0
+      fi
       if [[ ! "$ans" =~ ^[yY]$ ]]; then
         info "已取消部署"
         exit 0
@@ -809,7 +827,7 @@ fi
 # 无法写入 data/testdata 缓存，导致大测点每次回源 Mongo、性能异常。
 # 直接以 root 在 app 容器内对可写卷目录 chown（app 镜像已装 coreutils，无需额外镜像）。
 # /app/temp 是 tmpfs 挂载，uid/gid 已在 docker-compose.yml 中指定，无需 chown。
-if compose exec -T -u root app chown -R 1001:1001 /app/data /app/public/uploads 2>/dev/null; then
+if timeout 60 compose exec -T -u root app chown -R 1001:1001 /app/data /app/public/uploads 2>/dev/null; then
   info "已修复评测卷属主（app_testdata / app_uploads → nextjs 1001）"
 else
   warn "自动修复评测卷属主失败，请手动执行："
@@ -869,6 +887,7 @@ echo -e "  ${BOLD}常用命令:${NC}"
 echo -e "    cd ${PROJECT_DIR}"
 echo -e "    ${COMPOSE_HINT} logs -f app"
 echo -e "    sudo bash scripts/bt-deploy.sh                 # 升级（git pull 后）"
+echo -e "    sudo bash scripts/bt-deploy.sh --yes           # 跳过交互确认（宝塔终端推荐）"
 echo -e "    sudo bash scripts/bt-deploy.sh --no-build      # 仅重启"
 echo -e "    sudo bash scripts/bt-deploy.sh --prune         # 升级并深度清理构建缓存"
 echo -e "    sudo bash scripts/bt-deploy.sh https://域名    # 切域名并重建"

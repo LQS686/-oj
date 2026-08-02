@@ -66,7 +66,13 @@ sudo bash scripts/bt-deploy.sh http://你的服务器IP
 sudo bash scripts/bt-deploy.sh --no-build          # 仅重启，不重建镜像
 sudo bash scripts/bt-deploy.sh --prune             # 升级时顺带清理 7 天前 BuildKit 缓存
 sudo bash scripts/bt-deploy.sh --skip-mirror       # 不改 /etc/docker/daemon.json
+sudo bash scripts/bt-deploy.sh --yes               # 跳过交互确认（宝塔终端推荐）
 ```
+
+> **宝塔终端用户注意**：宝塔 Web 终端是 TTY，脚本中的 `read` 交互提示会阻塞终端。
+> 当升级时恰好有进行中的评测，脚本会弹出 `确认继续重启？(y/N)` 等待输入，
+> 若不注意会导致终端"卡死"。**推荐在宝塔终端中始终加 `--yes`** 跳过交互确认。
+> 不加 `--yes` 时，`read` 已设 60s 超时自动取消，不会永久阻塞。
 
 ### 4. 配置宝塔网站
 
@@ -92,7 +98,7 @@ curl -sf http://127.0.0.1:3000/api/health/db && echo DB_OK
 ```bash
 cd /www/wwwroot/dashan-oj
 git pull
-sudo bash scripts/bt-deploy.sh
+sudo bash scripts/bt-deploy.sh --yes
 ```
 
 切到正式 HTTPS 域名（会更新 `.env` 并**强制重建**镜像，因 `NEXT_PUBLIC_*` 构建期固化）：
@@ -148,6 +154,7 @@ docker builder prune -af --filter "until=168h"
 
 | 问题                                          | 处理                                                                                                                                                                                                                                                                                                |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 宝塔终端卡死 / 无响应                         | 脚本在检测到进行中评测时会 `read` 等待确认，宝塔 Web 终端是 TTY 会阻塞。已加 60s 超时自动取消；**推荐加 `--yes` 跳过交互**：`sudo bash scripts/bt-deploy.sh --yes`。若已卡死，Ctrl+C 中断后加 `--yes` 重跑。                                                                                          |
 | 构建报 `libasan` / `libubsan` no such package | Alpine/musl 无这两个包。请 `git pull` 后重跑（Dockerfile 已移除）。评测默认不开 ASan/UBSan。                                                                                                                                                                                                        |
 | 未检测到 docker compose 插件                  | OpenCloudOS/宝塔常只有独立 `docker-compose`。新脚本会自动检测并尝试安装。也可先手动：`curl -fsSL https://get.daocloud.io/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose && docker-compose version` |
 | 首次部署 app 起不来 / Cookie 登不上           | HTTP 必须用 `http://IP` 部署；脚本会设 `FORCE_SECURE_COOKIE=false`。HTTPS 必须为 `true`。                                                                                                                                                                                                           |
