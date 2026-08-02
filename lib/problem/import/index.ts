@@ -8,7 +8,6 @@ export type {
   ImportedSample,
   ImportedSolution,
   ImportedProblemResult,
-  ImportBatchResult,
   ImportFormat,
   ImportOptions,
   ImportStreamEvent,
@@ -16,16 +15,13 @@ export type {
 } from './types'
 
 export {
-  importProblems,
   importOneProblem,
 } from './service'
 
 export {
-  executeProblemImport,
   executeProblemImportStream,
   prepareProblemImport,
   parseImportOptions,
-  parseImportByFormat,
   VALID_IMPORT_FORMATS,
   IMPORT_MAX_FILE_BYTES,
 } from './execute'

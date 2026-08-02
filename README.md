@@ -304,7 +304,7 @@ Route → withApi.public|auth|admin|systemAdmin|classRole
 - **题目统计** — `/api/problems/[id]/stats` + `ProblemStatsPanel`
 - **随机一题** — `/api/problems/random`
 - **竞赛解封** — `/api/admin/contests/[id]/unseal`
-- **题目导入** — `lib/problem/import/`（DSOJ / FPS / Hydro / SYZOJ / CSV / Codeforces）
+- **题目导入** — `lib/problem/import/`（仅 DSOJ 标准题包，NDJSON 流式进度：meta → 逐题 item → done）
 - **题目导出** — `lib/problem/export/dsoj-exporter.ts`
 - **用户热力图** — `components/user/SubmissionHeatmap.tsx`
 - **SSRF 防护** — `lib/security/safe-fetch.ts`

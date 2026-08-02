@@ -93,15 +93,6 @@ export interface ImportedProblemResult {
   reason?: string
 }
 
-/** 批量导入结果 */
-export interface ImportBatchResult {
-  total: number
-  created: number
-  skipped: number
-  failed: number
-  results: ImportedProblemResult[]
-}
-
 /** 流式导入 done 事件的最终汇总 */
 export interface ImportStreamDoneSummary {
   total: number

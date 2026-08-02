@@ -5,7 +5,6 @@
  * 仅支持 DSOJ 标准题包导入（ZIP / tar.xz）：
  *   - prepareProblemImport：解析前置，全局错误在此抛出（路由可在创建流式 Response 之前 await）
  *   - executeProblemImportStream：流式导入（meta → 逐题 item → done），供 NDJSON 流写出
- *   - executeProblemImport：非流式入口（兼容现有路由）
  */
 import { ApiError } from '@/lib/api/errors'
 import { isValidDifficulty } from '@/lib/constants'
@@ -24,9 +23,7 @@ import {
 import type {
   ImportFormat,
   ImportOptions,
-  ImportedProblem,
   ImportedProblemResult,
-  ImportBatchResult,
   ImportStreamEvent,
 } from './types'
 
@@ -61,23 +58,6 @@ export function parseImportOptions(raw: unknown, authorId: string): ImportOption
     defaultDifficulty,
     authorId,
   }
-}
-
-export async function parseImportByFormat(
-  format: ImportFormat,
-  content: string | Buffer,
-  options: ImportOptions
-): Promise<ImportedProblem[]> {
-  if (format !== 'dsoj') {
-    throw new ApiError('INVALID_FORMAT', '仅支持 DSOJ 标准题包导入', 400)
-  }
-  const prepared = await prepareProblemImport({
-    format,
-    content,
-    rawOptions: options,
-    authorId: options.authorId,
-  })
-  return prepared.jobs.flatMap((job) => (job.ok ? [job.problem] : []))
 }
 
 export interface PreparedProblemImport {
@@ -166,56 +146,4 @@ export interface ExecuteImportInput {
   content: string | Buffer | null
   rawOptions: unknown
   authorId: string
-}
-
-export interface ExecuteImportResult extends ImportBatchResult {
-  format: ImportFormat
-  message: string
-}
-
-/**
- * 解析并写入题库（非流式入口）
- * total 等于题包题目总数；单题解析失败项计入 failed。
- */
-export async function executeProblemImport(
-  input: ExecuteImportInput
-): Promise<ExecuteImportResult> {
-  const { format } = input
-  if (!VALID_IMPORT_FORMATS.includes(format)) {
-    throw new ApiError(
-      'INVALID_FORMAT',
-      `缺少或无效的 format 参数，支持: ${VALID_IMPORT_FORMATS.join(', ')}`,
-      400
-    )
-  }
-  const prepared = await prepareProblemImport(input)
-  const { jobs, options } = prepared
-
-  const results: ImportedProblemResult[] = []
-  for (const job of jobs) {
-    results.push(
-      job.ok
-        ? await importOneProblem(job.problem, options)
-        : {
-            status: 'failed' as const,
-            title: job.title || job.dir,
-            externalId: job.dir,
-            reason: job.reason,
-          }
-    )
-  }
-
-  const created = results.filter((r) => r.status === 'created').length
-  const skipped = results.filter((r) => r.status === 'skipped').length
-  const failed = results.filter((r) => r.status === 'failed').length
-
-  return {
-    total: jobs.length,
-    created,
-    skipped,
-    failed,
-    results,
-    format,
-    message: `成功导入 ${created} 题${skipped > 0 ? `，跳过 ${skipped} 题` : ''}${failed > 0 ? `，失败 ${failed} 题` : ''}`,
-  }
 }

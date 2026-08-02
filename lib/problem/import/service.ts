@@ -16,7 +16,6 @@ import { invalidateProblemTestCaseCache } from '@/lib/judge/testcase-loader'
 import type {
   ImportedProblem,
   ImportedProblemResult,
-  ImportBatchResult,
   ImportOptions,
 } from './types'
 
@@ -405,53 +404,5 @@ export async function importOneProblem(
       externalId,
       reason: e.message || '未知错误',
     }
-  }
-}
-
-/**
- * 批量导入入口
- *
- * - 单题失败/跳过不会影响其他题目
- * - 顺序执行（避免并发引发题号冲突）
- * - 大批量导入建议拆分为多批次调用
- */
-export async function importProblems(
-  rawList: ImportedProblem[],
-  options: ImportOptions
-): Promise<ImportBatchResult> {
-  if (!rawList || rawList.length === 0) {
-    return { total: 0, created: 0, skipped: 0, failed: 0, results: [] }
-  }
-
-  // 上限保护：单次最多 500 道
-  const MAX_BATCH = 500
-  if (rawList.length > MAX_BATCH) {
-    throw new ApiError(
-      'BATCH_TOO_LARGE',
-      `单次最多导入 ${MAX_BATCH} 道题目，请分批处理`,
-      400
-    )
-  }
-
-  const results: ImportedProblemResult[] = []
-  for (const raw of rawList) {
-    const result = await importOneProblem(raw, options)
-    results.push(result)
-  }
-
-  const created = results.filter(r => r.status === 'created').length
-  const skipped = results.filter(r => r.status === 'skipped').length
-  const failed = results.filter(r => r.status === 'failed').length
-
-  logger.info(
-    `[import] 批量导入完成：共 ${rawList.length} 题，新建 ${created}，跳过 ${skipped}，失败 ${failed}`
-  )
-
-  return {
-    total: rawList.length,
-    created,
-    skipped,
-    failed,
-    results,
   }
 }
