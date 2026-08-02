@@ -371,7 +371,7 @@ async function handleProblemImportDirect(
   }
 
   try {
-    const { executeProblemImport, VALID_IMPORT_FORMATS, IMPORT_MAX_FILE_BYTES } =
+    const { prepareProblemImport, executeProblemImportStream, IMPORT_MAX_FILE_BYTES } =
       await import('./lib/problem/import/execute')
 
     const parts = parseMultipart(body, boundary, {
@@ -381,12 +381,12 @@ async function handleProblemImportDirect(
     const optionsPart = parts.find((p) => p.name === 'options')
     const filePart = parts.find((p) => p.name === 'file')
 
-    const formatStr = formatPart?.data.toString('utf8').trim() || ''
-    if (!formatStr || !(VALID_IMPORT_FORMATS as string[]).includes(formatStr)) {
+    const formatStr = formatPart?.data.toString('utf8').trim() || 'dsoj'
+    if (formatStr !== 'dsoj') {
       writeJson(res, 400, {
         success: false,
         code: 'INVALID_FORMAT',
-        error: `缺少或无效的 format 参数，支持: ${VALID_IMPORT_FORMATS.join(', ')}`,
+        error: '仅支持 DSOJ 标准题包导入（format=dsoj）',
       })
       return true
     }
@@ -406,29 +406,46 @@ async function handleProblemImportDirect(
     }
 
     let content: Buffer | null = null
-    if (formatStr !== 'codeforces') {
-      if (!filePart || filePart.data.length === 0) {
-        writeJson(res, 400, { success: false, code: 'NO_FILE', error: '未选择文件' })
-        return true
-      }
-      if (filePart.data.length > IMPORT_MAX_FILE_BYTES) {
-        writeJson(res, 413, {
-          success: false,
-          code: 'FILE_TOO_LARGE',
-          error: '文件大小超过 50MB 限制',
-        })
-        return true
-      }
-      content = filePart.data
+    if (!filePart || filePart.data.length === 0) {
+      writeJson(res, 400, { success: false, code: 'NO_FILE', error: '未选择文件' })
+      return true
     }
+    if (filePart.data.length > IMPORT_MAX_FILE_BYTES) {
+      writeJson(res, 413, {
+        success: false,
+        code: 'FILE_TOO_LARGE',
+        error: '文件大小超过 50MB 限制',
+      })
+      return true
+    }
+    content = filePart.data
 
-    const result = await executeProblemImport({
-      format: formatStr as typeof VALID_IMPORT_FORMATS[number],
+    const prepared = await prepareProblemImport({
+      format: 'dsoj',
       content,
       rawOptions,
       authorId: user.id,
     })
-    writeJson(res, 200, { success: true, data: result })
+
+    // NDJSON 流式写出
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-cache')
+
+    const write = (line: string) => {
+      if (!res.destroyed) res.write(line + '\n')
+    }
+    try {
+      await executeProblemImportStream(prepared, (event) => {
+        write(JSON.stringify(event))
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      write(JSON.stringify({ type: 'error', message: msg }))
+    } finally {
+      if (!res.destroyed) res.end()
+    }
+    return true
   } catch (e) {
     if (e instanceof ApiError) {
       writeJson(res, e.status, { success: false, code: e.code, error: e.message })

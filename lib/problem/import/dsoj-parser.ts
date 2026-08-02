@@ -2,6 +2,10 @@
  * lib/problem/import/dsoj-parser.ts
  * DSOJ 标准题包格式解析器（自主实现，不复用其它格式解析器）
  *
+ * 提供两种解析入口：
+ *   - parseDsojArchive：兼容入口，部分题目失败静默跳过，全部失败抛 ALL_PROBLEMS_FAILED
+ *   - parseDsojArchiveDetailed：详细入口，按原始顺序返回每题成功/失败结果（供流式导入使用）
+ *
  * 设计目标：
  *   1. 格式稳定：版本化（pack.yaml.version），兼容 v1.0 / v2.0
  *   2. 爬虫友好：所有字段文件化、UTF-8 编码、文件名约定清晰
@@ -1098,6 +1102,15 @@ function parseOneProblem(
  * ========================================================================== */
 
 /**
+ * 单题解析结果（detailed 模式）：按题包原始顺序返回每题成功或失败
+ * - ok: true  → problem 为该题解析产物
+ * - ok: false → dir 为题目目录、reason 为失败原因、title 尽量取 index.json 中的标题
+ */
+export type DsojParseJobResult =
+  | { ok: true; index: number; problem: ImportedProblem }
+  | { ok: false; index: number; dir: string; reason: string; title?: string }
+
+/**
  * 解析 DSOJ 标准题包 ZIP
  *
  * @param zipBuffer ZIP 文件的 Buffer
@@ -1121,17 +1134,20 @@ export function parseDsojZip(zipBuffer: Buffer): ImportedProblem[] {
 }
 
 /**
- * 解析 DSOJ 标准题包归档对象（zip / tar.xz 等统一入口）
+ * 解析 DSOJ 标准题包归档对象（zip / tar.xz 等统一入口），按原始顺序返回每题结果
  *
  * 与 parseDsojZip 的区别：parseDsojZip 接受 ZIP Buffer 并自行 new AdmZip；
  * 本函数接受任意实现了 ArchiveLike 接口的归档对象（如 ZIP、tar.xz 适配器），
  * 便于支持多种归档格式，复用主体解析逻辑。
  *
+ * detailed 模式：即使部分/全部题目解析失败也不抛错，只返回结果数组；
+ * 全局校验错误（不安全路径、pack.yaml 非法、无题目目录等）仍照常抛出。
+ *
  * @param archive 已打开的归档对象
- * @returns ImportedProblem[] 已解析的题目列表
- * @throws ApiError 格式错误、文件缺失、安全校验失败等
+ * @returns DsojParseJobResult[] 按题包原始顺序的每题解析结果（成功或失败+原因）
+ * @throws ApiError 全局校验错误（UNSAFE_ZIP_ENTRY / FORMAT_MISMATCH / UNSUPPORTED_VERSION / INVALID_INDEX / NO_PROBLEMS）
  */
-export function parseDsojArchive(archive: ArchiveLike): ImportedProblem[] {
+export function parseDsojArchiveDetailed(archive: ArchiveLike): DsojParseJobResult[] {
   for (const entry of archive.getEntries()) {
     if (entry.isDirectory) continue
     if (!isStrictSafePath(entry.entryName)) {
@@ -1192,12 +1208,15 @@ export function parseDsojArchive(archive: ArchiveLike): ImportedProblem[] {
     )
   }
 
-  const results: ImportedProblem[] = []
-  const errors: Array<{ dir: string; reason: string }> = []
-
-  for (const job of problemJobs) {
+  const results: DsojParseJobResult[] = []
+  for (let i = 0; i < problemJobs.length; i++) {
+    const job = problemJobs[i]
     try {
-      results.push(parseOneProblem(archive, job.dir, rootPrefix, job.meta))
+      results.push({
+        ok: true,
+        index: i,
+        problem: parseOneProblem(archive, job.dir, rootPrefix, job.meta),
+      })
     } catch (err: unknown) {
       const reason =
         err instanceof ApiError
@@ -1205,10 +1224,34 @@ export function parseDsojArchive(archive: ArchiveLike): ImportedProblem[] {
           : err instanceof Error
             ? err.message
             : '未知错误'
-      errors.push({ dir: job.dir, reason })
+      results.push({ ok: false, index: i, dir: job.dir, reason, title: job.meta?.title })
     }
   }
+  return results
+}
 
+/**
+ * 解析 DSOJ 标准题包归档对象（zip / tar.xz 等统一入口）
+ *
+ * 与 parseDsojZip 的区别：parseDsojZip 接受 ZIP Buffer 并自行 new AdmZip；
+ * 本函数接受任意实现了 ArchiveLike 接口的归档对象（如 ZIP、tar.xz 适配器），
+ * 便于支持多种归档格式，复用主体解析逻辑。
+ *
+ * 保持兼容，见 parseDsojArchiveDetailed：部分题目失败只返回成功项，
+ * 全部失败抛 ALL_PROBLEMS_FAILED。
+ *
+ * @param archive 已打开的归档对象
+ * @returns ImportedProblem[] 已解析的题目列表
+ * @throws ApiError 格式错误、文件缺失、安全校验失败等
+ */
+export function parseDsojArchive(archive: ArchiveLike): ImportedProblem[] {
+  const detailed = parseDsojArchiveDetailed(archive)
+  const results: ImportedProblem[] = []
+  const errors: Array<{ dir: string; reason: string }> = []
+  for (const item of detailed) {
+    if (item.ok) results.push(item.problem)
+    else errors.push({ dir: item.dir, reason: item.reason })
+  }
   if (results.length === 0) {
     const detail = errors.map((e) => `${e.dir}: ${e.reason}`).join('; ')
     throw new ApiError(
@@ -1217,7 +1260,6 @@ export function parseDsojArchive(archive: ArchiveLike): ImportedProblem[] {
       400
     )
   }
-
   return results
 }
 

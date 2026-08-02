@@ -2,8 +2,8 @@
  * lib/problem/import/types.ts
  * 批量导入题库的统一中间数据结构
  *
- * 各格式解析器（FPS / Hydro / SYZOJ / CSV / Codeforces）最终都要把数据
- * 转换为 ImportedProblem，再由 service.ts 统一去重 + 写库。
+ * 仅支持 DSOJ 标准题包：解析器（dsoj-parser）把题包数据转换为
+ * ImportedProblem，再由 service.ts 统一去重 + 写库。
  *
  * 设计目标：
  *   - 解析器只负责格式转换，不直接访问数据库
@@ -102,8 +102,24 @@ export interface ImportBatchResult {
   results: ImportedProblemResult[]
 }
 
-/** 支持的导入格式 */
-export type ImportFormat = 'fps' | 'hydro' | 'syzoj' | 'csv' | 'codeforces' | 'dsoj'
+/** 流式导入 done 事件的最终汇总 */
+export interface ImportStreamDoneSummary {
+  total: number
+  created: number
+  skipped: number
+  failed: number
+  message: string
+}
+
+/** 流式导入 NDJSON 事件（meta → 逐题 item → done / error） */
+export type ImportStreamEvent =
+  | { type: 'meta'; total: number }
+  | { type: 'item'; index: number; result: ImportedProblemResult }
+  | { type: 'done'; summary: ImportStreamDoneSummary }
+  | { type: 'error'; message: string }
+
+/** 支持的导入格式（仅 DSOJ 标准题包） */
+export type ImportFormat = 'dsoj'
 
 /** 导入选项 */
 export interface ImportOptions {
@@ -115,10 +131,4 @@ export interface ImportOptions {
   defaultDifficulty: Difficulty
   /** 创建者 ID（必填） */
   authorId: string
-  /** Codeforces 同步专用：按 tag 过滤 */
-  cfTags?: string[]
-  /** Codeforces 同步专用：按 rating 范围过滤 [min, max] */
-  cfRatingRange?: [number, number]
-  /** Codeforces 同步专用：最大同步题数 */
-  cfLimit?: number
 }

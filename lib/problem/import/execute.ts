@@ -1,35 +1,36 @@
 /**
  * lib/problem/import/execute.ts
  * 题库批量导入执行入口（供 API 路由与自定义 server 直通共用）
+ *
+ * 仅支持 DSOJ 标准题包导入（ZIP / tar.xz）：
+ *   - prepareProblemImport：解析前置，全局错误在此抛出（路由可在创建流式 Response 之前 await）
+ *   - executeProblemImportStream：流式导入（meta → 逐题 item → done），供 NDJSON 流写出
+ *   - executeProblemImport：非流式入口（兼容现有路由）
  */
 import { ApiError } from '@/lib/api/errors'
 import { isValidDifficulty } from '@/lib/constants'
+import AdmZip from 'adm-zip'
+import { logger } from '@/lib/logger'
+import { importOneProblem } from './service'
 import {
-  parseFps,
-  parseHydroZip,
-  parseHydroJson,
-  parseSyzojJson,
-  parseCsvProblems,
-  fetchCodeforcesProblems,
-  parseDsojZip,
-  parseDsojArchive,
+  parseDsojArchiveDetailed,
+  type ArchiveLike,
+  type DsojParseJobResult,
+} from './dsoj-parser'
+import {
   parseTarXzBuffer,
   detectArchiveFormat,
-  importProblems,
-  type ImportFormat,
-  type ImportOptions,
-  type ImportedProblem,
-  type ImportBatchResult,
-} from '@/lib/problem/import'
+} from './tarxz-archive'
+import type {
+  ImportFormat,
+  ImportOptions,
+  ImportedProblem,
+  ImportedProblemResult,
+  ImportBatchResult,
+  ImportStreamEvent,
+} from './types'
 
-export const VALID_IMPORT_FORMATS: ImportFormat[] = [
-  'fps',
-  'hydro',
-  'syzoj',
-  'csv',
-  'codeforces',
-  'dsoj',
-]
+export const VALID_IMPORT_FORMATS: ImportFormat[] = ['dsoj']
 const VALID_DUPLICATE_POLICIES = ['skip', 'overwrite', 'duplicate'] as const
 const VALID_VISIBILITIES = ['public', 'private', 'contest'] as const
 
@@ -54,29 +55,12 @@ export function parseImportOptions(raw: unknown, authorId: string): ImportOption
     ? opts.defaultDifficulty
     : '入门'
 
-  const result: ImportOptions = {
+  return {
     onDuplicate,
     visibility,
     defaultDifficulty,
     authorId,
   }
-
-  if (Array.isArray(opts.cfTags)) {
-    result.cfTags = opts.cfTags.filter((t: unknown) => typeof t === 'string') as string[]
-  }
-  if (
-    Array.isArray(opts.cfRatingRange) &&
-    opts.cfRatingRange.length === 2 &&
-    typeof opts.cfRatingRange[0] === 'number' &&
-    typeof opts.cfRatingRange[1] === 'number'
-  ) {
-    result.cfRatingRange = opts.cfRatingRange as [number, number]
-  }
-  if (typeof opts.cfLimit === 'number' && opts.cfLimit > 0) {
-    result.cfLimit = Math.min(opts.cfLimit, 500)
-  }
-
-  return result
 }
 
 export async function parseImportByFormat(
@@ -84,55 +68,101 @@ export async function parseImportByFormat(
   content: string | Buffer,
   options: ImportOptions
 ): Promise<ImportedProblem[]> {
-  switch (format) {
-    case 'fps':
-      return parseFps(typeof content === 'string' ? content : content.toString('utf-8'))
-    case 'hydro': {
-      const buf = typeof content === 'string' ? Buffer.from(content) : content
-      if (buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b) {
-        return parseHydroZip(buf)
-      }
-      return parseHydroJson(buf.toString('utf-8'))
-    }
-    case 'syzoj':
-      return parseSyzojJson(
-        typeof content === 'string' ? content : content.toString('utf-8')
-      )
-    case 'csv':
-      return parseCsvProblems(
-        typeof content === 'string' ? content : content.toString('utf-8')
-      )
-    case 'codeforces':
-      return fetchCodeforcesProblems({
-        tags: options.cfTags,
-        ratingRange: options.cfRatingRange,
-        limit: options.cfLimit ?? 100,
-      })
-    case 'dsoj': {
-      const buf = typeof content === 'string' ? Buffer.from(content) : content
-      // 按魔数分派：ZIP（0x50 0x4B "PK"）走 AdmZip，XZ（\xFD7zXZ\x00）走 tar.xz 适配器
-      const kind = detectArchiveFormat(buf)
-      if (kind === 'tar.xz') {
-        const archive = await parseTarXzBuffer(buf)
-        return parseDsojArchive(archive)
-      }
-      if (kind === 'zip') {
-        return parseDsojZip(buf)
-      }
-      throw new ApiError(
-        'INVALID_DSOJ_FORMAT',
-        'DSOJ 标准格式必须是 ZIP 或 tar.xz 文件',
-        400
-      )
-    }
-    default:
-      throw new ApiError('INVALID_FORMAT', `不支持的格式: ${format}`, 400)
+  if (format !== 'dsoj') {
+    throw new ApiError('INVALID_FORMAT', '仅支持 DSOJ 标准题包导入', 400)
   }
+  const prepared = await prepareProblemImport({
+    format,
+    content,
+    rawOptions: options,
+    authorId: options.authorId,
+  })
+  return prepared.jobs.flatMap((job) => (job.ok ? [job.problem] : []))
+}
+
+export interface PreparedProblemImport {
+  jobs: DsojParseJobResult[]
+  options: ImportOptions
+}
+
+/**
+ * 解析前置：校验 format / 内容非空，解压 zip 或 tar.xz 并逐题解析。
+ * 全局错误（非法格式、格式不匹配、安全校验失败、无任何题目目录）在此抛出；
+ * 单题解析失败不会抛出，而是进入 jobs 的失败项。
+ */
+export async function prepareProblemImport(
+  input: ExecuteImportInput
+): Promise<PreparedProblemImport> {
+  const { format, content, rawOptions, authorId } = input
+  if (format !== 'dsoj') {
+    throw new ApiError('INVALID_FORMAT', '仅支持 DSOJ 标准题包导入（format=dsoj）', 400)
+  }
+  if (content == null || content === '') {
+    throw new ApiError('NO_CONTENT', '缺少导入内容', 400)
+  }
+  const options = parseImportOptions(rawOptions, authorId)
+  const buf = typeof content === 'string' ? Buffer.from(content, 'utf-8') : content
+  const kind = detectArchiveFormat(buf)
+  let archive: ArchiveLike
+  if (kind === 'tar.xz') {
+    archive = await parseTarXzBuffer(buf)
+  } else if (kind === 'zip') {
+    archive = new AdmZip(buf) as unknown as ArchiveLike
+  } else {
+    throw new ApiError('INVALID_DSOJ_FORMAT', 'DSOJ 标准格式必须是 ZIP 或 tar.xz 文件', 400)
+  }
+  const jobs = parseDsojArchiveDetailed(archive)
+  return { jobs, options }
+}
+
+/**
+ * 流式导入：meta → 逐题 item（解析失败项直接以 failed 结果输出）→ done。
+ * 供 API 路由与自定义 server 以 NDJSON 流写出。
+ */
+export async function executeProblemImportStream(
+  prepared: PreparedProblemImport,
+  onEvent: (event: ImportStreamEvent) => void
+): Promise<void> {
+  const { jobs, options } = prepared
+  onEvent({ type: 'meta', total: jobs.length })
+
+  const results: ImportedProblemResult[] = []
+  for (const job of jobs) {
+    const result: ImportedProblemResult = job.ok
+      ? await importOneProblem(job.problem, options)
+      : {
+          status: 'failed',
+          title: job.title || job.dir,
+          externalId: job.dir,
+          reason: job.reason,
+        }
+    results.push(result)
+    onEvent({ type: 'item', index: job.index, result })
+  }
+
+  const created = results.filter((r) => r.status === 'created').length
+  const skipped = results.filter((r) => r.status === 'skipped').length
+  const failed = results.filter((r) => r.status === 'failed').length
+
+  logger.info(
+    `[import] 流式导入完成：共 ${jobs.length} 题，新建 ${created}，跳过 ${skipped}，失败 ${failed}`
+  )
+
+  onEvent({
+    type: 'done',
+    summary: {
+      total: jobs.length,
+      created,
+      skipped,
+      failed,
+      message: `成功导入 ${created} 题${skipped > 0 ? `，跳过 ${skipped} 题` : ''}${failed > 0 ? `，失败 ${failed} 题` : ''}`,
+    },
+  })
 }
 
 export interface ExecuteImportInput {
   format: ImportFormat
-  /** 文件/文本内容；codeforces 可为 null */
+  /** 文件/文本内容 */
   content: string | Buffer | null
   rawOptions: unknown
   authorId: string
@@ -144,12 +174,13 @@ export interface ExecuteImportResult extends ImportBatchResult {
 }
 
 /**
- * 解析并写入题库
+ * 解析并写入题库（非流式入口）
+ * total 等于题包题目总数；单题解析失败项计入 failed。
  */
 export async function executeProblemImport(
   input: ExecuteImportInput
 ): Promise<ExecuteImportResult> {
-  const { format, content, rawOptions, authorId } = input
+  const { format } = input
   if (!VALID_IMPORT_FORMATS.includes(format)) {
     throw new ApiError(
       'INVALID_FORMAT',
@@ -157,34 +188,34 @@ export async function executeProblemImport(
       400
     )
   }
+  const prepared = await prepareProblemImport(input)
+  const { jobs, options } = prepared
 
-  const options = parseImportOptions(rawOptions, authorId)
-
-  if (format !== 'codeforces' && (content == null || content === '')) {
-    throw new ApiError('NO_CONTENT', '缺少导入内容', 400)
+  const results: ImportedProblemResult[] = []
+  for (const job of jobs) {
+    results.push(
+      job.ok
+        ? await importOneProblem(job.problem, options)
+        : {
+            status: 'failed' as const,
+            title: job.title || job.dir,
+            externalId: job.dir,
+            reason: job.reason,
+          }
+    )
   }
 
-  const importedProblems =
-    format === 'codeforces'
-      ? await parseImportByFormat(format, '', options)
-      : await parseImportByFormat(format, content ?? '', options)
+  const created = results.filter((r) => r.status === 'created').length
+  const skipped = results.filter((r) => r.status === 'skipped').length
+  const failed = results.filter((r) => r.status === 'failed').length
 
-  if (importedProblems.length === 0) {
-    return {
-      total: 0,
-      created: 0,
-      skipped: 0,
-      failed: 0,
-      results: [],
-      format,
-      message: '解析完成但未找到任何题目',
-    }
-  }
-
-  const result = await importProblems(importedProblems, options)
   return {
-    ...result,
+    total: jobs.length,
+    created,
+    skipped,
+    failed,
+    results,
     format,
-    message: `成功导入 ${result.created} 题${result.skipped > 0 ? `，跳过 ${result.skipped} 题` : ''}${result.failed > 0 ? `，失败 ${result.failed} 题` : ''}`,
+    message: `成功导入 ${created} 题${skipped > 0 ? `，跳过 ${skipped} 题` : ''}${failed > 0 ? `，失败 ${failed} 题` : ''}`,
   }
 }

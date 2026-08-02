@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
   Sync repo into WSL ~/dsoj and run npm run dev there (Linux judge only).
@@ -35,10 +35,23 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " Windows src: $repoRoot"
 Write-Host ""
 
+# Probe WSL availability. NOTE: the first `wsl` call starts the distro and may print
+# a Chinese warning to stderr (e.g. localhost proxy vs WSL0NAT mismatch). Under PS 5.1,
+# `$ErrorActionPreference=Stop` + `2>$null` turns native stderr into a terminating
+# error and falsely reports "WSL not available". So relax EAP to Continue around the probe.
+# Keep this block ASCII-only: UTF-8 Chinese + GBK misread can swallow the following
+# line break and merge code into the comment (see wsl-dev.cmd note).
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 try {
     $null = & wsl -e echo ok 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "wsl failed" }
+    $wslOk = ($LASTEXITCODE -eq 0)
 } catch {
+    $wslOk = $false
+} finally {
+    $ErrorActionPreference = $prevEAP
+}
+if (-not $wslOk) {
     Write-Fail "WSL not available. Install Ubuntu first: wsl --install"
     exit 1
 }

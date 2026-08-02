@@ -1,8 +1,6 @@
 /**
  * lib/problem/import/index.ts
- * 批量导入题库 - 统一入口
- *
- * 支持格式：FPS / Hydro / SYZOJ / CSV / Codeforces API / DSOJ 标准
+ * 批量导入题库 - 统一入口（仅支持 DSOJ 标准题包）
  */
 export type {
   ImportedProblem,
@@ -13,6 +11,8 @@ export type {
   ImportBatchResult,
   ImportFormat,
   ImportOptions,
+  ImportStreamEvent,
+  ImportStreamDoneSummary,
 } from './types'
 
 export {
@@ -22,37 +22,24 @@ export {
 
 export {
   executeProblemImport,
+  executeProblemImportStream,
+  prepareProblemImport,
   parseImportOptions,
   parseImportByFormat,
   VALID_IMPORT_FORMATS,
   IMPORT_MAX_FILE_BYTES,
 } from './execute'
 
-export {
-  parseFps,
-  parseFpsXml,
-  parseFpsJson,
-} from './fps-parser'
-
-export {
-  parseHydroZip,
-  parseHydroJson,
-} from './hydro-parser'
-
-export { parseSyzojJson } from './syzoj-parser'
-
-export { parseCsvProblems } from './csv-parser'
-
-export { fetchCodeforcesProblems } from './codeforces-sync'
-
-// DSOJ 标准格式（自主可控，推荐用于爬虫批量采集和题库迁移）
+// DSOJ 标准格式（自主实现，推荐用于爬虫批量采集和题库迁移）
 export {
   parseDsojZip,
   parseDsojArchive,
+  parseDsojArchiveDetailed,
   isDsojPack,
   isDsojPackArchive,
   DSOJ_PACK_VERSION,
   DSOJ_PACK_FORMAT_ID,
+  type DsojParseJobResult,
   type ArchiveEntry,
   type ArchiveLike,
 } from './dsoj-parser'

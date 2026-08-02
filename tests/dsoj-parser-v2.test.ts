@@ -5,7 +5,13 @@ import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import AdmZip from 'adm-zip'
-import { parseDsojZip, isDsojPack } from '@/lib/problem/import/dsoj-parser'
+import {
+  parseDsojZip,
+  parseDsojArchive,
+  parseDsojArchiveDetailed,
+  isDsojPack,
+  type ArchiveLike,
+} from '@/lib/problem/import/dsoj-parser'
 
 const REF_PACK = path.join(process.cwd(), '参考资源', 'dsoj-pack.zip')
 
@@ -330,5 +336,105 @@ spj_kind: bracket_construct
     expect(problem.spjCode).toContain('isValidBrackets')
     expect(problem.tags).toContain('Special Judge')
     expect(problem.testCases.length).toBeGreaterThanOrEqual(10)
+  })
+})
+
+describe('parseDsojArchiveDetailed 解析错误不再静默', () => {
+  /** 构造 3 题的题包：P1 有效、P2 缺 description.md（解析失败）、P3 有效；index.json 提供标题兜底 */
+  function buildMixedZip() {
+    const zip = new AdmZip()
+    zip.addFile('pack.yaml', Buffer.from(`format: dsoj-pack\nversion: 2.0\n`, 'utf-8'))
+    zip.addFile(
+      'index.json',
+      Buffer.from(
+        JSON.stringify({
+          schema_version: 2,
+          problem_count: 3,
+          problems: [
+            { order: 1, pid: 'P1', dir: 'P1', title: '第一题' },
+            { order: 2, pid: 'P2', dir: 'P2', title: '坏题' },
+            { order: 3, pid: 'P3', dir: 'P3', title: '第三题' },
+          ],
+        }),
+        'utf-8'
+      )
+    )
+    zip.addFile(
+      'problems/P1/problem.yaml',
+      Buffer.from(
+        `title: 第一题\nproblem_number: P1\ndifficulty: 入门\ntime_limit: 1000\nmemory_limit: 128\n`,
+        'utf-8'
+      )
+    )
+    zip.addFile('problems/P1/description.md', Buffer.from('# first problem description ok', 'utf-8'))
+    zip.addFile('problems/P1/testcases/1.in', Buffer.from('1\n', 'utf-8'))
+    zip.addFile('problems/P1/testcases/1.out', Buffer.from('1\n', 'utf-8'))
+    // P2：缺 description.md → 解析失败
+    zip.addFile(
+      'problems/P2/problem.yaml',
+      Buffer.from(`title: 坏题\nproblem_number: P2\ndifficulty: 入门\n`, 'utf-8')
+    )
+    zip.addFile('problems/P2/testcases/1.in', Buffer.from('1\n', 'utf-8'))
+    zip.addFile('problems/P2/testcases/1.out', Buffer.from('1\n', 'utf-8'))
+    zip.addFile(
+      'problems/P3/problem.yaml',
+      Buffer.from(
+        `title: 第三题\nproblem_number: P3\ndifficulty: 入门\ntime_limit: 1000\nmemory_limit: 128\n`,
+        'utf-8'
+      )
+    )
+    zip.addFile('problems/P3/description.md', Buffer.from('# third problem description ok', 'utf-8'))
+    zip.addFile('problems/P3/testcases/1.in', Buffer.from('1\n', 'utf-8'))
+    zip.addFile('problems/P3/testcases/1.out', Buffer.from('1\n', 'utf-8'))
+    return zip
+  }
+
+  it('部分解析失败时 detailed 返回全部项（含失败原因与 index 标题）', () => {
+    const zip = buildMixedZip()
+    const archive = zip as unknown as ArchiveLike
+    const detailed = parseDsojArchiveDetailed(archive)
+    expect(detailed).toHaveLength(3)
+    const okItems = detailed.filter((d) => d.ok)
+    const badItems = detailed.filter((d) => !d.ok)
+    expect(okItems).toHaveLength(2)
+    expect(badItems).toHaveLength(1)
+    const bad = badItems[0]
+    if (!bad.ok) {
+      expect(bad.dir).toBe('problems/P2/')
+      expect(bad.title).toBe('坏题')
+      expect(bad.reason).toMatch(/description\.md/)
+    }
+    // 顺序保持 index.json 的 order
+    const numbers = okItems.map((d) => (d.ok ? d.problem.problemNumber : undefined))
+    expect(numbers).toEqual(['P1', 'P3'])
+  })
+
+  it('parseDsojArchive 部分失败时只返回成功项（行为不变）', () => {
+    const zip = buildMixedZip()
+    const problems = parseDsojArchive(zip as unknown as ArchiveLike)
+    expect(problems).toHaveLength(2)
+    expect(problems.map((p) => p.problemNumber)).toEqual(['P1', 'P3'])
+  })
+
+  it('全部解析失败时 parseDsojArchive 抛 ALL_PROBLEMS_FAILED（含原因）', () => {
+    const zip = new AdmZip()
+    zip.addFile('pack.yaml', Buffer.from(`format: dsoj-pack\nversion: 2.0\n`, 'utf-8'))
+    zip.addFile(
+      'problems/PB1/problem.yaml',
+      Buffer.from(`title: 坏题1\nproblem_number: PB1\ndifficulty: 入门\n`, 'utf-8')
+    )
+    zip.addFile(
+      'problems/PB2/problem.yaml',
+      Buffer.from(`title: 坏题2\nproblem_number: PB2\ndifficulty: 入门\n`, 'utf-8')
+    )
+    let threw = false
+    try {
+      parseDsojArchive(zip as unknown as ArchiveLike)
+    } catch (e) {
+      threw = true
+      expect(String((e as Error).message)).toMatch(/所有题目解析失败/)
+      expect(String((e as Error).message)).toContain('problems/PB1/')
+    }
+    expect(threw).toBe(true)
   })
 })
