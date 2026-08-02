@@ -167,6 +167,9 @@ async function importSolutions(
           : s.content,
       isOfficial: false,
       sourceType: 'USER',
+      // 安全合规：批量导入由管理员触发，导入即视为已通过（不经审核）
+      status: 'approved',
+      reviewedAt: new Date(),
     })),
   })
 }
