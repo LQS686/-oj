@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { FileText, List, BarChart2, Info } from 'lucide-react'
+import { FileText, List, ChartBar, Info } from 'lucide-react'
 import { formatDateTimeShort } from '@/lib/utils'
 import { useContestCountdown } from '@/hooks/useContestCountdown'
 import { EntityDetailHeader } from '@/components/entity'
@@ -65,7 +65,7 @@ export default function ContestHeader({
           {
             key: 'rank',
             label: '排名',
-            icon: BarChart2,
+            icon: ChartBar,
             href: `/contests/${contest.id}/rank`,
           },
         ]

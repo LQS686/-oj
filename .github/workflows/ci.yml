@@ -45,7 +45,7 @@ jobs:
         # 勿设置 registry-url（会注入空的 _authToken，公共包安装秒失败）
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Clear npm cache (skip-cache only)
         if: steps.skip-cache.outputs.skip == 'true'
