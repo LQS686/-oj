@@ -282,19 +282,25 @@ code, pre {
     font-size: 0.875rem;
     border-collapse: collapse;
     border: 1px solid var(--border);
+    background: var(--card);
   }
+  /* 覆盖 tailwind typography 的默认深色表头：与浅色卡片协调，避免「深底白字」突兀 */
+  .prose thead,
   .prose th {
     border: 1px solid var(--border);
-    background: rgba(79, 106, 232, 0.03);
-    padding: 0.75rem 1rem;
+    background: var(--muted) !important;
+    padding: 0.625rem 1rem;
     text-align: left;
     font-weight: 600;
-    color: var(--foreground);
+    color: var(--foreground) !important;
   }
   .prose td {
     border: 1px solid var(--border);
     padding: 0.75rem 1rem;
-    color: var(--muted-foreground);
+    color: var(--foreground);
+  }
+  .dark .prose td {
+    color: var(--foreground);
   }
   .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
     font-weight: 700;

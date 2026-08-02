@@ -14,12 +14,14 @@ import {
   ExternalLink,
   FileCode,
   Loader2,
+  Flag,
 } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import { useUser } from '@/contexts/UserContext'
 import SolutionCard, { type SolutionListItem } from '@/components/solution/SolutionCard'
 import { fetchWithCookie } from '@/lib/api/base'
 import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
+import ReportModal from '@/components/report/ReportModal'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { loginPathFromLocation } from '@/lib/navigation'
 
@@ -127,6 +129,8 @@ export default function SolutionTabPanel({
  // Phase 6 Task 32.4: 语言筛选 tab（'all' = 全部，'cpp' / 'python' / ... = 按语言过滤）
  const [languageFilter, setLanguageFilter] = useState<string>('all')
  const [createOpen, setCreateOpen] = useState(false)
+ // 举报（安全合规：投诉举报机制）
+ const [reportTarget, setReportTarget] = useState<SolutionListItem | null>(null)
 
  /** 行内展开：同一时间只开一篇，正文懒加载 */
  const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -536,7 +540,7 @@ export default function SolutionTabPanel({
    >
     {expanded && (
      <div className="space-y-3">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-4">
        <Link
         href={`/problems/${problemId}/solutions/${solution.id}`}
         onClick={(e) => e.stopPropagation()}
@@ -545,6 +549,20 @@ export default function SolutionTabPanel({
         在新页打开
         <ExternalLink className="w-3 h-3" />
        </Link>
+       {!!user && user.id !== solution.author?.id && (
+        <button
+         type="button"
+         onClick={(e) => {
+          e.stopPropagation()
+          setReportTarget(solution)
+         }}
+         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-error transition-colors"
+         aria-label="举报该题解"
+        >
+         <Flag className="w-3 h-3" />
+         举报
+        </button>
+       )}
       </div>
 
       {loading && !detail && (
@@ -619,6 +637,14 @@ export default function SolutionTabPanel({
    })
   }
  }}
+ />
+
+ <ReportModal
+  open={!!reportTarget}
+  onClose={() => setReportTarget(null)}
+  targetType="SOLUTION"
+  targetId={reportTarget?.id ?? ''}
+  targetTitle={reportTarget?.title}
  />
  </div>
  )

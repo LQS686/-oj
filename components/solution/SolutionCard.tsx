@@ -8,6 +8,7 @@ export interface SolutionListItem {
   id: string
   title: string
   author: {
+    id: string
     nickname: string
     avatar?: string
   }
