@@ -1122,18 +1122,6 @@ code, pre {
   border-bottom-color: var(--primary-dark);
 }
 
-.markdown-body .markdown-inline-code {
-  background: rgba(79, 106, 232, 0.08);
-  color: var(--primary);
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-  font-weight: 500;
-  border: 1px solid rgba(79, 106, 232, 0.12);
-  word-break: break-word;
-}
-
 .markdown-body pre {
   background: var(--card);
   color: var(--foreground);
@@ -1222,43 +1210,6 @@ code, pre {
   text-shadow: none !important;
 }
 
-.markdown-body .markdown-table {
-  width: 100%;
-  font-size: 0.875rem;
-  border-collapse: collapse;
-  border: 1px solid var(--border);
-  margin: 0.75rem 0;
-  background: var(--card);
-}
-
-.markdown-body .markdown-thead {
-  background: rgba(79, 106, 232, 0.04);
-}
-
-.markdown-body .markdown-tr {
-  border-bottom: 1px solid var(--border);
-}
-
-.markdown-body .markdown-tr:last-child {
-  border-bottom: none;
-}
-
-.markdown-body .markdown-th {
-  border: 1px solid var(--border);
-  padding: 0.5rem 0.75rem;
-  text-align: left;
-  font-weight: 600;
-  color: var(--foreground);
-  background: rgba(79, 106, 232, 0.04);
-}
-
-.markdown-body .markdown-td {
-  border: 1px solid var(--border);
-  padding: 0.5rem 0.75rem;
-  color: var(--muted-foreground);
-  vertical-align: top;
-}
-
 /* 列表样式：直接应用到原生 ul/ol/li 标签，不依赖 .markdown-* 类名
    原因：MarkdownContent 组件用 react-markdown 渲染，输出的是原生 ul/ol/li
    标签（不带 className），原 .markdown-ul/.markdown-ol/.markdown-li 规则
@@ -1337,24 +1288,6 @@ code, pre {
   margin-right: 0.5rem;
 }
 
-.markdown-body .markdown-blockquote {
-  border-left: 3px solid var(--primary);
-  padding: 0.375rem 0 0.375rem 1rem;
-  margin: 0.75rem 0;
-  font-style: italic;
-  color: var(--muted-foreground);
-  background: rgba(79, 106, 232, 0.03);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
-.markdown-body .markdown-blockquote > :first-child {
-  margin-top: 0;
-}
-
-.markdown-body .markdown-blockquote > :last-child {
-  margin-bottom: 0;
-}
-
 .markdown-body .markdown-hr {
   border: none;
   height: 1px;
@@ -1374,28 +1307,9 @@ code, pre {
   color: var(--foreground);
 }
 
-.dark .markdown-body .markdown-inline-code {
-  background: rgba(129, 140, 248, 0.12);
-  color: #A5B4FC;
-  border-color: rgba(129, 140, 248, 0.2);
-}
-
 .dark .markdown-body pre {
   background: #0d1117;
   border-color: var(--border);
-}
-
-.dark .markdown-body .markdown-table {
-  background: var(--background-secondary);
-}
-
-.dark .markdown-body .markdown-thead,
-.dark .markdown-body .markdown-th {
-  background: rgba(129, 140, 248, 0.06);
-}
-
-.dark .markdown-body .markdown-blockquote {
-  background: rgba(129, 140, 248, 0.06);
 }
 
 @media (prefers-reduced-motion: reduce) {

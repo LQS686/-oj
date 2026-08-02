@@ -76,7 +76,7 @@ export default function MarkdownContent({
  }
 
  return (
- <code className="bg-primary/10 text-primary-light px-1.5 py-0.5 rounded border border-primary/20 font-mono text-[0.85em]" {...props}>
+ <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 font-mono text-[0.85em]" {...props}>
  {children}
  </code>
  )
@@ -84,20 +84,20 @@ export default function MarkdownContent({
  table({ children }) {
  return (
  <div className="overflow-x-auto my-4">
- <table className="min-w-full border-collapse border border-slate-600">
+ <table className="min-w-full border-collapse border border-border">
  {children}
  </table>
  </div>
  )
  },
  th({ children }) {
- return <th className="border border-slate-600 px-4 py-2 bg-slate-700 text-left font-semibold">{children}</th>
+ return <th className="border border-border px-4 py-2 bg-muted text-left font-semibold">{children}</th>
  },
  td({ children }) {
- return <td className="border border-slate-600 px-4 py-2">{children}</td>
+ return <td className="border border-border px-4 py-2">{children}</td>
  },
  blockquote({ children }) {
- return <blockquote className="border-l-4 border-primary pl-4 italic text-slate-400">{children}</blockquote>
+ return <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground">{children}</blockquote>
  },
  }}
  >

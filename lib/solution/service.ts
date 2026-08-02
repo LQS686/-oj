@@ -186,18 +186,13 @@ export async function listSolutionsWithPermission(
   // - 管理员/教师：全部可见
   // - 普通登录用户：已通过 + 自己的全部状态（待审核/驳回/下架仅自己可见）
   // - 未登录：仅已通过
-  // 兼容存量数据：存量题解 status 为 null（schema 改动前导入），视为已通过
-  // 注：Prisma 不允许对非可空标量做 { equals: null }，改用 NOT in(待审核/驳回/下架)
-  const hiddenOrPending: Prisma.SolutionWhereInput = {
-    status: { in: ['pending', 'rejected', 'hidden'] },
-  }
   const where: Prisma.SolutionWhereInput = { problemId: realProblemId }
   if (viewer && canManageContent(viewer)) {
     // 全部可见，不追加过滤
   } else if (viewer) {
-    where.OR = [{ NOT: hiddenOrPending }, { authorId: viewer.id }]
+    where.OR = [{ status: 'approved' }, { authorId: viewer.id }]
   } else {
-    where.NOT = hiddenOrPending
+    where.status = 'approved'
   }
   const [items, total] = await Promise.all([
     prisma.solution.findMany({
@@ -319,8 +314,7 @@ export async function getSolutionDetailWithPermission(
   if (!solution) return { found: false as const }
 
   // 审核状态过滤：非「已通过」内容仅作者本人或管理员/教师可见
-  // 兼容存量数据：status 为 null 视为已通过（schema 改动前导入的题解）
-  if (solution.status !== 'approved' && solution.status !== null) {
+  if (solution.status !== 'approved') {
     const isManager = viewer && canManageContent(viewer)
     const isAuthor = viewer && solution.authorId === viewer.id
     if (!isManager && !isAuthor) {
