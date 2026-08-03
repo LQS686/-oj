@@ -19,6 +19,13 @@ const OUTPUT_LIMIT_RATIO = 2
 /** RE/pretest 预览截断 */
 const OUTPUT_PREVIEW_BYTES = 8 * 1024
 const ERROR_PREVIEW_BYTES = 8 * 1024
+/**
+ * 杀进程阈值高于判定阈值的缓冲（参考 AtCoder 1.1× / go-judge）。
+ * 判定仍严格按 timeLimit（CPU > timeLimit 即 TLE），但 dsoj-watch 与
+ * setrlimit 在 timeLimit + 此缓冲处才杀进程，使 rusage 测量值自然 > timeLimit，
+ * 避免「2.99s TLE」粒度矛盾（内核在 3.0s 边界杀 → tick 测到 2.99s）。
+ */
+const CPU_KILL_BUFFER_MS = 200
 
 /**
  * 根据标准答案大小计算 OLE 上限：
@@ -217,6 +224,11 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
   //    若仍用 3×TL，会把「CPU 未超限、只是写了上百万行」的正解误杀成 TLE（如 LP3383）
   //    I/O 预算按 ~8MB/s，上限 ioSlackMaxMs（系统设置可调），避免暴力解拖到 120s+
   const cpuTimeLimitMs = timeLimit + extraTime
+  // B-P2-13：杀进程阈值 > 判定阈值（参考 AtCoder 1.1× / go-judge / Hydro）。
+  // 判定仍严格按 timeLimit（CPU > timeLimit 即 TLE），但 dsoj-watch 与
+  // setrlimit 在 timeLimit + 200ms 才杀进程，使 rusage 测量值自然 > timeLimit，
+  // 避免「2.99s TLE」的粒度矛盾（内核在 3.0s 边界杀 → tick 粒度测到 2.99s）。
+  const cpuKillMs = cpuTimeLimitMs + CPU_KILL_BUFFER_MS
   const expectedBytesForWall = expectedOutputBytes ?? 0
   const ioSlackMaxMs = getJudgeConfig().ioSlackMaxMs
   const ioSlackMs = Math.min(ioSlackMaxMs, Math.ceil(expectedBytesForWall / 8000))
@@ -287,11 +299,12 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     const timeFilePath = join(tempDir, `time_${timestamp}_${randomId}.txt`)
     const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
     const safeMem = Math.min(Math.max(16, Number(memoryLimit) || 256), 4096)
-    // RLIMIT_CPU 现由 dsoj-watch 的 setrlimit 在子进程中设置（soft=ceil(cpuLimit/1000),
+    // RLIMIT_CPU 现由 dsoj-watch 的 setrlimit 在子进程中设置（soft=ceil(cpuKillMs/1000),
     // hard=soft+1），不再通过 bash ulimit -t（soft=hard 同值导致直接 SIGKILL）。
     // 此参数保留仅为向后兼容 runner.sh 调用签名，实际未被使用。
+    // 传 cpuKillMs（=timeLimit+buffer）使内核杀进程晚于判定阈值，测量值自然 > timeLimit。
     const safeCpu = Math.min(
-      Math.max(1, Math.ceil(Number(cpuTimeLimitMs) / 1000) || 1),
+      Math.max(1, Math.ceil(Number(cpuKillMs) / 1000) || 1),
       300,
     )
     const safeStackMb = 8
@@ -323,7 +336,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       DSOJ_STDOUT_FILE: outputPath,
       DSOJ_STDERR_FILE: errorPath,
       DSOJ_OUTPUT_LIMIT_BYTES: String(Math.max(1024, outputLimitBytes)),
-      DSOJ_CPU_LIMIT_MS: String(Math.max(1, cpuTimeLimitMs)),
+      DSOJ_CPU_LIMIT_MS: String(Math.max(1, cpuKillMs)),
       // runner 内墙钟硬杀：比 Node setTimeout 更及时（事件循环忙碌时也生效）
       DSOJ_WALL_LIMIT_MS: String(Math.max(1, hardTimeoutMs)),
     }
@@ -692,18 +705,15 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       void wallTimeMs // 仅用于调试，避免未使用警告
     }
 
-    // B-P2-13：CPU TLE(exit 152) 时内核在 RLIMIT_CPU soft 限制处发 SIGXCPU，
-    // 但 rusage 受 tick 粒度影响报告值略低于限制（如 2990ms vs 3000ms）。
-    // 显示时间至少应为 timeLimit，符合 TLE 语义并与其他 OJ 一致。
-    const displayCpuMs = cpuTleExit ? Math.max(realCpuMs, timeLimit) : realCpuMs
-    const displayTime = cpuTleExit ? Math.max(preciseTime, timeLimit) : preciseTime
-
+    // B-P2-13：杀进程阈值 = timeLimit + 200ms（cpuKillMs），rusage 测量值自然
+    // > timeLimit（如 3180ms > 3000ms），无需 clamp，显示真实测量值即可。
+    // 参考 AtCoder/go-judge：显示真实 rusage 值，杀进程阈值 > 判定阈值。
     if (abortedBySignal) {
       detailedError = '评测已中止'
     } else if (timeout) {
       const wallTimeMs = Math.max(0, endTime - startTime)
       if (timeoutType === 'cpu') {
-        detailedError = `Time Limit Exceeded (CPU 时间 ${displayCpuMs}ms > 限制 ${timeLimit}ms)`
+        detailedError = `Time Limit Exceeded (CPU 时间 ${realCpuMs}ms > 限制 ${timeLimit}ms)`
       } else {
         detailedError = `Time Limit Exceeded (墙钟时间 ${wallTimeMs}ms > 限制 ${wallClockLimitMs}ms，可能是 sleep 型死循环或 IO 阻塞)`
       }
@@ -725,7 +735,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     return {
       output,
       error: detailedError,
-      time: abortedBySignal ? 0 : displayTime,
+      time: abortedBySignal ? 0 : preciseTime,
       memory: abortedBySignal ? 0 : peakMemoryKB,
       exitCode,
       timeout,
@@ -733,7 +743,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       outputLimitExceeded,
       runtimeError,
       cannotStart,
-      cpuTime: abortedBySignal ? 0 : displayCpuMs,
+      cpuTime: abortedBySignal ? 0 : realCpuMs,
       exceedsTimeLimit,
       timeoutType,
       aborted: abortedBySignal || undefined,
