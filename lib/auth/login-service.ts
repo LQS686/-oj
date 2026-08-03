@@ -56,9 +56,16 @@ async function checkAccountLockout(usernameOrEmail: string): Promise<void> {
     if (attempts && parseInt(attempts, 10) >= MAX_LOGIN_ATTEMPTS) {
       const ttl = await client.ttl(key)
       const minutes = Math.ceil((ttl > 0 ? ttl : LOCKOUT_DURATION_SEC) / 60)
+      // A-P2-5：真实锁定原因仅记日志，对外统一为「用户名或密码错误」，避免通过锁定提示枚举账号存在性
+      logger.warn('账号已锁定，拒绝登录', {
+        usernameOrEmail,
+        attempts: parseInt(attempts, 10),
+        lockoutMinutes: minutes,
+        key,
+      })
       throw new LoginError(
-        `登录失败次数过多，账号已临时锁定，请 ${minutes} 分钟后重试`,
-        'ACCOUNT_LOCKED'
+        '用户名或密码错误',
+        'UNAUTHORIZED'
       )
     }
   } catch (e) {

@@ -1,9 +1,14 @@
 /**
  * /api/admin/testcases/upload - 上传测试点压缩包（管理员）
  */
-import { withApi, ok, throw400 } from '@/lib/api/withApi'
-import { parseTestCaseZip } from '@/lib/problem/testcase'
+import { withApi, ok, throw400, ApiError } from '@/lib/api/withApi'
+import { parseTestCaseZip, TESTCASE_UPLOAD_CONFIG } from '@/lib/problem/testcase'
 import { logger } from '@/lib/logger'
+
+// A-P1-1 修复：上传大小限制（对齐 parseTestCaseZip 的 MAX_FILE_SIZE 上限）
+const MAX_UPLOAD_BYTES = TESTCASE_UPLOAD_CONFIG.MAX_FILE_SIZE
+// Content-Length 前置检查上限：50MB 压缩包 + multipart 表单开销余量
+const MAX_CONTENT_LENGTH = 60 * 1024 * 1024
 
 // 禁用 Next.js 默认的 body parser
 export const dynamic = 'force-dynamic'
@@ -13,6 +18,12 @@ export const bodyParser = false
  * POST /api/admin/testcases/upload - 上传测试点压缩包
  */
 export const POST = withApi.admin(async (req, _ctx, { user: _user }) => {
+
+  // A-P1-1 修复：读取 body 前先检查 Content-Length，超过上限直接拒绝，避免超大请求全量读入内存（OOM）
+  const contentLength = Number(req.headers.get('content-length') || 0)
+  if (contentLength > MAX_CONTENT_LENGTH) {
+    throw new ApiError('PAYLOAD_TOO_LARGE', `上传文件过大（最大 ${MAX_UPLOAD_BYTES / 1024 / 1024}MB）`, 413)
+  }
 
   logger.info('📥 收到测试点上传请求')
 
@@ -30,6 +41,12 @@ export const POST = withApi.admin(async (req, _ctx, { user: _user }) => {
   if (!file) {
     logger.error('❌ 未选择文件')
     throw400('NO_FILE', '未选择文件')
+  }
+
+  // A-P1-1 修复：读取文件内容前按 file.size 校验（对齐 parseTestCaseZip 的 50MB 上限）
+  if (file.size > MAX_UPLOAD_BYTES) {
+    logger.error('❌ 文件大小超过限制:', file.size)
+    throw400('FILE_TOO_LARGE', `压缩包大小超过限制（最大 ${MAX_UPLOAD_BYTES / 1024 / 1024}MB）`)
   }
 
   // 验证文件类型

@@ -33,4 +33,24 @@ describe('SPJ exit code mapping (Testlib)', () => {
     const r = parseSpjExit(3, '', 'FAIL checker bug', 10)
     expect(r.status).toBe('SE')
   })
+
+  // B-P1-1：墙钟超时（runner/dsoj-watch 退出码 152，或 Node timeout 兜底归一为 152）
+  // 必须判 SE，而不是被误判成 WA（退出码 1）
+  it('maps timeout (152, SIGXCPU) to SE, not WA', () => {
+    const r = parseSpjExit(152, '', '', 10)
+    expect(r.status).toBe('SE')
+    expect(r.score).toBe(0)
+    expect(r.message).toContain('超时')
+  })
+
+  it('maps 137 (SIGKILL, 墙钟强杀/内存超限) to SE', () => {
+    const r = parseSpjExit(137, '', '', 10)
+    expect(r.status).toBe('SE')
+    expect(r.score).toBe(0)
+  })
+
+  it('keeps exit 1 as WA (超时归一不能误伤正常 WA)', () => {
+    const r = parseSpjExit(1, '', 'wrong answer', 10)
+    expect(r.status).toBe('WA')
+  })
 })

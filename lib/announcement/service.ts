@@ -87,8 +87,9 @@ export async function listPublicAnnouncements(limit = 8): Promise<PublicAnnounce
 /** 公开公告详情（仅已发布且在有效期内） */
 export async function getPublicAnnouncementById(id: string): Promise<PublicAnnouncementDetail | null> {
   const now = new Date()
+  let row
   try {
-    const row = await prisma.systemAnnouncement.findFirst({
+    row = await prisma.systemAnnouncement.findFirst({
       where: {
         id,
         isPublished: true,
@@ -97,25 +98,28 @@ export async function getPublicAnnouncementById(id: string): Promise<PublicAnnou
         author: { select: { username: true, nickname: true } },
       },
     })
-    if (!row || !isActive(now, row.publishedAt, row.expiresAt)) return null
-    return {
-      id: row.id,
-      title: row.title,
-      content: row.content,
-      isPinned: row.isPinned,
-      publishedAt: row.publishedAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      authorName: row.author?.nickname || row.author?.username || '未知',
-    }
   } catch (error) {
+    // C-P2-21：DB 异常不伪装成「不存在」，记录日志后交由统一错误处理（500），避免掩盖故障
     logger.error('[announcement] getPublicAnnouncementById failed', error)
-    return null
+    throw error
+  }
+  if (!row || !isActive(now, row.publishedAt, row.expiresAt)) return null
+  return {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    isPinned: row.isPinned,
+    publishedAt: row.publishedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    authorName: row.author?.nickname || row.author?.username || '未知',
   }
 }
 
 export async function listAllAnnouncementsForAdmin(): Promise<AdminAnnouncementItem[]> {
   const rows = await prisma.systemAnnouncement.findMany({
     orderBy: [{ isPinned: 'desc' }, { updatedAt: 'desc' }],
+    // C-P2-11：管理端列表无分页，加 take 上限防公告数量过大（调用方 /api/admin/announcements 无需 total）
+    take: 200,
     include: {
       author: { select: { username: true, nickname: true } },
     },

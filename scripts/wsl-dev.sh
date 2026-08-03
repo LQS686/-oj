@@ -81,9 +81,9 @@ patch_env() {
     fi
   fi
   if grep -q '^DATABASE_URL=' .env; then
-    sed -i 's|^DATABASE_URL=.*|DATABASE_URL=mongodb://127.0.0.1:27017/oj-platform?replicaSet=rs0\&directConnection=true|' .env
+    sed -i 's|^DATABASE_URL=.*|DATABASE_URL=mongodb://127.0.0.1:27017/oj_platform?replicaSet=rs0\&directConnection=true|' .env
   else
-    echo 'DATABASE_URL=mongodb://127.0.0.1:27017/oj-platform?replicaSet=rs0&directConnection=true' >> .env
+    echo 'DATABASE_URL=mongodb://127.0.0.1:27017/oj_platform?replicaSet=rs0&directConnection=true' >> .env
   fi
   # 开发环境保存 SMTP 等设置需要 ENCRYPTION_KEY；空值会导致 PUT /api/admin/settings 500
   if ! grep -q '^ENCRYPTION_KEY=.' .env; then

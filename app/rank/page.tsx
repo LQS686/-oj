@@ -5,7 +5,7 @@ import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { motion, AnimatePresence } from 'motion/react'
 import { Trophy, TrendingUp, Minus, RefreshCw, AlertCircle, ChevronUp, Crown, Medal, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import io from 'socket.io-client'
+import { acquireAppSocket, releaseAppSocket } from '@/hooks/socket-client'
 import { EducationalPageShell, ListEmptyState, ListToolbar, ListToolbarTabs } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import { errorLike } from '@/lib/api/errors'
@@ -100,21 +100,19 @@ export default function RankPage() {
  }, [activeTab, fetchRankings, fetchMyRank])
 
  useEffect(() => {
- const socket = io({
-   path: '/socket.io/',
-   transports: ['websocket'],
-   upgrade: false,
-   withCredentials: true,
- })
- 
- socket.on('leaderboard:update', () => {
+ // 复用全局 socket 单例（与提交/通知/公告共用一条连接），避免单独建立连接
+ const socket = acquireAppSocket()
+
+ const onLeaderboardUpdate = () => {
  if (pageRef.current === 1) {
  fetchRankings(1, activeTab, true)
  }
- })
+ }
+ socket.on('leaderboard:update', onLeaderboardUpdate)
 
  return () => {
- socket.disconnect()
+ socket.off('leaderboard:update', onLeaderboardUpdate)
+ releaseAppSocket()
  }
  }, [activeTab, fetchRankings])
 

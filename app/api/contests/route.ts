@@ -9,6 +9,7 @@
 import { withApi, ok, readJson, readQuery, throw403, resolveViewerFromRequest } from '@/lib/api/withApi'
 import { canManageContent } from '@/lib/permissions'
 import { toInt } from '@/lib/api/validation'
+import { validateContestTimeFields } from '@/lib/contest/admin'
 import { createContestDirect } from '@/lib/mongodb-direct'
 import { listPublicContests } from '@/lib/contest/service'
 
@@ -45,6 +46,13 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     problemIds?: string[]
     sealRankTime?: string | null
   }>(req)
+
+  // A-P2-3：先校验起止时间与封榜时间窗（非法日期 400、结束须晚于开始），再写入
+  validateContestTimeFields({
+    startTime: body.startTime,
+    endTime: body.endTime,
+    sealRankTime: body.sealRankTime,
+  })
 
   // Use direct helper to avoid Prisma transaction issues on non-replica set MongoDB
   const contest = await createContestDirect({

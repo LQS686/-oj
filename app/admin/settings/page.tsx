@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { useRouter } from 'next/navigation'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
 import { Save, Mail, Shield, Globe, Send, Cpu, ChevronDown, ChevronUp } from 'lucide-react'
@@ -21,7 +21,7 @@ function numOr(v: string, fallback: number): number {
 }
 
 export default function AdminSettingsPage() {
- const router = useRouter()
+ const scheduleForbiddenRedirect = useForbiddenRedirect()
  const { refreshSettings } = useSettings()
  const [loading, setLoading] = useState(true)
  const [saving, setSaving] = useState(false)
@@ -51,7 +51,7 @@ export default function AdminSettingsPage() {
 
  if (response.status === 403) {
  setError('需要系统管理员权限')
- setTimeout(() => router.push('/403'), 2000)
+ scheduleForbiddenRedirect()
  return
  }
 
@@ -68,7 +68,7 @@ export default function AdminSettingsPage() {
  } finally {
  setLoading(false)
  }
- }, [router])
+ }, [scheduleForbiddenRedirect])
 
  useDeferredEffect(() => {
  void fetchSettings()

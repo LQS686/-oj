@@ -1,7 +1,7 @@
 /**
  * /api/users/avatar/upload/chunk - 接收头像分片
  */
-import { withApi, ok, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, throw400, ApiError } from '@/lib/api/withApi'
 import { saveChunk, isValidUploadId } from '@/lib/upload'
 import { assertAvatarUploadOwner } from '@/lib/avatar-upload-registry'
 import { logger } from '@/lib/logger'
@@ -10,6 +10,8 @@ import { logger } from '@/lib/logger'
 const MAX_CHUNK_SIZE = 2 * 1024 * 1024
 /** chunkIndex 上限（与 complete 路由的 totalChunks 上限一致） */
 const MAX_CHUNK_INDEX = 1000
+/** A-P1-3 修复：整包请求体上限 = 单分片 2MB + multipart 表单开销余量（与 server.ts MAX_BODY_SIZE 对齐） */
+const MAX_REQUEST_BODY = 3 * 1024 * 1024
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
   // 关键修复：自定义 server 模式下（tsx server.ts + Next 16），req.formData() 在 multipart/form-data
@@ -18,6 +20,14 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   let uploadId = ''
   let chunkIndex = NaN
   let fileBuffer: Buffer | null = null
+
+  // A-P1-3 修复：读取请求体前先检查 Content-Length，超过上限直接拒绝，
+  // 避免超大请求体被 req.arrayBuffer() 全量读入内存（OOM，登录用户可触发）。
+  // 置于 try 外：不落入下方「解析失败统一转 PARSE_FAILED」的 catch，保留 413 语义。
+  const contentLength = Number(req.headers.get('content-length') || 0)
+  if (contentLength > MAX_REQUEST_BODY) {
+    throw new ApiError('PAYLOAD_TOO_LARGE', `请求体过大（单分片最大 ${MAX_CHUNK_SIZE / 1024 / 1024}MB）`, 413)
+  }
 
   try {
     const contentType = req.headers.get('content-type') || ''
@@ -38,6 +48,10 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     }
     const boundary = `--${boundaryValue}`
     const body = Buffer.from(arrayBuffer)
+    // A-P1-3 修复：无 Content-Length（chunked 编码）时兜底，读入后按实际大小再校验，防止绕过前置检查
+    if (body.length > MAX_REQUEST_BODY) {
+      throw new ApiError('PAYLOAD_TOO_LARGE', `请求体过大（单分片最大 ${MAX_CHUNK_SIZE / 1024 / 1024}MB）`, 413)
+    }
 
     // 极简 multipart 解析：定位各 part 的头部与正文
     const parts: Array<{ headers: string; data: Buffer }> = []
@@ -72,6 +86,8 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
       }
     }
   } catch (e) {
+    // 业务异常（如 PAYLOAD_TOO_LARGE）原样上抛，保留其状态码与错误信息；其余解析失败统一处理
+    if (e instanceof ApiError) throw e
     logger.error('multipart 解析失败', e instanceof Error ? e : new Error(String(e)))
     throw400('PARSE_FAILED', 'multipart 解析失败')
   }

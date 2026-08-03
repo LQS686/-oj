@@ -121,10 +121,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.server.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/tailwind.config.ts ./
 COPY --from=builder --chown=nextjs:nodejs /app/postcss.config.mjs ./
 
-# 复制 tailwindcss（standalone 不追踪的 CSS 相关依赖）
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@tailwindcss ./node_modules/@tailwindcss
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tailwindcss ./node_modules/tailwindcss
-
 # 安装生产依赖
 # 注意：standalone 模式只追踪 Next.js 构建图里的依赖，但 server.ts 动态 import 了
 # 很多模块（dotenv、socket.io、ioredis、jsonwebtoken、mongodb、bcryptjs、adm-zip、

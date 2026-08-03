@@ -26,6 +26,39 @@ export interface AdminUpdateContestInput {
   sealUnlocked?: boolean
 }
 
+/**
+ * A-P2-3：竞赛时间字段公共校验（创建/更新共用，公开 API 与管理员 API 对齐）
+ * 非法日期 / 结束不晚于开始 / 封榜时间越界一律抛 400。
+ * 未提供的字段不校验（允许部分更新）；sealRankTime 仅当 start/end 均已知时校验时间窗。
+ */
+export function validateContestTimeFields(input: {
+  startTime?: string | Date | null
+  endTime?: string | Date | null
+  sealRankTime?: string | Date | null
+}) {
+  const isEmpty = (v: unknown): v is null | undefined | '' => v == null || v === ''
+  const start = isEmpty(input.startTime) ? null : new Date(input.startTime as string | Date)
+  const end = isEmpty(input.endTime) ? null : new Date(input.endTime as string | Date)
+  if (!isEmpty(input.startTime) && isNaN(start!.getTime())) {
+    throw new ApiError('INVALID_TIME', '开始时间格式无效', 400)
+  }
+  if (!isEmpty(input.endTime) && isNaN(end!.getTime())) {
+    throw new ApiError('INVALID_TIME', '结束时间格式无效', 400)
+  }
+  if (start && end && end.getTime() <= start.getTime()) {
+    throw new ApiError('INVALID_TIME', '结束时间必须晚于开始时间', 400)
+  }
+  if (!isEmpty(input.sealRankTime)) {
+    const seal = new Date(input.sealRankTime as string | Date)
+    if (isNaN(seal.getTime())) {
+      throw new ApiError('INVALID_SEAL_TIME', '封榜时间格式无效', 400)
+    }
+    if (start && end && (seal.getTime() <= start.getTime() || seal.getTime() >= end.getTime())) {
+      throw new ApiError('INVALID_SEAL_TIME', '封榜时间必须在比赛起止时间范围内', 400)
+    }
+  }
+}
+
 export async function adminUpdateContest(
   contestId: string,
   body: AdminUpdateContestInput
@@ -89,9 +122,57 @@ export async function adminUpdateContest(
     updateData.sealUnlocked = !!sealUnlocked
   }
 
-  // 改为非事务处理以兼容 standalone MongoDB
-  // 1. 更新基本信息
-  await prisma.contest.update({ where: { id: contestId }, data: updateData })
+  // 题目存在性与可见性校验（只读，事务外执行，与 public.updateContestWithProblems 一致）
+  if (problems && Array.isArray(problems) && problems.length > 0) {
+    const found = await prisma.problem.findMany({
+      where: { id: { in: problems } },
+      select: { id: true, visibility: true },
+    })
+    if (found.length !== problems.length) {
+      const foundIds = new Set(found.map((p) => p.id))
+      const missing = problems.filter((id) => !foundIds.has(id))
+      throw new ApiError('INVALID_PROBLEMS', `题目不存在: ${missing.slice(0, 5).join(', ')}`, 400)
+    }
+    // 竞赛仅允许 public / contest 题；禁止后台隐藏草稿绕过可见性
+    const invalid = found.filter(
+      (p) => p.visibility !== 'public' && p.visibility !== 'contest'
+    )
+    if (invalid.length > 0) {
+      throw new ApiError(
+        'INVALID_PROBLEMS',
+        `竞赛只能添加公开或竞赛可见题目: ${invalid
+          .slice(0, 5)
+          .map((p) => p.id)
+          .join(', ')}`,
+        400
+      )
+    }
+  }
+
+  // C-P1-3：更新主表 + 重建题目关联放入同一事务，避免两阶段写出现中间态
+  // （与 public.updateContestWithProblems 的 $transaction 写法一致）。
+  // 注：Mongo 事务需要副本集；本项目 DATABASE_URL 默认带 replicaSet=rs0（见 lib/prisma.ts），
+  // 且 lib/contest/public.ts、lib/mongodb/contest-direct.ts 已在使用 $transaction / withTransaction，
+  // 故此处可按同样方式使用事务；若部署环境为 standalone MongoDB 需先切换为副本集。
+  await prisma.$transaction(async (tx) => {
+    // 1. 更新基本信息
+    await tx.contest.update({ where: { id: contestId }, data: updateData })
+
+    // 2. 如果提供了题目列表，重建题目关联（空数组 = 清空题目）
+    if (problems && Array.isArray(problems)) {
+      await tx.contestProblem.deleteMany({ where: { contestId } })
+      if (problems.length > 0) {
+        await tx.contestProblem.createMany({
+          data: problems.map((problemId: string, index: number) => ({
+            contestId,
+            problemId,
+            orderIndex: index,
+            score: 100,
+          })),
+        })
+      }
+    }
+  })
 
   // 解冻：补齐封榜期间延迟的全局题目计数与用户 solvedCount
   if (unlockingSeal) {
@@ -102,45 +183,6 @@ export async function adminUpdateContest(
     })
   }
 
-  // 2. 如果提供了题目列表，校验题目存在且可见性允许挂入竞赛后再更新关联
-  if (problems && Array.isArray(problems)) {
-    if (problems.length > 0) {
-      const found = await prisma.problem.findMany({
-        where: { id: { in: problems } },
-        select: { id: true, visibility: true },
-      })
-      if (found.length !== problems.length) {
-        const foundIds = new Set(found.map((p) => p.id))
-        const missing = problems.filter((id) => !foundIds.has(id))
-        throw new ApiError('INVALID_PROBLEMS', `题目不存在: ${missing.slice(0, 5).join(', ')}`, 400)
-      }
-      // 竞赛仅允许 public / contest 题；禁止后台隐藏草稿绕过可见性
-      const invalid = found.filter(
-        (p) => p.visibility !== 'public' && p.visibility !== 'contest'
-      )
-      if (invalid.length > 0) {
-        throw new ApiError(
-          'INVALID_PROBLEMS',
-          `竞赛只能添加公开或竞赛可见题目: ${invalid
-            .slice(0, 5)
-            .map((p) => p.id)
-            .join(', ')}`,
-          400
-        )
-      }
-    }
-    await prisma.contestProblem.deleteMany({ where: { contestId } })
-    if (problems.length > 0) {
-      await prisma.contestProblem.createMany({
-        data: problems.map((problemId: string, index: number) => ({
-          contestId,
-          problemId,
-          orderIndex: index,
-          score: 100,
-        })),
-      })
-    }
-  }
   cache.delete(CacheKeys.contest.byId(contestId))
   cache.deleteByPrefix('contest:rank')
   return { message: '更新成功' }
@@ -188,19 +230,26 @@ export async function listAdminContests(opts?: { page?: number; pageSize?: numbe
     typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
   const take = usePaging ? (pageSize as number) : 100
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
-  const rows = await prisma.contest.findMany({
-    skip,
-    take,
-    orderBy: { startTime: 'desc' },
-    include: {
-      author: { select: { username: true } },
-      _count: { select: { problems: true, participants: true } },
-    },
-  })
-  return rows.map((c) => {
-    const { password: _pw, ...safe } = c
-    return { ...safe, hasPassword: Boolean(_pw) }
-  })
+  // C-P2-22：并行查询列表与总数，总数不受 take=100 截断影响（供前端统计卡片/分页使用）
+  const [rows, total] = await Promise.all([
+    prisma.contest.findMany({
+      skip,
+      take,
+      orderBy: { startTime: 'desc' },
+      include: {
+        author: { select: { username: true } },
+        _count: { select: { problems: true, participants: true } },
+      },
+    }),
+    prisma.contest.count(),
+  ])
+  return {
+    list: rows.map((c) => {
+      const { password: _pw, ...safe } = c
+      return { ...safe, hasPassword: Boolean(_pw) }
+    }),
+    total,
+  }
 }
 
 export interface AdminCreateContestInput {

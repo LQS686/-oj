@@ -72,10 +72,13 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
     prisma.submission.findMany({
       where: { userId, submittedAt: { gte: weekStart } },
       select: { status: true },
+      // C-P2-9：两周窗口提交量理论上有限，仍加 take 上限防极端活跃用户拖垮内存
+      take: 5000,
     }),
     prisma.submission.findMany({
       where: { userId, submittedAt: { gte: prevWeekStart, lt: weekStart } },
       select: { status: true },
+      take: 5000,
     }),
     prisma.submission.groupBy({
       by: ['problemId'],
@@ -85,10 +88,10 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
         submittedAt: { gte: todayStart },
       },
     }),
-    prisma.submission.findMany({
+    // C-P2-9：累计 AC 去重改用 groupBy（按 problemId 聚合），替代全量 distinct 拉取
+    prisma.submission.groupBy({
+      by: ['problemId'],
       where: { userId, status: SubmissionStatus.ACCEPTED },
-      distinct: ['problemId'],
-      select: { problemId: true },
     }),
   ])
 

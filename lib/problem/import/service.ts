@@ -166,6 +166,9 @@ async function importSolutions(
           : s.content,
       isOfficial: false,
       sourceType: 'USER',
+      // 安全合规：发布前审核。导入题解不直接公开，置为待审核，
+      // 与普通用户新建题解（createUserSolution）一致，经 admin/reviews 审核通过后才对他人可见
+      status: 'pending',
     })),
   })
 }

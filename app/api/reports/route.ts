@@ -1,14 +1,25 @@
 /**
  * /api/reports - 内容举报（登录用户）
  *
- * POST 鉴权：创建举报
+ * POST 鉴权：创建举报（含频率限制，防刷举报）
  */
-import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, fail, readJson, throw400 } from '@/lib/api/withApi'
 import { createReport } from '@/lib/report/service'
 import { isObjectId } from '@/lib/api/validation'
 import { logger } from '@/lib/logger'
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  // 频率限制：举报接口防刷（用户 + IP 维度，5 次/分钟，窗口内超限返回 429）
+  const { checkRateLimit, getClientIP } = await import('@/lib/rate-limit')
+  const rl = await checkRateLimit(`report:${user.id}:${getClientIP(req)}`, {
+    maxRequests: 5,
+    windowMs: 60 * 1000,
+    keyPrefix: 'report',
+  })
+  if (!rl.success) {
+    return fail('RATE_LIMITED', '举报提交过于频繁，请稍后再试', 429)
+  }
+
   const body = await readJson<{
     targetType: string
     targetId: string

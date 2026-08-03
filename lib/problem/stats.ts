@@ -79,6 +79,8 @@ export async function getProblemStats(
       prisma.submission.findMany({
         where: recentWhere,
         select: { status: true, submittedAt: true },
+        // C-P2-10：近 7 天趋势只需按天聚合计数，加 take 上限防极端提交量拖垮内存
+        take: 5000,
       }),
       prisma.submission.aggregate({
         where: acWhere,

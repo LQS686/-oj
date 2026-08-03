@@ -35,7 +35,8 @@ export const POST = withApi.public(async (req) => {
     return response
   } catch (error: unknown) {
     if (error instanceof LoginError) {
-      if (error.code === 'ACCOUNT_LOCKED') return fail(error.code, error.message, 429)
+      // A-P2-5：账号锁定与密码错误统一响应（401 + 同一文案），避免枚举账号存在性；真实锁定原因已由 service 记录日志
+      if (error.code === 'ACCOUNT_LOCKED') return fail('UNAUTHORIZED', '用户名或密码错误', 401)
       if (error.code === 'AUTH_UNAVAILABLE') return fail(error.code, error.message, 503)
       if (error.code === 'BAD_REQUEST') return fail(error.code, error.message, 400)
       if (error.code === 'UNAUTHORIZED') return fail(error.code, error.message, 401)

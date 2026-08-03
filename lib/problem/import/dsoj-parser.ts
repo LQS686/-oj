@@ -45,6 +45,9 @@ import AdmZip from 'adm-zip'
 import { ApiError } from '@/lib/api/errors'
 import { isValidDifficulty } from '@/lib/constants'
 import type { ImportedProblem, ImportedSolution, ImportedTestCase } from './types'
+// 解压炸弹防护上限（常量定义在 tarxz-archive.ts；dsoj-parser → tarxz-archive 为单向运行时依赖，
+// 反向仅为 type-only import，无循环）
+import { MAX_ARCHIVE_ENTRY_BYTES } from './tarxz-archive'
 
 /* ============================================================================
  * 归档抽象
@@ -484,10 +487,18 @@ function findSubdirUnderProblemDir(
   return null
 }
 
-/** 读取 entry 文本内容（UTF-8） */
+/** 读取 entry 文本内容（UTF-8）；超过单文件上限抛错（解压炸弹防线，配合 tarxz/ZIP 解压前检查） */
 function readEntryText(entry: ArchiveEntry | null): string {
   if (!entry) return ''
-  return entry.getData().toString('utf-8')
+  const data = entry.getData()
+  if (data.length > MAX_ARCHIVE_ENTRY_BYTES) {
+    throw new ApiError(
+      'IMPORT_ARCHIVE_ENTRY_TOO_LARGE',
+      `题包内单文件超过 ${Math.floor(MAX_ARCHIVE_ENTRY_BYTES / 1024 / 1024)}MB 上限`,
+      400
+    )
+  }
+  return data.toString('utf-8')
 }
 
 /* ============================================================================

@@ -5,6 +5,11 @@
 # 用法：chmod +x deploy.sh && sudo bash deploy.sh
 # 也可：curl -fsSL <url>/deploy.sh | sudo bash
 # ============================================================
+# ============================================================
+# ⚠️ 已废弃：本脚本为旧版云服务器一键部署脚本，仅作参考。
+# 请使用 scripts/bt-deploy.sh（宝塔部署）：
+#   sudo bash scripts/bt-deploy.sh
+# ============================================================
 set -euo pipefail
 
 # --------------- 颜色输出 ---------------
@@ -286,7 +291,11 @@ main() {
   echo -e "  操作系统: ${GREEN}${OS} ${VER}${NC}"
   echo -e "  安装目录: ${GREEN}${PROJECT_DIR}${NC}"
   echo ""
-  read -rp "按 Enter 开始部署，Ctrl+C 取消..." _
+  # read 加 30s 超时：避免非交互环境下永久阻塞
+  if ! read -t 30 -rp "按 Enter 开始部署，Ctrl+C 取消..." _; then
+    err "输入超时（30s），已取消部署"
+    exit 1
+  fi
 
   check_root
   install_docker

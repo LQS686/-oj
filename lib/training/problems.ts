@@ -58,10 +58,7 @@ export async function updateTrainingAndProblems(
   id: string,
   input: TrainingUpdateInput
 ) {
-  cache.delete(byIdKey(id))
-  cache.deleteByPrefix('training:list')
-  cache.deleteByPrefix('training:recommended')
-  return prisma.training.update({
+  const updated = await prisma.training.update({
     where: { id },
     data: {
       ...(input.title !== undefined ? { title: input.title } : {}),
@@ -76,6 +73,11 @@ export async function updateTrainingAndProblems(
       ...(input.cover !== undefined ? { cover: input.cover } : {}),
     },
   })
+  // C-P2-24：先写 DB 成功后再清缓存，避免写失败时缓存被提前清空导致旧数据误入新页
+  cache.delete(byIdKey(id))
+  cache.deleteByPrefix('training:list')
+  cache.deleteByPrefix('training:recommended')
+  return updated
 }
 
 /* ============================================================================

@@ -186,6 +186,10 @@ export default function ProblemTimer({
     let cancelled = false
 
     const init = async () => {
+      // baseUrlRef 由上方 useDeferredEffect 在微任务中赋值（queueMicrotask 排队先于本处），
+      // 这里先让出一次微任务，确保挂载首次 fetch 时 baseUrlRef 已就绪，避免用空串发无效请求
+      await new Promise<void>((resolve) => queueMicrotask(resolve))
+      if (cancelled) return
       await fetchProgress()
       if (cancelled) return
       // 仅当 active 时才 start；非选中题（被动展示）只 fetchProgress 一次
@@ -260,29 +264,89 @@ export default function ProblemTimer({
   }, [])
 
   // 30 秒心跳：GET 同步累计用时（也用于感知后端 finalizeTiming 完成）
+  // 页面隐藏时暂停、恢复前台继续（参考 useWallClock 的 visibility-aware 模式，避免后台空转）
   useEffect(() => {
     if (isCompleted || !active) return
-    const id = setInterval(() => {
-      if (!isCompletedRef.current) {
-        void fetchProgress()
+
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
+    const stop = () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId)
+        intervalId = null
       }
-    }, HEARTBEAT_INTERVAL_MS)
-    return () => clearInterval(id)
+    }
+
+    const start = () => {
+      if (intervalId !== null) return
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      intervalId = setInterval(() => {
+        if (!isCompletedRef.current) {
+          void fetchProgress()
+        }
+      }, HEARTBEAT_INTERVAL_MS)
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start()
+      else stop()
+    }
+
+    start()
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility)
+    }
+    return () => {
+      stop()
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility)
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCompleted, active])
 
   // 1 秒 tick：本地累加显示（仅当计时中且未完成时）
+  // 页面隐藏时暂停、恢复前台继续，避免后台空转
   useEffect(() => {
     if (isCompleted || !progress || !active) return
     // 仅在计时中（未暂停）时累加
     if (progress.isPaused) return
     if (!progress.lastResumedAt) return
-    const id = setInterval(() => {
-      const last = new Date(progress.lastResumedAt!).getTime()
-      const delta = Math.max(0, Date.now() - last)
-      setDisplayMs((progress.timeElapsedMs ?? 0) + delta)
-    }, TICK_INTERVAL_MS)
-    return () => clearInterval(id)
+
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
+    const stop = () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+    }
+
+    const start = () => {
+      if (intervalId !== null) return
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      intervalId = setInterval(() => {
+        const last = new Date(progress.lastResumedAt!).getTime()
+        const delta = Math.max(0, Date.now() - last)
+        setDisplayMs((progress.timeElapsedMs ?? 0) + delta)
+      }, TICK_INTERVAL_MS)
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start()
+      else stop()
+    }
+
+    start()
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility)
+    }
+    return () => {
+      stop()
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility)
+      }
+    }
   }, [isCompleted, progress, active])
 
   // active 切换：处理 false → true（恢复计时）与 true → false（暂停）

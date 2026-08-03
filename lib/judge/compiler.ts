@@ -75,9 +75,15 @@ export function isJudgeAsanEnabled(): boolean {
   return ENABLE_ASAN
 }
 
-/** ASan 未启用时可对虚拟内存做硬限（DSOJ_FORCE_ULIMIT_V） */
-export function shouldForceUlimitV(): boolean {
-  return !ENABLE_ASAN
+/**
+ * 是否对选手进程启用 ulimit -v（RLIMIT_AS 硬限虚拟内存）
+ * B-P1-5：仅编译型语言（C/C++）启用。解释型语言（Python 等）的解释器
+ * VmSize 基础占用大（解释器 + 内建模块 mmap），RLIMIT_AS 过小会
+ * 让「小内存题目」的解释器启动即崩（SIGKILL → 误判 MLE/RE）。
+ */
+export function shouldForceUlimitV(language?: string): boolean {
+  if (ENABLE_ASAN) return false
+  return language === 'cpp' || language === 'c'
 }
 const languageConfigs: Record<string, {
   extension: string
@@ -220,6 +226,18 @@ function buildCompileCommand(compiler: 'g++' | 'gcc', std: string, source: strin
   return `${compiler} ${buildCompileArgs(compiler, std, source, output).join(' ')}`
 }
 
+/** 净化编译进程环境：禁止继承应用环境，避免 g++ 读到 JWT_SECRET 等敏感变量 */
+function compileSpawnEnv(cwd: string): NodeJS.ProcessEnv {
+  return {
+    PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+    HOME: cwd,
+    TMPDIR: cwd,
+    LANG: process.env.LANG || 'C.UTF-8',
+    TZ: process.env.TZ || 'UTC',
+    NODE_ENV: 'production',
+  }
+}
+
 /**
  * 使用 spawn 执行编译命令，收集 stdout/stderr/exitCode
  *
@@ -228,9 +246,14 @@ function buildCompileCommand(compiler: 'g++' | 'gcc', std: string, source: strin
  * - spawn 直接调用命令数组，不经过 shell，更可靠且安全
  * - 切勿改回 exec，否则评测编译会静默失败（exitCode=1，stderr 为空）
  */
-function spawnCompile(cmd: string, args: string[], timeoutMs: number): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+function spawnCompile(
+  cmd: string,
+  args: string[],
+  timeoutMs: number,
+  env: NodeJS.ProcessEnv = compileSpawnEnv(process.cwd()),
+): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { timeout: timeoutMs })
+    const child = spawn(cmd, args, { timeout: timeoutMs, env })
     let stdout = ''
     let stderr = ''
 
@@ -245,7 +268,10 @@ function spawnCompile(cmd: string, args: string[], timeoutMs: number): Promise<{
       if (signal) {
         logger.debug(`编译进程被信号终止`, { signal, cmd, args })
       }
-      resolve({ exitCode: code ?? 1, stdout, stderr })
+      // B-P2-10：Node timeout 以 SIGTERM 终止（code=null），须与「编译器正常退出码 1」区分，
+      // 否则编译超时会被误报成编译错误（CE）
+      const timedOut = code === null && signal === 'SIGTERM'
+      resolve({ exitCode: code ?? 1, stdout, stderr, timedOut })
     })
   })
 }
@@ -312,6 +338,9 @@ export async function compileCode(code: string, language: string): Promise<Compi
 
     const outputPath = join(tempDir, compiledBasename)
 
+    // B-P2-9：净化编译进程环境，不继承 JWT_SECRET 等应用敏感变量
+    const compileEnv = compileSpawnEnv(tempDir)
+
     // 编译统一走 runner.sh 沙箱（限制内存/CPU/栈/文件描述符）
     const isLinux = process.platform === 'linux'
     const useSandbox = isLinux
@@ -335,6 +364,11 @@ export async function compileCode(code: string, language: string): Promise<Compi
       const std = language === 'c' ? 'c11' : 'c++17'
       // 编译参数（不含 compiler 名称，由 runner.sh 单独传）
       const compileArgs = buildCompileArgs(compiler as 'g++' | 'gcc', std, sourcePath, outputPath)
+      // B-P2-11：编译内存限制（runner.sh 的 $1）真实生效——runner.sh 仅在
+      // DSOJ_FORCE_ULIMIT_V=1 时才执行 ulimit -v $((MEM_MB * 1024))。
+      // 编译期 g++ 非 ASan 二进制，不受「ASan 与 ulimit -v 不兼容」限制
+      // （sanitizer 模式编译内存上限已提至 2048MB，见上）。
+      compileEnv.DSOJ_FORCE_ULIMIT_V = '1'
       spawnCmd = 'bash'
       spawnArgs = [runnerPath, compileMemMb, '15', '64', compiler, ...compileArgs]
     } else {
@@ -354,10 +388,11 @@ export async function compileCode(code: string, language: string): Promise<Compi
     logger.debug(`编译命令`, { cmd: spawnCmd, args: spawnArgs, useSandbox })
 
     try {
-      const { exitCode, stderr } = await spawnCompile(
+      const { exitCode, stderr, timedOut } = await spawnCompile(
         spawnCmd,
         spawnArgs,
         getJudgeConfig().compileTimeoutMs,
+        compileEnv,
       )
 
       if (exitCode === 0) {
@@ -369,9 +404,23 @@ export async function compileCode(code: string, language: string): Promise<Compi
         }
       }
 
-      // 编译失败
       const ext = config.extension.substring(1)
       const filteredStderr = filterCompileError(stderr, ext)
+
+      // B-P2-10：编译超时（Node 兜底 SIGTERM 终止 或 runner 内 SIGXCPU=152）→
+      // CompileTimeLimitExceeded，而非 CompileError，便于区分「代码编译不过」与「编译资源超限」；
+      // 前端状态仍为 CE（CompileState 仅影响 message 前缀），保持兼容。
+      if (timedOut || exitCode === 152) {
+        logger.warn(`编译超时`, { exitCode, cmd: spawnCmd, args: spawnArgs })
+        return {
+          success: false,
+          compileState: CompileState.CompileTimeLimitExceeded,
+          error: '编译超时',
+          stderr: filteredStderr,
+        }
+      }
+
+      // 编译失败
       logger.warn(`编译失败详情`, { exitCode, stderr: filteredStderr, cmd: spawnCmd, args: spawnArgs })
       return {
         success: false,

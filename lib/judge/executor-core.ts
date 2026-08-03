@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'child_process'
 import { writeFile, unlink, open as fsOpen } from 'fs/promises'
-import { existsSync, mkdirSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { join } from 'path'
 import * as crypto from 'crypto'
 import { constants as osConstants } from 'os'
@@ -41,24 +41,43 @@ export function computeOutputLimitBytes(expectedOutputBytes?: number, override?:
  */
 function killJudgeTree(rootPid: number | undefined): void {
   if (!rootPid || rootPid <= 0) return
-  const killDescendants = (pid: number) => {
+
+  /**
+   * B-P2-8：优先读 /proc/<pid>/task/<pid>/children（Linux 原生，无 pgrep 依赖），
+   * 精简镜像缺失 procps 时树清理仍然生效；读取失败（非 Linux / 进程已退出）回退 pgrep。
+   */
+  const readChildren = (pid: number): number[] => {
     try {
-      const out = spawnSync('pgrep', ['-P', String(pid)], { encoding: 'utf8' })
-      const kids = (out.stdout || '')
+      const raw = readFileSync(`/proc/${pid}/task/${pid}/children`, 'utf8')
+      const kids = raw
         .trim()
         .split(/\s+/)
         .map((s) => parseInt(s, 10))
         .filter((n) => Number.isFinite(n) && n > 0)
-      for (const c of kids) {
-        killDescendants(c)
-        try {
-          process.kill(c, 'SIGKILL')
-        } catch {
-          /* ignore */
-        }
-      }
+      if (kids.length > 0) return kids
     } catch {
-      /* ignore */
+      /* 无 /proc 或进程已退出，走 pgrep 回退 */
+    }
+    try {
+      const out = spawnSync('pgrep', ['-P', String(pid)], { encoding: 'utf8' })
+      return (out.stdout || '')
+        .trim()
+        .split(/\s+/)
+        .map((s) => parseInt(s, 10))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    } catch {
+      return []
+    }
+  }
+
+  const killDescendants = (pid: number) => {
+    for (const c of readChildren(pid)) {
+      killDescendants(c)
+      try {
+        process.kill(c, 'SIGKILL')
+      } catch {
+        /* ignore */
+      }
     }
   }
   killDescendants(rootPid)
@@ -305,7 +324,9 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       // runner 内墙钟硬杀：比 Node setTimeout 更及时（事件循环忙碌时也生效）
       DSOJ_WALL_LIMIT_MS: String(Math.max(1, hardTimeoutMs)),
     }
-    if (shouldForceUlimitV()) {
+    // B-P1-5：ulimit -v 仅对编译型语言（C/C++）启用；
+    // Python 解释器 VmSize 基础占用高，RLIMIT_AS 会让小内存题目启动即崩
+    if (shouldForceUlimitV(language)) {
       spawnEnv.DSOJ_FORCE_ULIMIT_V = '1'
     }
 

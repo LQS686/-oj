@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { X } from 'lucide-react'
 
 export type ModalSize = 'sm' | 'md' | 'lg'
@@ -61,9 +61,34 @@ export default function Modal({
   size = 'md',
   className = '',
 }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
-      if (closeOnEsc && e.key === 'Escape') onClose()
+      if (closeOnEsc && e.key === 'Escape') {
+        onClose()
+        return
+      }
+      // Tab 焦点循环：焦点在首/末可聚焦元素时循环到另一侧（基础焦点陷阱）
+      if (e.key === 'Tab') {
+        const container = dialogRef.current
+        if (!container) return
+        const focusable = Array.from(
+          container.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+          )
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
     },
     [closeOnEsc, onClose]
   )
@@ -73,9 +98,21 @@ export default function Modal({
     document.addEventListener('keydown', handleKey)
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+
+    // 记录打开前的活动元素，关闭后还原焦点
+    const prevActive = document.activeElement as HTMLElement | null
+    // 初始聚焦容器内首个可聚焦元素（无则聚焦容器本身）
+    const container = dialogRef.current
+    const first = container?.querySelector<HTMLElement>(
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    )
+    if (first) first.focus()
+    else container?.focus()
+
     return () => {
       document.removeEventListener('keydown', handleKey)
       document.body.style.overflow = prevOverflow
+      prevActive?.focus?.()
     }
   }, [open, handleKey])
 
@@ -89,6 +126,8 @@ export default function Modal({
       role="presentation"
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className={`card-static rounded-xl w-full ${SIZE_CLASS[size]} max-h-[min(90dvh,calc(100dvh-2rem))] flex flex-col shadow-xl border border-border overflow-hidden ${className}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"

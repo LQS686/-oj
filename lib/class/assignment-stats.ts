@@ -88,6 +88,16 @@ export async function listClassAssignmentsWithStats(
     assignmentIds.length > 0
       ? await prisma.classAssignmentSubmission.findMany({
           where: { assignmentId: { in: assignmentIds }, ...ACTIVE_SUBMISSION_WHERE },
+          // C-P2-14：统计仅需 assignmentId/userId/problemId/status 四个字段，避免拉取 code 等大字段
+          select: {
+            id: true,
+            assignmentId: true,
+            userId: true,
+            problemId: true,
+            status: true,
+          },
+          // C-P2-14：take 上限防超大班级提交量拖垮内存（单页作业数有限，10000 已足够）
+          take: 10000,
         })
       : []
 
@@ -210,6 +220,14 @@ export async function computeAssignmentStatistics(
   const totalMembers = members.length
   const totalProblems = assignment.problemIds.length
 
+  // C-P2-23：按 userId 分组提交为 Map，成员循环 O(1) 查 Map，避免 O(成员×提交) 双重循环
+  const submissionsByUser = new Map<string, typeof submissions>()
+  for (const s of submissions) {
+    const list = submissionsByUser.get(s.userId)
+    if (list) list.push(s)
+    else submissionsByUser.set(s.userId, [s])
+  }
+
   const memberCompletionMap = new Map<string, Set<string>>()
   members.forEach((m) => memberCompletionMap.set(m.userId, new Set()))
 
@@ -226,7 +244,7 @@ export async function computeAssignmentStatistics(
   // 平均分 / 正确率：按「每题最高分」汇总（逾期记 0）
   const memberScores = Array.from(memberCompletionMap.entries()).map(
     ([userId, solvedSet]) => {
-      const ms = submissions.filter((s) => s.userId === userId)
+      const ms = submissionsByUser.get(userId) || []
       const bestByProblem = new Map<string, number>()
       for (const s of ms) {
         const score = s.isLate ? 0 : s.score || 0
@@ -283,7 +301,7 @@ export async function computeAssignmentStatistics(
   // 成员维度
   const memberStats = members.map((m) => {
     const userId = m.userId
-    const us = submissions.filter((s) => s.userId === userId)
+    const us = submissionsByUser.get(userId) || []
     const solved = memberCompletionMap.get(userId) || new Set()
     const bestByProblem = new Map<string, number>()
     for (const s of us) {

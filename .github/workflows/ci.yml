@@ -85,8 +85,7 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Build (only on main)
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      - name: Build
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1

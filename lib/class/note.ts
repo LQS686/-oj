@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { ApiError } from '@/lib/api/errors'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 
 export interface CreateClassNoteInput {
@@ -176,6 +177,10 @@ export async function createClassNoteSimple(
   authorId: string,
   data: { title: string; content: string; category?: string; tags?: string[] }
 ) {
+  // A-P2-4：lib 层长度上限兜底（与 API 层校验一致：标题 200、内容 50000）
+  if (data.title.length > 200 || data.content.length > 50000) {
+    throw new ApiError('NOTE_TOO_LONG', '笔记标题不能超过 200 字、内容不能超过 50000 字', 400)
+  }
   return prisma.classNote.create({
     data: {
       classId,

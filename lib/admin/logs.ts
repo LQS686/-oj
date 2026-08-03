@@ -22,5 +22,7 @@ export async function listProblemVerificationLogs(problemId: string) {
   return prisma.verificationLog.findMany({
     where: { problemId },
     orderBy: { createdAt: 'desc' },
+    // C-P2-12：验证日志只读最近记录，加 take 上限防单题日志无限增长拖垮响应
+    take: 100,
   })
 }

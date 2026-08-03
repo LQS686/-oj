@@ -159,9 +159,16 @@ export const GET = withApi.admin(async (req, _ctx) => {
     p.totalAccepted,
   ])
 
+  // A-P2-8 修复：CSV 公式注入防护 - 对以 = + - @ 或制表符/回车开头的单元格值加单引号前缀，
+  // 防止 title/source 等文本字段被 Excel/WPS 当作公式执行（CSV Injection）
+  const sanitizeCsvCell = (value: unknown): string => {
+    const raw = String(value)
+    return /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw
+  }
+
   const csvContent = [
     headers.join(','),
-    ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')),
+    ...rows.map((r) => r.map((c) => `"${sanitizeCsvCell(c).replace(/"/g, '""')}"`).join(',')),
   ].join('\n')
 
   // Return as download

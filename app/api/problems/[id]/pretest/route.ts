@@ -14,18 +14,32 @@
  *   - 语言白名单 ['cpp', 'c', 'python']（与 compiler.ts 一致）
  *   - 复用 executePretest 内的代码安全分析与沙箱执行
  */
-import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
+import { withApi, ok, fail, readJson, throw400, throw404 } from '@/lib/api/withApi'
 import { executePretest, type PretestCase } from '@/lib/judge/pretest'
 import type { ComparisonMode } from '@/lib/judge/types'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { isObjectIdLike } from '@/lib/problem/lookup'
 import { assertCanAccessProblem } from '@/lib/problem/access'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 // 支持的提交语言白名单（与 lib/judge/compiler.ts 的 languageConfigs 一致）
 const ALLOWED_LANGUAGES = ['cpp', 'c', 'python']
+// A-P1-5 修复：pretest 会同步执行用户代码（CPU 密集），按用户+IP 维度限流
+const PRETEST_MAX_PER_MIN = 10
 
 export const POST = withApi.auth(async (req, ctx, { user }) => {
+  // A-P1-5 修复：handler 开头限流，防止登录用户高频触发同步评测造成 CPU DoS
+  const ip = getClientIP(req)
+  const rl = await checkRateLimit(`pretest:${user.id}:${ip}`, {
+    maxRequests: PRETEST_MAX_PER_MIN,
+    windowMs: 60_000,
+    keyPrefix: 'api',
+  })
+  if (!rl.success) {
+    return fail('RATE_LIMITED', 'pretest 请求过于频繁，请稍后再试', 429)
+  }
+
   const { id: problemId } = ctx.params
   if (!problemId) throw400('INVALID_ID', '无效的题目ID')
 

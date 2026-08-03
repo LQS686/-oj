@@ -130,7 +130,13 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
       assignmentSubmissionId: assignmentSubmission.id,
     })
   } catch (err) {
-    await deleteClassAssignmentSubmissionDirect(assignmentSubmission.id).catch(() => {})
+    // C-P2-20：回滚失败不能静默吞掉，记录日志（不回抛，避免掩盖主流程错误）
+    await deleteClassAssignmentSubmissionDirect(assignmentSubmission.id).catch((rollbackErr) => {
+      logger.error(
+        '回滚班级作业提交记录失败',
+        rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr))
+      )
+    })
     throw err
   }
 

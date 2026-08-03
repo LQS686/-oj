@@ -2,6 +2,7 @@
 
 import { useState, useCallback, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -26,6 +27,7 @@ interface Class {
 function AdminClassesPageContent() {
   const dialog = useDialog()
   const router = useRouter()
+  const scheduleForbiddenRedirect = useForbiddenRedirect()
   const searchParams = useSearchParams()
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +48,7 @@ function AdminClassesPageContent() {
 
       if (response.status === 403) {
         setError('需要管理员权限')
-        setTimeout(() => router.push('/403'), 2000)
+        scheduleForbiddenRedirect()
         return
       }
 
@@ -62,7 +64,7 @@ function AdminClassesPageContent() {
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, [scheduleForbiddenRedirect])
 
   useDeferredEffect(() => {
     void fetchClasses()

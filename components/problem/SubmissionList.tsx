@@ -26,6 +26,7 @@ import {
   SubmissionStatus,
   isAcceptedStatus,
   isCompileErrorStatus,
+  isFinalSubmissionStatus,
   isNonFinalSubmissionStatus,
 } from '@/lib/constants/submission-status'
 import { formatDateTime, formatTime, formatMemory } from '@/lib/utils'
@@ -426,6 +427,8 @@ export default function SubmissionList({
   const [detailCache, setDetailCache] = useState<Record<string, SubmissionListItem>>({})
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
   const expandedStatus = submissions.find((s) => s.id === expandedId)?.status
+  // 终态标志：仅用于控制详情 GET 的触发时机（进入终态时补拉一次），WS 中间态进度不触发
+  const expandedFinal = expandedStatus ? isFinalSubmissionStatus(expandedStatus) : false
 
   useDeferredEffect(() => {
     if (!expandedId) return
@@ -468,7 +471,8 @@ export default function SubmissionList({
     return () => {
       cancelled = true
     }
-  }, [expandedId, expandedStatus])
+    // 详情 GET 仅用于初始展开与进入终态时补拉；WS 已把 status/testResults 合并进列表，中间态不重复请求
+  }, [expandedId, expandedFinal])
 
   useDeferredEffect(() => {
     if (!expandedId) return

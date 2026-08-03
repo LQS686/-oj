@@ -176,6 +176,34 @@ export async function batchRegisterUsers(
     errors: [],
   }
 
+  // C-P2-6：批量预取批内已存在的 username/email，避免循环内逐条串行 findUnique
+  const candidateUsernames: string[] = []
+  const candidateEmails: string[] = []
+  for (const user of users) {
+    const trimmedUsername = String(user.username ?? '').trim()
+    candidateUsernames.push(trimmedUsername)
+    const rawEmail = user.email != null ? String(user.email).trim() : ''
+    if (rawEmail.length > 0) {
+      candidateEmails.push(rawEmail.toLowerCase())
+    }
+  }
+  const [existingUsernameRows, existingEmailRows] = await Promise.all([
+    candidateUsernames.length > 0
+      ? prisma.user.findMany({
+          where: { username: { in: candidateUsernames } },
+          select: { username: true },
+        })
+      : Promise.resolve([] as { username: string }[]),
+    candidateEmails.length > 0
+      ? prisma.user.findMany({
+          where: { email: { in: candidateEmails } },
+          select: { email: true },
+        })
+      : Promise.resolve([] as { email: string }[]),
+  ])
+  const existingUsernameSet = new Set(existingUsernameRows.map((u) => u.username))
+  const existingEmailSet = new Set(existingEmailRows.map((e) => e.email))
+
   for (let i = 0; i < users.length; i++) {
     const user = users[i]
     const rowNumber = user.row ?? startRow + i
@@ -266,10 +294,7 @@ export async function batchRegisterUsers(
       const sanitizedUsername = trimmedUsername
       const sanitizedEmail = trimmedEmail
 
-      const existingUsername = await prisma.user.findUnique({
-        where: { username: sanitizedUsername },
-      })
-      if (existingUsername) {
+      if (existingUsernameSet.has(sanitizedUsername)) {
         result.failed++
         result.errors.push({
           row: rowNumber,
@@ -281,10 +306,7 @@ export async function batchRegisterUsers(
       }
 
       if (hasEmail) {
-        const existingEmail = await prisma.user.findUnique({
-          where: { email: sanitizedEmail },
-        })
-        if (existingEmail) {
+        if (existingEmailSet.has(sanitizedEmail)) {
           result.failed++
           result.errors.push({
             row: rowNumber,
@@ -325,6 +347,9 @@ export async function batchRegisterUsers(
       })
 
       result.succeeded++
+      // 批内后续重复的 username/email 视为已存在（等价于原串行查询语义）
+      existingUsernameSet.add(sanitizedUsername)
+      existingEmailSet.add(sanitizedEmail)
     } catch (error) {
       result.failed++
       result.errors.push({

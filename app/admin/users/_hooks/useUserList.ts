@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { useRouter } from 'next/navigation'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { User } from '../_utils'
 
@@ -11,7 +11,7 @@ import type { User } from '../_utils'
  * 处理初始加载、错误提示（含 403 跳转）与手动刷新。
  */
 export function useUserList() {
-  const router = useRouter()
+  const scheduleForbiddenRedirect = useForbiddenRedirect()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -23,7 +23,7 @@ export function useUserList() {
 
       if (response.status === 403) {
         setError('需要管理员权限')
-        setTimeout(() => router.push('/403'), 2000)
+        scheduleForbiddenRedirect()
         return
       }
 
@@ -40,7 +40,7 @@ export function useUserList() {
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, [scheduleForbiddenRedirect])
 
   useDeferredEffect(() => {
     fetchUsers()

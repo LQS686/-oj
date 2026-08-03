@@ -99,6 +99,7 @@
     ],
     "*.{json,md,yml,yaml}": [
       "prettier --write"
-    ]
+    ],
+    "!package-lock.json": []
   }
 }

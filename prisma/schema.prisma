@@ -189,10 +189,11 @@ model Submission {
   // 索引设计：复合索引左前缀覆盖单字段查询，避免冗余索引
   // - [problemId, userId] 覆盖 [problemId] 查询
   // - [userId, submittedAt] 覆盖 [userId] 查询
-  // - [contestId] 单独保留：无其他复合索引以 contestId 开头
+  // - [contestId, submittedAt] 覆盖 [contestId] 查询（竞赛提交列表/排行榜按竞赛过滤+提交时间排序）
   // - [status] 单独保留：用于全局状态统计
   // - [submittedAt] 单独保留：用于全局时间排序
   @@index([contestId])
+  @@index([contestId, submittedAt])
   @@index([status])
   @@index([submittedAt])
   @@index([problemId, userId])
@@ -258,9 +259,13 @@ model ContestParticipant {
   rank      Int      @default(0)
   penalty   Int      @default(0)
   joinedAt  DateTime @default(now())
+  // 邀请码报名：与 lib/mongodb/contest-direct.ts 原生写入保持一致
+  inviteCode String?
 
   @@unique([contestId, userId]) // 确保同一用户在同一竞赛中只有一条参与记录
   @@index([contestId, score])
+  // C-P1-2：用户参与竞赛统计（user/public-info.ts、user/profile.ts 按 userId count 查询）
+  @@index([userId])
 }
 
 // 班级

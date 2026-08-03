@@ -230,3 +230,43 @@ describe('compareOutput - 边界', () => {
     }
   })
 })
+
+// B-P1-4：超长行（>1024 字节）不得截断比较，尾部差异必须判 WA
+describe('compareOutput - 超长行（>1024 字节）', () => {
+  it('字符串流：1500 字节行尾部差异 → WA（不得截断忽略尾部）', async () => {
+    const base = 'a'.repeat(1499)
+    const r = await cmp(base + 'X', base + 'Y', 'default')
+    expect(r.status).toBe('WA')
+    expect(r.score).toBe(0)
+  })
+
+  it('双文件同步比对：1500 字节行尾部差异 → WA', async () => {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const os = await import('os')
+    const base = 'b'.repeat(1499)
+    const user = path.join(os.tmpdir(), `dsoj-long-u-${Date.now()}.txt`)
+    const exp = path.join(os.tmpdir(), `dsoj-long-e-${Date.now()}.txt`)
+    await fs.writeFile(user, base + 'X', 'utf-8')
+    await fs.writeFile(exp, base + 'Y', 'utf-8')
+    try {
+      const r = await compareOutput({
+        userOutputPath: user,
+        expectedOutputPath: exp,
+        fullScore: FULL,
+        comparisonMode: 'default',
+      })
+      expect(r.status).toBe('WA')
+      expect(r.score).toBe(0)
+    } finally {
+      await fs.unlink(user).catch(() => {})
+      await fs.unlink(exp).catch(() => {})
+    }
+  })
+
+  it('strict 模式：1500 字节行尾部差异 → WA', async () => {
+    const base = 'c'.repeat(1499)
+    const r = await cmp(base + 'X', base + 'Y', 'strict')
+    expect(r.status).toBe('WA')
+  })
+})

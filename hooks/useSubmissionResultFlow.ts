@@ -366,12 +366,43 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
   })
 
   // 评测弹窗打开期间轻量兜底：仅在仍非终态时拉取，弥补偶发丢包（非主路径）
+  // 页面隐藏时暂停轮询、恢复前台继续（参考 useWallClock 的 visibility-aware 模式）；WS 推送不受影响
   useEffect(() => {
     if (!submitting || !currentSubmissionId) return
-    const timer = window.setInterval(() => {
-      void syncCurrentSubmission()
-    }, 2500)
-    return () => window.clearInterval(timer)
+
+    // 兜底轮询 interval（window.setInterval 返回 number）
+    let timer: number | null = null
+
+    const stop = () => {
+      if (timer !== null) {
+        window.clearInterval(timer)
+        timer = null
+      }
+    }
+
+    const start = () => {
+      if (timer !== null) return
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      timer = window.setInterval(() => {
+        void syncCurrentSubmission()
+      }, 2500)
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start()
+      else stop()
+    }
+
+    start()
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility)
+    }
+    return () => {
+      stop()
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility)
+      }
+    }
   }, [submitting, currentSubmissionId, syncCurrentSubmission])
 
   const beginSubmitSession = useCallback((): number => {

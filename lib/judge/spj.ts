@@ -194,7 +194,9 @@ export async function runSpj(input: RunSpjInput): Promise<CompareResult> {
         stderrPath,
         signal,
       })
-      exitCode = result.exitCode
+      // B-P1-1：Node 兜底超时（15s watch + 5s 缓冲）以 SIGTERM 终止，code=null 被归一为 1
+      // 会误判成 WA；统一映射为 152（与 runner 内超时退出码一致），parseSpjExit → SE
+      exitCode = result.timedOut ? 152 : result.exitCode
       stderr = result.stderr
       stdout = result.stdout
     } else {
@@ -206,7 +208,8 @@ export async function runSpj(input: RunSpjInput): Promise<CompareResult> {
         signal,
         judgeSpawnEnv(cwd),
       )
-      exitCode = result.exitCode
+      // B-P1-1：同上的超时归一问题（非 Linux 兜底路径）
+      exitCode = result.timedOut ? 152 : result.exitCode
       stderr = result.stderr
       stdout = result.stdout
     }
@@ -361,7 +364,7 @@ async function runViaRunner(opts: {
   stdoutPath: string
   stderrPath: string
   signal?: AbortSignal
-}): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+}): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean }> {
   const binName = opts.checkerPath.includes('/') || opts.checkerPath.includes('\\')
     ? opts.checkerPath
     : `./${opts.checkerPath}`
@@ -380,30 +383,43 @@ async function runViaRunner(opts: {
   const emptyIn = join(opts.cwd, `spj_empty_${crypto.randomBytes(3).toString('hex')}.in`)
   await writeFile(emptyIn, '', 'utf8')
 
+  // B-P1-2：DSOJ_MEM_FILE / DSOJ_TIME_FILE 是 runner.sh 决定走 dsoj-watch 监控的开关。
+  // 缺这两项时 runner.sh 落到 exec 无监控分支：512MB 内存限制完全无效，
+  // 15s 墙钟也只靠外层 Node 的 20s（15s+5s）兜底，宣称 15s 实际 20s。
+  // 补齐后 dsoj-watch 以 15s CPU/墙钟真实采样并强杀（退出码 152 → SE）。
+  const memFilePath = join(opts.cwd, `spj_mem_${crypto.randomBytes(3).toString('hex')}.txt`)
+  const timeFilePath = join(opts.cwd, `spj_time_${crypto.randomBytes(3).toString('hex')}.txt`)
+
   try {
     const env: NodeJS.ProcessEnv = {
       ...judgeSpawnEnv(opts.cwd),
+      DSOJ_MEM_FILE: memFilePath,
+      DSOJ_TIME_FILE: timeFilePath,
       DSOJ_STDIN_FILE: emptyIn,
       DSOJ_STDOUT_FILE: opts.stdoutPath,
       DSOJ_STDERR_FILE: opts.stderrPath,
       DSOJ_OUTPUT_LIMIT_BYTES: String(2 * 1024 * 1024),
       DSOJ_CPU_LIMIT_MS: String(SPJ_WALL_LIMIT_MS),
       DSOJ_WALL_LIMIT_MS: String(SPJ_WALL_LIMIT_MS),
+      // checker 为编译型 C++ 二进制（无 ASan），启用 ulimit -v 让 512MB 内存限制真实生效
+      DSOJ_FORCE_ULIMIT_V: '1',
     }
 
-    const { exitCode } = await spawnCapture('bash', args, SPJ_WALL_LIMIT_MS + 5_000, opts.cwd, opts.signal, env)
+    const result = await spawnCapture('bash', args, SPJ_WALL_LIMIT_MS + 5_000, opts.cwd, opts.signal, env)
     const stdout = existsSync(opts.stdoutPath)
       ? await readFile(opts.stdoutPath, 'utf8').catch(() => '')
       : ''
     const stderr = existsSync(opts.stderrPath)
       ? await readFile(opts.stderrPath, 'utf8').catch(() => '')
       : ''
-    return { exitCode, stdout, stderr }
+    return { exitCode: result.exitCode, stdout, stderr, timedOut: result.timedOut }
   } finally {
-    try {
-      if (existsSync(emptyIn)) await unlink(emptyIn)
-    } catch {
-      /* ignore */
+    for (const p of [emptyIn, memFilePath, timeFilePath]) {
+      try {
+        if (existsSync(p)) await unlink(p)
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
@@ -426,7 +442,7 @@ function spawnCapture(
   cwd?: string,
   signal?: AbortSignal,
   env?: NodeJS.ProcessEnv,
-): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean }> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(new Error('aborted'))
@@ -460,9 +476,12 @@ function spawnCapture(
       signal?.removeEventListener('abort', onAbort)
       reject(err)
     })
-    child.on('close', (code) => {
+    child.on('close', (code, signalName) => {
       signal?.removeEventListener('abort', onAbort)
-      resolve({ exitCode: code ?? 1, stdout, stderr })
+      // B-P1-1：Node timeout 触发时以 SIGTERM 杀进程，close 的 code=null；
+      // 不能与「checker 正常退出码 1（WA）」混为一谈，否则墙钟超时会被误判成 WA
+      const timedOut = code === null && signalName === 'SIGTERM'
+      resolve({ exitCode: code ?? 1, stdout, stderr, timedOut })
     })
   })
 }

@@ -78,10 +78,12 @@ export async function createTraining(data: Prisma.TrainingUncheckedCreateInput) 
 }
 
 export async function updateTraining(id: string, data: Prisma.TrainingUncheckedUpdateInput) {
+  const updated = await prisma.training.update({ where: { id }, data })
+  // C-P2-24：先写 DB 成功后再清缓存，避免写失败时缓存被提前清空导致旧数据误入新页
   cache.delete(byIdKey(id))
   cache.deleteByPrefix('training:list')
   cache.deleteByPrefix('training:recommended')
-  return prisma.training.update({ where: { id }, data })
+  return updated
 }
 
 export async function deleteTraining(id: string) {

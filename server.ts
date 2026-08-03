@@ -488,7 +488,16 @@ const dev = process.env.NODE_ENV !== 'production'
 // 必须绑定 0.0.0.0 而非 localhost，否则 Docker 容器外无法访问服务。
 // Dockerfile 中已设置 ENV HOSTNAME="0.0.0.0"，这里读取环境变量以保持一致。
 const hostname = process.env.HOSTNAME || '0.0.0.0'
-const port = parseInt(process.env.PORT || '3000', 10)
+// PORT 必须是合法端口号（1-65535）；非法值回退默认 3000 并告警，避免进程因 NaN 启动失败
+const port = (() => {
+  const raw = process.env.PORT || '3000'
+  const n = parseInt(raw, 10)
+  if (Number.isNaN(n) || n < 1 || n > 65535) {
+    logger.warn(`[server] PORT="${raw}" 非法，回退默认端口 3000`)
+    return 3000
+  }
+  return n
+})()
 
 validateEnvironment()
 
@@ -558,7 +567,7 @@ app.prepare().then(async () => {
   await import('./lib/judge/init')
   logger.info('评测 Worker 启动完成')
 
-  httpServer.listen(port, () => {
+  httpServer.listen(port, hostname, () => {
     logger.info(`服务器运行在 http://${hostname}:${port}`)
     logger.info(`WebSocket 服务在 ws://${hostname}:${port}/socket.io`)
   })
@@ -665,10 +674,6 @@ app.prepare().then(async () => {
           }
         }),
       ]
-
-      // 评测队列（judgeQueue）无 dispose/drain 方法，跳过清理
-      logger.info('评测队列无 dispose 方法，跳过 judgeQueue 清理')
-
       return Promise.allSettled(tasks)
     }).then(() => {
       clearTimeout(forceExitTimer)
@@ -698,4 +703,9 @@ app.prepare().then(async () => {
       gracefulShutdown('uncaughtException')
     }
   })
+}).catch((err) => {
+  // F-P2-8：app.prepare() 失败（依赖缺失、构建产物不完整等）必须显式报错退出，
+  // 否则进程会静默挂起（无 HTTP 服务）或被 unhandledRejection 兜底后语义不清。
+  logger.error('Next.js app.prepare() 失败，进程退出', err instanceof Error ? err : new Error(String(err)))
+  process.exit(1)
 })

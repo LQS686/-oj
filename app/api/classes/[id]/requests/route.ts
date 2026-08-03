@@ -6,6 +6,7 @@
  */
 import { withApi, ok, readJson, throw400, throw403, fail } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
+import { checkRateLimit } from '@/lib/rate-limit'
 import {
   createOrReuseJoinRequest,
   getClassById,
@@ -20,6 +21,16 @@ import {
 export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id: classId } = ctx.params
   if (!isObjectId(classId)) throw400('INVALID_ID', '无效的班级ID')
+
+  // A-P2-2：加入申请频率限制（同一用户 1 分钟最多 5 次），防止刷申请/骚扰管理员
+  const rl = await checkRateLimit(`class-join:${user.id}`, {
+    maxRequests: 5,
+    windowMs: 60_000,
+    keyPrefix: 'class-join-request',
+  })
+  if (!rl.success) {
+    return fail('RATE_LIMITED', '请求过于频繁，请稍后再试', 429)
+  }
 
   const body = await readJson<{ message?: string }>(req)
   const { message } = body

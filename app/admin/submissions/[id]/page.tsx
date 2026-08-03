@@ -6,8 +6,8 @@
  */
 import { use, useState, useRef, useCallback, type ReactNode } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   Clock,
@@ -230,7 +230,7 @@ function MetricCell({
 
 export default function AdminSubmissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const router = useRouter()
+  const scheduleForbiddenRedirect = useForbiddenRedirect()
   const dialog = useDialog()
   const { user } = useUser()
   const [submission, setSubmission] = useState<Submission | null>(null)
@@ -256,7 +256,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
       } else {
         if (response.status === 403) {
           setError('需要管理员权限')
-          setTimeout(() => router.push('/403'), 2000)
+          scheduleForbiddenRedirect()
           return
         }
         if (response.status === 404) {
@@ -278,7 +278,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
       isRefreshingRef.current = false
       if (showRefreshing) setIsRefreshing(false)
     }
-  }, [id, router])
+  }, [id, scheduleForbiddenRedirect])
 
   useDeferredEffect(() => {
     void fetchSubmission()

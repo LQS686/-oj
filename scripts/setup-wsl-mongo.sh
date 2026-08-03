@@ -117,5 +117,5 @@ mongosh --quiet --eval 'rs.status().ok' || true
 echo
 echo "============================================"
 echo " MongoDB (WSL) 已就绪"
-echo " DATABASE_URL=mongodb://127.0.0.1:27017/oj-platform?replicaSet=rs0&directConnection=true"
+echo " DATABASE_URL=mongodb://127.0.0.1:27017/oj_platform?replicaSet=rs0&directConnection=true"
 echo "============================================"

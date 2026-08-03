@@ -109,12 +109,12 @@ describe('loginUser', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' })
   })
 
-  it('应抛出 LoginError(ACCOUNT_LOCKED) 当 lockout 计数 ≥ 5', async () => {
+  it('应抛出 LoginError(UNAUTHORIZED) 当 lockout 计数 ≥ 5（对外不区分账号锁定，防枚举）', async () => {
     mockRedis.get.mockResolvedValue('5')
     mockRedis.ttl.mockResolvedValue(300)
     await expect(
       loginUser({ username: 'alice', password: 'pwd123' })
-    ).rejects.toMatchObject({ code: 'ACCOUNT_LOCKED' })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
   })
 
   it('应抛出 LoginError(UNAUTHORIZED) 当用户不存在', async () => {

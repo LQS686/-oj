@@ -417,6 +417,9 @@ export async function executeJudge(
   job: JudgeJob,
   options?: { signal?: AbortSignal },
 ): Promise<JudgeResult> {
+  // B-P2-12：评测开始即清理上一次残留的节流条目（幂等），
+  // 覆盖「上轮 fail-fast / 异常 / 中止」未能走到删除分支的泄漏场景
+  progressDbThrottle.delete(job.submissionId)
   const startTime = Date.now()
   const jobSignal = options?.signal
   /** 编译结束时间点（编译 + SPJ 编译之后、测点执行之前），用于拆分评测耗时 */
@@ -838,6 +841,9 @@ export async function executeJudge(
     result.status = 'SE'
     result.message = error instanceof Error ? error.message : '系统错误'
   } finally {
+    // B-P2-12：评测结束的所有路径（正常 / fail-fast / SE / 超时 / 中止）统一清理
+    // progressDbThrottle 条目，防止 Map 长跑缓慢泄漏
+    progressDbThrottle.delete(job.submissionId)
     // 仅当编译成功时清理编译产物
     if (compileResult?.success && compileResult.compiledPath) {
       try {

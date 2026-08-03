@@ -23,6 +23,16 @@ import { ApiError } from '@/lib/api/errors'
 import type { ArchiveEntry, ArchiveLike } from './dsoj-parser'
 
 /* ============================================================================
+ * 解压炸弹防护上限（与 lib/problem/testcase.ts 的 MAX_UNZIP_SIZE 先例对齐）
+ *   - 单条目字节上限：50MB（与导入文件大小上限 IMPORT_MAX_FILE_BYTES 对齐）
+ *   - 解压后总字节上限：200MB（防解压炸弹）
+ *   - 条目总数上限：10000（防海量条目拖垮解析）
+ * ========================================================================== */
+export const MAX_ARCHIVE_ENTRY_BYTES = 50 * 1024 * 1024
+export const MAX_ARCHIVE_TOTAL_BYTES = 200 * 1024 * 1024
+export const MAX_ARCHIVE_ENTRIES = 10000
+
+/* ============================================================================
  * 魔数与格式检测
  * ========================================================================== */
 
@@ -137,6 +147,7 @@ export async function parseTarXzBuffer(buffer: Buffer): Promise<ArchiveLike> {
   }
 
   const entries: ArchiveEntry[] = []
+  let totalBytes = 0
 
   await new Promise<void>((resolve, reject) => {
     // xz -d: 解压到 stdout；-c: 写入 stdout（与 dsoj-exporter 的 -c 对称）
@@ -170,14 +181,79 @@ export async function parseTarXzBuffer(buffer: Buffer): Promise<ArchiveLike> {
     tar.on('entry', (header: TarHeaders, stream: NodeJS.ReadableStream, next: () => void) => {
       const name = String(header.name || '').replace(/\\/g, '/')
       const isDir = header.type === 'directory'
+
+      // 解压炸弹防护：在读入内存前拦截，避免超大条目/海量条目拖垮进程
+      // 1) 条目总数上限（含目录，防海量空目录）
+      if (entries.length >= MAX_ARCHIVE_ENTRIES) {
+        next()
+        fail(
+          new ApiError(
+            'IMPORT_ARCHIVE_TOO_MANY_ENTRIES',
+            `题包条目数超过 ${MAX_ARCHIVE_ENTRIES} 个上限`,
+            400
+          )
+        )
+        return
+      }
+      // 2) tar header 声明的单条目大小前置检查
+      const declaredSize = typeof header.size === 'number' ? header.size : 0
+      if (!isDir && declaredSize > MAX_ARCHIVE_ENTRY_BYTES) {
+        next()
+        fail(
+          new ApiError(
+            'IMPORT_ARCHIVE_ENTRY_TOO_LARGE',
+            `题包内单文件超过 ${Math.floor(MAX_ARCHIVE_ENTRY_BYTES / 1024 / 1024)}MB 上限`,
+            400
+          )
+        )
+        return
+      }
+
       const chunks: Buffer[] = []
-      stream.on('data', (chunk: Buffer) => chunks.push(chunk))
+      let entryBytes = 0
+      let aborted = false
+      // 数据流中超出限制：先 next() 释放当前条目，再 fail 终止整体流程
+      const abort = (err: unknown): void => {
+        if (aborted) return
+        aborted = true
+        next()
+        fail(err)
+      }
+
+      stream.on('data', (chunk: Buffer) => {
+        if (aborted) return
+        entryBytes += chunk.length
+        if (entryBytes > MAX_ARCHIVE_ENTRY_BYTES) {
+          abort(
+            new ApiError(
+              'IMPORT_ARCHIVE_ENTRY_TOO_LARGE',
+              `题包内单文件超过 ${Math.floor(MAX_ARCHIVE_ENTRY_BYTES / 1024 / 1024)}MB 上限`,
+              400
+            )
+          )
+          return
+        }
+        // 3) 解压后总字节上限（防解压炸弹）
+        if (totalBytes + entryBytes > MAX_ARCHIVE_TOTAL_BYTES) {
+          abort(
+            new ApiError(
+              'IMPORT_ARCHIVE_TOTAL_TOO_LARGE',
+              `题包解压后总大小超过 ${Math.floor(MAX_ARCHIVE_TOTAL_BYTES / 1024 / 1024)}MB 上限`,
+              400
+            )
+          )
+          return
+        }
+        chunks.push(chunk)
+      })
       stream.on('error', (err: unknown) => {
         // 先推进入参 next 让 tar-stream 释放当前条目，再 fail 终止整体流程
         next()
         fail(err)
       })
       stream.on('end', () => {
+        if (aborted) return
+        totalBytes += entryBytes
         if (name) {
           entries.push(new InMemoryArchiveEntry(name, isDir, Buffer.concat(chunks)))
         }
@@ -204,7 +280,20 @@ export async function parseTarXzBuffer(buffer: Buffer): Promise<ArchiveLike> {
       tryComplete()
     })
     tar.on('error', fail)
-    xz.on('error', fail)
+    xz.on('error', (err: unknown) => {
+      // E-P2-4：系统缺少 xz 命令时给明确提示（spawn ENOENT），而非 500 含糊错误
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        fail(
+          new ApiError(
+            'IMPORT_TARXZ_NO_XZ',
+            '服务器缺少 xz 解压工具，无法处理 .tar.xz 题包（请安装 xz-utils，或改用 ZIP 格式）',
+            400
+          )
+        )
+        return
+      }
+      fail(err)
+    })
     // xz 进程退出：exit code 0 = 成功，非 0 = 解码失败（数据损坏、非 xz 内容等）
     xz.on('close', (code: number | null) => {
       xzExitCode = code
@@ -213,10 +302,18 @@ export async function parseTarXzBuffer(buffer: Buffer): Promise<ArchiveLike> {
 
     // 输入：buffer → xz stdin；输出：xz stdout → tar
     // xz.stdin 在数据写完后 end，触发 xz 处理并输出到 stdout
-    xz.stdin.on('error', fail)
-    xz.stdout!.on('error', fail)
-    xz.stdout!.pipe(tar)
-    Readable.from([buffer]).pipe(xz.stdin)
+    // 注意：spawn 失败（如 ENOENT）时 stdin/stdout 为 null，需防护避免 TypeError
+    if (xz.stdin) {
+      xz.stdin.on('error', fail)
+      Readable.from([buffer]).pipe(xz.stdin)
+    }
+    if (xz.stdout) {
+      xz.stdout.on('error', fail)
+      xz.stdout.pipe(tar)
+    } else {
+      // stdout 不可用（进程未启动），直接失败避免管道静默挂起
+      fail(new Error('xz 进程未能启动（stdout 不可用）'))
+    }
   })
 
   return new InMemoryArchive(entries)

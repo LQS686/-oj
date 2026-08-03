@@ -4,6 +4,11 @@ import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import SampleDataBlock from './SampleDataBlock'
+
+// 视为「纯文本/数据块」的语言标识（洛谷/Hydro 题面常见 ```plain）
+// 这些代码块不需要语法高亮工具栏，应与题面样例输入/输出一致
+const PLAIN_LANGS = new Set(['plain', 'plaintext', 'text', 'txt', 'output', 'sample', 'console'])
 
 // 按需注册 Prism 语言包，避免加载全部 ~280 种语言（包体积从 2.19MB 降至 ~200KB）
 // 项目实际只展示 OJ 相关的 8 种语言；text/plaintext 不注册，PrismLight 自动降级为纯文本
@@ -70,7 +75,12 @@ const CODE_THEME = {
 
 function languageLabel(lang: string): string {
   const key = (lang || 'text').toLowerCase()
-  return LANGUAGE_LABELS[key] || lang.toUpperCase() || 'Text'
+  // 别名归一化（与 highlighterLanguage 保持一致）
+  if (key === 'c++' || key === 'cxx' || key === 'cc') return 'C++'
+  if (key === 'py' || key === 'python3') return 'Python'
+  if (key === 'js') return 'JavaScript'
+  if (key === 'ts') return 'TypeScript'
+  return LANGUAGE_LABELS[key] || 'Text'
 }
 
 function highlighterLanguage(lang: string): string {
@@ -80,6 +90,12 @@ function highlighterLanguage(lang: string): string {
   if (key === 'js') return 'javascript'
   if (key === 'ts') return 'typescript'
   return key || 'text'
+}
+
+/** 是否是纯文本/数据块（走 SampleDataBlock 而不是代码高亮） */
+function isPlainLang(lang: string): boolean {
+  const key = (lang || '').toLowerCase()
+  return PLAIN_LANGS.has(key)
 }
 
 export default function MarkdownCodeBlock({
@@ -92,6 +108,11 @@ export default function MarkdownCodeBlock({
   const [copied, setCopied] = useState(false)
   const label = languageLabel(language)
   const hlLang = highlighterLanguage(language)
+
+  // 题面里的纯文本/数据块（```plain 等）：走 SampleDataBlock 与样例输入输出一致
+  if (isPlainLang(language)) {
+    return <SampleDataBlock code={code} />
+  }
 
   const handleCopy = async () => {
     try {

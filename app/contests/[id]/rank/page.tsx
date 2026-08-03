@@ -193,7 +193,8 @@ export default function ContestRankPage() {
       }
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [refreshInterval])
+    // 依赖加入 params.id：竞赛切换时 effect 重跑，interval 回调捕获最新 id，避免 stale closure
+  }, [refreshInterval, params?.id])
 
   const formatTime = (ms: number) => {
     const minutes = Math.floor(ms / 60000)

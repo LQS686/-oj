@@ -70,6 +70,10 @@ export const POST = withApi.classRole(['owner', 'assistant', 'student'], async (
     tags?: string[]
   }>(req)
   if (!body.title || !body.content) throw400('MISSING_FIELDS', '请提供标题和内容')
+  // A-P2-4：长度上限（与公告/题解一致：标题 200、内容 50000）
+  // 非空断言与下方 createClassNoteSimple 传参的既有写法一致（throw400 调用不触发类型收窄）
+  if (body.title!.length > 200) throw400('TITLE_TOO_LONG', '笔记标题不能超过 200 字')
+  if (body.content!.length > 50_000) throw400('CONTENT_TOO_LONG', '笔记内容不能超过 50000 字')
 
   const created = await createClassNoteSimple(id, user.id, {
     title: body.title!,

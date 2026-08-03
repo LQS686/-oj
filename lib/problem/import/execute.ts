@@ -19,6 +19,9 @@ import {
 import {
   parseTarXzBuffer,
   detectArchiveFormat,
+  MAX_ARCHIVE_ENTRY_BYTES,
+  MAX_ARCHIVE_TOTAL_BYTES,
+  MAX_ARCHIVE_ENTRIES,
 } from './tarxz-archive'
 import type {
   ImportFormat,
@@ -87,7 +90,8 @@ export async function prepareProblemImport(
   if (kind === 'tar.xz') {
     archive = await parseTarXzBuffer(buf)
   } else if (kind === 'zip') {
-    archive = new AdmZip(buf) as unknown as ArchiveLike
+    // ZIP 分支：解压前做条目数/单文件/总量检查，防解压炸弹
+    archive = parseZipWithLimits(buf)
   } else {
     throw new ApiError('INVALID_DSOJ_FORMAT', 'DSOJ 标准格式必须是 ZIP 或 tar.xz 文件', 400)
   }
@@ -146,4 +150,43 @@ export interface ExecuteImportInput {
   content: string | Buffer | null
   rawOptions: unknown
   authorId: string
+}
+
+/**
+ * ZIP 解压炸弹防护：在解压前依据 ZIP central directory 声明的大小做检查。
+ * - 单条目未压缩大小上限（与 tar.xz 路径对齐）
+ * - 条目总数上限
+ * - 解压后总量上限
+ * 注：header.size 为声明的未压缩大小，实际内容读取还有 readEntryText 的单文件长度防线兜底。
+ */
+function parseZipWithLimits(buf: Buffer): ArchiveLike {
+  const zip = new AdmZip(buf)
+  const entries = zip.getEntries()
+  if (entries.length > MAX_ARCHIVE_ENTRIES) {
+    throw new ApiError(
+      'IMPORT_ARCHIVE_TOO_MANY_ENTRIES',
+      `题包条目数超过 ${MAX_ARCHIVE_ENTRIES} 个上限`,
+      400
+    )
+  }
+  let totalBytes = 0
+  for (const entry of entries) {
+    const size = typeof entry.header?.size === 'number' ? entry.header.size : 0
+    if (size > MAX_ARCHIVE_ENTRY_BYTES) {
+      throw new ApiError(
+        'IMPORT_ARCHIVE_ENTRY_TOO_LARGE',
+        `题包内单文件超过 ${Math.floor(MAX_ARCHIVE_ENTRY_BYTES / 1024 / 1024)}MB 上限`,
+        400
+      )
+    }
+    totalBytes += size
+    if (totalBytes > MAX_ARCHIVE_TOTAL_BYTES) {
+      throw new ApiError(
+        'IMPORT_ARCHIVE_TOTAL_TOO_LARGE',
+        `题包解压后总大小超过 ${Math.floor(MAX_ARCHIVE_TOTAL_BYTES / 1024 / 1024)}MB 上限`,
+        400
+      )
+    }
+  }
+  return zip as unknown as ArchiveLike
 }

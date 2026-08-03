@@ -90,9 +90,12 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   if (!note) throw404('笔记不存在')
   const safeNote = note!
 
-  const isAuthor = safeNote.authorId === user.id
   const member = await getCurrentClassMember(id, user.id)
-  const isAdmin = !!(member && isClassAdminRole(member.role))
+  // A-P2-1：要求作者/管理员当前仍是班级成员，被移出班级后不可再编辑历史笔记
+  if (!member) throw403('您不是班级成员')
+  const isAuthor = safeNote.authorId === user.id
+  // 与仓库既有约定一致：守卫后使用非空断言（throw403 调用在本项目 TS 环境下不触发类型收窄）
+  const isAdmin = isClassAdminRole(member!.role)
   if (!isAuthor && !isAdmin) throw403('只有作者或管理员可以编辑笔记')
 
   const updateData: { title?: string; content?: string; category?: string; tags?: string[] } = {}
@@ -115,9 +118,11 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   if (!note) throw404('笔记不存在')
   const safeNote = note!
 
-  const isAuthor = safeNote.authorId === user.id
   const member = await getCurrentClassMember(id, user.id)
-  const isAdmin = !!(member && isClassAdminRole(member.role))
+  // A-P2-1：要求作者/管理员当前仍是班级成员，被移出班级后不可再删除历史笔记
+  if (!member) throw403('您不是班级成员')
+  const isAuthor = safeNote.authorId === user.id
+  const isAdmin = isClassAdminRole(member!.role)
   if (!isAuthor && !isAdmin) throw403('只有作者或管理员可以删除笔记')
 
   await deleteClassNoteSimple(noteId)

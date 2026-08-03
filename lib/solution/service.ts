@@ -177,7 +177,15 @@ export async function listSolutionsWithPermission(
   if (!realProblemId) return { found: false as const }
 
   const flags = await resolveSolutionHideFlags(viewer, realProblemId, isAssignmentContext)
-  const permission = await canViewSolutions(viewer, realProblemId, flags)
+  // 作者本人在该题发布过题解（含待审核/驳回/下架）时跳过 90 分门槛，
+  // 列表过滤仍保证只展示「已通过 + 自己的全部状态」
+  const isAuthor = viewer
+    ? await prisma.solution.findFirst({
+        where: { problemId: realProblemId, authorId: viewer.id },
+        select: { id: true },
+      }).then(Boolean)
+    : false
+  const permission = await canViewSolutions(viewer, realProblemId, { ...flags, isAuthor })
   if (!permission.allowed) {
     return { found: true as const, allowed: false, permission }
   }
@@ -323,7 +331,12 @@ export async function getSolutionDetailWithPermission(
   }
 
   const flags = await resolveSolutionHideFlags(viewer, solution.problemId, isAssignmentContext)
-  const permission = await canViewSolutions(viewer, solution.problemId, flags)
+  // 作者本人查看自己的题解（含待审核/驳回/下架）时跳过 90 分门槛；
+  // 他人的查看门槛与管理员/教师豁免保持不变
+  const permission = await canViewSolutions(viewer, solution.problemId, {
+    ...flags,
+    isAuthor: viewer ? solution.authorId === viewer.id : false,
+  })
   if (!permission.allowed) return { found: true as const, allowed: false, permission }
 
   // 浏览数 +1（按 userId/IP 去重）
@@ -377,13 +390,14 @@ export async function updateUserSolution(
   if (!isAuthor && !isAdmin && !isTeacher) {
     throw AppError.forbidden('无权修改此题解')
   }
-  // 安全合规：作者重新编辑被驳回/下架的题解时，重置为待审核，重新进入审核队列；
-  // 管理员/教师编辑不重置（他们可直接通过/驳回）
+  // 安全合规：发布前审核。作者编辑题解后需重新审核——
+  // 只要当前非待审核状态（已通过 / 已驳回 / 已下架），一律重置为 pending 并清空审核痕迹，
+  // 防止「审核通过后私自改内容重新公开」绕过审核；管理员/教师编辑不重置（他们可直接通过/驳回）
   const isManagerEdit = isAdmin || isTeacher
   const shouldRequeue =
     isAuthor &&
     !isManagerEdit &&
-    (solution.status === 'rejected' || solution.status === 'hidden')
+    solution.status !== 'pending'
   const data: Prisma.SolutionUncheckedUpdateInput = {}
   if (shouldRequeue) {
     data.status = 'pending'

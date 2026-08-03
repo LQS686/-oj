@@ -387,6 +387,7 @@ export async function rejudgeSubmission(submissionId: string) {
       id: true,
       problemId: true,
       userId: true,
+      contestId: true,
       code: true,
       language: true,
       status: true,
@@ -424,6 +425,32 @@ export async function rejudgeSubmission(submissionId: string) {
 
   const wasAccepted = submission.status === SubmissionStatus.ACCEPTED
   let wasOnlyAc = false
+  // B-P1-3：封榜期间 worker 对竞赛 AC 提交不写全局计数（worker.ts deferGlobalAc=true，
+  // totalAccepted/solvedCount 均未 +1）；rejudge 回滚须与之一致——封榜中的提交
+  // 跳过 decrement，否则 totalAccepted / solvedCount 会永久少 1。
+  // 普通（非封榜）rejudge 行为不变。
+  let shouldRollbackAccepted = wasAccepted
+  if (wasAccepted && submission.contestId) {
+    try {
+      const { isContestSealed } = await import('@/lib/contest/rankings')
+      const contest = await prisma.contest.findUnique({
+        where: { id: submission.contestId },
+        select: { sealRankTime: true, sealUnlocked: true },
+      })
+      if (contest && isContestSealed(contest)) {
+        shouldRollbackAccepted = false
+        logger.info('封榜期间 rejudge：跳过 AC 计数回滚', {
+          submissionId: submission.id,
+          contestId: submission.contestId,
+        })
+      }
+    } catch (err) {
+      logger.warn('rejudge 封榜判断失败，按未封榜回滚', {
+        submissionId: submission.id,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
   let assignmentSnapshot: {
     status: string
     score: number
@@ -436,7 +463,7 @@ export async function rejudgeSubmission(submissionId: string) {
   } | null = null
 
   // 重测前回滚 AC 计数：否则终态被清成 PENDING 后再次 AC 会双计 totalAccepted / solvedCount
-  if (wasAccepted) {
+  if (wasAccepted && shouldRollbackAccepted) {
     await decrementProblemAcceptedCount(submission.problemId)
     cache.delete(CacheKeys.problem.byId(submission.problemId))
     cache.delete(CacheKeys.problem.statusCounts(submission.problemId))
@@ -454,6 +481,11 @@ export async function rejudgeSubmission(submissionId: string) {
       })
       clearRankingCache()
     }
+  } else if (wasAccepted) {
+    // 封榜中：计数未计入全局，无需回滚；但题目状态/统计缓存仍须失效，避免展示旧数据
+    cache.delete(CacheKeys.problem.byId(submission.problemId))
+    cache.delete(CacheKeys.problem.statusCounts(submission.problemId))
+    cache.delete(CacheKeys.problem.stats(submission.problemId))
   }
 
   if (submission.assignmentSubmissionId) {
@@ -505,6 +537,10 @@ export async function rejudgeSubmission(submissionId: string) {
     },
     { forceStatus: true }
   )
+
+  // B-P2-13：提交状态已重置为 PENDING，失效 byId 缓存（与 worker.ts 终态失效同键），
+  // 避免详情页/列表在 30s TTL 内读到旧的 AC/WA 终态
+  cache.delete(`submission:byId:${submission.id}`)
 
   // 同步作业提交行，避免主 Submission 已 PENDING 而作业行仍显示 AC / 首次 AC 徽章
   if (submission.assignmentSubmissionId) {
@@ -562,7 +598,9 @@ export async function rejudgeSubmission(submissionId: string) {
       },
       { forceStatus: true }
     )
-    if (wasAccepted) {
+    // 入队失败：恢复计数仅限「未封榜且确实回滚过」的提交（B-P1-3），
+    // 并失效 byId 缓存，避免读到短暂 PENDING 态（B-P2-13）
+    if (wasAccepted && shouldRollbackAccepted) {
       await incrementProblemAcceptedCount(submission.problemId)
       if (wasOnlyAc) {
         await prisma.user.update({
@@ -572,6 +610,7 @@ export async function rejudgeSubmission(submissionId: string) {
         clearRankingCache()
       }
     }
+    cache.delete(`submission:byId:${submission.id}`)
     if (submission.assignmentSubmissionId && assignmentSnapshot) {
       try {
         await updateClassAssignmentSubmissionDirect(

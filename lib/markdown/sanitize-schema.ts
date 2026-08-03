@@ -3,9 +3,10 @@
  * MarkdownContent 渲染时使用的 rehype-sanitize schema
  *
  * 设计目标：
- *   1. 安全第一：禁止 javascript:/vbscript:/data:/file: 等危险协议
- *   2. 兼容 Hydro/FPS 等导出格式：题面常含 HTML（<h2>/<p>/<span style> 等），
- *      需保留常见展示类标签和属性，否则题面会丢失样式信息
+ *   1. 安全第一：禁止 javascript:/vbscript:/data:/file: 等危险协议，
+ *      并禁止 style 属性（hast-util-sanitize 不过滤 style 值，任意 CSS 可注入）
+ *   2. 兼容 Hydro/FPS 等导出格式：题面常含 HTML（<h2>/<p>/<span class> 等），
+ *      需保留常见展示类标签和属性，否则题面会丢失结构信息
  *   3. 仍禁止所有事件处理器（onclick、onload 等）和脚本标签
  */
 
@@ -36,29 +37,33 @@ const EXTRA_ALLOWED_TAGS = [
 /**
  * 允许的 HTML 属性白名单（按标签分组）
  *
- * 重要：不包含任何 on* 事件处理器属性（onclick/onload/onerror 等），
- *       rehype-sanitize 默认会剥离所有未在白名单中的属性。
+ * 重要：
+ *   1. 不包含任何 on* 事件处理器属性（onclick/onload/onerror 等），
+ *      rehype-sanitize 默认会剥离所有未在白名单中的属性。
+ *   2. 不包含 style 属性：hast-util-sanitize 不解析/不过滤 style 值，
+ *      任意 CSS 可做 UI 覆盖（如 position:fixed 遮罩）或发起外部请求
+ *      （如 background-image:url() 追踪用户），因此统一禁止。
  */
 const ALLOWED_ATTRIBUTES_BY_TAG: Record<string, string[]> = {
-  // 通用展示属性（color/font-family/font-size/text-align 等）
-  // 注：style 属性经过 rehype-sanitize 内置 css 过滤，会剥离 url()、expression() 等危险 CSS
-  span: ['style', 'className', 'id'],
-  div: ['style', 'className', 'id', 'align'],
-  p: ['style', 'className', 'id', 'align'],
-  pre: ['style', 'className'],
-  code: ['style', 'className'],
-  h1: ['style', 'className', 'id'],
-  h2: ['style', 'className', 'id'],
-  h3: ['style', 'className', 'id'],
-  h4: ['style', 'className', 'id'],
-  h5: ['style', 'className', 'id'],
-  h6: ['style', 'className', 'id'],
-  table: ['style', 'className', 'border', 'cellpadding', 'cellspacing', 'align'],
-  th: ['style', 'className', 'align', 'colspan', 'rowspan'],
-  td: ['style', 'className', 'align', 'colspan', 'rowspan'],
+  // 通用展示属性（color/font-family/font-size/text-align 等由前端 CSS 类控制，
+  // 不再放行内 style）
+  span: ['className', 'id'],
+  div: ['className', 'id', 'align'],
+  p: ['className', 'id', 'align'],
+  pre: ['className'],
+  code: ['className'],
+  h1: ['className', 'id'],
+  h2: ['className', 'id'],
+  h3: ['className', 'id'],
+  h4: ['className', 'id'],
+  h5: ['className', 'id'],
+  h6: ['className', 'id'],
+  table: ['className', 'border', 'cellpadding', 'cellspacing', 'align'],
+  th: ['className', 'align', 'colspan', 'rowspan'],
+  td: ['className', 'align', 'colspan', 'rowspan'],
   font: ['color', 'face', 'size'],
   br: ['clear'],
-  img: ['src', 'alt', 'title', 'width', 'height', 'style', 'className'],
+  img: ['src', 'alt', 'title', 'width', 'height', 'className'],
   a: ['href', 'title', 'target', 'rel'],
   // KaTeX MathML 标签属性：rehype-katex 输出含下列展示属性
   // 缺失会导致 KaTeX 渲染时丢失样式（如颜色、字号、对齐），导致公式变形
@@ -73,24 +78,24 @@ const ALLOWED_ATTRIBUTES_BY_TAG: Record<string, string[]> = {
   munderover: ['accentunder', 'accent', 'align'],
   mtable: ['rowspacing', 'columnspacing', 'columnalign', 'rowalign', 'displaystyle', 'align', 'side', 'frame', 'framespacing', 'equalrows', 'equalcolumns', 'minlabelspacing'],
   mtr: ['rowalign', 'columnalign', 'groupalign'],
-  mtd: ['rowalign', 'columnalign', 'groupalign', 'rowspan', 'columnspan', 'style'],
+  mtd: ['rowalign', 'columnalign', 'groupalign', 'rowspan', 'columnspan'],
   mspace: ['width', 'height', 'depth', 'linebreak', 'mathbackground', 'mathcolor'],
   mstyle: ['displaystyle', 'scriptlevel', 'mathcolor', 'mathvariant', 'color', 'background', 'fontfamily', 'fontsize'],
   merror: ['mathcolor', 'mathbackground'],
   mfenced: ['open', 'close', 'separators'],
-  msqrt: ['style', 'className'],
-  mroot: ['style', 'className'],
+  msqrt: ['className'],
+  mroot: ['className'],
   menclose: ['notation', 'notationstyle'],
-  mtext: ['mathcolor', 'mathvariant', 'style', 'className'],
-  mn: ['mathcolor', 'mathvariant', 'style', 'className'],
-  mo: ['mathcolor', 'mathvariant', 'form', 'fence', 'separator', 'stretchy', 'symmetric', 'maxsize', 'minsize', 'largeop', 'movablelimits', 'accent', 'lspace', 'rspace', 'style', 'className'],
-  mi: ['mathcolor', 'mathvariant', 'mathsize', 'fontstyle', 'fontweight', 'style', 'className'],
-  mpadded: ['width', 'height', 'depth', 'lspace', 'voffset', 'style', 'className'],
-  mphantom: ['style', 'className'],
-  maction: ['actiontype', 'selection', 'style', 'className'],
+  mtext: ['mathcolor', 'mathvariant', 'className'],
+  mn: ['mathcolor', 'mathvariant', 'className'],
+  mo: ['mathcolor', 'mathvariant', 'form', 'fence', 'separator', 'stretchy', 'symmetric', 'maxsize', 'minsize', 'largeop', 'movablelimits', 'accent', 'lspace', 'rspace', 'className'],
+  mi: ['mathcolor', 'mathvariant', 'mathsize', 'fontstyle', 'fontweight', 'className'],
+  mpadded: ['width', 'height', 'depth', 'lspace', 'voffset', 'className'],
+  mphantom: ['className'],
+  maction: ['actiontype', 'selection', 'className'],
   mlabeledtr: ['rowalign', 'columnalign', 'groupalign'],
   maligngroup: ['groupalign'],
-  malignmark: ['edge', 'style', 'className'],
+  malignmark: ['edge', 'className'],
   mglyph: ['src', 'alt', 'width', 'height', 'valign', 'mathbackground'],
 }
 
@@ -99,7 +104,9 @@ const ALLOWED_ATTRIBUTES_BY_TAG: Record<string, string[]> = {
  */
 // 注意：hast 中代表 HTML class 属性的字段是 'className'（驼峰），不是 'class'
 // 写错会导致 rehype-sanitize 把所有 className 属性剥离（KaTeX 样式全失效）
-const GLOBAL_ALLOWED_ATTRIBUTES = ['style', 'className']
+// style 属性不在此列：hast-util-sanitize 不校验其值（不剥离 url()/expression() 等危险 CSS），
+// 允许 style 等于允许任意 CSS 注入（UI 覆盖 / 外部请求），故一律禁止。
+const GLOBAL_ALLOWED_ATTRIBUTES = ['className']
 
 export const markdownSanitizeSchema: Schema = {
   ...defaultSchema,

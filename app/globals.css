@@ -1,6 +1,27 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
 
+/* KaTeX 行内公式与中文段落排版对齐：
+   - 默认 KaTeX 行内公式尺寸较小（分数/sum 等结构在中文段落中显得突兀、像上标）。
+   - 将行内 .katex 字号设为正文字号的 1.15 倍，让分数、上下标与中文行高自然衔接；
+     KaTeX 内部布局用 em 单位，会随字号等比缩放，无需改动具体子元素。
+   - .katex-display 是块级公式 $$...$$，保留更大尺寸（默认 1.2 倍）。
+   - 公式与中文之间保留少量水平空白，避免紧贴。 */
+.markdown-body .katex {
+ font-size: 1.15em;
+}
+.markdown-body .katex-display {
+ font-size: 1.2em;
+ margin: 1em 0;
+}
+/* 中英文混排时公式与中文间留出半角空隙，避免粘连（特别是在 "的概率为 $\\frac{...}$" 这种情形） */
+.markdown-body .katex + .katex,
+.markdown-body :not(.katex) + .katex,
+.markdown-body .katex + :not(.katex) {
+ margin-left: 0.15em;
+ margin-right: 0.15em;
+}
+
 :root {
   --primary: #4F6AE8;
   --primary-dark: #3D54C7;

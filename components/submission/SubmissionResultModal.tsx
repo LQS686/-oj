@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   CheckCircle2,
@@ -289,6 +289,8 @@ export default function SubmissionResultModal({
   const isFinal = !!result && !isJudging
   const firstWaIndex = findFirstWaIndex(result?.testResults)
   const [waDownloading, setWaDownloading] = useState(false)
+  // 弹窗面板容器：用于初始聚焦与 Tab 焦点循环
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   const handleDownloadWa = async () => {
     if (!result?.submissionId || waDownloading) return
@@ -302,26 +304,59 @@ export default function SubmissionResultModal({
     }
   }
 
-  // ESC 关闭（仅评测完成后）
+  // 弹窗键盘交互：ESC 关闭（仅评测完成后）+ Tab 焦点循环（基础焦点陷阱）
   useEffect(() => {
-    if (!isOpen || isJudging) return
+    if (!isOpen) return
+    const dialogEl = dialogRef.current
+    // 记录打开前的活动元素，关闭后还原焦点
+    const prevActive = document.activeElement as HTMLElement | null
+    // 初始聚焦容器内首个可聚焦元素（无则聚焦容器本身）
+    const firstFocusable = dialogEl?.querySelector<HTMLElement>(
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    )
+    if (firstFocusable) firstFocusable.focus()
+    else dialogEl?.focus()
+
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (isJudging) return
         e.preventDefault()
         onClose()
+        return
+      }
+      // Tab 焦点循环：焦点在首/末可聚焦元素时循环到另一侧
+      if (e.key === 'Tab' && dialogEl) {
+        const focusable = Array.from(
+          dialogEl.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+          )
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
       }
     }
     window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    return () => {
+      window.removeEventListener('keydown', handler)
+      prevActive?.focus?.()
+    }
   }, [isOpen, isJudging, onClose])
 
-  // 锁定 body 滚动
+  // 锁定 body 滚动（关闭时还原打开前的 overflow 值，参考 Modal.tsx 的 prevOverflow 模式）
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    }
+    if (!isOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = ''
+      document.body.style.overflow = prevOverflow
     }
   }, [isOpen])
 
@@ -367,6 +402,8 @@ export default function SubmissionResultModal({
           )}
 
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             className="card-static rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl"
             variants={panelVariants}
             initial="hidden"

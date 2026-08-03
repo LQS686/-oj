@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { DataTable, type Column } from '@/components/admin'
@@ -42,6 +43,7 @@ interface DashboardStats {
 
 export default function AdminDashboard() {
  const router = useRouter()
+ const scheduleForbiddenRedirect = useForbiddenRedirect()
  const [loading, setLoading] = useState(true)
  const [stats, setStats] = useState<DashboardStats | null>(null)
  const [error, setError] = useState('')
@@ -56,7 +58,7 @@ export default function AdminDashboard() {
  if (!response.ok) {
  if (response.status === 403) {
  setError('需要管理员权限')
- setTimeout(() => router.push('/403'), 2000)
+ scheduleForbiddenRedirect()
  return
  }
  setError(data.error || '加载失败')
@@ -70,7 +72,7 @@ export default function AdminDashboard() {
  } finally {
  setLoading(false)
  }
- }, [router])
+ }, [scheduleForbiddenRedirect])
 
  useDeferredEffect(() => {
  fetchDashboardData()

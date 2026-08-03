@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { useRouter } from 'next/navigation'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDialog } from '@/components/common/DialogProvider'
 import type { Problem } from '../_types'
@@ -17,7 +17,7 @@ import type { Problem } from '../_types'
  * 403 时设置错误并跳转 /403，与原实现保持一致。
  */
 export function useProblemList() {
-  const router = useRouter()
+  const scheduleForbiddenRedirect = useForbiddenRedirect()
   const dialog = useDialog()
   const [problems, setProblems] = useState<Problem[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,7 +35,7 @@ export function useProblemList() {
 
       if (response.status === 403) {
         setError('需要管理员权限')
-        setTimeout(() => router.push('/403'), 2000)
+        scheduleForbiddenRedirect()
         return
       }
 
@@ -53,7 +53,7 @@ export function useProblemList() {
       setLoading(false)
       setInitialLoading(false)
     }
-  }, [router])
+  }, [scheduleForbiddenRedirect])
 
   const toggleVisibility = useCallback(async (problemId: string, currentVisibility: string) => {
     const nextVisibility =

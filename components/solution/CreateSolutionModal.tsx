@@ -181,6 +181,13 @@ export default function CreateSolutionModal({
         })
         const data = await res.json().catch(() => null)
         if (res.ok && data?.success) {
+          // 安全合规：作者编辑后重新进入审核队列，审核通过后才再次公开；管理员/教师编辑不提示
+          if (!canManageContent(user)) {
+            await dialog.alert({
+              tone: 'info',
+              message: '题解已更新，将重新进入审核。管理员审核通过后才会再次展示给其他用户，你仍可随时查看自己的题解。',
+            })
+          }
           onSaved?.()
           onClose()
         } else {

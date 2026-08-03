@@ -17,6 +17,8 @@ import {
 
 const MAX_JSON_USERS = 100
 const MAX_CSV_USERS = 500
+// A-P1-2 修复：CSV 文件大小上限（按 MAX_CSV_USERS=500 估算约 2MB，含安全余量）
+const MAX_CSV_BYTES = 2 * 1024 * 1024
 
 /**
  * POST /api/admin/users/batch-register
@@ -38,6 +40,10 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
     const f = file as File
     if (!f.name.endsWith('.csv') && !f.name.endsWith('.txt')) {
       throw400('BAD_FILE_TYPE', '只支持CSV或TXT格式文件')
+    }
+    // A-P1-2 修复：读取前检查文件大小，避免超大 CSV 被 f.text() 全量读入内存（OOM）
+    if (f.size > MAX_CSV_BYTES) {
+      throw400('FILE_TOO_LARGE', `CSV 文件过大（最大 ${MAX_CSV_BYTES / 1024 / 1024}MB）`)
     }
     const csvText = await f.text()
     try {

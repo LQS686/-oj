@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 
 describe('API Tests', () => {
-  const baseURL = 'http://localhost:3001';
+  const baseURL = 'http://localhost:3000';
   const agent = request(baseURL);
 
   describe('Health Check', () => {

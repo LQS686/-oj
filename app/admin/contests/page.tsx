@@ -2,6 +2,7 @@
 
 import { useState, useCallback, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -28,8 +29,11 @@ interface Contest {
 function AdminContestsPageContent() {
  const dialog = useDialog()
  const router = useRouter()
+ const scheduleForbiddenRedirect = useForbiddenRedirect()
  const searchParams = useSearchParams()
  const [contests, setContests] = useState<Contest[]>([])
+ // C-P2-22：服务端返回 { list, total }，total 为竞赛总数（不受 take 截断影响）
+ const [total, setTotal] = useState(0)
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
  const [searchQuery, setSearchQuery] = useState('')
@@ -65,13 +69,14 @@ function AdminContestsPageContent() {
 
  if (response.status === 403) {
  setError('需要管理员权限')
- setTimeout(() => router.push('/403'), 2000)
+ scheduleForbiddenRedirect()
  return
  }
 
  const data = await response.json()
  if (data.success) {
- setContests(Array.isArray(data.data) ? data.data : [])
+ setContests(Array.isArray(data.data?.list) ? data.data.list : [])
+ setTotal(typeof data.data?.total === 'number' ? data.data.total : 0)
  } else {
  setError(data.error || '获取竞赛列表失败')
  setContests([])
@@ -81,7 +86,7 @@ function AdminContestsPageContent() {
  } finally {
  setLoading(false)
  }
- }, [router])
+ }, [scheduleForbiddenRedirect])
 
  useDeferredEffect(() => {
  fetchContests()
@@ -315,7 +320,7 @@ function AdminContestsPageContent() {
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
  <div className="card p-4">
  <div className="text-muted-foreground text-sm">总竞赛数</div>
- <div className="text-2xl font-bold text-foreground mt-1">{contests.length}</div>
+ <div className="text-2xl font-bold text-foreground mt-1">{total}</div>
  </div>
  <div className="card p-4">
  <div className="text-muted-foreground text-sm">进行中</div>

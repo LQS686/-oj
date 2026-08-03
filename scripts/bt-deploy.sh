@@ -728,9 +728,12 @@ check_host_port "$APP_BIND" "$APP_PORT"
 compose up -d mongo redis
 echo -n "等待 mongo/redis healthy"
 dep_ok=0
-# 从 .env 读 root 账号供回退探测（勿 export 到全局过久）
+# 从 .env 读 root 账号供回退探测。
+# export 后经 compose exec -e（不带值，继承本进程环境）注入容器，mongosh 在 --eval 内
+# 通过 process.env 读取密码并 db.auth() 认证，密码不进入任何 ps 命令行参数。
 MONGO_ROOT_USER="$(env_get MONGO_ROOT_USER || echo admin)"
 MONGO_ROOT_PASSWORD="$(env_get MONGO_ROOT_PASSWORD || true)"
+export MONGO_ROOT_USER MONGO_ROOT_PASSWORD
 for i in $(seq 1 60); do
   mongo_h="$(service_health mongo)"
   redis_h="$(service_health redis)"
@@ -742,7 +745,7 @@ for i in $(seq 1 60); do
   fi
   if [[ -n "$MONGO_ROOT_PASSWORD" ]] \
      && timeout 10 compose exec -T redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping' 2>/dev/null | grep -q PONG \
-     && timeout 15 compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --eval 'db.adminCommand("ping").ok' 2>/dev/null | grep -q 1; then
+     && timeout 15 compose exec -T -e MONGO_ROOT_USER -e MONGO_ROOT_PASSWORD mongo mongosh --quiet --eval 'const pwd = process.env.MONGO_ROOT_PASSWORD; const admin = db.getSiblingDB("admin"); admin.auth(process.env.MONGO_ROOT_USER, pwd) && db.adminCommand("ping").ok' 2>/dev/null | grep -q 1; then
     echo ""
     info "mongo / redis 可连通（health 字段可能暂不可用：mongo=${mongo_h} redis=${redis_h}）"
     dep_ok=1
@@ -760,8 +763,8 @@ fi
 # 重启前检测进行中的评测（app 重启会清空内存队列，进行中的提交将被标记为 SE）
 # 仅当 app 已在运行且 DB 可查时检测
 if compose ps -q app 2>/dev/null | grep -q .; then
-  ACTIVE_CNT="$(timeout 30 compose exec -T mongo mongosh --quiet -u "$MONGO_ROOT_USER" -p "$MONGO_ROOT_PASSWORD" \
-    --authenticationDatabase admin --eval 'try { print(db.getSiblingDB("oj_platform").Submission.countDocuments({status:{$in:["PENDING","JUDGING","RUNNING"]}})) } catch(e) { print("?") }' 2>/dev/null | tr -d '\r' || true)"
+  ACTIVE_CNT="$(timeout 30 compose exec -T -e MONGO_ROOT_USER -e MONGO_ROOT_PASSWORD mongo mongosh --quiet \
+    --eval 'const pwd = process.env.MONGO_ROOT_PASSWORD; const admin = db.getSiblingDB("admin"); admin.auth(process.env.MONGO_ROOT_USER, pwd); try { print(db.getSiblingDB("oj_platform").Submission.countDocuments({status:{$in:["PENDING","JUDGING","RUNNING"]}})) } catch(e) { print("?") }' 2>/dev/null | tr -d '\r' || true)"
   if [[ "$ACTIVE_CNT" =~ ^[0-9]+$ ]] && [[ "$ACTIVE_CNT" -gt 0 ]]; then
     warn "检测到 ${ACTIVE_CNT} 个进行中的评测；重启 app 将中断它们并标记为 SE（系统错误），需用户重新提交"
     if [[ "$ASSUME_YES" -eq 1 ]]; then

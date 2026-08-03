@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -43,6 +44,7 @@ const LANGUAGES = [
 
 export default function AdminSubmissionsPage() {
   const router = useRouter()
+  const scheduleForbiddenRedirect = useForbiddenRedirect()
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -81,7 +83,7 @@ export default function AdminSubmissionsPage() {
 
       if (response.status === 403) {
         setError('需要管理员权限')
-        setTimeout(() => router.push('/403'), 2000)
+        scheduleForbiddenRedirect()
         return
       }
 
@@ -101,7 +103,7 @@ export default function AdminSubmissionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, statusFilter, language, searchQuery, router])
+  }, [page, pageSize, statusFilter, language, searchQuery, scheduleForbiddenRedirect])
 
   useDeferredEffect(() => {
     void fetchSubmissions()

@@ -64,63 +64,68 @@ export async function createProblemWithTestcases(input: CreateProblemInput) {
     'special-judge',
   ]
   const visibility = input.visibility ?? 'private'
-  const problem = await prisma.problem.create({
-    data: {
-      title: input.title,
-      description: input.description,
-      background: input.background,
-      input: input.input,
-      output: input.output,
-      samples: input.samples || [],
-      hint: input.hint,
-      source: input.source,
-      difficulty: input.difficulty,
-      tags: input.tags || [],
-      timeLimit: input.timeLimit || 1000,
-      memoryLimit: input.memoryLimit || 128,
-      comparisonMode: VALID_COMPARISON_MODES.includes(input.comparisonMode as string)
-        ? (input.comparisonMode as string)
-        : 'default',
-      realPrecision:
-        typeof input.realPrecision === 'number' && input.realPrecision >= 0
-          ? input.realPrecision
-          : 3,
-      spjCode: input.spjCode ?? null,
-      visibility,
-      isPublic: visibility === 'public',
-      authorId: input.authorId,
-    },
+  const normalizedTestCases = Array.isArray(input.testCases)
+    ? ensureTotalScoreIs100(
+        input.testCases.map((tc, index) => ({
+          input: tc.input,
+          output: tc.output,
+          isSample: tc.isSample || false,
+          score: tc.score || 0,
+          timeLimit: tc.timeLimit,
+          memoryLimit: tc.memoryLimit,
+          orderIndex: index + 1,
+        }))
+      )
+    : []
+
+  // C-P2-7：题目 + 测试点同事务写入，测试点用 createMany 批量插入，避免逐个 create 出现孤儿题目
+  // （与 lib/problem/admin.ts 的 $transaction + createMany 先例一致；本项目 MongoDB 副本集已支持事务）
+  const problem = await prisma.$transaction(async (tx) => {
+    const created = await tx.problem.create({
+      data: {
+        title: input.title,
+        description: input.description,
+        background: input.background,
+        input: input.input,
+        output: input.output,
+        samples: input.samples || [],
+        hint: input.hint,
+        source: input.source,
+        difficulty: input.difficulty,
+        tags: input.tags || [],
+        timeLimit: input.timeLimit || 1000,
+        memoryLimit: input.memoryLimit || 128,
+        comparisonMode: VALID_COMPARISON_MODES.includes(input.comparisonMode as string)
+          ? (input.comparisonMode as string)
+          : 'default',
+        realPrecision:
+          typeof input.realPrecision === 'number' && input.realPrecision >= 0
+            ? input.realPrecision
+            : 3,
+        spjCode: input.spjCode ?? null,
+        visibility,
+        isPublic: visibility === 'public',
+        authorId: input.authorId,
+      },
+    })
+
+    if (normalizedTestCases.length > 0) {
+      await tx.testCase.createMany({
+        data: normalizedTestCases.map((tc) => ({
+          problemId: created.id,
+          input: tc.input,
+          output: tc.output,
+          isSample: tc.isSample,
+          score: tc.score,
+          timeLimit: tc.timeLimit ?? null,
+          memoryLimit: tc.memoryLimit ?? null,
+          orderIndex: tc.orderIndex,
+        })),
+      })
+    }
+    return created
   })
 
-  if (input.testCases && Array.isArray(input.testCases)) {
-    const normalized = ensureTotalScoreIs100(
-      input.testCases.map((tc, index) => ({
-        input: tc.input,
-        output: tc.output,
-        isSample: tc.isSample || false,
-        score: tc.score || 0,
-        timeLimit: tc.timeLimit,
-        memoryLimit: tc.memoryLimit,
-        orderIndex: index + 1,
-      }))
-    )
-    await Promise.all(
-      normalized.map((tc) =>
-        prisma.testCase.create({
-          data: {
-            problemId: problem.id,
-            input: tc.input,
-            output: tc.output,
-            isSample: tc.isSample,
-            score: tc.score,
-            timeLimit: tc.timeLimit ?? null,
-            memoryLimit: tc.memoryLimit ?? null,
-            orderIndex: tc.orderIndex,
-          },
-        })
-      )
-    )
-  }
   clearProblemCache(problem.id)
   return problem
 }

@@ -47,6 +47,14 @@ export async function buildClassAssignmentDetail(
     .map((id) => problemById.get(id))
     .filter(Boolean) as typeof problemsRaw
 
+  // C-P2-23：按 userId 分组提交为 Map，成员循环 O(1) 查 Map，避免 O(成员×提交) 双重循环
+  const submissionsByUser = new Map<string, typeof submissions>()
+  for (const s of submissions) {
+    const list = submissionsByUser.get(s.userId)
+    if (list) list.push(s)
+    else submissionsByUser.set(s.userId, [s])
+  }
+
   // 成员完成情况
   type MemberProgressRow = {
     userId: string
@@ -58,7 +66,7 @@ export async function buildClassAssignmentDetail(
   }
   const memberProgress = members
     .map((m) => {
-      const us = submissions.filter((s) => s.userId === m.userId)
+      const us = submissionsByUser.get(m.userId) || []
       const solved = new Set(us.filter((s) => s.status === 'AC').map((s) => s.problemId))
       const row: MemberProgressRow = {
         userId: m.userId,
@@ -186,14 +194,27 @@ export async function recalculateLateFlags(assignmentId: string): Promise<void> 
     select: { id: true, submittedAt: true, isLate: true },
   })
 
+  // C-P2-5：按新 isLate 值分两组批量 updateMany，替代循环内逐条 update
+  const shouldBeLate: string[] = []
+  const shouldBeNotLate: string[] = []
   for (const s of submissions) {
     const newIsLate = new Date(s.submittedAt) > endAt
     if (s.isLate !== newIsLate) {
-      await prisma.classAssignmentSubmission.update({
-        where: { id: s.id },
-        data: { isLate: newIsLate },
-      })
+      if (newIsLate) shouldBeLate.push(s.id)
+      else shouldBeNotLate.push(s.id)
     }
+  }
+  if (shouldBeLate.length > 0) {
+    await prisma.classAssignmentSubmission.updateMany({
+      where: { id: { in: shouldBeLate } },
+      data: { isLate: true },
+    })
+  }
+  if (shouldBeNotLate.length > 0) {
+    await prisma.classAssignmentSubmission.updateMany({
+      where: { id: { in: shouldBeNotLate } },
+      data: { isLate: false },
+    })
   }
 }
 

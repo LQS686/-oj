@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
@@ -133,6 +133,17 @@ const [editOpen, setEditOpen] = useState(false)
  const [language, setLanguage] = useState('cpp')
  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
  const [submitCooldown, setSubmitCooldown] = useState(false)
+ // 提交失败冷却计时器：卸载时清理，避免卸载后 setState 泄漏
+ const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+ useEffect(() => {
+   return () => {
+     if (cooldownTimerRef.current) {
+       clearTimeout(cooldownTimerRef.current)
+       cooldownTimerRef.current = null
+     }
+   }
+ }, [])
 
  useDeferredEffect(() => {
    setViewTab(parseViewTab(searchParams.get('tab')))
@@ -339,11 +350,13 @@ const [editOpen, setEditOpen] = useState(false)
  } else {
  abortSubmitSession()
  const cooldownMs = data.code === 'SUBMIT_TOO_FREQUENT' ? 10000 : 3000
- setTimeout(() => setSubmitCooldown(false), cooldownMs)
+ if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current)
+ cooldownTimerRef.current = setTimeout(() => setSubmitCooldown(false), cooldownMs)
  }
  } catch {
  abortSubmitSession()
- setTimeout(() => setSubmitCooldown(false), 3000)
+ if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current)
+ cooldownTimerRef.current = setTimeout(() => setSubmitCooldown(false), 3000)
  }
  }
 

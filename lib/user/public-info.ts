@@ -100,6 +100,8 @@ export async function getUserFullStats(userId: string) {
     prisma.submission.findMany({
       where: { userId, status: 'AC' },
       select: { problemId: true, submittedAt: true },
+      // C-P2-8：限制 AC 提交拉取量，避免全量历史提交占用内存（对极大量 AC 用户统计略有截断，可接受）
+      take: 2000,
     }),
     prisma.submission.findMany({
       where: { userId },
@@ -131,6 +133,8 @@ export async function getUserFullStats(userId: string) {
         submittedAt: true,
         problem: { select: { difficulty: true } },
       },
+      // C-P2-8：限制难度分布 AC 拉取量，避免全量历史提交占用内存
+      take: 2000,
     }),
     prisma.problem.count({ where: { authorId: userId } }),
     prisma.solution.count({ where: { authorId: userId } }),

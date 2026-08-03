@@ -29,40 +29,125 @@
 #define EXIT_TLE 152
 #define EXIT_OLE 153
 
+/* 进程树容量上限：防 fork 炸弹导致的数组溢出（超出部分不计内存，TLE 强杀仍覆盖） */
+#define MAX_TREE_PROCS 512
+
 static long long now_ns(void) {
   struct timespec ts;
   if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
   return (long long)ts.tv_sec * 1000000000LL + (long long)ts.tv_nsec;
 }
 
-static int read_status_kb(pid_t pid, const char *key, long *out) {
+/* ----------------------------------------------------------------------------
+ * 进程树遍历（B-P2-6）：/proc/<pid>/task/<pid>/children 是 Linux 原生接口，
+ * 无 pgrep 依赖，直接给出直接子进程 pid 列表。
+ * -------------------------------------------------------------------------- */
+
+/* 前置声明：read_cpu_tree_ms_approx 在 read_cpu_ms_approx 定义之前引用 */
+static long read_cpu_ms_approx(pid_t pid);
+
+/** 读取某个进程的直接子进程（返回数量，最多 cap 个） */
+static int read_children(pid_t pid, pid_t *out, int cap) {
+  char path[64];
+  snprintf(path, sizeof(path), "/proc/%d/task/%d/children", (int)pid, (int)pid);
+  FILE *f = fopen(path, "r");
+  if (!f) return 0;
+  char buf[4096];
+  int n = 0;
+  if (fgets(buf, sizeof(buf), f)) {
+    char *tok = strtok(buf, " \n");
+    while (tok && n < cap) {
+      char *end = NULL;
+      long v = strtol(tok, &end, 10);
+      if (end && *end == '\0' && v > 0) out[n++] = (pid_t)v;
+      tok = strtok(NULL, " \n");
+    }
+  }
+  fclose(f);
+  return n;
+}
+
+/** BFS 收集整棵进程树（含 root），返回进程总数（不超过 cap） */
+static int collect_tree(pid_t root, pid_t *pids, int cap) {
+  if (cap <= 0) return 0;
+  int head = 0, tail = 1;
+  pids[0] = root;
+  while (head < tail && tail < cap) {
+    pid_t cur = pids[head++];
+    int n = read_children(cur, pids + tail, cap - tail);
+    tail += n;
+  }
+  return tail;
+}
+
+/** 强杀整棵进程树（先子后父，减少僵尸窗口；pid 重用窗口内误杀风险可忽略） */
+static void kill_tree(pid_t root) {
+  pid_t pids[MAX_TREE_PROCS];
+  int n = collect_tree(root, pids, MAX_TREE_PROCS);
+  for (int i = n - 1; i >= 0; i--) {
+    if (pids[i] > 0 && pids[i] != root) (void)kill(pids[i], SIGKILL);
+  }
+  (void)kill(root, SIGKILL);
+}
+
+/**
+ * 一次 fopen 读取 status 的 RssAnon 与 VmHWM 两个字段。
+ * - RssAnon 缺失（旧内核）回退 VmRSS
+ * - VmHWM 缺失时退化为当前 anon（仅降级路径）
+ * 返回 0 表示至少拿到一个字段。
+ */
+static int read_status_anon_hwm(pid_t pid, long *anon, long *hwm) {
   char path[64];
   snprintf(path, sizeof(path), "/proc/%d/status", (int)pid);
   FILE *f = fopen(path, "r");
   if (!f) return -1;
   char line[256];
-  size_t klen = strlen(key);
-  int found = 0;
+  int found_anon = 0, found_hwm = 0;
   while (fgets(line, sizeof(line), f)) {
-    if (strncmp(line, key, klen) == 0 && line[klen] == ':') {
-      long v = 0;
-      if (sscanf(line + klen + 1, "%ld", &v) == 1) {
-        *out = v;
-        found = 1;
+    if (!found_anon) {
+      if (strncmp(line, "RssAnon:", 8) == 0) {
+        if (sscanf(line + 8, "%ld", anon) == 1) found_anon = 1;
+      } else if (strncmp(line, "VmRSS:", 6) == 0) {
+        if (sscanf(line + 6, "%ld", anon) == 1) found_anon = 1;
       }
-      break;
+    } else if (!found_hwm && strncmp(line, "VmHWM:", 6) == 0) {
+      if (sscanf(line + 6, "%ld", hwm) == 1) found_hwm = 1;
     }
+    if (found_anon && found_hwm) break;
   }
   fclose(f);
-  return found ? 0 : -1;
+  if (!found_hwm && found_anon) *hwm = *anon;
+  return (found_anon || found_hwm) ? 0 : -1;
 }
 
-/** 选手自有内存：RssAnon；旧内核回退当前 VmRSS（仍优于含库的 maxrss） */
-static long read_mem_kb(pid_t pid) {
-  long v = 0;
-  if (read_status_kb(pid, "RssAnon", &v) == 0) return v;
-  if (read_status_kb(pid, "VmRSS", &v) == 0) return v;
-  return -1;
+/**
+ * 整棵进程树内存：sum(RssAnon) 与 sum(VmHWM)。
+ * 已退出的进程读不到 status，直接跳过（其峰值在存活期间已计入 VmHWM 和）。
+ */
+static void read_mem_tree_kb(pid_t root, long *sum_anon, long *sum_hwm) {
+  pid_t pids[MAX_TREE_PROCS];
+  int n = collect_tree(root, pids, MAX_TREE_PROCS);
+  long a = 0, h = 0;
+  for (int i = 0; i < n; i++) {
+    long an = 0, hw = 0;
+    if (read_status_anon_hwm(pids[i], &an, &hw) != 0) continue;
+    a += an;
+    h += hw;
+  }
+  *sum_anon = a;
+  *sum_hwm = h;
+}
+
+/** 整棵树运行中 CPU 粗测（含 fork 子进程；仍仅用于中途 TLE 强杀，最终以 wait4 为准） */
+static long read_cpu_tree_ms_approx(pid_t root) {
+  pid_t pids[MAX_TREE_PROCS];
+  int n = collect_tree(root, pids, MAX_TREE_PROCS);
+  long total = 0;
+  for (int i = 0; i < n; i++) {
+    long m = read_cpu_ms_approx(pids[i]);
+    if (m > 0) total += m;
+  }
+  return total;
 }
 
 /** 运行中 CPU 粗测（jiffies，仅用于中途 TLE 强杀；最终以 wait4 为准） */
@@ -157,28 +242,34 @@ int main(int argc, char **argv) {
   for (;;) {
     long elapsed_ms = (long)((now_ns() - t0) / 1000000LL);
 
-    long m = read_mem_kb(pid);
-    if (m > peak_mem) peak_mem = m;
+    /* B-P2-6：进程树内存峰值。双口径取 max：
+       - sum(RssAnon) 瞬时并发和（并发场景准确）
+       - sum(VmHWM) 内核记录的各进程历史峰值和（无采样漏采；单进程时即真实峰值）
+       fork 子进程的内存全部计入，不再只统计主进程。 */
+    long sum_anon = 0, sum_hwm = 0;
+    read_mem_tree_kb(pid, &sum_anon, &sum_hwm);
+    long cur = sum_anon > sum_hwm ? sum_anon : sum_hwm;
+    if (cur > peak_mem) peak_mem = cur;
 
-    /* 中途 TLE：jiffies 粗测足够杀掉死循环；最终时间仍用 wait4 */
+    /* 中途 TLE：整棵树 jiffies 粗测（含 fork 子进程死循环）；最终时间仍用 wait4 */
     if (cpu_limit_ms > 0) {
-      long approx = read_cpu_ms_approx(pid);
+      long approx = read_cpu_tree_ms_approx(pid);
       if (approx > cpu_limit_ms) {
         tle_hit = 1;
-        kill(pid, SIGKILL);
+        kill_tree(pid);
         break;
       }
     }
     if (wall_limit_ms > 0) {
       if (elapsed_ms > wall_limit_ms) {
         tle_hit = 1;
-        kill(pid, SIGKILL);
+        kill_tree(pid);
         break;
       }
     }
     if (stdout_over_limit(stdout_path, ole_limit)) {
       ole_hit = 1;
-      kill(pid, SIGKILL);
+      kill_tree(pid);
       break;
     }
 
@@ -193,13 +284,9 @@ int main(int argc, char **argv) {
       break;
     }
 
-    /* 自适应采样间隔（D+G 优化）：
-     * - 前 300ms 用 100µs 密采样：捕获短程序内存峰值与 OLE
-     * - 300ms 后降为 1ms：长测点减少 /proc 读取与 lseek 系统调用挤占选手 CPU
-     *   3 路并发时系统调用 10.8 万/s → 1.08 万/s，降低 cache 抖动
-     *   内存变化在 ms 级，1ms 采样精度足够；最终 CPU 用 wait4 不受影响 */
-    long interval_ns = elapsed_ms < 300 ? 100000L : 1000000L; /* 100µs / 1ms */
-    struct timespec ts = { .tv_sec = 0, .tv_nsec = interval_ns };
+    /* B-P2-7：VmHWM 为内核级历史峰值，峰值漏采已被根治，不再需要 100µs 密窗；
+       统一 1ms 间隔，降低 /proc 读取与 lseek 系统调用对选手 CPU 的挤占 */
+    struct timespec ts = { .tv_sec = 0, .tv_nsec = 1000000L }; /* 1ms */
     nanosleep(&ts, NULL);
   }
 

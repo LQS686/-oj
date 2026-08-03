@@ -10,6 +10,7 @@
 import { withApi, ok, readJson, throw400, throw403, throw404, resolveViewerFromRequest } from '@/lib/api/withApi'
 import { canManageContent, canAccessAdmin } from '@/lib/permissions'
 import { isObjectId } from '@/lib/api/validation'
+import { validateContestTimeFields } from '@/lib/contest/admin'
 import bcrypt from 'bcryptjs'
 import {
   deleteContest,
@@ -56,6 +57,13 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     sealRankTime?: string | null
   }>(req)
 
+  // A-P2-3：校验时间字段（非法日期 400、结束须晚于开始、封榜时间窗），与管理员 API 对齐
+  validateContestTimeFields({
+    startTime: body.startTime,
+    endTime: body.endTime,
+    sealRankTime: body.sealRankTime,
+  })
+
   // 密码：null/空 -> null, 有值 -> bcrypt
   let hashedPassword: string | null | undefined
   if (body.password !== undefined) {
@@ -66,14 +74,13 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     }
   }
 
-  // 封榜时间：null/空 -> null, 字符串 -> Date
+  // 封榜时间：null/空 -> null, 字符串 -> Date（合法性已由上方校验保证，不再静默降级为 null）
   let sealRankTime: Date | null | undefined
   if (body.sealRankTime !== undefined) {
     if (body.sealRankTime === null || body.sealRankTime === '') {
       sealRankTime = null
     } else {
-      const parsed = new Date(body.sealRankTime)
-      sealRankTime = isNaN(parsed.getTime()) ? null : parsed
+      sealRankTime = new Date(body.sealRankTime)
     }
   }
 

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
@@ -58,6 +59,7 @@ function getPublicStatus(row: AnnouncementRow): { label: string; className: stri
 export default function AdminAnnouncementsPage() {
   const dialog = useDialog()
   const router = useRouter()
+  const scheduleForbiddenRedirect = useForbiddenRedirect()
   const { user, isLoading: userLoading } = useUser()
   const [items, setItems] = useState<AnnouncementRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,7 +86,7 @@ export default function AdminAnnouncementsPage() {
       const res = await fetchWithCookie('/api/admin/announcements')
       if (res.status === 403) {
         setError('需要系统管理员权限')
-        setTimeout(() => router.push('/403'), 2000)
+        scheduleForbiddenRedirect()
         return
       }
       const data = await res.json()
@@ -98,7 +100,7 @@ export default function AdminAnnouncementsPage() {
     } finally {
       setLoading(false)
     }
-  }, [router, user])
+  }, [user, scheduleForbiddenRedirect])
 
   useDeferredEffect(() => {
     if (userLoading || !canManageSystemAnnouncements(user)) return

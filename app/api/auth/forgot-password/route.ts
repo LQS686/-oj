@@ -19,10 +19,10 @@ const PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789
 const GENERIC_OK = '如果该邮箱已注册，你将收到包含新密码的邮件'
 
 function generateTempPassword(length = 12): string {
-  const bytes = crypto.randomBytes(length)
+  // A-P2-6：crypto.randomInt 内部做拒绝采样，字符分布均匀（替代 % 取模导致的模偏差）
   let pwd = ''
   for (let i = 0; i < length; i++) {
-    pwd += PASSWORD_CHARS[bytes[i] % PASSWORD_CHARS.length]
+    pwd += PASSWORD_CHARS[crypto.randomInt(PASSWORD_CHARS.length)]
   }
   return pwd
 }

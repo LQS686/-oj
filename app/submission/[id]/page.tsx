@@ -340,11 +340,12 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   })
 
   const fetchSubmissionHistory = useCallback(async () => {
-    if (!submission) return
+    const problemId = submission?.problem?.id
+    if (!problemId) return
 
     try {
       setHistoryLoading(true)
-      const response = await fetchWithCookie(`/api/problems/${submission.problem.id}/submissions`)
+      const response = await fetchWithCookie(`/api/problems/${problemId}/submissions`)
       const data = await response.json()
 
       if (data.success) {
@@ -359,13 +360,14 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     } finally {
       setHistoryLoading(false)
     }
-  }, [submission])
+  }, [submission?.problem?.id])
 
   useDeferredEffect(() => {
     if (submission) {
       void fetchSubmissionHistory()
     }
-  }, [submission, fetchSubmissionHistory])
+    // 历史列表仅在题目切换或进入终态时重拉；WS 推送的评测中间态不触发，避免重复请求
+  }, [submission?.problem?.id, isFinalStatus(submission?.status)])
 
   if (loading) {
     return (
