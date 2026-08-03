@@ -7,7 +7,8 @@
 # musl 的 printf/scanf/math 比 glibc 慢 5-8 倍，导致评测耗时严重放大。
 # 实测同一份代码：glibc 0.15s vs musl 1.17s（7.6x 慢）。
 # node 24 对齐本地与 CI，三端 npm 版本一致，避免 lockfile 兼容问题。
-ARG NODE_IMAGE=node:24-slim
+# 使用 trixie 变体：评测编译器 g++ 从 12.x(bookworm) 升到 14.x，实测同一代码快 ~10%。
+ARG NODE_IMAGE=node:24-trixie-slim
 FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
@@ -64,7 +65,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 
 # 生产阶段
-ARG NODE_IMAGE=node:24-slim
+ARG NODE_IMAGE=node:24-trixie-slim
 FROM ${NODE_IMAGE} AS runner
 
 WORKDIR /app
