@@ -71,3 +71,6 @@ lib/judge/dsoj-watch.new*
 # development scratch directories (not part of product)
 /_tmp_*/
 /tmp/
+
+# IDE local topic cache (auto-generated)
+/.reasonix/
