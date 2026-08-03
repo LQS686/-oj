@@ -178,6 +178,11 @@ async function importSolutions(
  * - samples/ → Problem.samples（题面展示，不进入评测）
  * - testcases/ → TestCase 表（正式评测点，isSample=false）
  * - solutions/ → Solution 表（可选）
+ *
+ * 注意：题目与测试用例分两次写入，不使用嵌套 create。
+ * 嵌套 create 会把「题目 + 全部测试用例」放进同一个 WiredTiger 事务，
+ * 大测试用例（如深基系列输入输出各数百 KB）会使事务超过引擎缓存限制，
+ * 报错 `transaction is too large and will not fit in the storage engine cache`。
  */
 async function createOne(
   problem: ImportedProblem,
@@ -201,6 +206,7 @@ async function createOne(
   const visibility = problem.visibility ?? options.visibility
   const { rows: testCasesData, customScores } = buildTestCasesData(problem)
 
+  // 第一步：仅创建题目（不含测试用例），事务体小，不会触发缓存限制
   const created = await prisma.problem.create({
     data: {
       problemNumber: finalProblemNumber,
@@ -224,13 +230,18 @@ async function createOne(
       stdLang: problem.stdLang || null,
       spjCode: problem.spjCode || null,
       author: { connect: { id: options.authorId } },
-      testCases: { create: testCasesData },
     },
-    include: { testCases: true },
+    select: { id: true, problemNumber: true },
   })
 
-  if (!customScores && created.testCases && created.testCases.length > 0) {
-    await redistributeTestScores(created.id)
+  // 第二步：单独批量创建测试用例（独立事务，避免与题目大字段合并）
+  if (testCasesData.length > 0) {
+    await prisma.testCase.createMany({
+      data: testCasesData.map((tc) => ({ ...tc, problemId: created.id })),
+    })
+    if (!customScores) {
+      await redistributeTestScores(created.id)
+    }
   }
   clearProblemCache(created.id)
 
