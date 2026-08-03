@@ -680,10 +680,11 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     if (timeout) {
       const wallTimeMs = endTime - startTime
       // 判定逻辑：
+      //   - cpuTleExit(exit 152) → CPU TLE（内核 RLIMIT_CPU soft 触发 SIGXCPU）
       //   - 若 cpuTimeMs > timeLimit → CPU TLE（CPU 满载死循环或算法效率不足）
       //   - 否则 → 墙钟 TLE（sleep 型死循环、IO 阻塞等，CPU 时间正常但墙钟超限）
       // 参考 HOJ/Hydro：两者最终状态都是 TLE，但 timeoutType 用于错误消息细化
-      if (cpuTimeMs > timeLimit) {
+      if (cpuTleExit || cpuTimeMs > timeLimit) {
         timeoutType = 'cpu'
       } else {
         timeoutType = 'wall-clock'
@@ -691,12 +692,18 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       void wallTimeMs // 仅用于调试，避免未使用警告
     }
 
+    // B-P2-13：CPU TLE(exit 152) 时内核在 RLIMIT_CPU soft 限制处发 SIGXCPU，
+    // 但 rusage 受 tick 粒度影响报告值略低于限制（如 2990ms vs 3000ms）。
+    // 显示时间至少应为 timeLimit，符合 TLE 语义并与其他 OJ 一致。
+    const displayCpuMs = cpuTleExit ? Math.max(realCpuMs, timeLimit) : realCpuMs
+    const displayTime = cpuTleExit ? Math.max(preciseTime, timeLimit) : preciseTime
+
     if (abortedBySignal) {
       detailedError = '评测已中止'
     } else if (timeout) {
       const wallTimeMs = Math.max(0, endTime - startTime)
       if (timeoutType === 'cpu') {
-        detailedError = `Time Limit Exceeded (CPU 时间 ${cpuTimeMs}ms > 限制 ${timeLimit}ms)`
+        detailedError = `Time Limit Exceeded (CPU 时间 ${displayCpuMs}ms > 限制 ${timeLimit}ms)`
       } else {
         detailedError = `Time Limit Exceeded (墙钟时间 ${wallTimeMs}ms > 限制 ${wallClockLimitMs}ms，可能是 sleep 型死循环或 IO 阻塞)`
       }
@@ -718,7 +725,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     return {
       output,
       error: detailedError,
-      time: abortedBySignal ? 0 : preciseTime,
+      time: abortedBySignal ? 0 : displayTime,
       memory: abortedBySignal ? 0 : peakMemoryKB,
       exitCode,
       timeout,
@@ -726,7 +733,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       outputLimitExceeded,
       runtimeError,
       cannotStart,
-      cpuTime: abortedBySignal ? 0 : realCpuMs,
+      cpuTime: abortedBySignal ? 0 : displayCpuMs,
       exceedsTimeLimit,
       timeoutType,
       aborted: abortedBySignal || undefined,
