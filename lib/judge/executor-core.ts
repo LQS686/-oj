@@ -256,6 +256,8 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     let error = ''
     let exitCode = 0
     let timeout = false
+    /** B-P2-13：dsoj-watch 中途 CPU TLE（退出码 152）标志，供墙钟撤销逻辑排除 */
+    let cpuTleExit = false
     let runtimeError = false
     let memoryExceeded = false
     let outputLimitExceeded = false
@@ -465,6 +467,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           savedTimeout = false
         } else if (finalCode === 152) {
           savedTimeout = true
+          cpuTleExit = true
         } else if (finalCode === 137) {
           if (savedForceKilled || savedTimeout) {
             savedTimeout = true
@@ -620,10 +623,14 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     // 墙钟强杀但 CPU 未超（或仅在浮动窗口内）：常见于百万行输出的 IO 等待。
     // 此时不应直接 TLE，而应进入输出比对 / 临界重测。
     // sleep 死循环通常 CPU≈墙钟或输出为空，仍保持 TLE。
+    // B-P2-13：152 = dsoj-watch 中途 CPU TLE（jiffies 粗测）或 ulimit -t SIGXCPU，
+    // 是明确的 CPU 超时信号，绝不撤销——否则输出不完整会被误判成 WA。
+    // 仅墙钟强杀（137/SIGKILL、Node 定时器）才允许按 IO 密集/临界 TLE 处理。
     if (timeout && !abortedBySignal) {
       const outSize = existsSync(outputPath) ? statSync(outputPath).size : 0
       const childWall = wrapperWallMs > 0 ? wrapperWallMs : Math.max(0, endTime - startTime)
-      if (outSize > 0 && realCpuMs > 0 && realCpuMs <= timeLimit) {
+      const isCpuTle = cpuTleExit
+      if (!isCpuTle && outSize > 0 && realCpuMs > 0 && realCpuMs <= timeLimit) {
         logger.info('墙钟超时但 CPU 未超限且已有输出，按 IO 密集处理', {
           realCpuMs,
           timeLimit,
@@ -631,7 +638,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           outSize,
         })
         timeout = false
-      } else if (outSize > 0 && realCpuMs > timeLimit && realCpuMs <= cpuTimeLimitMs) {
+      } else if (!isCpuTle && outSize > 0 && realCpuMs > timeLimit && realCpuMs <= cpuTimeLimitMs) {
         logger.info('墙钟超时且 CPU 处于浮动窗口，转临界 TLE', {
           realCpuMs,
           timeLimit,
