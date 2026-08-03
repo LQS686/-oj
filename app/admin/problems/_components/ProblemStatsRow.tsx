@@ -26,7 +26,7 @@ export function ProblemStatsRow({ problems, filteredProblems }: ProblemStatsRowP
     const v = p.visibility || (p.isPublic ? 'public' : 'private')
     return v === 'private' || (!p.visibility && !p.isPublic && v !== 'contest')
   }).length
-  const hasStdCount = filteredProblems.filter(p => !!p.stdCode).length
+  const hasStdCount = filteredProblems.filter(p => !!p.stdLang).length
   const hasTestsCount = filteredProblems.filter(p => (p._count?.testCases ?? 0) > 0).length
 
   const isFiltered = filteredProblems.length !== problems.length

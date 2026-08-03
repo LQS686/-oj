@@ -59,8 +59,8 @@ export function filterProblems(problems: Problem[], filters: ProblemFilters): Pr
     const matchesSource = sources.length === 0 ||
       (p.source != null && sources.includes(p.source))
 
-    // 数据完整度
-    const hasStd = !!p.stdCode
+    // 数据完整度：用 stdLang 判断有无标程（后端 select 已不返回 stdCode，改用 stdLang 非空判断）
+    const hasStd = !!p.stdLang
     const testCount = p._count?.testCases ?? 0
     const hasTests = testCount > 0
     const matchesCompleteness =

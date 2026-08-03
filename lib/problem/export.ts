@@ -5,8 +5,25 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 
+/** 公共列表返回的题目轻量字段（不含 description/stdCode/spjCode 等大字段） */
+export type PublicProblemListItem = Prisma.ProblemGetPayload<{
+  select: {
+    id: true
+    problemNumber: true
+    title: true
+    difficulty: true
+    tags: true
+    source: true
+    timeLimit: true
+    memoryLimit: true
+    totalSubmit: true
+    totalAccepted: true
+    createdAt: true
+  }
+}>
+
 export interface ListPublicProblemsResult {
-  problems: Prisma.ProblemGetPayload<object>[]
+  problems: PublicProblemListItem[]
   pagination: {
     total: number
     page: number
@@ -45,6 +62,20 @@ export async function listPublicProblems(filter: {
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
+      // 与分页分支保持同一轻量字段集，避免竞赛加题拉回 spjCode 等大字段
+      select: {
+        id: true,
+        problemNumber: true,
+        title: true,
+        difficulty: true,
+        tags: true,
+        source: true,
+        timeLimit: true,
+        memoryLimit: true,
+        totalSubmit: true,
+        totalAccepted: true,
+        createdAt: true,
+      },
     })
     // 按请求顺序去重（大小写不敏感）
     const byNumber = new Map(
@@ -83,6 +114,21 @@ export async function listPublicProblems(filter: {
       skip: (page - 1) * pageSize,
       take: pageSize,
       orderBy: { createdAt: 'desc' },
+      // 列表只需轻量字段，剔除 description/input/output/background/hint/samples/stdCode/spjCode 等大字段
+      // （spjCode 上限 512KB，stdCode 可能数 KB，description 可能数 KB，全拉回会严重拖慢列表响应）
+      select: {
+        id: true,
+        problemNumber: true,
+        title: true,
+        difficulty: true,
+        tags: true,
+        source: true,
+        timeLimit: true,
+        memoryLimit: true,
+        totalSubmit: true,
+        totalAccepted: true,
+        createdAt: true,
+      },
     }),
     prisma.problem.count({ where }),
   ])
@@ -105,21 +151,18 @@ export async function listPublicProblems(filter: {
     ])
     const submitMap = new Map(submitGroups.map((g) => [g.problemId, g._count._all]))
     const acMap = new Map(acGroups.map((g) => [g.problemId, g._count._all]))
-    // 异步回填 denormalized 字段（不阻塞响应，不等待结果）
-    const repairs: Promise<unknown>[] = []
+    // 异步回填 denormalized 字段（fire-and-forget，不阻塞列表响应）
     for (const p of items) {
       const liveSubmit = submitMap.get(p.id) ?? 0
       const liveAc = acMap.get(p.id) ?? 0
       if (p.totalSubmit !== liveSubmit || p.totalAccepted !== liveAc) {
-        repairs.push(
-          prisma.problem.update({
-            where: { id: p.id },
-            data: { totalSubmit: liveSubmit, totalAccepted: liveAc },
-          }).catch(() => {})
-        )
+        // 不 await：写库失败不影响列表返回，下次列表会再次检测并回填
+        prisma.problem.update({
+          where: { id: p.id },
+          data: { totalSubmit: liveSubmit, totalAccepted: liveAc },
+        }).catch(() => {})
       }
     }
-    await Promise.all(repairs)
     // 覆盖返回值，确保前端拿到实时数据
     for (const p of items) {
       const liveP = p as { totalSubmit: number; totalAccepted: number }

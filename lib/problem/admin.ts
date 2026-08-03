@@ -61,9 +61,6 @@ export async function listAllProblemsForAdmin(opts?: {
         id: true,
         problemNumber: true,
         title: true,
-        samples: true,
-        background: true,
-        hint: true,
         source: true,
         difficulty: true,
         tags: true,
@@ -76,7 +73,7 @@ export async function listAllProblemsForAdmin(opts?: {
         createdAt: true,
         updatedAt: true,
         // 题目管理筛选需要：标程存在性 + 测试点数量（用于"有标程/无标程/有测试点/无测试点"筛选维度）
-        stdCode: true,
+        // 用 stdLang 判断有无标程（非空即有），避免传输 stdCode 源码（可达数 KB）
         stdLang: true,
         _count: { select: { testCases: true } },
       },
