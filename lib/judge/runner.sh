@@ -29,7 +29,10 @@ WATCH_SRC="${SCRIPT_DIR}/dsoj-watch.c"
 if [[ "${DSOJ_FORCE_ULIMIT_V:-}" == "1" ]]; then
   ulimit -v $((MEM_MB * 1024)) 2>/dev/null
 fi
-ulimit -t "$CPU_SEC" 2>/dev/null
+# CPU 时间限制由 dsoj-watch 的 setrlimit(RLIMIT_CPU) 统一管理：
+#   soft = ceil(cpu_limit_ms/1000)  → SIGXCPU（可捕获，默认终止）
+#   hard = soft + 1                 → SIGKILL（兜底）
+# 不再使用 bash ulimit -t（soft=hard 同值 → 直接 SIGKILL，抢在 watch 之前）
 ulimit -s $((STACK_MB * 1024)) 2>/dev/null
 ulimit -c 0 2>/dev/null
 ulimit -u "${DSOJ_NPROC_LIMIT:-4096}" 2>/dev/null

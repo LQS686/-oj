@@ -287,13 +287,11 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     const timeFilePath = join(tempDir, `time_${timestamp}_${randomId}.txt`)
     const runnerPath = join(process.cwd(), 'lib', 'judge', 'runner.sh')
     const safeMem = Math.min(Math.max(16, Number(memoryLimit) || 256), 4096)
-    // RLIMIT_CPU 跟 CPU 窗口（timeLimit+extra），不能跟墙钟/ioSlack，
-    // 否则大输出题暴力解会把 ulimit -t 跑满才死，评测极慢。
-    // B-P2-13：+5s 余量——bash `ulimit -t` 会同时设软=硬限制，硬限制超时直接
-    // SIGKILL(137) 抢在 watch 粗测(152) 之前，破坏 CPU TLE 语义；加大后由
-    // dsoj-watch 的 jiffies 粗测统一判定 CPU TLE（152），结果可预测。
+    // RLIMIT_CPU 现由 dsoj-watch 的 setrlimit 在子进程中设置（soft=ceil(cpuLimit/1000),
+    // hard=soft+1），不再通过 bash ulimit -t（soft=hard 同值导致直接 SIGKILL）。
+    // 此参数保留仅为向后兼容 runner.sh 调用签名，实际未被使用。
     const safeCpu = Math.min(
-      Math.max(1, Math.ceil(Number(cpuTimeLimitMs) / 1000) + 5 || 1),
+      Math.max(1, Math.ceil(Number(cpuTimeLimitMs) / 1000) || 1),
       300,
     )
     const safeStackMb = 8
@@ -453,7 +451,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         // 不再用 Node 外包墙钟冒充 CPU（含 spawn/bash 开销，非真实选手时间）
 
         // 信号分类（HOJ SandboxRun 信号表）：
-        //   152 = SIGXCPU → CPU TLE（ulimit -t / runner CPU 轮询）
+        //   152 = SIGXCPU → CPU TLE（dsoj-watch setrlimit / jiffies 粗测）
         //   153 = SIGXFSZ → OLE（输出超限）
         //   137 = SIGKILL → 墙钟强杀 / ulimit -v；用峰值、CPU、墙钟区分 MLE vs TLE
         const wallMs = wrapperWallMs > 0 ? wrapperWallMs : Math.max(0, endTime - startTime)

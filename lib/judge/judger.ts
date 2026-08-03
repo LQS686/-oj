@@ -203,7 +203,7 @@ async function runOnce(
     timeLimit: tcTimeLimit,
     memoryLimit: tcMemoryLimit,
     compiledPath,
-    extraTimeRatio: job.extraTimeRatio ?? 0.1,
+    extraTimeRatio: job.extraTimeRatio ?? 0,
     expectedOutputBytes: files.expectedBytes,
     signal,
   })

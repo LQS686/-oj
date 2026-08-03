@@ -186,6 +186,22 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (pid == 0) {
+    /* RLIMIT_CPU：soft = ceil(cpu_limit_ms/1000), hard = soft + 1
+     * 内核在 soft limit 发 SIGXCPU（默认终止，可捕获），
+     * 在 hard limit 发 SIGKILL（兜底，防止捕获 SIGXCPU 后死循环）。
+     * 这是 Project LemonLime / go-judge / Hydro 等主流 OJ 的标准做法，
+     * 比 bash ulimit -t（soft=hard 同值 → 直接 SIGKILL）精确可靠。
+     * bash ulimit -t 已从 runner.sh 移除，由此处统一管理。 */
+    if (cpu_limit_ms > 0) {
+      long cpu_sec = (cpu_limit_ms + 999) / 1000; /* ceil */
+      struct rlimit rl;
+      rl.rlim_cur = cpu_sec;
+      rl.rlim_max = cpu_sec + 1;
+      if (setrlimit(RLIMIT_CPU, &rl) != 0) {
+        /* 非致命：jiffies 粗测仍可兜底 TLE 检测 */
+        perror("setrlimit(RLIMIT_CPU)");
+      }
+    }
     execvp(cmd[0], cmd);
     _exit(127);
   }
