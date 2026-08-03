@@ -83,20 +83,21 @@ export default function MarkdownContent({
  <div className={`markdown-body ${className}`}>
  <ReactMarkdown
  remarkPlugins={[remarkGfm, remarkMath]}
- // rehype 插件顺序（关键，顺序错误会导致 KaTeX 不渲染）：
- //   1. rehype-katex：把 remark-math 生成的 <code className="math-display/math-inline"> 节点
- //      转换为 KaTeX 输出的 HTML（含 .katex / .katex-mathml / .katex-html 结构）
- //   2. rehype-sanitize：最后做安全过滤，schema 中已加 KaTeX 输出所需的全部标签
+ // rehype 插件顺序（关键，顺序错误会导致公式渲染异常）：
+ //   1. rehype-sanitize：先过滤用户输入的 HTML（剥离 script/on*/style 等危险内容），
+ //      remark-math 生成的 <code class="language-math math-inline"> 节点因 code+className
+ //      均在白名单内而完整保留。
+ //   2. rehype-katex：后转换 math code 节点为 KaTeX HTML（含 .katex / 内联 style），
+ //      因在 sanitize 之后，KaTeX 输出的 style 属性（如 strut height、上下标 vertical-align）
+ //      不会被剥离。若 sanitize 在 katex 之后，KaTeX 的 style 会被过滤导致公式布局塌陷。
  //
  // 不使用 rehype-raw：
  //   rehype-raw 会重新解析 KaTeX 输出的 HTML 字符串（含 <math> MathML 部分），
  //   破坏 KaTeX 渲染结果，导致 DOM 中出现 <math> 但缺少 .katex 类。
  //   原始 Markdown 已支持 GFM（表格/任务列表/删除线等），题面无需嵌入 HTML。
- //   若未来要兼容 Hydro 题面（含原生 HTML），需用 rehype-raw 时必须放在
- //   rehype-katex 之前，并解决 math 节点 className 被剥离的问题（参考 remark-math 文档）。
  rehypePlugins={[
- rehypeKatex,
  [rehypeSanitize, markdownSanitizeSchema],
+ rehypeKatex,
  ]}
  components={{
  // 去掉默认 <pre> 外壳，避免与 SyntaxHighlighter 叠成「深色外框 + 浅色内容」

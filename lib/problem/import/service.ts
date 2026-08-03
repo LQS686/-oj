@@ -150,27 +150,47 @@ function buildTestCasesData(
   }
 }
 
+/**
+ * 逐条创建测试用例，避免 createMany 单事务过大触发 WiredTiger 缓存限制。
+ * 深基/NOIP 等大测试用例单条输入输出可达数百 KB，
+ * 多条合并进一个事务会超 `transaction is too large` 限制。
+ * 逐条 create 每条是独立事务，不会超限。
+ */
+async function createTestCasesIndividually(
+  problemId: string,
+  rows: Array<{ input: string; output: string; isSample: false; score: number; orderIndex: number }>
+) {
+  for (const tc of rows) {
+    await prisma.testCase.create({
+      data: { ...tc, problemId },
+    })
+  }
+}
+
 async function importSolutions(
   problemId: string,
   solutions: NonNullable<ImportedProblem['solutions']>,
   authorId: string
 ) {
-  await prisma.solution.createMany({
-    data: solutions.map((s) => ({
-      problemId,
-      authorId,
-      title: (s.title || '题解').slice(0, 200),
-      content:
-        s.authorName && !s.content.startsWith('> ')
-          ? `> 原作者：${s.authorName}\n\n${s.content}`
-          : s.content,
-      isOfficial: false,
-      sourceType: 'USER',
-      // 安全合规：发布前审核。导入题解不直接公开，置为待审核，
-      // 与普通用户新建题解（createUserSolution）一致，经 admin/reviews 审核通过后才对他人可见
-      status: 'pending',
-    })),
-  })
+  // 题包题解由管理员导入，为可信内容，直接设为 approved 可见，
+  // 不需要走 pending 审核（与普通用户提交题解不同）。
+  // 同样逐条 create 避免 createMany 事务超限。
+  for (const s of solutions) {
+    await prisma.solution.create({
+      data: {
+        problemId,
+        authorId,
+        title: (s.title || '题解').slice(0, 200),
+        content:
+          s.authorName && !s.content.startsWith('> ')
+            ? `> 原作者：${s.authorName}\n\n${s.content}`
+            : s.content,
+        isOfficial: false,
+        sourceType: 'USER',
+        status: 'approved',
+      },
+    })
+  }
 }
 
 /**
@@ -234,11 +254,9 @@ async function createOne(
     select: { id: true, problemNumber: true },
   })
 
-  // 第二步：单独批量创建测试用例（独立事务，避免与题目大字段合并）
+  // 第二步：逐条创建测试用例（每条独立事务，避免 WiredTiger 缓存超限）
   if (testCasesData.length > 0) {
-    await prisma.testCase.createMany({
-      data: testCasesData.map((tc) => ({ ...tc, problemId: created.id })),
-    })
+    await createTestCasesIndividually(created.id, testCasesData)
     if (!customScores) {
       await redistributeTestScores(created.id)
     }
@@ -301,9 +319,7 @@ async function overwriteOne(
   ])
 
   if (testCasesData.length > 0) {
-    await prisma.testCase.createMany({
-      data: testCasesData.map((tc) => ({ ...tc, problemId: existingId })),
-    })
+    await createTestCasesIndividually(existingId, testCasesData)
     if (!customScores) {
       await redistributeTestScores(existingId)
     }
