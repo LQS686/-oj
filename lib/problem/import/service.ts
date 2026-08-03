@@ -344,6 +344,99 @@ async function overwriteOne(
 }
 
 /**
+ * 比对导入数据与已存在题目是否完全一致（用于 skip 策略的智能判定）。
+ *
+ * 比对范围：题面包内的所有内容字段（题面、限制、样例、标准代码、SPJ、测试点、题解数量），
+ * 不比对 problemNumber / visibility / isPublic（由导入选项或已存在记录决定，非题包内容）。
+ *
+ * 大测试点处理：
+ *   - 题面字段一次性查出（总大小通常几十 KB，可控）；
+ *   - 测试点先比对数量，数量一致后**逐条** select input/output 比对，
+ *     每次内存中只有一条测试点（避免一次性加载全部大测试点导致内存峰值）；
+ *   - 任何字段不一致立即短路返回 false，减少不必要的比对。
+ *
+ * @returns true=数据一致可跳过 / false=数据不一致需覆盖
+ */
+async function isProblemDataUnchanged(
+  existingId: string,
+  imported: ImportedProblem
+): Promise<boolean> {
+  // 1. 比对题面字段（一次性查出，字段总大小可控）
+  const existing = await prisma.problem.findUnique({
+    where: { id: existingId },
+    select: {
+      title: true,
+      description: true,
+      background: true,
+      input: true,
+      output: true,
+      hint: true,
+      source: true,
+      difficulty: true,
+      tags: true,
+      timeLimit: true,
+      memoryLimit: true,
+      comparisonMode: true,
+      realPrecision: true,
+      stdCode: true,
+      stdLang: true,
+      spjCode: true,
+      samples: true,
+    },
+  })
+  if (!existing) return false
+
+  // 短路比对各字段（null 与 undefined 统一为空串处理）
+  const norm = (v: string | null | undefined): string => v ?? ''
+  if (existing.title !== imported.title) return false
+  if (existing.description !== imported.description) return false
+  if (norm(existing.background) !== norm(imported.background)) return false
+  if (norm(existing.input) !== norm(imported.input)) return false
+  if (norm(existing.output) !== norm(imported.output)) return false
+  if (norm(existing.hint) !== norm(imported.hint)) return false
+  if (norm(existing.source) !== norm(imported.source)) return false
+  if (existing.difficulty !== imported.difficulty) return false
+  if (JSON.stringify(existing.tags ?? []) !== JSON.stringify(imported.tags ?? [])) return false
+  if (existing.timeLimit !== imported.timeLimit) return false
+  if (existing.memoryLimit !== imported.memoryLimit) return false
+  if ((existing.comparisonMode ?? 'default') !== (imported.comparisonMode ?? 'default')) return false
+  if ((existing.realPrecision ?? 3) !== (imported.realPrecision ?? 3)) return false
+  if (norm(existing.stdCode) !== norm(imported.stdCode)) return false
+  if (norm(existing.stdLang) !== norm(imported.stdLang)) return false
+  if (norm(existing.spjCode) !== norm(imported.spjCode)) return false
+  // samples 是 Json 类型，序列化后比对
+  if (JSON.stringify(existing.samples ?? []) !== JSON.stringify(imported.samples ?? [])) return false
+
+  // 2. 比对测试点数量（快速判断，数量不同直接判为不一致）
+  const existingTcCount = await prisma.testCase.count({ where: { problemId: existingId } })
+  if (existingTcCount !== imported.testCases.length) return false
+
+  // 3. 逐条比对测试点内容（大测试点处理：每次只加载一条，避免内存峰值）
+  //    按 orderIndex 顺序比对 input/output，短路返回。
+  for (let i = 0; i < imported.testCases.length; i++) {
+    const importedTc = imported.testCases[i]
+    const dbTc = await prisma.testCase.findFirst({
+      where: { problemId: existingId, orderIndex: i },
+      select: { input: true, output: true },
+    })
+    if (!dbTc) return false
+    if (dbTc.input !== importedTc.input) return false
+    if (dbTc.output !== importedTc.output) return false
+  }
+
+  // 4. 比对题解数量（仅当导入数据含题解时；不比对内容，题解可能很大）
+  //    若之前题解未导入成功（数量为 0），此处判定不一致 → 触发覆盖补齐题解。
+  if (imported.solutions && imported.solutions.length > 0) {
+    const existingSolCount = await prisma.solution.count({
+      where: { problemId: existingId, isOfficial: false },
+    })
+    if (existingSolCount !== imported.solutions.length) return false
+  }
+
+  return true
+}
+
+/**
  * 导入单题（带去重 + 错误隔离）
  */
 export async function importOneProblem(
@@ -393,11 +486,32 @@ export async function importOneProblem(
           : `已存在同名题目（${existing.problemNumber}）`
 
         if (options.onDuplicate === 'skip') {
+          // 智能 skip：比对数据一致性。
+          //   - 数据一致 → 真正跳过（避免无谓的覆盖写入）
+          //   - 数据不一致 → 降级为覆盖（题包有更新，需同步到数据库）
+          // 这样修复「题包更新后因题号相同被跳过、新数据/题解未同步」的问题。
+          const unchanged = await isProblemDataUnchanged(existing.id, problem)
+          if (unchanged) {
+            return {
+              status: 'skipped',
+              title: problem.title,
+              externalId,
+              reason,
+            }
+          }
+          // 数据不一致：降级为覆盖，保留原 id 和 problemNumber
+          logger.info('[import] 数据不一致，skip 降级为覆盖', {
+            problemId: existing.id,
+            problemNumber: existing.problemNumber,
+          })
+          await overwriteOne(existing.id, problem, options)
           return {
-            status: 'skipped',
+            status: 'created',
+            problemId: existing.id,
+            problemNumber: existing.problemNumber || undefined,
             title: problem.title,
             externalId,
-            reason,
+            reason: '数据已更新，覆盖已有题目',
           }
         }
         // overwrite：保留原 id 和 problemNumber，覆盖其他字段
