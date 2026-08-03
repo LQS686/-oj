@@ -234,9 +234,10 @@ check_host_port() {
     fi
   fi
 
-  warn "检测到端口 ${port} 已被占用（绑定目标 ${bind}:${port}）："
+  err "端口 ${port} 已被占用（绑定目标 ${bind}:${port}），app 无法启动："
   echo "$listeners" | sed 's/^/    /'
-  warn "若非本项目容器，请修改 .env 中 APP_HOST_PORT，或停止占用进程后再部署"
+  err "若非本项目容器，请修改 .env 中 APP_HOST_PORT，或停止占用进程后重试"
+  return 1
 }
 
 ensure_docker_mirrors() {
@@ -723,7 +724,8 @@ fi
 step "启动服务"
 APP_PORT="$(env_get APP_HOST_PORT || echo 3000)"
 APP_BIND="$(env_get APP_HOST_BIND || echo 127.0.0.1)"
-check_host_port "$APP_BIND" "$APP_PORT"
+# 端口被非本项目进程占用：直接失败（避免 compose up 绑定失败后才报错）
+check_host_port "$APP_BIND" "$APP_PORT" || exit 1
 
 compose up -d mongo redis
 echo -n "等待 mongo/redis healthy"

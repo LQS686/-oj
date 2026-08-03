@@ -295,7 +295,7 @@ tmpfs:
 
 | 环境变量 / 设置 | 默认值 | 说明 |
 |----------------|--------|------|
-| `JUDGE_MAX_CONCURRENT` | 2 | 同时评测的提交数（建议 = CPU 核数 - 1） |
+| `JUDGE_MAX_CONCURRENT` | 2（代码默认；部署脚本生成 `.env` 时保守设 1） | 同时评测的提交数（建议 = CPU 核数 - 1） |
 | `JUDGE_CASE_CONCURRENCY` | 3（4核） | 单提交内测点并发数 |
 | `JUDGE_LARGE_CASE_CONCURRENCY` | 同 caseConcurrency | 大测点（>2MB）并发数 |
 | `JUDGE_ENABLE_ASAN` | false | AddressSanitizer，开启需 2-3x 内存 |
