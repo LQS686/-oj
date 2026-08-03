@@ -151,7 +151,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 RUN mkdir -p /app/temp /app/logs /app/public/uploads/avatars /app/data/testdata && \
     chown -R nextjs:nodejs /app/temp /app/logs /app/public/uploads /app/data
 
-# 预编译评测监视器：同步密采样 RssAnon，避免 /usr/bin/time 总 RSS 虚高与后台轮询竞态
+# 预编译评测监视器：同步密采样进程树 RssAnon（自适应间隔），避免 /usr/bin/time 总 RSS 虚高与后台轮询竞态
 RUN cc -O2 -o /app/lib/judge/dsoj-watch /app/lib/judge/dsoj-watch.c && \
     chown nextjs:nodejs /app/lib/judge/dsoj-watch
 
