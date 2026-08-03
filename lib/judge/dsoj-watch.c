@@ -256,12 +256,13 @@ int main(int argc, char **argv) {
       break;
     }
 
-    /* 自适应采样间隔：
-     * - 前 300ms 用 100µs 密采样：覆盖短程序启动期内存尖峰与 OLE
-     * - 300ms 后降为 1ms：长测点减少 /proc 读取与 lseek 系统调用挤占选手 CPU
-     *   （CPU 粗测已降频，内存变化在 ms 级，1ms 采样精度足够） */
-    long interval_ns = elapsed_ms < 300 ? 100000L : 1000000L; /* 100µs / 1ms */
-    struct timespec ts = { .tv_sec = 0, .tv_nsec = interval_ns };
+    /* 统一 1ms 采样间隔：
+     * - 实测 100µs 密窗（前 300ms）对内存密集型程序干扰显著（评测 CPU +6~10%）：
+     *   每 100µs 唤醒读 /proc，系统调用 + cache 抖动挤占选手 CPU（内存密集程序更敏感）
+     * - 统一 1ms：评测 CPU 开销 <2%，且内存峰值通常持续 ms 级，1ms 采样精度足够
+     *   （短程序在 1ms 下仍有数百次采样，覆盖启动尖峰）
+     * - CPU 粗测已降频（每 CPU_TICK_N 次采样一次），最终时间以 wait4 为准 */
+    struct timespec ts = { .tv_sec = 0, .tv_nsec = 1000000L }; /* 1ms */
     nanosleep(&ts, NULL);
   }
 

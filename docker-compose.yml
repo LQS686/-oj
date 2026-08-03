@@ -39,7 +39,10 @@ services:
       redis:
         condition: service_healthy
     restart: always
-    mem_limit: 2.5g
+    # 4G 宿主资源预算建议：app 2.0g + mongo 1g + redis 256m + 系统 ≈ 3.76g（留 ~250m 回收缓存余量）。
+    # 若上调 JUDGE_MAX_CONCURRENT 或题目 memoryLimit 较大，需同步调大 app 内存上限；
+    # 评测内存门控（lib/judge/memory-gate.ts）会在宿主/容器内存压力过大时自动暂停派发防 OOM。
+    mem_limit: 2.0g
     cpus: "3"
     pids_limit: 512
     networks:

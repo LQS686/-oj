@@ -8,6 +8,7 @@ import {
   getJudgeConfig,
   registerJudgeQueueRuntimeApplier,
 } from './config'
+import { memoryGateOk } from './memory-gate'
 
 // 评测任务数据类型
 export interface JudgeJob {
@@ -82,6 +83,11 @@ class JudgeQueue extends EventEmitter {
   private abortControllers = new Map<string, AbortController>()
   /** 精确到点的任务级超时定时器（比周期扫描更及时） */
   private jobTimeoutTimers = new Map<string, NodeJS.Timeout>()
+  /** 内存门控触发的延迟重试定时器（防 OOM 连锁；避免内存不足时忙等重试） */
+  private memRetryTimer: NodeJS.Timeout | null = null
+  private readonly memRetryDelayMs = 3000
+  /** 内存门控阻塞中：阻止 processQueue 的 finally 立即重新调度（避免忙等循环） */
+  private memGateBlocked = false
 
   constructor(maxConcurrent?: number) {
     super()
@@ -207,6 +213,11 @@ class JudgeQueue extends EventEmitter {
       clearInterval(this.deadJobChecker)
       this.deadJobChecker = null
     }
+    if (this.memRetryTimer) {
+      clearTimeout(this.memRetryTimer)
+      this.memRetryTimer = null
+    }
+    this.memGateBlocked = false
     for (const timer of this.jobTimeoutTimers.values()) {
       clearTimeout(timer)
     }
@@ -248,6 +259,26 @@ class JudgeQueue extends EventEmitter {
     return job.id
   }
 
+  /**
+   * 内存门控触发时延迟重试（不阻塞事件循环；避免内存不足时的忙等循环）。
+   * 仅记录一次日志（3s 间隔天然限频）。
+   */
+  private deferProcessDueToMemory(reason?: string) {
+    if (this.memRetryTimer) return
+    logger.warn(`评测调度被内存门控暂停（等待内存恢复后重试）`, {
+      reason,
+      waiting: this.queue.length,
+      active: this.processing.size,
+    })
+    this.memRetryTimer = setTimeout(() => {
+      this.memRetryTimer = null
+      // 解除阻塞并重新调度：内存可能已恢复，让 processQueue 重新过门控
+      this.memGateBlocked = false
+      this.scheduleProcess()
+    }, this.memRetryDelayMs)
+    this.memRetryTimer.unref?.()
+  }
+
   // 处理队列：一次填满空闲槽位后退出；任务结束时再 scheduleProcess
   private async processQueue() {
     if (this.isProcessing) return
@@ -255,6 +286,17 @@ class JudgeQueue extends EventEmitter {
 
     try {
       while (this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
+        // 内存门控：宿主可用内存 / app 容器 cgroup 内存压力过大时暂停派发，
+        // 防止 OOM 连锁（宿主 OOM 误杀 mongo/app，或 cgroup OOM 误杀评测进程）。
+        // 指标读不到（非 Linux）时放行，不因监控缺失阻塞评测。
+        const gate = memoryGateOk()
+        if (!gate.ok) {
+          // 标记阻塞：阻止 finally 立即重新调度（避免内存不足时的忙等循环）；
+          // 由 memRetryTimer（3s）解除阻塞后重新过门控
+          this.memGateBlocked = true
+          this.deferProcessDueToMemory(gate.reason)
+          break
+        }
         const job = this.queue.shift()
         if (!job) break
         job.status = 'active'
@@ -288,7 +330,8 @@ class JudgeQueue extends EventEmitter {
       }
     } finally {
       this.isProcessing = false
-      if (this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
+      // 内存门控阻塞中不立即重试，等待 memRetryTimer 解除；其余情况继续调度
+      if (!this.memGateBlocked && this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
         this.scheduleProcess()
       }
     }
