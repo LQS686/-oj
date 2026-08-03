@@ -289,8 +289,11 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     const safeMem = Math.min(Math.max(16, Number(memoryLimit) || 256), 4096)
     // RLIMIT_CPU 跟 CPU 窗口（timeLimit+extra），不能跟墙钟/ioSlack，
     // 否则大输出题暴力解会把 ulimit -t 跑满才死，评测极慢。
+    // B-P2-13：+5s 余量——bash `ulimit -t` 会同时设软=硬限制，硬限制超时直接
+    // SIGKILL(137) 抢在 watch 粗测(152) 之前，破坏 CPU TLE 语义；加大后由
+    // dsoj-watch 的 jiffies 粗测统一判定 CPU TLE（152），结果可预测。
     const safeCpu = Math.min(
-      Math.max(1, Math.ceil(Number(cpuTimeLimitMs) / 1000) || 1),
+      Math.max(1, Math.ceil(Number(cpuTimeLimitMs) / 1000) + 5 || 1),
       300,
     )
     const safeStackMb = 8
@@ -623,14 +626,16 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     // 墙钟强杀但 CPU 未超（或仅在浮动窗口内）：常见于百万行输出的 IO 等待。
     // 此时不应直接 TLE，而应进入输出比对 / 临界重测。
     // sleep 死循环通常 CPU≈墙钟或输出为空，仍保持 TLE。
-    // B-P2-13：152 = dsoj-watch 中途 CPU TLE（jiffies 粗测）或 ulimit -t SIGXCPU，
-    // 是明确的 CPU 超时信号，绝不撤销——否则输出不完整会被误判成 WA。
-    // 仅墙钟强杀（137/SIGKILL、Node 定时器）才允许按 IO 密集/临界 TLE 处理。
+    // B-P2-13：仅"墙钟真正到达限制"（Node 定时器强杀 savedForceKilled，
+    // 或墙钟接近 hardTimeout）才允许撤销；CPU TLE(152) 与资源超限被杀
+    // （RLIMIT_CPU 硬限制 SIGKILL=137，wallMs 远小于 hardTimeout）必须保持
+    // TLE——否则输出不完整会被误判成 WA。
     if (timeout && !abortedBySignal) {
       const outSize = existsSync(outputPath) ? statSync(outputPath).size : 0
       const childWall = wrapperWallMs > 0 ? wrapperWallMs : Math.max(0, endTime - startTime)
       const isCpuTle = cpuTleExit
-      if (!isCpuTle && outSize > 0 && realCpuMs > 0 && realCpuMs <= timeLimit) {
+      const isWallTimeout = forceKilled || childWall >= hardTimeoutMs * 0.95
+      if (!isCpuTle && isWallTimeout && outSize > 0 && realCpuMs > 0 && realCpuMs <= timeLimit) {
         logger.info('墙钟超时但 CPU 未超限且已有输出，按 IO 密集处理', {
           realCpuMs,
           timeLimit,
@@ -638,7 +643,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           outSize,
         })
         timeout = false
-      } else if (!isCpuTle && outSize > 0 && realCpuMs > timeLimit && realCpuMs <= cpuTimeLimitMs) {
+      } else if (!isCpuTle && isWallTimeout && outSize > 0 && realCpuMs > timeLimit && realCpuMs <= cpuTimeLimitMs) {
         logger.info('墙钟超时且 CPU 处于浮动窗口，转临界 TLE', {
           realCpuMs,
           timeLimit,
