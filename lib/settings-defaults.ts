@@ -20,8 +20,8 @@ export const defaultJudgeSettings = {
   largeCaseConcurrency: 3,
   /** 临界 TLE 重测次数 */
   rejudgeTimes: 1,
-  /** 超时容差比例 */
-  extraTimeRatio: 0.1,
+  /** 超时容差比例（0 = 严格按 timeLimit，不加余量） */
+  extraTimeRatio: 0,
   /** 编译超时（毫秒） */
   compileTimeout: 20000,
   // —— 高级 ——

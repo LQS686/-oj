@@ -83,7 +83,7 @@ function checkJudgeAndMongoReplica(): string[] {
     JUDGE_MAX_CONCURRENT: '评测并发数（默认 1）',
     JUDGE_JOB_TIMEOUT: '单次评测任务超时秒数（默认 300）',
     JUDGE_COMPILE_TIMEOUT: '编译超时毫秒数（默认 20000）',
-    JUDGE_EXTRA_TIME_RATIO: '评测额外时间比例（默认 0.1）',
+    JUDGE_EXTRA_TIME_RATIO: '评测额外时间比例（默认 0，严格按 timeLimit）',
     JUDGE_REJUDGE_TIMES: '临界 TLE 重测次数（默认 1）',
   }
   for (const [k, desc] of Object.entries(judgeVars)) {

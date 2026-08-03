@@ -202,7 +202,7 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
           timeLimit: tcTimeLimit,
           memoryLimit: tcMemoryLimit,
           compiledPath,
-          extraTimeRatio: 0.1,
+          extraTimeRatio: 0,
           expectedOutputBytes: expectedBytes,
         })
 

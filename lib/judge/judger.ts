@@ -342,7 +342,7 @@ async function judgeOneCaseWithFiles(
       }
     }
 
-    const extraRatio = job.extraTimeRatio ?? 0.1
+    const extraRatio = job.extraTimeRatio ?? 0
     const extraMs = computeExtraTime(tcTimeLimit, extraRatio)
     const maxRejudge = job.rejudgeTimes ?? 1
     for (let r = 0; r < maxRejudge; r++) {

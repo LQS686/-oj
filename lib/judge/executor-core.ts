@@ -182,7 +182,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     timeLimit,
     memoryLimit,
     compiledPath,
-    extraTimeRatio = 0.1,
+    extraTimeRatio = 0,
     expectedOutputBytes,
     outputLimitBytes: outputLimitOverride,
     signal,
