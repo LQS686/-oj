@@ -23,6 +23,9 @@ export function useProblemList() {
   const [loading, setLoading] = useState(true)
   const [initialLoading, setInitialLoading] = useState(true)
   const [error, setError] = useState('')
+  // 分页状态：数据全量加载后客户端分页展示，避免一次渲染全部行导致卡顿
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   const fetchProblems = useCallback(async (isInitial = false) => {
     try {
@@ -119,5 +122,9 @@ export function useProblemList() {
     toggleVisibility,
     allTags,
     allSources,
+    page,
+    pageSize,
+    setPage,
+    setPageSize,
   }
 }

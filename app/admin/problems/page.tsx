@@ -35,6 +35,10 @@ function AdminProblemsPageContent() {
     toggleVisibility,
     allTags,
     allSources,
+    page,
+    pageSize,
+    setPage,
+    setPageSize,
   } = useProblemList()
 
   // 筛选条件：初始值从 URL query string 恢复（支持分享 / 刷新保留筛选状态）
@@ -53,14 +57,17 @@ function AdminProblemsPageContent() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   // 部分更新筛选条件（保持其他维度不变）
+  // 筛选变化时重置到第 1 页，避免停留在空页
   const handleFiltersChange = useCallback((patch: Partial<ProblemFilters>) => {
     setFilters(prev => ({ ...prev, ...patch }))
-  }, [])
+    setPage(1)
+  }, [setPage])
 
   // 重置筛选条件
   const handleReset = useCallback(() => {
     setFilters(DEFAULT_FILTERS)
-  }, [])
+    setPage(1)
+  }, [setPage])
 
   // 筛选条件 URL 持久化：filters 变化时同步到 URL（用 replace 避免污染历史栈）
   useEffect(() => {
@@ -78,6 +85,12 @@ function AdminProblemsPageContent() {
     () => filterProblems(problems, filters),
     [problems, filters]
   )
+
+  // 客户端分页：筛选后的全量数据切片展示当前页，避免一次渲染所有行导致卡顿
+  const pagedProblems = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredProblems.slice(start, start + pageSize)
+  }, [filteredProblems, page, pageSize])
 
   const handleBatchAction = async (action: BatchActionType, selectedIds: string[]) => {
     if (selectedIds.length === 0) return
@@ -225,7 +238,7 @@ function AdminProblemsPageContent() {
         <ProblemStatsRow problems={problems} filteredProblems={filteredProblems} />
 
         <DataTable<Problem>
-          data={filteredProblems}
+          data={pagedProblems}
           columns={columns}
           idKey="id"
           loading={loading}
@@ -233,6 +246,16 @@ function AdminProblemsPageContent() {
           batchActions={batchActions}
           onRowClick={(row) => router.push(`/admin/problems/${row.id}/edit`)}
           onSelectionChange={setSelectedIds}
+          pagination={{
+            page,
+            pageSize,
+            total: filteredProblems.length,
+            onPageChange: setPage,
+            onPageSizeChange: (size) => {
+              setPageSize(size)
+              setPage(1)
+            },
+          }}
         />
       </AdminPageShell>
 
