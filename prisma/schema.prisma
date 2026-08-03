@@ -2,6 +2,9 @@
 // Prisma Schema for 大山 OJ with MongoDB
 generator client {
   provider      = "prisma-client-js"
+  // Prisma 6.19+ 默认生成 Query Compiler 客户端，而该架构尚不支持 MongoDB（运行时报 P6001
+  // "URL must start with prisma://"）。必须显式指定 library（Rust 查询引擎）才能连 MongoDB。
+  engineType    = "library"
   binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
 }
 
