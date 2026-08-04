@@ -164,12 +164,42 @@ docker builder prune -af --filter "until=168h"
 | 登录页无注册入口                              | 查 `curl -s https://你的域名/api/settings/public`：`needsBootstrap=true` 应显示「创建管理员」；二者皆 false 表示库中已有用户且关闭了开放注册。管理员登录后在后台打开「开放注册」，或见下方 mongosh 开启。                                                                                           |
 | `mongo-keyfile: no such file`                 | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile`                                                                                                                                                                   |
 | 构建 ENOSPC / 磁盘满                          | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                                                                                                                                                                                     |
-| 镜像拉取失败                                  | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认不覆盖已有自定义 daemon；可用 `--skip-mirror` 跳过                                                                                                                                                        |
+| 镜像拉取失败 / 下载慢                        | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认多源 fallback（`docker.1panel.live` / `docker.1ms.run` / `docker.xuanyuan.me` / `docker.m.daocloud.io`），不覆盖已有自定义 daemon。手动配置示例见下方「配置镜像加速」。                                                                                                              |
 | 改域名后前端仍请求旧地址                      | 必须重建：`sudo bash scripts/bt-deploy.sh https://新域名`（不要用 `--no-build`）                                                                                                                                                                                                                    |
 | API 502                                       | `docker compose ps`；等健康检查通过；看 `docker compose logs -f app`                                                                                                                                                                                                                                |
 | 80/443 冲突                                   | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                                                                                                                                                                                  |
 | 3000 端口被占用                               | 脚本会提示；可改 `.env` 的 `APP_HOST_PORT` 后重跑，并重新粘贴 `nginx/baota-proxy.conf`（端口已写入片段）                                                                                                                                                                                            |
 | 粘贴 Nginx 后 WebSocket 断线                  | 确认存在 `location /socket.io/`，且 `X-Forwarded-Proto` 与站点协议一致                                                                                                                                                                                                                              |
+
+### 配置镜像加速（镜像拉取慢 / 失败时）
+
+脚本首次部署会自动写入多源 `registry-mirrors`（见 `bt-deploy.sh` 的 `ensure_docker_mirrors`）。若你的服务器已配置过 `daemon.json` 或镜像仍慢，可手动配置：
+
+```bash
+# 1a. 若 /etc/docker/daemon.json 不存在或为空，直接写入加速源（多源 fallback，按可用性顺序）：
+sudo tee /etc/docker/daemon.json >/dev/null <<'JSON'
+{
+  "registry-mirrors": [
+    "https://docker.1panel.live",
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me",
+    "https://docker.m.daocloud.io"
+  ]
+}
+JSON
+
+# 1b. 若已存在自定义 daemon.json，请先备份再合并（勿用 tee 整文件覆盖，会丢原有配置）：
+sudo cp /etc/docker/daemon.json /etc/docker/daemon.json.bak
+# 将上方 "registry-mirrors" 数组合并进现有 JSON 后保存
+
+# 2. 重启 Docker 使其生效
+sudo systemctl restart docker
+
+# 3. 验证：拉取 mongo:7 应显著提速
+sudo docker pull mongo:7
+```
+
+> 说明：公共加速源可能随政策/维护动态变化；若某个源失效，Docker 会自动尝试下一个（多源 fallback）。也可只保留当前最快的源。`--skip-mirror` 可跳过脚本的加速配置逻辑（适合已有自建加速的服务器）。
 
 ### 修复 Mongo 副本集（API 503 / NotYetInitialized）
 

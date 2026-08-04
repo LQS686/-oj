@@ -270,7 +270,8 @@ try:
 except Exception:
     sys.exit(2)
 mirrors = data.get("registry-mirrors") or []
-wanted = ["https://docker.1ms.run", "https://docker.xuanyuan.me"]
+# 国内镜像源多源 fallback：1panel.live 实测最稳（2026-08），其余保留作为备选
+wanted = ["https://docker.1panel.live", "https://docker.1ms.run", "https://docker.xuanyuan.me", "https://docker.m.daocloud.io"]
 for m in wanted:
     if m not in mirrors:
         mirrors.append(m)
@@ -298,8 +299,10 @@ PY
     cat > "$conf" <<'DOCKERCONF'
 {
   "registry-mirrors": [
+    "https://docker.1panel.live",
     "https://docker.1ms.run",
-    "https://docker.xuanyuan.me"
+    "https://docker.xuanyuan.me",
+    "https://docker.m.daocloud.io"
   ],
   "log-driver": "json-file",
   "log-opts": {
