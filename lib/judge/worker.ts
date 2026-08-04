@@ -147,7 +147,8 @@ if (judgeQueue.listenerCount('completed') === 0) judgeQueue.on('completed', asyn
 
     // 失效提交详情缓存 + 题目状态/详情缓存（任意终态都可能改变统计）
     cache.delete(`submission:byId:${result.submissionId}`)
-    cache.delete(CacheKeys.problem.statusCounts(submission.problemId))
+    // statusCounts 实际 key 含 contestId/viewerId 变体，需按题目前缀失效
+    cache.deleteByPrefix(CacheKeys.problem.statusCounts(submission.problemId))
     cache.delete(CacheKeys.problem.stats(submission.problemId))
     cache.delete(CacheKeys.problem.byId(submission.problemId))
 

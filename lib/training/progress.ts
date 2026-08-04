@@ -237,7 +237,8 @@ export async function listTrainingProblemsWithStatus(
   })
 
   const problemIds = trainingProblems.map((tp) => tp.problemId)
-  const userSubmissionStatus: Record<string, 'AC' | 'Attempted' | null> = {}
+  // 状态枚举统一大写（与详情页 getTrainingProblemStatus 的 'ATTEMPTED' 一致）
+  const userSubmissionStatus: Record<string, 'AC' | 'ATTEMPTED' | null> = {}
 
   if (userId && problemIds.length > 0) {
     const submissions = await prisma.submission.findMany({
@@ -255,7 +256,7 @@ export async function listTrainingProblemsWithStatus(
       if (statuses?.has(SubmissionStatus.ACCEPTED)) {
         userSubmissionStatus[pid] = 'AC'
       } else if (statuses && statuses.size > 0) {
-        userSubmissionStatus[pid] = 'Attempted'
+        userSubmissionStatus[pid] = 'ATTEMPTED'
       } else {
         userSubmissionStatus[pid] = null
       }

@@ -103,11 +103,16 @@ patch_env
 
 if [[ "$FULL" -eq 1 ]] || [[ ! -d node_modules ]]; then
   if [[ "$FULL" -eq 1 ]]; then
-    echo "==> npm install (--full)..."
+    echo "==> npm ci (--full，严格按 lock 文件安装)..."
   else
-    echo "==> 无 node_modules，执行 npm install..."
+    echo "==> 无 node_modules，执行 npm ci..."
   fi
-  npm install
+  # 必须用 npm ci 而非 npm install：
+  #   npm install 会按 package.json 的 ^/~ 范围重新解析，可能拉取与
+  #   package-lock.json 不同的版本（如 katex ^0.16.47 解析为 0.18.1），
+  #   导致 WSL 与 Windows 环境依赖版本不一致（CSS 类名不匹配等难查 bug）。
+  #   npm ci 严格按 package-lock.json 安装，保证两环境版本完全一致。
+  npm ci
 else
   # 日常同步：schema 可能新增字段（如 spjCode），须刷新 Client，否则运行时 Unknown argument
   echo "==> prisma generate（同步 schema → Client）..."

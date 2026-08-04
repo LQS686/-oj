@@ -168,6 +168,20 @@ export async function deleteClass(classId: string) {
     })
     const assignmentIds = assignments.map((a) => a.id)
     if (assignmentIds.length > 0) {
+      // 与单作业删除（deleteClassAssignmentDirect）一致：先收集作业提交 id，
+      // 置空主 Submission 表的 assignmentSubmissionId 引用（保留提交记录本身），
+      // 再删除作业子表，避免主表残留指向已删除作业的孤儿引用
+      const classSubs = await tx.classAssignmentSubmission.findMany({
+        where: { assignmentId: { in: assignmentIds } },
+        select: { id: true },
+      })
+      const classSubIds = classSubs.map((s) => s.id)
+      if (classSubIds.length > 0) {
+        await tx.submission.updateMany({
+          where: { assignmentSubmissionId: { in: classSubIds } },
+          data: { assignmentSubmissionId: null },
+        })
+      }
       await tx.classAssignmentProblemProgress.deleteMany({
         where: { assignmentId: { in: assignmentIds } },
       })

@@ -14,6 +14,24 @@ import { ApiError } from '@/lib/api/errors'
 
 export async function createTrainingWithProblems(input: TrainingCreateInput) {
   const { problemIds, ...rest } = input
+  const uniqueProblemIds = problemIds ? [...new Set(problemIds)] : []
+
+  // 先校验题目（存在性 + 可见性），校验失败时不再创建训练，
+  // 避免先建后验导致「校验失败但训练已落库」的孤儿题单
+  if (uniqueProblemIds.length > 0) {
+    const existing = await prisma.problem.findMany({
+      where: { id: { in: uniqueProblemIds } },
+      select: { id: true, visibility: true },
+    })
+    if (existing.length !== uniqueProblemIds.length) {
+      throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
+    }
+    const nonPublic = existing.filter((p) => p.visibility !== 'public')
+    if (nonPublic.length > 0) {
+      throw new ApiError('INVALID_PROBLEMS', '训练题单只能添加公开题目', 400)
+    }
+  }
+
   const training = await prisma.training.create({
     data: {
       title: rest.title,
@@ -30,19 +48,8 @@ export async function createTrainingWithProblems(input: TrainingCreateInput) {
       cover: rest.cover || null,
     },
   })
-  if (problemIds && problemIds.length > 0) {
-    const existing = await prisma.problem.findMany({
-      where: { id: { in: problemIds } },
-      select: { id: true, visibility: true },
-    })
-    if (existing.length !== new Set(problemIds).size) {
-      throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
-    }
-    const nonPublic = existing.filter((p) => p.visibility !== 'public')
-    if (nonPublic.length > 0) {
-      throw new ApiError('INVALID_PROBLEMS', '训练题单只能添加公开题目', 400)
-    }
-    const trainingProblems = problemIds.map((problemId, index) => ({
+  if (uniqueProblemIds.length > 0) {
+    const trainingProblems = uniqueProblemIds.map((problemId, index) => ({
       trainingId: training.id,
       problemId,
       orderIndex: index,

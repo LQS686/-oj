@@ -11,9 +11,7 @@ import { submitCode, listSubmissionsAdvanced } from '@/lib/submission/service'
 import { toInt } from '@/lib/api/validation'
 import { logger } from '@/lib/logger'
 import { canAccessAdmin } from '@/lib/permissions'
-
-// 支持的提交语言白名单（与 lib/judge/compiler.ts 的 languageConfigs 一致）
-const ALLOWED_LANGUAGES = ['cpp', 'c', 'python']
+import { ALLOWED_LANGUAGES, MAX_CODE_LENGTH } from '@/lib/constants'
 
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
   const q = readQuery<{
@@ -63,10 +61,10 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   }
 
   // 前置校验：code 长度上限与语言白名单，避免无效提交进入评测队列
-  if (typeof body.code !== 'string' || body.code.length > 50000) {
+  if (typeof body.code !== 'string' || body.code.length > MAX_CODE_LENGTH) {
     throw400('VALIDATION', '代码长度不合法（最大 50000 字符）')
   }
-  if (typeof body.language !== 'string' || !ALLOWED_LANGUAGES.includes(body.language)) {
+  if (typeof body.language !== 'string' || !(ALLOWED_LANGUAGES as readonly string[]).includes(body.language)) {
     throw400('VALIDATION', '不支持的语言')
   }
 

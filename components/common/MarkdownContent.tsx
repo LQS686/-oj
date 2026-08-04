@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, type ComponentPropsWithoutRef } from 'react'
+import { useMemo, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -9,6 +9,7 @@ import rehypeKatex from 'rehype-katex'
 import rehypeSanitize from 'rehype-sanitize'
 import type { ExtraProps } from 'react-markdown'
 import { markdownSanitizeSchema } from '@/lib/markdown/sanitize-schema'
+import { normalizeLatexDelimiters } from '@/lib/markdown/delimiters'
 import MarkdownCodeBlock from '@/components/common/MarkdownCodeBlock'
 
 interface MarkdownContentProps {
@@ -16,48 +17,12 @@ interface MarkdownContentProps {
   className?: string
 }
 
-/**
- * 归一化 LaTeX 公式定界符。
- *
- * 官方 remark-math 只识别 `$...$`（行内）与 `$$...$$`（块级），但题面里
- * 还存在标准 LaTeX 写法 `\(...\)` 与 `\[...\]`（Codeforces/Hydro 等导出的
- * 题面常见）。这里做一次最小且安全的转换：
- *   \(...\) → $...$   （行内公式）
- *   \[...\] → $$...$$ （块级公式，可跨行、可含 `\\` 换行）
- *
- * 安全设计：
- *   1. 先保护代码块（围栏 / 行内），归一化正则永远看不到代码内容；
- *   2. 只做定界符替换，不改写任何公式内容；
- *   3. 不做「裸 LaTeX 命令」启发式包裹——历史版本的正则会把
- *      `C:\Windows\System32`、英文句子等误包成公式，导致红色 KaTeX 错误
- *      （该写法非常规，应使用 `$...$` 显式包裹）。
- */
-function normalizeLatexDelimiters(content: string): string {
-  if (!content) return content
-
-  const placeholders: string[] = []
-  const protect = (match: string) => {
-    const idx = placeholders.length
-    placeholders.push(match)
-    return `\x00CODE_${idx}\x00`
-  }
-
-  // 1. 保护代码块（先围栏后行内；占位符不含反引号，互不干扰）
-  let text = content.replace(/```[\s\S]*?```/g, protect)
-  text = text.replace(/`[^`\n]+`/g, protect)
-
-  // 2. 块级公式 \[...\] → $$...$$（非贪婪匹配到第一个 \]，多行内容安全）
-  text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_match, inner: string) => `$$${inner}$$`)
-
-  // 3. 行内公式 \(...\) → $...$
-  text = text.replace(/\\\(([\s\S]*?)\\\)/g, (_match, inner: string) => `$${inner}$`)
-
-  // 4. 还原代码块
-  placeholders.forEach((m, i) => {
-    text = text.split(`\x00CODE_${i}\x00`).join(m)
-  })
-  return text
-}
+// 模块级渲染缓存（LRU）：题目页切换 tab 时 AnimatePresence 会卸载/重挂载
+// ProblemDescription，若每次挂载都重跑 remark/rehype/KaTeX 全管线，大题面
+// 会阻塞主线程数百毫秒~数秒。缓存 key 为归一化后的内容，渲染结果（ReactNode）
+// 可安全跨挂载复用（同一输入输出完全确定，无 hydration 风险）。
+const renderCache = new Map<string, ReactNode>()
+const RENDER_CACHE_MAX = 24
 
 export default function MarkdownContent({
   content,
@@ -65,11 +30,15 @@ export default function MarkdownContent({
 }: MarkdownContentProps) {
   const processedContent = useMemo(() => {
     if (!content) return ''
-    return normalizeLatexDelimiters(content)
-  }, [content])
-
-  return (
-    <div className={`markdown-body ${className}`}>
+    const normalized = normalizeLatexDelimiters(content)
+    const cached = renderCache.get(normalized)
+    if (cached !== undefined) {
+      // 命中后重插以保持 LRU 顺序（Map.get 不更新迭代顺序）
+      renderCache.delete(normalized)
+      renderCache.set(normalized, cached)
+      return cached
+    }
+    const rendered = (
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         // rehype 插件顺序（react-markdown 官方推荐组合，顺序不可乱）：
@@ -159,8 +128,18 @@ export default function MarkdownContent({
           },
         }}
       >
-        {processedContent}
+        {normalized}
       </ReactMarkdown>
-    </div>
+    )
+    if (renderCache.size >= RENDER_CACHE_MAX) {
+      const oldest = renderCache.keys().next().value
+      if (oldest !== undefined) renderCache.delete(oldest)
+    }
+    renderCache.set(normalized, rendered)
+    return rendered
+  }, [content])
+
+  return (
+    <div className={`markdown-body ${className}`}>{processedContent}</div>
   )
 }

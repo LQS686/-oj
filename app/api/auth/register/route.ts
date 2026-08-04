@@ -68,7 +68,6 @@ export const POST = withApi.public(async (req) => {
     sanitizedEmail,
     sanitizedNickname,
     hashedPassword,
-    isFirstUser,
   })
 
   const token = signToken({

@@ -466,7 +466,8 @@ export async function rejudgeSubmission(submissionId: string) {
   if (wasAccepted && shouldRollbackAccepted) {
     await decrementProblemAcceptedCount(submission.problemId)
     cache.delete(CacheKeys.problem.byId(submission.problemId))
-    cache.delete(CacheKeys.problem.statusCounts(submission.problemId))
+    // statusCounts 实际 key 含 contestId/viewerId 变体，需按题目前缀失效
+    cache.deleteByPrefix(CacheKeys.problem.statusCounts(submission.problemId))
     cache.delete(CacheKeys.problem.stats(submission.problemId))
 
     wasOnlyAc = await isFirstAccepted(
@@ -484,7 +485,8 @@ export async function rejudgeSubmission(submissionId: string) {
   } else if (wasAccepted) {
     // 封榜中：计数未计入全局，无需回滚；但题目状态/统计缓存仍须失效，避免展示旧数据
     cache.delete(CacheKeys.problem.byId(submission.problemId))
-    cache.delete(CacheKeys.problem.statusCounts(submission.problemId))
+    // statusCounts 实际 key 含 contestId/viewerId 变体，需按题目前缀失效
+    cache.deleteByPrefix(CacheKeys.problem.statusCounts(submission.problemId))
     cache.delete(CacheKeys.problem.stats(submission.problemId))
   }
 

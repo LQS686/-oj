@@ -13,7 +13,7 @@ interface ResetPasswordModalProps {
 
 /**
  * 重置用户密码对话框（仅 SYSTEM_ADMIN 可触发）。
- * 密码长度至少 6 位。
+ * 密码长度至少 8 位，需包含字母和数字。
  */
 export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
   const dialog = useDialog()
@@ -25,8 +25,24 @@ export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
       await dialog.alert({ tone: 'warning', message: '请输入新密码' })
       return
     }
-    if (password.length < 6) {
-      await dialog.alert({ tone: 'warning', message: '密码长度至少为6位' })
+    if (password.length < 8) {
+      await dialog.alert({ tone: 'warning', message: '密码长度至少为8位，且需包含字母和数字' })
+      return
+    }
+    if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      await dialog.alert({ tone: 'warning', message: '密码必须同时包含字母和数字' })
+      return
+    }
+    if (password.length > 128) {
+      await dialog.alert({ tone: 'warning', message: '密码长度不能超过128位' })
+      return
+    }
+    if (
+      ['12345678', 'password', '123456789', '1234567890', 'qwerty', 'abc123', '111111', '1234567', '12345', '123456', 'password1', 'qwerty123'].includes(
+        password.toLowerCase()
+      )
+    ) {
+      await dialog.alert({ tone: 'warning', message: '密码过于简单，请使用更强的密码' })
       return
     }
 
@@ -78,7 +94,7 @@ export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="至少6位"
+          placeholder="至少8位，含字母和数字"
           className="input"
           autoComplete="new-password"
         />

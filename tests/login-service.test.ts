@@ -117,6 +117,28 @@ describe('loginUser', () => {
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
   })
 
+  it('锁定计数按 userId 归一化：用邮箱登录命中同一锁定（双标识符共享计数）', async () => {
+    // 只有 userId 维度的计数达到阈值；输入标识符维度未锁定——
+    // 修复前交替用用户名/邮箱各失败 5 次可绕过锁定，修复后共享 userId 计数
+    mockRedis.get.mockImplementation(async (key: string) =>
+      key.includes(':u1') ? '5' : null
+    )
+    mockRedis.ttl.mockResolvedValue(300)
+    fakePrisma.user.findFirst.mockResolvedValue({
+      id: 'u1', username: 'alice', email: 'alice@example.com', password: 'hash',
+      nickname: null, avatar: null, bio: null, rating: 0, rank: 'gray',
+      color: '#999', role: 'USER', isBanned: false, tokenVersion: 0,
+      createdAt: new Date(),
+    })
+    // 密码设为正确：若回归旧实现（按输入标识符查锁），流程将走到密码比对
+    // 分支并成功登录（测试失败），从而真正锁住「userId 维度命中」这一行为
+    bcryptCompare.mockResolvedValue(true)
+    // 用邮箱登录 → 解析到 u1 → 命中 userId 锁定
+    await expect(
+      loginUser({ username: 'alice@example.com', password: 'pwd123' })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
+  })
+
   it('应抛出 LoginError(UNAUTHORIZED) 当用户不存在', async () => {
     fakePrisma.user.findFirst.mockResolvedValue(null)
     await expect(

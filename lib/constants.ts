@@ -7,6 +7,13 @@
  * 不得在其他文件硬编码难度列表。
  */
 
+/** 评测支持的提交语言（与前端 WORKSPACE_LANGUAGE_OPTIONS 保持一致） */
+export const ALLOWED_LANGUAGES = ['cpp', 'c', 'python'] as const
+export type AllowedLanguage = (typeof ALLOWED_LANGUAGES)[number]
+
+/** 代码长度上限（普通提交与竞赛提交共用） */
+export const MAX_CODE_LENGTH = 50000
+
 /** 难度档位（由易到难，对齐洛谷命名） */
 export const DIFFICULTIES = [
   '入门',      // 红色 Red

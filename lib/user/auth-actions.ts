@@ -107,7 +107,6 @@ export async function registerNewUser(input: {
   sanitizedEmail: string
   sanitizedNickname: string
   hashedPassword: string
-  isFirstUser?: boolean
 }): Promise<RegisterResult> {
   const email = input.sanitizedEmail.toLowerCase()
 

@@ -43,7 +43,9 @@ export async function listPublicProblems(filter: {
   page: number
   pageSize: number
   search?: string
+  /** 多值：逗号分隔，OR 语义 */
   difficulty?: string
+  /** 多值：逗号分隔，OR 语义（任意命中即匹配） */
   tag?: string
   /** 按题号精确批量查询（竞赛批量加题）；存在时忽略分页过滤语义，最多 100 个 */
   numbers?: string[]
@@ -105,8 +107,15 @@ export async function listPublicProblems(filter: {
       { source: { contains: search, mode: 'insensitive' } },
     ]
   }
-  if (difficulty) where.difficulty = difficulty
-  if (tag) where.tags = { has: tag }
+  // 多值筛选（逗号分隔）：难度 OR、标签 OR（hasSome = 命中任意标签）
+  const difficulties = difficulty
+    ? difficulty.split(',').map((s) => s.trim()).filter(Boolean)
+    : []
+  const tags = tag
+    ? tag.split(',').map((s) => s.trim()).filter(Boolean)
+    : []
+  if (difficulties.length > 0) where.difficulty = { in: difficulties }
+  if (tags.length > 0) where.tags = { hasSome: tags }
 
   const [items, total] = await Promise.all([
     prisma.problem.findMany({

@@ -22,6 +22,15 @@ export const POST = withApi.admin(async (_req, ctx) => {
     data: { sealUnlocked: true },
   })
 
+  // 解冻：补齐封榜期间延迟的全局题目计数与用户 solvedCount
+  // （与 adminUpdateContest 传 sealUnlocked 的路径保持一致，否则封榜期
+  //   跳过的 totalSubmit/totalAccepted/solvedCount 将永久缺失）
+  const { applyDeferredGlobalStatsAfterSealUnlock } = await import('@/lib/contest/seal-stats')
+  const { logger } = await import('@/lib/logger')
+  void applyDeferredGlobalStatsAfterSealUnlock(id).catch((err) => {
+    logger.error('封榜解冻后补齐全局统计失败', err)
+  })
+
   cache.delete(CacheKeys.contest.byId(id))
   cache.deleteByPrefix('contest:rank')
 

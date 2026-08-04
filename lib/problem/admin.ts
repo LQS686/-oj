@@ -129,16 +129,21 @@ export async function ensureAdminProblemNumber(problemNumber?: string): Promise<
     }
     return problemNumber
   }
-  const latestProblem = await prisma.problem.findFirst({
+  const latestProblems = await prisma.problem.findMany({
     where: { problemNumber: { startsWith: 'P' } },
-    orderBy: { problemNumber: 'desc' },
     select: { problemNumber: true },
   })
   let nextNumber = 1001
-  if (latestProblem?.problemNumber) {
-    const match = latestProblem.problemNumber.match(/^P(\d+)$/)
-    if (match) nextNumber = parseInt(match[1], 10) + 1
+  let maxSeen = 0
+  for (const p of latestProblems) {
+    if (!p.problemNumber) continue
+    const match = p.problemNumber.match(/^P(\d+)$/)
+    if (match) {
+      const num = parseInt(match[1], 10)
+      if (num > maxSeen) maxSeen = num
+    }
   }
+  if (maxSeen > 0) nextNumber = maxSeen + 1
   return `P${nextNumber}`
 }
 
@@ -335,7 +340,8 @@ export async function createAdminProblem(
  */
 export function clearProblemCache(problemId: string) {
   cache.delete(CacheKeys.problem.byId(problemId))
-  cache.delete(CacheKeys.problem.statusCounts(problemId))
+  // statusCounts 实际 key 含 contestId/viewerId 变体，需按题目前缀失效
+  cache.deleteByPrefix(CacheKeys.problem.statusCounts(problemId))
   cache.delete(CacheKeys.problem.stats(problemId))
   cache.deleteByPrefix('problem:tags')
 }

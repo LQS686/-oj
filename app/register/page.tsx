@@ -71,8 +71,24 @@ export default function RegisterPage() {
       return
     }
 
-    if (formData.password.length < 6) {
-      setError('密码长度至少为6位')
+    if (formData.password.length < 8) {
+      setError('密码长度至少为8位，且需包含字母和数字')
+      return
+    }
+    if (!/[a-zA-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)) {
+      setError('密码必须同时包含字母和数字')
+      return
+    }
+    if (formData.password.length > 128) {
+      setError('密码长度不能超过128位')
+      return
+    }
+    if (
+      ['12345678', 'password', '123456789', '1234567890', 'qwerty', 'abc123', '111111', '1234567', '12345', '123456', 'password1', 'qwerty123'].includes(
+        formData.password.toLowerCase()
+      )
+    ) {
+      setError('密码过于简单，请使用更强的密码')
       return
     }
 
@@ -187,8 +203,8 @@ export default function RegisterPage() {
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                     className="input pl-12 py-3 hover:border-primary/30 transition-all duration-200"
-                    placeholder="3-20位字母、数字或下划线"
-                    pattern="[a-zA-Z0-9_]{3,20}"
+                    placeholder="3-20位字母、数字、下划线或中文"
+                    pattern="[a-zA-Z0-9_\u4e00-\u9fa5]{3,20}"
                     required
                   />
                 </div>
@@ -242,7 +258,7 @@ export default function RegisterPage() {
                     value={formData.password}
                     onChange={(e) => handlePasswordChange(e.target.value)}
                     className="input pl-12 pr-12 py-3 hover:border-primary/30 transition-all duration-200"
-                    placeholder="至少6位密码"
+                    placeholder="至少8位，需包含字母和数字"
                     required
                   />
                   <button

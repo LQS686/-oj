@@ -300,7 +300,7 @@ const [editOpen, setEditOpen] = useState(false)
  router.push(loginPathFromLocation())
  return
  }
- if (!code.trim() || code.trim().length < 10) return
+ if (!code.trim()) return
  if (!assignment?.problems?.[selectedProblemIndex]) return
  // 作业状态守卫：upcoming/ended(无 allowLateSubmission) 禁止提交
  if (assignment.status === 'upcoming') return

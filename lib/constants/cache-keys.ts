@@ -18,6 +18,10 @@ export const CacheKeys = {
     listPrefix: () => 'problem:list',
     tags: () => 'problem:tags',
     statusCounts: (id: string) => `problem:statusCounts:${id}`,
+    // 注意：写入侧 cache.get('problem:statusCounts', [problemId, contestId, viewerId])
+    // 生成的 key 带 contestId/viewerId 变体，因此失效时必须用
+    // cache.deleteByPrefix(CacheKeys.problem.statusCounts(id)) 按题目前缀删除
+    //（cache.delete 精确删除永远无法命中多参数变体 key）
     /** 与 cache.get('problem:stats', [id]) 生成的键一致 */
     stats: (id: string) => `problem:stats:${id}`,
   },

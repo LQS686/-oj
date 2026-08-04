@@ -40,9 +40,6 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
     throw new ApiError('INVALID_LANGUAGE', '不支持的语言', 400)
   }
   const codeLen = input.code?.length ?? 0
-  if (codeLen < 10) {
-    throw new ApiError('CODE_TOO_SHORT', '代码长度不能少于 10 个字符', 400)
-  }
   if (codeLen > 50_000) {
     throw new ApiError('CODE_TOO_LONG', '代码长度不能超过 50000 个字符', 400)
   }

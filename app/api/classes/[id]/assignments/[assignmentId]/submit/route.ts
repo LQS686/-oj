@@ -3,7 +3,7 @@
  * POST /api/classes/[id]/assignments/[assignmentId]/submit
  *
  * 业务层（submitAssignmentCode）会在以下情况抛出 ApiError，由 withApi 统一捕获：
- *   - INVALID_LANGUAGE / CODE_TOO_SHORT / CODE_TOO_LONG  → 400
+ *   - INVALID_LANGUAGE / CODE_TOO_LONG                → 400
  *   - ASSIGNMENT_NOT_STARTED / ASSIGNMENT_ENDED          → 403
  *   - SUBMIT_TOO_FREQUENT                                → 429
  *   - JUDGE_QUEUE_FAILED                                 → 503

@@ -154,8 +154,24 @@ function SettingsPageContent() {
       showMessage('error', '两次输入的密码不一致')
       return
     }
-    if (formData.newPassword.length < 6) {
-      showMessage('error', '密码长度至少为 6 位')
+    if (formData.newPassword.length < 8) {
+      showMessage('error', '密码长度至少为 8 位，且需包含字母和数字')
+      return
+    }
+    if (!/[a-zA-Z]/.test(formData.newPassword) || !/[0-9]/.test(formData.newPassword)) {
+      showMessage('error', '密码必须同时包含字母和数字')
+      return
+    }
+    if (formData.newPassword.length > 128) {
+      showMessage('error', '密码长度不能超过 128 位')
+      return
+    }
+    if (
+      ['12345678', 'password', '123456789', '1234567890', 'qwerty', 'abc123', '111111', '1234567', '12345', '123456', 'password1', 'qwerty123'].includes(
+        formData.newPassword.toLowerCase()
+      )
+    ) {
+      showMessage('error', '密码过于简单，请使用更强的密码')
       return
     }
 

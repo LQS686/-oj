@@ -53,8 +53,8 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     throw400('INVALID_NAME', '班级名称不能为空')
   }
   const trimmedName = className!.trim()
-  if (trimmedName.length > 50) {
-    throw400('INVALID_NAME', '班级名称不能超过50个字符')
+  if (trimmedName.length > 100) {
+    throw400('INVALID_NAME', '班级名称不能超过 100 个字符')
   }
 
   // isPublic / maxMembers 严格类型校验，禁止负数或非布尔脏数据入库
@@ -70,8 +70,8 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     if (typeof body.maxMembers !== 'number' || !Number.isInteger(body.maxMembers)) {
       throw400('INVALID_MAX_MEMBERS', 'maxMembers 必须为整数')
     }
-    if (body.maxMembers < 1 || body.maxMembers > 500) {
-      throw400('INVALID_MAX_MEMBERS', 'maxMembers 须在 1-500 之间')
+    if (body.maxMembers < 1 || body.maxMembers > 10000) {
+      throw400('INVALID_MAX_MEMBERS', 'maxMembers 须在 1-10000 之间')
     }
     maxMembers = body.maxMembers
   }

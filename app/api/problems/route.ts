@@ -36,6 +36,7 @@ export const GET = withApi.public(async (req) => {
     page,
     pageSize,
     search: q.search,
+    // 多值筛选：difficulty/tag 支持逗号分隔（与列表页多选交互对应）
     difficulty: q.difficulty,
     tag: q.tag,
     numbers,

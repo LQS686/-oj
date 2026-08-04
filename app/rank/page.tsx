@@ -127,10 +127,12 @@ export default function RankPage() {
  }
  }
 
+ // 初始 loading 时容器未挂载（null），依赖 loading 让监听器在
+ // 列表渲染完成后重新绑定，否则无限滚动永远不触发
  const container = containerRef.current
  container?.addEventListener('scroll', handleScroll)
  return () => container?.removeEventListener('scroll', handleScroll)
- }, [hasMore, activeTab, fetchRankings])
+ }, [hasMore, activeTab, fetchRankings, loading])
 
  const handleRetry = () => {
  setError(null)

@@ -21,6 +21,9 @@ export interface UserProfile {
   email: string | null
   role: string
   isBanned: boolean
+  rating: number
+  rank: string
+  color: string
   createdAt: Date
 }
 
@@ -37,6 +40,9 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
         email: true,
         role: true,
         isBanned: true,
+        rating: true,
+        rank: true,
+        color: true,
         createdAt: true,
       },
     })

@@ -16,6 +16,7 @@ import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { parseComparisonMode } from '@/lib/judge/types'
 import { mapTestCasesMeta, TESTCASE_META_SELECT } from '@/lib/judge/testcase-loader'
 import { CacheKeys } from '@/lib/constants/cache-keys'
+import { ALLOWED_LANGUAGES, MAX_CODE_LENGTH, type AllowedLanguage } from '@/lib/constants'
 import { isContestSealed } from './rankings'
 import { canAccessAdmin } from '@/lib/permissions'
 
@@ -129,6 +130,14 @@ export interface SubmitContestCodeInput {
 export async function submitContestCode(input: SubmitContestCodeInput) {
   if (!input.problemId || !input.code || !input.language) {
     throw new ApiError('MISSING_FIELDS', '缺少必需字段: problemId, code, language', 400)
+  }
+  // 与普通提交一致的前置校验：代码长度上限 + 语言白名单
+  // （否则超大代码/非法语言会直接进入评测队列与数据库）
+  if (typeof input.code !== 'string' || input.code.length > MAX_CODE_LENGTH) {
+    throw new ApiError('VALIDATION', '代码长度不合法（最大 50000 字符）', 400)
+  }
+  if (typeof input.language !== 'string' || !ALLOWED_LANGUAGES.includes(input.language as AllowedLanguage)) {
+    throw new ApiError('VALIDATION', '不支持的语言', 400)
   }
   const contest = await prisma.contest.findUnique({ where: { id: input.contestId } })
   if (!contest) {

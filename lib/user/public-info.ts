@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { getMongoClient } from '@/lib/mongodb-direct'
 import type bcrypt from 'bcryptjs'
 import { AppError } from '@/lib/errors'
+import { validatePassword } from '@/lib/api/validation'
 import { clearUserCache } from './profile'
 import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 
@@ -342,8 +343,17 @@ export async function changeCurrentUserPassword(
   if (!currentPassword || !newPassword) {
     throw AppError.badRequest('MISSING_FIELDS', '请提供当前密码和新密码')
   }
-  if (newPassword.length < 8) {
-    throw AppError.badRequest('PASSWORD_TOO_SHORT', '新密码长度至少为8位')
+  // 与登录/注册的 trimAll 语义一致：密码首尾空白会存进哈希，
+  // 不 trim 会导致「改密后含空格密码永远无法登录」
+  const trimmedCurrent = currentPassword.trim()
+  const trimmedNew = newPassword.trim()
+  if (!trimmedCurrent || !trimmedNew) {
+    throw AppError.badRequest('MISSING_FIELDS', '请提供当前密码和新密码')
+  }
+  // 与注册/重置密码策略一致：复用 validatePassword（≥8、≤128、含字母+数字、非常见弱密码）
+  const passwordValidation = validatePassword(trimmedNew)
+  if (!passwordValidation.valid) {
+    throw AppError.badRequest('WEAK_PASSWORD', passwordValidation.errors.join('；'))
   }
 
   const userRecord = await prisma.user.findUnique({
@@ -353,11 +363,11 @@ export async function changeCurrentUserPassword(
   if (!userRecord) {
     throw AppError.notFound('用户不存在')
   }
-  const isPasswordValid = await bcryptModule.compare(currentPassword, userRecord.password)
+  const isPasswordValid = await bcryptModule.compare(trimmedCurrent, userRecord.password)
   if (!isPasswordValid) {
     throw AppError.badRequest('WRONG_PASSWORD', '当前密码错误')
   }
-  const hashedPassword = await bcryptModule.hash(newPassword, 12)
+  const hashedPassword = await bcryptModule.hash(trimmedNew, 12)
   // 统一走 Prisma：改密与登录共用同一数据源；递增 tokenVersion 使旧 Token 失效
   await prisma.user.update({
     where: { id: userId },

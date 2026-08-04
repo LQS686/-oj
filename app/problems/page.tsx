@@ -58,6 +58,11 @@ export default function ProblemsPage() {
   const difficultyRef = useRef<HTMLDivElement>(null)
   useClickOutside(difficultyRef, () => setDifficultyOpen(false))
 
+  // 请求序号：快速翻页/筛选时丢弃过期响应，避免旧数据覆盖新数据
+  const reqSeqRef = useRef(0)
+  // 最新页码引用：筛选防抖回调读取最新 page，避免闭包捕获陈旧值
+  const pageRef = useRef(1)
+
   const fetchTags = useCallback(async () => {
     try {
       const response = await fetchWithCookie('/api/problems/tags')
@@ -71,10 +76,24 @@ export default function ProblemsPage() {
   }, [])
 
   const fetchProblems = useCallback(async () => {
+    const seq = ++reqSeqRef.current
     try {
       setLoading(true)
-      const response = await fetchWithCookie(`/api/problems?page=${page}&pageSize=30`)
+      // 搜索/难度/标签全部提交服务端，避免只过滤当前页 30 条导致
+      // 「目标题目不在第 1 页时搜不到、分页总数与筛选结果矛盾」
+      const params = new URLSearchParams({ page: String(page), pageSize: '30' })
+      if (searchQuery.trim()) params.set('search', searchQuery.trim())
+      if (selectedDifficulties.length > 0) {
+        params.set('difficulty', selectedDifficulties.join(','))
+      }
+      if (selectedTags.length > 0) {
+        params.set('tag', selectedTags.join(','))
+      }
+      const response = await fetchWithCookie(`/api/problems?${params.toString()}`)
       const data = await response.json()
+
+      // 过期响应（期间又发起了新请求）直接丢弃
+      if (seq !== reqSeqRef.current) return
 
       if (data.success) {
         setProblems(data.data.problems || [])
@@ -84,9 +103,9 @@ export default function ProblemsPage() {
     } catch (error) {
       console.error('获取题目列表失败:', error)
     } finally {
-      setLoading(false)
+      if (seq === reqSeqRef.current) setLoading(false)
     }
-  }, [page])
+  }, [page, searchQuery, selectedDifficulties, selectedTags])
 
   const fetchProblemStatus = useCallback(async () => {
     if (!user) return
@@ -110,41 +129,38 @@ export default function ProblemsPage() {
     }
   }, [user, problems])
 
+  // 挂载时仅拉一次标签集合（不随页码/筛选重复请求）
   useDeferredEffect(() => {
-    void fetchProblems()
     void fetchTags()
-  }, [fetchProblems, fetchTags])
+  }, [fetchTags])
+
+  // 翻页：立即请求（排除挂载首次，挂载由下方筛选 effect 触发，避免双请求）
+  const prevPageRef = useRef(1)
+  useDeferredEffect(() => {
+    pageRef.current = page
+    if (prevPageRef.current === page) return
+    prevPageRef.current = page
+    void fetchProblems()
+  }, [page])
+
+  // 筛选（搜索词/难度/标签）变化：防抖 300ms 后回到第 1 页重新请求
+  useDeferredEffect(() => {
+    const timer = window.setTimeout(() => {
+      // 用 ref 读取最新页码，避免闭包捕获防抖期间已变化的陈旧 page
+      if (pageRef.current !== 1) {
+        setPage(1)
+      } else {
+        void fetchProblems()
+      }
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchQuery, selectedDifficulties, selectedTags])
 
   useDeferredEffect(() => {
     if (user && problems.length > 0) {
       void fetchProblemStatus()
     }
   }, [user, problems, fetchProblemStatus])
-
-  const filteredProblems = useMemo(() => {
-    let filtered = [...problems]
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (p) =>
-          p.problemNumber?.toLowerCase().includes(query) ||
-          p.title.toLowerCase().includes(query)
-      )
-    }
-
-    if (selectedDifficulties.length > 0) {
-      filtered = filtered.filter((p) => selectedDifficulties.includes(p.difficulty))
-    }
-
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter((p) =>
-        selectedTags.some((tag) => p.tags?.includes(tag))
-      )
-    }
-
-    return filtered
-  }, [problems, searchQuery, selectedDifficulties, selectedTags])
 
   const hasFilters =
     !!searchQuery || selectedDifficulties.length > 0 || selectedTags.length > 0
@@ -246,7 +262,7 @@ export default function ProblemsPage() {
       )
     }
 
-    if (filteredProblems.length === 0) {
+    if (problems.length === 0) {
       return (
         <ListEmptyState
           icon={Search}
@@ -266,7 +282,7 @@ export default function ProblemsPage() {
     return (
       <div className="animate-fadeIn">
         <DenseListShell columns={problemListColumns}>
-          {filteredProblems.map((problem) => {
+          {problems.map((problem) => {
             const status = problemStatus[problem.id]
             const score = status?.score || 0
             const submitted = status?.submitted || false

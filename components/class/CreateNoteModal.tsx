@@ -132,11 +132,11 @@ export default function CreateNoteModal({
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="例如：二分查找算法总结"
-              maxLength={100}
+              maxLength={200}
               className="input w-full"
               required
             />
-            <p className="mt-1 text-xs text-muted-foreground">{formData.title.length} / 100</p>
+            <p className="mt-1 text-xs text-muted-foreground">{formData.title.length} / 200</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

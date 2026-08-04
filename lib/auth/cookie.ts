@@ -21,8 +21,13 @@ export function authCookieName(secure: boolean = isSecureAuthCookie()): string {
 }
 
 const AUTH_MAX_AGE = 7 * 24 * 60 * 60
+const REMEMBER_MAX_AGE = 30 * 24 * 60 * 60
 
-export function setAuthCookie(response: NextResponse, token: string): void {
+export function setAuthCookie(
+  response: NextResponse,
+  token: string,
+  rememberMe = false
+): void {
   const secure = isSecureAuthCookie()
   const name = authCookieName(secure)
   response.cookies.set(name, token, {
@@ -31,7 +36,8 @@ export function setAuthCookie(response: NextResponse, token: string): void {
     sameSite: 'lax',
     priority: 'high',
     path: '/',
-    maxAge: AUTH_MAX_AGE,
+    // 「记住我」30 天，否则 7 天（与登录页 rememberMe 开关对应）
+    maxAge: rememberMe ? REMEMBER_MAX_AGE : AUTH_MAX_AGE,
   })
 }
 

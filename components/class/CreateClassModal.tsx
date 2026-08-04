@@ -48,16 +48,12 @@ export default function CreateClassModal({
       setError('请输入班级名称')
       return
     }
-    if (formData.name.trim().length < 2) {
-      setError('班级名称至少需要 2 个字符')
+    if (formData.name.trim().length > 100) {
+      setError('班级名称不能超过 100 个字符')
       return
     }
-    if (formData.name.trim().length > 20) {
-      setError('班级名称不能超过 20 个字符')
-      return
-    }
-    if (formData.maxMembers < 2 || formData.maxMembers > 200) {
-      setError('班级人数限制应在 2–200 之间')
+    if (formData.maxMembers < 1 || formData.maxMembers > 10000) {
+      setError('班级人数限制应在 1–10000 之间')
       return
     }
 
@@ -107,12 +103,12 @@ export default function CreateClassModal({
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="2–20 个字符，全站唯一"
+              placeholder="1–100 个字符，全站唯一"
               className="input w-full"
-              maxLength={20}
+              maxLength={100}
               required
             />
-            <p className="text-xs text-muted-foreground mt-1">{formData.name.length} / 20</p>
+            <p className="text-xs text-muted-foreground mt-1">{formData.name.length} / 100</p>
           </div>
 
           <div>
@@ -147,8 +143,8 @@ export default function CreateClassModal({
               type="number"
               value={formData.maxMembers}
               onChange={(e) => setFormData({ ...formData, maxMembers: parseInt(e.target.value, 10) || 50 })}
-              min={2}
-              max={200}
+              min={1}
+              max={10000}
               className="input w-full max-w-[8rem]"
             />
           </div>

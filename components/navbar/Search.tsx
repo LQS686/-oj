@@ -202,7 +202,7 @@ export default function SearchBar() {
  {searchResults.contests.slice(0, 3).map((contest) => (
  <Link
  key={contest.id}
- href={`/contest/${contest.id}`}
+ href={`/contests/${contest.id}`}
  className="block p-2 rounded-lg hover:bg-primary/10 transition-colors duration-200"
  onClick={() => {
  setIsSearchOpen(false)

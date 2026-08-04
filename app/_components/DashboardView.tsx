@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import {
   Users,
@@ -71,28 +72,10 @@ export function DashboardView() {
     }
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        setLoading(true)
-        setError('')
-        const res = await fetchWithCookie('/api/home/dashboard')
-        const json = await res.json()
-        if (!json.success && !json.ok) {
-          throw new Error(json.error || '加载失败')
-        }
-        if (!cancelled) setData(json.data)
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : '加载失败')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  // 挂载时加载首页数据（复用 fetchDashboard，避免与 socket 刷新逻辑重复）
+  useDeferredEffect(() => {
+    void fetchDashboard()
+  }, [fetchDashboard])
 
   // 监听公告实时推送：新发布时弹 toast 提示并刷新首页公告区
   useAnnouncementSocket({

@@ -2,7 +2,7 @@
  * lib/user/validation.ts
  * 用户参数校验
  */
-import { required, optional, toBool, ValidationError, asRecord } from '@/lib/api/validation'
+import { required, optional, toBool, ValidationError, asRecord, validatePassword } from '@/lib/api/validation'
 
 export function parseProfileUpdate(body: unknown) {
   const b = asRecord(body)
@@ -24,7 +24,10 @@ export function parseEmailUpdate(body: unknown): { newEmail: string; password: s
 export function parsePasswordUpdate(body: unknown): { oldPassword: string; newPassword: string } {
   const b = asRecord(body)
   const newPassword = required(b.newPassword, '新密码')
-  if (newPassword.length < 6) throw new ValidationError('新密码至少 6 位')
+  const passwordValidation = validatePassword(newPassword)
+  if (!passwordValidation.valid) {
+    throw new ValidationError(passwordValidation.errors.join('；'))
+  }
   return {
     oldPassword: required(b.oldPassword, '当前密码'),
     newPassword,

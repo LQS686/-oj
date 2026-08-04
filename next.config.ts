@@ -22,10 +22,18 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
+    // 开发模式：React/Turbopack dev 的调试特性（如 devtools callstack 重建、
+    // HMR）依赖 eval()，必须放行 'unsafe-eval'，否则控制台报
+    // "eval() is not supported in this environment"。
+    // 生产模式 React 不使用 eval()，不放行以保持 CSP 严格。
+    const isDev = process.env.NODE_ENV === 'development'
+    const scriptSrc = isDev
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net"
+      : "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net"
     const cspDirectives = [
       "default-src 'self'",
       // 'wasm-unsafe-eval'：允许 WASM；'unsafe-inline' 保留给 Next.js 内联引导脚本（删除会破坏 SSR）。
-      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // img-src 白名单：允许常见 OJ 题库图床（洛谷/Codeforces/AtCoder/Hydro/牛客等）加载题目图片
       // 题面常含跨域图片资源，白名单需覆盖主流图床域名，否则 CSP 会静默拦截图片加载

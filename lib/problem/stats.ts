@@ -186,7 +186,8 @@ export async function recountAllProblemSubmissionStats(): Promise<{
       data: { totalSubmit, totalAccepted },
     })
     cache.delete(CacheKeys.problem.byId(p.id))
-    cache.delete(CacheKeys.problem.statusCounts(p.id))
+    // statusCounts 实际 key 含 contestId/viewerId 变体，需按题目前缀失效
+    cache.deleteByPrefix(CacheKeys.problem.statusCounts(p.id))
     cache.delete(CacheKeys.problem.stats(p.id))
     updatedCount++
   }

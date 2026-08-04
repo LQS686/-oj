@@ -325,8 +325,8 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       return
     }
 
-    if (!code.trim() || code.trim().length < 10) {
-      toast.error('代码不能为空或少于10个字符')
+    if (!code.trim()) {
+      toast.error('代码不能为空')
       return
     }
 

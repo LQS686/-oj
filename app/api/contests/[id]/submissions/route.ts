@@ -6,11 +6,16 @@ import {
   submitContestCode,
   listContestSubmissionsPaged,
 } from '@/lib/contest/service'
+import { submissionRateLimiter } from '@/lib/rate-limit'
 
 // POST /api/contests/[id]/submissions - 提交竞赛代码
 export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id: contestId } = ctx.params
   if (!isObjectId(contestId)) throw400('INVALID_ID', '无效的竞赛ID')
+
+  // 提交频率限制（IP 维度，20 次/分钟；防止刷爆评测队列与数据库）
+  const rl = await submissionRateLimiter(req)
+  if (rl) return rl
 
   const body = await readJson<{ problemId: string; code: string; language: string }>(req)
   const adminFlag = canAccessAdmin(user)

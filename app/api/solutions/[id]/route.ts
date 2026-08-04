@@ -80,7 +80,8 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
   } catch (err: unknown) {
     logger.error('更新题解失败', err)
     if (err instanceof ApiError) {
-      if (err.status === 400) throw400('VALIDATION', '请求参数不合法')
+      // 400 错误透传业务消息(如标题/内容长度明细),避免前端只见泛化的「请求参数不合法」
+      if (err.status === 400) throw400('VALIDATION', err.message)
       if (err.status === 403) throw403('无权操作')
       if (err.status === 404) throw404('资源不存在')
     }

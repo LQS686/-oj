@@ -76,8 +76,8 @@ export default function PretestPanel({
 
   const handleRunPretest = async () => {
     if (running) return
-    if (!code.trim() || code.trim().length < 10) {
-      toast.error('代码不能为空或少于 10 个字符')
+    if (!code.trim()) {
+      toast.error('代码不能为空')
       return
     }
 

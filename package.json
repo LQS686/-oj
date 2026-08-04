@@ -38,7 +38,7 @@
     "motion": "^12.33.0",
     "ioredis": "^5.9.2",
     "jsonwebtoken": "^9.0.2",
-    "katex": "^0.18.1",
+    "katex": "~0.16.47",
     "lucide-react": "^1.28.0",
     "mongodb": "^7.5.0",
     "next": "16.2.12",
@@ -92,6 +92,9 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "katex": "~0.16.47"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

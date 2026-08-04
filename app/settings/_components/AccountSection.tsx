@@ -154,7 +154,7 @@ export function AccountSection({
             onChange={(v) => onFormDataChange({ ...formData, currentPassword: v })}
           />
           <PasswordInput
-            placeholder="新密码（至少 6 位）"
+            placeholder="新密码（至少 8 位，含字母和数字）"
             value={formData.newPassword}
             visible={showPasswords.new}
             onToggle={() => onShowPasswordsChange({ ...showPasswords, new: !showPasswords.new })}

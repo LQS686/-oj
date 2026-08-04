@@ -303,6 +303,3 @@ export async function fetchWithCookie(
     credentials: 'include',
   })
 }
-
-/** @deprecated 请使用 fetchWithCookie */
-export const fetchWithAuth = fetchWithCookie

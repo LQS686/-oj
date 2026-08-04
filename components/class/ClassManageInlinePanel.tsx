@@ -181,8 +181,8 @@ export default function ClassManageInlinePanel({
 
   const saveSettings = async () => {
     if (!settings) return
-    if (!settings.name.trim() || settings.name.trim().length < 2) {
-      setSettingsMsg('班级名称至少 2 个字符')
+    if (!settings.name.trim()) {
+      setSettingsMsg('请输入班级名称')
       return
     }
     try {
@@ -257,7 +257,7 @@ export default function ClassManageInlinePanel({
                   value={settings.name}
                   onChange={(e) => setSettings({ ...settings, name: e.target.value })}
                   className="input w-full text-sm"
-                  maxLength={20}
+                  maxLength={100}
                 />
               </div>
 
@@ -280,8 +280,8 @@ export default function ClassManageInlinePanel({
                   <label className="block text-xs font-medium text-foreground mb-1.5">最大成员数</label>
                   <input
                     type="number"
-                    min={2}
-                    max={200}
+                    min={1}
+                    max={10000}
                     value={settings.maxMembers}
                     onChange={(e) =>
                       setSettings({ ...settings, maxMembers: parseInt(e.target.value, 10) || 50 })

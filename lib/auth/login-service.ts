@@ -148,8 +148,8 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
       throw new LoginError('登录暂时受限，请稍后再试', 'RATE_LIMITED')
     }
 
-    await checkAccountLockout(sanitizedUsername)
-
+    // 先查用户再检查锁定：锁定计数按 userId 归一化，
+    // 避免同一账号交替用用户名/邮箱各失败 5 次绕过锁定（合计 10 次不触发）
     const user = await prisma.user.findFirst({
       where: {
         OR: [{ username: sanitizedUsername }, { email: sanitizedUsername }],
@@ -171,9 +171,13 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
         createdAt: true,
       },
     })
+    // 用户存在时用 userId 作锁定 key（双标识符共享计数）；
+    // 不存在时退化为输入标识符（防止对同一字符串高频尝试）
+    const lockKey = user ? user.id : sanitizedUsername.toLowerCase()
+    await checkAccountLockout(lockKey)
 
     if (!user) {
-      await recordLoginFailure(sanitizedUsername)
+      await recordLoginFailure(lockKey)
       throw new LoginError('用户名或密码错误', 'UNAUTHORIZED')
     }
 
@@ -183,11 +187,11 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
 
     const isPasswordValid = await bcrypt.compare(password, user.password)
     if (!isPasswordValid) {
-      await recordLoginFailure(sanitizedUsername)
+      await recordLoginFailure(lockKey)
       throw new LoginError('用户名或密码错误', 'UNAUTHORIZED')
     }
 
-    await clearLoginAttempts(sanitizedUsername)
+    await clearLoginAttempts(lockKey)
 
     const token = signToken({
       userId: user.id,
