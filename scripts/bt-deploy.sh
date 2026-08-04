@@ -710,7 +710,10 @@ fi
 # ============================================================
 step "清理 Docker 悬空资源"
 docker image prune -f >/dev/null || true
-docker container prune -f >/dev/null || true
+# 仅清理本项目（compose 项目名）的 stopped 容器，避免误删宝塔上其他项目的容器
+PROJECT_NAME="$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')"
+docker container prune -f --filter "label=com.docker.compose.project=${PROJECT_NAME}" >/dev/null 2>&1 || \
+  docker container prune -f --filter "label=com.docker.compose.project=$(basename "$PROJECT_DIR")" >/dev/null 2>&1 || true
 if [[ "$DO_PRUNE" -eq 1 ]]; then
   docker builder prune -af --filter "until=168h" >/dev/null 2>&1 || true
   info "已清理悬空镜像/容器，并清理 7 天前 BuildKit 缓存（--prune）"

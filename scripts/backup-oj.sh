@@ -5,6 +5,7 @@ APP_DIR="/www/wwwroot/dashan-oj"
 BACKUP_DIR="/www/backup/oj"
 
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR" 2>/dev/null || true
 log() { echo "$(date '+%F %T') $*" >> "$BACKUP_DIR/backup.log"; }
 
 # 项目目录不存在 / 无 compose 配置时直接失败（避免误备份到别的目录）
@@ -48,7 +49,11 @@ if ! docker exec "$MONGO_NAME" mongodump --uri="$DB_URL" --out="/dump/$STAMP" --
   log "[$STAMP] mongodump FAILED (container=$MONGO_NAME)"
   exit 1
 fi
-docker cp "$MONGO_NAME:/dump/$STAMP" "$BACKUP_DIR/$STAMP" >>"$BACKUP_DIR/backup.log" 2>&1
+if ! docker cp "$MONGO_NAME:/dump/$STAMP" "$BACKUP_DIR/$STAMP" >>"$BACKUP_DIR/backup.log" 2>&1; then
+  log "[$STAMP] docker cp FAILED (container=$MONGO_NAME)；容器内 /dump/$STAMP 已保留，请手动检查"
+  exit 1
+fi
+# 复制成功后才清理容器内 dump；失败时保留供人工恢复
 docker exec "$MONGO_NAME" rm -rf "/dump/$STAMP"
 
 # 保留 7 天
