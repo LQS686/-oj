@@ -15,6 +15,51 @@ import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 const MAX_LOGIN_ATTEMPTS = 5
 const LOCKOUT_DURATION_SEC = 15 * 60
 
+/**
+ * 账号锁内存退化存储（REDIS_URL 未配置时使用）：
+ * 与 Redis 版保持相同语义（次数 + 过期），避免单实例部署时账号锁定静默失效。
+ * 注意：多实例部署下内存锁不共享，生产仍应配置 Redis。
+ */
+const memoryLockStore = new Map<string, { count: number; expiresAt: number }>()
+const MEMORY_LOCK_MAX_ENTRIES = 5000
+
+function memoryLockGet(key: string): number {
+  const entry = memoryLockStore.get(key)
+  if (!entry) return 0
+  if (entry.expiresAt < Date.now()) {
+    memoryLockStore.delete(key)
+    return 0
+  }
+  return entry.count
+}
+
+function memoryLockIncr(key: string): number {
+  const now = Date.now()
+  const entry = memoryLockStore.get(key)
+  const next = entry && entry.expiresAt >= now
+    ? { count: entry.count + 1, expiresAt: entry.expiresAt }
+    : { count: 1, expiresAt: now + LOCKOUT_DURATION_SEC * 1000 }
+  memoryLockStore.set(key, next)
+  // LRU 上限保护：防止攻击者用随机用户名撑爆内存
+  if (memoryLockStore.size > MEMORY_LOCK_MAX_ENTRIES) {
+    const oldest = [...memoryLockStore.keys()].slice(0, memoryLockStore.size - MEMORY_LOCK_MAX_ENTRIES)
+    for (const k of oldest) memoryLockStore.delete(k)
+  }
+  return next.count
+}
+
+function memoryLockDelete(key: string): void {
+  memoryLockStore.delete(key)
+}
+
+/**
+ * 仅供测试使用：清空内存锁存储，避免模块级单例跨测试污染。
+ * 生产代码不调用。
+ */
+export function __resetMemoryLockStoreForTests(): void {
+  memoryLockStore.clear()
+}
+
 export class LoginError extends Error {
   constructor(message: string, public code: string = 'AUTH_ERROR') {
     super(message)
@@ -34,7 +79,6 @@ export interface UserResponse {
   nickname?: string
   avatar?: string
   bio?: string
-  rating: number
   rank: string
   color: string
   role: string
@@ -49,7 +93,19 @@ export interface LoginResult {
 
 async function checkAccountLockout(usernameOrEmail: string): Promise<void> {
   const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
-  if (!isRedisConfigured()) return
+  if (!isRedisConfigured()) {
+    // Redis 未配置：退化到进程内内存锁（单实例语义一致）
+    const attempts = memoryLockGet(key)
+    if (attempts >= MAX_LOGIN_ATTEMPTS) {
+      logger.warn('账号已锁定（内存退化存储），拒绝登录', {
+        usernameOrEmail,
+        attempts,
+        lockoutMinutes: LOCKOUT_DURATION_SEC / 60,
+      })
+      throw new LoginError('用户名或密码错误', 'UNAUTHORIZED')
+    }
+    return
+  }
   try {
     const client = getRedisClient()
     const attempts = await client.get(key)
@@ -76,8 +132,11 @@ async function checkAccountLockout(usernameOrEmail: string): Promise<void> {
 }
 
 async function recordLoginFailure(usernameOrEmail: string): Promise<void> {
-  if (!isRedisConfigured()) return
   const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
+  if (!isRedisConfigured()) {
+    memoryLockIncr(key)
+    return
+  }
   try {
     const client = getRedisClient()
     const multi = client.multi()
@@ -90,8 +149,11 @@ async function recordLoginFailure(usernameOrEmail: string): Promise<void> {
 }
 
 async function clearLoginAttempts(usernameOrEmail: string): Promise<void> {
-  if (!isRedisConfigured()) return
   const key = `auth:lockout:${usernameOrEmail.toLowerCase()}`
+  if (!isRedisConfigured()) {
+    memoryLockDelete(key)
+    return
+  }
   try {
     const client = getRedisClient()
     await client.del(key)
@@ -107,7 +169,6 @@ function mapUserToResponse(user: {
   nickname: string | null
   avatar: string | null
   bio: string | null
-  rating: number
   rank: string
   color: string
   role: string
@@ -121,7 +182,6 @@ function mapUserToResponse(user: {
     nickname: user.nickname ?? undefined,
     avatar: avatar ?? undefined,
     bio: user.bio ?? undefined,
-    rating: user.rating,
     rank: user.rank,
     color: user.color,
     role: user.role,
@@ -162,7 +222,6 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
         nickname: true,
         avatar: true,
         bio: true,
-        rating: true,
         rank: true,
         color: true,
         role: true,

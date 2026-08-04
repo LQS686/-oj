@@ -338,7 +338,6 @@ export async function batchRegisterUsers(
           email: sanitizedEmail,
           password: hashedPassword,
           nickname: sanitizedUsername,
-          rating: 1500,
           rank: roleDefaults.rank,
           color: roleDefaults.color,
           role: role,

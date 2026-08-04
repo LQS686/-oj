@@ -22,7 +22,6 @@ export interface HomeDashboardStats {
   weeklyPassRateDelta: number | null
   totalSolved: number
   weeklySubmissions: number
-  rating: number
   rank: string
 }
 
@@ -56,7 +55,7 @@ export interface HomeDashboardData {
 async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { rating: true, rank: true, solvedCount: true },
+    select: { rank: true, solvedCount: true },
   })
 
   const now = new Date()
@@ -113,7 +112,6 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
     weeklyPassRateDelta,
     totalSolved: user?.solvedCount || totalSolved,
     weeklySubmissions: weekSubs.length,
-    rating: user?.rating ?? 1500,
     rank: user?.rank ?? '新手',
   }
 }

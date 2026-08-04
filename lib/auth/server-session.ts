@@ -32,7 +32,6 @@ export async function getServerSessionUser(): Promise<UserData | null> {
       nickname: user.nickname || undefined,
       avatar: sanitizeAvatarUrl(user.avatar) || undefined,
       role: user.role,
-      rating: 0,
       rank: '',
       color: '',
       createdAt: '',

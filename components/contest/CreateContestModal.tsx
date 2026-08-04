@@ -48,6 +48,8 @@ export default function CreateContestModal({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState(defaultForm)
+  /** 编辑模式：原竞赛是否已有密码（API 不回传密码本身，仅回传 hasPassword） */
+  const [existingHasPassword, setExistingHasPassword] = useState(false)
 
   // 题目管理 state
   const [contestProblems, setContestProblems] = useState<Problem[]>([])
@@ -58,6 +60,7 @@ export default function CreateContestModal({
 
   const resetForm = useCallback(() => {
     setFormData(defaultForm())
+    setExistingHasPassword(false)
     setContestProblems([])
     setSearchQuery('')
     setSearchResults([])
@@ -126,6 +129,7 @@ export default function CreateContestModal({
           : []
 
         applyContest(contestData.data, problems)
+        setExistingHasPassword(!!(contestData.data as { hasPassword?: boolean }).hasPassword)
       } catch {
         if (!cancelled) {
           await dialog.alert({ tone: 'error', message: '网络错误，请稍后重试' })
@@ -232,7 +236,7 @@ export default function CreateContestModal({
     const duration = Math.floor(
       (new Date(formData.endTime).getTime() - new Date(formData.startTime).getTime()) / 60000
     )
-    return {
+    const payload: Record<string, unknown> = {
       title: formData.title,
       description: formData.description,
       type: formData.type,
@@ -240,10 +244,22 @@ export default function CreateContestModal({
       endTime: formData.endTime,
       duration,
       isPublic: formData.isPublic,
-      password: formData.isPublic ? undefined : formData.password,
       sealRankTime: formData.sealRankTime || null,
       problemIds: contestProblems.map(p => p.id),
     }
+    // 密码语义：公开 -> 清除；私有且填写 -> 设置新密码；
+    // 私有且留空 -> 编辑时保持原密码，新建时按空处理（由后端校验）
+    if (formData.isPublic) {
+      payload.password = null
+    } else if (formData.password.trim()) {
+      payload.password = formData.password
+    } else if (isEdit && existingHasPassword) {
+      // 留空：不传 password，服务端保持原哈希
+      delete payload.password
+    } else {
+      payload.password = formData.password
+    }
+    return payload
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -252,6 +268,10 @@ export default function CreateContestModal({
 
     if (new Date(formData.endTime) <= new Date(formData.startTime)) {
       setError('结束时间必须晚于开始时间')
+      return
+    }
+    if (!formData.isPublic && !formData.password.trim() && !(isEdit && existingHasPassword)) {
+      setError('私有竞赛请设置参赛密码')
       return
     }
 

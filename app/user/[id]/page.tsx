@@ -195,7 +195,6 @@ export default function UserProfilePage() {
                     {user.rank}
                   </span>
                 )}
-                <span className="tag tag-primary text-xs">Rating {user.rating}</span>
               </div>
 
               <p className="text-sm text-muted-foreground font-mono mt-1">@{user.username}</p>

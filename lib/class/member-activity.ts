@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 import type { ClassPermissionFlags } from './permission-flags'
 
 /* ============================================================================
@@ -98,7 +99,11 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
 
   const [submissions, notes] = await Promise.all([
     prisma.classAssignmentSubmission.findMany({
-      where: { assignment: { classId }, userId: memberId },
+      where: {
+        assignment: { classId },
+        userId: memberId,
+        status: { not: SubmissionStatus.REMOVED },
+      },
       orderBy: { submittedAt: 'desc' },
       take: 50,
       include: { assignment: { select: { title: true } } },
@@ -112,10 +117,18 @@ export async function getClassMemberActivity(classId: string, memberId: string) 
 
   const [totalSubmissions, acCount, totalNotes] = await Promise.all([
     prisma.classAssignmentSubmission.count({
-      where: { assignment: { classId }, userId: memberId },
+      where: {
+        assignment: { classId },
+        userId: memberId,
+        status: { not: SubmissionStatus.REMOVED },
+      },
     }),
     prisma.classAssignmentSubmission.count({
-      where: { assignment: { classId }, userId: memberId, status: 'AC' },
+      where: {
+        assignment: { classId },
+        userId: memberId,
+        status: SubmissionStatus.ACCEPTED,
+      },
     }),
     prisma.classNote.count({ where: { classId, authorId: memberId } }),
   ])

@@ -21,7 +21,6 @@ export interface UserProfile {
   email: string | null
   role: string
   isBanned: boolean
-  rating: number
   rank: string
   color: string
   createdAt: Date
@@ -40,7 +39,6 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
         email: true,
         role: true,
         isBanned: true,
-        rating: true,
         rank: true,
         color: true,
         createdAt: true,
@@ -108,7 +106,7 @@ export async function clearUserCache(userId: string, options?: { clearRanking?: 
   cache.delete(`user:stats:${userId}`)
   cache.delete(`auth:user:${userId}`)
   clearAuthUserCache(userId)
-  // 仅角色/封禁/rating/solved 等影响榜单的变更才清排行榜；资料/头像/邮箱不触发
+  // 仅角色/封禁/solved 等影响榜单的变更才清排行榜；资料/头像/邮箱不触发
   if (options?.clearRanking) {
     clearRankingCache()
   }

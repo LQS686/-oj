@@ -6,7 +6,6 @@ export interface User {
   bio: string | null
   avatar: string | null
   color: string | null
-  rating: number
   rank: string | null
   role: string
   solvedCount: number

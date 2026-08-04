@@ -15,8 +15,8 @@ export const GET = withApi.admin(async (req, _ctx) => {
     language?: string
     keyword?: string
   }>(req)
-  const page = parseInt(query.page || '1')
-  const pageSize = parseInt(query.pageSize || '50')
+  const page = Math.max(1, parseInt(query.page || '1') || 1)
+  const pageSize = Math.min(100, Math.max(1, parseInt(query.pageSize || '50') || 50))
   const status = query.status
   const language = query.language
   const keyword = query.keyword

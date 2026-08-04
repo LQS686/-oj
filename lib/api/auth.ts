@@ -8,7 +8,6 @@ export interface LoginResponse {
     nickname?: string
     avatar?: string
     bio?: string
-    rating: number
     rank: string
     color: string
     role: string
@@ -30,7 +29,6 @@ export interface UserData {
   nickname?: string
   avatar?: string
   bio?: string
-  rating: number
   rank: string
   color: string
   role: string

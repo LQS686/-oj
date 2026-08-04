@@ -1,122 +1,19 @@
 /**
  * lib/ranking/service.ts
- * 排行榜：综合榜、班级榜
+ * 排行榜：按解题数排名，支持总榜 / 月榜 / 周榜 / 日榜
  */
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/cache'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
+import { SubmissionStatus } from '@/lib/constants/submission-status'
 
-export type RankingType = 'global' | 'class' | 'contest' | 'weekly'
-
-export interface RankingItem {
-  rank: number
-  userId: string
-  username: string
-  nickname: string | null
-  avatar: string | null
-  score: number
-  solvedCount: number
-  submissionCount: number
-}
-
-export async function getGlobalRanking(limit = 100): Promise<RankingItem[]> {
-  return cache.get('ranking:global', [limit], async () => {
-    const users = await prisma.user.findMany({
-      take: limit,
-      orderBy: { rating: 'desc' },
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        avatar: true,
-        rating: true,
-        _count: { select: { submissions: true } },
-      },
-    })
-
-    const userIds = users.map(u => u.id)
-    const acCounts = await prisma.submission.groupBy({
-      by: ['userId'],
-      where: { userId: { in: userIds }, status: 'AC' },
-      _count: { id: true },
-    })
-    const acMap = new Map(acCounts.map(r => [r.userId, r._count.id]))
-
-    return users.map((u, idx) => ({
-      rank: idx + 1,
-      userId: u.id,
-      username: u.username,
-      nickname: u.nickname,
-      avatar: sanitizeAvatarUrl(u.avatar),
-      score: u.rating,
-      solvedCount: acMap.get(u.id) || 0,
-      submissionCount: u._count.submissions,
-    }))
-  }, { ttl: 60_000 })
-}
-
-export async function getClassRanking(classId: string, limit = 100): Promise<RankingItem[]> {
-  return cache.get('ranking:class', [classId, limit], async () => {
-    const members = await prisma.classMember.findMany({
-      where: { classId },
-      take: limit,
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            nickname: true,
-            avatar: true,
-            rating: true,
-            _count: { select: { submissions: true } },
-          },
-        },
-      },
-    })
-    members.sort((a, b) => (b.user.rating || 0) - (a.user.rating || 0))
-
-    const userIds = members.map(m => m.user.id)
-    const acCounts = await prisma.submission.groupBy({
-      by: ['userId'],
-      where: { userId: { in: userIds }, status: 'AC' },
-      _count: { id: true },
-    })
-    const acMap = new Map(acCounts.map(r => [r.userId, r._count.id]))
-
-    return members.map((m, idx) => ({
-      rank: idx + 1,
-      userId: m.user.id,
-      username: m.user.username,
-      nickname: m.user.nickname,
-      avatar: sanitizeAvatarUrl(m.user.avatar),
-      score: m.user.rating,
-      solvedCount: acMap.get(m.user.id) || 0,
-      submissionCount: m.user._count.submissions,
-    }))
-  }, { ttl: 60_000 })
-}
-
-export async function getMyRank(userId: string) {
-  return cache.get('ranking:myRank', [userId], async () => {
-    const me = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { rating: true },
-    })
-    if (!me) return null
-    const higher = await prisma.user.count({ where: { rating: { gt: me.rating } } })
-    return { rank: higher + 1, rating: me.rating }
-  }, { ttl: 60_000 })
-}
-
-/* ============================================================================
- * 业务封装：原 /api/rankings 路由中的复杂逻辑（rating / solved）
- * ========================================================================== */
+/** 排行榜时间维度：total 总榜 / month 月榜 / week 周榜 / day 日榜 */
+export type RankingPeriod = 'total' | 'month' | 'week' | 'day'
 
 export interface RankingUser {
   id: string
   username: string
   nickname: string | null
-  rating: number
   solvedCount: number
   rank: string | null
   color: string | null
@@ -130,44 +27,141 @@ export interface RankingPage {
   pagination: { page: number; limit: number; total: number; totalPages: number }
 }
 
+/** 周期起点（本地时区自然日/周/月） */
+function periodStart(period: RankingPeriod, now: Date = new Date()): Date | null {
+  if (period === 'total') return null
+  const d = new Date(now)
+  if (period === 'day') {
+    d.setHours(0, 0, 0, 0)
+    return d
+  }
+  if (period === 'week') {
+    // 本周一 0 点
+    const day = d.getDay() === 0 ? 7 : d.getDay()
+    d.setDate(d.getDate() - (day - 1))
+    d.setHours(0, 0, 0, 0)
+    return d
+  }
+  // month：本月 1 日 0 点
+  d.setDate(1)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+/** 周期内每个用户的 AC 去重题数（按 userId+problemId 聚合去重） */
+async function getPeriodSolvedMap(start: Date): Promise<Map<string, number>> {
+  const rows = await prisma.submission.groupBy({
+    by: ['userId', 'problemId'],
+    where: {
+      status: SubmissionStatus.ACCEPTED,
+      submittedAt: { gte: start },
+    },
+  })
+  const map = new Map<string, number>()
+  for (const r of rows) {
+    map.set(r.userId, (map.get(r.userId) || 0) + 1)
+  }
+  return map
+}
+
+const USER_LIST_SELECT = {
+  id: true,
+  username: true,
+  nickname: true,
+  solvedCount: true,
+  rank: true,
+  color: true,
+  avatar: true,
+} as const
+
 /**
- * 综合 / 已解决 排行榜（已禁用户剔除，带缓存 60s）
+ * 排行榜（已禁用户剔除，带缓存 60s）
+ * - total：按全量 AC 去重题数（solvedCount）
+ * - month/week/day：按周期内 AC 去重题数
  */
-export async function listRankingByType(type: 'rating' | 'solved', page: number, limit: number): Promise<RankingPage> {
-  return cache.get('ranking:list', [type, page, limit], async () => {
-    const orderBy: Record<string, string>[] = type === 'solved'
-      ? [{ solvedCount: 'desc' }, { rating: 'desc' }]
-      : [{ rating: 'desc' }, { solvedCount: 'desc' }]
+export async function listRankingByPeriod(
+  period: RankingPeriod,
+  page: number,
+  limit: number
+): Promise<RankingPage> {
+  return cache.get('ranking:list', [period, page, limit], async () => {
+    const start = periodStart(period)
 
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        where: { isBanned: false },
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy,
-        select: {
-          id: true,
-          username: true,
-          nickname: true,
-          rating: true,
-          solvedCount: true,
-          rank: true,
-          color: true,
-          avatar: true,
+    // 总榜：直接读 denormalized solvedCount（含 0 分用户展示，与旧「解题榜」一致）
+    if (start === null) {
+      const [users, total] = await Promise.all([
+        prisma.user.findMany({
+          where: { isBanned: false },
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: [{ solvedCount: 'desc' }, { id: 'asc' }],
+          select: USER_LIST_SELECT,
+        }),
+        prisma.user.count({ where: { isBanned: false } }),
+      ])
+
+      const rankedUsers: RankingUser[] = users.map((user, index) => ({
+        id: user.id,
+        username: user.username,
+        nickname: user.nickname,
+        solvedCount: user.solvedCount,
+        rank: user.rank,
+        color: user.color,
+        avatar: sanitizeAvatarUrl(user.avatar),
+        position: (page - 1) * limit + index + 1,
+        solvedProblems: user.solvedCount,
+      }))
+
+      return {
+        users: rankedUsers,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
         },
-      }),
-      prisma.user.count({ where: { isBanned: false } }),
-    ])
+      }
+    }
 
-    const rankedUsers: RankingUser[] = users.map((user, index) => ({
-      ...user,
-      avatar: sanitizeAvatarUrl(user.avatar),
-      position: (page - 1) * limit + index + 1,
-      solvedProblems: user.solvedCount,
-    }))
+    // 周期榜：按周期内 AC 去重题数降序，仅展示周期内有 AC 的用户
+    const solvedMap = await getPeriodSolvedMap(start)
+    const entries = Array.from(solvedMap.entries())
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1])
+
+    const total = entries.length
+    const pageEntries = entries.slice((page - 1) * limit, (page - 1) * limit + limit)
+
+    let users: RankingUser[] = []
+    if (pageEntries.length > 0) {
+      const userIds = pageEntries.map(([userId]) => userId)
+      const rows = await prisma.user.findMany({
+        where: { id: { in: userIds }, isBanned: false },
+        select: USER_LIST_SELECT,
+      })
+      const rowMap = new Map(rows.map((u) => [u.id, u]))
+      const scoreMap = new Map(pageEntries)
+
+      users = pageEntries
+        .filter(([userId]) => rowMap.has(userId))
+        .map(([userId], index) => {
+          const user = rowMap.get(userId)!
+          return {
+            id: user.id,
+            username: user.username,
+            nickname: user.nickname,
+            solvedCount: scoreMap.get(userId) || 0,
+            rank: user.rank,
+            color: user.color,
+            avatar: sanitizeAvatarUrl(user.avatar),
+            position: (page - 1) * limit + index + 1,
+            solvedProblems: scoreMap.get(userId) || 0,
+          }
+        })
+    }
 
     return {
-      users: rankedUsers,
+      users,
       pagination: {
         page,
         limit,
@@ -179,54 +173,50 @@ export async function listRankingByType(type: 'rating' | 'solved', page: number,
 }
 
 /**
- * 当前用户的实时排名（rating / solved 模式分别计算）
+ * 当前用户的实时排名（按周期计算；total 读 solvedCount，周期榜按窗口内 AC 去重题数）
  */
-export async function getMyRankAdvanced(userId: string, type: 'rating' | 'solved' = 'rating') {
-  return cache.get('ranking:myRankAdvanced', [userId, type], async () => {
-    let rank = 0
-    if (type === 'solved') {
-      const currentUser = await prisma.user.findUnique({
+export async function getMyRankAdvanced(userId: string, period: RankingPeriod = 'total') {
+  return cache.get('ranking:myRankAdvanced', [userId, period], async () => {
+    const start = periodStart(period)
+    let myScore = 0
+
+    if (start === null) {
+      const me = await prisma.user.findUnique({
         where: { id: userId },
-        select: { solvedCount: true, rating: true },
+        select: { solvedCount: true },
       })
-      if (currentUser) {
-        const count = await prisma.user.count({
-          where: {
-            isBanned: false,
-            OR: [
-              { solvedCount: { gt: currentUser.solvedCount } },
-              { solvedCount: currentUser.solvedCount, rating: { gt: currentUser.rating } },
-            ],
-          },
-        })
-        rank = count + 1
-      }
-    } else {
-      const currentUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { rating: true, solvedCount: true },
+      if (!me) return null
+      myScore = me.solvedCount
+      const higher = await prisma.user.count({
+        where: { isBanned: false, solvedCount: { gt: myScore } },
       })
-      if (currentUser) {
-        const count = await prisma.user.count({
-          where: {
-            isBanned: false,
-            OR: [
-              { rating: { gt: currentUser.rating } },
-              { rating: currentUser.rating, solvedCount: { gt: currentUser.solvedCount } },
-            ],
-          },
-        })
-        rank = count + 1
-      }
+      return { rank: higher + 1, solvedCount: myScore, userId }
     }
-    return { rank, userId }
+
+    const solvedMap = await getPeriodSolvedMap(start)
+    // 周期榜需排除被封禁用户（与 total 榜一致）
+    myScore = solvedMap.get(userId) || 0
+    const bannedIds = new Set(
+      (
+        await prisma.user.findMany({
+          where: { isBanned: true },
+          select: { id: true },
+        })
+      ).map((u) => u.id)
+    )
+    let higher = 0
+    for (const [uid, count] of solvedMap) {
+      if (bannedIds.has(uid)) continue
+      if (count > myScore) higher++
+    }
+    return { rank: higher + 1, solvedCount: myScore, userId }
   }, { ttl: 30_000 })
 }
 
 /**
  * 清空所有排行榜相关缓存
  * （adminUpdateUser / adminDeleteUser / batchUpdateUserRole / batchDeleteUsers 等
- *  影响 rating / solvedCount / isBanned 的操作都需要清榜单）
+ *  影响 solvedCount / isBanned 的操作都需要清榜单）
  */
 export function clearRankingCache() {
   cache.deleteByPrefix('ranking:global')

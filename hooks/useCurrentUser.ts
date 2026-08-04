@@ -17,7 +17,7 @@ export interface CurrentUser {
   nickname: string | null
   avatar: string | null
   bio: string | null
-  rating: number
+  rank: string
   role: string
   createdAt: string
   updatedAt?: string

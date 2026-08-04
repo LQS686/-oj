@@ -237,9 +237,13 @@ export default function MemberPermissionsPage() {
         <div className="divide-y divide-border">
           {(Object.keys(permissionDescriptions) as Array<keyof Permissions>).map((key) => {
             const permission = permissionDescriptions[key]
-            const isDisabled =
+            // 与后端 canManageMember 对齐：assistant 只能管理 student；
+            // owner 全禁、assistant 禁 canManageMembers、assistant 不能改 assistant/owner
+            const targetNotManageable =
               memberInfo.role === 'owner' ||
-              (memberInfo.role === 'assistant' && key === 'canManageMembers')
+              (memberInfo.role === 'assistant' &&
+                (key === 'canManageMembers' || currentUserRole !== 'owner'))
+            const isDisabled = targetNotManageable
 
             return (
               <div
@@ -292,7 +296,11 @@ export default function MemberPermissionsPage() {
         <button
           type="button"
           onClick={handleSavePermissions}
-          disabled={saving || memberInfo.role === 'owner'}
+          disabled={
+            saving ||
+            memberInfo.role === 'owner' ||
+            (memberInfo.role === 'assistant' && currentUserRole !== 'owner')
+          }
           className="btn btn-primary"
         >
           {saving ? '保存中...' : '保存权限'}
@@ -301,6 +309,9 @@ export default function MemberPermissionsPage() {
 
       {memberInfo.role === 'owner' && (
         <p className="mt-3 text-center text-sm text-muted-foreground">班主任拥有所有权限，无法修改</p>
+      )}
+      {memberInfo.role === 'assistant' && currentUserRole !== 'owner' && (
+        <p className="mt-3 text-center text-sm text-muted-foreground">仅班主任可修改助教权限</p>
       )}
     </ClassWorkspaceShell>
   )

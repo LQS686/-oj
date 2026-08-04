@@ -22,7 +22,7 @@ interface SearchResult {
  username: string
  nickname: string | null
  avatar: string | null
- rating: number
+ solvedCount: number
  }>
  contests: Array<{
  id: string
@@ -186,7 +186,7 @@ export default function SearchBar() {
  {user.nickname || user.username}
  </div>
  <div className="text-xs text-muted-foreground">
- {user.rating} 分
+ {user.solvedCount} 题
  </div>
  </div>
  </Link>

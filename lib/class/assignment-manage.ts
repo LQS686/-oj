@@ -24,7 +24,8 @@ export async function buildClassAssignmentDetail(
   classId: string,
   assignmentId: string,
   viewerUserId: string,
-  viewerRole: string
+  viewerRole: string,
+  viewerPermissions?: Record<string, boolean>
 ) {
   const detail = await getClassAssignmentDetail(classId, assignmentId)
   if (!detail) return null
@@ -89,7 +90,9 @@ export async function buildClassAssignmentDetail(
 
   const userSubmissions = submissions.filter((s) => s.userId === viewerUserId)
   const viewerIsClassAdmin = isClassAdminApiRole(viewerRole)
-  const canViewAllSubmissions = viewerIsClassAdmin
+  // 完成情况可见性：班级 admin 恒可见；被授予 canViewStats 权限位的成员也可见
+  const canViewAllSubmissions =
+    viewerIsClassAdmin || viewerPermissions?.canViewStats === true
 
   // 列表主键 = 主 Submission.id；assignmentSubmissionId 仅为作业记录元数据
   const assignmentSubmissionIds = submissions.map((s) => s.id)

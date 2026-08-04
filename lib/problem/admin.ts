@@ -303,19 +303,29 @@ export async function createAdminProblem(
 
   if (testCases && Array.isArray(testCases) && testCases.length > 0) {
     problemData.testCases = {
-      create: testCases.map((tc: Record<string, unknown>, idx: number) => ({
-        input: String(tc.input || ''),
-        output: String(tc.output || ''),
-        isSample: Boolean(tc.isSample),
-        score: Number(tc.score) || 10,
-        timeLimit:
-          tc.timeLimit === undefined || tc.timeLimit === null ? null : Number(tc.timeLimit),
-        memoryLimit:
-          tc.memoryLimit === undefined || tc.memoryLimit === null
-            ? null
-            : Number(tc.memoryLimit),
-        orderIndex: idx,
-      })),
+      create: testCases.map((tc: Record<string, unknown>, idx: number) => {
+        // 单测点限制范围校验：与题目主表一致（1-30000ms / 1-1024MB），
+        // 避免误配超大值导致该测点可无限运行占用评测槽位
+        const tcTime =
+          tc.timeLimit === undefined || tc.timeLimit === null ? null : Number(tc.timeLimit)
+        const tcMemory =
+          tc.memoryLimit === undefined || tc.memoryLimit === null ? null : Number(tc.memoryLimit)
+        if (tcTime !== null && (Number.isNaN(tcTime) || tcTime < 1 || tcTime > 30000)) {
+          throw new ApiError('INVALID_TIME_LIMIT', '测试点时间限制必须在1-30000ms之间', 400)
+        }
+        if (tcMemory !== null && (Number.isNaN(tcMemory) || tcMemory < 1 || tcMemory > 1024)) {
+          throw new ApiError('INVALID_MEMORY_LIMIT', '测试点内存限制必须在1-1024MB之间', 400)
+        }
+        return {
+          input: String(tc.input || ''),
+          output: String(tc.output || ''),
+          isSample: Boolean(tc.isSample),
+          score: Number(tc.score) || 10,
+          timeLimit: tcTime,
+          memoryLimit: tcMemory,
+          orderIndex: idx,
+        }
+      }),
     }
   }
 
@@ -506,6 +516,22 @@ export async function updateAdminProblem(
   } else if (body.comparisonMode !== undefined && body.comparisonMode !== 'special-judge') {
     if (body.spjCode === undefined) {
       updateData.spjCode = null
+    }
+  }
+
+  // 单测点限制范围校验（与题目主表一致：1-30000ms / 1-1024MB）
+  if (body.testCases && Array.isArray(body.testCases)) {
+    for (const tc of body.testCases as Record<string, unknown>[]) {
+      const tcTime =
+        tc.timeLimit === undefined || tc.timeLimit === null ? null : Number(tc.timeLimit)
+      const tcMemory =
+        tc.memoryLimit === undefined || tc.memoryLimit === null ? null : Number(tc.memoryLimit)
+      if (tcTime !== null && (Number.isNaN(tcTime) || tcTime < 1 || tcTime > 30000)) {
+        throw new ApiError('INVALID_TIME_LIMIT', '测试点时间限制必须在1-30000ms之间', 400)
+      }
+      if (tcMemory !== null && (Number.isNaN(tcMemory) || tcMemory < 1 || tcMemory > 1024)) {
+        throw new ApiError('INVALID_MEMORY_LIMIT', '测试点内存限制必须在1-1024MB之间', 400)
+      }
     }
   }
 

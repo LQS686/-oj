@@ -44,7 +44,6 @@ import {
 } from '@/hooks/useSubmissionResultFlow'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import EditAssignmentModal from '@/components/class/EditAssignmentModal'
-import { canManageContent } from '@/lib/permissions'
 import { isClassAdminApiRole, isClassStudentApiRole, normalizeClassRoleToApi } from '@/lib/class/roles'
 import { formatDateTime } from '@/lib/utils'
 import SubmissionResultModal from '@/components/submission/SubmissionResultModal'
@@ -114,7 +113,6 @@ export default function AssignmentDetailPage() {
  const [classMembers, setClassMembers] = useState<ClassMember[]>([])
  const [userRole, setUserRole] = useState<string>('student')
 const [editOpen, setEditOpen] = useState(false)
- const [canManage, setCanManage] = useState(false)
 
  // 顶层：简介 / 题目 / 完成情况（管理员）
  type ViewTab = 'info' | 'problems' | 'completion'
@@ -162,14 +160,6 @@ const [editOpen, setEditOpen] = useState(false)
  if (r !== userRole) setUserRole(r)
  }
  }, [user, classMembers, userRole])
-
- useDeferredEffect(() => {
- if (!user) {
- setCanManage(false)
- return
- }
- setCanManage(canManageContent(user))
- }, [user])
 
  const fetchAssignment = useCallback(async () => {
  try {
@@ -398,9 +388,19 @@ const [editOpen, setEditOpen] = useState(false)
  }
  }
 
- /** 班级班主任/助教，或站点管理员/教师，均可查看完成情况 */
- const isAdminOrOwner =
-   isClassAdminApiRole(userRole) || canManage
+ /** 编辑/删除等管理操作：仅班级班主任/助教（站点 canManage 不授予班级操作权限，
+  * 避免站内教师以学生身份加入班级时误显按钮 → 后端 403） */
+ const canManageAssignment = isClassAdminApiRole(userRole)
+ // 完成情况可见性：班级 admin 恒可见；被授予 canViewStats 权限位的成员也可见
+ const canViewCompletion =
+   canManageAssignment ||
+   (() => {
+     const me = (Array.isArray(classMembers) ? classMembers : []).find(
+       (m: ClassMember) => m.userId === user?.id
+     )
+     return (me as { permissions?: { canViewStats?: boolean } } | undefined)?.permissions?.canViewStats === true
+   })()
+ const isAdminOrOwner = canViewCompletion
 
  if (loading) {
  return (
@@ -445,7 +445,7 @@ const [editOpen, setEditOpen] = useState(false)
    router.replace(`${window.location.pathname}?${tabParams.toString()}`, { scroll: false })
  }
 
- // 成员角色未就绪时 canManage 仍可能为 true（站内教师）；班级助教需等 members
+ // 成员角色未就绪时默认 student；班级角色就绪后由 useDeferredEffect 更新
  const effectiveViewTab: ViewTab =
    viewTab === 'completion' && !isAdminOrOwner ? 'info' : viewTab
 
@@ -531,7 +531,7 @@ const [editOpen, setEditOpen] = useState(false)
      </div>
    }
    actions={
-     isAdminOrOwner ? (
+     canManageAssignment ? (
        <div className="flex items-center gap-1.5 shrink-0">
          <button
            type="button"
@@ -563,7 +563,7 @@ const [editOpen, setEditOpen] = useState(false)
          content={assignment.description}
          emptyTitle="暂无作业说明"
          emptyHint={
-           isAdminOrOwner
+           canManageAssignment
              ? '可点击顶部「编辑」，补充要求、参考资料与注意事项（支持 Markdown）'
              : assignment.status === 'upcoming'
                ? '老师尚未填写说明，开始前可先查看题目'

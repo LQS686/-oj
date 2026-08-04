@@ -32,7 +32,8 @@ export const POST = withApi.admin(async (_req, ctx) => {
   })
 
   cache.delete(CacheKeys.contest.byId(id))
-  cache.deleteByPrefix('contest:rank')
+  // 仅失效当前竞赛的榜单缓存，避免误伤其他竞赛
+  cache.deleteByPrefix(CacheKeys.contest.rankPrefix(id))
 
   return ok({ message: '已解冻封榜' })
 })

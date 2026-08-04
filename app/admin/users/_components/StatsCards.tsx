@@ -6,15 +6,16 @@ import { getRoleDisplay, getWeeklyGrowth, ROLE_ORDER, ROLE_BAR_COLOR } from '../
 
 /**
  * 顶部统计卡：总用户数（含本周增长） + 角色分布条形图。
+ * total：全量用户数（来自分页 total，避免仅当前页导致失真）。
  */
-export function StatsCards({ users }: { users: User[] }) {
+export function StatsCards({ users, total }: { users: User[]; total: number }) {
   const weeklyGrowth = getWeeklyGrowth(users)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="card p-4">
         <div className="text-muted-foreground text-sm">总用户数</div>
-        <div className="text-3xl font-bold text-foreground mt-1">{users.length}</div>
+        <div className="text-3xl font-bold text-foreground mt-1">{total}</div>
         {weeklyGrowth > 0 && (
           <div className="text-xs text-secondary-light mt-2 flex items-center gap-1">
             <TrendingUp className="w-3 h-3" />

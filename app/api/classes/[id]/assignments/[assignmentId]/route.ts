@@ -29,8 +29,9 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const member = await getCurrentClassMember(id, user.id)
   if (!member) throw403('只有班级成员可以查看作业')
   const memberRole = member!.role
+  const memberPermissions = (member as { permissions?: Record<string, boolean> }).permissions || {}
 
-  const detail = await buildClassAssignmentDetail(id, assignmentId, user.id, memberRole)
+  const detail = await buildClassAssignmentDetail(id, assignmentId, user.id, memberRole, memberPermissions)
   if (!detail) throw404('作业不存在')
   return ok(detail)
 })

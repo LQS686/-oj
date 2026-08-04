@@ -30,6 +30,8 @@ class BufferedStreamReader {
   private streamEnded: boolean
   /** B-P1-4：最近一次 nextUntilNewLineBuf 读取的行是否因超长被截断（尾部被丢弃） */
   lastLineTruncated = false
+  /** B-P1-4：最近一次 nextUntilSpace 读取的 token 是否因超长被截断（尾部被丢弃） */
+  lastTokenTruncated = false
 
   constructor(stream: Readable) {
     this.stream = stream
@@ -202,7 +204,10 @@ class BufferedStreamReader {
   }
 
   // 跳过前导空白后读取一个 token，最多 maxLen 字符
+  // B-P1-4：token 超长（>maxLen）时置 lastTokenTruncated=true，
+  // 调用方据此判 WA，避免「>256 字节 token 尾部差异被忽略 → 误判 AC」
   async nextUntilSpace(maxLen = 256): Promise<string> {
+    this.lastTokenTruncated = false
     while (true) {
       await this.ensureData()
       if (this.pos >= this.buffer.length) break
@@ -234,11 +239,23 @@ class BufferedStreamReader {
       parts.push(slice.subarray(0, take))
       taken += take
       this.pos += take
-      if (take < end) break // hit maxLen
+      if (take < end) {
+        // 命中 maxLen 且本块内 token 仍有剩余 → 截断
+        this.lastTokenTruncated = true
+        break
+      }
       // 若停在空白前，下一轮 while 会 break；若本块扫完非空白，继续
       if (this.pos < this.buffer.length) {
         const c = this.buffer[this.pos]
         if (c === SPACE || c === TAB || c === CR || c === LF) break
+      }
+    }
+
+    // 恰好读满 maxLen 且其后仍是非空白 → 也视为截断（尾部被丢弃）
+    if (!this.lastTokenTruncated && taken >= maxLen && !(await this.eof())) {
+      const c = this.buffer[this.pos]
+      if (c !== SPACE && c !== TAB && c !== CR && c !== LF) {
+        this.lastTokenTruncated = true
       }
     }
 
@@ -380,6 +397,16 @@ async function compareIgnoreSpaces(
     const userToken = await userReader.nextUntilSpace()
     const stdToken = await stdReader.nextUntilSpace()
 
+    // B-P1-4：token 超长（>256 字节）被截断后无法精确比较，直接判 WA，
+    // 避免「前 256 字符相同、尾部差异被忽略 → 误判 AC」
+    if (userReader.lastTokenTruncated || stdReader.lastTokenTruncated) {
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${userReader.line()} 行，token 长度超过 256 字节，无法精确比较`,
+      }
+    }
+
     if (userToken === stdToken) {
       const userEof = await userReader.eof()
       const stdEof = await stdReader.eof()
@@ -420,6 +447,15 @@ async function compareRealNumbers(
   while (true) {
     const userToken = await userReader.nextUntilSpace()
     const stdToken = await stdReader.nextUntilSpace()
+
+    // B-P1-4：token 超长被截断时 parseFloat 结果可能失真，直接判 WA
+    if (userReader.lastTokenTruncated || stdReader.lastTokenTruncated) {
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${userReader.line()} 行，token 长度超过 256 字节，无法精确比较`,
+      }
+    }
 
     const userEmpty = userToken === '' && (await userReader.eof())
     const stdEmpty = stdToken === '' && (await stdReader.eof())

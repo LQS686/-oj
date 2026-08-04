@@ -8,7 +8,6 @@ import {
   Clock,
   CheckCircle2,
   Calendar,
-  BarChart3,
   TrendingUp,
   ChevronRight,
   Loader2,
@@ -183,7 +182,7 @@ export function DashboardView() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-stagger-in">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 animate-stagger-in">
         <div className="card-static rounded-xl p-4">
           <div className="flex items-center gap-2.5 mb-2.5">
             <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -236,19 +235,6 @@ export function DashboardView() {
           ) : (
             <div className="text-xs text-muted-foreground mt-1">暂无上周对比</div>
           )}
-        </div>
-
-        <div className="card-static rounded-xl p-4">
-          <div className="flex items-center gap-2.5 mb-2.5">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-              <BarChart3 className="w-[18px] h-[18px] text-primary" />
-            </div>
-            <span className="text-sm text-muted-foreground font-medium">Rating</span>
-          </div>
-          <div className="text-2xl font-bold text-foreground tabular-nums">{stats.rating}</div>
-          <div className="text-xs text-primary mt-1">
-            {isStaff ? '竞赛积分' : stats.rank}
-          </div>
         </div>
       </div>
 

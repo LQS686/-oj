@@ -3,6 +3,7 @@
  * 管理员用户管理：角色分配、用户 CRUD、批量操作
  */
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { isSystemAdmin, isAdmin } from '@/lib/permissions'
 import { AppError } from '@/lib/errors'
 import { clearUserCache } from './profile'
@@ -46,7 +47,12 @@ export function assertAssignableRole(
 /**
  * 列出所有用户（管理员）
  */
-export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: number }) {
+export async function listAllUsersForAdmin(opts?: {
+  page?: number
+  pageSize?: number
+  search?: string
+  role?: string
+}) {
   const page = opts?.page
   const rawPageSize = opts?.pageSize
   const pageSize =
@@ -55,10 +61,26 @@ export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: nu
     typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
   const take = usePaging ? (pageSize as number) : 100
   const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
+
+  // 服务端过滤：搜索（用户名/邮箱/昵称，模糊）+ 角色（精确）
+  const where: Prisma.UserWhereInput = {}
+  const search = opts?.search?.trim()
+  if (search) {
+    where.OR = [
+      { username: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+      { nickname: { contains: search, mode: 'insensitive' } },
+    ]
+  }
+  if (opts?.role && opts.role !== 'all') {
+    where.role = opts.role as Prisma.UserWhereInput['role']
+  }
+
   const [data, total] = await Promise.all([
     prisma.user.findMany({
       skip,
       take,
+      where,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -66,7 +88,6 @@ export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: nu
         email: true,
         nickname: true,
         avatar: true,
-        rating: true,
         rank: true,
         role: true,
         isBanned: true,
@@ -79,7 +100,7 @@ export async function listAllUsersForAdmin(opts?: { page?: number; pageSize?: nu
         },
       },
     }),
-    prisma.user.count(),
+    prisma.user.count({ where }),
   ])
   return {
     data: data.map((u) => ({ ...u, avatar: sanitizeAvatarUrl(u.avatar) })),

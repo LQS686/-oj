@@ -91,7 +91,6 @@ export interface RegisterResult {
   username: string
   email: string
   nickname: string | null
-  rating: number
   rank: string
   color: string
   role: string
@@ -135,7 +134,6 @@ export async function registerNewUser(input: {
           email,
           password: input.hashedPassword,
           nickname: input.sanitizedNickname,
-          rating: 1500,
           rank: isFirstUser ? '管理员' : '新手',
           color: isFirstUser ? '#FF6B6B' : '#808080',
           role: isFirstUser ? 'SYSTEM_ADMIN' : 'STUDENT',
@@ -146,7 +144,6 @@ export async function registerNewUser(input: {
           username: true,
           email: true,
           nickname: true,
-          rating: true,
           rank: true,
           color: true,
           role: true,

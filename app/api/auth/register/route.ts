@@ -19,15 +19,22 @@ import { trimAll } from '@/lib/sanitize'
 import { getSystemSettings } from '@/lib/settings'
 import { setAuthCookie } from '@/lib/auth/cookie'
 import { setCsrfCookie, generateCsrfToken } from '@/lib/security/csrf'
+import { cache } from '@/lib/cache'
+
+const USER_COUNT_KEY = 'user:count:total'
 
 export const POST = withApi.public(async (req) => {
-  // 首用户判定优先于「关闭注册」：空库必须允许创建第一个 SYSTEM_ADMIN
-  const userCount = await prisma.user.count()
-  const isFirstUser = userCount === 0
-
   const settings = await getSystemSettings()
-  if (!settings.allowRegistration && !isFirstUser) {
-    return fail('FORBIDDEN', '系统已关闭注册功能', 403)
+  // 首用户判定优先于「关闭注册」：空库必须允许创建第一个 SYSTEM_ADMIN。
+  // 仅在「关闭注册」时才查询全表 count（短 TTL 缓存 + 注册成功后失效），
+  // 注册开放时零成本，避免攻击者高频触发全集合 count 打满 Mongo。
+  if (!settings.allowRegistration) {
+    const userCount = await cache.get(USER_COUNT_KEY, [], () => prisma.user.count(), {
+      ttl: 5_000,
+    })
+    if (userCount > 0) {
+      return fail('FORBIDDEN', '系统已关闭注册功能', 403)
+    }
   }
 
   const body = await readJson<{
@@ -69,6 +76,9 @@ export const POST = withApi.public(async (req) => {
     sanitizedNickname,
     hashedPassword,
   })
+
+  // 注册成功：使 user:count 缓存失效，避免窗口内后续注册读到旧值
+  cache.delete(USER_COUNT_KEY)
 
   const token = signToken({
     userId: user.id,

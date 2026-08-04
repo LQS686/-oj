@@ -30,7 +30,6 @@ model User {
   nickname      String?
   avatar        String?
   bio           String?
-  rating        Int       @default(1500)
   solvedCount   Int       @default(0) // 解题数
   rank          String    @default("新手")
   color         String    @default("#808080")
@@ -80,7 +79,6 @@ model User {
   // 班级作业题目计时进度（非游戏化奖励）
   problemProgress        ClassAssignmentProblemProgress[]
 
-  @@index([rating])
   @@index([solvedCount])
   @@index([role])
   @@index([previousEmail])

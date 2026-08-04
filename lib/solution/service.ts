@@ -177,11 +177,11 @@ export async function listSolutionsWithPermission(
   if (!realProblemId) return { found: false as const }
 
   const flags = await resolveSolutionHideFlags(viewer, realProblemId, isAssignmentContext)
-  // 作者本人在该题发布过题解（含待审核/驳回/下架）时跳过 90 分门槛，
+  // 作者本人在该题有「已通过」题解时跳过 90 分门槛（待审核/驳回/下架不豁免）；
   // 列表过滤仍保证只展示「已通过 + 自己的全部状态」
   const isAuthor = viewer
     ? await prisma.solution.findFirst({
-        where: { problemId: realProblemId, authorId: viewer.id },
+        where: { problemId: realProblemId, authorId: viewer.id, status: 'approved' },
         select: { id: true },
       }).then(Boolean)
     : false
@@ -245,6 +245,15 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
   }
   if (typeof input.content !== 'string' || input.content.length < 10 || input.content.length > 50000) {
     throw AppError.badRequest('VALIDATION', '内容长度需在 10-50000 字符之间')
+  }
+  // 代码片段防撑库：上限 512KB（附代码的题解）
+  if (input.code !== undefined && input.code !== null && input.code.length > 512 * 1024) {
+    throw AppError.badRequest('VALIDATION', '代码片段长度不能超过 512KB')
+  }
+  if (input.codeLanguage !== undefined && input.codeLanguage !== null) {
+    if (String(input.codeLanguage).length > 32) {
+      throw AppError.badRequest('VALIDATION', '代码语言标识不合法')
+    }
   }
   const { resolveProblemId } = await import('./problem-resolver')
   const realProblemId = await resolveProblemId(input.problemId)
@@ -418,8 +427,14 @@ export async function updateUserSolution(
   }
   if (input.codeLanguage !== undefined) {
     data.codeLanguage = input.codeLanguage === null ? null : String(input.codeLanguage)
+    if (data.codeLanguage !== null && data.codeLanguage.length > 32) {
+      throw AppError.badRequest('VALIDATION', '代码语言标识不合法')
+    }
   }
   if (input.code !== undefined) {
+    if (input.code !== null && input.code.length > 512 * 1024) {
+      throw AppError.badRequest('VALIDATION', '代码片段长度不能超过 512KB')
+    }
     data.code = input.code === null ? null : String(input.code)
   }
   const updated = await prisma.solution.update({
@@ -475,10 +490,21 @@ export async function checkSolutionPermission(
   if (!realProblemId) {
     throw AppError.notFound('题目不存在')
   }
+  // 与列表逻辑一致：作者在该题有「已通过」题解时传入 isAuthor 豁免 90 分门槛，
+  // 避免「预检拒绝但列表放行」的前后端不一致
+  const isAuthor = viewer
+    ? await prisma.solution.findFirst({
+        where: { problemId: realProblemId, authorId: viewer.id, status: 'approved' },
+        select: { id: true },
+      }).then(Boolean)
+    : false
   const result = await canViewSolutions(
     viewer,
     realProblemId,
-    await resolveSolutionHideFlags(viewer, realProblemId, isAssignmentContext)
+    {
+      ...(await resolveSolutionHideFlags(viewer, realProblemId, isAssignmentContext)),
+      isAuthor,
+    },
   )
   return {
     allowed: result.allowed,

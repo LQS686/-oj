@@ -49,10 +49,10 @@ export const GET = withApi.public(async (req) => {
         username: true,
         nickname: true,
         avatar: true,
-        rating: true,
+        solvedCount: true,
       },
       take: limit,
-      orderBy: { rating: 'desc' },
+      orderBy: { solvedCount: 'desc' },
     }),
     prisma.contest.findMany({
       where: {

@@ -126,7 +126,7 @@ describe('loginUser', () => {
     mockRedis.ttl.mockResolvedValue(300)
     fakePrisma.user.findFirst.mockResolvedValue({
       id: 'u1', username: 'alice', email: 'alice@example.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rating: 0, rank: 'gray',
+      nickname: null, avatar: null, bio: null, rank: 'gray',
       color: '#999', role: 'USER', isBanned: false, tokenVersion: 0,
       createdAt: new Date(),
     })
@@ -151,7 +151,7 @@ describe('loginUser', () => {
   it('应抛出 LoginError(FORBIDDEN) 当用户被封禁', async () => {
     fakePrisma.user.findFirst.mockResolvedValue({
       id: 'u1', username: 'banned', email: 'b@b.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rating: 0, rank: 'gray',
+      nickname: null, avatar: null, bio: null, rank: 'gray',
       color: '#999', role: 'USER', isBanned: true, tokenVersion: 0,
       createdAt: new Date(),
     })
@@ -163,7 +163,7 @@ describe('loginUser', () => {
   it('应抛出 LoginError(UNAUTHORIZED) 当密码错误', async () => {
     fakePrisma.user.findFirst.mockResolvedValue({
       id: 'u1', username: 'alice', email: 'a@a.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rating: 0, rank: 'gray',
+      nickname: null, avatar: null, bio: null, rank: 'gray',
       color: '#999', role: 'USER', isBanned: false, tokenVersion: 0,
       createdAt: new Date(),
     })
@@ -178,7 +178,7 @@ describe('loginUser', () => {
     fakePrisma.user.findFirst.mockResolvedValue({
       id: 'u1', username: 'alice', email: 'a@a.com', password: 'hash',
       nickname: 'Alice', avatar: 'https://img/a.png', bio: 'hi',
-      rating: 1500, rank: 'green', color: '#0f0',
+      rank: 'green', color: '#0f0',
       role: 'SYSTEM_ADMIN', isBanned: false, tokenVersion: 1,
       createdAt: new Date('2024-01-01T00:00:00Z'),
     })
@@ -197,7 +197,7 @@ describe('loginUser', () => {
   it('应允许通过 email 登录', async () => {
     fakePrisma.user.findFirst.mockResolvedValue({
       id: 'u1', username: 'alice', email: 'a@a.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rating: 0, rank: 'gray',
+      nickname: null, avatar: null, bio: null, rank: 'gray',
       color: '#999', role: 'USER', isBanned: false, tokenVersion: 0,
       createdAt: new Date(),
     })

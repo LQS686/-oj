@@ -28,7 +28,7 @@ export interface CanViewOptions {
   isAssignmentContext?: boolean
   /** 用户正在参与含该题的进行中竞赛 */
   isContestContext?: boolean
-  /** 当前用户是否为该题题解的作者（作者查看自己发布的内容跳过 90 分门槛，含待审核/驳回/下架） */
+  /** 当前用户是否为该题的「已通过题解」作者（作者查看已发布内容跳过 90 分门槛） */
   isAuthor?: boolean
 }
 
@@ -222,7 +222,8 @@ export async function canViewSolutions(
     }
   }
 
-  // 3b) 作者本人查看自己发布的题解（含 pending/任意状态）时跳过 90 分门槛；
+  // 3b) 作者本人查看自己「已通过」的题解时跳过 90 分门槛；
+  //     待审核/驳回/下架的题解不豁免（防止「随便发一篇即可绕过门槛」），
   //     他人查看门槛、管理员/教师豁免保持不变
   if (user && options.isAuthor === true) {
     return {

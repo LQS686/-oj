@@ -13,6 +13,7 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
   '/api/auth/login': { maxRequests: 10, windowMs: 60000 },
   '/api/auth/register': { maxRequests: 5, windowMs: 60000 },
   '/api/auth/forgot-password': { maxRequests: 3, windowMs: 300000 },
+  '/api/auth/reset-password': { maxRequests: 10, windowMs: 60000 },
   // 通知：WS 推送 + 回前台/重连同步；非轮询
   '/api/notifications': { maxRequests: 60, windowMs: 60000 },
   // 修复 P1：补充限流白名单（之前大量写接口无显式限流）
@@ -152,14 +153,17 @@ export async function middleware(request: NextRequest) {
     const baseConfig = findRateLimitConfig(pathname)
 
     const ip = getClientIP(request)
-    // unknown IP 施加更严格限流（默认值的 50%），防止无代理头请求共用桶被滥用
+    // unknown IP（无任何可信 IP 头，且 socket 也未提供）：不使用共享桶。
+    // 共享桶会让单个攻击者耗尽后连坐所有「无代理头」请求（全局 429 DoS）。
+    // 生产走 nginx 追加 X-Forwarded-For，正常用户必有真实 IP；真正 unknown 的
+    // 请求仅受 withApi 业务层限流（login/register/forgot/submissions 等）兜底。
     const isUnknown = ip === 'unknown'
-    const maxRequests = isUnknown
-      ? Math.max(1, Math.floor(baseConfig.maxRequests * 0.5))
-      : baseConfig.maxRequests
+    const rateKey = isUnknown
+      ? `mw:unknown:${crypto.randomUUID()}`
+      : `mw:${ip}:${pathname}`
 
-    const result = await checkRateLimit(`mw:${ip}:${pathname}`, {
-      maxRequests,
+    const result = await checkRateLimit(rateKey, {
+      maxRequests: baseConfig.maxRequests,
       windowMs: baseConfig.windowMs,
       keyPrefix: 'middleware'
     })

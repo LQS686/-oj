@@ -49,6 +49,8 @@ class SyncFileReader {
   private fileEnded = false
   private lineNumber = 1
   private closed = false
+  /** B-P1-4：最近一次 nextToken 读取的 token 是否因超长被截断（尾部被丢弃） */
+  lastTokenTruncated = false
   /** 可复用行缓冲，避免每行 new Buffer */
   readonly lineBuf: Buffer = Buffer.allocUnsafe(LINE_CAP)
 
@@ -208,6 +210,7 @@ class SyncFileReader {
   }
 
   nextToken(): string {
+    this.lastTokenTruncated = false
     for (;;) {
       if (this.eof()) return ''
       const c = this.buf[this.pos]
@@ -239,6 +242,14 @@ class SyncFileReader {
       taken += p - start
       this.pos = p
       if (this.pos < this.len) break
+    }
+
+    // B-P1-4：恰好读满 TOKEN_CAP 且其后仍是非空白 → 视为截断（尾部被丢弃）
+    if (taken >= TOKEN_CAP && !this.eof()) {
+      const c = this.buf[this.pos]
+      if (c !== SPACE && c !== TAB && c !== CR && c !== LF) {
+        this.lastTokenTruncated = true
+      }
     }
     return out
   }
@@ -383,6 +394,16 @@ function compareIgnoreSpaces(user: SyncFileReader, std: SyncFileReader, fullScor
   for (;;) {
     const userToken = user.nextToken()
     const stdToken = std.nextToken()
+
+    // B-P1-4：token 超长被截断后无法精确比较，直接判 WA
+    if (user.lastTokenTruncated || std.lastTokenTruncated) {
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${user.line()} 行，token 长度超过 256 字节，无法精确比较`,
+      }
+    }
+
     if (userToken === stdToken) {
       if (user.eof() && std.eof()) return { score: fullScore, status: 'AC', message: '' }
       if (user.line() !== std.line()) {
@@ -412,6 +433,16 @@ function compareRealNumbers(
   for (;;) {
     const userToken = user.nextToken()
     const stdToken = std.nextToken()
+
+    // B-P1-4：token 超长被截断时 parseFloat 结果可能失真，直接判 WA
+    if (user.lastTokenTruncated || std.lastTokenTruncated) {
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${user.line()} 行，token 长度超过 256 字节，无法精确比较`,
+      }
+    }
+
     const userEmpty = userToken === '' && user.eof()
     const stdEmpty = stdToken === '' && std.eof()
     if (userEmpty && stdEmpty) return { score: fullScore, status: 'AC', message: '' }

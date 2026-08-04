@@ -184,7 +184,7 @@ export async function adminUpdateContest(
   }
 
   cache.delete(CacheKeys.contest.byId(contestId))
-  cache.deleteByPrefix('contest:rank')
+  cache.deleteByPrefix(CacheKeys.contest.rankPrefix(contestId))
   return { message: '更新成功' }
 }
 

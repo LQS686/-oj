@@ -33,7 +33,6 @@ interface ContestParticipantUser {
   username: string
   nickname: string | null
   avatar: string | null
-  rating: number
   rank: string
   color: string
   role: string
@@ -91,7 +90,6 @@ export async function computeContestRankings(
               username: true,
               nickname: true,
               avatar: true,
-              rating: true,
               rank: true,
               color: true,
               role: true,

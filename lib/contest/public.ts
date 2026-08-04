@@ -231,7 +231,7 @@ export async function updateContestWithProblems(
     return contest
   })
   cache.delete(CacheKeys.contest.byId(contestId))
-  cache.deleteByPrefix('contest:rank')
+  cache.deleteByPrefix(CacheKeys.contest.rankPrefix(contestId))
   const { password: _pw, ...safe } = updated
   return { ...safe, hasPassword: Boolean(_pw) }
 }

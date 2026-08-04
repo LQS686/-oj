@@ -270,3 +270,53 @@ describe('compareOutput - 超长行（>1024 字节）', () => {
     expect(r.status).toBe('WA')
   })
 })
+
+// B-P1-4：超长 token（>256 字节）不得截断比较，尾部差异必须判 WA
+describe('compareOutput - 超长 token（>256 字节）', () => {
+  it('ignore-spaces：300 字节 token 尾部差异 → WA（字符串流）', async () => {
+    const base = '9'.repeat(299)
+    const r = await cmp(base + '1', base + '2', 'ignore-spaces')
+    expect(r.status).toBe('WA')
+    expect(r.score).toBe(0)
+    expect(r.message).toContain('token 长度超过 256')
+  })
+
+  it('ignore-spaces：双文件同步比对，300 字节 token 尾部差异 → WA', async () => {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const os = await import('os')
+    const base = '8'.repeat(299)
+    const user = path.join(os.tmpdir(), `dsoj-tok-u-${Date.now()}.txt`)
+    const exp = path.join(os.tmpdir(), `dsoj-tok-e-${Date.now()}.txt`)
+    await fs.writeFile(user, base + '1', 'utf-8')
+    await fs.writeFile(exp, base + '2', 'utf-8')
+    try {
+      const r = await compareOutput({
+        userOutputPath: user,
+        expectedOutputPath: exp,
+        fullScore: FULL,
+        comparisonMode: 'ignore-spaces',
+      })
+      expect(r.status).toBe('WA')
+      expect(r.score).toBe(0)
+      expect(r.message).toContain('token 长度超过 256')
+    } finally {
+      await fs.unlink(user).catch(() => {})
+      await fs.unlink(exp).catch(() => {})
+    }
+  })
+
+  it('ignore-spaces：双方完全相同但 token 超长 → WA（截断无法证明相等）', async () => {
+    const tok = '7'.repeat(300)
+    const r = await cmp(tok, tok, 'ignore-spaces')
+    expect(r.status).toBe('WA')
+    expect(r.score).toBe(0)
+  })
+
+  it('real-number：300 字节数字 token 尾部差异 → WA', async () => {
+    const base = '9'.repeat(299)
+    const r = await cmp(base + '1', base + '2', 'real-number')
+    expect(r.status).toBe('WA')
+    expect(r.score).toBe(0)
+  })
+})

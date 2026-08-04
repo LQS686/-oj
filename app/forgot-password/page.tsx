@@ -60,9 +60,9 @@ export default function ForgotPasswordPage() {
             </div>
             <h3 className="text-xl font-bold text-foreground mb-2">邮件已发送</h3>
             <p className="text-muted-foreground mb-6">
-              如果该邮箱已注册，你将收到包含临时新密码的邮件。
+              如果该邮箱已注册，你将收到一封包含密码重置链接的邮件。
               <br />
-              请检查收件箱和垃圾邮件文件夹。
+              请检查收件箱和垃圾邮件文件夹，链接 30 分钟内有效。
             </p>
             <Link href="/login" className="btn-primary btn inline-flex">
               返回登录
@@ -78,7 +78,7 @@ export default function ForgotPasswordPage() {
             )}
 
             <p className="text-muted-foreground mb-6">
-              请输入你的注册邮箱，我们将发送临时新密码到该邮箱。
+              请输入你的注册邮箱，我们将发送密码重置链接到该邮箱。
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">

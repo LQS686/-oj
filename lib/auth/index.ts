@@ -80,5 +80,48 @@ export function getUserFromRequest(request: NextRequest): JWTPayload | null {
   return verifyToken(token)
 }
 
+/* ============================================================================
+ * 密码重置签名 token（forgot-password 流程）
+ * 短 TTL（30 分钟）+ 绑定 tokenVersion：改密/登出后旧链接立即失效。
+ * purpose 字段防止被当作登录 token 使用（与 login JWT payload 区分）。
+ * ========================================================================== */
+
+const RESET_TOKEN_EXPIRES = '30m'
+
+export interface PasswordResetPayload {
+  purpose: 'password-reset'
+  userId: string
+  tokenVersion: number
+}
+
+export function signPasswordResetToken(userId: string, tokenVersion: number): string {
+  validateJwtSecret()
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET 未初始化')
+  }
+  const payload: PasswordResetPayload = { purpose: 'password-reset', userId, tokenVersion }
+  return jwt.sign(payload, JWT_SECRET, {
+    algorithm: JWT_ALGORITHM,
+    expiresIn: RESET_TOKEN_EXPIRES,
+  })
+}
+
+export function verifyPasswordResetToken(token: string): PasswordResetPayload | null {
+  validateJwtSecret()
+  if (!JWT_SECRET) return null
+  try {
+    const payload = jwt.verify(token, JWT_SECRET, {
+      algorithms: [JWT_ALGORITHM],
+    }) as jwt.JwtPayload & Partial<PasswordResetPayload>
+    if (payload?.purpose !== 'password-reset') return null
+    if (typeof payload.userId !== 'string' || typeof payload.tokenVersion !== 'number') {
+      return null
+    }
+    return { purpose: 'password-reset', userId: payload.userId, tokenVersion: payload.tokenVersion }
+  } catch {
+    return null
+  }
+}
+
 // 注意：勿在此 barrel 再导出 ./service（会把 prisma/cache/ioredis 拉进客户端图）
 // 需要 findUserById / hashPassword 等请直接 import '@/lib/auth/service'

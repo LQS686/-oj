@@ -22,11 +22,20 @@ export default function AdminUsersPage() {
   // 当前操作者是否为系统管理员（系统管理员可赋予 ADMIN/TEACHER/STUDENT；管理员只能赋予 TEACHER/STUDENT）
   const operatorIsSystemAdmin = isSystemAdmin(currentUser)
 
-  const { users, loading, error, fetchUsers } = useUserList()
+  const { users, loading, error, pagination, fetchUsers, goToPage, changePageSize, applyFilters } =
+    useUserList()
 
-  // 列表筛选
+  // 列表筛选（服务端过滤：条件变化自动回到第 1 页重新拉取）
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
+  const handleSearchChange = (v: string) => {
+    setSearchQuery(v)
+    applyFilters(v, roleFilter)
+  }
+  const handleRoleFilterChange = (v: string) => {
+    setRoleFilter(v)
+    applyFilters(searchQuery, v)
+  }
 
   // 单条操作目标
   const [editTarget, setEditTarget] = useState<User | null>(null)
@@ -43,13 +52,7 @@ export default function AdminUsersPage() {
   // 强制 DataTable 重置内部选中状态（批量操作成功后调用）
   const [tableKey, setTableKey] = useState(0)
 
-  const filteredUsers = useMemo(() => users.filter(user => {
-    const matchesSearch = user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter
-    return matchesSearch && matchesRole
-  }), [users, searchQuery, roleFilter])
-
+  const filteredUsers = users
   // 行操作回调
   const handleEdit = (user: User) => setEditTarget(user)
   const handleReset = (user: User) => setResetTarget(user)
@@ -89,13 +92,13 @@ export default function AdminUsersPage() {
   return (
     <>
       <AdminPageShell width="list" className="space-y-6">
-        <StatsCards users={users} />
+        <StatsCards users={users} total={pagination.total} />
 
         <FilterToolbar
           searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          onSearchChange={handleSearchChange}
           roleFilter={roleFilter}
-          onRoleFilterChange={setRoleFilter}
+          onRoleFilterChange={handleRoleFilterChange}
           onBatchRegisterClick={() => setShowBatchRegisterModal(true)}
         />
 
@@ -109,6 +112,13 @@ export default function AdminUsersPage() {
             // 与编辑按钮一致的锁定判断：系统管理员 / （非系统管理员操作时的）管理员不可编辑
             if (isUserLocked(row, operatorIsSystemAdmin)) return
             setEditTarget(row)
+          }}
+          pagination={{
+            page: pagination.page,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onPageChange: goToPage,
+            onPageSizeChange: changePageSize,
           }}
           batchActions={[
             { label: '批量修改角色', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchEditModal(true) } },

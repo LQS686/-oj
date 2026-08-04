@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { motion, AnimatePresence } from 'motion/react'
-import { Trophy, TrendingUp, Minus, RefreshCw, AlertCircle, ChevronUp, Crown, Medal, Loader2 } from 'lucide-react'
+import { Trophy, AlertCircle, ChevronUp, Crown, Medal, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { acquireAppSocket, releaseAppSocket } from '@/hooks/socket-client'
 import { EducationalPageShell, ListEmptyState, ListToolbar, ListToolbarTabs } from '@/components/common'
@@ -15,7 +15,6 @@ interface UserRanking {
  id: string
  username: string
  nickname: string
- rating: number
  position: number
  rank: string
  color: string
@@ -28,21 +27,29 @@ interface MyRankData {
  userId: string
 }
 
+type RankingPeriod = 'total' | 'month' | 'week' | 'day'
+
+const PERIOD_TABS: { key: RankingPeriod; label: string }[] = [
+ { key: 'total', label: '总榜' },
+ { key: 'month', label: '月榜' },
+ { key: 'week', label: '周榜' },
+ { key: 'day', label: '日榜' },
+]
+
 export default function RankPage() {
  const [rankings, setRankings] = useState<UserRanking[]>([])
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState<string | null>(null)
- const [activeTab, setActiveTab] = useState<'rating' | 'solved'>('rating')
+ const [activePeriod, setActivePeriod] = useState<RankingPeriod>('total')
  const [myRank, setMyRank] = useState<MyRankData | null>(null)
  const [hasMore, setHasMore] = useState(true)
  const [loadingMore, setLoadingMore] = useState(false)
- const [isRefreshing, setIsRefreshing] = useState(false)
  
  const pageRef = useRef(1)
  const loadingRef = useRef(false)
  const containerRef = useRef<HTMLDivElement>(null)
 
- const fetchRankings = useCallback(async (pageNum: number, type: string, reset = false) => {
+ const fetchRankings = useCallback(async (pageNum: number, period: string, reset = false) => {
  if (loadingRef.current && !reset) return
 
  try {
@@ -53,7 +60,7 @@ export default function RankPage() {
  setLoadingMore(true)
  }
  
- const res = await fetchWithCookie(`/api/rankings?type=${type}&page=${pageNum}&limit=50`)
+ const res = await fetchWithCookie(`/api/rankings?period=${period}&page=${pageNum}&limit=50`)
  
  if (!res.ok) throw new Error('Failed to fetch')
  
@@ -72,13 +79,12 @@ export default function RankPage() {
  loadingRef.current = false
  setLoading(false)
  setLoadingMore(false)
- setIsRefreshing(false)
  }
  }, [])
 
- const fetchMyRank = useCallback(async (type: string) => {
+ const fetchMyRank = useCallback(async (period: string) => {
  try {
- const res = await fetchWithCookie(`/api/rankings/my-rank?type=${type}`)
+ const res = await fetchWithCookie(`/api/rankings/my-rank?period=${period}`)
  if (res.ok) {
  const data = await res.json()
  if (data.success) {
@@ -95,9 +101,9 @@ export default function RankPage() {
  setRankings([])
  setHasMore(true)
  setError(null)
- fetchRankings(1, activeTab, true)
- fetchMyRank(activeTab)
- }, [activeTab, fetchRankings, fetchMyRank])
+ fetchRankings(1, activePeriod, true)
+ fetchMyRank(activePeriod)
+ }, [activePeriod, fetchRankings, fetchMyRank])
 
  useEffect(() => {
  // 复用全局 socket 单例（与提交/通知/公告共用一条连接），避免单独建立连接
@@ -105,7 +111,7 @@ export default function RankPage() {
 
  const onLeaderboardUpdate = () => {
  if (pageRef.current === 1) {
- fetchRankings(1, activeTab, true)
+ fetchRankings(1, activePeriod, true)
  }
  }
  socket.on('leaderboard:update', onLeaderboardUpdate)
@@ -114,7 +120,7 @@ export default function RankPage() {
  socket.off('leaderboard:update', onLeaderboardUpdate)
  releaseAppSocket()
  }
- }, [activeTab, fetchRankings])
+ }, [activePeriod, fetchRankings])
 
  useEffect(() => {
  const handleScroll = () => {
@@ -123,7 +129,7 @@ export default function RankPage() {
  const { scrollTop, scrollHeight, clientHeight } = containerRef.current
  if (scrollTop + clientHeight >= scrollHeight - 200) {
  const nextPage = pageRef.current + 1
- fetchRankings(nextPage, activeTab, false)
+ fetchRankings(nextPage, activePeriod, false)
  }
  }
 
@@ -132,11 +138,11 @@ export default function RankPage() {
  const container = containerRef.current
  container?.addEventListener('scroll', handleScroll)
  return () => container?.removeEventListener('scroll', handleScroll)
- }, [hasMore, activeTab, fetchRankings, loading])
+ }, [hasMore, activePeriod, fetchRankings, loading])
 
  const handleRetry = () => {
  setError(null)
- fetchRankings(pageRef.current, activeTab, pageRef.current === 1)
+ fetchRankings(pageRef.current, activePeriod, pageRef.current === 1)
  }
 
  const getRankIcon = (rank: number) => {
@@ -175,31 +181,14 @@ export default function RankPage() {
   title="全站排行榜"
   icon={Trophy}
   iconClassName="bg-accent text-white"
-  actions={
-  <button
-  type="button"
-  onClick={() => {
-  setIsRefreshing(true)
-  fetchRankings(1, activeTab, true)
-  }}
-  disabled={isRefreshing}
-  className="btn btn-ghost"
-  >
-  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-  刷新
-  </button>
-  }
   toolbar={
   <ListToolbar
   leading={
   <ListToolbarTabs
-  ariaLabel="排行榜类型"
-  value={activeTab}
-  onChange={(key) => setActiveTab(key as typeof activeTab)}
-  items={[
-  { key: 'rating', label: 'Rating 排行榜' },
-  { key: 'solved', label: 'AC 刷题榜' },
-  ]}
+  ariaLabel="排行榜周期"
+  value={activePeriod}
+  onChange={(key) => setActivePeriod(key as RankingPeriod)}
+  items={PERIOD_TABS}
   />
   }
   />
@@ -212,9 +201,7 @@ export default function RankPage() {
   <div className="flex px-4 py-3 text-sm font-semibold text-muted-foreground border-b border-border/50">
   <div className="w-16 text-center">排名</div>
   <div className="flex-1">选手</div>
-  <div className="w-24 text-right">Rating</div>
   <div className="w-24 text-right">解题数</div>
-  <div className="w-16 text-right">趋势</div>
   </div>
   {Array.from({ length: 8 }).map((_, i) => (
   <div key={i} className="flex items-center border-b border-border/50 px-4 py-3 animate-pulse">
@@ -224,8 +211,6 @@ export default function RankPage() {
   <div className="h-4 w-24 rounded bg-muted" />
   </div>
   <div className="w-24 text-right"><div className="h-5 w-12 rounded bg-muted ml-auto" /></div>
-  <div className="w-24 text-right"><div className="h-4 w-10 rounded bg-muted ml-auto" /></div>
-  <div className="w-16 flex justify-end"><div className="w-4 h-4 rounded bg-muted" /></div>
   </div>
   ))}
   </div>
@@ -253,16 +238,14 @@ export default function RankPage() {
  <div className="card-static rounded-t-xl flex px-4 py-3 text-sm font-semibold text-muted-foreground border-b border-border/50">
  <div className="w-16 text-center">排名</div>
  <div className="flex-1">选手</div>
- <div className="w-24 text-right">Rating</div>
  <div className="w-24 text-right">解题数</div>
- <div className="w-16 text-right">趋势</div>
  </div>
 
  <div 
  ref={containerRef}
  className="flex-1 card-static rounded-b-xl overflow-y-auto custom-scrollbar max-h-[calc(100vh-14rem)]"
  >
- {rankings.map((user, _index) => {
+ {rankings.map((user) => {
  const isTop3 = user.position <= 3
  const isCurrentUser = user.id === myRank?.userId
  
@@ -309,19 +292,7 @@ export default function RankPage() {
  </div>
 
  <div className="w-24 text-right font-bold text-lg" style={{ color: user.color }}>
- {user.rating}
- </div>
- 
- <div className="w-24 text-right text-muted-foreground">
- {user.solvedProblems} <span className="text-xs text-muted-foreground/60">题</span>
- </div>
- 
- <div className="w-16 flex justify-end">
- {user.rating >= 2000 ? (
- <TrendingUp className="w-4 h-4 text-error" />
- ) : (
- <Minus className="w-4 h-4 text-muted-foreground/40" />
- )}
+ {user.solvedProblems}
  </div>
  </div>
  )
@@ -362,9 +333,6 @@ export default function RankPage() {
  <span className="text-muted-foreground text-sm">我的当前排名</span>
  <div className="flex items-center gap-2">
  <span className="font-bold text-2xl text-primary-light">{myRank.rank}</span>
- <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
- 距离上一名还差 ? 分
- </span>
  </div>
  </div>
  <button 

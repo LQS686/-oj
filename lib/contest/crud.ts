@@ -60,21 +60,20 @@ export async function getContestById(id: string) {
 }
 
 export async function createContest(data: Omit<Prisma.ContestUncheckedCreateInput, 'authorId'>, authorId: string) {
-  cache.deleteByPrefix('contest:list:')
+  // listContests 直接查库无缓存，无需清 'contest:list'（历史遗留的无效删除已移除）
   return prisma.contest.create({ data: { ...data, authorId } })
 }
 
 export async function updateContest(id: string, data: Prisma.ContestUncheckedUpdateInput) {
   cache.delete(CacheKeys.contest.byId(id))
-  cache.deleteByPrefix('contest:list:')
-  cache.deleteByPrefix('contest:rank')
+  // 仅失效当前竞赛榜单缓存，避免误伤其他竞赛
+  cache.deleteByPrefix(CacheKeys.contest.rankPrefix(id))
   return prisma.contest.update({ where: { id }, data })
 }
 
 export async function deleteContest(id: string) {
   cache.delete(CacheKeys.contest.byId(id))
-  cache.deleteByPrefix('contest:list:')
-  cache.deleteByPrefix('contest:rank')
+  cache.deleteByPrefix(CacheKeys.contest.rankPrefix(id))
   return prisma.contest.delete({ where: { id } })
 }
 

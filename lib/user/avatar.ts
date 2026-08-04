@@ -91,12 +91,11 @@ export async function listActiveUsers(limit = 5) {
   if (sortedUserIds.length === 0) {
     const fallback = await prisma.user.findMany({
       take: limit,
-      orderBy: { rating: 'desc' },
+      orderBy: { solvedCount: 'desc' },
       select: {
         id: true,
         username: true,
         nickname: true,
-        rating: true,
         color: true,
         avatar: true,
         _count: { select: { solutions: true } },
@@ -111,7 +110,6 @@ export async function listActiveUsers(limit = 5) {
       id: true,
       username: true,
       nickname: true,
-      rating: true,
       color: true,
       avatar: true,
       _count: {
