@@ -253,11 +253,8 @@ ensure_docker_mirrors() {
   mkdir -p /etc/docker
   local conf="/etc/docker/daemon.json"
 
-  if [[ -f "$conf" ]] && grep -q "registry-mirrors" "$conf" 2>/dev/null; then
-    info "Docker 镜像加速已存在"
-    return 0
-  fi
-
+  # 注意：不再因「已有 registry-mirrors」直接跳过——旧源可能已失效（2024 后公共源大量停服），
+  # 必须幂等合并追加缺失的新源并重启 Docker，否则 BuildKit 仍直连 docker.io 导致构建极慢。
   if [[ -f "$conf" ]]; then
     # 已有自定义 daemon.json：尝试用 python 合并，避免整文件覆盖
     if command -v python3 &>/dev/null; then
@@ -272,9 +269,11 @@ except Exception:
 mirrors = data.get("registry-mirrors") or []
 # 国内镜像源多源 fallback：1panel.live 实测最稳（2026-08），其余保留作为备选
 wanted = ["https://docker.1panel.live", "https://docker.1ms.run", "https://docker.xuanyuan.me", "https://docker.m.daocloud.io"]
+changed = False
 for m in wanted:
     if m not in mirrors:
         mirrors.append(m)
+        changed = True
 data["registry-mirrors"] = mirrors
 data.setdefault("log-driver", "json-file")
 opts = data.setdefault("log-opts", {})
@@ -283,9 +282,10 @@ opts.setdefault("max-file", "3")
 with open(path, "w", encoding="utf-8") as f:
     json.dump(data, f, ensure_ascii=False, indent=2)
     f.write("\n")
+print("MERGED" if changed else "UNCHANGED")
 PY
       then
-        info "已向现有 daemon.json 合并 registry-mirrors"
+        info "已向现有 daemon.json 合并 registry-mirrors（原配置保留）"
       else
         warn "现有 /etc/docker/daemon.json 无法自动合并，请手动添加 registry-mirrors（未覆盖原文件）"
         return 0
