@@ -49,7 +49,7 @@ sudo bash scripts/bt-deploy.sh http://你的服务器IP
 脚本会自动：
 
 1. 检查 Docker / Compose / 磁盘（至少约 4GB 可用）
-2. 配置国内镜像加速（如尚未配置；**不会覆盖**已有自定义 `daemon.json`，必要时用 python 合并）
+2. 配置国内镜像加速（**幂等合并**已有 `daemon.json`：保留原配置，追加缺失的镜像源；仅实际变更时重启 Docker）
 3. 生成 `.env`（含 JWT / ENCRYPTION_KEY / Redis·Mongo 密码）
 4. 按 URL 协议设置 `FORCE_SECURE_COOKIE`（HTTP→false，HTTPS→true）
 5. 生成 `mongo-keyfile`

@@ -269,6 +269,59 @@ describe('compareOutput - 超长行（>1024 字节）', () => {
     const r = await cmp(base + 'X', base + 'Y', 'strict')
     expect(r.status).toBe('WA')
   })
+
+  // 超长行可精确比较：完全相同 → AC（修复前会被「无法精确比较」误判 WA）
+  it('字符串流：1500 字节行完全相同 → AC', async () => {
+    const base = 'a'.repeat(1500)
+    const r = await cmp(base + '\n' + base, base + '\n' + base, 'default')
+    expect(r.status).toBe('AC')
+    expect(r.score).toBe(FULL)
+  })
+
+  it('字符串流：远超 1024 字节（300KB 单行）完全相同 → AC', async () => {
+    const base = 'a'.repeat(300 * 1024)
+    const r = await cmp(base, base, 'default')
+    expect(r.status).toBe('AC')
+    expect(r.score).toBe(FULL)
+  })
+
+  it('default 模式：超长行仅行尾空白差异 → AC（trimEnd 语义保持）', async () => {
+    const base = 'a'.repeat(1500)
+    const r = await cmp(base + '   ', base, 'default')
+    expect(r.status).toBe('AC')
+    expect(r.score).toBe(FULL)
+  })
+
+  it('strict 模式：1500 字节行完全相同 → AC', async () => {
+    const base = 'c'.repeat(1500)
+    const r = await cmp(base + '\nend', base + '\nend', 'strict')
+    expect(r.status).toBe('AC')
+    expect(r.score).toBe(FULL)
+  })
+
+  it('双文件同步比对：1500 字节行完全相同 → AC', async () => {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const os = await import('os')
+    const base = 'b'.repeat(1500)
+    const user = path.join(os.tmpdir(), `dsoj-long-ac-u-${Date.now()}.txt`)
+    const exp = path.join(os.tmpdir(), `dsoj-long-ac-e-${Date.now()}.txt`)
+    await fs.writeFile(user, base + '\n', 'utf-8')
+    await fs.writeFile(exp, base + '\n', 'utf-8')
+    try {
+      const r = await compareOutput({
+        userOutputPath: user,
+        expectedOutputPath: exp,
+        fullScore: FULL,
+        comparisonMode: 'default',
+      })
+      expect(r.status).toBe('AC')
+      expect(r.score).toBe(FULL)
+    } finally {
+      await fs.unlink(user).catch(() => {})
+      await fs.unlink(exp).catch(() => {})
+    }
+  })
 })
 
 // B-P1-4：超长 token（>256 字节）不得截断比较，尾部差异必须判 WA

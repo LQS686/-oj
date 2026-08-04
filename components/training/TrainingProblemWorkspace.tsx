@@ -102,6 +102,14 @@ export default function TrainingProblemWorkspace({
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
 
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value)
+    // 仅在用户手动切换时写入本题语言草稿；偏好回退的默认语言不落草稿，
+    // 否则草稿固化后修改偏好将不再生效（且切题时 effect 写回会产生竞态）
+    if (typeof window === 'undefined' || !problemDetail?.id) return
+    localStorage.setItem(`lang_training_${trainingId}_${problemDetail.id}`, value)
+  }
+
   const selectedMeta = railProblems[selectedIndex] ?? null
   const selectedProblemId = selectedMeta?.id ?? null
 
@@ -184,11 +192,6 @@ export default function TrainingProblemWorkspace({
     if (typeof window === 'undefined' || !problemDetail?.id) return
     localStorage.setItem(`code_training_${trainingId}_${problemDetail.id}`, code)
   }, [code, problemDetail?.id, trainingId])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !problemDetail?.id) return
-    localStorage.setItem(`lang_training_${trainingId}_${problemDetail.id}`, language)
-  }, [language, problemDetail?.id, trainingId])
 
   const fetchSubmissions = useCallback(async () => {
     if (!selectedProblemId) return
@@ -404,7 +407,7 @@ export default function TrainingProblemWorkspace({
             code={code}
             language={language}
             onCodeChange={setCode}
-            onLanguageChange={setLanguage}
+            onLanguageChange={handleLanguageChange}
             onSubmit={() => void handleSubmit()}
             submitting={submitting}
             problemId={selectedProblemId}

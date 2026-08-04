@@ -9,6 +9,7 @@
  *   - IP 限流由 middleware（3/5min）；另加按邮箱限流降低重置轰炸
  */
 import { withApi, ok, fail, readJson } from '@/lib/api/withApi'
+import type { NextRequest } from 'next/server'
 import { findUserByEmail } from '@/lib/auth/service'
 import { signPasswordResetToken } from '@/lib/auth'
 import { sendMail } from '@/lib/email'
@@ -16,6 +17,30 @@ import { getSystemSettings } from '@/lib/settings'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 const GENERIC_OK = '如果该邮箱已注册，你将收到一封包含重置链接的邮件'
+
+/**
+ * 解析站点对外基础 URL（邮件链接使用）。
+ * 优先级：显式配置的 NEXT_PUBLIC_BASE_URL（部署脚本写入 https://dsoj.run）
+ *  → 反代头（x-forwarded-proto/x-forwarded-host）→ 请求 Host 反射。
+ * 不能用 req.nextUrl.host 直接反射：绕过反向代理访问（如 0.0.0.0:3000）时
+ * 会把内网地址写进邮件链接，导致用户无法打开。
+ * 反代头可能被客户端伪造：仅接受合法 host（域名[:端口]），x-forwarded-proto 取首值。
+ */
+function resolveSiteBaseUrl(req: NextRequest): string {
+  const configured = process.env.NEXT_PUBLIC_BASE_URL
+  if (configured && configured.trim()) {
+    return configured.replace(/\/+$/, '')
+  }
+  const rawProto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol.replace(/:$/, '')
+  const scheme = rawProto.split(',')[0].trim() === 'http' ? 'http' : 'https'
+  const rawHost = req.headers.get('x-forwarded-host') || req.nextUrl.host
+  const host = rawHost.split(',')[0].trim().toLowerCase()
+  const hostOk = /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && !host.startsWith('.') && !host.includes('..')
+  if (!hostOk) {
+    return `${req.nextUrl.protocol}//${req.nextUrl.host}`
+  }
+  return `${scheme}://${host}`
+}
 
 export const POST = withApi.public(async (req) => {
   const { email } = await readJson<{ email: string }>(req)
@@ -53,8 +78,7 @@ export const POST = withApi.public(async (req) => {
 
   // 生成短期签名重置链接（绑定当前 tokenVersion；用户改密/登出后链接失效）
   const resetToken = signPasswordResetToken(user.id, user.tokenVersion)
-  const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`
-  const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`
+  const resetUrl = `${resolveSiteBaseUrl(req)}/reset-password?token=${encodeURIComponent(resetToken)}`
 
   const result = await sendMail({
     to: normalized,

@@ -72,6 +72,14 @@ function ContestProblemsWorkspace() {
   const selectedProblem = contestProblems[selectedIndex] ?? null
   const selectedProblemId = selectedProblem?.id ?? null
 
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value)
+    // 仅在用户手动切换时写入本题语言草稿；偏好回退的默认语言不落草稿，
+    // 否则草稿固化后修改偏好将不再生效（且切题时 effect 写回会产生竞态）
+    if (typeof window === 'undefined' || !problemDetail?.id) return
+    localStorage.setItem(`lang_contest_${contestId}_${problemDetail.id}`, value)
+  }
+
   const refreshContestProblems = useCallback(async () => {
     try {
       const res = await fetchWithCookie(`/api/contests/${contestId}/problems`, {
@@ -214,11 +222,6 @@ function ContestProblemsWorkspace() {
     if (typeof window === 'undefined' || !problemDetail?.id) return
     localStorage.setItem(`code_contest_${contestId}_${problemDetail.id}`, code)
   }, [code, problemDetail?.id, contestId])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !problemDetail?.id) return
-    localStorage.setItem(`lang_contest_${contestId}_${problemDetail.id}`, language)
-  }, [language, problemDetail?.id, contestId])
 
   const fetchSubmissions = useCallback(async () => {
     if (!selectedProblemId) return
@@ -457,7 +460,7 @@ function ContestProblemsWorkspace() {
             code={code}
             language={language}
             onCodeChange={setCode}
-            onLanguageChange={setLanguage}
+            onLanguageChange={handleLanguageChange}
             onSubmit={() => void handleSubmit()}
             submitting={submitting}
             problemId={selectedProblemId}

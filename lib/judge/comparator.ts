@@ -28,8 +28,6 @@ class BufferedStreamReader {
   private pos: number
   private lineNumber: number
   private streamEnded: boolean
-  /** B-P1-4：最近一次 nextUntilNewLineBuf 读取的行是否因超长被截断（尾部被丢弃） */
-  lastLineTruncated = false
   /** B-P1-4：最近一次 nextUntilSpace 读取的 token 是否因超长被截断（尾部被丢弃） */
   lastTokenTruncated = false
 
@@ -139,19 +137,14 @@ class BufferedStreamReader {
   }
 
   // 读取直到换行符或末尾；返回 Buffer（调用方负责 trim/toString）
-  // B-P1-4：行超长时不再截断后当作完整行，置 lastLineTruncated=true，
-  // 调用方据此判 WA，避免「>1024 字节行尾部差异被忽略 → 误判 AC」
-  async nextUntilNewLineBuf(maxLen = 1024): Promise<Buffer> {
+  // 行长不限：任意长度行均完整读入（跨块拼接），可精确比较
+  async nextUntilNewLineBuf(): Promise<Buffer> {
     await this.ensureData()
     if (this.pos >= this.buffer.length && this.streamEnded) {
-      this.lastLineTruncated = false
       return Buffer.alloc(0)
     }
 
     const parts: Buffer[] = []
-    let taken = 0
-    let truncated = false
-
     while (true) {
       await this.ensureData()
       if (this.pos >= this.buffer.length) {
@@ -167,24 +160,12 @@ class BufferedStreamReader {
       else if (cr >= 0) cut = cr
 
       if (cut >= 0) {
-        const room = maxLen - taken
-        if (cut > room) truncated = true
-        if (room > 0) {
-          const need = Math.min(cut, room)
-          if (need > 0) parts.push(slice.subarray(0, need))
-          taken += need
-        }
+        if (cut > 0) parts.push(slice.subarray(0, cut))
         this.pos = await this.consumeNewlineAt(this.pos + cut)
         break
       }
 
-      const room = maxLen - taken
-      if (slice.length > room) truncated = true
-      if (room > 0) {
-        const need = Math.min(slice.length, room)
-        if (need > 0) parts.push(slice.subarray(0, need))
-        taken += need
-      }
+      parts.push(slice)
       this.pos = this.buffer.length
       await this.ensureData()
       if (this.pos >= this.buffer.length && this.streamEnded) {
@@ -192,14 +173,13 @@ class BufferedStreamReader {
       }
     }
 
-    this.lastLineTruncated = truncated
     if (parts.length === 0) return Buffer.alloc(0)
     if (parts.length === 1) return parts[0]
     return Buffer.concat(parts)
   }
 
-  async nextUntilNewLine(maxLen = 1024): Promise<string> {
-    const buf = await this.nextUntilNewLineBuf(maxLen)
+  async nextUntilNewLine(_maxLen = 1024): Promise<string> {
+    const buf = await this.nextUntilNewLineBuf()
     return buf.length === 0 ? '' : buf.toString('utf-8')
   }
 
@@ -323,16 +303,6 @@ async function compareDefault(
     const userEof = await userReader.eof()
     const stdEof = await stdReader.eof()
 
-    // B-P1-4：超长行（>1024 字节）尾部被丢弃后无法精确比较，直接判 WA，
-    // 避免「尾部差异被忽略 → 误判 AC」
-    if (userReader.lastLineTruncated || stdReader.lastLineTruncated) {
-      return {
-        score: 0,
-        status: 'WA',
-        message: `第 ${lineNum} 行，行长度超过 1024 字节，无法精确比较`,
-      }
-    }
-
     if (!buffersEqual(userLine, stdLine)) {
       return {
         score: 0,
@@ -368,15 +338,6 @@ async function compareStrict(
     const lineNum = userReader.line()
     const userLine = await userReader.nextUntilNewLineBuf()
     const stdLine = await stdReader.nextUntilNewLineBuf()
-
-    // B-P1-4：超长行（>1024 字节）尾部被丢弃后无法精确比较，直接判 WA
-    if (userReader.lastLineTruncated || stdReader.lastLineTruncated) {
-      return {
-        score: 0,
-        status: 'WA',
-        message: `第 ${lineNum} 行，行长度超过 1024 字节，无法精确比较`,
-      }
-    }
 
     if (!buffersEqual(userLine, stdLine)) {
       return {

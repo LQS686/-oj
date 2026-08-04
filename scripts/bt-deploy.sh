@@ -252,43 +252,97 @@ ensure_docker_mirrors() {
 
   mkdir -p /etc/docker
   local conf="/etc/docker/daemon.json"
+  local DO_RESTART_DOCKER=0
 
   # 注意：不再因「已有 registry-mirrors」直接跳过——旧源可能已失效（2024 后公共源大量停服），
   # 必须幂等合并追加缺失的新源并重启 Docker，否则 BuildKit 仍直连 docker.io 导致构建极慢。
   if [[ -f "$conf" ]]; then
     # 已有自定义 daemon.json：尝试用 python 合并，避免整文件覆盖
     if command -v python3 &>/dev/null; then
-      if python3 - "$conf" <<'PY'
-import json, sys
+      # 捕获 python 输出（MERGED/UNCHANGED），仅实际变更时才重启 Docker，
+      # 避免每次部署/升级都重启 Docker 打断运行中的容器与评测
+      merge_result="$(
+        python3 - "$conf" <<'PY' || echo "PYFAIL"
+import json, sys, os, tempfile
 path = sys.argv[1]
 try:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
+    if not isinstance(data, dict):
+        sys.exit(2)
+    mirrors = data.get("registry-mirrors")
+    if mirrors is None:
+        mirrors = []
+    if not isinstance(mirrors, list):
+        sys.exit(2)
+    # 国内镜像源多源 fallback：1panel.live 实测最稳（2026-08），其余保留作为备选
+    wanted = ["https://docker.1panel.live", "https://docker.1ms.run", "https://docker.xuanyuan.me", "https://docker.m.daocloud.io"]
+    changed = False
+    for m in wanted:
+        if m not in mirrors:
+            mirrors.append(m)
+            changed = True
+    data["registry-mirrors"] = mirrors
+    # setdefault 仅补缺；log-driver/log-opts 实际新增时也计入 changed（否则文件被改却报 UNCHANGED 不重启）
+    if "log-driver" not in data:
+        data["log-driver"] = "json-file"
+        changed = True
+    if "log-opts" not in data:
+        opts = {}
+        data["log-opts"] = opts
+        changed = True
+    else:
+        opts = data["log-opts"]
+    if not isinstance(opts, dict):
+        sys.exit(2)
+    if "max-size" not in opts:
+        opts["max-size"] = "10m"
+        changed = True
+    if "max-file" not in opts:
+        opts["max-file"] = "3"
+        changed = True
+    # 原子写：先写临时文件再 os.replace，避免写盘中断损坏用户 daemon.json
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".", prefix=".daemon.json.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        # mkstemp 默认 0600，os.replace 不保留原权限；继承原文件 mode（默认 0644）
+        try:
+            orig_mode = os.stat(path).st_mode & 0o777
+        except Exception:
+            orig_mode = 0o644
+        os.chmod(tmp, orig_mode)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except Exception:
+            pass
+        raise
 except Exception:
     sys.exit(2)
-mirrors = data.get("registry-mirrors") or []
-# 国内镜像源多源 fallback：1panel.live 实测最稳（2026-08），其余保留作为备选
-wanted = ["https://docker.1panel.live", "https://docker.1ms.run", "https://docker.xuanyuan.me", "https://docker.m.daocloud.io"]
-changed = False
-for m in wanted:
-    if m not in mirrors:
-        mirrors.append(m)
-        changed = True
-data["registry-mirrors"] = mirrors
-data.setdefault("log-driver", "json-file")
-opts = data.setdefault("log-opts", {})
-opts.setdefault("max-size", "10m")
-opts.setdefault("max-file", "3")
-with open(path, "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=2)
-    f.write("\n")
+# print 置于最外层 try/except 之后：即使打印异常也不误判 PYFAIL（文件已改，shell 侧仍按 MERGED 重启）
 print("MERGED" if changed else "UNCHANGED")
 PY
-      then
-        info "已向现有 daemon.json 合并 registry-mirrors（原配置保留）"
+      )"
+      if [[ "$merge_result" == "PYFAIL" || "$merge_result" == "" ]]; then
+        # python 异常可能发生在文件已写入之后（如 print 阶段）：先校验新源是否已落盘，
+        # 已落盘则按 MERGED 处理并重启，避免「文件已改却报错不重启」导致新配置不生效
+        if grep -q "docker.1panel.live" "$conf" 2>/dev/null; then
+          info "daemon.json 已写入新镜像源（python 合并后输出异常，忽略）"
+          DO_RESTART_DOCKER=1
+        else
+          warn "现有 /etc/docker/daemon.json 无法自动合并，请手动添加 registry-mirrors（未覆盖原文件）"
+          return 0
+        fi
       else
-        warn "现有 /etc/docker/daemon.json 无法自动合并，请手动添加 registry-mirrors（未覆盖原文件）"
-        return 0
+        if [[ "$merge_result" == "MERGED" ]]; then
+          info "已向现有 daemon.json 合并 registry-mirrors（原配置保留）"
+          DO_RESTART_DOCKER=1
+        else
+          info "daemon.json 已包含全部配置，无需变更"
+        fi
       fi
     else
       warn "已有 /etc/docker/daemon.json 且无 python3，跳过写入以免覆盖自定义配置"
@@ -312,16 +366,19 @@ PY
 }
 DOCKERCONF
     info "已写入 Docker 镜像加速配置"
+    DO_RESTART_DOCKER=1
   fi
 
-  if systemctl restart docker; then
-    info "Docker 已重启以应用镜像加速"
-    for _ in $(seq 1 30); do
-      docker info &>/dev/null && break
-      sleep 1
-    done
-  else
-    warn "Docker 重启失败，请手动检查 /etc/docker/daemon.json"
+  if [[ "$DO_RESTART_DOCKER" -eq 1 ]]; then
+    if systemctl restart docker; then
+      info "Docker 已重启以应用镜像加速"
+      for _ in $(seq 1 30); do
+        docker info &>/dev/null && break
+        sleep 1
+      done
+    else
+      warn "Docker 重启失败，请手动检查 /etc/docker/daemon.json"
+    fi
   fi
 }
 

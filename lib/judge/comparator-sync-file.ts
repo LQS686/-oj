@@ -2,14 +2,15 @@
  * 同步文件比对（fs.readSync）
  *
  * 百万行测点禁止「每行一个 await」：1e6 次 Promise/微任务会在与 Next 同进程时把堆打到 OOM。
- * 固定读缓冲 + 可复用行缓冲，峰值 O(BUFFER)，接近顺序读盘速度。
+ * 固定读缓冲 + 可复用行缓冲（按行长扩容，无固定上限），接近顺序读盘速度。
  */
 import { closeSync, openSync, readSync, statSync } from 'fs'
 import { createHash } from 'crypto'
 import type { CompareResult, ComparisonMode } from './types'
 
 const READ_SIZE = 256 * 1024
-const LINE_CAP = 1024
+/** 行缓冲初始大小（按需 2 倍扩容，行长不限） */
+const LINE_BUF_INIT = 1024
 const TOKEN_CAP = 256
 
 const LF = 0x0a
@@ -51,8 +52,8 @@ class SyncFileReader {
   private closed = false
   /** B-P1-4：最近一次 nextToken 读取的 token 是否因超长被截断（尾部被丢弃） */
   lastTokenTruncated = false
-  /** 可复用行缓冲，避免每行 new Buffer */
-  readonly lineBuf: Buffer = Buffer.allocUnsafe(LINE_CAP)
+  /** 可复用行缓冲，避免每行 new Buffer；按行长扩容，行长不限 */
+  lineBuf: Buffer = Buffer.allocUnsafe(LINE_BUF_INIT)
 
   constructor(filePath: string) {
     this.fd = openSync(filePath, 'r')
@@ -116,17 +117,14 @@ class SyncFileReader {
   }
 
   /**
-   * 读一行到 this.lineBuf，返回有效字节长度。
+   * 读一行到 this.lineBuf，返回有效字节长度（行缓冲按需扩容，行长不限）。
    * 空文件/已 EOF 且无残留 → 返回 0 且 eof() 为 true。
-   * B-P1-4：行超长（超过 LINE_CAP）不再截断丢弃尾部后装作完整行——
-   * 返回 -1 表示「该行无法在 LINE_CAP 内完整读取」，调用方据此判 WA，
-   * 避免「>1024 字节行尾部差异被忽略 → 误判 AC」。
+   * 行长不受固定上限约束：任意长度行均可完整读入并精确比较。
    */
   readLine(): number {
     if (this.eof()) return 0
 
     let copied = 0
-    let truncated = false
     for (;;) {
       if (this.pos >= this.len) {
         this.fill()
@@ -146,15 +144,8 @@ class SyncFileReader {
       if (rel >= 0) {
         const cut = this.pos + rel
         const avail = cut - this.pos
-        const room = LINE_CAP - copied
-        if (avail > room) {
-          // 本行内容超过 LINE_CAP：拷贝前缀到行缓冲，丢弃尾部，标记截断
-          truncated = true
-          if (room > 0) {
-            this.buf.copy(this.lineBuf, copied, this.pos, this.pos + room)
-            copied += room
-          }
-        } else if (avail > 0) {
+        if (avail > 0) {
+          this.ensureLineCapacity(copied + avail)
           this.buf.copy(this.lineBuf, copied, this.pos, cut)
           copied += avail
         }
@@ -164,49 +155,25 @@ class SyncFileReader {
       }
 
       const avail = this.len - this.pos
-      const room = LINE_CAP - copied
-      if (avail > room) {
-        // 当前缓冲块已超出剩余容量：行超长，拷贝前缀后丢弃到行尾
-        truncated = true
-        if (room > 0) {
-          this.buf.copy(this.lineBuf, copied, this.pos, this.pos + room)
-          copied += room
-        }
-        this.pos = this.len
-        for (;;) {
-          if (this.pos >= this.len) {
-            this.fill()
-            if (this.pos >= this.len) {
-              this.lineNumber++
-              break
-            }
-          }
-          const s2 = this.buf.subarray(this.pos, this.len)
-          const nli = s2.indexOf(LF)
-          const cri = s2.indexOf(CR)
-          let r2 = -1
-          if (nli >= 0 && cri >= 0) r2 = Math.min(nli, cri)
-          else if (nli >= 0) r2 = nli
-          else if (cri >= 0) r2 = cri
-          if (r2 >= 0) {
-            this.pos = this.pos + r2
-            this.consumeNewline()
-            break
-          }
-          this.pos = this.len
-        }
-        break
-      }
       if (avail > 0) {
+        this.ensureLineCapacity(copied + avail)
         this.buf.copy(this.lineBuf, copied, this.pos, this.pos + avail)
         copied += avail
       }
       this.pos = this.len
     }
 
-    // B-P1-4：超长行（含 EOF 前恰好溢出 LINE_CAP 的情况）返回 -1，交由调用方判 WA
-    if (truncated) return -1
     return copied
+  }
+
+  /** 行缓冲按需扩容（2 倍增长），行长不受固定上限约束 */
+  private ensureLineCapacity(need: number): void {
+    if (need <= this.lineBuf.length) return
+    let cap = this.lineBuf.length * 2
+    while (cap < need) cap *= 2
+    const next = Buffer.allocUnsafe(cap)
+    this.lineBuf.copy(next, 0, 0, this.lineBuf.length)
+    this.lineBuf = next
   }
 
   nextToken(): string {
@@ -335,14 +302,6 @@ function compareDefault(user: SyncFileReader, std: SyncFileReader, fullScore: nu
     const lineNum = user.line()
     const uLen = user.readLine()
     const sLen = std.readLine()
-    // B-P1-4：超长行（>LINE_CAP）无法完整读取，不得截断后比较，直接判 WA
-    if (uLen < 0 || sLen < 0) {
-      return {
-        score: 0,
-        status: 'WA',
-        message: `第 ${lineNum} 行，行长度超过 ${LINE_CAP} 字节，无法精确比较`,
-      }
-    }
     const uTrim = trimEndLen(user.lineBuf, uLen)
     const sTrim = trimEndLen(std.lineBuf, sLen)
     const userEof = user.eof()
@@ -372,14 +331,6 @@ function compareStrict(user: SyncFileReader, std: SyncFileReader, fullScore: num
     const lineNum = user.line()
     const uLen = user.readLine()
     const sLen = std.readLine()
-    // B-P1-4：超长行（>LINE_CAP）无法完整读取，不得截断后比较，直接判 WA
-    if (uLen < 0 || sLen < 0) {
-      return {
-        score: 0,
-        status: 'WA',
-        message: `第 ${lineNum} 行，行长度超过 ${LINE_CAP} 字节，无法精确比较`,
-      }
-    }
     if (!bufEqual(user.lineBuf, uLen, std.lineBuf, sLen)) {
       return {
         score: 0,

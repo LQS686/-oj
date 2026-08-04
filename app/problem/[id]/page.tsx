@@ -120,6 +120,15 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null)
 
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value)
+    // 仅在用户手动切换时写入本题语言草稿；偏好回退的默认语言不落草稿，
+    // 否则草稿固化后修改偏好将不再生效（且切题时 effect 写回会产生竞态）
+    if (typeof window === 'undefined' || !problem?.id) return
+    const langKey = getLanguageStorageKey(problem.id, classId, fromAssignment)
+    localStorage.setItem(langKey, value)
+  }
+
   // 是否可编辑题目（SYSTEM_ADMIN / ADMIN / TEACHER）
   const canEditProblem = canManageContent(user)
 
@@ -229,13 +238,6 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     const codeKey = getStorageKey(problem.id, classId, fromAssignment)
     localStorage.setItem(codeKey, code)
   }, [code, problem?.id, classId, fromAssignment])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !problem?.id) return
-
-    const langKey = getLanguageStorageKey(problem.id, classId, fromAssignment)
-    localStorage.setItem(langKey, language)
-  }, [language, problem?.id, classId, fromAssignment])
 
   // 桌面端（>= 1024px）不允许停留在 'code' tab，避免左栏内容为空
   useEffect(() => {
@@ -572,7 +574,7 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
               code={code}
               language={language}
               onCodeChange={setCode}
-              onLanguageChange={setLanguage}
+              onLanguageChange={handleLanguageChange}
               onSubmit={() => void handleSubmit()}
               submitting={submitting}
               problemId={problemId}
