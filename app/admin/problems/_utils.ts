@@ -1,6 +1,6 @@
-import type { Problem } from './_types'
-
-/** 题目列表筛选条件 */
+/**
+ * 题目列表筛选条件
+ */
 export interface ProblemFilters {
   searchQuery: string
   /** 难度多选：空数组=全部 */
@@ -23,61 +23,6 @@ export const DEFAULT_FILTERS: ProblemFilters = {
   tags: [],
   sources: [],
   completeness: 'all',
-}
-
-/**
- * 按搜索词 / 难度 / 可见性 / 标签 / 来源 / 数据完整度筛选题目。
- *
- * - 难度：空数组=全部；非空=任一命中
- * - 可见性：all=全部；其他值精确匹配 problem.visibility
- * - 标签：AND 语义，需同时拥有所有选中标签
- * - 来源：精确匹配 problem.source（空数组=不限）
- * - 数据完整度：hasStd/noStd 基于 stdCode 字段；hasTests/noTests 基于 _count.testCases
- */
-export function filterProblems(problems: Problem[], filters: ProblemFilters): Problem[] {
-  const { searchQuery, difficultyFilter, visibility, tags, sources, completeness } = filters
-  const q = searchQuery.trim().toLowerCase()
-
-  return problems.filter(p => {
-    // 关键字：题号 / 标题 / 来源 模糊匹配
-    const matchesSearch = !q ||
-      p.title.toLowerCase().includes(q) ||
-      (p.problemNumber && p.problemNumber.toLowerCase().includes(q)) ||
-      (p.source && p.source.toLowerCase().includes(q))
-
-    // 难度：空数组=全部
-    const matchesDifficulty = difficultyFilter.length === 0 ||
-      difficultyFilter.includes(p.difficulty)
-
-    const matchesVisibility = visibility === 'all' || p.visibility === visibility
-
-    // 标签：AND 语义
-    const matchesTags = tags.length === 0 ||
-      tags.every(t => p.tags.includes(t))
-
-    // 来源：精确匹配（空数组=不限）
-    const matchesSource = sources.length === 0 ||
-      (p.source != null && sources.includes(p.source))
-
-    // 数据完整度：用 stdLang 判断有无标程（后端 select 已不返回 stdCode，改用 stdLang 非空判断）
-    const hasStd = !!p.stdLang
-    const testCount = p._count?.testCases ?? 0
-    const hasTests = testCount > 0
-    const matchesCompleteness =
-      completeness === 'all' ||
-      (completeness === 'hasStd' && hasStd) ||
-      (completeness === 'noStd' && !hasStd) ||
-      (completeness === 'hasTests' && hasTests) ||
-      (completeness === 'noTests' && !hasTests)
-
-    return matchesSearch && matchesDifficulty && matchesVisibility &&
-      matchesTags && matchesSource && matchesCompleteness
-  })
-}
-
-/** 难度筛选下拉显示文案（保留用于其他单选场景） */
-export function getDifficultyLabel(difficultyFilter: string): string {
-  return difficultyFilter === 'all' ? '全部难度' : difficultyFilter
 }
 
 /**

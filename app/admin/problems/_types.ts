@@ -25,14 +25,32 @@ export interface Problem {
   totalSubmit: number
   totalAccepted: number
   createdAt: string
-  /** 标程代码（用于"有标程/无标程"筛选维度），后端 listAllProblemsForAdmin 已返回 */
+  /** 标程代码（仅题目详情接口返回；列表接口为减小传输只返回 stdLang） */
   stdCode?: string | null
-  /** 标程语言（cpp/c/python），与 stdCode 配套 */
+  /** 标程语言（cpp/c/python），列表接口用非空判断"有标程" */
   stdLang?: string | null
-  /** 各关联实体的数量统计（Prisma _count） */
+  /** 各关联实体的数量统计（后端 groupBy 一次聚合，Mongo 下避免 _count N+1） */
   _count?: {
     testCases?: number
   }
+}
+
+/** 题目列表响应中的筛选后统计（后端 listAllProblemsForAdmin 返回 stats 字段） */
+export interface ProblemListStats {
+  /** 全部题目总数（未筛选） */
+  totalAll: number
+  /** 当前筛选条件下的题目总数 */
+  total: number
+  /** 公开题目数（筛选后） */
+  public: number
+  /** 隐藏（private）题目数（筛选后） */
+  hidden: number
+  /** 竞赛题目数（筛选后） */
+  contest: number
+  /** 有标程题目数（筛选后） */
+  hasStd: number
+  /** 有测试点题目数（筛选后） */
+  hasTests: number
 }
 
 export interface LogEntry {

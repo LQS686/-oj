@@ -12,26 +12,53 @@ import { listAllProblemsForAdmin, createAdminProblem } from '@/lib/problem/servi
  *
  * Query 参数：
  * - q: 关键字模糊匹配题号 / 标题 / 来源（不区分大小写）
- * - tagIds / tags: 标签过滤，逗号分隔，多个标签为 OR（任一命中即返回）
- * - page / pageSize: 分页参数（q / tagIds 必须配合分页使用，避免一次性返回全表）
+ * - tags / tagIds: 标签过滤，逗号分隔，多个标签为 OR（任一命中即返回）
+ * - difficulty: 难度过滤，逗号分隔，任一命中即返回
+ * - visibility: all=全部；public/private/contest 精确匹配
+ * - source: 来源过滤，逗号分隔，任一命中即返回
+ * - completeness: hasStd/noStd/hasTests/noTests 数据完整度过滤
+ * - page / pageSize: 分页参数（默认 page=1&pageSize=20，pageSize 上限 100）
  */
 export const GET = withApi.admin(async (req) => {
   const url = new URL(req.url)
   const q = url.searchParams.get('q') || undefined
   const pageStr = url.searchParams.get('page')
   const pageSizeStr = url.searchParams.get('pageSize')
-  const tagIdsParam = url.searchParams.get('tagIds')
-  const page = pageStr ? parseInt(pageStr, 10) : undefined
-  const pageSize = pageSizeStr ? parseInt(pageSizeStr, 10) : undefined
-  // tagIds 以逗号分隔
-  const tagIds = tagIdsParam
-    ? tagIdsParam.split(',').map(s => s.trim()).filter(Boolean)
+  // 兼容旧参数名 tagIds，新调用统一用 tags
+  const tagsParam = url.searchParams.get('tags') ?? url.searchParams.get('tagIds')
+  const difficultyParam = url.searchParams.get('difficulty')
+  const visibility = url.searchParams.get('visibility') || undefined
+  const sourceParam = url.searchParams.get('source')
+  const completeness = url.searchParams.get('completeness') || undefined
+  // 非法分页参数（NaN / 非正数）回落 undefined，由 service 层使用默认值
+  const parsedPage = pageStr ? parseInt(pageStr, 10) : undefined
+  const parsedPageSize = pageSizeStr ? parseInt(pageSizeStr, 10) : undefined
+  const page = Number.isFinite(parsedPage) && (parsedPage as number) > 0
+    ? parsedPage as number
     : undefined
-  // 模糊搜索 / 标签过滤时强制分页（默认 20 条），避免无限制返回
-  if ((q || (tagIds && tagIds.length > 0)) && (!page || !pageSize)) {
-    return ok(await listAllProblemsForAdmin({ q, page: 1, pageSize: 20, tagIds }))
-  }
-  return ok(await listAllProblemsForAdmin({ q, page, pageSize, tagIds }))
+  const pageSize = Number.isFinite(parsedPageSize) && (parsedPageSize as number) > 0
+    ? parsedPageSize as number
+    : undefined
+  const tags = tagsParam
+    ? tagsParam.split(',').map(s => s.trim()).filter(Boolean)
+    : undefined
+  const difficulty = difficultyParam
+    ? difficultyParam.split(',').map(s => s.trim()).filter(Boolean)
+    : undefined
+  const sources = sourceParam
+    ? sourceParam.split(',').map(s => s.trim()).filter(Boolean)
+    : undefined
+
+  return ok(await listAllProblemsForAdmin({
+    q,
+    page,
+    pageSize,
+    tagIds: tags,
+    difficulty,
+    visibility,
+    sources,
+    completeness,
+  }))
 })
 
 /**

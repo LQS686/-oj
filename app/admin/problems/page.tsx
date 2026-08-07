@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, AdminPageShell } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -14,7 +14,6 @@ import { DeleteProblemModal } from './_components/DeleteProblemModal'
 import { ImportProblemsModal } from './_components/ImportProblemsModal'
 import { ExportProblemsModal } from './_components/ExportProblemsModal'
 import {
-  filterProblems,
   DEFAULT_FILTERS,
   filtersToQueryParams,
   queryParamsToFilters,
@@ -26,8 +25,20 @@ import type { Problem, BatchActionType } from './_types'
 function AdminProblemsPageContent() {
   const dialog = useDialog()
   const router = useRouter()
+
+  // 筛选条件：初始值从 URL query string 恢复（支持分享 / 刷新保留筛选状态）
+  // 必须先于 useProblemList 定义（hook 依赖 filters 构造请求参数）
+  const [filters, setFilters] = useState<ProblemFilters>(() => {
+    if (typeof window === 'undefined') return DEFAULT_FILTERS
+    // 从 URL 恢复筛选条件
+    const params = new URLSearchParams(window.location.search)
+    return queryParamsToFilters(params)
+  })
+
   const {
     problems,
+    total,
+    stats,
     loading,
     initialLoading,
     error,
@@ -39,15 +50,7 @@ function AdminProblemsPageContent() {
     pageSize,
     setPage,
     setPageSize,
-  } = useProblemList()
-
-  // 筛选条件：初始值从 URL query string 恢复（支持分享 / 刷新保留筛选状态）
-  const [filters, setFilters] = useState<ProblemFilters>(() => {
-    if (typeof window === 'undefined') return DEFAULT_FILTERS
-    // 从 URL 恢复筛选条件
-    const params = new URLSearchParams(window.location.search)
-    return queryParamsToFilters(params)
-  })
+  } = useProblemList(filters)
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingProblem, setDeletingProblem] = useState<Problem | null>(null)
@@ -80,17 +83,6 @@ function AdminProblemsPageContent() {
       router.replace(newUrl, { scroll: false })
     }
   }, [filters, router])
-
-  const filteredProblems = useMemo(
-    () => filterProblems(problems, filters),
-    [problems, filters]
-  )
-
-  // 客户端分页：筛选后的全量数据切片展示当前页，避免一次渲染所有行导致卡顿
-  const pagedProblems = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filteredProblems.slice(start, start + pageSize)
-  }, [filteredProblems, page, pageSize])
 
   const handleBatchAction = async (action: BatchActionType, selectedIds: string[]) => {
     if (selectedIds.length === 0) return
@@ -235,10 +227,15 @@ function AdminProblemsPageContent() {
           allSources={allSources}
         />
 
-        <ProblemStatsRow problems={problems} filteredProblems={filteredProblems} />
+        <ProblemStatsRow
+          totalAll={stats?.totalAll ?? 0}
+          total={total}
+          stats={stats}
+          hasActiveFilters={hasActiveFilters}
+        />
 
         <DataTable<Problem>
-          data={pagedProblems}
+          data={problems}
           columns={columns}
           idKey="id"
           loading={loading}
@@ -249,7 +246,7 @@ function AdminProblemsPageContent() {
           pagination={{
             page,
             pageSize,
-            total: filteredProblems.length,
+            total,
             onPageChange: setPage,
             onPageSizeChange: (size) => {
               setPageSize(size)
@@ -285,7 +282,8 @@ function AdminProblemsPageContent() {
         <ExportProblemsModal
           onClose={() => setShowExportModal(false)}
           selectedIds={selectedIds}
-          totalCount={problems.length}
+          // totalCount 语义为"全部题目"（导出范围是全量，不受当前筛选影响）
+          totalCount={stats?.totalAll ?? 0}
         />
       )}
     </>

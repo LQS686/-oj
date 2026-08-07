@@ -23,22 +23,33 @@ export async function listAllProblemsForAdmin(opts?: {
   pageSize?: number
   q?: string
   tagIds?: string[]
+  difficulty?: string[]
+  visibility?: string
+  sources?: string[]
+  completeness?: string
 }) {
-  const page = opts?.page
-  const rawPageSize = opts?.pageSize
-  const pageSize =
-    typeof rawPageSize === 'number' && rawPageSize > 0 ? Math.min(rawPageSize, 100) : undefined
-  const usePaging =
-    typeof page === 'number' && typeof pageSize === 'number' && page > 0 && pageSize > 0
-  const take = usePaging ? (pageSize as number) : 100
-  const skip = usePaging ? ((page as number) - 1) * (pageSize as number) : 0
+  // 默认强制分页（page=1&pageSize=20），避免无分页参数时一次性返回全表
+  // 对非法分页参数做防御（NaN / 负数 → 回落默认值），避免 Prisma 收到 NaN skip/take
+  const page = Number.isFinite(opts?.page)
+    ? Math.max(1, Math.floor(opts?.page as number))
+    : 1
+  const rawPageSize = Number.isFinite(opts?.pageSize) && (opts?.pageSize as number) > 0
+    ? Math.floor(opts?.pageSize as number)
+    : 20
+  const pageSize = Math.min(Math.max(1, rawPageSize), 100)
+  const take = pageSize
+  const skip = (page - 1) * pageSize
 
   // q 关键字模糊匹配题号 / 标题 / 来源（不区分大小写，参考 HOJ ProblemMapper.xml）
   // - "P1000" / "1000" / 标题片段 / 来源片段均能匹配
-  // - 模糊查询时强制分页，避免无 q 时一次性返回全表
   const q = opts?.q?.trim()
   const tagIds = opts?.tagIds?.filter(Boolean)
-  const where: Record<string, unknown> = {}
+  const difficulty = opts?.difficulty?.filter(Boolean)
+  const visibility = opts?.visibility
+  const sources = opts?.sources?.filter(Boolean)
+  const completeness = opts?.completeness
+
+  const where: Prisma.ProblemWhereInput = {}
   if (q) {
     where.OR = [
       { problemNumber: { contains: q, mode: 'insensitive' as const } },
@@ -46,48 +57,165 @@ export async function listAllProblemsForAdmin(opts?: {
       { source: { contains: q, mode: 'insensitive' as const } },
     ]
   }
-  // 标签过滤（参考 HOJ problem_tag RIGHT JOIN ... HAVING COUNT = tagListSize 的 AND 语义）
+  // 标签过滤：保持原前端 AND 语义（需同时拥有所有选中标签）。
+  // Mongo 连接器不支持 hasEvery，用多个 has 条件组合 AND 实现（Mongo 支持数组字段 has 过滤）
   if (tagIds && tagIds.length > 0) {
-    where.tags = { hasSome: tagIds }
+    const tagConditions: Prisma.ProblemWhereInput[] = tagIds.map(t => ({ tags: { has: t } }))
+    const andConditions: Prisma.ProblemWhereInput[] = []
+    // q 与标签同时存在时，把 OR（q 条件）移入 AND 首个分支，避免 where 自引用
+    if (where.OR) {
+      andConditions.push({ OR: where.OR })
+      delete where.OR
+    }
+    where.AND = [...andConditions, ...tagConditions]
+  }
+  if (difficulty && difficulty.length > 0) {
+    where.difficulty = { in: difficulty }
+  }
+  if (visibility && visibility !== 'all') {
+    where.visibility = visibility
+  }
+  if (sources && sources.length > 0) {
+    where.source = { in: sources }
+  }
+  if (completeness === 'hasStd') {
+    where.stdLang = { not: null }
+  } else if (completeness === 'noStd') {
+    where.stdLang = null
   }
 
-  const [data, total] = await Promise.all([
-    prisma.problem.findMany({
-      where,
-      skip,
-      take,
-      orderBy: [{ problemNumber: 'asc' }, { createdAt: 'desc' }],
+  // ===== 性能关键：MongoDB 连接器下 _count 关联查询是逐条执行（N+1）=====
+  // 改为：一次 findMany 取候选 id → 一次 testCase.groupBy 聚合全部测点数，
+  // 内存合并 _count / 做 hasTests-noTests 过滤 / 统计"有测试点"数量。
+  const candidateIds = (
+    await prisma.problem.findMany({ where, select: { id: true } })
+  ).map(p => p.id)
+
+  let countMap = new Map<string, number>()
+  if (candidateIds.length > 0) {
+    const grouped = await prisma.testCase.groupBy({
+      by: ['problemId'],
+      where: { problemId: { in: candidateIds } },
+      _count: { _all: true },
+    })
+    countMap = new Map(grouped.map(g => [g.problemId, g._count._all]))
+  }
+
+  // hasTests / noTests 基于测点计数过滤（Mongo 连接器不支持 relation filter）
+  let finalIds = candidateIds
+  if (completeness === 'hasTests') {
+    finalIds = candidateIds.filter(id => (countMap.get(id) ?? 0) > 0)
+  } else if (completeness === 'noTests') {
+    finalIds = candidateIds.filter(id => (countMap.get(id) ?? 0) === 0)
+  }
+  const total = finalIds.length
+
+  // 筛选后的统计（公开/隐藏/竞赛/有标程/有测试点）与标签/来源聚合：
+  // 一次 findMany 仅取统计与下拉所需字段，避免逐题查询
+  let stats: {
+    totalAll: number
+    total: number
+    public: number
+    hidden: number
+    contest: number
+    hasStd: number
+    hasTests: number
+  } = {
+    totalAll: await prisma.problem.count(),
+    total,
+    public: 0,
+    hidden: 0,
+    contest: 0,
+    hasStd: 0,
+    hasTests: 0,
+  }
+  let availableTags: string[] = []
+  let availableSources: string[] = []
+  if (finalIds.length > 0) {
+    const statRows = await prisma.problem.findMany({
+      where: { id: { in: finalIds } },
       select: {
         id: true,
-        problemNumber: true,
-        title: true,
-        source: true,
-        difficulty: true,
-        tags: true,
-        isPublic: true,
         visibility: true,
-        timeLimit: true,
-        memoryLimit: true,
-        totalSubmit: true,
-        totalAccepted: true,
-        createdAt: true,
-        updatedAt: true,
-        // 题目管理筛选需要：标程存在性 + 测试点数量（用于"有标程/无标程/有测试点/无测试点"筛选维度）
-        // 用 stdLang 判断有无标程（非空即有），避免传输 stdCode 源码（可达数 KB）
+        isPublic: true,
         stdLang: true,
-        _count: { select: { testCases: true } },
+        tags: true,
+        source: true,
       },
-    }),
-    prisma.problem.count({ where }),
-  ])
+    })
+    let publicCount = 0
+    let hiddenCount = 0
+    let contestCount = 0
+    let hasStdCount = 0
+    let hasTestsCount = 0
+    const tagSet = new Set<string>()
+    const sourceSet = new Set<string>()
+    for (const row of statRows) {
+      const v = row.visibility || (row.isPublic ? 'public' : 'private')
+      if (v === 'public') publicCount++
+      else if (v === 'contest') contestCount++
+      else hiddenCount++
+      if (row.stdLang) hasStdCount++
+      if ((countMap.get(row.id) ?? 0) > 0) hasTestsCount++
+      for (const t of row.tags) {
+        if (t) tagSet.add(t)
+      }
+      if (row.source && row.source.trim()) sourceSet.add(row.source.trim())
+    }
+    stats = {
+      totalAll: stats.totalAll,
+      total,
+      public: publicCount,
+      hidden: hiddenCount,
+      contest: contestCount,
+      hasStd: hasStdCount,
+      hasTests: hasTestsCount,
+    }
+    availableTags = Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
+    availableSources = Array.from(sourceSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
+  }
+
+  const data = await prisma.problem.findMany({
+    where: { id: { in: finalIds } },
+    skip,
+    take,
+    orderBy: [{ problemNumber: 'asc' }, { createdAt: 'desc' }],
+    select: {
+      id: true,
+      problemNumber: true,
+      title: true,
+      source: true,
+      difficulty: true,
+      tags: true,
+      isPublic: true,
+      visibility: true,
+      timeLimit: true,
+      memoryLimit: true,
+      totalSubmit: true,
+      totalAccepted: true,
+      createdAt: true,
+      updatedAt: true,
+      // 题目管理筛选需要：标程存在性（用于"有标程/无标程"筛选维度）
+      // 用 stdLang 判断有无标程（非空即有），避免传输 stdCode 源码（可达数 KB）
+      stdLang: true,
+    },
+  })
+  // 合并测点数到每行（保持 _count.testCases 响应结构，兼容前端类型）
+  const rows = data.map(p => ({
+    ...p,
+    _count: { testCases: countMap.get(p.id) ?? 0 },
+  }))
+
   return {
-    data,
+    data: rows,
     pagination: {
-      page: usePaging ? (page as number) : 1,
+      page,
       limit: take,
       total,
       totalPages: Math.ceil(total / take),
     },
+    stats,
+    meta: { availableTags, availableSources },
   }
 }
 
