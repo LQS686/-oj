@@ -101,7 +101,7 @@ function MultiSelectDropdown({ label, options, selected, onChange, placeholder }
       )}
 
       {open && (
-        <div className="absolute left-0 z-[60] mt-1 w-64 max-w-[calc(100vw-2rem)] max-h-72 rounded-lg border border-border bg-background shadow-lg">
+        <div className="absolute right-0 z-[60] mt-1 w-64 max-w-[calc(100vw-2rem)] max-h-72 rounded-lg border border-border bg-background shadow-lg">
           <div className="p-2 border-b border-border">
             <input
               type="text"

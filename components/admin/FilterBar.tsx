@@ -100,9 +100,10 @@ export default function FilterBar({ children, activeCount = 0, onReset, onApply 
   }
 
   // 桌面端展开渲染
-  // 注意：不能依赖 .card 的 overflow:hidden（会裁剪筛选下拉菜单），显式 overflow-visible 覆盖
+  // 用 card-flat 而非 card：card 的 overflow:hidden 会裁剪下拉，且 hover 的 transform
+  // 会创建 stacking context，导致下拉被下方列表遮挡；card-flat 两者皆无
   return (
-    <div className="card p-4 overflow-visible">
+    <div className="card-flat p-4">
       <div className="flex gap-4 flex-wrap items-center">
         {children}
       </div>
