@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Trophy, Plus, Search, Trash2, AlertCircle, Loader2, Edit } from 'lucide-react'
 import { CreateModalShell } from '@/components/common'
@@ -57,6 +57,12 @@ export default function CreateContestModal({
   const [searchResults, setSearchResults] = useState<Problem[]>([])
   const [searching, setSearching] = useState(false)
   const [batchInput, setBatchInput] = useState('')
+
+  // 最新已添加题目集合的引用：搜索响应返回时用它过滤，避免异步闭包读到过期的 contestProblems
+  const contestProblemsRef = useRef<Problem[]>([])
+  useEffect(() => {
+    contestProblemsRef.current = contestProblems
+  }, [contestProblems])
 
   const resetForm = useCallback(() => {
     setFormData(defaultForm())
@@ -155,8 +161,9 @@ export default function CreateContestModal({
       const response = await fetchWithCookie(`/api/problems?search=${encodeURIComponent(query)}&limit=5`)
       const data = await response.json()
       if (data.success) {
+        // 用 ref 读最新已添加集合，避免异步响应覆盖时读过期闭包、把已添加项重新加回结果
         const filtered = (data.data.problems || []).filter((p: Problem) =>
-          !contestProblems.find(cp => cp.id === p.id)
+          !contestProblemsRef.current.find(cp => cp.id === p.id)
         )
         setSearchResults(filtered)
       }
@@ -169,8 +176,8 @@ export default function CreateContestModal({
 
   const handleAddProblem = (problem: Problem) => {
     setContestProblems([...contestProblems, problem])
-    setSearchResults([])
-    setSearchQuery('')
+    // 保留关键词与剩余结果，支持连续添加包含该关键词的题目；仅移除已添加项
+    setSearchResults(prev => prev.filter(p => p.id !== problem.id))
   }
 
   const handleRemoveProblem = (problemId: string) => {

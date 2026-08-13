@@ -29,6 +29,7 @@ export default function AssignmentProblemPicker({
   const selectedIdSet = useMemo(() => new Set(orderedIds), [orderedIds])
 
   // 客户端搜索：从已加载的全部公开题中过滤（作业不允许竞赛专用题）
+  // 关键词覆盖题号 / 标题 / 难度 / 标签，便于连续添加同类题目
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
     const q = searchQuery.trim().toLowerCase()
@@ -36,7 +37,9 @@ export default function AssignmentProblemPicker({
       .filter((p) => {
         const byTitle = p.title.toLowerCase().includes(q)
         const byNumber = p.problemNumber.toLowerCase().includes(q)
-        return byTitle || byNumber
+        const byDifficulty = p.difficulty.toLowerCase().includes(q)
+        const byTag = (p.tags || []).some((t) => t.toLowerCase().includes(q))
+        return byTitle || byNumber || byDifficulty || byTag
       })
       .filter((p) => !selectedIdSet.has(p.id))
       .slice(0, 8)
@@ -61,7 +64,7 @@ export default function AssignmentProblemPicker({
 
   const handleSearchAdd = (problem: ProblemPickItem) => {
     onChange([...orderedIds, problem.id])
-    setSearchQuery('')
+    // 保留关键词：支持连续添加包含该关键词的题目；已添加项由 selectedIdSet 变化自动从结果排除
   }
 
   if (problemsLoading) {

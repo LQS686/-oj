@@ -4,6 +4,36 @@
  */
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { getMongoRoClient } from '@/lib/mongodb/client'
+
+/** 转义正则特殊字符，防止用户输入被当作正则语法 */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * 按标签模糊匹配公开题目 id（大小写不敏感、支持部分标签名）。
+ * Prisma MongoDB 对 String[] 仅支持 has/hasSome 精确匹配，无法 contains，
+ * 故用原生 driver 的 $elemMatch + $regex 实现子串匹配。
+ */
+async function findPublicProblemIdsByTagFuzzy(keyword: string): Promise<string[]> {
+  try {
+    const client = await getMongoRoClient()
+    const regex = new RegExp(escapeRegex(keyword), 'i')
+    const docs = await client
+      .db()
+      .collection('Problem')
+      .find(
+        { visibility: 'public', tags: { $elemMatch: { $regex: regex } } },
+        { projection: { _id: 1 } },
+      )
+      .toArray()
+    return docs.map((d) => String(d._id))
+  } catch {
+    // 标签模糊查询失败不影响主查询（退化为不按标签匹配）
+    return []
+  }
+}
 
 /** 公共列表返回的题目轻量字段（不含 description/stdCode/spjCode 等大字段） */
 export type PublicProblemListItem = Prisma.ProblemGetPayload<{
@@ -101,11 +131,19 @@ export async function listPublicProblems(filter: {
 
   const where: Prisma.ProblemWhereInput = { visibility: 'public' }
   if (search) {
-    where.OR = [
+    // 关键词匹配覆盖题号 / 标题 / 来源 / 难度 / 标签，便于快速筛选同类题目
+    const orConditions: Prisma.ProblemWhereInput[] = [
       { title: { contains: search, mode: 'insensitive' } },
       { problemNumber: { contains: search, mode: 'insensitive' } },
       { source: { contains: search, mode: 'insensitive' } },
+      { difficulty: { contains: search, mode: 'insensitive' } },
     ]
+    // 标签做子串匹配（大小写不敏感），命中则并入 OR
+    const tagMatchedIds = await findPublicProblemIdsByTagFuzzy(search)
+    if (tagMatchedIds.length > 0) {
+      orConditions.push({ id: { in: tagMatchedIds } })
+    }
+    where.OR = orConditions
   }
   // 多值筛选（逗号分隔）：难度 OR、标签 OR（hasSome = 命中任意标签）
   const difficulties = difficulty

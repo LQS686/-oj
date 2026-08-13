@@ -130,7 +130,7 @@ export default function EditTrainingPage() {
  if (!searchOpen) return
  const t = setTimeout(() => {
  const params = new URLSearchParams({ limit: '50' })
- if (searchKw) params.set('keyword', searchKw)
+ if (searchKw) params.set('search', searchKw)
  fetchWithCookie(`/api/problems?${params}`, { cache: 'no-store' })
  .then(r => r.json())
  .then(data => {

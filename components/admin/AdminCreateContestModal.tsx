@@ -15,6 +15,7 @@ interface Problem {
   difficulty: string
   visibility: string
   isPublic: boolean
+  tags?: string[]
 }
 
 const defaultForm = () => ({
@@ -140,16 +141,25 @@ export default function AdminCreateContestModal({
     if (!open) return
     const fetchProblems = async () => {
       try {
-        const response = await fetchWithCookie('/api/admin/problems')
-        const data = await response.json()
-        if (data.success) {
+        // 循环分页加载全部题目（避免默认 pageSize=20 导致搜索范围不全），供客户端关键词过滤
+        const all: Problem[] = []
+        let page = 1
+        const pageSize = 100
+        for (;;) {
+          const response = await fetchWithCookie(`/api/admin/problems?page=${page}&pageSize=${pageSize}`)
+          const data = await response.json()
+          if (!data.success) break
           const payload = data.data
-          setAllProblems(Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [])
-        } else {
-          setAllProblems([])
+          const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
+          all.push(...rows)
+          const totalPages = payload?.pagination?.totalPages ?? 1
+          if (page >= totalPages || rows.length === 0) break
+          page += 1
         }
+        setAllProblems(all)
       } catch (err) {
         logger.error('加载题目列表失败', err)
+        setAllProblems([])
       }
     }
     fetchProblems()
@@ -163,9 +173,12 @@ export default function AdminCreateContestModal({
     }
 
     const lowerQuery = query.toLowerCase()
+    // 关键词覆盖题号 / 标题 / 难度 / 标签，便于连续添加同类题目
     const filtered = allProblems.filter((p: Problem) =>
       (p.title.toLowerCase().includes(lowerQuery) ||
-        (p.problemNumber && p.problemNumber.toLowerCase().includes(lowerQuery))) &&
+        (p.problemNumber && p.problemNumber.toLowerCase().includes(lowerQuery)) ||
+        p.difficulty.toLowerCase().includes(lowerQuery) ||
+        (p.tags || []).some(t => t.toLowerCase().includes(lowerQuery))) &&
       !contestProblems.find(cp => cp.id === p.id)
     )
     setSearchResults(filtered.slice(0, 10))
@@ -173,8 +186,8 @@ export default function AdminCreateContestModal({
 
   const handleAddProblem = (problem: Problem) => {
     setContestProblems([...contestProblems, problem])
-    setSearchResults([])
-    setSearchQuery('')
+    // 保留关键词与剩余结果，支持连续添加包含该关键词的题目；仅移除已添加项
+    setSearchResults(prev => prev.filter(p => p.id !== problem.id))
   }
 
   const handleRemoveProblem = (problemId: string) => {
