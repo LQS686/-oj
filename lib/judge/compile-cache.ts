@@ -14,7 +14,7 @@
 import { createHash } from 'crypto'
 import { spawnSync } from 'child_process'
 import { unlink } from 'fs/promises'
-import { existsSync } from 'fs'
+import { existsSync, utimesSync } from 'fs'
 import { logger } from '@/lib/logger'
 
 export interface CompileCacheEntry {
@@ -89,6 +89,13 @@ class CompileArtifactCache {
     this.entries.delete(key)
     this.entries.set(key, entry)
     entry.refs++
+    // 刷新产物 mtime：避免 cleanupOldTempFiles 按 mtime>1h 误删正在被评测使用的产物
+    try {
+      const now = new Date()
+      utimesSync(entry.compiledPath, now, now)
+    } catch {
+      // 忽略 touch 失败（文件可能刚好被外部清理）
+    }
     return { compiledPath: entry.compiledPath, sourceExt: entry.sourceExt }
   }
 
@@ -102,7 +109,8 @@ class CompileArtifactCache {
       void this.removeArtifact(existing)
     }
     this.entries.set(key, { ...entry, refs: 0 })
-    this.evictIfNeeded()
+    // 传入 protectKey，确保刚写入的条目不会被本次淘汰误删（随后 acquire 必须能命中它）
+    this.evictIfNeeded(key)
   }
 
   /** 评测结束释放引用；释放后如超限则尝试淘汰 */
@@ -113,10 +121,11 @@ class CompileArtifactCache {
     this.evictIfNeeded()
   }
 
-  private evictIfNeeded(): void {
+  private evictIfNeeded(protectKey?: string): void {
     if (this.entries.size <= MAX_ENTRIES) return
-    // 按插入顺序（近似 LRU）淘汰 refs===0 的条目；在用条目跳过
+    // 按插入顺序（近似 LRU）淘汰 refs===0 的条目；在用条目与 protectKey 跳过
     for (const [k, e] of this.entries) {
+      if (k === protectKey) continue
       if (e.refs > 0) continue
       this.entries.delete(k)
       void this.removeArtifact(e)
