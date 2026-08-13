@@ -8,6 +8,8 @@ export { default as RouteLoading } from './RouteLoading'
 export { default as NavigationProgress } from './NavigationProgress'
 export { ListEmptyState } from './ListEmptyState'
 export type { ListEmptyStateProps } from './ListEmptyState'
+export { Pagination } from './Pagination'
+export type { PaginationProps } from './Pagination'
 export { ListToolbar, ListToolbarTabs } from './ListToolbar'
 export type {
   ListToolbarProps,

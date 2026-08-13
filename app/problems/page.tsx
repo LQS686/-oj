@@ -8,8 +8,6 @@ import {
   Search,
   Check,
   X,
-  ChevronLeft,
-  ChevronRight,
   BookOpen,
   MoreHorizontal,
   ChevronDown,
@@ -21,7 +19,7 @@ import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useClickOutside } from '@/hooks/useClickOutside'
-import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState, useDialog, Modal, ListToolbar } from '@/components/common'
+import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState, useDialog, Modal, ListToolbar, Pagination } from '@/components/common'
 
 interface Problem {
   id: string
@@ -387,55 +385,7 @@ export default function ProblemsPage() {
 
         {totalPages > 1 && (
           <div className="flex justify-center mt-8">
-            <div className="flex items-center gap-2 card-static rounded-lg p-1">
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-                className="btn btn-ghost px-3 py-2 rounded-md"
-              >
-                <ChevronLeft className="w-4.5 h-4.5" />
-              </button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = i + 1
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setPage(pageNum)}
-                      className={`w-8 h-8 rounded-md font-semibold transition-colors ${
-                        page === pageNum
-                          ? 'btn btn-primary'
-                          : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  )
-                })}
-                {totalPages > 5 && (
-                  <>
-                    <span className="px-2 text-muted-foreground">...</span>
-                    <button
-                      onClick={() => setPage(totalPages)}
-                      className={`w-8 h-8 rounded-md font-semibold transition-colors ${
-                        page === totalPages
-                          ? 'btn btn-primary'
-                          : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
-                      }`}
-                    >
-                      {totalPages}
-                    </button>
-                  </>
-                )}
-              </div>
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={page === totalPages}
-                className="btn btn-ghost px-3 py-2 rounded-md"
-              >
-                <ChevronRight className="w-4.5 h-4.5" />
-              </button>
-            </div>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} compact />
           </div>
         )}
       </div>

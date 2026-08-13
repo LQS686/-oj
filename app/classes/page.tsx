@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
-import { Users, Plus, Calendar, TrendingUp, ChevronLeft, ChevronRight, Globe, Lock, FileText } from 'lucide-react'
+import { Users, Plus, Calendar, TrendingUp, Globe, Lock, FileText } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
@@ -11,7 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
 import { formatDate } from '@/lib/utils'
 import CreateClassModal from '@/components/class/CreateClassModal'
-import { EducationalPageShell, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback, Modal, ListToolbar, ListToolbarTabs } from '@/components/common'
+import { EducationalPageShell, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback, Modal, ListToolbar, ListToolbarTabs, Pagination } from '@/components/common'
 import { loginPathFromLocation } from '@/lib/navigation'
 
 interface Class {
@@ -260,55 +260,7 @@ function ClassesPageContent() {
 
             {totalPages > 1 && (
               <div className="flex justify-center">
-                <div className="flex items-center gap-2 card-static rounded-xl p-2">
-                  <button
-                    onClick={() => setPage(page - 1)}
-                    disabled={page === 1}
-                    className="btn btn-ghost px-3 py-2"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      const pageNum = i + 1
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setPage(pageNum)}
-                          className={`w-10 h-10 rounded-lg font-semibold transition-all ${
-                            page === pageNum
-                              ? 'bg-primary text-primary-foreground shadow-lg'
-                              : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      )
-                    })}
-                    {totalPages > 5 && (
-                      <>
-                        <span className="px-2 text-muted-foreground">...</span>
-                        <button
-                          onClick={() => setPage(totalPages)}
-                          className={`w-10 h-10 rounded-lg font-semibold transition-all ${
-                            page === totalPages
-                              ? 'bg-primary text-primary-foreground shadow-lg'
-                              : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
-                          }`}
-                        >
-                          {totalPages}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setPage(page + 1)}
-                    disabled={page === totalPages}
-                    className="btn btn-ghost px-3 py-2"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
+                <Pagination page={page} totalPages={totalPages} onChange={setPage} />
               </div>
             )}
           </div>

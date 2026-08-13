@@ -481,7 +481,7 @@ export function clearProblemCache(problemId: string) {
   // statusCounts 实际 key 含 contestId/viewerId 变体，需按题目前缀失效
   cache.deleteByPrefix(CacheKeys.problem.statusCounts(problemId))
   cache.delete(CacheKeys.problem.stats(problemId))
-  cache.deleteByPrefix('problem:tags')
+  cache.deleteByPrefix(CacheKeys.problem.tags())
 }
 
 const ADMIN_PROBLEM_EDITABLE_FIELDS = [

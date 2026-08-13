@@ -3,10 +3,10 @@
 import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
-import { Bell, Check, Trash2, Eye, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Bell, Check, Trash2, Eye, Clock } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
-import { EducationalPageShell, PageLoading, ListEmptyState, useDialog, ListToolbar, ListToolbarTabs } from '@/components/common'
+import { EducationalPageShell, PageLoading, ListEmptyState, useDialog, ListToolbar, ListToolbarTabs, Pagination } from '@/components/common'
 import { DataTable, type Column } from '@/components/admin'
 import type { Notification } from '@/types/models'
 import { formatDate } from '@/lib/utils'
@@ -49,7 +49,13 @@ export default function NotificationsPage() {
  setUnreadCount(data.data.unreadCount || 0)
  const total = data.data.total || 0
  const pageSize = data.data.pageSize || 20
- setTotalPages(Math.max(1, Math.ceil(total / pageSize)))
+ const newTotalPages = Math.max(1, Math.ceil(total / pageSize))
+ setTotalPages(newTotalPages)
+ // 删除最后一页的最后一条后 page 可能 > newTotalPages：回退到最后一页，
+ // 避免停留在已不存在的空页（否则删除后只见空列表，需手动翻回前一页）。
+ if (page > newTotalPages) {
+ setPage(newTotalPages)
+ }
  }
  } catch (error) {
  console.error('获取通知失败:', error)
@@ -366,55 +372,7 @@ export default function NotificationsPage() {
 
  {totalPages > 1 && (
  <div className="mt-8 flex justify-center">
- <div className="flex items-center gap-2 card-static rounded-lg p-2">
- <button
- onClick={() => setPage(p => Math.max(1, p - 1))}
- disabled={page === 1}
- className="btn btn-ghost px-3 py-2"
- >
- <ChevronLeft className="w-5 h-5" />
- </button>
- <div className="flex items-center gap-1">
- {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
- const pageNum = i + 1
- return (
- <button
- key={pageNum}
- onClick={() => setPage(pageNum)}
- className={`w-10 h-10 rounded-lg font-semibold transition-all ${
- page === pageNum
- ? 'bg-primary text-primary-foreground shadow-lg'
- : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
- }`}
- >
- {pageNum}
- </button>
- )
- })}
- {totalPages > 5 && (
- <>
- <span className="px-2 text-muted-foreground">...</span>
- <button
- onClick={() => setPage(totalPages)}
- className={`w-10 h-10 rounded-lg font-semibold transition-all ${
- page === totalPages
- ? 'bg-primary text-primary-foreground shadow-lg'
- : 'text-muted-foreground hover:bg-primary/10 hover:text-primary-light'
- }`}
- >
- {totalPages}
- </button>
- </>
- )}
- </div>
- <button
- onClick={() => setPage(p => Math.min(totalPages, p + 1))}
- disabled={page === totalPages}
- className="btn btn-ghost px-3 py-2"
- >
- <ChevronRight className="w-5 h-5" />
- </button>
- </div>
+ <Pagination page={page} totalPages={totalPages} onChange={setPage} />
  </div>
  )}
  </EducationalPageShell>

@@ -5,66 +5,33 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
-import { DEFAULT_PAGE_SIZE, type ListOptions, type PaginatedResult } from '@/lib/types/common'
-import type { Difficulty } from '@/lib/constants'
+import { CacheKeys } from '@/lib/constants/cache-keys'
 import { clearProblemCache } from './admin'
 import { deleteTestCaseFiles } from './testcase'
 import { logger } from '@/lib/logger'
 
-export interface ProblemListFilter {
-  keyword?: string
-  tagIds?: string[]
-  difficulty?: Difficulty
-  visibility?: 'public' | 'private' | 'contest'
-  categoryId?: string
-}
-
 export async function listProblemTags(): Promise<string[]> {
-  const problems = await prisma.problem.findMany({
-    where: { visibility: 'public' },
-    select: { tags: true },
-  })
+  // 标签集合来自全库扫描，代价高且变化频率低：缓存 5 分钟（与 listTags 历史策略一致），
+  // clearProblemCache 已通过 deleteByPrefix('problem:tags') 在题目增删改时失效。
+  return cache.get(CacheKeys.problem.tags(), [], async () => {
+    const problems = await prisma.problem.findMany({
+      where: { visibility: 'public' },
+      select: { tags: true },
+    })
 
-  const tagSet = new Set<string>()
-  problems.forEach((p) => {
-    if (Array.isArray(p.tags)) {
-      p.tags.forEach((tag) => {
-        if (tag && typeof tag === 'string' && tag.trim()) {
-          tagSet.add(tag.trim())
-        }
-      })
-    }
-  })
+    const tagSet = new Set<string>()
+    problems.forEach((p) => {
+      if (Array.isArray(p.tags)) {
+        p.tags.forEach((tag) => {
+          if (tag && typeof tag === 'string' && tag.trim()) {
+            tagSet.add(tag.trim())
+          }
+        })
+      }
+    })
 
-  return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-CN'))
-}
-
-export async function listProblems(
-  filter: ProblemListFilter = {},
-  options: ListOptions = {}
-): Promise<PaginatedResult<Prisma.ProblemGetPayload<object>>> {
-  const page = options.page ?? 1
-  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const where: Prisma.ProblemWhereInput = {}
-  if (filter.keyword) {
-    where.OR = [
-      { title: { contains: filter.keyword, mode: 'insensitive' } },
-    ]
-  }
-  if (filter.difficulty) where.difficulty = filter.difficulty
-  if (filter.visibility !== undefined) where.visibility = filter.visibility
-  if (filter.tagIds?.length) where.tags = { hasSome: filter.tagIds }
-
-  const [items, total] = await Promise.all([
-    prisma.problem.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { [options.sortBy || 'createdAt']: options.sortOrder || 'desc' },
-    }),
-    prisma.problem.count({ where }),
-  ])
-  return { items, total, page, pageSize }
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  }, { ttl: 5 * 60_000 })
 }
 
 export async function getProblemById(id: string) {
@@ -106,18 +73,6 @@ export async function deleteProblem(id: string) {
 
   clearProblemCache(id)
   return result
-}
-
-export async function listTags() {
-  return cache.get('problem:tags', [], async () => {
-    const problems = await prisma.problem.findMany({
-      where: { visibility: 'public' },
-      select: { tags: true },
-    })
-    const set = new Set<string>()
-    for (const p of problems) for (const t of p.tags) set.add(t)
-    return Array.from(set).sort().map((name) => ({ name }))
-  }, { ttl: 5 * 60_000 })
 }
 
 export async function getProblemStatusCounts(
