@@ -252,10 +252,13 @@ verify() {
   else
     warn "应用尚未就绪：curl http://localhost:3000/healthcheck-static"
   fi
-  if curl -sf http://localhost:3000/api/health/db >/dev/null 2>&1; then
-    info "数据库健康检查通过（/api/health/db）"
+  # 数据库探针改查 mongo 容器健康状态（/api/health/db 需管理员鉴权，匿名 curl 会误报）
+  local MONGO_CID
+  MONGO_CID="$(docker compose ps -q mongo 2>/dev/null | head -1 || true)"
+  if [[ -n "$MONGO_CID" ]] && [[ "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$MONGO_CID" 2>/dev/null)" == "healthy" ]]; then
+    info "数据库健康检查通过（mongo 容器 healthy）"
   else
-    warn "数据库尚未就绪：curl http://localhost:3000/api/health/db"
+    warn "mongo 容器健康状态未就绪（可用 docker compose ps 查看）"
   fi
 
   local SITE_URL="http://localhost:3000"

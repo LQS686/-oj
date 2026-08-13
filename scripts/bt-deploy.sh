@@ -902,11 +902,10 @@ else
   echo "  docker compose exec -u root app chown -R 1001:1001 /app/data /app/public/uploads"
 fi
 
-if curl -sf "$DB_HEALTH_URL" >/dev/null 2>&1; then
-  info "数据库健康检查通过（/api/health/db）"
+if [[ "$(service_health mongo)" == "healthy" ]]; then
+  info "数据库健康检查通过（mongo 容器 healthy）"
 else
-  warn "数据库探针暂未通过: curl -sf ${DB_HEALTH_URL}"
-  warn "若刚完成首次初始化，可再等 30 秒后重试"
+  warn "mongo 容器健康状态: $(service_health mongo)（可用 docker compose ps 查看；若刚完成首次初始化可再等片刻）"
 fi
 
 # ============================================================
