@@ -13,6 +13,10 @@ import { ApiError } from '@/lib/api/errors'
 import { logger } from '@/lib/logger'
 import { DIFFICULTIES, isValidDifficulty } from '@/lib/constants'
 import { purgeProblemDependents } from '@/lib/problem/purge-dependents'
+import { clearProblemCache } from './cache-invalidation'
+
+// 向后兼容：clearProblemCache 定义已移至 cache-invalidation.ts（避免 admin ⇄ testcase 循环依赖）
+export { clearProblemCache } from './cache-invalidation'
 
 /* ============================================================================
  * 管理员视角：列出全部题目（含隐藏字段）/ 创建题目（含自动编号）
@@ -84,99 +88,45 @@ export async function listAllProblemsForAdmin(opts?: {
     where.stdLang = null
   }
 
-  // ===== 性能关键：MongoDB 连接器下 _count 关联查询是逐条执行（N+1）=====
-  // 改为：一次 findMany 取候选 id → 一次 testCase.groupBy 聚合全部测点数，
-  // 内存合并 _count / 做 hasTests-noTests 过滤 / 统计"有测试点"数量。
-  const candidateIds = (
-    await prisma.problem.findMany({ where, select: { id: true } })
-  ).map(p => p.id)
-
-  let countMap = new Map<string, number>()
-  if (candidateIds.length > 0) {
-    const grouped = await prisma.testCase.groupBy({
-      by: ['problemId'],
-      where: { problemId: { in: candidateIds } },
-      _count: { _all: true },
-    })
-    countMap = new Map(grouped.map(g => [g.problemId, g._count._all]))
-  }
+  // ===== 性能关键：避免每次请求（含翻页）重复全量扫描 =====
+  // 1) 聚合快照（候选行 + 全库测点计数 + 全库总数）按筛选条件缓存 30s，
+  //    题目增删改（clearProblemCache）会按前缀失效；翻页只做一次分页查询。
+  // 2) 快照内三路并行（一次 findMany 统计字段 + 一次 groupBy 全量测点 + 一次 count 全库），
+  //    消除原先 5 次串行数据库往返。
+  const snapshotKey = JSON.stringify({
+    q: q ?? '',
+    tagIds: tagIds ?? [],
+    difficulty: difficulty ?? [],
+    visibility: visibility ?? '',
+    sources: sources ?? [],
+    completeness: completeness ?? '',
+  })
+  const snapshot = await getAdminProblemListSnapshot(where, snapshotKey)
 
   // hasTests / noTests 基于测点计数过滤（Mongo 连接器不支持 relation filter）
-  let finalIds = candidateIds
+  let finalIds = snapshot.candidateIds
   if (completeness === 'hasTests') {
-    finalIds = candidateIds.filter(id => (countMap.get(id) ?? 0) > 0)
+    finalIds = snapshot.candidateIds.filter(id => (snapshot.countByProblem[id] ?? 0) > 0)
   } else if (completeness === 'noTests') {
-    finalIds = candidateIds.filter(id => (countMap.get(id) ?? 0) === 0)
+    finalIds = snapshot.candidateIds.filter(id => (snapshot.countByProblem[id] ?? 0) === 0)
   }
   const total = finalIds.length
 
-  // 筛选后的统计（公开/隐藏/竞赛/有标程/有测试点）与标签/来源聚合：
-  // 一次 findMany 仅取统计与下拉所需字段，避免逐题查询
-  let stats: {
-    totalAll: number
-    total: number
-    public: number
-    hidden: number
-    contest: number
-    hasStd: number
-    hasTests: number
-  } = {
-    totalAll: await prisma.problem.count(),
-    total,
-    public: 0,
-    hidden: 0,
-    contest: 0,
-    hasStd: 0,
-    hasTests: 0,
-  }
-  let availableTags: string[] = []
-  let availableSources: string[] = []
-  if (finalIds.length > 0) {
-    const statRows = await prisma.problem.findMany({
-      where: { id: { in: finalIds } },
-      select: {
-        id: true,
-        visibility: true,
-        isPublic: true,
-        stdLang: true,
-        tags: true,
-        source: true,
-      },
-    })
-    let publicCount = 0
-    let hiddenCount = 0
-    let contestCount = 0
-    let hasStdCount = 0
-    let hasTestsCount = 0
-    const tagSet = new Set<string>()
-    const sourceSet = new Set<string>()
-    for (const row of statRows) {
-      const v = row.visibility || (row.isPublic ? 'public' : 'private')
-      if (v === 'public') publicCount++
-      else if (v === 'contest') contestCount++
-      else hiddenCount++
-      if (row.stdLang) hasStdCount++
-      if ((countMap.get(row.id) ?? 0) > 0) hasTestsCount++
-      for (const t of row.tags) {
-        if (t) tagSet.add(t)
-      }
-      if (row.source && row.source.trim()) sourceSet.add(row.source.trim())
-    }
-    stats = {
-      totalAll: stats.totalAll,
-      total,
-      public: publicCount,
-      hidden: hiddenCount,
-      contest: contestCount,
-      hasStd: hasStdCount,
-      hasTests: hasTestsCount,
-    }
-    availableTags = Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
-    availableSources = Array.from(sourceSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
-  }
+  // 统计（公开/隐藏/竞赛/有标程/有测试点）与标签/来源聚合：纯内存计算
+  const { stats, availableTags, availableSources } = aggregateAdminListSnapshot(
+    snapshot.rows,
+    new Set(finalIds),
+    snapshot.countByProblem,
+    snapshot.totalAll,
+    total
+  )
 
   const data = await prisma.problem.findMany({
-    where: { id: { in: finalIds } },
+    // 无测点过滤时直接用 where（走索引），避免传递大数组 $in
+    where:
+      completeness === 'hasTests' || completeness === 'noTests'
+        ? { id: { in: finalIds } }
+        : where,
     skip,
     take,
     orderBy: [{ problemNumber: 'asc' }, { createdAt: 'desc' }],
@@ -203,7 +153,7 @@ export async function listAllProblemsForAdmin(opts?: {
   // 合并测点数到每行（保持 _count.testCases 响应结构，兼容前端类型）
   const rows = data.map(p => ({
     ...p,
-    _count: { testCases: countMap.get(p.id) ?? 0 },
+    _count: { testCases: snapshot.countByProblem[p.id] ?? 0 },
   }))
 
   return {
@@ -216,6 +166,126 @@ export async function listAllProblemsForAdmin(opts?: {
     },
     stats,
     meta: { availableTags, availableSources },
+  }
+}
+
+/* ============================================================================
+ * 后台题目列表聚合快照（性能：翻页/重复打开列表时避免全量扫描）
+ * ========================================================================== */
+
+/** 快照中的单行统计字段（保持可 JSON 序列化，避免 Map/Date 序列化陷阱） */
+interface AdminProblemSnapshotRow {
+  id: string
+  visibility: string
+  isPublic: boolean
+  stdLang: string | null
+  tags: string[]
+  source: string | null
+}
+
+interface AdminProblemListSnapshot {
+  rows: AdminProblemSnapshotRow[]
+  candidateIds: string[]
+  countByProblem: Record<string, number>
+  totalAll: number
+}
+
+/**
+ * 获取后台题目列表的聚合快照（候选行 + 全库测点计数 + 全库总数）。
+ *
+ * 按筛选条件缓存（TTL 30s），翻页 / 重复打开列表时复用，避免每次全量扫描；
+ * 快照内三路查询并行，将原先 5 次串行数据库往返压缩为 1 次往返。
+ */
+async function getAdminProblemListSnapshot(
+  where: Prisma.ProblemWhereInput,
+  cacheKey: string
+): Promise<AdminProblemListSnapshot> {
+  return cache.get(CacheKeys.problem.adminListSnapshot(), [cacheKey], async () => {
+    const [rows, grouped, totalAll] = await Promise.all([
+      prisma.problem.findMany({
+        where,
+        select: {
+          id: true,
+          visibility: true,
+          isPublic: true,
+          stdLang: true,
+          tags: true,
+          source: true,
+        },
+      }),
+      prisma.testCase.groupBy({
+        by: ['problemId'],
+        _count: { _all: true },
+      }),
+      prisma.problem.count(),
+    ])
+
+    const countByProblem: Record<string, number> = {}
+    for (const g of grouped) {
+      countByProblem[g.problemId] = g._count._all
+    }
+
+    return {
+      rows,
+      candidateIds: rows.map(r => r.id),
+      countByProblem,
+      totalAll,
+    }
+  }, { ttl: 30_000 })
+}
+
+/** 内存聚合：统计（公开/隐藏/竞赛/有标程/有测试点）与标签/来源 */
+function aggregateAdminListSnapshot(
+  rows: AdminProblemSnapshotRow[],
+  finalIdSet: Set<string>,
+  countByProblem: Record<string, number>,
+  totalAll: number,
+  total: number
+): {
+  stats: {
+    totalAll: number
+    total: number
+    public: number
+    hidden: number
+    contest: number
+    hasStd: number
+    hasTests: number
+  }
+  availableTags: string[]
+  availableSources: string[]
+} {
+  let publicCount = 0
+  let hiddenCount = 0
+  let contestCount = 0
+  let hasStdCount = 0
+  let hasTestsCount = 0
+  const tagSet = new Set<string>()
+  const sourceSet = new Set<string>()
+  for (const row of rows) {
+    if (!finalIdSet.has(row.id)) continue
+    const v = row.visibility || (row.isPublic ? 'public' : 'private')
+    if (v === 'public') publicCount++
+    else if (v === 'contest') contestCount++
+    else hiddenCount++
+    if (row.stdLang) hasStdCount++
+    if ((countByProblem[row.id] ?? 0) > 0) hasTestsCount++
+    for (const t of row.tags) {
+      if (t) tagSet.add(t)
+    }
+    if (row.source && row.source.trim()) sourceSet.add(row.source.trim())
+  }
+  return {
+    stats: {
+      totalAll,
+      total,
+      public: publicCount,
+      hidden: hiddenCount,
+      contest: contestCount,
+      hasStd: hasStdCount,
+      hasTests: hasTestsCount,
+    },
+    availableTags: Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN')),
+    availableSources: Array.from(sourceSet).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN')),
   }
 }
 
@@ -472,17 +542,6 @@ export async function createAdminProblem(
 /* ============================================================================
  * 管理员编辑/获取/删除题目（原 /api/admin/problems/[id]）
  * ========================================================================== */
-
-/**
- * 清除单道题目的全部缓存（byId + statusCounts）
- */
-export function clearProblemCache(problemId: string) {
-  cache.delete(CacheKeys.problem.byId(problemId))
-  // statusCounts 实际 key 含 contestId/viewerId 变体，需按题目前缀失效
-  cache.deleteByPrefix(CacheKeys.problem.statusCounts(problemId))
-  cache.delete(CacheKeys.problem.stats(problemId))
-  cache.deleteByPrefix(CacheKeys.problem.tags())
-}
 
 const ADMIN_PROBLEM_EDITABLE_FIELDS = [
   'problemNumber',

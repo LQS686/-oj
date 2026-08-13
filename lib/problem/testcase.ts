@@ -10,6 +10,7 @@ import AdmZip from 'adm-zip'
 import path from 'path'
 import { writeFile, mkdir, rm, access } from 'fs/promises'
 import { invalidateProblemTestCaseCache } from '@/lib/judge/testcase-loader'
+import { clearProblemCache } from './cache-invalidation'
 
 // 重新导出纯函数以兼容服务端 import（不会把 fs 传到客户端因为这些函数本身无副作用）
 export {
@@ -35,6 +36,8 @@ export interface TestcaseData {
  */
 export async function saveTestcases(problemId: string, testcases: TestcaseData[]) {
   await invalidateProblemTestCaseCache(problemId)
+  // 测点数量/样例变化会影响题面详情缓存与后台列表测点计数快照，一并失效
+  clearProblemCache(problemId)
   await prisma.testCase.deleteMany({ where: { problemId } })
   if (!testcases.length) return { count: 0 }
   const equalScore = Math.floor(100 / testcases.length)
@@ -63,6 +66,8 @@ export async function listTestcases(problemId: string) {
  * 上传测试用例文件（base64）
  */
 export async function uploadTestcaseFile(problemId: string, _fileName: string, content: string) {
+  // 新增测点会改变后台列表测点计数，失效相关缓存
+  clearProblemCache(problemId)
   return prisma.testCase.create({
     data: {
       problemId,

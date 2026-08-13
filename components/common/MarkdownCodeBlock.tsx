@@ -1,10 +1,7 @@
-'use client'
-
-import { useState } from 'react'
-import { Check, Copy } from 'lucide-react'
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import SampleDataBlock from './SampleDataBlock'
+import CopyButton from './CopyButton'
 
 // 视为「纯文本/数据块」的语言标识（洛谷/Hydro 题面常见 ```plain）
 // 这些代码块不需要语法高亮工具栏，应与题面样例输入/输出一致
@@ -105,7 +102,6 @@ export default function MarkdownCodeBlock({
   language: string
   code: string
 }) {
-  const [copied, setCopied] = useState(false)
   const label = languageLabel(language)
   const hlLang = highlighterLanguage(language)
 
@@ -114,38 +110,16 @@ export default function MarkdownCodeBlock({
     return <SampleDataBlock code={code} />
   }
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      // ignore
-    }
-  }
-
   return (
     <div className="markdown-code-shell group">
       <div className="markdown-code-toolbar">
         <span className="markdown-code-lang">{label}</span>
-        <button
-          type="button"
-          onClick={() => void handleCopy()}
+        <CopyButton
+          code={code}
           className="markdown-code-copy"
-          aria-label="复制代码"
-        >
-          {copied ? (
-            <>
-              <Check className="w-3.5 h-3.5" />
-              <span>已复制</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3.5 h-3.5" />
-              <span>复制</span>
-            </>
-          )}
-        </button>
+          iconClassName="w-3.5 h-3.5"
+          showLabel
+        />
       </div>
       <div className="markdown-code-body">
         <SyntaxHighlighter

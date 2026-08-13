@@ -17,6 +17,10 @@ export const CacheKeys = {
     byIdPrefix: () => 'problem:byId',
     listPrefix: () => 'problem:list',
     tags: () => 'problem:tags',
+    /** 后台题目列表的聚合快照（候选行 + 测点计数 + 全库总数），按筛选条件缓存 */
+    adminListSnapshot: () => 'problem:adminListSnapshot',
+    /** 题面详情（按 ObjectId 或 problemNumber）缓存前缀 */
+    byIdOrNumberPrefix: () => 'problem:byIdOrNumber',
     statusCounts: (id: string) => `problem:statusCounts:${id}`,
     // 注意：写入侧 cache.get('problem:statusCounts', [problemId, contestId, viewerId])
     // 生成的 key 带 contestId/viewerId 变体，因此失效时必须用

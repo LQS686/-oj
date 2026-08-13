@@ -1,24 +1,13 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { AlertCircle, Code as CodeIcon, Send } from 'lucide-react'
+import { AlertCircle, Send } from 'lucide-react'
 import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
 import PretestPanel from '@/components/problem/PretestPanel'
+import { WORKSPACE_LANGUAGE_OPTIONS } from './ProblemSubmitColumnMeta'
 
-export const WORKSPACE_LANGUAGE_OPTIONS = [
-  { value: 'cpp', label: 'C++', version: 'C++17' },
-  { value: 'c', label: 'C', version: 'C11' },
-  { value: 'python', label: 'Python', version: 'Python 3.10' },
-] as const
-
-export function ProblemSubmitColumnHeader() {
-  return (
-    <>
-      <CodeIcon className="w-4 h-4 text-primary-light" />
-      <h3 className="text-sm font-medium text-foreground">提交代码</h3>
-    </>
-  )
-}
+// 向后兼容：轻量导出从 meta 文件 re-export，避免其它页面同步引入时连带 CodeMirror
+export { WORKSPACE_LANGUAGE_OPTIONS, ProblemSubmitColumnHeader } from './ProblemSubmitColumnMeta'
 
 interface ProblemSubmitColumnProps {
   user: { id: string } | null | undefined
