@@ -100,8 +100,9 @@ export default function FilterBar({ children, activeCount = 0, onReset, onApply 
   }
 
   // 桌面端展开渲染
+  // 注意：不能依赖 .card 的 overflow:hidden（会裁剪筛选下拉菜单），显式 overflow-visible 覆盖
   return (
-    <div className="card p-4">
+    <div className="card p-4 overflow-visible">
       <div className="flex gap-4 flex-wrap items-center">
         {children}
       </div>
