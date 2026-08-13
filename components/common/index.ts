@@ -10,6 +10,8 @@ export { ListEmptyState } from './ListEmptyState'
 export type { ListEmptyStateProps } from './ListEmptyState'
 export { Pagination } from './Pagination'
 export type { PaginationProps } from './Pagination'
+export { default as ProblemPicker } from './ProblemPicker'
+export type { ProblemPickerProps } from './ProblemPicker'
 export { ListToolbar, ListToolbarTabs } from './ListToolbar'
 export type {
   ListToolbarProps,

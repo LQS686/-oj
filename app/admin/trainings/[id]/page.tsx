@@ -10,12 +10,13 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
  ArrowLeft, Save, X, Plus, Trash2, Check, AlertCircle, RefreshCw,
- Search, ExternalLink, ChevronUp, ChevronDown
+ ExternalLink, ChevronUp, ChevronDown
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
 import { useDialog } from '@/components/common/DialogProvider'
+import { ProblemPicker } from '@/components/common'
 
 interface TrainingProblem {
  id: string
@@ -45,6 +46,7 @@ interface ProblemListItem {
  title: string
  difficulty: string
  problemNumber?: string | null
+ tags?: string[]
 }
 
 const difficultyClass = (d: string) => {
@@ -80,10 +82,10 @@ export default function EditTrainingPage() {
  const [dirty, setDirty] = useState<Set<string>>(new Set())
  const [savingProblems, setSavingProblems] = useState(false)
 
- // 题目添加搜索
+ // 题目添加搜索（全量题目 + ProblemPicker 客户端过滤）
  const [searchOpen, setSearchOpen] = useState(false)
- const [searchKw, setSearchKw] = useState('')
- const [searchResults, setSearchResults] = useState<ProblemListItem[]>([])
+ const [allProblems, setAllProblems] = useState<ProblemListItem[]>([])
+ const [problemsLoading, setProblemsLoading] = useState(false)
 
  const [saving, setSaving] = useState(false)
 
@@ -125,24 +127,36 @@ export default function EditTrainingPage() {
 
  useDeferredEffect(() => { fetchDetail() }, [fetchDetail])
 
- // 搜索题目
+ // 加载全量公开题（供 ProblemPicker 客户端搜索/批量添加）
  useEffect(() => {
- if (!searchOpen) return
- const t = setTimeout(() => {
- const params = new URLSearchParams({ limit: '50' })
- if (searchKw) params.set('search', searchKw)
- fetchWithCookie(`/api/problems?${params}`, { cache: 'no-store' })
- .then(r => r.json())
- .then(data => {
- const items = Array.isArray(data?.data?.items) ? data.data.items
- : Array.isArray(data?.data) ? data.data : []
- const inList = new Set(training?.problems.map(p => p.problemId) || [])
- setSearchResults(items.filter((p: ProblemListItem) => !inList.has(p.id)))
- })
- .catch(() => setSearchResults([]))
- }, 300)
- return () => clearTimeout(t)
- }, [searchKw, searchOpen, training])
+ let cancelled = false
+ const load = async () => {
+ setProblemsLoading(true)
+ try {
+ const all: ProblemListItem[] = []
+ let page = 1
+ const pageSize = 50
+ for (;;) {
+ const res = await fetchWithCookie(`/api/problems?page=${page}&pageSize=${pageSize}`, { cache: 'no-store' })
+ const data = await res.json()
+ if (cancelled) return
+ if (!data.success) break
+ const batch = data.data?.problems || []
+ all.push(...batch)
+ const totalPages = data.data?.pagination?.totalPages ?? 1
+ if (page >= totalPages || batch.length === 0) break
+ page += 1
+ }
+ if (!cancelled) setAllProblems(all)
+ } catch {
+ if (!cancelled) setAllProblems([])
+ } finally {
+ if (!cancelled) setProblemsLoading(false)
+ }
+ }
+ void load()
+ return () => { cancelled = true }
+ }, [])
 
  const saveMeta = async () => {
  if (!title || !description || !categoryType) {
@@ -209,6 +223,15 @@ export default function EditTrainingPage() {
  problems: problemIds.map(p => ({ problemId: p })),
  })
  if (ok) await fetchDetail()
+ }
+
+ // ProblemPicker 的 onChange 语义是「完整已选列表」；题单编辑为增量保存，这里只提交新增项
+ const handlePickerChange = (ids: string[]) => {
+ const currentIds = new Set(training?.problems.map(p => p.problemId) || [])
+ const added = ids.filter(id => !currentIds.has(id))
+ if (added.length > 0) {
+ void handleAddProblems(added)
+ }
  }
 
  const handleRemove = async (problemId: string) => {
@@ -535,47 +558,15 @@ export default function EditTrainingPage() {
  </button>
 
  {searchOpen && (
- <div className="border rounded-lg p-3 bg-muted/10 space-y-2" style={{ borderColor: 'var(--border)' }}>
- <div className="relative">
- <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
- <input
- type="text"
- value={searchKw}
- onChange={e => setSearchKw(e.target.value)}
- className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary/50"
- placeholder="搜索题目..."
- autoFocus
+ <div className="border rounded-lg p-3 bg-muted/10" style={{ borderColor: 'var(--border)' }}>
+ <ProblemPicker
+ problems={allProblems}
+ problemsLoading={problemsLoading}
+ selectedIds={training?.problems.map(p => p.problemId) || []}
+ onChange={handlePickerChange}
+ hideSelectedList
+ searchPlaceholder="搜索题目名称、题号、难度或标签..."
  />
- </div>
- <div className="max-h-60 overflow-y-auto rounded-lg border bg-background" style={{ borderColor: 'var(--border)' }}>
- {searchResults.length === 0 ? (
- <div className="py-4 text-center text-muted-foreground text-sm">
- {searchKw ? '无匹配题目' : '输入关键词搜索'}
- </div>
- ) : (
- <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
- {searchResults.map(p => (
- <li key={p.id}>
- <button
- onClick={() => handleAddProblems([p.id])}
- className="w-full flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-primary/5 transition-colors text-left"
- >
- <Plus className="w-4 h-4 text-primary-light flex-shrink-0" />
- <span className="flex-1 text-sm text-foreground truncate">
- {p.problemNumber ? (
- <span className="text-muted-foreground">[{p.problemNumber}] </span>
- ) : null}
- {p.title}
- </span>
- <span className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${difficultyClass(p.difficulty)}`}>
- {p.difficulty}
- </span>
- </button>
- </li>
- ))}
- </ul>
- )}
- </div>
  </div>
  )}
 

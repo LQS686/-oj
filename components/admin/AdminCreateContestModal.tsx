@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { Trophy, Search, Plus, X, AlertCircle, Edit } from 'lucide-react'
-import { CreateModalShell } from '@/components/common'
+import { Trophy, X, AlertCircle, Edit } from 'lucide-react'
+import { CreateModalShell, ProblemPicker } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useDialog } from '@/components/common/DialogProvider'
@@ -52,19 +52,14 @@ export default function AdminCreateContestModal({
   const [formData, setFormData] = useState(defaultForm)
 
   const [allProblems, setAllProblems] = useState<Problem[]>([])
+  const [problemsLoading, setProblemsLoading] = useState(false)
   const [contestProblems, setContestProblems] = useState<Problem[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<Problem[]>([])
-  const [batchInput, setBatchInput] = useState('')
   /** 编辑态：库中已有参赛密码（表单留空表示保持） */
   const [existingHasPassword, setExistingHasPassword] = useState(false)
 
   const resetForm = useCallback(() => {
     setFormData(defaultForm())
     setContestProblems([])
-    setSearchQuery('')
-    setSearchResults([])
-    setBatchInput('')
     setError('')
     setSubmitting(false)
     setLoading(false)
@@ -142,6 +137,7 @@ export default function AdminCreateContestModal({
     const fetchProblems = async () => {
       try {
         // 循环分页加载全部题目（避免默认 pageSize=20 导致搜索范围不全），供客户端关键词过滤
+        setProblemsLoading(true)
         const all: Problem[] = []
         let page = 1
         const pageSize = 100
@@ -160,73 +156,19 @@ export default function AdminCreateContestModal({
       } catch (err) {
         logger.error('加载题目列表失败', err)
         setAllProblems([])
+      } finally {
+        setProblemsLoading(false)
       }
     }
     fetchProblems()
   }, [open])
 
-  const searchProblems = (query: string) => {
-    setSearchQuery(query)
-    if (!query) {
-      setSearchResults([])
-      return
-    }
-
-    const lowerQuery = query.toLowerCase()
-    // 关键词覆盖题号 / 标题 / 难度 / 标签，便于连续添加同类题目
-    const filtered = allProblems.filter((p: Problem) =>
-      (p.title.toLowerCase().includes(lowerQuery) ||
-        (p.problemNumber && p.problemNumber.toLowerCase().includes(lowerQuery)) ||
-        p.difficulty.toLowerCase().includes(lowerQuery) ||
-        (p.tags || []).some(t => t.toLowerCase().includes(lowerQuery))) &&
-      !contestProblems.find(cp => cp.id === p.id)
-    )
-    setSearchResults(filtered.slice(0, 10))
-  }
-
-  const handleAddProblem = (problem: Problem) => {
-    setContestProblems([...contestProblems, problem])
-    // 保留关键词与剩余结果，支持连续添加包含该关键词的题目；仅移除已添加项
-    setSearchResults(prev => prev.filter(p => p.id !== problem.id))
-  }
-
-  const handleRemoveProblem = (problemId: string) => {
-    setContestProblems(contestProblems.filter(p => p.id !== problemId))
-  }
-
-  const handleBatchAdd = async () => {
-    if (!batchInput.trim()) return
-
-    const numbers = batchInput.split(/[,，\s\n]+/).filter(s => s.trim())
-    const problemsToAdd: Problem[] = []
-    const notFound: string[] = []
-
-    numbers.forEach(num => {
-      const targetNum = num.toUpperCase().startsWith('P') ? num.toUpperCase() : `P${num}`
-
-      const problem = allProblems.find((p: Problem) =>
-        p.problemNumber && p.problemNumber.toUpperCase() === targetNum
-      )
-
-      if (problem) {
-        if (!contestProblems.find(cp => cp.id === problem.id) && !problemsToAdd.find(p => p.id === problem.id)) {
-          problemsToAdd.push(problem)
-        }
-      } else {
-        notFound.push(num)
-      }
-    })
-
-    setContestProblems([...contestProblems, ...problemsToAdd])
-    setBatchInput('')
-
-    if (notFound.length > 0) {
-      await dialog.alert({
-        tone: 'warning',
-        message: `以下题目未找到: ${notFound.join(', ')}`,
-      })
-    }
-  }
+  const handleProblemsChange = useCallback((ids: string[]) => {
+    // 公开题从 allProblems 重建；编辑态/加载中竞赛可能含不在 allProblems 里的题目，从原 contestProblems 保留
+    const map = new Map(allProblems.map((p) => [p.id, p]))
+    const existing = new Map(contestProblems.map((p) => [p.id, p]))
+    setContestProblems(ids.map((id) => map.get(id) ?? existing.get(id)).filter((p): p is Problem => !!p))
+  }, [allProblems, contestProblems])
 
   const buildPayload = () => {
     const payload: Record<string, unknown> = {
@@ -437,129 +379,48 @@ export default function AdminCreateContestModal({
                 <span className="tag">已添加 {contestProblems.length} 题</span>
               </div>
 
-              {/* 批量添加 */}
-              <div>
-                <label className="block text-sm font-bold text-primary-light mb-2">
-                  批量添加题目
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="输入题号，例如: P1001, 1002, P1005 (支持逗号或空格分隔)"
-                    value={batchInput}
-                    onChange={(e) => setBatchInput(e.target.value)}
-                    className="input flex-1"
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleBatchAdd())}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleBatchAdd}
-                    disabled={!batchInput.trim()}
-                    className="btn btn-primary whitespace-nowrap"
-                  >
-                    <Plus className="w-4 h-4" />
-                    批量添加
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  提示：直接输入数字（如 1001）将自动识别为 P1001。支持一次性添加多个题目。
-                </p>
-              </div>
-
-              {/* 搜索添加 */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  搜索添加题目
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="搜索题目名称或题号..."
-                    value={searchQuery}
-                    onChange={(e) => searchProblems(e.target.value)}
-                    className="input w-full pl-10"
-                  />
-                  <Search className="w-5 h-5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                </div>
-
-                {searchResults.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 card-static rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto">
-                    {searchResults.map(problem => (
-                      <button
-                        key={problem.id}
-                        type="button"
-                        onClick={() => handleAddProblem(problem)}
-                        className="w-full px-4 py-3 text-left hover:bg-muted flex justify-between items-center border-b border-border last:border-0 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="tag font-mono">
-                            {problem.problemNumber}
-                          </span>
-                          <span className="font-medium text-foreground">{problem.title}</span>
-                          <span className={`tag ${
-                            (problem.visibility === 'contest') ? 'tag-warning' :
-                              (problem.visibility === 'public' || problem.isPublic) ? 'tag-success' : ''
-                          }`}>
-                            {problem.visibility === 'contest' ? '竞赛专用' :
-                              (problem.visibility === 'public' || problem.isPublic) ? '公开' : '隐藏'}
-                          </span>
-                        </div>
-                        <span className={`tag ${
-                          problem.difficulty === '入门' ? 'tag-success' :
-                            problem.difficulty.includes('普及') ? 'tag-warning' :
-                            'tag-error'
-                        }`}>
-                          {problem.difficulty}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 已添加题目列表 */}
-              <div className="space-y-2">
-                {contestProblems.map((problem, index) => (
-                  <div key={problem.id} className="flex items-center justify-between p-3 card-static rounded-xl border border-border group hover:border-primary/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <span className="w-7 h-7 flex items-center justify-center bg-primary/10 border border-primary/20 rounded-full text-xs font-bold text-primary-light">
+              <ProblemPicker
+                problems={allProblems}
+                problemsLoading={problemsLoading}
+                selectedIds={contestProblems.map(p => p.id)}
+                selectedProblems={contestProblems}
+                onChange={handleProblemsChange}
+                emptyText="请使用上方工具添加题目到竞赛"
+                renderSelectedItem={(problem, index) => {
+                  const p = problem as Problem
+                  const vis = p.visibility ?? (p.isPublic ? 'public' : 'private')
+                  return (
+                    <>
+                      <span className="w-7 h-7 flex items-center justify-center bg-primary/10 border border-primary/20 rounded-full text-xs font-bold text-primary-light shrink-0">
                         {String.fromCharCode(65 + index)}
                       </span>
-                      <div className="flex flex-col">
+                      <div className="flex flex-col flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs text-muted-foreground">{problem.problemNumber}</span>
                           <span className="font-medium text-foreground text-sm">{problem.title}</span>
                         </div>
                         <div className="flex gap-2 mt-0.5">
                           <span className={`tag text-xs ${
-                            (problem.visibility === 'contest') ? 'tag-warning' :
-                              (problem.visibility === 'public' || problem.isPublic) ? 'tag-success' : ''
+                            vis === 'contest' ? 'tag-warning' :
+                              vis === 'public' ? 'tag-success' : ''
                           }`}>
-                            {problem.visibility === 'contest' ? '竞赛' :
-                              (problem.visibility === 'public' || problem.isPublic) ? '公开' : '隐藏'}
+                            {vis === 'contest' ? '竞赛' : vis === 'public' ? '公开' : '隐藏'}
                           </span>
                           <span className="text-xs text-muted-foreground">{problem.difficulty}</span>
                         </div>
                       </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveProblem(problem.id)}
-                      className="p-2 text-muted-foreground hover:text-error hover:bg-error/10 rounded-lg transition-colors"
-                      title="移除题目"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-
-                {contestProblems.length === 0 && (
-                  <div className="text-center py-10 card-static rounded-xl border-2 border-dashed border-border text-muted-foreground">
-                    <p>暂无题目</p>
-                    <p className="text-sm mt-1">请使用上方工具添加题目到竞赛</p>
-                  </div>
-                )}
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => handleProblemsChange(contestProblems.filter(p => p.id !== problem.id).map(p => p.id))}
+                        className="p-2 text-muted-foreground hover:text-error hover:bg-error/10 rounded-lg transition-colors shrink-0"
+                        title="移除题目"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  )
+                }}
+              />
             </div>
           </div>
 

@@ -6,20 +6,16 @@
  * 由 app/admin/trainings/create/page.tsx 改造而来，
  * 使用 CreateModalShell (variant="admin") 作为统一外壳。
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
-import { ListChecks, Plus, Search, X } from 'lucide-react'
+import { ListChecks, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fetchWithCookie } from '@/lib/api/base'
-import { CreateModalShell } from '@/components/common'
+import { CreateModalShell, ProblemPicker } from '@/components/common'
+import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 
-interface Problem {
-  id: string
-  title: string
-  problemNumber?: string | null
-  difficulty: string
-}
+type Problem = ProblemPickItem
 
 const difficultyClass = (d: string) => {
   if (d?.includes('入门')) return 'bg-success/15 text-success border-success/30'
@@ -52,8 +48,7 @@ export default function AdminCreateTrainingModal({
 }) {
   const router = useRouter()
   const [problems, setProblems] = useState<Problem[]>([])
-  const [searchProblem, setSearchProblem] = useState('')
-  const [filterDifficulty, setFilterDifficulty] = useState<string>('')
+  const [problemsLoading, setProblemsLoading] = useState(false)
   const [form, setForm] = useState(defaultForm)
   const [tagInput, setTagInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -61,21 +56,40 @@ export default function AdminCreateTrainingModal({
   const resetForm = useCallback(() => {
     setForm(defaultForm())
     setTagInput('')
-    setSearchProblem('')
-    setFilterDifficulty('')
     setProblems([])
   }, [])
 
   useDeferredEffect(() => {
     if (!open) return
     resetForm()
-    fetchWithCookie('/api/problems?pageSize=50', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(data => {
-        const items = Array.isArray(data?.data?.problems) ? data.data.problems : []
-        setProblems(items)
-      })
-      .catch(() => setProblems([]))
+    // 循环分页加载全部公开题，供 ProblemPicker 客户端搜索/批量添加
+    let cancelled = false
+    const load = async () => {
+      setProblemsLoading(true)
+      try {
+        const all: Problem[] = []
+        let page = 1
+        const pageSize = 50
+        for (;;) {
+          const res = await fetchWithCookie(`/api/problems?page=${page}&pageSize=${pageSize}`, { cache: 'no-store' })
+          const data = await res.json()
+          if (cancelled) return
+          if (!data.success) break
+          const batch = data.data?.problems || []
+          all.push(...batch)
+          const totalPages = data.data?.pagination?.totalPages ?? 1
+          if (page >= totalPages || batch.length === 0) break
+          page += 1
+        }
+        if (!cancelled) setProblems(all)
+      } catch {
+        if (!cancelled) setProblems([])
+      } finally {
+        if (!cancelled) setProblemsLoading(false)
+      }
+    }
+    void load()
+    return () => { cancelled = true }
   }, [open, resetForm])
 
   const addTag = () => {
@@ -90,13 +104,8 @@ export default function AdminCreateTrainingModal({
     setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }))
   }
 
-  const toggleProblem = (id: string) => {
-    setForm(f => ({
-      ...f,
-      problemIds: f.problemIds.includes(id)
-        ? f.problemIds.filter(x => x !== id)
-        : [...f.problemIds, id],
-    }))
+  const handleProblemsChange = (ids: string[]) => {
+    setForm(f => ({ ...f, problemIds: ids }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,23 +145,6 @@ export default function AdminCreateTrainingModal({
       setLoading(false)
     }
   }
-
-  const filteredProblems = useMemo(() => {
-    const q = searchProblem.toLowerCase().trim()
-    return problems
-      .filter(p => {
-        if (filterDifficulty && p.difficulty !== filterDifficulty) return false
-        if (q && !p.title.toLowerCase().includes(q)) return false
-        return true
-      })
-      .slice(0, 100)
-  }, [problems, searchProblem, filterDifficulty])
-
-  const difficulties = useMemo(() => {
-    const set = new Set<string>()
-    problems.forEach(p => p.difficulty && set.add(p.difficulty))
-    return Array.from(set)
-  }, [problems])
 
   return (
     <CreateModalShell
@@ -305,88 +297,37 @@ export default function AdminCreateTrainingModal({
               </span>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={searchProblem}
-                  onChange={e => setSearchProblem(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary/50"
-                  placeholder="搜索题目名称..."
-                />
-              </div>
-              {difficulties.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
+            <ProblemPicker
+              problems={problems}
+              problemsLoading={problemsLoading}
+              selectedIds={form.problemIds}
+              onChange={handleProblemsChange}
+              emptyText="暂无题目"
+              renderSelectedItem={(p, index) => (
+                <>
+                  <span className="flex-shrink-0 w-7 text-center text-xs font-semibold text-primary-light">
+                    #{index + 1}
+                  </span>
+                  <span className="flex-1 text-sm text-foreground truncate">
+                    {p.problemNumber ? (
+                      <span className="text-muted-foreground">[{p.problemNumber}] </span>
+                    ) : null}
+                    {p.title}
+                  </span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${difficultyClass(p.difficulty)}`}>
+                    {p.difficulty}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setFilterDifficulty('')}
-                    className={`text-xs px-2.5 py-1.5 rounded-md border transition-colors ${
-                      !filterDifficulty
-                        ? 'border-primary bg-primary/10 text-primary-light'
-                        : 'border-border bg-muted text-muted-foreground hover:border-primary/40'
-                    }`}
+                    onClick={() => handleProblemsChange(form.problemIds.filter(id => id !== p.id))}
+                    className="p-1 rounded text-muted-foreground hover:text-error hover:bg-error/10 flex-shrink-0"
+                    title="移除"
                   >
-                    全部
+                    <X className="w-4 h-4" />
                   </button>
-                  {difficulties.map(d => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setFilterDifficulty(d)}
-                      className={`text-xs px-2.5 py-1.5 rounded-md border transition-colors ${
-                        filterDifficulty === d
-                          ? 'border-primary bg-primary/10 text-primary-light'
-                          : 'border-border bg-muted text-muted-foreground hover:border-primary/40'
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
+                </>
               )}
-            </div>
-
-            <div className="border rounded-lg overflow-hidden bg-background/50" style={{ borderColor: 'var(--border)' }}>
-              {filteredProblems.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">暂无题目</div>
-              ) : (
-                <ul className="divide-y max-h-80 overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
-                  {filteredProblems.map(p => {
-                    const checked = form.problemIds.includes(p.id)
-                    const orderIndex = checked ? form.problemIds.indexOf(p.id) + 1 : null
-                    return (
-                      <li key={p.id}>
-                        <label
-                          className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
-                            checked ? 'bg-primary/5' : 'hover:bg-muted'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleProblem(p.id)}
-                            className="w-4 h-4 rounded accent-primary flex-shrink-0"
-                          />
-                          <span className={`flex-shrink-0 w-7 text-center text-xs font-semibold ${checked ? 'text-primary-light' : 'text-transparent'}`}>
-                            #{orderIndex ?? '-'}
-                          </span>
-                          <span className="flex-1 text-sm text-foreground truncate">
-                            {p.problemNumber ? (
-                              <span className="text-muted-foreground">[{p.problemNumber}] </span>
-                            ) : null}
-                            {p.title}
-                          </span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${difficultyClass(p.difficulty)}`}>
-                            {p.difficulty}
-                          </span>
-                        </label>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
+            />
           </div>
         </div>
 

@@ -80,7 +80,7 @@ export default function CreateAssignmentModal({
         }
         const batch = data.data?.problems || []
         all.push(...batch)
-        const totalPages = data.data?.totalPages ?? 1
+        const totalPages = data.data?.pagination?.totalPages ?? 1
         if (page >= totalPages || batch.length === 0) break
         page += 1
       }

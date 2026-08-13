@@ -36,7 +36,7 @@ async function fetchAllPublicProblems(): Promise<ProblemPickItem[]> {
     if (!data.success) throw new Error(data.error || '获取题目列表失败')
     const batch = data.data?.problems || []
     all.push(...batch)
-    const totalPages = data.data?.totalPages ?? 1
+    const totalPages = data.data?.pagination?.totalPages ?? 1
     if (page >= totalPages || batch.length === 0) break
     page += 1
   }

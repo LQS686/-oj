@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { Trophy, Plus, Search, Trash2, AlertCircle, Loader2, Edit } from 'lucide-react'
-import { CreateModalShell } from '@/components/common'
+import { Trophy, Trash2, AlertCircle, Loader2, Edit } from 'lucide-react'
+import { CreateModalShell, ProblemPicker } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useDialog } from '@/components/common/DialogProvider'
@@ -13,6 +13,7 @@ interface Problem {
   problemNumber: string
   title: string
   difficulty: string
+  tags?: string[]
 }
 
 const defaultForm = () => ({
@@ -53,24 +54,15 @@ export default function CreateContestModal({
 
   // 题目管理 state
   const [contestProblems, setContestProblems] = useState<Problem[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<Problem[]>([])
-  const [searching, setSearching] = useState(false)
-  const [batchInput, setBatchInput] = useState('')
-
-  // 最新已添加题目集合的引用：搜索响应返回时用它过滤，避免异步闭包读到过期的 contestProblems
-  const contestProblemsRef = useRef<Problem[]>([])
-  useEffect(() => {
-    contestProblemsRef.current = contestProblems
-  }, [contestProblems])
+  const [allProblems, setAllProblems] = useState<Problem[]>([])
+  const [problemsLoading, setProblemsLoading] = useState(false)
 
   const resetForm = useCallback(() => {
     setFormData(defaultForm())
     setExistingHasPassword(false)
     setContestProblems([])
-    setSearchQuery('')
-    setSearchResults([])
-    setBatchInput('')
+    // 注意：不要清空 allProblems —— 它由 useDeferredEffect 每次 open 时重新加载，
+    // 若在此清空会把刚加载好的题库清掉，导致新建时搜索/批量添加失效
     setError('')
     setSubmitting(false)
     setLoading(false)
@@ -99,16 +91,50 @@ export default function CreateContestModal({
   useDeferredEffect(() => {
     if (!open) return
 
+    let cancelled = false
+
+    // 立即重置表单（新建）或进入加载态（编辑），不等待全量题目加载，
+    // 避免用户输入被延迟的 resetForm 清空、或旧表单在加载窗口仍可交互
     if (!isEdit || !contestId) {
       resetForm()
-      return
+    } else {
+      setLoading(true)
     }
 
-    let cancelled = false
     const load = async () => {
+      // 加载全量公开题（供 ProblemPicker 客户端搜索/批量添加）
+      setProblemsLoading(true)
       try {
-        setLoading(true)
-        const contestRes = await fetchWithCookie(`/api/contests/${contestId}`)
+        const all: Problem[] = []
+        let page = 1
+        const pageSize = 50
+        for (;;) {
+          const res = await fetchWithCookie(`/api/problems?page=${page}&pageSize=${pageSize}`)
+          const data = await res.json()
+          if (cancelled) return
+          if (!data.success) break
+          const batch = (data.data?.problems || []).map((p: Problem) => ({
+            id: p.id,
+            problemNumber: p.problemNumber,
+            title: p.title,
+            difficulty: p.difficulty,
+            tags: p.tags || [],
+          }))
+          all.push(...batch)
+          const totalPages = data.data?.pagination?.totalPages ?? 1
+          if (page >= totalPages || batch.length === 0) break
+          page += 1
+        }
+        if (!cancelled) setAllProblems(all)
+      } catch (err) {
+        logger.error('CreateContestModal 加载题目列表失败', err)
+      } finally {
+        if (!cancelled) setProblemsLoading(false)
+      }
+
+      if (isEdit && contestId) {
+        try {
+          const contestRes = await fetchWithCookie(`/api/contests/${contestId}`)
         const contestData = await contestRes.json()
         if (cancelled) return
         if (!contestRes.ok || !contestData.success) {
@@ -131,6 +157,7 @@ export default function CreateContestModal({
               problemNumber: p.problemNumber,
               title: p.title,
               difficulty: p.difficulty,
+              tags: p.tags || [],
             }))
           : []
 
@@ -144,6 +171,7 @@ export default function CreateContestModal({
       } finally {
         if (!cancelled) setLoading(false)
       }
+      }
     }
     void load()
     return () => {
@@ -151,93 +179,12 @@ export default function CreateContestModal({
     }
   }, [open, isEdit, contestId, resetForm, applyContest, dialog, onClose])
 
-  const searchProblems = async (query: string) => {
-    if (!query) {
-      setSearchResults([])
-      return
-    }
-    setSearching(true)
-    try {
-      const response = await fetchWithCookie(`/api/problems?search=${encodeURIComponent(query)}&limit=5`)
-      const data = await response.json()
-      if (data.success) {
-        // 用 ref 读最新已添加集合，避免异步响应覆盖时读过期闭包、把已添加项重新加回结果
-        const filtered = (data.data.problems || []).filter((p: Problem) =>
-          !contestProblemsRef.current.find(cp => cp.id === p.id)
-        )
-        setSearchResults(filtered)
-      }
-    } catch (err) {
-      logger.error('CreateContestModal searchProblems failed', err)
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  const handleAddProblem = (problem: Problem) => {
-    setContestProblems([...contestProblems, problem])
-    // 保留关键词与剩余结果，支持连续添加包含该关键词的题目；仅移除已添加项
-    setSearchResults(prev => prev.filter(p => p.id !== problem.id))
-  }
-
-  const handleRemoveProblem = (problemId: string) => {
-    setContestProblems(contestProblems.filter(p => p.id !== problemId))
-  }
-
-  const handleBatchAdd = async () => {
-    if (!batchInput.trim()) return
-
-    setSearching(true)
-    try {
-      const numbers = batchInput.split(/[,，\s\n]+/)
-        .filter(s => s.trim())
-        .map(s => s.trim().toUpperCase().startsWith('P') ? s.trim().toUpperCase() : `P${s.trim()}`)
-
-      if (numbers.length === 0) return
-
-      const response = await fetchWithCookie(`/api/problems?numbers=${encodeURIComponent(numbers.join(','))}`)
-      const data = await response.json()
-
-      if (data.success) {
-        const foundProblems = (data.data.problems || []) as Problem[]
-        const requested = new Set(numbers.map((n) => n.toUpperCase()))
-        // 仅接受题号落在请求集合内的题目，防止 API 忽略 numbers 时误加整页
-        const matched = foundProblems.filter((p) =>
-          requested.has(String(p.problemNumber || '').toUpperCase())
-        )
-        const newProblems: Problem[] = []
-        const foundNumbers = new Set(matched.map((p) => p.problemNumber.toUpperCase()))
-        const notFound: string[] = []
-
-        numbers.forEach((num) => {
-          if (!foundNumbers.has(num.toUpperCase())) {
-            notFound.push(num)
-          }
-        })
-
-        matched.forEach((p) => {
-          if (!contestProblems.find((cp) => cp.id === p.id)) {
-            newProblems.push(p)
-          }
-        })
-
-        setContestProblems([...contestProblems, ...newProblems])
-        setBatchInput('')
-
-        if (notFound.length > 0) {
-          await dialog.alert({
-            tone: 'warning',
-            message: `以下题目未找到或未公开: ${notFound.join(', ')}`,
-          })
-        }
-      }
-    } catch (err) {
-      logger.error('CreateContestModal handleBatchAdd failed', err)
-      await dialog.alert({ tone: 'error', message: '批量添加失败：网络错误' })
-    } finally {
-      setSearching(false)
-    }
-  }
+  const handleProblemsChange = useCallback((ids: string[]) => {
+    // 公开题从 allProblems 重建；编辑态竞赛可能含非公开/已下架题目，从原 contestProblems 保留
+    const map = new Map(allProblems.map((p) => [p.id, p]))
+    const existing = new Map(contestProblems.map((p) => [p.id, p]))
+    setContestProblems(ids.map((id) => map.get(id) ?? existing.get(id)).filter((p): p is Problem => !!p))
+  }, [allProblems, contestProblems])
 
   const buildPayload = () => {
     const duration = Math.floor(
@@ -453,127 +400,36 @@ export default function CreateContestModal({
                 <span className="tag">已添加 {contestProblems.length} 题</span>
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-primary-light mb-2">
-                  批量添加题目
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="输入题号，例如: P1001, 1002, P1005 (支持逗号或空格分隔)"
-                    value={batchInput}
-                    onChange={(e) => setBatchInput(e.target.value)}
-                    className="input flex-1"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleBatchAdd()
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleBatchAdd}
-                    disabled={searching || !batchInput.trim()}
-                    className="btn btn-primary whitespace-nowrap"
-                  >
-                    <Plus className="w-4 h-4" />
-                    {searching ? '添加中...' : '批量添加'}
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  提示：直接输入数字（如 1001）将自动识别为 P1001。仅能添加已公开的题目。
-                </p>
-              </div>
-
-              <div className="relative">
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  搜索添加题目
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="输入题目名称或题号进行搜索..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value)
-                      searchProblems(e.target.value)
-                    }}
-                    className="input w-full pl-10"
-                  />
-                  <Search className="w-5 h-5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                </div>
-
-                {searchResults.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 card rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto divide-y divide-border">
-                    {searchResults.map(problem => (
-                      <button
-                        key={problem.id}
-                        type="button"
-                        onClick={() => handleAddProblem(problem)}
-                        className="w-full px-4 py-3 text-left hover:bg-primary/5 flex justify-between items-center group transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded text-sm group-hover:bg-primary/10 group-hover:text-primary-light transition-colors">
-                            {problem.problemNumber}
-                          </span>
-                          <span className="font-medium text-foreground group-hover:text-primary-light">{problem.title}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs px-2 py-1 rounded font-medium ${
-                            problem.difficulty === '入门' ? 'bg-secondary/10 text-secondary-light' :
-                            problem.difficulty.includes('普及') ? 'bg-accent/10 text-accent-light' :
-                            'bg-error/10 text-error'
-                          }`}>
-                            {problem.difficulty}
-                          </span>
-                          <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary-light" />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="border border-border rounded-xl overflow-hidden">
-                {contestProblems.length === 0 ? (
-                  <div className="py-10 text-center">
-                    <div className="bg-muted w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Search className="w-6 h-6 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-muted-foreground font-medium text-sm">暂无题目</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1">请使用上方工具搜索或批量添加题目</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border max-h-60 overflow-y-auto">
-                    {contestProblems.map((problem, index) => (
-                      <div key={problem.id} className="p-3 flex items-center justify-between hover:bg-primary/5 transition-colors group">
-                        <div className="flex items-center gap-3">
-                          <span className="w-7 h-7 flex items-center justify-center bg-muted text-muted-foreground rounded-lg text-xs font-bold group-hover:bg-primary/10 group-hover:text-primary-light transition-colors">
-                            {String.fromCharCode(65 + index)}
-                          </span>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs text-muted-foreground">{problem.problemNumber}</span>
-                              <span className="font-medium text-foreground text-sm">{problem.title}</span>
-                            </div>
-                            <span className="text-xs text-muted-foreground/60 mt-0.5">{problem.difficulty}</span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveProblem(problem.id)}
-                          className="p-2 text-muted-foreground hover:text-error hover:bg-error/10 rounded-lg transition-all"
-                          title="移除题目"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+              <ProblemPicker
+                problems={allProblems}
+                problemsLoading={problemsLoading}
+                selectedIds={contestProblems.map(p => p.id)}
+                selectedProblems={contestProblems}
+                onChange={handleProblemsChange}
+                emptyText="请使用上方工具搜索或批量添加题目"
+                renderSelectedItem={(problem, index) => (
+                  <>
+                    <span className="w-7 h-7 flex items-center justify-center bg-muted text-muted-foreground rounded-lg text-xs font-bold shrink-0">
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">{problem.problemNumber}</span>
+                        <span className="font-medium text-foreground text-sm">{problem.title}</span>
                       </div>
-                    ))}
-                  </div>
+                      <span className="text-xs text-muted-foreground/60 mt-0.5">{problem.difficulty}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleProblemsChange(contestProblems.filter(p => p.id !== problem.id).map(p => p.id))}
+                      className="p-2 text-muted-foreground hover:text-error hover:bg-error/10 rounded-lg transition-all shrink-0"
+                      title="移除题目"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
                 )}
-              </div>
+              />
             </div>
           </div>
 

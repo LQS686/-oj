@@ -1,6 +1,6 @@
 export interface ProblemPickItem {
   id: string
-  problemNumber: string
+  problemNumber?: string | null
   title: string
   difficulty: string
   tags?: string[]
