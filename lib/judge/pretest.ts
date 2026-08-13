@@ -11,6 +11,7 @@
  */
 import type { ComparisonMode, ResultState } from './types'
 import { compileCode } from './compiler'
+import { releaseCompileCache } from './compile-cache'
 import { executeCode, cleanupExecuteArtifacts } from './executor'
 import { compareOutput } from './comparator'
 import { validateCodeSafety } from './codeAnalyzer'
@@ -131,6 +132,7 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
 
   let compiledPath: string | undefined
   let spjPath: string | undefined
+  let compileCacheKeyValue: string | undefined
 
   try {
     // 第一步：代码安全分析
@@ -156,6 +158,7 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
       }
     }
     compiledPath = compileResult.compiledPath
+    compileCacheKeyValue = compileResult.cacheKey
 
     if (isSpecialJudgeMode(comparisonMode)) {
       if (!spjCode?.trim()) {
@@ -340,10 +343,14 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
     baseResult.status = 'SE'
     baseResult.compileError = err instanceof Error ? err.message : '系统错误'
   } finally {
-    // 清理编译产物（项目约束：编译产物必须清理防止磁盘泄漏）
+    // 清理编译产物（缓存管理的产物只释放引用，不删除；Python 等正常删除）
     if (compiledPath) {
       try {
-        await cleanup(compiledPath, language)
+        if (compileCacheKeyValue) {
+          releaseCompileCache(compileCacheKeyValue)
+        } else {
+          await cleanup(compiledPath, language)
+        }
       } catch (err) {
         logger.warn('pretest 清理编译产物失败', { error: err instanceof Error ? err.message : String(err) })
       }

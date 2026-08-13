@@ -7,6 +7,11 @@ import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 import { CompileState } from './types'
 import { getJudgeConfig } from './config'
+import {
+  compileCacheKey,
+  acquireCompileCache,
+  putCompileCache,
+} from './compile-cache'
 
 export interface CompileResult {
   success: boolean
@@ -14,6 +19,10 @@ export interface CompileResult {
   compiledPath?: string
   error?: string
   stderr?: string
+  /** 产物由编译缓存管理（C/C++ 编译成功）；调用方评测结束应 releaseCompileCache(cacheKey) 而非删除产物 */
+  cacheKey?: string
+  /** 是否命中编译缓存（复用等价产物，未重新编译） */
+  fromCache?: boolean
 }
 
 // 语言配置
@@ -167,11 +176,9 @@ const languageConfigs: Record<string, {
  *   生产环境对数组越界有严格要求的题目，可在 docker-compose 设 JUDGE_ENABLE_ASAN=true。
  *   ASan 有 2-5x 性能开销，且内存需调大 memoryLimit × 2-3，故默认不启用。
  */
-function buildCompileArgs(
+function buildStableCompileArgs(
   compiler: 'g++' | 'gcc',
   std: string,
-  sourcePath: string,
-  outputPath: string
 ): string[] {
   const args = [
     '-O2',
@@ -215,10 +222,18 @@ function buildCompileArgs(
     )
   }
 
-  args.push('-o', outputPath, sourcePath)
   // compiler 作为返回值的一部分供调用方使用
   void compiler
   return args
+}
+
+function buildCompileArgs(
+  compiler: 'g++' | 'gcc',
+  std: string,
+  sourcePath: string,
+  outputPath: string
+): string[] {
+  return [...buildStableCompileArgs(compiler, std), '-o', outputPath, sourcePath]
 }
 
 /** 构造 compileCommand 字符串（仅用于 languageConfigs.compileCommand 字段展示） */
@@ -303,6 +318,30 @@ export async function compileCode(code: string, language: string): Promise<Compi
       success: false,
       compileState: CompileState.NoValidSourceFile,
       error: '源代码为空',
+    }
+  }
+
+  // 编译产物缓存：C/C++ 相同代码命中时直接复用产物（避免重复 g++ 编译）
+  let cacheKey: string | undefined
+  if (config.needsCompile) {
+    const compiler = language === 'c' ? 'gcc' : 'g++'
+    const std = language === 'c' ? 'c11' : 'c++17'
+    cacheKey = compileCacheKey(
+      language,
+      code,
+      buildStableCompileArgs(compiler as 'g++' | 'gcc', std),
+      compiler,
+    )
+    const hit = acquireCompileCache(cacheKey, code)
+    if (hit) {
+      logger.debug('编译缓存命中', { language, cacheKey })
+      return {
+        success: true,
+        compileState: CompileState.CompileSuccessfully,
+        compiledPath: hit.compiledPath,
+        cacheKey,
+        fromCache: true,
+      }
     }
   }
 
@@ -396,11 +435,31 @@ export async function compileCode(code: string, language: string): Promise<Compi
       )
 
       if (exitCode === 0) {
+        // 编译成功：写入缓存并占用引用，供后续相同代码复用；评测结束由调用方 release
+        let finalCompiledPath = outputPath
+        if (cacheKey) {
+          putCompileCache(cacheKey, {
+            compiledPath: outputPath,
+            sourceExt: config.extension,
+            code,
+          })
+          const acquired = acquireCompileCache(cacheKey, code)
+          if (acquired) {
+            if (acquired.compiledPath !== outputPath) {
+              // 并发编译相同代码：已有条目在用，复用其产物，清理本次编译的孤儿产物 + 源文件
+              await unlink(outputPath).catch(() => {})
+              await unlink(sourcePath).catch(() => {})
+            }
+            finalCompiledPath = acquired.compiledPath
+          }
+        }
         return {
           success: true,
           compileState: CompileState.CompileSuccessfully,
-          compiledPath: outputPath,
+          compiledPath: finalCompiledPath,
           stderr: stderr || undefined,
+          cacheKey,
+          fromCache: false,
         }
       }
 

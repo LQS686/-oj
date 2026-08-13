@@ -2,6 +2,7 @@
 // 参考 Project LemonLime 的 TaskJudger，协调 compiler/executor/comparator
 import type { JudgeJob, JudgeResult } from './queue'
 import { compileCode } from './compiler'
+import { releaseCompileCache } from './compile-cache'
 import { executeCode, cleanupExecuteArtifacts } from './executor'
 import { compareOutput } from './comparator'
 import { validateCodeSafety } from './codeAnalyzer'
@@ -844,10 +845,14 @@ export async function executeJudge(
     // B-P2-12：评测结束的所有路径（正常 / fail-fast / SE / 超时 / 中止）统一清理
     // progressDbThrottle 条目，防止 Map 长跑缓慢泄漏
     progressDbThrottle.delete(job.submissionId)
-    // 仅当编译成功时清理编译产物
+    // 仅当编译成功且产物由缓存管理时释放缓存引用（不删产物）；Python 等仍正常清理
     if (compileResult?.success && compileResult.compiledPath) {
       try {
-        await cleanup(compileResult.compiledPath, job.language)
+        if (compileResult.cacheKey) {
+          releaseCompileCache(compileResult.cacheKey)
+        } else {
+          await cleanup(compileResult.compiledPath, job.language)
+        }
       } catch (err) {
         logger.warn('清理编译产物失败', { error: err instanceof Error ? err.message : String(err) })
       }

@@ -5,6 +5,7 @@
 import { prisma } from '@/lib/prisma'
 import { AppError } from '@/lib/errors'
 import { compileCode, cleanup } from '@/lib/judge/compiler'
+import { releaseCompileCache } from '@/lib/judge/compile-cache'
 import { executeCode } from '@/lib/judge/executor'
 import { logger } from '@/lib/logger'
 
@@ -105,6 +106,7 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
   }
 
   const compiledPath = compileResult.compiledPath
+  const compileCacheKeyValue = compileResult.cacheKey
   const results: VerifyStdCaseResult[] = []
   const updatedOutputs: Array<{ id: string; output: string }> = []
   let passedCount = 0
@@ -224,7 +226,11 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
   } finally {
     if (compiledPath) {
       try {
-        await cleanup(compiledPath)
+        if (compileCacheKeyValue) {
+          releaseCompileCache(compileCacheKeyValue)
+        } else {
+          await cleanup(compiledPath)
+        }
       } catch (err) {
         logger.warn('标程验证清理编译产物失败', {
           error: err instanceof Error ? err.message : String(err),
