@@ -55,7 +55,8 @@ sudo bash scripts/bt-deploy.sh http://你的服务器IP
 5. 生成 `mongo-keyfile`
 6. 拉取基础镜像并构建应用（首次约 5–10 分钟）
 7. 先拉起 mongo/redis，再启动 app，并做健康检查
-8. 写出 Nginx 片段：`nginx/baota-proxy.conf`（端口与 `APP_HOST_PORT` 一致）
+8. **同步数据库结构**：在 app 容器内执行 `prisma db push`（幂等创建新增集合/索引，如客观题 `ObjectiveQuestion` 等，已有数据不受影响）
+9. 写出 Nginx 片段：`nginx/baota-proxy.conf`（端口与 `APP_HOST_PORT` 一致）
 
 > **说明**：HTTP 临时站可在 `NODE_ENV=production` 下运行（脚本已兼容）。  
 > 切勿在 HTTPS 站点关闭 Secure Cookie。
@@ -154,7 +155,7 @@ docker builder prune -af --filter "until=168h"
 
 | 问题                                          | 处理                                                                                                                                                                                                                                                                                                |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 宝塔终端卡死 / 无响应                         | 脚本在检测到进行中评测时会 `read` 等待确认，宝塔 Web 终端是 TTY 会阻塞。已加 60s 超时自动取消；**推荐加 `--yes` 跳过交互**：`sudo bash scripts/bt-deploy.sh --yes`。若已卡死，Ctrl+C 中断后加 `--yes` 重跑。                                                                                          |
+| 宝塔终端卡死 / 无响应                         | 脚本在检测到进行中评测时会 `read` 等待确认，宝塔 Web 终端是 TTY 会阻塞。已加 60s 超时自动取消；**推荐加 `--yes` 跳过交互**：`sudo bash scripts/bt-deploy.sh --yes`。若已卡死，Ctrl+C 中断后加 `--yes` 重跑。                                                                                        |
 | 构建报 `libasan` / `libubsan` no such package | Alpine/musl 无这两个包。请 `git pull` 后重跑（Dockerfile 已移除）。评测默认不开 ASan/UBSan。                                                                                                                                                                                                        |
 | 未检测到 docker compose 插件                  | OpenCloudOS/宝塔常只有独立 `docker-compose`。新脚本会自动检测并尝试安装。也可先手动：`curl -fsSL https://get.daocloud.io/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose && docker-compose version` |
 | 首次部署 app 起不来 / Cookie 登不上           | HTTP 必须用 `http://IP` 部署；脚本会设 `FORCE_SECURE_COOKIE=false`。HTTPS 必须为 `true`。                                                                                                                                                                                                           |
@@ -164,8 +165,9 @@ docker builder prune -af --filter "until=168h"
 | 登录页无注册入口                              | 查 `curl -s https://你的域名/api/settings/public`：`needsBootstrap=true` 应显示「创建管理员」；二者皆 false 表示库中已有用户且关闭了开放注册。管理员登录后在后台打开「开放注册」，或见下方 mongosh 开启。                                                                                           |
 | `mongo-keyfile: no such file`                 | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile`                                                                                                                                                                   |
 | 构建 ENOSPC / 磁盘满                          | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                                                                                                                                                                                     |
-| 镜像拉取失败 / 下载慢                        | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认多源 fallback（`docker.1panel.live` / `docker.1ms.run` / `docker.xuanyuan.me` / `docker.m.daocloud.io`），不覆盖已有自定义 daemon。手动配置示例见下方「配置镜像加速」。                                                                                                              |
+| 镜像拉取失败 / 下载慢                         | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认多源 fallback（`docker.1panel.live` / `docker.1ms.run` / `docker.xuanyuan.me` / `docker.m.daocloud.io`），不覆盖已有自定义 daemon。手动配置示例见下方「配置镜像加速」。                                   |
 | 改域名后前端仍请求旧地址                      | 必须重建：`sudo bash scripts/bt-deploy.sh https://新域名`（不要用 `--no-build`）                                                                                                                                                                                                                    |
+| 升级后新功能报集合不存在 / 唯一约束不生效     | 部署脚本已内置数据库同步（app 就绪后自动 `prisma db push`）。若用了旧镜像（`--no-build`）或同步告警，手动执行：`docker compose exec app /opt/prisma-cli/node_modules/.bin/prisma db push --skip-generate`；涉及破坏性变更时会要求人工确认，确认前请先备份数据。                                     |
 | API 502                                       | `docker compose ps`；等健康检查通过；看 `docker compose logs -f app`                                                                                                                                                                                                                                |
 | 80/443 冲突                                   | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                                                                                                                                                                                  |
 | 3000 端口被占用                               | 脚本会提示；可改 `.env` 的 `APP_HOST_PORT` 后重跑，并重新粘贴 `nginx/baota-proxy.conf`（端口已写入片段）                                                                                                                                                                                            |
@@ -275,6 +277,7 @@ docker compose restart app
 8. **须显式 COPY `server.ts` / `lib` / `prisma`** — 不要用 tracing 冒充。
 9. **健康检查用 `/healthcheck-static`** — 不要改回依赖动态路由的 `/api/health` 作容器探活。
 10. **`.env` 值不要包反引号**。
+11. **prisma CLI 独立装在 `/opt/prisma-cli` 并须显式 COPY 到 runner** — runner 的 `npm ci --omit=dev` 不含 devDependencies（prisma CLI 在其中）；部署脚本依赖容器内 `prisma db push` 做幂等集合/索引同步，勿删该目录。
 
 更细的编译 / 评测相关说明见仓库历史注释与 `Dockerfile`。
 
@@ -290,22 +293,22 @@ judger.ts → executor-core.ts → runner.sh → dsoj-watch（C 同步监视器�
 
 无 Docker 沙箱、无 bwrap 分支，全平台统一一条路径：
 
-| 组件 | 职责 |
-|------|------|
+| 组件         | 职责                                                                               |
+| ------------ | ---------------------------------------------------------------------------------- |
 | `dsoj-watch` | C 同步进程，100µs 采样 RssAnon 内存 + wait4 rusage CPU 时间 + CLOCK_MONOTONIC 墙钟 |
-| `runner.sh` | 设置 ulimit（栈/CPU/进程数/FD/文件大小），调用 dsoj-watch 执行选手程序 |
-| `ulimit` | 系统级软限制：`-t` CPU 秒、`-s` 栈大小、`-u` 进程数、`-n` FD、`-f` 文件大小 |
+| `runner.sh`  | 设置 ulimit（栈/CPU/进程数/FD/文件大小），调用 dsoj-watch 执行选手程序             |
+| `ulimit`     | 系统级软限制：`-t` CPU 秒、`-s` 栈大小、`-u` 进程数、`-n` FD、`-f` 文件大小        |
 
 ### 资源限制机制
 
-| 资源 | 限制方式 | 说明 |
-|------|----------|------|
-| CPU 时间 | `dsoj-watch` wait4 rusage + `ulimit -t` | TLE 判定用真实 CPU（realCpuMs），不受并发影响 |
-| 墙钟时间 | `dsoj-watch` CLOCK_MONOTONIC + Node setTimeout 硬杀 | 防 sleep 型死循环 |
-| 内存 | `dsoj-watch` RssAnon 采样 | 不含共享库，精确 |
-| 输出大小 | `dsoj-watch` 实时检测 + runner.sh 退出后 stat | OLE 触发 SIGKILL，退出码 153 |
-| 栈大小 | `ulimit -s` | 默认 8MB |
-| 进程数 | `ulimit -u` | 默认 4096 |
+| 资源     | 限制方式                                            | 说明                                          |
+| -------- | --------------------------------------------------- | --------------------------------------------- |
+| CPU 时间 | `dsoj-watch` wait4 rusage + `ulimit -t`             | TLE 判定用真实 CPU（realCpuMs），不受并发影响 |
+| 墙钟时间 | `dsoj-watch` CLOCK_MONOTONIC + Node setTimeout 硬杀 | 防 sleep 型死循环                             |
+| 内存     | `dsoj-watch` RssAnon 采样                           | 不含共享库，精确                              |
+| 输出大小 | `dsoj-watch` 实时检测 + runner.sh 退出后 stat       | OLE 触发 SIGKILL，退出码 153                  |
+| 栈大小   | `ulimit -s`                                         | 默认 8MB                                      |
+| 进程数   | `ulimit -u`                                         | 默认 4096                                     |
 
 ### 临时文件
 
@@ -323,13 +326,13 @@ tmpfs:
 
 ### 关键配置项
 
-| 环境变量 / 设置 | 默认值 | 说明 |
-|----------------|--------|------|
-| `JUDGE_MAX_CONCURRENT` | 2（代码默认；部署脚本生成 `.env` 时保守设 1） | 同时评测的提交数（建议 = CPU 核数 - 1） |
-| `JUDGE_CASE_CONCURRENCY` | 3（4核） | 单提交内测点并发数 |
-| `JUDGE_LARGE_CASE_CONCURRENCY` | 同 caseConcurrency | 大测点（>2MB）并发数 |
-| `JUDGE_ENABLE_ASAN` | false | AddressSanitizer，开启需 2-3x 内存 |
-| `JUDGE_ENABLE_UBSAN` | false | UndefinedBehaviorSanitizer |
+| 环境变量 / 设置                | 默认值                                        | 说明                                    |
+| ------------------------------ | --------------------------------------------- | --------------------------------------- |
+| `JUDGE_MAX_CONCURRENT`         | 2（代码默认；部署脚本生成 `.env` 时保守设 1） | 同时评测的提交数（建议 = CPU 核数 - 1） |
+| `JUDGE_CASE_CONCURRENCY`       | 3（4核）                                      | 单提交内测点并发数                      |
+| `JUDGE_LARGE_CASE_CONCURRENCY` | 同 caseConcurrency                            | 大测点（>2MB）并发数                    |
+| `JUDGE_ENABLE_ASAN`            | false                                         | AddressSanitizer，开启需 2-3x 内存      |
+| `JUDGE_ENABLE_UBSAN`           | false                                         | UndefinedBehaviorSanitizer              |
 
 查看当前运行时配置：
 
@@ -343,13 +346,13 @@ docker compose logs app | grep "评测运行时配置"
 
 ### 已实施优化
 
-| 优化项 | 效果 | 实施方式 |
-|--------|------|----------|
-| glibc 替代 musl | 消除 7x printf/scanf/math 慢 | Dockerfile 基础镜像 alpine → debian-slim |
-| tmpfs 替代磁盘卷 | 消除百万行 I/O 磁盘延迟 | docker-compose.yml `app_temp` volume → tmpfs |
-| `-march=native` | 利用 CPU AVX2/AVX-512 自动向量化，10-20% | compiler.ts 编译参数 |
-| 统一评测路径 | 无分支探测失败、无回退开销 | 删除 Docker 沙箱 / bwrap 分支 |
-| 测点磁盘缓存 | 避免每次回源 Mongo 拉百万行字符串 | init.ts 启动自检 data/testdata 可写 |
+| 优化项           | 效果                                     | 实施方式                                     |
+| ---------------- | ---------------------------------------- | -------------------------------------------- |
+| glibc 替代 musl  | 消除 7x printf/scanf/math 慢             | Dockerfile 基础镜像 alpine → debian-slim     |
+| tmpfs 替代磁盘卷 | 消除百万行 I/O 磁盘延迟                  | docker-compose.yml `app_temp` volume → tmpfs |
+| `-march=native`  | 利用 CPU AVX2/AVX-512 自动向量化，10-20% | compiler.ts 编译参数                         |
+| 统一评测路径     | 无分支探测失败、无回退开销               | 删除 Docker 沙箱 / bwrap 分支                |
+| 测点磁盘缓存     | 避免每次回源 Mongo 拉百万行字符串        | init.ts 启动自检 data/testdata 可写          |
 
 ### 服务器 CPU 调优
 
@@ -357,11 +360,11 @@ docker compose logs app | grep "评测运行时配置"
 
 ### 性能基准
 
-| 环境 | 耗时 | 说明 |
-|------|------|------|
-| 本地 WSL（高频 CPU） | ~1.6s | 基准参照 |
-| 云端优化前 | ~3.4s | alpine + musl + 磁盘 + bwrap |
-| 云端优化后 | ~2.9s | glibc + tmpfs + -march=native + 统一路径 |
+| 环境                 | 耗时  | 说明                                     |
+| -------------------- | ----- | ---------------------------------------- |
+| 本地 WSL（高频 CPU） | ~1.6s | 基准参照                                 |
+| 云端优化前           | ~3.4s | alpine + musl + 磁盘 + bwrap             |
+| 云端优化后           | ~2.9s | glibc + tmpfs + -march=native + 统一路径 |
 
 ### 剩余瓶颈
 
@@ -399,6 +402,7 @@ docker compose logs app --tail 50 | grep -E "评测|EACCES|error"
 ```
 
 常见原因：
+
 - `/app/data/testdata` 不可写 → `docker compose exec -u root app chown -R 1001:1001 /app/data`
 - MongoDB 连接失败 → 见上方「修复 Mongo 副本集」
 - dsoj-watch 未编译 → `docker compose exec app ls -la /app/lib/judge/dsoj-watch`

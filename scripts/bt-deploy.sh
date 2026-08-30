@@ -909,6 +909,31 @@ else
 fi
 
 # ============================================================
+# 6.5 同步数据库结构（幂等）
+# ============================================================
+# 背景：init-mongo.js 仅在数据卷首次初始化时执行，且集合列表为硬编码，
+# 升级引入的新集合（如客观题 ObjectiveQuestion 等）不会被创建，索引也不会建。
+# 这里在运行容器内执行 `prisma db push`，将 prisma/schema.prisma 与实际库对齐：
+# 幂等创建缺失的集合/索引，已有数据不受影响。
+# 若 schema 变更涉及删除字段/集合等破坏性操作，prisma 非交互模式下会失败，
+# 此处仅告警不中断部署，需人工核查后手动执行（加 --accept-data-loss 前请先备份）。
+step "同步数据库结构（prisma db push）"
+PRISMA_BIN="/opt/prisma-cli/node_modules/.bin/prisma"
+if timeout 30 compose exec -T app test -x "$PRISMA_BIN" 2>/dev/null; then
+  # </dev/null：阻断 prisma 交互提示读取终端（宝塔 Web 终端会卡死），非交互失败即告警
+  if timeout 300 compose exec -T app "$PRISMA_BIN" db push --skip-generate </dev/null; then
+    info "数据库结构已同步（集合/索引与 prisma/schema.prisma 对齐）"
+  else
+    warn "prisma db push 未成功（多为 schema 存在破坏性变更需人工确认），应用继续运行"
+    echo "  手动执行: $(compose_cli) exec app $PRISMA_BIN db push"
+    echo "  确认无误需接受数据丢失时: $(compose_cli) exec app $PRISMA_BIN db push --accept-data-loss"
+  fi
+else
+  warn "镜像内无独立 prisma CLI（旧镜像），跳过数据库结构同步"
+  echo "  请执行: sudo bash scripts/bt-deploy.sh （不带 --no-build，重建镜像后自动同步）"
+fi
+
+# ============================================================
 # 7. 输出宝塔 Nginx 配置
 # ============================================================
 SNIPPET="$(write_nginx_snippet "$FRONTEND_URL")"

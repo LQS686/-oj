@@ -56,6 +56,15 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY prisma ./prisma/
 RUN npx prisma generate
 
+# 独立目录安装 prisma CLI（版本与 package.json 对齐）：
+# runner 阶段 npm ci --omit=dev 不含 devDependencies（prisma CLI 在 devDependencies），
+# 部署脚本需在运行容器内执行 prisma db push 幂等同步 MongoDB 集合/索引，故单独安装。
+# 与应用 node_modules 完全隔离，不参与依赖解析，无版本漂移副作用。
+RUN mkdir -p /opt/prisma-cli && echo '{"name":"prisma-cli","private":true}' > /opt/prisma-cli/package.json && \
+    PRISMA_VER="$(node -p "require('./package.json').devDependencies.prisma")" && \
+    npm config set registry https://registry.npmmirror.com && \
+    npm install --prefix /opt/prisma-cli --no-package-lock "prisma@${PRISMA_VER}"
+
 # 复制源代码
 COPY . .
 
@@ -137,6 +146,13 @@ RUN --mount=type=cache,target=/root/.npm \
 # .prisma 是 prisma generate 产物，standalone / npm ci 都不会保留，必须在 npm ci 之后回拷
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
+# 复制 builder 阶段独立安装的 prisma CLI 到 runner：
+# 部署脚本（bt-deploy.sh）会在每次部署/升级后在运行容器内执行
+# `prisma db push --skip-generate` 幂等同步 MongoDB 集合/索引
+#（如新增的 ObjectiveQuestion 等集合），已有数据不受影响。
+# root 属主 + 默认 755 权限即可，nextjs 用户只需读执行。
+COPY --from=builder /opt/prisma-cli /opt/prisma-cli
 
 # 注：不再需要 COPY lzma-native 编译产物。
 # 题包 tar.xz 压缩/解压改用系统 xz 命令（xz-utils 已在 runner 阶段安装）。
