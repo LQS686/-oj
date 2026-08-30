@@ -200,6 +200,7 @@ export async function updateClassAssignmentDirect(
     startTime?: Date
     endTime?: Date
     problemIds?: string[]
+    objectiveQuestionIds?: string[]
     allowLateSubmission?: boolean
   }
 ) {
@@ -212,6 +213,10 @@ export async function updateClassAssignmentDirect(
 
     if (data.problemIds) {
       updateData.problemIds = data.problemIds.map(id => new ObjectId(id))
+    }
+
+    if (data.objectiveQuestionIds) {
+      updateData.objectiveQuestionIds = data.objectiveQuestionIds.map(id => new ObjectId(id))
     }
 
     await db.collection('ClassAssignment').updateOne(

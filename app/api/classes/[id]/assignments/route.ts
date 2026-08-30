@@ -16,6 +16,7 @@ import { isObjectId } from '@/lib/api/validation'
 import {
   getClassById,
   listClassAssignmentsWithStats,
+  validateAssignmentObjectiveQuestions,
   validateAssignmentProblems,
 } from '@/lib/class/service'
 import { createClassAssignment } from '@/lib/class/assignment'
@@ -53,11 +54,19 @@ export const POST = withApi.classRole(['owner', 'assistant', 'student'], async (
     startTime?: string | Date
     endTime?: string | Date
     problemIds?: string[]
+    objectiveQuestionIds?: string[]
     allowLateSubmission?: boolean
   }>(req)
 
-  if (!body.title || !body.endTime || !body.problemIds || body.problemIds.length === 0) {
+  // 编程题与客观题均为可选，默认空数组；两类合计至少 1 题
+  const problemIds = body.problemIds ?? []
+  const rawObjectiveQuestionIds = body.objectiveQuestionIds ?? []
+
+  if (!body.title || !body.endTime) {
     throw400('MISSING_FIELDS', '请填写完整的作业信息')
+  }
+  if (problemIds.length + rawObjectiveQuestionIds.length === 0) {
+    throw400('MISSING_FIELDS', '请至少选择一个编程题或客观题')
   }
 
   // === 输入校验 ===
@@ -70,12 +79,12 @@ export const POST = withApi.classRole(['owner', 'assistant', 'student'], async (
   if (body.description && body.description.length > 2000) {
     throw400('INVALID_DESCRIPTION', '描述长度不能超过 2000 字符')
   }
-  // problemIds 数量校验：1-50 个
-  if (body.problemIds!.length > 50) {
+  // 题目数量校验：编程题 + 客观题合计 1-50 个
+  if (problemIds.length + rawObjectiveQuestionIds.length > 50) {
     throw400('INVALID_PROBLEM_COUNT', '题目数量必须为 1-50 个')
   }
   // problemIds 每个元素 ObjectId 格式校验
-  for (const pid of body.problemIds!) {
+  for (const pid of problemIds) {
     if (!isObjectId(pid)) {
       throw400('INVALID_PROBLEM_ID', `无效的题目 ID: ${pid}`)
     }
@@ -100,8 +109,11 @@ export const POST = withApi.classRole(['owner', 'assistant', 'student'], async (
   if (!classData) throw404('班级不存在')
 
   // 验证题目是否存在并公开
-  const valid = await validateAssignmentProblems(body.problemIds!)
+  const valid = await validateAssignmentProblems(problemIds)
   if (!valid) throw400('INVALID_PROBLEMS', '部分题目不存在或未公开')
+
+  // 验证客观题是否存在（含逐项 ObjectId 格式校验，返回去重规范化 id）
+  const objectiveQuestionIds = await validateAssignmentObjectiveQuestions(rawObjectiveQuestionIds)
 
   const now = new Date()
   const finalStartTime = body.startTime ? new Date(body.startTime) : now
@@ -111,7 +123,8 @@ export const POST = withApi.classRole(['owner', 'assistant', 'student'], async (
     classId: id,
     title: body.title!,
     description: body.description || '',
-    problemIds: body.problemIds!,
+    problemIds,
+    objectiveQuestionIds,
     startTime: finalStartTime,
     endTime: finalEndDate,
     createdBy: user.id,

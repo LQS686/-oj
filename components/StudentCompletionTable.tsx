@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { CheckCircle2, XCircle, Clock, Search, ChevronDown, User, FileCode, Copy, Check, Timer } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
@@ -12,6 +12,10 @@ import {
   isNonFinalSubmissionStatus,
   SubmissionStatus,
 } from '@/lib/constants/submission-status'
+import {
+  OBJECTIVE_QUESTION_TYPE_LABELS,
+  type ObjectiveQuestionType,
+} from '@/lib/objective-question/types'
 
 interface RawSubmission {
   id: string
@@ -54,6 +58,20 @@ interface Problem {
  totalAccepted: number
 }
 
+/** 客观题列定义（仅需 id / 题号 / 题型） */
+interface ObjectiveQuestionColumn {
+  id: string
+  questionNumber: string | null
+  type: string
+}
+
+/** 客观题作答汇总（DB 唯一约束保证 userId+questionId 仅一条） */
+interface ObjectiveSubmissionSummary {
+  userId: string
+  questionId: string
+  isCorrect: boolean
+}
+
 interface StudentCompletionTableProps {
  students: Student[]
  problems: Problem[]
@@ -62,6 +80,10 @@ interface StudentCompletionTableProps {
  allSubmissions?: RawSubmission[]
  classId?: string
  assignmentId?: string
+ /** 作业客观题（按作业内顺序）；不传或为空时不渲染客观题列 */
+ objectiveQuestions?: ObjectiveQuestionColumn[]
+ /** 全员客观题作答（按 userId+questionId 查询单元格状态） */
+ allObjectiveSubmissions?: ObjectiveSubmissionSummary[]
 }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
@@ -270,11 +292,23 @@ export default function StudentCompletionTable({
   allSubmissions,
   classId: _classId,
   assignmentId: _assignmentId,
+  objectiveQuestions,
+  allObjectiveSubmissions,
 }: StudentCompletionTableProps) {
- const [searchTerm, setSearchTerm] = useState('')
- const [statusFilter, setStatusFilter] = useState('all')
- const [sortField, setSortField] = useState<'name' | 'score' | 'completed' | 'time'>('name')
- const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortField, setSortField] = useState<'name' | 'score' | 'completed' | 'time'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  const objectiveList = objectiveQuestions ?? []
+  // userId+questionId → 作答（DB 唯一约束保证一条），避免每格线性过滤
+  const objectiveSubMap = useMemo(() => {
+    const map = new Map<string, ObjectiveSubmissionSummary>()
+    for (const s of allObjectiveSubmissions ?? []) {
+      map.set(`${s.userId}:${s.questionId}`, s)
+    }
+    return map
+  }, [allObjectiveSubmissions])
 
  const [modalState, setModalState] = useState<{
  studentName: string
@@ -433,6 +467,24 @@ export default function StudentCompletionTable({
  {LETTERS[index]}
  </th>
  ))}
+ {objectiveList.map((question, index) => {
+ const typeLabel =
+ OBJECTIVE_QUESTION_TYPE_LABELS[question.type as ObjectiveQuestionType] ?? question.type
+ return (
+ <th
+ key={question.id}
+ className="px-2 py-2 font-mono font-bold text-sm text-center min-w-[3.5rem] select-none text-foreground/60"
+ title={`${question.questionNumber ? `${question.questionNumber} · ` : ''}${typeLabel}`}
+ >
+ <span className="flex flex-col items-center gap-0.5">
+ <span>{index + 1}</span>
+ <span className="text-[9px] font-sans font-medium text-muted-foreground">
+ {typeLabel}
+ </span>
+ </span>
+ </th>
+ )
+ })}
  <th
  className="px-3 py-2.5 font-medium text-muted-foreground text-center cursor-pointer hover:text-foreground transition-colors select-none w-[72px]"
  onClick={() => {
@@ -485,7 +537,7 @@ export default function StudentCompletionTable({
  <td
  key={problem.id}
  onClick={() => handleClickCell(student, problem, index)}
- className={`px-3 py-2.5 text-center align-middle ${
+ className={`px-2 py-2.5 text-center align-middle ${
  student.submissions[problem.id]
  ? 'cursor-pointer hover:bg-muted transition-colors'
  : onProblemClick ? 'cursor-pointer hover:bg-muted transition-colors' : ''
@@ -494,6 +546,22 @@ export default function StudentCompletionTable({
  {getStatusDisplay(student.submissions[problem.id])}
  </td>
  ))}
+ {objectiveList.map((question) => {
+ const sub = objectiveSubMap.get(`${student.id}:${question.id}`)
+ return (
+ <td key={question.id} className="px-2 py-2.5 text-center align-middle">
+ {sub ? (
+ sub.isCorrect ? (
+ <CheckCircle2 className="w-4 h-4 text-secondary mx-auto" />
+ ) : (
+ <XCircle className="w-4 h-4 text-error mx-auto" />
+ )
+ ) : (
+ <span className="text-muted-foreground/50 text-xs">—</span>
+ )}
+ </td>
+ )
+ })}
  <td className="px-3 py-2.5 text-center tabular-nums font-semibold text-foreground align-middle">
  <span className="inline-flex items-center justify-center w-full">{student.totalScore}</span>
  </td>
@@ -515,7 +583,7 @@ export default function StudentCompletionTable({
  </tr>
  )) : (
  <tr>
- <td colSpan={problems.length + 4} className="py-12 text-center text-muted-foreground text-sm">
+ <td colSpan={problems.length + objectiveList.length + 4} className="py-12 text-center text-muted-foreground text-sm">
  暂无学生数据
  </td>
  </tr>

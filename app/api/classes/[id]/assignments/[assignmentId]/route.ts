@@ -52,6 +52,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
     startTime?: string | Date
     endTime?: string | Date
     problemIds?: string[]
+    objectiveQuestionIds?: string[]
     allowLateSubmission?: boolean
   }>(req)
   return ok(await updateClassAssignment(id, assignmentId, body))

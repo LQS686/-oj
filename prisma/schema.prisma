@@ -79,6 +79,9 @@ model User {
   // 班级作业题目计时进度（非游戏化奖励）
   problemProgress        ClassAssignmentProblemProgress[]
 
+  // 客观题库（作者侧反向关系）
+  objectiveQuestions     ObjectiveQuestion[]
+
   @@index([solvedCount])
   @@index([role])
   @@index([previousEmail])
@@ -318,6 +321,7 @@ model ClassAssignment {
   title       String
   description String
   problemIds  String[]  @db.ObjectId  // 引用平台公开题库的题目ID列表
+  objectiveQuestionIds String[] @db.ObjectId // 引用客观题库的题目ID列表（与 problemIds 平行存储）
   startTime   DateTime?
   endTime     DateTime?
   createdBy   String                    @db.ObjectId  // 作业创建者ID
@@ -378,6 +382,45 @@ model ClassAssignmentSubmission {
   @@index([assignmentId, userId])  // 优化按作业和用户查询
   @@index([assignmentId, problemId])  // 优化按作业和题目查询
   @@index([assignmentId, userId, problemId, submittedAt])  // 优化查询最新提交
+}
+
+// 客观题（题库）
+model ObjectiveQuestion {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  questionNumber String?  @unique // 题号，如 "Q1001"，创建时服务端自动生成
+  type           String // 'single-choice' | 'multiple-choice' | 'true-false' | 'fill-blank'
+  title          String // 题干（Markdown，填空题以 ≥4 连续下划线 ____ 标记空位）
+  options        Json? // [{key:'A', content:'...'}]，单选/多选使用；判断/填空为 null
+  answer         Json // 标准答案
+  explanation    String? // 解析（选填，Markdown）
+  difficulty     String // '简单' | '中等' | '困难'
+  tags           String[]
+  score          Int      @default(5) // 建议分值（1-100）
+  authorId       String   @db.ObjectId
+  author         User     @relation(fields: [authorId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([type])
+  @@index([authorId])
+}
+
+// 班级作业客观题提交记录
+model ClassAssignmentObjectiveSubmission {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId String   @db.ObjectId
+  userId       String   @db.ObjectId
+  questionId   String   @db.ObjectId
+  answer       Json // 学生作答
+  isCorrect    Boolean  @default(false)
+  score        Int      @default(0) // 正确 = 题目分值，错误 = 0
+  submitCount  Int      @default(1) // 累计提交次数（重复提交 upsert 时 +1）
+  submittedAt  DateTime @default(now())
+  isLate       Boolean  @default(false)
+
+  @@unique([assignmentId, userId, questionId]) // 同题只保留最新作答
+  @@index([assignmentId, userId])
+  @@index([assignmentId, questionId])
 }
 
 // 班级笔记

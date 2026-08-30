@@ -144,6 +144,8 @@ export async function listClassAssignmentsWithStats(
       startTime: a.startTime,
       endTime: a.endTime,
       problemCount,
+      /** 客观题数量（由 objectiveQuestionIds 直接得出，无需额外查询） */
+      objectiveQuestionCount: (a.objectiveQuestionIds || []).length,
       stats: {
         totalMembers: memberCount,
         /** 完成全部题目的成员数 */
@@ -174,22 +176,44 @@ export async function getClassAssignmentDetail(
   classId: string,
   assignmentId: string
 ) {
-  const [assignment, members, submissions] = await Promise.all([
-    prisma.classAssignment.findUnique({
-      where: { id: assignmentId, classId },
-    }),
-    prisma.classMember.findMany({
-      where: { classId },
-      include: {
-        user: { select: { username: true, nickname: true, avatar: true } },
-      },
-    }),
-    prisma.classAssignmentSubmission.findMany({
-      where: { assignmentId, ...ACTIVE_SUBMISSION_WHERE },
-    }),
-  ])
+  const [assignment, members, submissions, objectiveSubmissionsRaw] =
+    await Promise.all([
+      prisma.classAssignment.findUnique({
+        where: { id: assignmentId, classId },
+      }),
+      prisma.classMember.findMany({
+        where: { classId },
+        include: {
+          user: { select: { username: true, nickname: true, avatar: true } },
+        },
+      }),
+      prisma.classAssignmentSubmission.findMany({
+        where: { assignmentId, ...ACTIVE_SUBMISSION_WHERE },
+      }),
+      // 客观题提交（@@unique(assignmentId,userId,questionId)：同题仅保留最新作答）
+      prisma.classAssignmentObjectiveSubmission.findMany({
+        where: { assignmentId },
+      }),
+    ])
   if (!assignment) return null
-  return { assignment, members, submissions }
+
+  // 客观题提交模型无 user relation，手动批量回填 user 信息（与 member 查询同款字段）
+  const objectiveUserIds = Array.from(
+    new Set(objectiveSubmissionsRaw.map((s) => s.userId))
+  )
+  const objectiveUsers = objectiveUserIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: objectiveUserIds } },
+        select: { id: true, username: true, nickname: true },
+      })
+    : []
+  const objectiveUserById = new Map(objectiveUsers.map((u) => [u.id, u]))
+  const objectiveSubmissions = objectiveSubmissionsRaw.map((s) => ({
+    ...s,
+    user: objectiveUserById.get(s.userId) || null,
+  }))
+
+  return { assignment, members, submissions, objectiveSubmissions }
 }
 
 /** 计算作业统计数据：整体 / 题目 / 成员 / 趋势 */

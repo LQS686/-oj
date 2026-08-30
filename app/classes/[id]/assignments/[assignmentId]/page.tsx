@@ -23,6 +23,9 @@ import ProblemDescription from '@/components/problem/ProblemDescription'
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import AssignmentProblemProgressList from '@/components/class/AssignmentProblemProgressList'
+import ObjectiveQuestionWorkspace, {
+  type ObjectiveSubmittedResult,
+} from '@/components/objective-question/ObjectiveQuestionWorkspace'
 import SubmissionList from '@/components/problem/SubmissionList'
 import ProblemSubmitColumn, {
   ProblemSubmitColumnHeader,
@@ -52,6 +55,13 @@ import { loginPathFromLocation } from '@/lib/navigation'
 import { useDialog } from '@/components/common'
 import { isAcceptedStatus } from '@/lib/constants/submission-status'
 import {
+  OBJECTIVE_QUESTION_TYPE_LABELS,
+  OBJECTIVE_QUESTION_TYPE_TAG_CLASSES,
+  type ObjectiveQuestionOption,
+  type ObjectiveQuestionType,
+  type ObjectiveSubmissionDTO,
+} from '@/lib/objective-question/types'
+import {
   EntityDescriptionCard,
   EntityDetailHeader,
   EntityInfoCard,
@@ -78,6 +88,23 @@ interface Assignment {
  status: string
  allowLateSubmission?: boolean
  problems: Problem[]
+ objectiveQuestions?: ObjectiveQuestion[]
+}
+
+/** 作业详情返回的客观题条目（不含 answer/explanation，防止答案泄露） */
+interface ObjectiveQuestion {
+ id: string
+ questionNumber: string | null
+ type: ObjectiveQuestionType
+ title: string
+ difficulty: string
+ score: number
+ options: ObjectiveQuestionOption[] | null
+}
+
+/** 全员客观题作答（仅班级 admin / canViewStats 可见，含 userId） */
+interface AllObjectiveSubmission extends ObjectiveSubmissionDTO {
+ userId: string
 }
 
 interface ClassMember {
@@ -110,6 +137,8 @@ export default function AssignmentDetailPage() {
  const [error, setError] = useState('')
  const [submissions, setSubmissions] = useState<SubmissionListRow[]>([])
  const [allSubmissions, setAllSubmissions] = useState<SubmissionListRow[]>([])
+ const [objectiveSubmissions, setObjectiveSubmissions] = useState<ObjectiveSubmissionDTO[]>([])
+ const [allObjectiveSubmissions, setAllObjectiveSubmissions] = useState<AllObjectiveSubmission[]>([])
  const [classMembers, setClassMembers] = useState<ClassMember[]>([])
  const [userRole, setUserRole] = useState<string>('student')
 const [editOpen, setEditOpen] = useState(false)
@@ -123,7 +152,8 @@ const [editOpen, setEditOpen] = useState(false)
  const [viewTab, setViewTab] = useState<ViewTab>(() => parseViewTab(searchParams.get('tab')))
  // 中栏 Tab：作业预设不含题解/统计
  const [problemTab, setProblemTab] = useState<WorkspaceTab>('description')
- const [selectedProblemIndex, setSelectedProblemIndex] = useState(0)
+ // 统一选中索引：[0, problems.length) = 编程题，其后为客观题
+ const [selectedIndex, setSelectedIndex] = useState(0)
  const [problemDetail, setProblemDetail] = useState<ProblemModel & { _id?: string } | null>(null)
  const [problemLoading, setProblemLoading] = useState(false)
 
@@ -170,6 +200,8 @@ const [editOpen, setEditOpen] = useState(false)
  setAssignment(data.data.assignment || null)
  setSubmissions(Array.isArray(data.data.submissions) ? data.data.submissions : [])
  setAllSubmissions(Array.isArray(data.data.allSubmissions) ? data.data.allSubmissions : [])
+ setObjectiveSubmissions(Array.isArray(data.data.objectiveSubmissions) ? data.data.objectiveSubmissions : [])
+ setAllObjectiveSubmissions(Array.isArray(data.data.allObjectiveSubmissions) ? data.data.allObjectiveSubmissions : [])
  } else {
  setError(data.error || '获取作业失败')
  }
@@ -217,12 +249,15 @@ const [editOpen, setEditOpen] = useState(false)
  }, [])
 
  useDeferredEffect(() => {
- // 仅在题目 Tab 拉题面；completion/info 不请求，避免无效流量
- if (assignment?.problems?.length && viewTab === 'problems') {
- const targetIndex = Math.min(selectedProblemIndex, assignment.problems.length - 1)
- fetchProblemDetail(assignment.problems[targetIndex].id)
+ // 仅在题目 Tab 且选中编程题时拉题面；客观题/completion/info 不请求，避免无效流量
+ if (
+ viewTab === 'problems' &&
+ assignment?.problems?.length &&
+ selectedIndex < assignment.problems.length
+ ) {
+ fetchProblemDetail(assignment.problems[selectedIndex].id)
  }
- }, [selectedProblemIndex, assignment?.problems, viewTab, fetchProblemDetail])
+ }, [selectedIndex, assignment?.problems, viewTab, fetchProblemDetail])
 
  // 桌面端（>= 1024px）不允许停留在 'code' tab，避免左栏内容为空
  useEffect(() => {
@@ -280,7 +315,7 @@ const [editOpen, setEditOpen] = useState(false)
  mergeListOnUpdate: (prev, data) =>
  defaultMergeSubmissionList(prev, data, {
  language,
- problemId: assignment?.problems?.[selectedProblemIndex]?.id,
+ problemId: assignment?.problems?.[selectedIndex]?.id,
  userId: user?.id,
  }),
  })
@@ -291,7 +326,7 @@ const [editOpen, setEditOpen] = useState(false)
  return
  }
  if (!code.trim()) return
- if (!assignment?.problems?.[selectedProblemIndex]) return
+ if (!assignment?.problems?.[selectedIndex]) return
  // 作业状态守卫：upcoming/ended(无 allowLateSubmission) 禁止提交
  if (assignment.status === 'upcoming') return
  if (assignment.status === 'ended' && !assignment.allowLateSubmission) return
@@ -306,7 +341,7 @@ const [editOpen, setEditOpen] = useState(false)
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({
- problemId: assignment.problems[selectedProblemIndex].id,
+ problemId: assignment.problems[selectedIndex].id,
  code,
  language
  })
@@ -322,7 +357,7 @@ const [editOpen, setEditOpen] = useState(false)
  setSubmissions((prev) => {
  const list = Array.isArray(prev) ? prev : []
  if (list.some((s) => s?.id === submissionId)) return list
- const problemId = assignment.problems[selectedProblemIndex].id
+ const problemId = assignment.problems[selectedIndex].id
  return [
  createPendingListRow({
  id: submissionId,
@@ -349,6 +384,30 @@ const [editOpen, setEditOpen] = useState(false)
  cooldownTimerRef.current = setTimeout(() => setSubmitCooldown(false), 3000)
  }
  }
+
+ // 客观题提交成功：覆盖/追加本地 objectiveSubmissions（同题仅一条最新记录）
+ const handleObjectiveSubmitted = useCallback(
+ (result: ObjectiveSubmittedResult | null) => {
+ if (!result) return
+ const record: ObjectiveSubmissionDTO = {
+ questionId: result.questionId,
+ answer: result.answer,
+ isCorrect: result.isCorrect,
+ score: result.score,
+ submitCount: result.submitCount,
+ submittedAt: result.submittedAt,
+ isLate: result.isLate,
+ }
+ setObjectiveSubmissions((prev) => {
+ const index = prev.findIndex((s) => s.questionId === result.questionId)
+ if (index === -1) return [...prev, record]
+ const next = prev.slice()
+ next[index] = record
+ return next
+ })
+ },
+ []
+ )
 
  const handleDeleteAssignment = async () => {
    if (!assignment) return
@@ -427,13 +486,31 @@ const [editOpen, setEditOpen] = useState(false)
  }
 
  const statusConfig = getStatusConfig(assignment.status)
- const selectedProblem = assignment.problems?.[selectedProblemIndex]
+ const objectiveQuestions = assignment.objectiveQuestions || []
  const problemCount = assignment.problems?.length || 0
- // 按题目去重：同一题多次 AC 只计 1
- const solvedCount = new Set(
-   submissions
-     .filter((s) => isAcceptedStatus(s.status) && s.problemId)
-     .map((s) => s.problemId as string)
+ const objectiveCount = objectiveQuestions.length
+ const totalQuestionCount = problemCount + objectiveCount
+ const selectedProblem = assignment.problems?.[selectedIndex]
+ // 统一选中索引落在客观题区间时，计算当前选中的客观题（越界回退编程题工作区）
+ const selectedObjectiveIndex =
+ selectedIndex >= problemCount ? selectedIndex - problemCount : null
+ const selectedObjective =
+ selectedObjectiveIndex !== null && selectedObjectiveIndex < objectiveCount
+ ? objectiveQuestions[selectedObjectiveIndex]
+ : null
+ // 客观题提交时间窗（对齐编程题：进行中 / 已结束但允许补交）
+ const objectiveCanSubmit =
+ assignment.status !== 'upcoming' &&
+ !(assignment.status === 'ended' && !assignment.allowLateSubmission)
+ // 按题目去重：同一题多次 AC 只计 1；客观题按判对去重（DB 唯一约束同题仅一条）
+ const solvedCount =
+ new Set(
+ submissions
+ .filter((s) => isAcceptedStatus(s.status) && s.problemId)
+ .map((s) => s.problemId as string)
+ ).size +
+ new Set(
+ objectiveSubmissions.filter((s) => s.isCorrect).map((s) => s.questionId)
  ).size
 
  const switchViewTab = (key: ViewTab) => {
@@ -458,9 +535,15 @@ const [editOpen, setEditOpen] = useState(false)
  ]
 
  const openProblemAt = (index: number) => {
-   setSelectedProblemIndex(index)
+   setSelectedIndex(index)
    setExpandedSubmissionId(null)
    setProblemTab('description')
+   switchViewTab('problems')
+ }
+
+ // 从简介页跳转到指定客观题（统一索引 = 编程题数量 + 客观题序号）
+ const openObjectiveAt = (index: number) => {
+   setSelectedIndex(problemCount + index)
    switchViewTab('problems')
  }
 
@@ -480,7 +563,7 @@ const [editOpen, setEditOpen] = useState(false)
    {
      icon: FileCode,
      label: '题目数量',
-     value: `${problemCount} 题`,
+     value: `${totalQuestionCount} 题`,
    },
    {
      icon: Clock,
@@ -526,7 +609,7 @@ const [editOpen, setEditOpen] = useState(false)
      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
        <span className="inline-flex items-center gap-1">
          <CheckCircle2 className="w-3.5 h-3.5 text-secondary-light" />
-         完成 {solvedCount}/{problemCount}
+         完成 {solvedCount}/{totalQuestionCount}
        </span>
      </div>
    }
@@ -570,33 +653,72 @@ const [editOpen, setEditOpen] = useState(false)
                : '老师尚未填写说明，可进入题目作答'
          }
          footer={
-           problemCount > 0 ? (
+           problemCount > 0 || objectiveCount > 0 ? (
              <div className="mt-5 pt-4 border-t border-border">
-               <p className="text-xs text-muted-foreground mb-2">题目一览</p>
-               <div className="flex flex-wrap gap-2">
-                 {assignment.problems.map((p, idx) => {
-                   const letter = String.fromCharCode(65 + idx)
-                   const done = submissions.some(
-                     (s) => s.problemId === p.id && isAcceptedStatus(s.status)
-                   )
-                   return (
-                     <button
-                       key={p.id}
-                       type="button"
-                       title={p.title}
-                       onClick={() => openProblemAt(idx)}
-                       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                         done
-                           ? 'border-secondary/30 bg-secondary/10 text-secondary'
-                           : 'border-border bg-muted/40 text-muted-foreground hover:border-primary/30 hover:text-foreground'
-                       }`}
-                     >
-                       <span className="font-mono font-bold">{letter}</span>
-                       <span className="truncate max-w-[10rem]">{p.title}</span>
-                     </button>
-                   )
-                 })}
-               </div>
+               {problemCount > 0 && (
+                 <>
+                   <p className="text-xs text-muted-foreground mb-2">题目一览</p>
+                   <div className="flex flex-wrap gap-2">
+                     {assignment.problems.map((p, idx) => {
+                       const letter = String.fromCharCode(65 + idx)
+                       const done = submissions.some(
+                         (s) => s.problemId === p.id && isAcceptedStatus(s.status)
+                       )
+                       return (
+                         <button
+                           key={p.id}
+                           type="button"
+                           title={p.title}
+                           onClick={() => openProblemAt(idx)}
+                           className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                             done
+                               ? 'border-secondary/30 bg-secondary/10 text-secondary'
+                               : 'border-border bg-muted/40 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+                           }`}
+                         >
+                           <span className="font-mono font-bold">{letter}</span>
+                           <span className="truncate max-w-[10rem]">{p.title}</span>
+                         </button>
+                       )
+                     })}
+                   </div>
+                 </>
+               )}
+               {objectiveCount > 0 && (
+                 <div className={problemCount > 0 ? 'mt-4' : ''}>
+                   <p className="text-xs text-muted-foreground mb-2">客观题一览</p>
+                   <div className="flex flex-wrap gap-2">
+                     {objectiveQuestions.map((q, idx) => {
+                       const done = objectiveSubmissions.some(
+                         (s) => s.questionId === q.id && s.isCorrect
+                       )
+                       return (
+                         <button
+                           key={q.id}
+                           type="button"
+                           title={q.title}
+                           onClick={() => openObjectiveAt(idx)}
+                           className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                             done
+                               ? 'border-secondary/30 bg-secondary/10 text-secondary'
+                               : 'border-border bg-muted/40 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+                           }`}
+                         >
+                           <span className="font-mono font-bold">{idx + 1}</span>
+                           {q.questionNumber && (
+                             <span className="font-mono">{q.questionNumber}</span>
+                           )}
+                           <span className={`tag ${OBJECTIVE_QUESTION_TYPE_TAG_CLASSES[q.type]}`}>
+                             {OBJECTIVE_QUESTION_TYPE_LABELS[q.type]}
+                           </span>
+                           <span className="truncate max-w-[10rem]">{q.title}</span>
+                           <span className="shrink-0">{q.score} 分</span>
+                         </button>
+                       )
+                     })}
+                   </div>
+                 </div>
+               )}
              </div>
            ) : undefined
          }
@@ -610,9 +732,9 @@ const [editOpen, setEditOpen] = useState(false)
              type="button"
              onClick={() => switchViewTab('problems')}
              className="btn btn-primary w-full"
-             disabled={problemCount === 0}
+             disabled={totalQuestionCount === 0}
            >
-             {problemCount === 0 ? '暂无题目' : enterProblemsLabel}
+             {totalQuestionCount === 0 ? '暂无题目' : enterProblemsLabel}
            </button>
          </div>
          <EntityInfoCard title="基本信息" items={infoItems} />
@@ -621,7 +743,20 @@ const [editOpen, setEditOpen] = useState(false)
    />
  )}
 
- {effectiveViewTab === 'problems' && (
+ {effectiveViewTab === 'problems' &&
+ (selectedObjective ? (
+ <ObjectiveQuestionWorkspace
+ key={selectedObjective.id}
+ classId={classId}
+ assignmentId={params.assignmentId as string}
+ question={selectedObjective}
+ submission={
+ objectiveSubmissions.find((s) => s.questionId === selectedObjective.id) ?? null
+ }
+ canSubmit={objectiveCanSubmit}
+ onSubmitted={handleObjectiveSubmitted}
+ />
+ ) : (
  <ProblemWorkspaceShell
  dense
  codeMode={problemTab === 'code'}
@@ -630,15 +765,19 @@ const [editOpen, setEditOpen] = useState(false)
  <AssignmentProblemProgressList
  problems={assignment.problems || []}
  submissions={submissions}
- selectedIndex={selectedProblemIndex}
+ selectedIndex={selectedObjectiveIndex !== null ? -1 : selectedIndex}
  onSelect={(index) => {
- setSelectedProblemIndex(index)
+ setSelectedIndex(index)
  setExpandedSubmissionId(null)
  setProblemTab('description')
  }}
  classId={classId}
  assignmentId={params.assignmentId as string}
  assignmentEndTime={assignment.endTime}
+ objectiveQuestions={objectiveQuestions}
+ objectiveSubmissions={objectiveSubmissions}
+ selectedObjectiveIndex={selectedObjective ? selectedObjectiveIndex : null}
+ onSelectObjective={(index) => setSelectedIndex(problemCount + index)}
  />
  }
  leftHeader={
@@ -651,7 +790,7 @@ const [editOpen, setEditOpen] = useState(false)
  leading={
  selectedProblem ? (
  <ProblemWorkspaceSelectedTitle
- letter={String.fromCharCode(65 + selectedProblemIndex)}
+ letter={String.fromCharCode(65 + selectedIndex)}
  title={selectedProblem.title}
  />
  ) : null
@@ -789,7 +928,7 @@ const [editOpen, setEditOpen] = useState(false)
  />
  }
  />
- )}
+ ))}
 
  {effectiveViewTab === 'completion' && isAdminOrOwner && (
  <StudentCompletionTable
@@ -840,6 +979,8 @@ const [editOpen, setEditOpen] = useState(false)
  problems={assignment.problems || []}
  assignmentTitle={assignment.title}
  allSubmissions={allSubmissions}
+ objectiveQuestions={objectiveQuestions}
+ allObjectiveSubmissions={allObjectiveSubmissions}
  onProblemClick={(index) => {
  setCode('')
  openProblemAt(index)

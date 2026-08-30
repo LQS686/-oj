@@ -2,11 +2,16 @@
 
 import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { Pencil, AlertCircle, Trash2 } from 'lucide-react'
+import { Pencil, AlertCircle, Trash2, ExternalLink } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { CreateModalShell, useDialog } from '@/components/common'
+import { useUser } from '@/contexts/UserContext'
+import { canAccessAdmin } from '@/lib/permissions'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
+import ObjectiveQuestionPicker, {
+  type ObjectiveQuestionPickItem,
+} from '@/components/objective-question/ObjectiveQuestionPicker'
 
 interface Assignment {
   id: string
@@ -17,6 +22,8 @@ interface Assignment {
   allowLateSubmission?: boolean
   status?: 'upcoming' | 'active' | 'ended'
   problems: ProblemPickItem[]
+  /** 作业详情返回的客观题摘要（按 objectiveQuestionIds 顺序，不含 answer/explanation） */
+  objectiveQuestions?: ObjectiveQuestionPickItem[]
 }
 
 function formatDateForInput(dateString: string) {
@@ -59,11 +66,14 @@ export default function EditAssignmentModal({
   onDeleted?: () => void
 }) {
   const dialog = useDialog()
+  const { user } = useUser()
   const [loading, setLoading] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
   const [error, setError] = useState('')
   const [problems, setProblems] = useState<ProblemPickItem[]>([])
   const [selectedProblems, setSelectedProblems] = useState<string[]>([])
+  const [objectiveQuestionIds, setObjectiveQuestionIds] = useState<string[]>([])
+  const [objectiveItems, setObjectiveItems] = useState<ObjectiveQuestionPickItem[]>([])
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -94,6 +104,10 @@ export default function EditAssignmentModal({
       })
       setAssignmentStatus(assignment.status ?? null)
       setSelectedProblems(assignment.problems.map((p) => p.id))
+      // 客观题回填：详情已按 objectiveQuestionIds 顺序返回 objectiveQuestions 摘要
+      const assignmentObjectiveQuestions = assignment.objectiveQuestions || []
+      setObjectiveQuestionIds(assignmentObjectiveQuestions.map((q) => q.id))
+      setObjectiveItems(assignmentObjectiveQuestions)
       setProblems(allProblems)
     } catch (err: unknown) {
       setError((err as Error).message || '加载失败')
@@ -120,8 +134,8 @@ export default function EditAssignmentModal({
       setError('请选择截止时间')
       return
     }
-    if (selectedProblems.length === 0) {
-      setError('请至少添加一道题目')
+    if (selectedProblems.length + objectiveQuestionIds.length === 0) {
+      setError('请至少选择一个编程题或客观题')
       return
     }
     const endTime = new Date(formData.endTime)
@@ -144,6 +158,7 @@ export default function EditAssignmentModal({
           startTime: formData.startTime ? new Date(formData.startTime) : undefined,
           endTime,
           problemIds: selectedProblems,
+          objectiveQuestionIds,
           allowLateSubmission: formData.allowLateSubmission,
         }),
       })
@@ -285,13 +300,36 @@ export default function EditAssignmentModal({
 
             <div className="px-5 py-3">
               <label className="block text-sm font-medium text-foreground mb-2">
-                题目 <span className="text-error">*</span>
+                编程题
               </label>
               <AssignmentProblemPicker
                 orderedIds={selectedProblems}
                 onChange={setSelectedProblems}
                 problems={problems}
                 problemsLoading={false}
+              />
+            </div>
+
+            <div className="px-5 py-3 border-t border-border/60">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label className="block text-sm font-medium text-foreground shrink-0">客观题</label>
+                {canAccessAdmin(user) && (
+                  <a
+                    href="/admin/objective-questions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                    title="管理客观题库"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    管理客观题库
+                  </a>
+                )}
+              </div>
+              <ObjectiveQuestionPicker
+                value={objectiveQuestionIds}
+                onChange={setObjectiveQuestionIds}
+                items={objectiveItems}
               />
             </div>
 

@@ -12,12 +12,38 @@ import {
 } from '@/lib/class/roles'
 import { ApiError } from '@/lib/api/errors'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
-import { validateAssignmentProblems } from './helpers'
+import { validateAssignmentObjectiveQuestions, validateAssignmentProblems } from './helpers'
 import { getClassAssignmentDetail, getAssignmentStatus } from './assignment-stats'
+import type {
+  ObjectiveAnswer,
+  ObjectiveQuestionOption,
+  ObjectiveQuestionType,
+  ObjectiveSubmissionDTO,
+} from '@/lib/objective-question/types'
 
 /* ============================================================================
  * 班级作业详情视图 / 更新 / 删除（原 /api/classes/[id]/assignments/[assignmentId]）
  * ========================================================================== */
+
+/** 作业详情中的客观题条目（不含 answer/explanation，防止答案泄露） */
+export interface AssignmentObjectiveQuestionItem {
+  id: string
+  questionNumber: string | null
+  type: ObjectiveQuestionType
+  title: string
+  difficulty: string
+  score: number
+  options: ObjectiveQuestionOption[] | null
+}
+
+/** 作业详情中的客观题作答条目（同题仅保留最新作答，结构复用 ObjectiveSubmissionDTO） */
+export type AssignmentObjectiveSubmissionItem = ObjectiveSubmissionDTO
+
+/** 作业详情中的全员客观题作答条目（仅班级 admin / canViewStats 可见） */
+export interface AssignmentAllObjectiveSubmissionItem
+  extends ObjectiveSubmissionDTO {
+  userId: string
+}
 
 /** 班级作业详情视图：题目 + 成员完成进度 + 当前用户提交 + 题目统计 */
 export async function buildClassAssignmentDetail(
@@ -29,7 +55,7 @@ export async function buildClassAssignmentDetail(
 ) {
   const detail = await getClassAssignmentDetail(classId, assignmentId)
   if (!detail) return null
-  const { assignment, members, submissions } = detail
+  const { assignment, members, submissions, objectiveSubmissions } = detail
 
   const problemsRaw = await prisma.problem.findMany({
     where: { id: { in: assignment.problemIds } },
@@ -48,6 +74,28 @@ export async function buildClassAssignmentDetail(
     .map((id) => problemById.get(id))
     .filter(Boolean) as typeof problemsRaw
 
+  // 客观题：select 明确排除 answer / explanation，防止答案泄露
+  const objectiveQuestionIds = assignment.objectiveQuestionIds || []
+  const objectiveQuestionsRaw = await prisma.objectiveQuestion.findMany({
+    where: { id: { in: objectiveQuestionIds } },
+    select: {
+      id: true,
+      questionNumber: true,
+      type: true,
+      title: true,
+      difficulty: true,
+      score: true,
+      options: true,
+    },
+  })
+  // findMany 不保证顺序，按 objectiveQuestionIds 顺序重排（与 problemIds 排序逻辑一致）
+  const objectiveQuestionById = new Map(
+    objectiveQuestionsRaw.map((q) => [q.id, q])
+  )
+  const objectiveQuestions = objectiveQuestionIds
+    .map((id) => objectiveQuestionById.get(id))
+    .filter(Boolean) as typeof objectiveQuestionsRaw
+
   // C-P2-23：按 userId 分组提交为 Map，成员循环 O(1) 查 Map，避免 O(成员×提交) 双重循环
   const submissionsByUser = new Map<string, typeof submissions>()
   for (const s of submissions) {
@@ -56,7 +104,15 @@ export async function buildClassAssignmentDetail(
     else submissionsByUser.set(s.userId, [s])
   }
 
-  // 成员完成情况
+  // 客观题提交按 userId 分组（同题仅一条最新记录，直接判对计数）
+  const objectiveSubmissionsByUser = new Map<string, typeof objectiveSubmissions>()
+  for (const s of objectiveSubmissions) {
+    const list = objectiveSubmissionsByUser.get(s.userId)
+    if (list) list.push(s)
+    else objectiveSubmissionsByUser.set(s.userId, [s])
+  }
+
+  // 成员完成情况（solved = AC 编程题数 + 判对客观题数；total = 编程题数 + 客观题数）
   type MemberProgressRow = {
     userId: string
     username: string
@@ -65,10 +121,15 @@ export async function buildClassAssignmentDetail(
     role: string
     progress: { solved: number; total: number; percentage: number }
   }
+  const totalQuestionCount = problems.length + objectiveQuestions.length
   const memberProgress = members
     .map((m) => {
       const us = submissionsByUser.get(m.userId) || []
       const solved = new Set(us.filter((s) => s.status === 'AC').map((s) => s.problemId))
+      const objectiveSolved = (objectiveSubmissionsByUser.get(m.userId) || []).filter(
+        (s) => s.isCorrect
+      ).length
+      const solvedCount = solved.size + objectiveSolved
       const row: MemberProgressRow = {
         userId: m.userId,
         username: m.user.username,
@@ -76,11 +137,11 @@ export async function buildClassAssignmentDetail(
         avatar: sanitizeAvatarUrl(m.user.avatar),
         role: normalizeClassRoleToApi(m.role),
         progress: {
-          solved: solved.size,
-          total: assignment.problemIds.length,
+          solved: solvedCount,
+          total: totalQuestionCount,
           percentage:
-            assignment.problemIds.length > 0
-              ? Math.round((solved.size / assignment.problemIds.length) * 100)
+            totalQuestionCount > 0
+              ? Math.round((solvedCount / totalQuestionCount) * 100)
               : 0,
         },
       }
@@ -139,6 +200,32 @@ export async function buildClassAssignmentDetail(
     ? submissions.map(mapSubmissionRow).filter(Boolean)
     : []
 
+  // 客观题作答 → DTO（原始记录含 user 信息，映射时剥离）
+  const mapObjectiveSubmissionRow = (
+    s: (typeof objectiveSubmissions)[number]
+  ): AssignmentObjectiveSubmissionItem => ({
+    questionId: s.questionId,
+    answer: Array.isArray(s.answer) ? (s.answer as ObjectiveAnswer) : [],
+    isCorrect: s.isCorrect,
+    score: s.score,
+    submitCount: s.submitCount,
+    submittedAt: new Date(s.submittedAt).toISOString(),
+    isLate: s.isLate,
+  })
+
+  // 当前用户最新作答（同题仅一条记录，无需再取最新）
+  const userObjectiveSubmissions = objectiveSubmissions.filter(
+    (s) => s.userId === viewerUserId
+  )
+  // 全员作答：可见性同 allSubmissions（班级 admin 恒可见；canViewStats 权限位成员可见）
+  const allObjectiveSubmissions: AssignmentAllObjectiveSubmissionItem[] =
+    canViewAllSubmissions
+      ? objectiveSubmissions.map((s) => ({
+          ...mapObjectiveSubmissionRow(s),
+          userId: s.userId,
+        }))
+      : []
+
   // 题目统计
   const problemStats: Record<
     string,
@@ -173,6 +260,20 @@ export async function buildClassAssignmentDetail(
         totalSubmit: problemStats[p.id]?.submitCount || 0,
         totalAccepted: problemStats[p.id]?.acceptedCount || 0,
       })),
+      // 客观题（按 objectiveQuestionIds 顺序，不含 answer/explanation）
+      objectiveQuestions: objectiveQuestions.map(
+        (q): AssignmentObjectiveQuestionItem => ({
+          id: q.id,
+          questionNumber: q.questionNumber,
+          type: q.type as ObjectiveQuestionType,
+          title: q.title,
+          difficulty: q.difficulty,
+          score: q.score,
+          options: Array.isArray(q.options)
+            ? (q.options as unknown as ObjectiveQuestionOption[])
+            : null,
+        })
+      ),
       classId: assignment.classId,
       memberProgress,
       createdAt: assignment.createdAt,
@@ -180,6 +281,10 @@ export async function buildClassAssignmentDetail(
     },
     submissions: userSubmissions.map(mapSubmissionRow).filter(Boolean),
     allSubmissions,
+    // 当前用户客观题最新作答
+    objectiveSubmissions: userObjectiveSubmissions.map(mapObjectiveSubmissionRow),
+    // 全员客观题作答（仅班级 admin / canViewStats 可见，否则为空数组）
+    allObjectiveSubmissions,
   }
 }
 
@@ -231,12 +336,19 @@ export async function updateClassAssignment(
     startTime?: string | Date
     endTime?: string | Date
     problemIds?: string[]
+    objectiveQuestionIds?: string[]
     allowLateSubmission?: boolean
   }
 ) {
   const finalEndTime = body.endTime
-  if (!body.title || !body.problemIds || body.problemIds.length === 0) {
+  // 编程题与客观题均为可选，默认空数组；两类合计至少 1 题
+  const problemIds = body.problemIds ?? []
+  const rawObjectiveQuestionIds = body.objectiveQuestionIds ?? []
+  if (!body.title) {
     throw new ApiError('MISSING_FIELDS', '请填写完整的作业信息', 400)
+  }
+  if (problemIds.length + rawObjectiveQuestionIds.length === 0) {
+    throw new ApiError('MISSING_FIELDS', '请至少选择一个编程题或客观题', 400)
   }
   // 强化输入校验：长度 / 数量
   if (body.title.length > 200) {
@@ -245,7 +357,8 @@ export async function updateClassAssignment(
   if (body.description && body.description.length > 2000) {
     throw new ApiError('INVALID_DESCRIPTION', '作业描述不能超过 2000 字符', 400)
   }
-  if (body.problemIds.length > 50) {
+  // 题目数量校验：编程题 + 客观题合计 1-50 个
+  if (problemIds.length + rawObjectiveQuestionIds.length > 50) {
     throw new ApiError('INVALID_PROBLEMS', '作业题目数量不能超过 50 个', 400)
   }
   // 日期格式校验（Date.isValid）
@@ -268,10 +381,12 @@ export async function updateClassAssignment(
   if (!existing) {
     throw new ApiError('NOT_FOUND', '作业不存在', 404)
   }
-  const valid = await validateAssignmentProblems(body.problemIds)
+  const valid = await validateAssignmentProblems(problemIds)
   if (!valid) {
     throw new ApiError('INVALID_PROBLEMS', '部分题目不存在或未公开', 400)
   }
+  // 验证客观题是否存在（含逐项 ObjectId 格式校验，返回去重规范化 id）
+  const objectiveQuestionIds = await validateAssignmentObjectiveQuestions(rawObjectiveQuestionIds)
 
   const finalStartTime = body.startTime
     ? new Date(body.startTime)
@@ -285,17 +400,25 @@ export async function updateClassAssignment(
 
   // 状态校验：读取作业当前状态（基于现有 startTime/endTime）
   const status = getAssignmentStatus(existing.startTime, existing.endTime)
-  // ended 状态下拒绝修改 problemIds
-  if (
-    status === 'ended' &&
-    body.problemIds &&
-    JSON.stringify(body.problemIds) !== JSON.stringify(existing.problemIds)
-  ) {
-    throw new ApiError(
-      'ASSIGNMENT_ENDED_CANNOT_MODIFY_PROBLEMS',
-      '作业已结束，不能修改题目列表',
-      403
-    )
+  // ended 状态下拒绝修改题目列表（编程题与客观题同规则）
+  if (status === 'ended') {
+    if (JSON.stringify(problemIds) !== JSON.stringify(existing.problemIds)) {
+      throw new ApiError(
+        'ASSIGNMENT_ENDED_CANNOT_MODIFY_PROBLEMS',
+        '作业已结束，不能修改题目列表',
+        403
+      )
+    }
+    if (
+      JSON.stringify(objectiveQuestionIds) !==
+      JSON.stringify(existing.objectiveQuestionIds || [])
+    ) {
+      throw new ApiError(
+        'ASSIGNMENT_ENDED_CANNOT_MODIFY_OBJECTIVE_QUESTIONS',
+        '作业已结束，不能修改客观题列表',
+        403
+      )
+    }
   }
 
   const { updateClassAssignmentDirect } = await import('@/lib/mongodb-direct')
@@ -304,14 +427,15 @@ export async function updateClassAssignment(
     description: body.description || '',
     startTime: finalStartTime,
     endTime: finalEndDate,
-    problemIds: body.problemIds,
+    problemIds,
+    objectiveQuestionIds,
     allowLateSubmission: typeof body.allowLateSubmission === 'boolean' ? body.allowLateSubmission : undefined,
   })
 
-  // active 状态下修改 problemIds 时，对被移除的题目清理孤儿提交与计时进度
-  if (status === 'active' && body.problemIds) {
+  // active 状态下修改题目列表时，对被移除的题目清理孤儿提交与计时进度
+  if (status === 'active') {
     const removedProblemIds = existing.problemIds.filter(
-      (id) => !body.problemIds!.includes(id)
+      (id) => !problemIds.includes(id)
     )
     if (removedProblemIds.length > 0) {
       // 标记孤儿提交为 REMOVED（终态，保留记录但不再参与统计/评测）
@@ -330,6 +454,15 @@ export async function updateClassAssignment(
           isPaused: true,
           lastResumedAt: null,
         },
+      })
+    }
+    // 客观题：删除被移除题目的作答记录（清理孤儿作答，硬删）
+    const removedObjectiveQuestionIds = (existing.objectiveQuestionIds || []).filter(
+      (id) => !objectiveQuestionIds.includes(id)
+    )
+    if (removedObjectiveQuestionIds.length > 0) {
+      await prisma.classAssignmentObjectiveSubmission.deleteMany({
+        where: { assignmentId, questionId: { in: removedObjectiveQuestionIds } },
       })
     }
   }

@@ -12,6 +12,7 @@ import {
   isClassOwnerRole,
 } from '@/lib/class/roles'
 import { ApiError } from '@/lib/api/errors'
+import { isObjectId } from '@/lib/api/validation'
 
 /** 读某用户在某班级中的成员记录（无则返回 null） */
 export async function getCurrentClassMember(classId: string, userId: string) {
@@ -146,6 +147,29 @@ export async function validateAssignmentProblems(problemIds: string[]) {
     where: { id: { in: problemIds }, isPublic: true },
   })
   return problems.length === problemIds.length
+}
+
+/**
+ * 校验作业内的所有客观题是否存在：
+ * 逐项 ObjectId 格式校验 + 批量存在性查询（数量对不上视为不存在）。
+ * 通过则返回去重规范化后的 id 数组，否则抛 ApiError。
+ */
+export async function validateAssignmentObjectiveQuestions(questionIds: string[]): Promise<string[]> {
+  const uniqueIds = Array.from(new Set(questionIds))
+  for (const id of uniqueIds) {
+    if (!isObjectId(id)) {
+      throw new ApiError('INVALID_OBJECTIVE_QUESTION_ID', `无效的客观题 ID: ${id}`, 400)
+    }
+  }
+  if (uniqueIds.length === 0) return uniqueIds
+  const questions = await prisma.objectiveQuestion.findMany({
+    where: { id: { in: uniqueIds } },
+    select: { id: true },
+  })
+  if (questions.length !== uniqueIds.length) {
+    throw new ApiError('INVALID_OBJECTIVE_QUESTIONS', '客观题不存在或已被删除', 400)
+  }
+  return uniqueIds
 }
 
 /* ============================================================================

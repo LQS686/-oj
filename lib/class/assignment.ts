@@ -11,6 +11,7 @@ export interface CreateClassAssignmentInput {
   title: string
   description: string
   problemIds: string[]
+  objectiveQuestionIds?: string[]
   startTime?: Date | null
   endTime?: Date | null
   createdBy: string
@@ -24,6 +25,7 @@ export async function createClassAssignment(input: CreateClassAssignmentInput) {
       title: input.title,
       description: input.description,
       problemIds: input.problemIds,
+      objectiveQuestionIds: input.objectiveQuestionIds ?? [],
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,
       createdBy: input.createdBy,

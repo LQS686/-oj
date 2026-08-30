@@ -2,11 +2,14 @@
 
 import { useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import { BookOpen, AlertCircle } from 'lucide-react'
+import { BookOpen, AlertCircle, ExternalLink } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { CreateModalShell } from '@/components/common'
+import { useUser } from '@/contexts/UserContext'
+import { canAccessAdmin } from '@/lib/permissions'
 import type { ProblemPickItem } from '@/lib/assignment/problemSelection'
 import AssignmentProblemPicker from '@/components/class/AssignmentProblemPicker'
+import ObjectiveQuestionPicker from '@/components/objective-question/ObjectiveQuestionPicker'
 
 // 将 Date 转为 <input type="datetime-local"> 所需的本地时间字符串 "YYYY-MM-DDTHH:mm"
 // 不能用 toISOString().slice(0,16) —— 那会返回 UTC 时间，导致默认值显示偏移 8 小时
@@ -40,11 +43,13 @@ export default function CreateAssignmentModal({
   onClose: () => void
   onCreated: () => void
 }) {
+  const { user } = useUser()
   const [loading, setLoading] = useState(false)
   const [problemsLoading, setProblemsLoading] = useState(false)
   const [error, setError] = useState('')
   const [problems, setProblems] = useState<ProblemPickItem[]>([])
   const [selectedProblems, setSelectedProblems] = useState<string[]>([])
+  const [objectiveQuestionIds, setObjectiveQuestionIds] = useState<string[]>([])
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -62,6 +67,7 @@ export default function CreateAssignmentModal({
       allowLateSubmission: false,
     })
     setSelectedProblems([])
+    setObjectiveQuestionIds([])
     setError('')
   }, [])
 
@@ -114,8 +120,8 @@ export default function CreateAssignmentModal({
       setError('请选择截止时间')
       return
     }
-    if (selectedProblems.length === 0) {
-      setError('请至少选择一个题目')
+    if (selectedProblems.length + objectiveQuestionIds.length === 0) {
+      setError('请至少选择一个编程题或客观题')
       return
     }
     const startMs = new Date(formData.startTime).getTime()
@@ -144,6 +150,7 @@ export default function CreateAssignmentModal({
           startTime: new Date(formData.startTime).toISOString(),
           endTime: new Date(formData.endTime).toISOString(),
           problemIds: selectedProblems,
+          objectiveQuestionIds,
           allowLateSubmission: formData.allowLateSubmission,
         }),
       })
@@ -247,13 +254,35 @@ export default function CreateAssignmentModal({
 
         <div className="px-5 py-3">
           <label className="block text-sm font-medium text-foreground mb-2 shrink-0">
-            按题号添加题目 <span className="text-error">*</span>
+            编程题
           </label>
           <AssignmentProblemPicker
             orderedIds={selectedProblems}
             onChange={setSelectedProblems}
             problems={problems}
             problemsLoading={problemsLoading}
+          />
+        </div>
+
+        <div className="px-5 py-3 border-t border-border/60">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <label className="block text-sm font-medium text-foreground shrink-0">客观题</label>
+            {canAccessAdmin(user) && (
+              <a
+                href="/admin/objective-questions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                title="管理客观题库"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                管理客观题库
+              </a>
+            )}
+          </div>
+          <ObjectiveQuestionPicker
+            value={objectiveQuestionIds}
+            onChange={setObjectiveQuestionIds}
           />
         </div>
 
