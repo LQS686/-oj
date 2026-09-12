@@ -2,13 +2,7 @@
  * 班级成员权限位更新
  * PATCH /api/classes/[id]/members/[memberId]/permissions
  */
-import {
-  withApi,
-  ok,
-  readJson,
-  throw400,
-  throw403,
-} from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
   mergeClassMemberPermissions,
@@ -36,10 +30,6 @@ export const PATCH = withApi.auth(async (req, ctx, { user }) => {
     throw403('助教无法修改班级创建人')
   }
 
-  const updated = await mergeClassMemberPermissions(
-    id,
-    memberId,
-    body as Record<string, boolean>
-  )
+  const updated = await mergeClassMemberPermissions(id, memberId, body as Record<string, boolean>)
   return ok({ permissions: updated?.permissions ?? body })
 })

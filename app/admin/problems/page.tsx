@@ -61,10 +61,13 @@ function AdminProblemsPageContent() {
 
   // 部分更新筛选条件（保持其他维度不变）
   // 筛选变化时重置到第 1 页，避免停留在空页
-  const handleFiltersChange = useCallback((patch: Partial<ProblemFilters>) => {
-    setFilters(prev => ({ ...prev, ...patch }))
-    setPage(1)
-  }, [setPage])
+  const handleFiltersChange = useCallback(
+    (patch: Partial<ProblemFilters>) => {
+      setFilters((prev) => ({ ...prev, ...patch }))
+      setPage(1)
+    },
+    [setPage]
+  )
 
   // 重置筛选条件
   const handleReset = useCallback(() => {

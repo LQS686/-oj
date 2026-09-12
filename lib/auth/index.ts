@@ -19,14 +19,14 @@ export function validateJwtSecret(): void {
   if (!process.env.JWT_SECRET) {
     throw new Error(
       'JWT_SECRET 环境变量未设置！请在 .env 文件中配置 JWT_SECRET。\n' +
-      '示例: JWT_SECRET=your-secure-random-string-at-least-32-characters-long'
+        '示例: JWT_SECRET=your-secure-random-string-at-least-32-characters-long'
     )
   }
   if (process.env.JWT_SECRET.length < 32) {
     throw new Error(
       `JWT_SECRET 长度不足（${process.env.JWT_SECRET.length} < 32），存在被暴力破解风险。\n` +
-      `请使用至少 32 字符的强随机字符串：\n` +
-      `  node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+        `请使用至少 32 字符的强随机字符串：\n` +
+        `  node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
     )
   }
   JWT_SECRET = process.env.JWT_SECRET

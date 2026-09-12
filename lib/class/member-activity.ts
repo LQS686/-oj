@@ -30,11 +30,7 @@ export async function getClassMemberByUserId(classId: string, userId: string) {
 }
 
 /** 更新成员备注（角色变更必须走 updateClassMemberRole） */
-export async function patchClassMember(
-  classId: string,
-  userId: string,
-  data: { remark?: string }
-) {
+export async function patchClassMember(classId: string, userId: string, data: { remark?: string }) {
   const update: { remark?: string } = {}
   if (data.remark !== undefined) update.remark = data.remark
 

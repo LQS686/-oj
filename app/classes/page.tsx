@@ -11,7 +11,23 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { canCreateClass } from '@/lib/permissions'
 import { formatDate } from '@/lib/utils'
 import CreateClassModal from '@/components/class/CreateClassModal'
-import { EducationalPageShell, ListEmptyState, LIST_GRID_CLASS, LIST_GRID_SKELETON_CLASS, LIST_GRID_CARD_META_ROW, LIST_GRID_CARD_TITLE, LIST_GRID_CARD_MIDDLE, LIST_GRID_CARD_FOOTER, listGridCardLinkClass, useDialog, RouteSuspenseFallback, Modal, ListToolbar, ListToolbarTabs, Pagination } from '@/components/common'
+import {
+  EducationalPageShell,
+  ListEmptyState,
+  LIST_GRID_CLASS,
+  LIST_GRID_SKELETON_CLASS,
+  LIST_GRID_CARD_META_ROW,
+  LIST_GRID_CARD_TITLE,
+  LIST_GRID_CARD_MIDDLE,
+  LIST_GRID_CARD_FOOTER,
+  listGridCardLinkClass,
+  useDialog,
+  RouteSuspenseFallback,
+  Modal,
+  ListToolbar,
+  ListToolbarTabs,
+  Pagination,
+} from '@/components/common'
 import { loginPathFromLocation } from '@/lib/navigation'
 
 interface Class {
@@ -64,48 +80,51 @@ function ClassesPageContent() {
     }
   }, [searchParams, user, router, canCreate])
 
-  const fetchClasses = useCallback(async (isInitial = false) => {
-    try {
-      if (isInitial) {
-        setInitialLoading(true)
-      } else {
-        setLoading(true)
-      }
-      const params = new URLSearchParams({
-        page: page.toString(),
-        pageSize: '24'
-      })
-      
-      if (searchQuery) params.append('search', searchQuery)
-      if (showMyClasses) params.append('myClasses', 'true')
+  const fetchClasses = useCallback(
+    async (isInitial = false) => {
+      try {
+        if (isInitial) {
+          setInitialLoading(true)
+        } else {
+          setLoading(true)
+        }
+        const params = new URLSearchParams({
+          page: page.toString(),
+          pageSize: '24',
+        })
 
-      const headers: Record<string, string> = {}
+        if (searchQuery) params.append('search', searchQuery)
+        if (showMyClasses) params.append('myClasses', 'true')
 
-      const response = await fetchWithCookie(`/api/classes?${params}`, { headers })
-      const data = await response.json()
+        const headers: Record<string, string> = {}
 
-      if (data.success) {
-        setClasses(data.data.classes || [])
-        setTotalPages(data.data.totalPages || 1)
-      } else {
+        const response = await fetchWithCookie(`/api/classes?${params}`, { headers })
+        const data = await response.json()
+
+        if (data.success) {
+          setClasses(data.data.classes || [])
+          setTotalPages(data.data.totalPages || 1)
+        } else {
+          setClasses([])
+          setTotalPages(1)
+        }
+      } catch (error) {
+        logger.error('获取班级列表失败', error)
         setClasses([])
         setTotalPages(1)
+      } finally {
+        setLoading(false)
+        setInitialLoading(false)
       }
-    } catch (error) {
-      logger.error('获取班级列表失败', error)
-      setClasses([])
-      setTotalPages(1)
-    } finally {
-      setLoading(false)
-      setInitialLoading(false)
-    }
-  }, [page, searchQuery, showMyClasses])
+    },
+    [page, searchQuery, showMyClasses]
+  )
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current)
     }
-    
+
     searchTimeoutRef.current = setTimeout(() => {
       fetchClasses()
     }, 300)
@@ -122,7 +141,7 @@ function ClassesPageContent() {
       try {
         const response = await fetchWithCookie(`/api/classes/${classData.id}`)
         const data = await response.json()
-        
+
         if (data.success) {
           setSelectedClass({
             ...classData,
@@ -131,8 +150,8 @@ function ClassesPageContent() {
               memberCount: classData.memberCount,
               problemCount: 0,
               assignmentCount: 0,
-              noteCount: 0
-            }
+              noteCount: 0,
+            },
           })
           setShowClassModal(true)
         }
@@ -145,12 +164,10 @@ function ClassesPageContent() {
     try {
       const response = await fetchWithCookie(`/api/classes/${classData.id}`)
       const data = await response.json()
-      
+
       if (data.success) {
-        const isMember = data.data.members.some(
-          (m: { userId: string }) => m.userId === user.id
-        )
-        
+        const isMember = data.data.members.some((m: { userId: string }) => m.userId === user.id)
+
         if (isMember) {
           router.push(`/classes/${classData.id}`)
         } else {
@@ -161,8 +178,8 @@ function ClassesPageContent() {
               memberCount: classData.memberCount,
               problemCount: 0,
               assignmentCount: 0,
-              noteCount: 0
-            }
+              noteCount: 0,
+            },
           })
           setShowClassModal(true)
         }
@@ -174,47 +191,51 @@ function ClassesPageContent() {
 
   return (
     <>
-    <EducationalPageShell
-      title="班级"
-      icon={Users}
-      actions={
-        user && canCreate ? (
-          <button type="button" onClick={() => setCreateClassOpen(true)} className="btn btn-primary">
-            <Plus className="w-5 h-5" />
-            创建班级
-          </button>
-        ) : undefined
-      }
-      toolbar={
-        <ListToolbar
-          search={{
-            value: searchQuery,
-            onChange: setSearchQuery,
-            placeholder: '搜索班级名称或描述...',
-          }}
-          trailing={
-            user ? (
-              <ListToolbarTabs
-                ariaLabel="班级范围"
-                value={showMyClasses ? 'mine' : 'all'}
-                onChange={(key) => {
-                  setShowMyClasses(key === 'mine')
-                  setPage(1)
-                }}
-                items={[
-                  { key: 'mine', label: '我的班级' },
-                  { key: 'all', label: '所有班级' },
-                ]}
-              />
-            ) : undefined
-          }
-        />
-      }
-    >
+      <EducationalPageShell
+        title="班级"
+        icon={Users}
+        actions={
+          user && canCreate ? (
+            <button
+              type="button"
+              onClick={() => setCreateClassOpen(true)}
+              className="btn btn-primary"
+            >
+              <Plus className="w-5 h-5" />
+              创建班级
+            </button>
+          ) : undefined
+        }
+        toolbar={
+          <ListToolbar
+            search={{
+              value: searchQuery,
+              onChange: setSearchQuery,
+              placeholder: '搜索班级名称或描述...',
+            }}
+            trailing={
+              user ? (
+                <ListToolbarTabs
+                  ariaLabel="班级范围"
+                  value={showMyClasses ? 'mine' : 'all'}
+                  onChange={(key) => {
+                    setShowMyClasses(key === 'mine')
+                    setPage(1)
+                  }}
+                  items={[
+                    { key: 'mine', label: '我的班级' },
+                    { key: 'all', label: '所有班级' },
+                  ]}
+                />
+              ) : undefined
+            }
+          />
+        }
+      >
         {initialLoading ? (
           <div className={LIST_GRID_SKELETON_CLASS}>
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="card rounded-lg p-4 border border-border animate-pulse h-[9.5rem]">
+              <div key={i} className="card p-4 border border-border animate-pulse h-[9.5rem]">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-lg bg-muted" />
                   <div className="flex-1">
@@ -254,7 +275,11 @@ function ClassesPageContent() {
             )}
             <div className={LIST_GRID_CLASS}>
               {classes.map((classData) => (
-                <ClassCard key={classData.id} classData={classData} onClassClick={handleClassClick} />
+                <ClassCard
+                  key={classData.id}
+                  classData={classData}
+                  onClassClick={handleClassClick}
+                />
               ))}
             </div>
 
@@ -265,7 +290,7 @@ function ClassesPageContent() {
             )}
           </div>
         )}
-    </EducationalPageShell>
+      </EducationalPageShell>
 
       {showClassModal && selectedClass && (
         <ClassDetailModal
@@ -324,9 +349,9 @@ function ClassDetailModal({
       const response = await fetchWithCookie(`/api/classes/${classData.id}/requests`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message }),
       })
 
       const data = await response.json()
@@ -358,120 +383,118 @@ function ClassDetailModal({
       closeOnEsc={!loading}
       footer={
         <div className="flex justify-end w-full">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="btn btn-outline"
-          >
+          <button onClick={onClose} disabled={loading} className="btn btn-outline">
             关闭
           </button>
         </div>
       }
     >
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-            {classData.avatar ? (
-              <img
-                src={classData.avatar}
-                alt={classData.name}
-                className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                <Users className="w-10 h-10 text-primary-foreground" />
-              </div>
-            )}
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-foreground mb-2">{classData.name}</h2>
-              <p className="text-muted-foreground mb-3">{classData.description || '暂无描述'}</p>
-              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-primary-light" />
-                  <span>{classData.stats?.memberCount || 0} / {classData.maxMembers} 成员</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-primary-light" />
-                  <span>{formatDate(classData.createdAt)}</span>
-                </div>
-                {classData.isPublic ? (
-                  <span className="tag tag-success flex items-center gap-1">
-                    <Globe className="w-3 h-3" />
-                    公开
-                  </span>
-                ) : (
-                  <span className="tag tag-warning flex items-center gap-1">
-                    <Lock className="w-3 h-3" />
-                    私有
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="card-static p-4 rounded-xl text-center">
-              <div className="text-2xl font-bold text-primary-light">{classData.stats?.memberCount || 0}</div>
-              <div className="text-sm text-muted-foreground">成员数</div>
-            </div>
-            <div className="card-static p-4 rounded-xl text-center">
-              <div className="text-2xl font-bold text-secondary-light">{classData.stats?.problemCount || 0}</div>
-              <div className="text-sm text-muted-foreground">作业题目</div>
-            </div>
-            <div className="card-static p-4 rounded-xl text-center">
-              <div className="text-2xl font-bold text-accent-light">{classData.stats?.assignmentCount || 0}</div>
-              <div className="text-sm text-muted-foreground">作业数</div>
-            </div>
-            <div className="card-static p-4 rounded-xl text-center">
-              <div className="text-2xl font-bold text-error">{classData.stats?.noteCount || 0}</div>
-              <div className="text-sm text-muted-foreground">笔记数</div>
-            </div>
-          </div>
-
-          {success ? (
-            <div className="card-static rounded-xl p-6 text-center border border-secondary/30 bg-secondary/5">
-              <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="w-6 h-6 text-secondary-light" />
-              </div>
-              <div className="text-secondary-light font-semibold mb-2">申请已提交</div>
-              <p className="text-muted-foreground">请等待管理员审批，2秒后自动关闭...</p>
-            </div>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+          {classData.avatar ? (
+            <img
+              src={classData.avatar}
+              alt={classData.name}
+              className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20"
+            />
           ) : (
-            <div className="card-static rounded-xl p-6">
-              <h4 className="font-semibold text-foreground mb-4">申请加入班级</h4>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  申请理由
-                </label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="请简要说明您申请加入班级的理由..."
-                  maxLength={500}
-                  className="input min-h-[120px] resize-none"
-                  rows={4}
-                />
-                <div className="flex justify-between items-center mt-2">
-                  <p className="text-xs text-muted-foreground">请填写申请理由，以便管理员审核</p>
-                  <span className="text-xs text-muted-foreground">{message.length}/500</span>
-                </div>
-              </div>
-              <button
-                onClick={handleJoinClass}
-                disabled={loading}
-                className="btn btn-primary w-full"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    提交申请中...
-                  </>
-                ) : (
-                  '申请加入班级'
-                )}
-              </button>
+            <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg">
+              <Users className="w-10 h-10 text-primary-foreground" />
             </div>
           )}
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-foreground mb-2">{classData.name}</h2>
+            <p className="text-muted-foreground mb-3">{classData.description || '暂无描述'}</p>
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-primary-light" />
+                <span>
+                  {classData.stats?.memberCount || 0} / {classData.maxMembers} 成员
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-primary-light" />
+                <span>{formatDate(classData.createdAt)}</span>
+              </div>
+              {classData.isPublic ? (
+                <span className="tag tag-success flex items-center gap-1">
+                  <Globe className="w-3 h-3" />
+                  公开
+                </span>
+              ) : (
+                <span className="tag tag-warning flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  私有
+                </span>
+              )}
+            </div>
+          </div>
         </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="card-static p-4 text-center">
+            <div className="text-2xl font-bold text-primary-light">
+              {classData.stats?.memberCount || 0}
+            </div>
+            <div className="text-sm text-muted-foreground">成员数</div>
+          </div>
+          <div className="card-static p-4 text-center">
+            <div className="text-2xl font-bold text-secondary-light">
+              {classData.stats?.problemCount || 0}
+            </div>
+            <div className="text-sm text-muted-foreground">作业题目</div>
+          </div>
+          <div className="card-static p-4 text-center">
+            <div className="text-2xl font-bold text-accent-light">
+              {classData.stats?.assignmentCount || 0}
+            </div>
+            <div className="text-sm text-muted-foreground">作业数</div>
+          </div>
+          <div className="card-static p-4 text-center">
+            <div className="text-2xl font-bold text-error">{classData.stats?.noteCount || 0}</div>
+            <div className="text-sm text-muted-foreground">笔记数</div>
+          </div>
+        </div>
+
+        {success ? (
+          <div className="card-static p-5 text-center border border-secondary/30 bg-secondary/5">
+            <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center mx-auto mb-4">
+              <TrendingUp className="w-6 h-6 text-secondary-light" />
+            </div>
+            <div className="text-secondary-light font-semibold mb-2">申请已提交</div>
+            <p className="text-muted-foreground">请等待管理员审批，2秒后自动关闭...</p>
+          </div>
+        ) : (
+          <div className="card-static p-5">
+            <h4 className="font-semibold text-foreground mb-4">申请加入班级</h4>
+            <div className="mb-4">
+              <label className="block text-label text-foreground mb-2">申请理由</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="请简要说明您申请加入班级的理由..."
+                maxLength={500}
+                className="input min-h-[120px] resize-none"
+                rows={4}
+              />
+              <div className="flex justify-between items-center mt-2">
+                <p className="text-xs text-muted-foreground">请填写申请理由，以便管理员审核</p>
+                <span className="text-xs text-muted-foreground">{message.length}/500</span>
+              </div>
+            </div>
+            <button onClick={handleJoinClass} disabled={loading} className="btn btn-primary w-full">
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  提交申请中...
+                </>
+              ) : (
+                '申请加入班级'
+              )}
+            </button>
+          </div>
+        )}
+      </div>
     </Modal>
   )
 }

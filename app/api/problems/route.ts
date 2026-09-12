@@ -24,12 +24,12 @@ export const GET = withApi.public(async (req) => {
     numbers?: string
   }>(req)
   const page = Math.max(1, parseInt(q.page || '1') || 1)
-  const pageSize = Math.min(
-    50,
-    Math.max(1, parseInt(q.pageSize || q.limit || '20') || 20)
-  )
+  const pageSize = Math.min(50, Math.max(1, parseInt(q.pageSize || q.limit || '20') || 20))
   const numbers = q.numbers
-    ? q.numbers.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean)
+    ? q.numbers
+        .split(/[,，\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
     : undefined
 
   const result = await listPublicProblems({
@@ -69,7 +69,9 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const problemTitle = body.title!
 
   // 测试用例处理
-  let processedTestCases: Array<{ input: string; output: string; isSample: boolean; score: number; orderIndex: number }> | undefined
+  let processedTestCases:
+    | Array<{ input: string; output: string; isSample: boolean; score: number; orderIndex: number }>
+    | undefined
   if (body.testCases && Array.isArray(body.testCases) && body.testCases.length > 0) {
     const withOrder = body.testCases.map((tc, index) => ({
       input: tc.input ?? '',

@@ -56,18 +56,12 @@ function renderMarkdown(normalized: string): ReactNode {
         pre({ children }) {
           return <>{children}</>
         },
-        code({
-          className,
-          children,
-          ...props
-        }: ComponentPropsWithoutRef<'code'> & ExtraProps) {
+        code({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & ExtraProps) {
           // 防御：若 math 节点未被 rehype-katex 转换（正常不会发生），
           // 按行内文本展示而不是渲染成带 "Math" 标签的代码块
           if (
             className &&
-            /(?:^|\s)(?:language-math|math-inline|math-display)(?:\s|$)/.test(
-              className
-            )
+            /(?:^|\s)(?:language-math|math-inline|math-display)(?:\s|$)/.test(className)
           ) {
             return <span className="markdown-math-unrendered">{children}</span>
           }
@@ -93,9 +87,7 @@ function renderMarkdown(normalized: string): ReactNode {
         table({ children }) {
           return (
             <div className="overflow-x-auto my-4">
-              <table className="min-w-full border-collapse border border-border">
-                {children}
-              </table>
+              <table className="min-w-full border-collapse border border-border">{children}</table>
             </div>
           )
         },
@@ -107,9 +99,7 @@ function renderMarkdown(normalized: string): ReactNode {
           )
         },
         td({ children }) {
-          return (
-            <td className="border border-border px-4 py-2">{children}</td>
-          )
+          return <td className="border border-border px-4 py-2">{children}</td>
         },
         blockquote({ children }) {
           return (
@@ -131,15 +121,8 @@ function renderMarkdown(normalized: string): ReactNode {
   return rendered
 }
 
-export default function MarkdownContent({
-  content,
-  className = '',
-}: MarkdownContentProps) {
-  const processedContent = content
-    ? renderMarkdown(normalizeLatexDelimiters(content))
-    : ''
+export default function MarkdownContent({ content, className = '' }: MarkdownContentProps) {
+  const processedContent = content ? renderMarkdown(normalizeLatexDelimiters(content)) : ''
 
-  return (
-    <div className={`markdown-body ${className}`}>{processedContent}</div>
-  )
+  return <div className={`markdown-body ${className}`}>{processedContent}</div>
 }

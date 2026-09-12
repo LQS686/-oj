@@ -14,7 +14,7 @@ export function ProblemSubmitColumnHeader() {
   return (
     <>
       <CodeIcon className="w-4 h-4 text-primary-light" />
-      <h3 className="text-sm font-medium text-foreground">提交代码</h3>
+      <h3 className="text-subsection-title text-foreground">提交代码</h3>
     </>
   )
 }

@@ -59,11 +59,23 @@ export default function AdminUsersPage() {
   const handleDelete = (user: User) => setDeleteTarget(user)
 
   const columns = useMemo(
-    () => buildUserColumns({ operatorIsSystemAdmin, onEdit: handleEdit, onReset: handleReset, onDelete: handleDelete }),
+    () =>
+      buildUserColumns({
+        operatorIsSystemAdmin,
+        onEdit: handleEdit,
+        onReset: handleReset,
+        onDelete: handleDelete,
+      }),
     [operatorIsSystemAdmin]
   )
   const mobileCardRenderer = useMemo(
-    () => buildUserMobileCard({ operatorIsSystemAdmin, onEdit: handleEdit, onReset: handleReset, onDelete: handleDelete }),
+    () =>
+      buildUserMobileCard({
+        operatorIsSystemAdmin,
+        onEdit: handleEdit,
+        onReset: handleReset,
+        onDelete: handleDelete,
+      }),
     [operatorIsSystemAdmin]
   )
 
@@ -121,8 +133,21 @@ export default function AdminUsersPage() {
             onPageSizeChange: changePageSize,
           }}
           batchActions={[
-            { label: '批量修改角色', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchEditModal(true) } },
-            { label: '批量删除', action: (ids) => { setSelectedUserIds(new Set(ids)); setShowBatchDeleteModal(true) }, danger: true },
+            {
+              label: '批量修改角色',
+              action: (ids) => {
+                setSelectedUserIds(new Set(ids))
+                setShowBatchEditModal(true)
+              },
+            },
+            {
+              label: '批量删除',
+              action: (ids) => {
+                setSelectedUserIds(new Set(ids))
+                setShowBatchDeleteModal(true)
+              },
+              danger: true,
+            },
           ]}
           mobileCardRenderer={mobileCardRenderer}
         />
@@ -177,7 +202,7 @@ export default function AdminUsersPage() {
           onSuccess={() => {
             setShowBatchEditModal(false)
             setSelectedUserIds(new Set())
-            setTableKey(k => k + 1)
+            setTableKey((k) => k + 1)
             fetchUsers()
           }}
         />
@@ -190,7 +215,7 @@ export default function AdminUsersPage() {
           onSuccess={() => {
             setShowBatchDeleteModal(false)
             setSelectedUserIds(new Set())
-            setTableKey(k => k + 1)
+            setTableKey((k) => k + 1)
             fetchUsers()
           }}
         />

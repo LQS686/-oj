@@ -13,8 +13,10 @@ export function MessageBanner({ message }: MessageBannerProps) {
 
   return (
     <div
-      className={`mb-6 p-4 rounded-lg flex items-center gap-3 card-static ${
-        isSuccess ? 'border-l-4 border-l-secondary bg-secondary/10' : 'border-l-4 border-l-error bg-error/10'
+      className={`mb-6 p-4 flex items-center gap-3 card-static ${
+        isSuccess
+          ? 'border-l-4 border-l-secondary bg-secondary/10'
+          : 'border-l-4 border-l-error bg-error/10'
       }`}
     >
       <div

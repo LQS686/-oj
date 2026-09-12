@@ -7,6 +7,7 @@ import { EducationalPageShell, ListEmptyState } from '@/components/common'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 import { formatDate } from '@/lib/utils'
+import { markdownToPlainText } from '@/lib/markdown/plain-text'
 import { useAnnouncementSocket } from '@/hooks/useAnnouncementSocket'
 
 export default function AnnouncementsListPage() {
@@ -17,7 +18,7 @@ export default function AnnouncementsListPage() {
     fetchWithCookie('/api/announcements?limit=20')
       .then((r) => r.json())
       .then((json) => {
-        if ((json.success) && json.data?.items) {
+        if (json.success && json.data?.items) {
           setItems(json.data.items)
         }
       })
@@ -31,7 +32,7 @@ export default function AnnouncementsListPage() {
     fetchWithCookie('/api/announcements?limit=20')
       .then((r) => r.json())
       .then((json) => {
-        if (!cancelled && (json.success) && json.data?.items) {
+        if (!cancelled && json.success && json.data?.items) {
           setItems(json.data.items)
         }
       })
@@ -55,7 +56,7 @@ export default function AnnouncementsListPage() {
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="card-static rounded-lg px-4 py-3 animate-pulse">
+            <div key={i} className="card-static px-4 py-3 animate-pulse">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="h-4 w-1/3 rounded bg-muted" />
                 <div className="h-3 w-16 rounded bg-muted" />
@@ -72,7 +73,7 @@ export default function AnnouncementsListPage() {
             <Link
               key={item.id}
               href={`/announcements/${item.id}`}
-              className={`card-static rounded-lg px-4 py-3 block hover:border-primary/30 transition-colors ${
+              className={`card-static px-4 py-3 block hover:border-primary/30 transition-colors ${
                 item.isPinned ? 'ring-1 ring-primary/25' : ''
               }`}
             >
@@ -82,14 +83,14 @@ export default function AnnouncementsListPage() {
                 ) : null}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-foreground truncate">{item.title}</h3>
+                    <h3 className="text-subsection-title text-foreground truncate">{item.title}</h3>
                     <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-                      {item.publishedAt
-                        ? formatDate(item.publishedAt)
-                        : formatDate(item.createdAt)}
+                      {item.publishedAt ? formatDate(item.publishedAt) : formatDate(item.createdAt)}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{item.content}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                    {markdownToPlainText(item.content)}
+                  </p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
               </div>

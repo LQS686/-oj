@@ -18,7 +18,7 @@ export default function Home() {
     <div className="min-h-[calc(100vh-var(--navbar-height))] flex flex-col">
       {isLoading ? (
         <PageContainer className="py-4 md:py-6 flex-1">
-          <div className="space-y-4 animate-pulse" aria-hidden="true">
+          <div className="space-y-6 animate-pulse" aria-hidden="true">
             <div className="h-8 w-64 rounded-lg bg-muted/60" />
             <div className="h-24 rounded-xl bg-muted/40" />
             <div className="grid gap-3 md:grid-cols-2">

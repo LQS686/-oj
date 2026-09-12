@@ -1,6 +1,15 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  ReactNode,
+} from 'react'
 import { authApi, type UserData } from '@/lib/api/auth'
 import { logger } from '@/lib/logger'
 
@@ -75,9 +84,10 @@ export function UserProvider({
       const userData = await authApi.getCurrentUser()
       setUser(userData)
     } catch (error) {
-      const code = error && typeof error === 'object' && 'code' in error
-        ? String((error as { code?: string }).code)
-        : undefined
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? String((error as { code?: string }).code)
+          : undefined
       // 仅在明确未授权时清空；网络错误保留现有会话，避免误登出
       if (code === 'UNAUTHORIZED') {
         setUser(null)
@@ -98,9 +108,10 @@ export function UserProvider({
         const userData = await authApi.getCurrentUser()
         setUser(userData)
       } catch (error) {
-        const code = error && typeof error === 'object' && 'code' in error
-          ? String((error as { code?: string }).code)
-          : undefined
+        const code =
+          error && typeof error === 'object' && 'code' in error
+            ? String((error as { code?: string }).code)
+            : undefined
         if (code === 'UNAUTHORIZED') {
           setUser(null)
         } else if (!initialUserRef.current) {
@@ -201,15 +212,18 @@ export function UserProvider({
     }
   }, [])
 
-  const login = useCallback((userData: User) => {
-    if (typeof window === 'undefined') return
-    void import('@/hooks/socket-client').then(({ forceResetAppSocket }) => {
-      forceResetAppSocket()
-    })
-    setUser(userData)
-    void refreshUser()
-    broadcast({ type: 'login' })
-  }, [refreshUser, broadcast])
+  const login = useCallback(
+    (userData: User) => {
+      if (typeof window === 'undefined') return
+      void import('@/hooks/socket-client').then(({ forceResetAppSocket }) => {
+        forceResetAppSocket()
+      })
+      setUser(userData)
+      void refreshUser()
+      broadcast({ type: 'login' })
+    },
+    [refreshUser, broadcast]
+  )
 
   const logout = useCallback(async () => {
     if (typeof window === 'undefined') return
@@ -217,7 +231,9 @@ export function UserProvider({
     try {
       await authApi.logout()
     } catch (error) {
-      logger.debug('退出登录失败', { error: error instanceof Error ? error.message : String(error) })
+      logger.debug('退出登录失败', {
+        error: error instanceof Error ? error.message : String(error),
+      })
     } finally {
       void import('@/hooks/socket-client').then(({ forceResetAppSocket }) => {
         forceResetAppSocket()
@@ -227,20 +243,19 @@ export function UserProvider({
     }
   }, [broadcast])
 
-  const value = useMemo(() => ({
-    user,
-    isLoading: !isInitialized,
-    setUser,
-    login,
-    logout,
-    refreshUser,
-  }), [user, isInitialized, login, logout, refreshUser])
-
-  return (
-    <UserContext.Provider value={value}>
-      {children}
-    </UserContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      isLoading: !isInitialized,
+      setUser,
+      login,
+      logout,
+      refreshUser,
+    }),
+    [user, isInitialized, login, logout, refreshUser]
   )
+
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>
 }
 
 export function useUser() {

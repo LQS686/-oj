@@ -176,13 +176,10 @@ export default function CreateAssignmentModal({
       icon={BookOpen}
       labelledById="create-assignment-title"
     >
-      <form
-        onSubmit={handleSubmit}
-        className="flex-1 min-h-0 overflow-y-auto flex flex-col"
-      >
+      <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
+            <label className="block text-label text-foreground mb-1.5">
               作业标题 <span className="text-error">*</span>
             </label>
             <input
@@ -196,7 +193,7 @@ export default function CreateAssignmentModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">作业说明</label>
+            <label className="block text-label text-foreground mb-1.5">作业说明</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -208,7 +205,7 @@ export default function CreateAssignmentModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
+              <label className="block text-label text-foreground mb-1.5">
                 开始时间 <span className="text-error">*</span>
               </label>
               <input
@@ -221,7 +218,7 @@ export default function CreateAssignmentModal({
               <p className="text-xs text-muted-foreground mt-1">到达此时间后学生可提交</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
+              <label className="block text-label text-foreground mb-1.5">
                 截止时间 <span className="text-error">*</span>
               </label>
               <input
@@ -238,13 +235,11 @@ export default function CreateAssignmentModal({
             <input
               type="checkbox"
               checked={formData.allowLateSubmission}
-              onChange={(e) =>
-                setFormData({ ...formData, allowLateSubmission: e.target.checked })
-              }
+              onChange={(e) => setFormData({ ...formData, allowLateSubmission: e.target.checked })}
               className="mt-0.5"
             />
             <div className="flex-1">
-              <div className="text-sm font-medium text-foreground">允许逾期提交</div>
+              <div className="text-label text-foreground">允许逾期提交</div>
               <div className="text-xs text-muted-foreground mt-0.5">
                 开启后，作业结束后学生仍可提交，但提交记录会被标记为「逾期」。
               </div>
@@ -253,9 +248,7 @@ export default function CreateAssignmentModal({
         </div>
 
         <div className="px-5 py-3">
-          <label className="block text-sm font-medium text-foreground mb-2 shrink-0">
-            编程题
-          </label>
+          <label className="block text-label text-foreground mb-2 shrink-0">编程题</label>
           <AssignmentProblemPicker
             orderedIds={selectedProblems}
             onChange={setSelectedProblems}
@@ -266,7 +259,7 @@ export default function CreateAssignmentModal({
 
         <div className="px-5 py-3 border-t border-border/60">
           <div className="flex items-center justify-between gap-2 mb-2">
-            <label className="block text-sm font-medium text-foreground shrink-0">客观题</label>
+            <label className="block text-label text-foreground shrink-0">客观题</label>
             {canAccessAdmin(user) && (
               <a
                 href="/admin/objective-questions"
@@ -292,12 +285,18 @@ export default function CreateAssignmentModal({
             <span>仅支持按题号添加；成员按下方列表顺序做题。</span>
           </div>
           {error && (
-            <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">{error}</div>
+            <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">
+              {error}
+            </div>
           )}
         </div>
 
         <div className="flex gap-3 px-5 py-4 border-t border-border">
-          <button type="submit" disabled={loading || problemsLoading} className="btn btn-primary flex-1">
+          <button
+            type="submit"
+            disabled={loading || problemsLoading}
+            className="btn btn-primary flex-1"
+          >
             {loading ? '创建中...' : '创建作业'}
           </button>
           <button type="button" onClick={onClose} className="btn btn-ghost">

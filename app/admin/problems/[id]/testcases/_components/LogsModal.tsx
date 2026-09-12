@@ -47,9 +47,7 @@ export function LogsModal({ open, onClose, loading, logs }: LogsModalProps) {
                 <div
                   key={log.id}
                   className={`p-3.5 rounded-lg border ${
-                    ok
-                      ? 'bg-success/10 border-success/30'
-                      : 'bg-error/10 border-error/30'
+                    ok ? 'bg-success/10 border-success/30' : 'bg-error/10 border-error/30'
                   }`}
                 >
                   <div className="flex justify-between items-start gap-3 mb-1.5">

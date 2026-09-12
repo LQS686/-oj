@@ -10,14 +10,13 @@ import { motion, AnimatePresence } from 'motion/react'
 import { BookOpen } from 'lucide-react'
 import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
+import { ListEmptyState } from '@/components/common'
 import { logger } from '@/lib/logger'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
-import ProblemLetterRail, {
-  type ProblemLetterStatus,
-} from '@/components/problem/ProblemLetterRail'
+import ProblemLetterRail, { type ProblemLetterStatus } from '@/components/problem/ProblemLetterRail'
 import SubmissionList from '@/components/problem/SubmissionList'
 import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
 import ProblemSubmitColumn, {
@@ -78,17 +77,19 @@ export default function TrainingProblemWorkspace({
 
   const railProblems = useMemo(
     () =>
-      problems.map((item, idx) => {
-        const id = item.problem?.id || ''
-        const letter = LETTERS[item.orderIndex] || LETTERS[idx] || String(idx + 1)
-        return {
-          id,
-          label: letter,
-          title: item.problem?.title || '题目',
-          status: mapStatus(item.status),
-          subtitle: item.required ? '必做' : undefined,
-        }
-      }).filter((p) => p.id),
+      problems
+        .map((item, idx) => {
+          const id = item.problem?.id || ''
+          const letter = LETTERS[item.orderIndex] || LETTERS[idx] || String(idx + 1)
+          return {
+            id,
+            label: letter,
+            title: item.problem?.title || '题目',
+            status: mapStatus(item.status),
+            subtitle: item.required ? '必做' : undefined,
+          }
+        })
+        .filter((p) => p.id),
     [problems]
   )
 
@@ -245,8 +246,7 @@ export default function TrainingProblemWorkspace({
       void fetchSubmissions()
       onProgressRefresh?.()
     },
-    mergeListOnUpdate: (prev, data) =>
-      defaultMergeSubmissionList(prev, data, { language }),
+    mergeListOnUpdate: (prev, data) => defaultMergeSubmissionList(prev, data, { language }),
   })
 
   const handleSubmit = async () => {
@@ -289,12 +289,7 @@ export default function TrainingProblemWorkspace({
   }
 
   if (railProblems.length === 0) {
-    return (
-      <div className="card-static rounded-xl p-12 text-center text-sm text-muted-foreground">
-        <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-40" />
-        该题单暂无题目
-      </div>
-    )
+    return <ListEmptyState icon={BookOpen} title="该题单暂无题目" />
   }
 
   return (
@@ -393,9 +388,7 @@ export default function TrainingProblemWorkspace({
               timeLimit={problemDetail.timeLimit}
               memoryLimit={problemDetail.memoryLimit}
               tags={PRESET.hideDifficultyAndTags ? undefined : problemDetail.tags}
-              difficulty={
-                PRESET.hideDifficultyAndTags ? undefined : problemDetail.difficulty
-              }
+              difficulty={PRESET.hideDifficultyAndTags ? undefined : problemDetail.difficulty}
               hideDifficultyAndTags={PRESET.hideDifficultyAndTags}
             />
           ) : null

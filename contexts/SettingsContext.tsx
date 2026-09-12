@@ -1,6 +1,14 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { settingsApi } from '@/lib/api/settings'
 import { defaultSettings, type SystemSettings } from '@/lib/settings-defaults'
@@ -70,7 +78,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       loading,
       refreshSettings: fetchSettings,
     }),
-    [settings, needsBootstrap, loading, fetchSettings],
+    [settings, needsBootstrap, loading, fetchSettings]
   )
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>

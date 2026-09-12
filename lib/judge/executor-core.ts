@@ -143,20 +143,20 @@ function assertLinuxJudgeHost(): void {
   if (process.env.NEXT_PHASE === 'phase-production-build') return
   if (process.platform === 'win32') {
     throw new Error(
-      '评测不支持 Windows 宿主。请在 WSL 中运行：docker compose up，或 bash scripts/wsl-dev.sh（见 docs/WSL_DEV.md）',
+      '评测不支持 Windows 宿主。请在 WSL 中运行：docker compose up，或 bash scripts/wsl-dev.sh（见 docs/WSL_DEV.md）'
     )
   }
 }
 
 /** Linux 运行命令（WSL / 容器）；已移除 Windows 宿主路径。 */
-function getRunInfo(language: string, compiledPath: string): { command: string, args: string[] } {
+function getRunInfo(language: string, compiledPath: string): { command: string; args: string[] } {
   const relativeCompiledPath = compiledPath.split('\\').pop() || compiledPath.split('/').pop() || ''
   // 无斜杠的本地二进制必须带 ./，否则 PATH 不含「.」时会 command not found
   const localBin = relativeCompiledPath.includes('/')
     ? relativeCompiledPath
     : `./${relativeCompiledPath}`
 
-  const commands: Record<string, { command: string, args: string[] }> = {
+  const commands: Record<string, { command: string; args: string[] }> = {
     cpp: {
       command: localBin,
       args: [],
@@ -303,10 +303,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     // hard=soft+1），不再通过 bash ulimit -t（soft=hard 同值导致直接 SIGKILL）。
     // 此参数保留仅为向后兼容 runner.sh 调用签名，实际未被使用。
     // 传 cpuKillMs（=timeLimit+buffer）使内核杀进程晚于判定阈值，测量值自然 > timeLimit。
-    const safeCpu = Math.min(
-      Math.max(1, Math.ceil(Number(cpuKillMs) / 1000) || 1),
-      300,
-    )
+    const safeCpu = Math.min(Math.max(1, Math.ceil(Number(cpuKillMs) / 1000) || 1), 300)
     const safeStackMb = 8
     const commandPath =
       typeof runInfo.command === 'string' ? runInfo.command.split(/[\n\r;|&`$()<>]/)[0] : ''
@@ -511,11 +508,23 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           runtimeError = true
         }
 
-        if (!savedForceKilled && !savedTimeout && !memoryExceeded && !outputLimitExceeded && cpuTimeMs > timeLimit) {
+        if (
+          !savedForceKilled &&
+          !savedTimeout &&
+          !memoryExceeded &&
+          !outputLimitExceeded &&
+          cpuTimeMs > timeLimit
+        ) {
           exceedsTimeLimit = true
         }
 
-        if (!savedTimeout && !memoryExceeded && !runtimeError && !outputLimitExceeded && cpuTimeMs > cpuTimeLimitMs) {
+        if (
+          !savedTimeout &&
+          !memoryExceeded &&
+          !runtimeError &&
+          !outputLimitExceeded &&
+          cpuTimeMs > cpuTimeLimitMs
+        ) {
           savedTimeout = true
           timeout = true
         }
@@ -654,7 +663,13 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
           outSize,
         })
         timeout = false
-      } else if (!isCpuTle && isWallTimeout && outSize > 0 && realCpuMs > timeLimit && realCpuMs <= cpuTimeLimitMs) {
+      } else if (
+        !isCpuTle &&
+        isWallTimeout &&
+        outSize > 0 &&
+        realCpuMs > timeLimit &&
+        realCpuMs <= cpuTimeLimitMs
+      ) {
         logger.info('墙钟超时且 CPU 处于浮动窗口，转临界 TLE', {
           realCpuMs,
           timeLimit,
@@ -747,9 +762,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       exceedsTimeLimit,
       timeoutType,
       aborted: abortedBySignal || undefined,
-      artifacts: retainArtifacts
-        ? { outputPath, errorPath }
-        : undefined,
+      artifacts: retainArtifacts ? { outputPath, errorPath } : undefined,
     }
   } catch (err) {
     try {

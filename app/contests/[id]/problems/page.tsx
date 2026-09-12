@@ -33,7 +33,7 @@ import {
   type SubmissionListRow,
 } from '@/hooks/useSubmissionResultFlow'
 import type { Problem } from '@/types/models'
-import { RouteSuspenseFallback } from '@/components/common'
+import { ListEmptyState, RouteSuspenseFallback } from '@/components/common'
 import { AlertCircle } from 'lucide-react'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
@@ -275,8 +275,7 @@ function ContestProblemsWorkspace() {
       void fetchSubmissions()
       void refreshContestProblems()
     },
-    mergeListOnUpdate: (prev, data) =>
-      defaultMergeSubmissionList(prev, data, { language }),
+    mergeListOnUpdate: (prev, data) => defaultMergeSubmissionList(prev, data, { language }),
   })
 
   const handleSubmit = async () => {
@@ -328,7 +327,7 @@ function ContestProblemsWorkspace() {
 
   if (listLoading) {
     return (
-      <div className="card-static rounded-xl p-10 flex justify-center">
+      <div className="card-static p-5 flex justify-center">
         <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     )
@@ -336,29 +335,26 @@ function ContestProblemsWorkspace() {
 
   if (listError) {
     return (
-      <div className="card-static rounded-xl p-12 text-center">
-        <AlertCircle className="w-8 h-8 text-error mx-auto mb-4" />
-        <p className="text-foreground font-medium mb-2">{listError}</p>
-        <p className="text-muted-foreground text-sm mb-6">
-          可能原因：竞赛未开始、未报名或无权访问
-        </p>
-        <button
-          type="button"
-          onClick={() => router.push(`/contests/${contestId}`)}
-          className="btn btn-primary"
-        >
-          返回概览
-        </button>
-      </div>
+      <ListEmptyState
+        tone="error"
+        icon={AlertCircle}
+        title={listError}
+        description="可能原因：竞赛未开始、未报名或无权访问"
+        action={
+          <button
+            type="button"
+            onClick={() => router.push(`/contests/${contestId}`)}
+            className="btn btn-primary"
+          >
+            返回概览
+          </button>
+        }
+      />
     )
   }
 
   if (contestProblems.length === 0) {
-    return (
-      <div className="card-static rounded-xl p-12 text-center text-muted-foreground text-sm">
-        暂无题目
-      </div>
-    )
+    return <ListEmptyState title="暂无题目" />
   }
 
   return (

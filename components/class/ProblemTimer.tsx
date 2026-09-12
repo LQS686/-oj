@@ -193,11 +193,7 @@ export default function ProblemTimer({
       await fetchProgress()
       if (cancelled) return
       // 仅当 active 时才 start；非选中题（被动展示）只 fetchProgress 一次
-      if (
-        activeRef.current &&
-        !isCompletedRef.current &&
-        !assignmentEndedRef.current
-      ) {
+      if (activeRef.current && !isCompletedRef.current && !assignmentEndedRef.current) {
         await callTiming('start')
       }
     }
@@ -430,11 +426,7 @@ export default function ProblemTimer({
       } ${className || ''}`}
       title={isPaused ? '计时已暂停（离开题目）' : '计时进行中'}
     >
-      {isPaused ? (
-        <PauseCircle className="w-3 h-3" />
-      ) : (
-        <Clock className="w-3 h-3" />
-      )}
+      {isPaused ? <PauseCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
       {compact
         ? formatDurationMs(displayMs)
         : `${isPaused ? '已暂停 ' : '计时 '}${formatDurationMs(displayMs)}`}

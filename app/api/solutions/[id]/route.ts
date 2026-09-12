@@ -5,7 +5,17 @@
  * PATCH  鉴权：更新（作者 / 管理员 / 教师）
  * DELETE 鉴权：删除（作者 / 管理员 / 教师，级联删评论）
  */
-import { withApi, ok, fail, readJson, readQuery, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  fail,
+  readJson,
+  readQuery,
+  throw400,
+  throw403,
+  throw404,
+  ApiError,
+} from '@/lib/api/withApi'
 import { canAccessAdmin, canManageContent } from '@/lib/permissions'
 import { verifyToken } from '@/lib/auth'
 import { readAuthTokenFromRequest } from '@/lib/auth/cookie'
@@ -21,10 +31,7 @@ import { isObjectId } from '@/lib/api/validation'
 import { logger } from '@/lib/logger'
 
 function getClientIp(req: Request): string {
-  return resolveClientIp(
-    req.headers.get('x-forwarded-for'),
-    req.headers.get('x-real-ip')
-  )
+  return resolveClientIp(req.headers.get('x-forwarded-for'), req.headers.get('x-real-ip'))
 }
 
 export const GET = withApi.public(async (req, ctx) => {
@@ -32,8 +39,7 @@ export const GET = withApi.public(async (req, ctx) => {
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题解ID')
 
   const q = readQuery<{ isAssignmentContext?: string }>(req)
-  const isAssignmentContext =
-    q.isAssignmentContext === 'true' || q.isAssignmentContext === '1'
+  const isAssignmentContext = q.isAssignmentContext === 'true' || q.isAssignmentContext === '1'
 
   // 提取 viewer（user）
   const viewer = await loadSolutionViewUser(req)

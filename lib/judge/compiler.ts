@@ -7,11 +7,7 @@ import * as crypto from 'crypto'
 import { logger } from '@/lib/logger'
 import { CompileState } from './types'
 import { getJudgeConfig } from './config'
-import {
-  compileCacheKey,
-  acquireCompileCache,
-  putCompileCache,
-} from './compile-cache'
+import { compileCacheKey, acquireCompileCache, putCompileCache } from './compile-cache'
 
 export interface CompileResult {
   success: boolean
@@ -94,11 +90,14 @@ export function shouldForceUlimitV(language?: string): boolean {
   if (ENABLE_ASAN) return false
   return language === 'cpp' || language === 'c'
 }
-const languageConfigs: Record<string, {
-  extension: string
-  compileCommand?: (source: string, output: string) => string
-  needsCompile: boolean
-}> = {
+const languageConfigs: Record<
+  string,
+  {
+    extension: string
+    compileCommand?: (source: string, output: string) => string
+    needsCompile: boolean
+  }
+> = {
   cpp: {
     extension: '.cpp',
     compileCommand: (source, output) => buildCompileCommand('g++', 'c++17', source, output),
@@ -176,10 +175,7 @@ const languageConfigs: Record<string, {
  *   生产环境对数组越界有严格要求的题目，可在 docker-compose 设 JUDGE_ENABLE_ASAN=true。
  *   ASan 有 2-5x 性能开销，且内存需调大 memoryLimit × 2-3，故默认不启用。
  */
-function buildStableCompileArgs(
-  compiler: 'g++' | 'gcc',
-  std: string,
-): string[] {
+function buildStableCompileArgs(compiler: 'g++' | 'gcc', std: string): string[] {
   const args = [
     '-O2',
     // 不使用 -march=native：Intel Xeon 启用 AVX-512 后会触发降频保护，
@@ -209,17 +205,9 @@ function buildStableCompileArgs(
       '-fno-omit-frame-pointer'
     )
   } else if (ENABLE_UBSAN) {
-    args.push(
-      '-fsanitize=undefined',
-      '-fno-sanitize-recover=all',
-      '-fno-omit-frame-pointer'
-    )
+    args.push('-fsanitize=undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer')
   } else if (ENABLE_ASAN) {
-    args.push(
-      '-fsanitize=address',
-      '-fno-sanitize-recover=all',
-      '-fno-omit-frame-pointer'
-    )
+    args.push('-fsanitize=address', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer')
   }
 
   // compiler 作为返回值的一部分供调用方使用
@@ -237,7 +225,12 @@ function buildCompileArgs(
 }
 
 /** 构造 compileCommand 字符串（仅用于 languageConfigs.compileCommand 字段展示） */
-function buildCompileCommand(compiler: 'g++' | 'gcc', std: string, source: string, output: string): string {
+function buildCompileCommand(
+  compiler: 'g++' | 'gcc',
+  std: string,
+  source: string,
+  output: string
+): string {
   return `${compiler} ${buildCompileArgs(compiler, std, source, output).join(' ')}`
 }
 
@@ -265,15 +258,19 @@ function spawnCompile(
   cmd: string,
   args: string[],
   timeoutMs: number,
-  env: NodeJS.ProcessEnv = compileSpawnEnv(process.cwd()),
+  env: NodeJS.ProcessEnv = compileSpawnEnv(process.cwd())
 ): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean }> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { timeout: timeoutMs, env })
     let stdout = ''
     let stderr = ''
 
-    child.stdout?.on('data', (data) => { stdout += data.toString() })
-    child.stderr?.on('data', (data) => { stderr += data.toString() })
+    child.stdout?.on('data', (data) => {
+      stdout += data.toString()
+    })
+    child.stderr?.on('data', (data) => {
+      stderr += data.toString()
+    })
 
     child.on('error', (err) => {
       reject(err)
@@ -330,7 +327,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
       language,
       code,
       buildStableCompileArgs(compiler as 'g++' | 'gcc', std),
-      compiler,
+      compiler
     )
     const hit = acquireCompileCache(cacheKey, code)
     if (hit) {
@@ -398,7 +395,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
       //   - UBSan 静态链接开销 ~50MB
       //   - ASan 编译时插桩开销 ~100-200MB
       // 默认 512MB；启用 sanitizer 时编译期内存显著更高，提到 2048MB
-      const compileMemMb = (ENABLE_UBSAN || ENABLE_ASAN) ? '2048' : '512'
+      const compileMemMb = ENABLE_UBSAN || ENABLE_ASAN ? '2048' : '512'
       const compiler = language === 'c' ? 'gcc' : 'g++'
       const std = language === 'c' ? 'c11' : 'c++17'
       // 编译参数（不含 compiler 名称，由 runner.sh 单独传）
@@ -431,7 +428,7 @@ export async function compileCode(code: string, language: string): Promise<Compi
         spawnCmd,
         spawnArgs,
         getJudgeConfig().compileTimeoutMs,
-        compileEnv,
+        compileEnv
       )
 
       if (exitCode === 0) {
@@ -480,7 +477,12 @@ export async function compileCode(code: string, language: string): Promise<Compi
       }
 
       // 编译失败
-      logger.warn(`编译失败详情`, { exitCode, stderr: filteredStderr, cmd: spawnCmd, args: spawnArgs })
+      logger.warn(`编译失败详情`, {
+        exitCode,
+        stderr: filteredStderr,
+        cmd: spawnCmd,
+        args: spawnArgs,
+      })
       return {
         success: false,
         compileState: CompileState.CompileError,

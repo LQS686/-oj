@@ -68,46 +68,56 @@ export async function unenrollTraining(trainingId: string, userId: string) {
 }
 
 export async function isEnrolled(trainingId: string, userId: string): Promise<boolean> {
-  return cache.get('training:enrollment:check', [trainingId, userId], async () => {
-    const r = await prisma.trainingEnrollment.findUnique({
-      where: { trainingId_userId: { trainingId, userId } },
-      select: { id: true },
-    })
-    return !!r
-  }, { ttl: 10_000 })
+  return cache.get(
+    'training:enrollment:check',
+    [trainingId, userId],
+    async () => {
+      const r = await prisma.trainingEnrollment.findUnique({
+        where: { trainingId_userId: { trainingId, userId } },
+        select: { id: true },
+      })
+      return !!r
+    },
+    { ttl: 10_000 }
+  )
 }
 
 export async function getUserEnrollments(userId: string) {
-  return cache.get('training:enrollments', [userId], async () => {
-    const enrollments = await prisma.trainingEnrollment.findMany({
-      where: { userId },
-      orderBy: { joinedAt: 'desc' },
-      include: {
-        training: {
-          include: {
-            _count: { select: { problems: true } },
-            category: { select: { id: true, name: true } },
+  return cache.get(
+    'training:enrollments',
+    [userId],
+    async () => {
+      const enrollments = await prisma.trainingEnrollment.findMany({
+        where: { userId },
+        orderBy: { joinedAt: 'desc' },
+        include: {
+          training: {
+            include: {
+              _count: { select: { problems: true } },
+              category: { select: { id: true, name: true } },
+            },
           },
         },
-      },
-    })
-    return enrollments.map((e) => ({
-      trainingId: e.trainingId,
-      joinedAt: e.joinedAt,
-      training: {
-        id: e.training.id,
-        title: e.training.title,
-        description: e.training.description,
-        difficulty: e.training.difficulty,
-        cover: e.training.cover,
-        tags: e.training.tags,
-        problemCount: e.training._count.problems,
-        category: e.training.category,
-        joinCount: e.training.joinCount,
-        viewCount: e.training.viewCount,
-      },
-    }))
-  }, { ttl: 30_000 })
+      })
+      return enrollments.map((e) => ({
+        trainingId: e.trainingId,
+        joinedAt: e.joinedAt,
+        training: {
+          id: e.training.id,
+          title: e.training.title,
+          description: e.training.description,
+          difficulty: e.training.difficulty,
+          cover: e.training.cover,
+          tags: e.training.tags,
+          problemCount: e.training._count.problems,
+          category: e.training.category,
+          joinCount: e.training.joinCount,
+          viewCount: e.training.viewCount,
+        },
+      }))
+    },
+    { ttl: 30_000 }
+  )
 }
 
 export async function incrementJoinCount(trainingId: string, delta: number) {

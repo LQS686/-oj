@@ -36,7 +36,7 @@ export function buildObjectiveQuestionColumns(
       label: '题号',
       className: 'whitespace-nowrap',
       render: (value) => (
-        <span className="font-mono text-sm font-medium text-muted-foreground">
+        <span className="font-mono text-label text-muted-foreground">
           {(value as string) || '—'}
         </span>
       ),
@@ -57,10 +57,7 @@ export function buildObjectiveQuestionColumns(
       key: 'title',
       label: '题干',
       render: (value) => (
-        <span
-          className="block max-w-md truncate text-foreground"
-          title={value as string}
-        >
+        <span className="block max-w-md truncate text-foreground" title={value as string}>
           {value as string}
         </span>
       ),
@@ -72,9 +69,7 @@ export function buildObjectiveQuestionColumns(
         const difficulty = value as string
         const tagClass = OBJECTIVE_DIFFICULTY_TAG_CLASSES[difficulty] || ''
         return tagClass ? (
-          <span className={`difficulty-tag ${tagClass} whitespace-nowrap`}>
-            {difficulty}
-          </span>
+          <span className={`difficulty-tag ${tagClass} whitespace-nowrap`}>{difficulty}</span>
         ) : (
           <span className="text-sm text-muted-foreground">{difficulty}</span>
         )
@@ -99,9 +94,7 @@ export function buildObjectiveQuestionColumns(
               </span>
             ))}
             {tags.length > 3 && (
-              <span className="text-xs text-muted-foreground">
-                +{tags.length - 3}
-              </span>
+              <span className="text-xs text-muted-foreground">+{tags.length - 3}</span>
             )}
           </div>
         )
@@ -113,11 +106,7 @@ export function buildObjectiveQuestionColumns(
       render: (value) => {
         const count = typeof value === 'number' ? value : 0
         return (
-          <span
-            className={`text-sm font-medium ${
-              count > 0 ? 'text-foreground' : 'text-muted-foreground'
-            }`}
-          >
+          <span className={`text-label ${count > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
             {count}
           </span>
         )
@@ -142,7 +131,7 @@ export function buildObjectiveQuestionColumns(
               e.stopPropagation()
               router.push(`/admin/objective-questions/${question.id}/edit`)
             }}
-            className="p-2.5 text-primary hover:bg-primary/5 rounded-lg transition-colors"
+            className="btn-icon text-primary hover:bg-primary/5 transition-colors"
             title="编辑"
           >
             <Edit className="w-4 h-4" />
@@ -152,7 +141,7 @@ export function buildObjectiveQuestionColumns(
               e.stopPropagation()
               onDelete(question)
             }}
-            className="p-2.5 text-error hover:bg-error/10 rounded-lg transition-colors"
+            className="btn-icon text-error hover:bg-error/10 transition-colors"
             title="删除"
           >
             <Trash2 className="w-4 h-4" />

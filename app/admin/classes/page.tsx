@@ -151,9 +151,7 @@ function AdminClassesPageContent() {
       key: 'isPublic',
       label: '类型',
       render: (value) => (
-        <span className={`tag ${value ? 'tag-success' : 'tag'}`}>
-          {value ? '公开' : '私有'}
-        </span>
+        <span className={`tag ${value ? 'tag-success' : 'tag'}`}>{value ? '公开' : '私有'}</span>
       ),
     },
     {
@@ -188,7 +186,7 @@ function AdminClassesPageContent() {
               e.stopPropagation()
               handleToggleVisibility(classData.id, classData.isPublic)
             }}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`btn-icon transition-colors ${
               classData.isPublic
                 ? 'text-secondary hover:bg-secondary/10'
                 : 'text-muted-foreground hover:bg-muted/10'
@@ -203,7 +201,7 @@ function AdminClassesPageContent() {
               setSelectedClass(classData)
               setShowDeleteModal(true)
             }}
-            className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
+            className="btn-icon text-error hover:bg-error/10 transition-colors"
             title="删除"
           >
             <Trash2 className="w-4 h-4" />
@@ -317,9 +315,8 @@ function AdminClassesPageContent() {
           }
         >
           <p className="text-muted-foreground">
-            确定要删除班级{' '}
-            <span className="text-foreground font-medium">{selectedClass.name}</span> 吗？
-            此操作无法撤销。
+            确定要删除班级 <span className="text-foreground font-medium">{selectedClass.name}</span>{' '}
+            吗？ 此操作无法撤销。
           </p>
         </Modal>
       )}

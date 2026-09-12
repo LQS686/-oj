@@ -26,8 +26,8 @@ export function StatsCards({ users, total }: { users: User[]; total: number }) {
       <div className="card p-4">
         <div className="text-muted-foreground text-sm mb-2">角色分布</div>
         <div className="space-y-2">
-          {ROLE_ORDER.map(role => {
-            const count = users.filter(u => u.role === role).length
+          {ROLE_ORDER.map((role) => {
+            const count = users.filter((u) => u.role === role).length
             const percent = users.length > 0 ? (count / users.length) * 100 : 0
             const display = getRoleDisplay(role)
             const barColor = ROLE_BAR_COLOR[role] || 'bg-primary'

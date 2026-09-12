@@ -158,10 +158,7 @@ export function acquireCompileCache(
 }
 
 /** 写入缓存 */
-export function putCompileCache(
-  key: string,
-  entry: Omit<CompileCacheEntry, 'refs'>
-): void {
+export function putCompileCache(key: string, entry: Omit<CompileCacheEntry, 'refs'>): void {
   cache.put(key, entry)
 }
 

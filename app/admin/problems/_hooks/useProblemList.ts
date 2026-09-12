@@ -70,86 +70,98 @@ export function useProblemList(filters: ProblemFilters) {
     return `/api/admin/problems?${params.toString()}`
   }, [page, pageSize, debouncedFilters])
 
-  const fetchProblems = useCallback(async (isInitial = false) => {
-    const seq = ++fetchSeq.current
-    try {
-      if (isInitial) {
-        setInitialLoading(true)
-      } else {
-        setLoading(true)
-      }
-      const response = await fetchWithCookie(buildUrl())
+  const fetchProblems = useCallback(
+    async (isInitial = false) => {
+      const seq = ++fetchSeq.current
+      try {
+        if (isInitial) {
+          setInitialLoading(true)
+        } else {
+          setLoading(true)
+        }
+        const response = await fetchWithCookie(buildUrl())
 
-      // 竞态守卫：若期间又发起了新请求（翻页/筛选变化），丢弃本次过期响应
-      if (seq !== fetchSeq.current) return
+        // 竞态守卫：若期间又发起了新请求（翻页/筛选变化），丢弃本次过期响应
+        if (seq !== fetchSeq.current) return
 
-      if (response.status === 403) {
-        setError('需要管理员权限')
-        scheduleForbiddenRedirect()
-        return
-      }
-
-      const data = await response.json()
-      if (seq !== fetchSeq.current) return
-      if (data.success) {
-        const payload = data.data
-        const rows = Array.isArray(payload?.data) ? payload.data : []
-        const nextTotal = typeof payload?.pagination?.total === 'number'
-          ? payload.pagination.total
-          : 0
-        // 当前页已空但还有数据（如删除了末页最后一题）：回退一页触发重新请求
-        if (rows.length === 0 && nextTotal > 0 && page > 1) {
-          setPage(page - 1)
+        if (response.status === 403) {
+          setError('需要管理员权限')
+          scheduleForbiddenRedirect()
           return
         }
-        setProblems(rows)
-        setTotal(nextTotal)
-        setAllTags(Array.isArray(payload?.meta?.availableTags) ? payload.meta.availableTags : [])
-        setAllSources(Array.isArray(payload?.meta?.availableSources) ? payload.meta.availableSources : [])
-        setStats(payload?.stats ?? null)
-      } else {
-        setError(data.error || '获取题目列表失败')
-        setProblems([])
-        setTotal(0)
-        setStats(null)
-      }
-    } catch {
-      if (seq !== fetchSeq.current) return
-      setError('网络错误')
-    } finally {
-      if (seq === fetchSeq.current) {
-        setLoading(false)
-        setInitialLoading(false)
-      }
-    }
-  }, [buildUrl, scheduleForbiddenRedirect, page])
 
-  const toggleVisibility = useCallback(async (problemId: string, currentVisibility: string) => {
-    const nextVisibility =
-      currentVisibility === 'public' ? 'private' :
-      currentVisibility === 'private' ? 'contest' : 'public'
-
-    try {
-      const response = await fetchWithCookie(`/api/admin/problems/${problemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visibility: nextVisibility })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setProblems(prev => prev.map(p =>
-          p.id === problemId
-            ? { ...p, visibility: nextVisibility, isPublic: nextVisibility === 'public' }
-            : p
-        ))
-      } else {
-        await dialog.alert({ tone: 'error', message: data.error || '操作失败' })
+        const data = await response.json()
+        if (seq !== fetchSeq.current) return
+        if (data.success) {
+          const payload = data.data
+          const rows = Array.isArray(payload?.data) ? payload.data : []
+          const nextTotal =
+            typeof payload?.pagination?.total === 'number' ? payload.pagination.total : 0
+          // 当前页已空但还有数据（如删除了末页最后一题）：回退一页触发重新请求
+          if (rows.length === 0 && nextTotal > 0 && page > 1) {
+            setPage(page - 1)
+            return
+          }
+          setProblems(rows)
+          setTotal(nextTotal)
+          setAllTags(Array.isArray(payload?.meta?.availableTags) ? payload.meta.availableTags : [])
+          setAllSources(
+            Array.isArray(payload?.meta?.availableSources) ? payload.meta.availableSources : []
+          )
+          setStats(payload?.stats ?? null)
+        } else {
+          setError(data.error || '获取题目列表失败')
+          setProblems([])
+          setTotal(0)
+          setStats(null)
+        }
+      } catch {
+        if (seq !== fetchSeq.current) return
+        setError('网络错误')
+      } finally {
+        if (seq === fetchSeq.current) {
+          setLoading(false)
+          setInitialLoading(false)
+        }
       }
-    } catch {
-      await dialog.alert({ tone: 'error', message: '网络错误' })
-    }
-  }, [dialog])
+    },
+    [buildUrl, scheduleForbiddenRedirect, page]
+  )
+
+  const toggleVisibility = useCallback(
+    async (problemId: string, currentVisibility: string) => {
+      const nextVisibility =
+        currentVisibility === 'public'
+          ? 'private'
+          : currentVisibility === 'private'
+            ? 'contest'
+            : 'public'
+
+      try {
+        const response = await fetchWithCookie(`/api/admin/problems/${problemId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visibility: nextVisibility }),
+        })
+
+        const data = await response.json()
+        if (data.success) {
+          setProblems((prev) =>
+            prev.map((p) =>
+              p.id === problemId
+                ? { ...p, visibility: nextVisibility, isPublic: nextVisibility === 'public' }
+                : p
+            )
+          )
+        } else {
+          await dialog.alert({ tone: 'error', message: data.error || '操作失败' })
+        }
+      } catch {
+        await dialog.alert({ tone: 'error', message: '网络错误' })
+      }
+    },
+    [dialog]
+  )
 
   // page / pageSize / filters 变化时自动重新请求；首次渲染走 initialLoading
   const isFirstRender = useRef(true)

@@ -4,7 +4,16 @@
  * GET  公开：按 problemId 列出题解（带权限校验、点赞状态）
  * POST 鉴权：创建题解
  */
-import { withApi, ok, fail, readJson, readQuery, throw400, throw404, ApiError } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  fail,
+  readJson,
+  readQuery,
+  throw400,
+  throw404,
+  ApiError,
+} from '@/lib/api/withApi'
 import {
   listSolutionsWithPermission,
   createUserSolution,
@@ -23,13 +32,18 @@ export const GET = withApi.public(async (req) => {
 
   if (!q.problemId) throw400('VALIDATION', 'problemId 不能为空')
 
-  const isAssignmentContext =
-    q.isAssignmentContext === 'true' || q.isAssignmentContext === '1'
+  const isAssignmentContext = q.isAssignmentContext === 'true' || q.isAssignmentContext === '1'
   const page = Math.max(1, toInt(q.page, 'page', 1))
   const pageSize = Math.max(1, Math.min(100, toInt(q.pageSize, 'pageSize', 20)))
 
   const viewer = await loadSolutionViewUser(req)
-  const result = await listSolutionsWithPermission(q.problemId!, isAssignmentContext, page, pageSize, viewer)
+  const result = await listSolutionsWithPermission(
+    q.problemId!,
+    isAssignmentContext,
+    page,
+    pageSize,
+    viewer
+  )
 
   if (!result.found) throw404('题目不存在')
   if (!result.allowed) {

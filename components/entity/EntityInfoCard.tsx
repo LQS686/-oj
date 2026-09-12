@@ -21,9 +21,9 @@ export default function EntityInfoCard({
   children?: ReactNode
 }) {
   return (
-    <section className="card-static rounded-xl overflow-hidden">
+    <section className="card-static overflow-hidden">
       <div className="px-4 py-3 border-b border-border bg-muted/30">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <h3 className="text-subsection-title text-foreground">{title}</h3>
       </div>
       {children}
       {items.length > 0 && (
@@ -31,10 +31,7 @@ export default function EntityInfoCard({
           {items.map((item) => {
             const Icon = item.icon
             return (
-              <div
-                key={item.label}
-                className="flex items-start gap-3 px-4 py-2.5 text-sm"
-              >
+              <div key={item.label} className="flex items-start gap-3 px-4 py-2.5 text-sm">
                 <dt className="flex items-center gap-1.5 text-muted-foreground shrink-0 w-[5.5rem]">
                   {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
                   {item.label}

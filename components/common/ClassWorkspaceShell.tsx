@@ -15,7 +15,6 @@ export interface ClassNavItem {
 
 export interface ClassWorkspaceShellProps {
   classId: string
-  className?: string
   title: string
   description?: ReactNode
   icon?: LucideIcon
@@ -34,7 +33,12 @@ export const classOverviewNav = (classId: string): ClassNavItem[] => [
   { href: `/classes/${classId}`, label: '管理', match: 'exact', tab: 'manage' },
 ]
 
-function isNavActive(pathname: string, classId: string, tab: string | null, item: ClassNavItem): boolean {
+function isNavActive(
+  pathname: string,
+  classId: string,
+  tab: string | null,
+  item: ClassNavItem
+): boolean {
   const base = `/classes/${classId}`
   const onClassHome = pathname === base || pathname === `${base}/`
   if (!onClassHome) return false
@@ -44,7 +48,6 @@ function isNavActive(pathname: string, classId: string, tab: string | null, item
 
 export function ClassWorkspaceShell({
   classId,
-  className: _classTitle,
   title,
   description,
   icon,
@@ -73,7 +76,7 @@ export function ClassWorkspaceShell({
             href={href}
             scroll={false}
             prefetch
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-4 py-2.5 text-label border-b-2 -mb-px transition-colors ${
               active
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -95,7 +98,6 @@ export function ClassWorkspaceShell({
       actions={actions}
       backHref={showBack ? '/classes' : undefined}
       backLabel="返回班级列表"
-      showTitle
       toolbar={
         <div className="space-y-3">
           {nav}

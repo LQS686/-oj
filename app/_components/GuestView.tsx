@@ -95,7 +95,7 @@ export function GuestView() {
     fetchWithCookie('/api/announcements?limit=6')
       .then((r) => r.json())
       .then((json) => {
-        if (!cancelled && (json.success) && json.data?.items) {
+        if (!cancelled && json.success && json.data?.items) {
           setAnnouncements(json.data.items)
         }
       })
@@ -113,12 +113,18 @@ export function GuestView() {
         <div className="absolute inset-0 -z-10" aria-hidden>
           <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.07]">
             <svg viewBox="0 0 1200 400" className="w-full h-full" preserveAspectRatio="none">
-              <path d="M0 320 L100 200 L200 240 L320 140 L440 200 L560 100 L680 180 L800 140 L920 220 L1040 180 L1200 260 L1200 400 L0 400 Z" fill="currentColor" />
+              <path
+                d="M0 320 L100 200 L200 240 L320 140 L440 200 L560 100 L680 180 L800 140 L920 220 L1040 180 L1200 260 L1200 400 L0 400 Z"
+                fill="currentColor"
+              />
             </svg>
           </div>
           <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
             <svg viewBox="0 0 1200 400" className="w-full h-full" preserveAspectRatio="none">
-              <path d="M0 360 L120 280 L240 310 L360 250 L480 290 L600 230 L720 280 L840 260 L960 300 L1080 270 L1200 310 L1200 400 L0 400 Z" fill="currentColor" />
+              <path
+                d="M0 360 L120 280 L240 310 L360 250 L480 290 L600 230 L720 280 L840 260 L960 300 L1080 270 L1200 310 L1200 400 L0 400 Z"
+                fill="currentColor"
+              />
             </svg>
           </div>
           {/* 顶部渐隐光晕 */}
@@ -142,33 +148,43 @@ export function GuestView() {
             </h1>
 
             {/* 副标题 */}
-            <p className="text-sm md:text-base lg:text-lg text-muted-foreground mb-8 leading-relaxed animate-fadeIn max-w-2xl mx-auto" style={{ animationDelay: '80ms' }}>
-              {siteName} 是一站式在线编程学习与竞赛平台。精心编排的题库、毫秒级实时评测、多元赛制竞赛与体系化训练路径，让每一位攀登者都能看见自己的成长曲线。
+            <p
+              className="text-sm md:text-base lg:text-lg text-muted-foreground mb-8 leading-relaxed animate-fadeIn max-w-2xl mx-auto"
+              style={{ animationDelay: '80ms' }}
+            >
+              {siteName}{' '}
+              是一站式在线编程学习与竞赛平台。精心编排的题库、毫秒级实时评测、多元赛制竞赛与体系化训练路径，让每一位攀登者都能看见自己的成长曲线。
             </p>
 
             {/* CTA 按钮 */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center animate-fadeIn" style={{ animationDelay: '160ms' }}>
+            <div
+              className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center animate-fadeIn"
+              style={{ animationDelay: '160ms' }}
+            >
               {allowRegistration ? (
-                <Link href="/register" className="btn btn-primary text-base px-7 py-3 h-auto">
+                <Link href="/register" className="btn btn-primary btn-lg px-7">
                   <Sparkles className="w-5 h-5" />
                   开始我的攀登
                   <ArrowRight className="w-5 h-5" />
                 </Link>
               ) : (
-                <Link href="/login" className="btn btn-primary text-base px-7 py-3 h-auto">
+                <Link href="/login" className="btn btn-primary btn-lg px-7">
                   <Sparkles className="w-5 h-5" />
                   登录后开始
                   <ArrowRight className="w-5 h-5" />
                 </Link>
               )}
-              <Link href="/problems" className="btn btn-outline text-base px-7 py-3 h-auto">
+              <Link href="/problems" className="btn btn-outline btn-lg px-7">
                 <BookOpen className="w-5 h-5" />
                 探索题库
               </Link>
             </div>
 
             {/* 三联标识：更紧凑 */}
-            <div className="flex items-center justify-center gap-4 md:gap-8 mt-8 text-xs md:text-sm text-muted-foreground animate-fadeIn" style={{ animationDelay: '240ms' }}>
+            <div
+              className="flex items-center justify-center gap-4 md:gap-8 mt-8 text-xs md:text-sm text-muted-foreground animate-fadeIn"
+              style={{ animationDelay: '240ms' }}
+            >
               <div className="flex items-center gap-1.5">
                 <Zap className="w-4 h-4 text-primary" />
                 <span>即时评测反馈</span>
@@ -207,20 +223,27 @@ export function GuestView() {
         {/* 路径卡片 + 连接线 */}
         <div className="relative">
           {/* desktop 横向连接线 */}
-          <div className="hidden md:block absolute top-[3.25rem] left-[16.67%] right-[16.67%] h-0.5 bg-gradient-to-r from-emerald-300 via-blue-300 to-amber-300 dark:from-emerald-700 dark:via-blue-700 dark:to-amber-700 opacity-50" aria-hidden />
+          <div
+            className="hidden md:block absolute top-[3.25rem] left-[16.67%] right-[16.67%] h-0.5 bg-gradient-to-r from-emerald-300 via-blue-300 to-amber-300 dark:from-emerald-700 dark:via-blue-700 dark:to-amber-700 opacity-50"
+            aria-hidden
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 animate-stagger-in">
             {climbPath.map((step, idx) => {
               const Icon = step.icon
               return (
-                <div key={idx} className="card-static rounded-2xl p-6 md:p-7 relative overflow-hidden group">
+                <div key={idx} className="card-static p-5 relative overflow-hidden group">
                   {/* 背景渐变光斑 */}
-                  <div className={`absolute -top-16 -right-16 w-44 h-44 rounded-full bg-gradient-to-br ${step.color} opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-500 blur-2xl`} />
+                  <div
+                    className={`absolute -top-16 -right-16 w-44 h-44 rounded-full bg-gradient-to-br ${step.color} opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-500 blur-2xl`}
+                  />
 
                   <div className="relative">
                     {/* 图标 + 序号 */}
                     <div className="flex items-center justify-between mb-5">
-                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center shadow-lg ring-4 ring-card`}>
+                      <div
+                        className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center shadow-lg ring-4 ring-card`}
+                      >
                         <Icon className="w-7 h-7 text-white" />
                       </div>
                       <span className="text-4xl font-black text-muted-foreground/15 select-none tabular-nums">
@@ -229,7 +252,9 @@ export function GuestView() {
                     </div>
 
                     {/* 标题 */}
-                    <h3 className="text-lg md:text-xl font-bold text-foreground mb-2">{step.level}</h3>
+                    <h3 className="text-lg md:text-xl font-bold text-foreground mb-2">
+                      {step.level}
+                    </h3>
 
                     {/* 描述 */}
                     <p className="text-sm text-muted-foreground leading-relaxed mb-4">
@@ -237,7 +262,7 @@ export function GuestView() {
                     </p>
 
                     {/* 示例标签 */}
-                    <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/8 dark:bg-primary/15 px-2.5 py-1 rounded-md">
+                    <div className="tag tag-primary gap-1.5">
                       <GitBranch className="w-3.5 h-3.5" />
                       {step.example}
                     </div>
@@ -262,13 +287,17 @@ export function GuestView() {
           {guestFeatures.map((feature, index) => {
             const Icon = feature.icon
             return (
-              <div key={index} className="card-static rounded-2xl p-6 group cursor-default flex flex-col">
+              <div key={index} className="card-static p-5 group cursor-default flex flex-col">
                 {/* 图标：多色渐变 */}
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.accent} flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition-transform duration-200`}>
+                <div
+                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.accent} flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition-transform duration-200`}
+                >
                   <Icon className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-base font-bold text-foreground mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed flex-1">{feature.description}</p>
+                <h3 className="text-section-title text-foreground mb-2">{feature.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                  {feature.description}
+                </p>
               </div>
             )
           })}
@@ -277,15 +306,18 @@ export function GuestView() {
 
       {/* ============ CTA ============ */}
       <PageContainer as="section">
-        <div className="card-static rounded-3xl p-8 md:p-12 lg:p-16 text-center max-w-4xl mx-auto relative overflow-hidden">
+        <div className="card-static p-5 md:p-10 lg:p-12 text-center max-w-4xl mx-auto relative overflow-hidden">
           {/* 背景山形装饰：放大、更可见 */}
           <div className="absolute inset-0 -z-10 opacity-[0.04] dark:opacity-[0.07]">
             <svg viewBox="0 0 800 300" className="w-full h-full" preserveAspectRatio="none">
-              <path d="M0 300 L80 180 L160 220 L240 100 L320 160 L400 60 L480 140 L560 100 L640 180 L720 140 L800 200 L800 300 Z" fill="currentColor" />
+              <path
+                d="M0 300 L80 180 L160 220 L240 100 L320 160 L400 60 L480 140 L560 100 L640 180 L720 140 L800 200 L800 300 Z"
+                fill="currentColor"
+              />
             </svg>
           </div>
           {/* 光晕 */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[250px] bg-primary/8 dark:bg-primary/12 rounded-full blur-[80px] -z-10" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[250px] bg-primary/10 rounded-full blur-[80px] -z-10" />
 
           {/* 图标 */}
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-xl shadow-primary/30">
@@ -304,19 +336,19 @@ export function GuestView() {
           {/* 按钮：平衡宽度 */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
             {allowRegistration ? (
-              <Link href="/register" className="btn btn-primary text-base px-8 py-3 h-auto min-w-[200px]">
+              <Link href="/register" className="btn btn-primary btn-lg px-8 min-w-[200px]">
                 <Sparkles className="w-5 h-5" />
                 免费注册
                 <ArrowRight className="w-5 h-5" />
               </Link>
             ) : (
-              <Link href="/problems" className="btn btn-primary text-base px-8 py-3 h-auto min-w-[200px]">
+              <Link href="/problems" className="btn btn-primary btn-lg px-8 min-w-[200px]">
                 <Sparkles className="w-5 h-5" />
                 先去逛逛题库
                 <ArrowRight className="w-5 h-5" />
               </Link>
             )}
-            <Link href="/login" className="btn btn-outline text-base px-8 py-3 h-auto min-w-[200px]">
+            <Link href="/login" className="btn btn-outline btn-lg px-8 min-w-[200px]">
               已有账号？登录
             </Link>
           </div>

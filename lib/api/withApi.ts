@@ -49,16 +49,7 @@ import {
 } from './errors'
 
 export type { AuthUser, ApiContext }
-export {
-  ApiError,
-  errorLike,
-  throw400,
-  throw401,
-  throw403,
-  throw404,
-  throw409,
-  throw500,
-}
+export { ApiError, errorLike, throw400, throw401, throw403, throw404, throw409, throw500 }
 
 export interface AuthContext {
   user: AuthUser
@@ -139,10 +130,13 @@ async function safeCall(
     try {
       const { errorMonitor } = await import('@/lib/error-monitor')
       const prismaCode = typeof e.code === 'string' && /^P\d{4}$/.test(e.code)
-      void errorMonitor.trackError(err instanceof Error ? err : new Error(String(e.message || err)), {
-        errorType: prismaCode ? 'database' : 'system',
-        operation: errorCode,
-      })
+      void errorMonitor.trackError(
+        err instanceof Error ? err : new Error(String(e.message || err)),
+        {
+          errorType: prismaCode ? 'database' : 'system',
+          operation: errorCode,
+        }
+      )
     } catch {
       // 监控失败不影响响应
     }
@@ -199,11 +193,15 @@ export const withApi = {
    */
   public(handler: RouteHandler) {
     return async (req: NextRequest, ctx: RouteContext) => {
-      return safeCall(async () => {
-        await assertWriteCsrf(req)
-        const resolved = await resolveCtxParams(ctx)
-        return handler(req, resolved)
-      }, 'PUBLIC', req)
+      return safeCall(
+        async () => {
+          await assertWriteCsrf(req)
+          const resolved = await resolveCtxParams(ctx)
+          return handler(req, resolved)
+        },
+        'PUBLIC',
+        req
+      )
     }
   },
 
@@ -211,18 +209,26 @@ export const withApi = {
    * 需登录：自动注入 user。写方法强制 CSRF。
    */
   auth<P = Record<string, string>>(
-    handler: (req: NextRequest, ctx: ApiContext<P>, context: AuthContext) => Promise<Response | unknown> | Response | unknown
+    handler: (
+      req: NextRequest,
+      ctx: ApiContext<P>,
+      context: AuthContext
+    ) => Promise<Response | unknown> | Response | unknown
   ) {
     return async (req: NextRequest, ctx: RouteContext<P>) => {
-      return safeCall(async () => {
-        await assertWriteCsrf(req)
-        const session = getUserFromRequest(req)
-        if (!session?.userId) throw throw401()
-        const user = await getCachedUser(session.userId, session.tokenVersion)
-        if (!user) throw throw401('用户不存在或登录已失效')
-        const resolved = await resolveCtxParams<P>(ctx)
-        return handler(req, resolved, { user })
-      }, 'AUTH', req)
+      return safeCall(
+        async () => {
+          await assertWriteCsrf(req)
+          const session = getUserFromRequest(req)
+          if (!session?.userId) throw throw401()
+          const user = await getCachedUser(session.userId, session.tokenVersion)
+          if (!user) throw throw401('用户不存在或登录已失效')
+          const resolved = await resolveCtxParams<P>(ctx)
+          return handler(req, resolved, { user })
+        },
+        'AUTH',
+        req
+      )
     }
   },
 
@@ -230,21 +236,29 @@ export const withApi = {
    * 管理员鉴权（SYSTEM_ADMIN 或 ADMIN 可访问后台）
    */
   admin(
-    handler: (req: NextRequest, ctx: ApiContext, context: AuthContext) => Promise<Response | unknown> | Response | unknown
+    handler: (
+      req: NextRequest,
+      ctx: ApiContext,
+      context: AuthContext
+    ) => Promise<Response | unknown> | Response | unknown
   ) {
     return async (req: NextRequest, ctx: RouteContext) => {
-      return safeCall(async () => {
-        await assertWriteCsrf(req)
-        const session = getUserFromRequest(req)
-        if (!session?.userId) throw throw401()
-        const user = await getCachedUser(session.userId, session.tokenVersion)
-        if (!user) throw throw401('用户不存在或登录已失效')
-        if (!canAccessAdmin(user)) {
-          throw throw403('需要管理员权限')
-        }
-        const resolved = await resolveCtxParams(ctx)
-        return handler(req, resolved, { user })
-      }, 'ADMIN', req)
+      return safeCall(
+        async () => {
+          await assertWriteCsrf(req)
+          const session = getUserFromRequest(req)
+          if (!session?.userId) throw throw401()
+          const user = await getCachedUser(session.userId, session.tokenVersion)
+          if (!user) throw throw401('用户不存在或登录已失效')
+          if (!canAccessAdmin(user)) {
+            throw throw403('需要管理员权限')
+          }
+          const resolved = await resolveCtxParams(ctx)
+          return handler(req, resolved, { user })
+        },
+        'ADMIN',
+        req
+      )
     }
   },
 
@@ -252,21 +266,29 @@ export const withApi = {
    * 系统管理员鉴权（仅 SYSTEM_ADMIN 可访问）
    */
   systemAdmin(
-    handler: (req: NextRequest, ctx: ApiContext, context: AuthContext) => Promise<Response | unknown> | Response | unknown
+    handler: (
+      req: NextRequest,
+      ctx: ApiContext,
+      context: AuthContext
+    ) => Promise<Response | unknown> | Response | unknown
   ) {
     return async (req: NextRequest, ctx: RouteContext) => {
-      return safeCall(async () => {
-        await assertWriteCsrf(req)
-        const session = getUserFromRequest(req)
-        if (!session?.userId) throw throw401()
-        const user = await getCachedUser(session.userId, session.tokenVersion)
-        if (!user) throw throw401('用户不存在或登录已失效')
-        if (!isSystemAdmin(user)) {
-          throw throw403('需要系统管理员权限')
-        }
-        const resolved = await resolveCtxParams(ctx)
-        return handler(req, resolved, { user })
-      }, 'SYSTEM_ADMIN', req)
+      return safeCall(
+        async () => {
+          await assertWriteCsrf(req)
+          const session = getUserFromRequest(req)
+          if (!session?.userId) throw throw401()
+          const user = await getCachedUser(session.userId, session.tokenVersion)
+          if (!user) throw throw401('用户不存在或登录已失效')
+          if (!isSystemAdmin(user)) {
+            throw throw403('需要系统管理员权限')
+          }
+          const resolved = await resolveCtxParams(ctx)
+          return handler(req, resolved, { user })
+        },
+        'SYSTEM_ADMIN',
+        req
+      )
     }
   },
 
@@ -275,26 +297,34 @@ export const withApi = {
    */
   classRole(
     allowedRoles: Array<'owner' | 'assistant' | 'student'>,
-    handler: (req: NextRequest, ctx: ApiContext, context: ClassContext) => Promise<Response | unknown> | Response | unknown
+    handler: (
+      req: NextRequest,
+      ctx: ApiContext,
+      context: ClassContext
+    ) => Promise<Response | unknown> | Response | unknown
   ) {
     return async (req: NextRequest, ctx: RouteContext) => {
-      return safeCall(async () => {
-        await assertWriteCsrf(req)
-        const session = getUserFromRequest(req)
-        if (!session?.userId) throw throw401()
-        const user = await getCachedUser(session.userId, session.tokenVersion)
-        // 会话签名有效但账号封禁/tokenVersion 失效：403 而非 401，便于前端区分「未登录」与「无权限」
-        if (!user) throw throw403('账号不可用或会话已失效')
-        const resolved = await resolveCtxParams(ctx)
-        const classId = resolved.params?.id
-        if (!classId) throw throw404('班级 ID 缺失')
-        const membership = await getClassMembership(classId, user.id)
-        if (!membership) throw throw403('不是班级成员')
-        if (!allowedRoles.includes(membership.role)) {
-          throw throw403('权限不足')
-        }
-        return handler(req, resolved, { user, membership, classId })
-      }, 'CLASS_ROLE', req)
+      return safeCall(
+        async () => {
+          await assertWriteCsrf(req)
+          const session = getUserFromRequest(req)
+          if (!session?.userId) throw throw401()
+          const user = await getCachedUser(session.userId, session.tokenVersion)
+          // 会话签名有效但账号封禁/tokenVersion 失效：403 而非 401，便于前端区分「未登录」与「无权限」
+          if (!user) throw throw403('账号不可用或会话已失效')
+          const resolved = await resolveCtxParams(ctx)
+          const classId = resolved.params?.id
+          if (!classId) throw throw404('班级 ID 缺失')
+          const membership = await getClassMembership(classId, user.id)
+          if (!membership) throw throw403('不是班级成员')
+          if (!allowedRoles.includes(membership.role)) {
+            throw throw403('权限不足')
+          }
+          return handler(req, resolved, { user, membership, classId })
+        },
+        'CLASS_ROLE',
+        req
+      )
     }
   },
 }
@@ -309,7 +339,10 @@ interface ValidationSchema {
     error?: { issues?: Array<{ path?: PropertyKey[]; message?: string }> }
   }
 }
-export async function readJson<T = unknown>(req: NextRequest, schema?: ValidationSchema): Promise<T> {
+export async function readJson<T = unknown>(
+  req: NextRequest,
+  schema?: ValidationSchema
+): Promise<T> {
   let body: unknown
   try {
     body = await req.json()
@@ -346,5 +379,20 @@ export function readQuery<T = Record<string, string>>(req: NextRequest): T {
 /* ============================================================================
  * 从 lib/api/handler.ts / response.ts 重新导出
  * ========================================================================== */
-export { getCachedUser, clearAuthUserCache, resolveViewerFromRequest, resolveViewerFromCookies } from './handler'
-export { fail, ok, serverError, unauthorized, forbidden, notFound, badRequest, conflict, tooManyRequests } from './response'
+export {
+  getCachedUser,
+  clearAuthUserCache,
+  resolveViewerFromRequest,
+  resolveViewerFromCookies,
+} from './handler'
+export {
+  fail,
+  ok,
+  serverError,
+  unauthorized,
+  forbidden,
+  notFound,
+  badRequest,
+  conflict,
+  tooManyRequests,
+} from './response'

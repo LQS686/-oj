@@ -43,10 +43,7 @@ interface ContestUserStats {
   solved: number
   totalScore: number
   penalty: number
-  problems: Record<
-    string,
-    { status: string; time: number; tries: number; score: number }
-  >
+  problems: Record<string, { status: string; time: number; tries: number; score: number }>
 }
 
 /**
@@ -56,7 +53,10 @@ interface ContestUserStats {
  * - sealUnlocked=true → 已解冻，不封榜
  * - 否则 → 封榜中
  */
-export function isContestSealed(contest: { sealRankTime?: Date | null; sealUnlocked?: boolean }, now: Date = new Date()): boolean {
+export function isContestSealed(
+  contest: { sealRankTime?: Date | null; sealUnlocked?: boolean },
+  now: Date = new Date()
+): boolean {
   if (!contest.sealRankTime) return false
   if (contest.sealUnlocked) return false
   // 到达封榜时刻即封榜（含等于 sealRankTime）
@@ -121,159 +121,160 @@ export async function computeContestRankings(
   //   前缀删除天然兼容。
   // 榜单计算主体（不含缓存）：finalize 落库等需要精确最新数据的场景传 bypassCache 绕过。
   const compute = async () => {
-      // 截止时间：封榜时普通用户只看到 sealRankTime 之前的提交；管理员或未封榜时看完整endTime
-      const submissionCutoffTime = sealed && !viewerIsAdmin
+    // 截止时间：封榜时普通用户只看到 sealRankTime 之前的提交；管理员或未封榜时看完整endTime
+    const submissionCutoffTime =
+      sealed && !viewerIsAdmin
         ? contest.sealRankTime!.getTime()
-        : (contest.endTime ? contest.endTime.getTime() : null)
+        : contest.endTime
+          ? contest.endTime.getTime()
+          : null
 
-      // 只获取必要的字段以减少数据量
-      const submissions = await prisma.submission.findMany({
-        where: { contestId },
-        select: {
-          userId: true,
-          problemId: true,
-          status: true,
-          submittedAt: true,
-          score: true, // 添加分数
-        },
-        orderBy: { submittedAt: 'asc' },
+    // 只获取必要的字段以减少数据量
+    const submissions = await prisma.submission.findMany({
+      where: { contestId },
+      select: {
+        userId: true,
+        problemId: true,
+        status: true,
+        submittedAt: true,
+        score: true, // 添加分数
+      },
+      orderBy: { submittedAt: 'asc' },
+    })
+
+    const startTime = contest.startTime.getTime()
+    const endTime = contest.endTime ? contest.endTime.getTime() : null
+
+    // 参考 HOJ：管理员（SYSTEM_ADMIN/ADMIN）与比赛创建者提交不入榜，
+    // 避免测试提交污染榜单。被排除的用户仍出现在参与者列表中（标记为 unranked）。
+    const adminRoleSet = new Set(['SYSTEM_ADMIN', 'ADMIN'])
+    const excludedUserIds = new Set<string>([contest.authorId])
+    for (const p of contest.participants) {
+      if (p.user && adminRoleSet.has(p.user.role)) {
+        excludedUserIds.add(p.userId)
+      }
+    }
+
+    const userStatsMap = new Map<string, ContestUserStats>()
+
+    // 预填充（管理员/系统账号不入榜，避免 0 分假排名）
+    contest.participants.forEach((p) => {
+      if (excludedUserIds.has(p.userId)) return
+      const user = p.user ? { ...p.user, avatar: sanitizeAvatarUrl(p.user.avatar) } : p.user
+      userStatsMap.set(p.userId, {
+        user,
+        solved: 0,
+        totalScore: 0,
+        penalty: 0,
+        problems: {},
       })
+    })
 
-      const startTime = contest.startTime.getTime()
-      const endTime = contest.endTime ? contest.endTime.getTime() : null
+    submissions.forEach((sub) => {
+      if (!userStatsMap.has(sub.userId)) return
+      // 管理员/创建者提交不计入排名
+      if (excludedUserIds.has(sub.userId)) return
 
-      // 参考 HOJ：管理员（SYSTEM_ADMIN/ADMIN）与比赛创建者提交不入榜，
-      // 避免测试提交污染榜单。被排除的用户仍出现在参与者列表中（标记为 unranked）。
-      const adminRoleSet = new Set(['SYSTEM_ADMIN', 'ADMIN'])
-      const excludedUserIds = new Set<string>([contest.authorId])
-      for (const p of contest.participants) {
-        if (p.user && adminRoleSet.has(p.user.role)) {
-          excludedUserIds.add(p.userId)
+      const stats = userStatsMap.get(sub.userId)!
+
+      if (!stats.problems[sub.problemId]) {
+        stats.problems[sub.problemId] = {
+          status: 'Unsubmitted',
+          time: 0,
+          tries: 0,
+          score: 0,
         }
       }
 
-      const userStatsMap = new Map<string, ContestUserStats>()
+      const problemStats = stats.problems[sub.problemId]
+      const relativeTime = new Date(sub.submittedAt).getTime() - startTime
+      if (relativeTime < 0) return
+      // 过滤竞赛结束后的提交（管理员补提交或评测延迟不应计入排名）
+      if (endTime && new Date(sub.submittedAt).getTime() > endTime) return
+      // 封榜逻辑：普通用户在封榜期间只看到 sealRankTime 之前的提交
+      if (
+        submissionCutoffTime !== null &&
+        new Date(sub.submittedAt).getTime() > submissionCutoffTime
+      )
+        return
 
-      // 预填充（管理员/系统账号不入榜，避免 0 分假排名）
-      contest.participants.forEach((p) => {
-        if (excludedUserIds.has(p.userId)) return
-        const user = p.user
-          ? { ...p.user, avatar: sanitizeAvatarUrl(p.user.avatar) }
-          : p.user
-        userStatsMap.set(p.userId, {
-          user,
-          solved: 0,
-          totalScore: 0,
-          penalty: 0,
-          problems: {},
-        })
-      })
-
-      submissions.forEach((sub) => {
-        if (!userStatsMap.has(sub.userId)) return
-        // 管理员/创建者提交不计入排名
-        if (excludedUserIds.has(sub.userId)) return
-
-        const stats = userStatsMap.get(sub.userId)!
-
-        if (!stats.problems[sub.problemId]) {
-          stats.problems[sub.problemId] = {
-            status: 'Unsubmitted',
-            time: 0,
-            tries: 0,
-            score: 0,
-          }
+      // ACM 逻辑
+      if (contest.type === 'ACM') {
+        if (problemStats.status === 'AC') return
+        if (sub.status === 'AC') {
+          problemStats.status = 'AC'
+          problemStats.time = relativeTime
+          problemStats.score = 1 // ACM 1题1分
+          stats.penalty += relativeTime + problemStats.tries * PENALTY_PER_WA
+          stats.solved += 1
+          stats.totalScore += 1
+        } else if (['WA', 'TLE', 'MLE', 'RE'].includes(sub.status)) {
+          problemStats.status = 'WA'
+          problemStats.tries += 1
         }
-
-        const problemStats = stats.problems[sub.problemId]
-        const relativeTime = new Date(sub.submittedAt).getTime() - startTime
-        if (relativeTime < 0) return
-        // 过滤竞赛结束后的提交（管理员补提交或评测延迟不应计入排名）
-        if (endTime && new Date(sub.submittedAt).getTime() > endTime) return
-        // 封榜逻辑：普通用户在封榜期间只看到 sealRankTime 之前的提交
-        if (submissionCutoffTime !== null && new Date(sub.submittedAt).getTime() > submissionCutoffTime) return
-
-        // ACM 逻辑
-        if (contest.type === 'ACM') {
-          if (problemStats.status === 'AC') return
-          if (sub.status === 'AC') {
-            problemStats.status = 'AC'
-            problemStats.time = relativeTime
-            problemStats.score = 1 // ACM 1题1分
-            stats.penalty += relativeTime + problemStats.tries * PENALTY_PER_WA
-            stats.solved += 1
-            stats.totalScore += 1
-          } else if (
-            ['WA', 'TLE', 'MLE', 'RE'].includes(sub.status)
-          ) {
-            problemStats.status = 'WA'
-            problemStats.tries += 1
-          }
-        } else {
-          // OI 逻辑 (取最高分)
-          const currentScore = sub.score || 0
-          if (currentScore > problemStats.score) {
-            // 更新最高分，同时更新总分
-            stats.totalScore += currentScore - problemStats.score
-            problemStats.score = currentScore
-            problemStats.status =
-              currentScore === 100 ? 'AC' : currentScore > 0 ? 'Partial' : 'WA'
-          }
-          // OI 也可以记录最后一次提交时间作为罚时？或者不计算罚时
+      } else {
+        // OI 逻辑 (取最高分)
+        const currentScore = sub.score || 0
+        if (currentScore > problemStats.score) {
+          // 更新最高分，同时更新总分
+          stats.totalScore += currentScore - problemStats.score
+          problemStats.score = currentScore
+          problemStats.status = currentScore === 100 ? 'AC' : currentScore > 0 ? 'Partial' : 'WA'
         }
-      })
-
-      // 4. 排序
-      const rankList = Array.from(userStatsMap.values()).sort((a, b) => {
-        if (contest.type === 'ACM') {
-          if (a.solved !== b.solved) return b.solved - a.solved
-          return a.penalty - b.penalty
-        } else {
-          // OI: 分数优先
-          return b.totalScore - a.totalScore
-        }
-      })
-
-      // 5. 赋予排名
-      // 参考 HOJ：相同分同排名（standard competition ranking），避免名次跳跃。
-      // 例如：3 人并列第 5 名 → 第 4 名后三名均记为第 5 名，下一名记为第 8 名。
-      const finalRankList: Array<ContestUserStats & { rank: number; penaltyMinutes: number }> = []
-      let currentRank = 0
-      let prevKey = ''
-      for (let i = 0; i < rankList.length; i++) {
-        const item = rankList[i]
-        const sortKey = contest.type === 'ACM'
-          ? `${item.solved}-${item.penalty}`
-          : `${item.totalScore}`
-        if (i === 0 || sortKey !== prevKey) {
-          currentRank = i + 1
-          prevKey = sortKey
-        }
-        finalRankList.push({
-          rank: currentRank,
-          ...item,
-          penaltyMinutes: Math.floor(item.penalty / 60000),
-        })
+        // OI 也可以记录最后一次提交时间作为罚时？或者不计算罚时
       }
+    })
 
-      return {
-        rankings: finalRankList,
-        contestType: contest.type,
-        problems: contest.problems.map((cp) => ({
-          id: cp.problem.id,
-          title: cp.problem.title,
-          problemNumber: cp.problem.problemNumber,
-          orderIndex: cp.orderIndex,
-        })),
-        // 封榜状态信息，供前端展示封榜提示横幅
-        seal: {
-          sealed,
-          sealRankTime: contest.sealRankTime,
-          sealUnlocked: contest.sealUnlocked,
-          // 普通用户在封榜期间，告诉前端"这是封榜快照"
-          isFrozenView: sealed && !viewerIsAdmin,
-        },
+    // 4. 排序
+    const rankList = Array.from(userStatsMap.values()).sort((a, b) => {
+      if (contest.type === 'ACM') {
+        if (a.solved !== b.solved) return b.solved - a.solved
+        return a.penalty - b.penalty
+      } else {
+        // OI: 分数优先
+        return b.totalScore - a.totalScore
       }
+    })
+
+    // 5. 赋予排名
+    // 参考 HOJ：相同分同排名（standard competition ranking），避免名次跳跃。
+    // 例如：3 人并列第 5 名 → 第 4 名后三名均记为第 5 名，下一名记为第 8 名。
+    const finalRankList: Array<ContestUserStats & { rank: number; penaltyMinutes: number }> = []
+    let currentRank = 0
+    let prevKey = ''
+    for (let i = 0; i < rankList.length; i++) {
+      const item = rankList[i]
+      const sortKey =
+        contest.type === 'ACM' ? `${item.solved}-${item.penalty}` : `${item.totalScore}`
+      if (i === 0 || sortKey !== prevKey) {
+        currentRank = i + 1
+        prevKey = sortKey
+      }
+      finalRankList.push({
+        rank: currentRank,
+        ...item,
+        penaltyMinutes: Math.floor(item.penalty / 60000),
+      })
+    }
+
+    return {
+      rankings: finalRankList,
+      contestType: contest.type,
+      problems: contest.problems.map((cp) => ({
+        id: cp.problem.id,
+        title: cp.problem.title,
+        problemNumber: cp.problem.problemNumber,
+        orderIndex: cp.orderIndex,
+      })),
+      // 封榜状态信息，供前端展示封榜提示横幅
+      seal: {
+        sealed,
+        sealRankTime: contest.sealRankTime,
+        sealUnlocked: contest.sealUnlocked,
+        // 普通用户在封榜期间，告诉前端"这是封榜快照"
+        isFrozenView: sealed && !viewerIsAdmin,
+      },
+    }
   }
 
   // finalize 落库等一次性精确操作绕过缓存，避免命中 TTL 内的旧榜单数据

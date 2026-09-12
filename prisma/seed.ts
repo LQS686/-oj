@@ -12,7 +12,16 @@ const url = process.env.DATABASE_URL || 'mongodb://localhost:27017/oj_platform'
  *      真实部署的第一个用户应通过 /api/auth/register 自动成为 SYSTEM_ADMIN
  *      （见 app/api/auth/register/route.ts 的 isFirstUser 判定）。
  *   2. 仅填充非敏感内容：题目、测试样例、竞赛、训练计划、成就定义等。
- *   3. 若需演示用题目，请运行 `npm run db:seed` 后再手动通过注册接口创建管理员。
+ *   3. 运行前提：库中已存在至少一个用户（先注册首个管理员，再 `npm run db:seed`）。
+ *      Problem.authorId / Contest.authorId 在 schema 中是必填字段；
+ *      而 seed 明确不创建账户，因此这里取库中最早的用户作为内容作者。
+ *
+ * 为何不能写 authorId: null（P0 修复）：
+ *   MongoDB 下 @default 只对「经由 Prisma 创建」的文档生效（参见
+ *   scripts/backfill-solution-status.mjs 的同类问题）。seed 走原生驱动直写，
+ *   缺省的 visibility 会以 null 读回，而 visibility 是题目可见性的唯一真相源
+ *   （lib/problem/access.ts、lib/problem/crud.ts 都按 visibility === 'public' 过滤），
+ *   于是 seed 出来的题目在列表里全部不可见。这里所有字段都显式写全。
  *
  * 安全审计修复（2026-07）：
  *   之前 seed 创建 'admin / admin123' + 10 个 'user1~user10 / user123' 测试账户，
@@ -44,12 +53,25 @@ async function main() {
     await db.collection('TrainingProblem').deleteMany({})
     await db.collection('Achievement').deleteMany({})
 
-    // 创建题目（authorId 为可选，真实部署应关联注册后的首个管理员）
-    //   P0 修复：不再创建 adminUser 记录；authorId 暂时置 null（admin 用户注册后可通过 API 关联）
+    // 内容作者：schema 里 Problem/Contest 的 authorId 必填，而 seed 不建账户，
+    // 于是取库中最早的用户（正常就是首个注册的 SYSTEM_ADMIN）。
+    const author = await db.collection('User').findOne({}, { sort: { createdAt: 1 } })
+    if (!author) {
+      throw new Error(
+        '库中还没有任何用户，无法填充内容数据：Problem / Contest 的 authorId 是必填字段。' +
+          '请先启动服务并注册第一个账户（首个注册用户会自动成为 SYSTEM_ADMIN），再运行本脚本。'
+      )
+    }
+    const authorId = author._id
+    logger.info(`内容作者：${author.username ?? String(authorId)}`)
+
+    // 创建题目。visibility 必须显式写：它是可见性的唯一真相源，
+    //   缺省时 MongoDB 不会补 @default，读回是 null，题目在列表里会全部不可见。
     const problems = [
       {
         title: 'A+B Problem',
-        description: '给定两个整数 A 和 B，输出它们的和。\n\n这是一道非常简单的题目，用于测试评测系统是否正常工作。',
+        description:
+          '给定两个整数 A 和 B，输出它们的和。\n\n这是一道非常简单的题目，用于测试评测系统是否正常工作。',
         input: '输入包含两个整数 A 和 B，用空格分隔。',
         output: '输出一个整数，表示 A + B 的值。',
         samples: [
@@ -62,67 +84,66 @@ async function main() {
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: null,
+        visibility: 'public',
+        authorId,
       },
       {
         title: '过河卒',
-        description: '在中国象棋中，有一个卒要从 (0,0) 走到 (n,m)，卒只能向右或向下走。棋盘上有一个马在 (x,y)，马可以控制周围8个点。问有多少种走法。',
+        description:
+          '在中国象棋中，有一个卒要从 (0,0) 走到 (n,m)，卒只能向右或向下走。棋盘上有一个马在 (x,y)，马可以控制周围8个点。问有多少种走法。',
         input: '输入四个整数 n, m, x, y。',
         output: '输出方案数。',
-        samples: [
-          { input: '6 6 3 2', output: '17' },
-        ],
+        samples: [{ input: '6 6 3 2', output: '17' }],
         difficulty: '普及-',
         tags: ['动态规划', '递推'],
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: null,
+        visibility: 'public',
+        authorId,
       },
       {
         title: '铺地毯',
         description: '给定若干张地毯的信息，求某个点被哪些地毯覆盖。',
         input: '第一行一个整数 n，表示地毯数量。接下来 n 行每行四个整数。',
         output: '输出一个整数，表示最上层地毯的编号。',
-        samples: [
-          { input: '3\n1 0 2 3\n0 2 3 3\n2 1 3 3\n2 2', output: '3' },
-        ],
+        samples: [{ input: '3\n1 0 2 3\n0 2 3 3\n2 1 3 3\n2 2', output: '3' }],
         difficulty: '普及',
         tags: ['模拟', '枚举'],
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: null,
+        visibility: 'public',
+        authorId,
       },
       {
         title: '方格取数',
-        description: '在一个 n×n 的方格棋盘上，每个方格中有一个数字。从左上角走到右下角，只能向右或向下走，求能取到的最大数字和。',
+        description:
+          '在一个 n×n 的方格棋盘上，每个方格中有一个数字。从左上角走到右下角，只能向右或向下走，求能取到的最大数字和。',
         input: '第一行一个整数 n，接下来 n 行每行 n 个整数。',
         output: '输出最大数字和。',
-        samples: [
-          { input: '3\n1 2 3\n4 5 6\n7 8 9', output: '29' },
-        ],
+        samples: [{ input: '3\n1 2 3\n4 5 6\n7 8 9', output: '29' }],
         difficulty: '普及+',
         tags: ['动态规划', '递归'],
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: null,
+        visibility: 'public',
+        authorId,
       },
       {
         title: '最长上升子序列',
         description: '给定一个长度为 n 的序列，求最长上升子序列的长度。',
         input: '第一行一个整数 n，第二行 n 个整数。',
         output: '输出最长上升子序列的长度。',
-        samples: [
-          { input: '7\n1 7 3 5 9 4 8', output: '4' },
-        ],
+        samples: [{ input: '7\n1 7 3 5 9 4 8', output: '4' }],
         difficulty: '提高',
         tags: ['动态规划', '二分'],
         timeLimit: 1000,
         memoryLimit: 128,
         isPublic: true,
-        authorId: null,
+        visibility: 'public',
+        authorId,
       },
     ]
 
@@ -151,7 +172,7 @@ async function main() {
 
     logger.info(`创建${createdProblems.length}个题目`)
 
-    // 创建竞赛（authorId 同样置 null，注册管理员后通过 API 关联）
+    // 创建竞赛（authorId 同题目，取库中最早的用户）
     const contestResult = await db.collection('Contest').insertOne({
       title: '新手赛 2024.10',
       description: '适合新手参加的比赛，包含基础题目。',
@@ -160,7 +181,7 @@ async function main() {
       endTime: new Date('2024-10-25T17:00:00'),
       duration: 180,
       isPublic: true,
-      authorId: null,
+      authorId,
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -197,16 +218,26 @@ async function main() {
     for (const training of trainings) {
       const result = await db.collection('Training').insertOne({
         ...training,
+        // status / tags / 计数同样显式写全：原生驱动直写不会补 @default，
+        // 而题单列表按 { isPublic: true, status: 'published' } 过滤
+        // （lib/training/public-list.ts），缺 status 会让 seed 的题单查不到。
+        status: 'published',
+        tags: [],
+        isRecommended: false,
+        joinCount: 0,
+        viewCount: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
 
-      // 添加题目到训练
+      // 添加题目到训练（score / required 也显式写全）
       if (createdProblems.length > 0) {
         await db.collection('TrainingProblem').insertOne({
           trainingId: result.insertedId,
           problemId: createdProblems[0]._id,
           orderIndex: 1,
+          score: 100,
+          required: true,
         })
       }
     }
@@ -230,8 +261,7 @@ async function main() {
     logger.info('种子数据填充完成（仅内容数据，未创建任何账户）')
     logger.info('提示：')
     logger.info('  - 部署完成后，第一个访问 /api/auth/register 注册的用户将自动成为 SYSTEM_ADMIN')
-    logger.info('  - 通过注册创建管理员后，可在后台将 seed 创建的题目/竞赛的 authorId 关联到该用户')
-
+    logger.info('  - seed 的内容数据均归属库中最早的用户（即首个注册的 SYSTEM_ADMIN）')
   } catch (error) {
     logger.error('种子数据填充错误', error)
     process.exit(1)

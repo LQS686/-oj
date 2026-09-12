@@ -18,13 +18,7 @@ import { validateCodeSafety } from './codeAnalyzer'
 import { cleanup } from './judger'
 import { logger } from '@/lib/logger'
 import { mapPool, resolveCaseConcurrency } from './pool'
-import {
-  compileSpj,
-  cleanupSpj,
-  runSpj,
-  ensureUserOutputFile,
-  isSpecialJudgeMode,
-} from './spj'
+import { compileSpj, cleanupSpj, runSpj, ensureUserOutputFile, isSpecialJudgeMode } from './spj'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
@@ -153,7 +147,9 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
         ...baseResult,
         status: 'CE',
         // 合并编译状态标签与 stderr（参考 judger.ts 的 mergeNonEmptyStrings）
-        compileError: [compileResult.error || '编译错误', compileResult.stderr].filter(Boolean).join('\n'),
+        compileError: [compileResult.error || '编译错误', compileResult.stderr]
+          .filter(Boolean)
+          .join('\n'),
         judgedAt: new Date(),
       }
     }
@@ -244,7 +240,7 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
                 const outFile = await ensureUserOutputFile(
                   execResult.artifacts?.outputPath,
                   execResult.artifacts?.outputPath ? undefined : userOutput,
-                  tempDir,
+                  tempDir
                 )
                 if (outFile.ephemeral) ephemeralUser = outFile.path
                 const cmp = await runSpj({
@@ -288,8 +284,12 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
           status,
           time: execResult.time,
           memory: execResult.memory,
-          userOutput: userOutput.length > 8000 ? userOutput.slice(0, 8000) + '\n[输出过长，已截断]' : userOutput,
-          expectedOutput: tc.output.length > 8000 ? tc.output.slice(0, 8000) + '\n[输出过长，已截断]' : tc.output,
+          userOutput:
+            userOutput.length > 8000
+              ? userOutput.slice(0, 8000) + '\n[输出过长，已截断]'
+              : userOutput,
+          expectedOutput:
+            tc.output.length > 8000 ? tc.output.slice(0, 8000) + '\n[输出过长，已截断]' : tc.output,
           message,
           skipped: false,
         }
@@ -352,14 +352,18 @@ export async function executePretest(options: PretestOptions): Promise<PretestRe
           await cleanup(compiledPath, language)
         }
       } catch (err) {
-        logger.warn('pretest 清理编译产物失败', { error: err instanceof Error ? err.message : String(err) })
+        logger.warn('pretest 清理编译产物失败', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
     }
     if (spjPath) {
       try {
         await cleanupSpj(spjPath)
       } catch (err) {
-        logger.warn('pretest 清理 SPJ 产物失败', { error: err instanceof Error ? err.message : String(err) })
+        logger.warn('pretest 清理 SPJ 产物失败', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
     }
   }

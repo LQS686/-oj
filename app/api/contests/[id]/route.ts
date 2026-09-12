@@ -7,7 +7,15 @@
  *
  * 迁移到 withApi 中间件模式
  */
-import { withApi, ok, readJson, throw400, throw403, throw404, resolveViewerFromRequest } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readJson,
+  throw400,
+  throw403,
+  throw404,
+  resolveViewerFromRequest,
+} from '@/lib/api/withApi'
 import { canManageContent, canAccessAdmin } from '@/lib/permissions'
 import { isObjectId } from '@/lib/api/validation'
 import { validateContestTimeFields } from '@/lib/contest/admin'

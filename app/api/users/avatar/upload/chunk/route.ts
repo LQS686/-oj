@@ -26,7 +26,11 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   // 置于 try 外：不落入下方「解析失败统一转 PARSE_FAILED」的 catch，保留 413 语义。
   const contentLength = Number(req.headers.get('content-length') || 0)
   if (contentLength > MAX_REQUEST_BODY) {
-    throw new ApiError('PAYLOAD_TOO_LARGE', `请求体过大（单分片最大 ${MAX_CHUNK_SIZE / 1024 / 1024}MB）`, 413)
+    throw new ApiError(
+      'PAYLOAD_TOO_LARGE',
+      `请求体过大（单分片最大 ${MAX_CHUNK_SIZE / 1024 / 1024}MB）`,
+      413
+    )
   }
 
   try {
@@ -50,7 +54,11 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     const body = Buffer.from(arrayBuffer)
     // A-P1-3 修复：无 Content-Length（chunked 编码）时兜底，读入后按实际大小再校验，防止绕过前置检查
     if (body.length > MAX_REQUEST_BODY) {
-      throw new ApiError('PAYLOAD_TOO_LARGE', `请求体过大（单分片最大 ${MAX_CHUNK_SIZE / 1024 / 1024}MB）`, 413)
+      throw new ApiError(
+        'PAYLOAD_TOO_LARGE',
+        `请求体过大（单分片最大 ${MAX_CHUNK_SIZE / 1024 / 1024}MB）`,
+        413
+      )
     }
 
     // 极简 multipart 解析：定位各 part 的头部与正文

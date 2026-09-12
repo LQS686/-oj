@@ -1,7 +1,16 @@
 /**
  * POST /api/contests/[id]/register - 报名参加竞赛
  */
-import { withApi, ok, readJson, throw400, throw403, throw404, throw409, errorLike } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readJson,
+  throw400,
+  throw403,
+  throw404,
+  throw409,
+  errorLike,
+} from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import { registerContestParticipantDirect } from '@/lib/mongodb-direct'
 import { cache } from '@/lib/cache'

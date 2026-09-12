@@ -2,13 +2,7 @@
 
 import { useState, useMemo, useCallback, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import {
-  Trophy,
-  Plus,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
+import { Trophy, Plus, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { canCreateContest } from '@/lib/permissions'
@@ -51,8 +45,7 @@ function ContestsPageContent() {
   // 纯派生：不在 render/useMemo 里调 Date.now；列表非「已结束」且有赛程则开墙钟
   const needsLiveClock = useMemo(
     () =>
-      activeTab !== 'ended' &&
-      contests.some((c) => Number.isFinite(new Date(c.endTime).getTime())),
+      activeTab !== 'ended' && contests.some((c) => Number.isFinite(new Date(c.endTime).getTime())),
     [contests, activeTab]
   )
   const nowMs = useWallClock(needsLiveClock)
@@ -132,7 +125,7 @@ function ContestsPageContent() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="card-static rounded-xl border border-border animate-pulse min-h-[11.5rem] p-4 pl-5"
+              className="card-static border border-border animate-pulse min-h-[11.5rem] p-4"
             >
               <div className="flex gap-2 mb-3">
                 <div className="w-4 h-4 rounded bg-muted" />
@@ -162,7 +155,11 @@ function ContestsPageContent() {
           tone="error"
           title={error}
           action={
-            <button type="button" onClick={() => void fetchContests()} className="btn-primary btn btn-sm">
+            <button
+              type="button"
+              onClick={() => void fetchContests()}
+              className="btn-primary btn btn-sm"
+            >
               重试
             </button>
           }

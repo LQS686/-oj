@@ -23,11 +23,5 @@ export const GET = withApi.public(async (req, ctx) => {
     return fail('FORBIDDEN', access.error || '禁止访问', access.status || 403)
   }
 
-  return ok(
-    await listContestProblemsWithStatus(
-      id!,
-      viewer?.user.id || null,
-      viewer?.user.role
-    )
-  )
+  return ok(await listContestProblemsWithStatus(id!, viewer?.user.id || null, viewer?.user.role))
 })

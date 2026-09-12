@@ -55,53 +55,56 @@ export function useObjectiveQuestionList(filters: ObjectiveQuestionFilters) {
     return `/api/admin/objective-questions?${params.toString()}`
   }, [page, pageSize, debouncedFilters])
 
-  const fetchQuestions = useCallback(async (isInitial = false) => {
-    const seq = ++fetchSeq.current
-    try {
-      if (isInitial) {
-        setInitialLoading(true)
-      } else {
-        setLoading(true)
-      }
-      const response = await fetchWithCookie(buildUrl())
+  const fetchQuestions = useCallback(
+    async (isInitial = false) => {
+      const seq = ++fetchSeq.current
+      try {
+        if (isInitial) {
+          setInitialLoading(true)
+        } else {
+          setLoading(true)
+        }
+        const response = await fetchWithCookie(buildUrl())
 
-      // 竞态守卫：若期间又发起了新请求（翻页/筛选变化），丢弃本次过期响应
-      if (seq !== fetchSeq.current) return
+        // 竞态守卫：若期间又发起了新请求（翻页/筛选变化），丢弃本次过期响应
+        if (seq !== fetchSeq.current) return
 
-      if (response.status === 403) {
-        setError('需要管理员权限')
-        scheduleForbiddenRedirect()
-        return
-      }
-
-      const data = await response.json()
-      if (seq !== fetchSeq.current) return
-      if (data.success) {
-        const payload = data.data
-        const rows = Array.isArray(payload?.list) ? payload.list : []
-        const nextTotal = typeof payload?.total === 'number' ? payload.total : 0
-        // 当前页已空但还有数据（如删除了末页最后一题）：回退一页触发重新请求
-        if (rows.length === 0 && nextTotal > 0 && page > 1) {
-          setPage(page - 1)
+        if (response.status === 403) {
+          setError('需要管理员权限')
+          scheduleForbiddenRedirect()
           return
         }
-        setQuestions(rows)
-        setTotal(nextTotal)
-      } else {
-        setError(data.error || '获取客观题列表失败')
-        setQuestions([])
-        setTotal(0)
+
+        const data = await response.json()
+        if (seq !== fetchSeq.current) return
+        if (data.success) {
+          const payload = data.data
+          const rows = Array.isArray(payload?.list) ? payload.list : []
+          const nextTotal = typeof payload?.total === 'number' ? payload.total : 0
+          // 当前页已空但还有数据（如删除了末页最后一题）：回退一页触发重新请求
+          if (rows.length === 0 && nextTotal > 0 && page > 1) {
+            setPage(page - 1)
+            return
+          }
+          setQuestions(rows)
+          setTotal(nextTotal)
+        } else {
+          setError(data.error || '获取客观题列表失败')
+          setQuestions([])
+          setTotal(0)
+        }
+      } catch {
+        if (seq !== fetchSeq.current) return
+        setError('网络错误')
+      } finally {
+        if (seq === fetchSeq.current) {
+          setLoading(false)
+          setInitialLoading(false)
+        }
       }
-    } catch {
-      if (seq !== fetchSeq.current) return
-      setError('网络错误')
-    } finally {
-      if (seq === fetchSeq.current) {
-        setLoading(false)
-        setInitialLoading(false)
-      }
-    }
-  }, [buildUrl, scheduleForbiddenRedirect, page])
+    },
+    [buildUrl, scheduleForbiddenRedirect, page]
+  )
 
   /**
    * 删除单题。成功后刷新列表；失败（含被作业引用的 400）返回后端错误信息，
@@ -110,10 +113,9 @@ export function useObjectiveQuestionList(filters: ObjectiveQuestionFilters) {
   const deleteQuestion = useCallback(
     async (questionId: string): Promise<{ ok: boolean; error?: string }> => {
       try {
-        const response = await fetchWithCookie(
-          `/api/admin/objective-questions/${questionId}`,
-          { method: 'DELETE' }
-        )
+        const response = await fetchWithCookie(`/api/admin/objective-questions/${questionId}`, {
+          method: 'DELETE',
+        })
         const data = await response.json()
         if (data.success) {
           void fetchQuestions()

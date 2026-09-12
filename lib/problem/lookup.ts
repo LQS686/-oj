@@ -18,21 +18,26 @@ import { clearProblemCache } from './admin'
 export async function findProblemByIdOrNumber(idOrNumber: string) {
   // 题面详情是高频读路径（每次打开题目页都会请求），且包含关联查询
   // （author + 样例测点），缓存 60s 避免重复往返；clearProblemCache 按前缀失效。
-  return cache.get(CacheKeys.problem.byIdOrNumberPrefix(), [idOrNumber], async () => {
-    const where: Prisma.ProblemWhereInput = isObjectIdLike(idOrNumber)
-      ? { id: idOrNumber }
-      : { problemNumber: idOrNumber }
-    return prisma.problem.findFirst({
-      where,
-      include: {
-        author: { select: { id: true, username: true, nickname: true } },
-        testCases: {
-          where: { isSample: true },
-          orderBy: { orderIndex: 'asc' },
+  return cache.get(
+    CacheKeys.problem.byIdOrNumberPrefix(),
+    [idOrNumber],
+    async () => {
+      const where: Prisma.ProblemWhereInput = isObjectIdLike(idOrNumber)
+        ? { id: idOrNumber }
+        : { problemNumber: idOrNumber }
+      return prisma.problem.findFirst({
+        where,
+        include: {
+          author: { select: { id: true, username: true, nickname: true } },
+          testCases: {
+            where: { isSample: true },
+            orderBy: { orderIndex: 'asc' },
+          },
         },
-      },
-    })
-  }, { ttl: 60_000 })
+      })
+    },
+    { ttl: 60_000 }
+  )
 }
 
 export function isObjectIdLike(s: string) {

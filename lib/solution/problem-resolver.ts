@@ -18,7 +18,7 @@ export async function resolveProblemId(input: string | null | undefined): Promis
   if (OBJECT_ID_REGEX.test(trimmed)) {
     const problem = await prisma.problem.findUnique({
       where: { id: trimmed },
-      select: { id: true }
+      select: { id: true },
     })
     if (problem) return problem.id
   }
@@ -26,7 +26,7 @@ export async function resolveProblemId(input: string | null | undefined): Promis
   // 2) 按 problemNumber 查
   const problem = await prisma.problem.findUnique({
     where: { problemNumber: trimmed },
-    select: { id: true }
+    select: { id: true },
   })
   return problem?.id ?? null
 }

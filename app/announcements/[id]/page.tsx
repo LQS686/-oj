@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Megaphone, Pin, ArrowLeft } from 'lucide-react'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { EducationalPageShell, ListEmptyState, PageLoading } from '@/components/common'
+import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import type { PublicAnnouncementDetail } from '@/lib/announcement/service'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
@@ -51,12 +52,15 @@ export default function AnnouncementDetailPage() {
   if (error || !item) {
     return (
       <EducationalPageShell width="narrow" title="系统公告" icon={Megaphone}>
-        <div className="card-static rounded-xl p-10 text-center">
-          <p className="text-error mb-4">{error || '公告不存在或已过期'}</p>
-          <Link href="/" className="btn btn-primary">
-            返回首页
-          </Link>
-        </div>
+        <ListEmptyState
+          tone="error"
+          title={error || '公告不存在或已过期'}
+          action={
+            <Link href="/" className="btn btn-primary">
+              返回首页
+            </Link>
+          }
+        />
       </EducationalPageShell>
     )
   }
@@ -74,7 +78,7 @@ export default function AnnouncementDetailPage() {
       }
     >
       <article
-        className={`card-static rounded-xl p-6 md:p-8 ${item.isPinned ? 'ring-1 ring-primary/30' : ''}`}
+        className={`card-static p-5 md:p-8 ${item.isPinned ? 'ring-1 ring-primary/30' : ''}`}
       >
         <div className="flex items-start gap-2 mb-4">
           {item.isPinned && (
@@ -83,14 +87,15 @@ export default function AnnouncementDetailPage() {
             </span>
           )}
         </div>
-        <h1 className="text-2xl font-bold text-foreground mb-4">{item.title}</h1>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{item.title}</h2>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-6 pb-6 border-b border-border">
           <span>发布者：{item.authorName}</span>
-          {item.publishedAt && (
-            <span>发布时间：{formatDateTime(item.publishedAt)}</span>
-          )}
+          {item.publishedAt && <span>发布时间：{formatDateTime(item.publishedAt)}</span>}
         </div>
-        <div className="text-foreground text-base leading-relaxed whitespace-pre-wrap">{item.content}</div>
+        <MarkdownRenderer
+          content={item.content}
+          className="text-foreground text-base leading-relaxed"
+        />
       </article>
     </EducationalPageShell>
   )

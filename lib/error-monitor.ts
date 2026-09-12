@@ -1,36 +1,36 @@
-import { logger, formatLogTimestamp } from './logger';
-import { redisCache } from './redis';
+import { logger, formatLogTimestamp } from './logger'
+import { redisCache } from './redis'
 
 export interface ErrorStats {
-  count: number;
-  lastOccurred: string;
+  count: number
+  lastOccurred: string
   occurrences: Array<{
-    timestamp: string;
-    message: string;
-    stack?: string;
-    context?: Record<string, unknown>;
-  }>;
+    timestamp: string
+    message: string
+    stack?: string
+    context?: Record<string, unknown>
+  }>
 }
 
 export interface ErrorThreshold {
-  maxCount: number;
-  timeWindow: number; // 时间窗口（秒）
-  action: 'alert' | 'block' | 'log';
+  maxCount: number
+  timeWindow: number // 时间窗口（秒）
+  action: 'alert' | 'block' | 'log'
 }
 
 class ErrorMonitor {
-  private errorStats: Map<string, ErrorStats> = new Map();
-  private thresholds: Map<string, ErrorThreshold> = new Map();
+  private errorStats: Map<string, ErrorStats> = new Map()
+  private thresholds: Map<string, ErrorThreshold> = new Map()
   /** action=block 时写入：key → 解封时间戳 */
-  private blockedUntil: Map<string, number> = new Map();
-  private readonly MAX_OCCURRENCES = 100;
-  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+  private blockedUntil: Map<string, number> = new Map()
+  private readonly MAX_OCCURRENCES = 100
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null
 
   constructor() {
     // 初始化默认阈值
-    this.setDefaultThresholds();
+    this.setDefaultThresholds()
     // 启动定期清理任务
-    this.startCleanupTask();
+    this.startCleanupTask()
   }
 
   private setDefaultThresholds() {
@@ -38,236 +38,237 @@ class ErrorMonitor {
     this.thresholds.set('default', {
       maxCount: 10,
       timeWindow: 60, // 1分钟
-      action: 'alert'
-    });
+      action: 'alert',
+    })
 
     // 数据库错误阈值（硬拦：与 auth 一致写 blockedUntil，供调用方 fail-closed）
     this.thresholds.set('database', {
       maxCount: 5,
       timeWindow: 60,
-      action: 'block'
-    });
+      action: 'block',
+    })
 
     // 认证错误阈值
     this.thresholds.set('auth', {
       maxCount: 20,
       timeWindow: 60,
-      action: 'block'
-    });
+      action: 'block',
+    })
 
     // 系统错误阈值
     this.thresholds.set('system', {
       maxCount: 3,
       timeWindow: 60,
-      action: 'block'
-    });
+      action: 'block',
+    })
   }
 
   private startCleanupTask() {
     // 每小时清理一次过期的错误统计
-    this.cleanupTimer = setInterval(() => this.cleanup(), 60 * 60 * 1000);
+    this.cleanupTimer = setInterval(() => this.cleanup(), 60 * 60 * 1000)
   }
 
   dispose() {
     if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
     }
-    this.errorStats.clear();
+    this.errorStats.clear()
   }
 
   private cleanup() {
-    const now = Date.now();
-    const oneHourAgo = now - 60 * 60 * 1000;
+    const now = Date.now()
+    const oneHourAgo = now - 60 * 60 * 1000
 
     for (const [key, stats] of this.errorStats.entries()) {
       // 清理1小时前的错误记录
-      stats.occurrences = stats.occurrences.filter(occurrence => {
-        const timestamp = new Date(occurrence.timestamp).getTime();
-        return timestamp > oneHourAgo;
-      });
+      stats.occurrences = stats.occurrences.filter((occurrence) => {
+        const timestamp = new Date(occurrence.timestamp).getTime()
+        return timestamp > oneHourAgo
+      })
 
       // 如果没有发生记录，删除该错误统计
       if (stats.occurrences.length === 0) {
-        this.errorStats.delete(key);
+        this.errorStats.delete(key)
       } else {
-        stats.count = stats.occurrences.length;
+        stats.count = stats.occurrences.length
       }
     }
   }
 
   private getErrorKey(error: Error | string, context?: Record<string, unknown>): string {
-    let key: string;
+    let key: string
     if (typeof error === 'string') {
-      key = error;
+      key = error
     } else {
-      key = error.message || error.name || 'unknown';
+      key = error.message || error.name || 'unknown'
     }
 
     // 如果有上下文信息，添加到key中
     if (context?.errorType) {
-      key = `${context.errorType}:${key}`;
+      key = `${context.errorType}:${key}`
     }
 
-    return key;
+    return key
   }
 
   async trackError(error: Error | string, context?: Record<string, unknown>) {
-    const key = this.getErrorKey(error, context);
-    const now = formatLogTimestamp();
+    const key = this.getErrorKey(error, context)
+    const now = formatLogTimestamp()
 
     // 更新错误统计
-    let stats = this.errorStats.get(key);
+    let stats = this.errorStats.get(key)
     if (!stats) {
       stats = {
         count: 0,
         lastOccurred: now,
-        occurrences: []
-      };
+        occurrences: [],
+      }
     }
 
     const errorInfo = {
       timestamp: now,
       message: typeof error === 'string' ? error : error.message,
       stack: error instanceof Error ? error.stack : undefined,
-      context
-    };
-
-    // 添加到发生记录中
-    stats.occurrences.unshift(errorInfo);
-    
-    // 限制发生记录数量
-    if (stats.occurrences.length > this.MAX_OCCURRENCES) {
-      stats.occurrences = stats.occurrences.slice(0, this.MAX_OCCURRENCES);
+      context,
     }
 
-    stats.count = stats.occurrences.length;
-    stats.lastOccurred = now;
-    this.errorStats.set(key, stats);
+    // 添加到发生记录中
+    stats.occurrences.unshift(errorInfo)
+
+    // 限制发生记录数量
+    if (stats.occurrences.length > this.MAX_OCCURRENCES) {
+      stats.occurrences = stats.occurrences.slice(0, this.MAX_OCCURRENCES)
+    }
+
+    stats.count = stats.occurrences.length
+    stats.lastOccurred = now
+    this.errorStats.set(key, stats)
 
     // 保存到Redis以便跨实例共享
-    await redisCache.set(`error:${key}`, stats, { ttl: 3600 });
+    await redisCache.set(`error:${key}`, stats, { ttl: 3600 })
 
     // 检查阈值
-    await this.checkThreshold(key, stats, context);
+    await this.checkThreshold(key, stats, context)
   }
 
   private async checkThreshold(key: string, stats: ErrorStats, context?: Record<string, unknown>) {
     // 确定适用的阈值
-    let threshold = this.thresholds.get('default');
+    let threshold = this.thresholds.get('default')
     if (key.includes('database')) {
-      threshold = this.thresholds.get('database');
+      threshold = this.thresholds.get('database')
     } else if (key.includes('auth') || key.includes('unauthorized')) {
-      threshold = this.thresholds.get('auth');
+      threshold = this.thresholds.get('auth')
     } else if (key.includes('system') || key.includes('internal')) {
-      threshold = this.thresholds.get('system');
+      threshold = this.thresholds.get('system')
     }
 
-    if (!threshold) return;
+    if (!threshold) return
 
     // 计算时间窗口内的错误数量
-    const timeWindowMs = threshold.timeWindow * 1000;
-    const now = Date.now();
-    const recentOccurrences = stats.occurrences.filter(occurrence => {
-      const timestamp = new Date(occurrence.timestamp).getTime();
-      return now - timestamp <= timeWindowMs;
-    });
+    const timeWindowMs = threshold.timeWindow * 1000
+    const now = Date.now()
+    const recentOccurrences = stats.occurrences.filter((occurrence) => {
+      const timestamp = new Date(occurrence.timestamp).getTime()
+      return now - timestamp <= timeWindowMs
+    })
 
-    const recentCount = recentOccurrences.length;
+    const recentCount = recentOccurrences.length
 
     // 检查是否超过阈值
     if (recentCount >= threshold.maxCount) {
-      await this.handleThresholdExceeded(key, recentCount, threshold, context);
+      await this.handleThresholdExceeded(key, recentCount, threshold, context)
     }
   }
 
-  private async handleThresholdExceeded(key: string, count: number, threshold: ErrorThreshold, context?: Record<string, unknown>) {
-    const message = `Error threshold exceeded: ${key} (${count} occurrences in ${threshold.timeWindow}s)`;
-    
+  private async handleThresholdExceeded(
+    key: string,
+    count: number,
+    threshold: ErrorThreshold,
+    context?: Record<string, unknown>
+  ) {
+    const message = `Error threshold exceeded: ${key} (${count} occurrences in ${threshold.timeWindow}s)`
+
     switch (threshold.action) {
       case 'alert':
-        logger.error(message, { key, count, threshold, context });
+        logger.error(message, { key, count, threshold, context })
         // 这里可以添加发送邮件、短信等通知机制
-        break;
+        break
       case 'block': {
-        logger.warn(message, { key, count, threshold, context });
+        logger.warn(message, { key, count, threshold, context })
         const blockScope = String(context?.errorType || key)
         const until = Date.now() + threshold.timeWindow * 1000
         this.blockedUntil.set(blockScope, until)
-        void redisCache.set(
-          `error-block:${blockScope}`,
-          { until },
-          { ttl: threshold.timeWindow }
-        )
+        void redisCache.set(`error-block:${blockScope}`, { until }, { ttl: threshold.timeWindow })
         break
       }
       case 'log':
-        logger.info(message, { key, count, threshold, context });
-        break;
+        logger.info(message, { key, count, threshold, context })
+        break
     }
   }
 
   getErrorStats(): Record<string, ErrorStats> {
-    const stats: Record<string, ErrorStats> = {};
+    const stats: Record<string, ErrorStats> = {}
     for (const [key, value] of this.errorStats.entries()) {
-      stats[key] = value;
+      stats[key] = value
     }
-    return stats;
+    return stats
   }
 
   getErrorStatsByType(type: string): Record<string, ErrorStats> {
-    const stats: Record<string, ErrorStats> = {};
+    const stats: Record<string, ErrorStats> = {}
     for (const [key, value] of this.errorStats.entries()) {
       if (key.startsWith(`${type}:`)) {
-        stats[key] = value;
+        stats[key] = value
       }
     }
-    return stats;
+    return stats
   }
 
   async getErrorStatsFromRedis(): Promise<Record<string, ErrorStats>> {
-    const keys = await redisCache.keys('error:*');
-    const stats: Record<string, ErrorStats> = {};
+    const keys = await redisCache.keys('error:*')
+    const stats: Record<string, ErrorStats> = {}
 
     for (const key of keys) {
-      const errorKey = key.replace('error:', '');
-      const value = await redisCache.get<ErrorStats>(key);
+      const errorKey = key.replace('error:', '')
+      const value = await redisCache.get<ErrorStats>(key)
       if (value) {
-        stats[errorKey] = value;
+        stats[errorKey] = value
       }
     }
 
-    return stats;
+    return stats
   }
 
   clearErrorStats(key?: string) {
     if (key) {
-      this.errorStats.delete(key);
-      this.blockedUntil.delete(key);
-      redisCache.delete(`error:${key}`);
-      redisCache.delete(`error-block:${key}`);
+      this.errorStats.delete(key)
+      this.blockedUntil.delete(key)
+      redisCache.delete(`error:${key}`)
+      redisCache.delete(`error-block:${key}`)
     } else {
-      this.errorStats.clear();
-      this.blockedUntil.clear();
-      redisCache.clear('error:*');
-      redisCache.clear('error-block:*');
+      this.errorStats.clear()
+      this.blockedUntil.clear()
+      redisCache.clear('error:*')
+      redisCache.clear('error-block:*')
     }
   }
 
   /** 查询某错误键是否处于 block 阈值触发的临时阻断期 */
   isBlocked(key: string): boolean {
-    const until = this.blockedUntil.get(key);
-    if (until && until > Date.now()) return true;
-    if (until) this.blockedUntil.delete(key);
-    return false;
+    const until = this.blockedUntil.get(key)
+    if (until && until > Date.now()) return true
+    if (until) this.blockedUntil.delete(key)
+    return false
   }
 
   async isBlockedAsync(key: string): Promise<boolean> {
-    if (this.isBlocked(key)) return true;
-    const remote = await redisCache.get<{ until: number }>(`error-block:${key}`);
-    return !!(remote && remote.until > Date.now());
+    if (this.isBlocked(key)) return true
+    const remote = await redisCache.get<{ until: number }>(`error-block:${key}`)
+    return !!(remote && remote.until > Date.now())
   }
 }
 
 // 导出单例实例
-export const errorMonitor = new ErrorMonitor();
+export const errorMonitor = new ErrorMonitor()

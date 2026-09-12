@@ -31,10 +31,7 @@ describe('parseBatchRegisterCSV', () => {
   })
 
   it('支持 RFC4180 引号字段与逗号', () => {
-    const csv = [
-      'username,password,email',
-      '"user,name","Pass""word","a@b.com"',
-    ].join('\n')
+    const csv = ['username,password,email', '"user,name","Pass""word","a@b.com"'].join('\n')
     const { users, parseErrors } = parseBatchRegisterCSV(csv)
     expect(parseErrors).toHaveLength(0)
     expect(users).toHaveLength(1)

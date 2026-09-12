@@ -95,13 +95,7 @@ function isPlainLang(lang: string): boolean {
   return PLAIN_LANGS.has(key)
 }
 
-export default function MarkdownCodeBlock({
-  language,
-  code,
-}: {
-  language: string
-  code: string
-}) {
+export default function MarkdownCodeBlock({ language, code }: { language: string; code: string }) {
   const label = languageLabel(language)
   const hlLang = highlighterLanguage(language)
 

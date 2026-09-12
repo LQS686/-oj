@@ -365,17 +365,17 @@ function detectZipRootPrefix(zip: ArchiveLike): string {
   }
   if (tops.size !== 1) return ''
   const root = [...tops][0]
-  if (
-    names.some(
-      (n) => n === `${root}pack.yaml` || n.startsWith(`${root}${PROBLEMS_DIR}`)
-    )
-  ) {
+  if (names.some((n) => n === `${root}pack.yaml` || n.startsWith(`${root}${PROBLEMS_DIR}`))) {
     return root
   }
   return ''
 }
 
-function getZipEntry(zip: ArchiveLike, rootPrefix: string, relativePath: string): ArchiveEntry | null {
+function getZipEntry(
+  zip: ArchiveLike,
+  rootPrefix: string,
+  relativePath: string
+): ArchiveEntry | null {
   const entry = zip.getEntry(rootPrefix + relativePath)
   if (!entry || entry.isDirectory) return null
   return entry
@@ -421,7 +421,10 @@ function listProblemDirsFromIndex(
         title: typeof item.title === 'string' ? item.title : undefined,
         difficulty: typeof item.difficulty === 'string' ? item.difficulty : undefined,
         tags: Array.isArray(item.tags)
-          ? item.tags.map(String).map((s: string) => s.trim()).filter(Boolean)
+          ? item.tags
+              .map(String)
+              .map((s: string) => s.trim())
+              .filter(Boolean)
           : undefined,
       })
     }
@@ -519,10 +522,7 @@ function readEntryText(entry: ArchiveEntry | null): string {
  *
  * 返回按编号排序的测试用例列表
  */
-function extractTestcases(
-  zip: ArchiveLike,
-  testcasesDir: string
-): ImportedTestCase[] {
+function extractTestcases(zip: ArchiveLike, testcasesDir: string): ImportedTestCase[] {
   const all = zip.getEntries()
   const prefix = testcasesDir
 
@@ -600,9 +600,7 @@ function extractTestcases(
  *   - sample1.in / test2.out（与 testcases 命名习惯对齐）
  *   - 1/in.txt、1/input.txt、1/1.in（一层子目录）
  */
-function parseSampleFileRole(
-  relativePath: string
-): { num: number; role: 'in' | 'out' } | null {
+function parseSampleFileRole(relativePath: string): { num: number; role: 'in' | 'out' } | null {
   const name = entryPath(relativePath)
   if (!name || name.split('/').length > 2) return null
 
@@ -703,12 +701,7 @@ function extractSolutions(
   problemDir: string,
   rootPrefix = ''
 ): ImportedSolution[] {
-  const indexEntry = findFileUnderProblemDir(
-    zip,
-    problemDir,
-    ['solutions/index.json'],
-    rootPrefix
-  )
+  const indexEntry = findFileUnderProblemDir(zip, problemDir, ['solutions/index.json'], rootPrefix)
   type IndexItem = {
     lid?: string
     title?: string
@@ -752,12 +745,7 @@ function extractSolutions(
     if (!fileName || !fileName.toLowerCase().endsWith('.md')) continue
     if (!isStrictSafePath(fileName) || fileName.startsWith('_')) continue
 
-    const entry = findFileUnderProblemDir(
-      zip,
-      problemDir,
-      [`solutions/${fileName}`],
-      rootPrefix
-    )
+    const entry = findFileUnderProblemDir(zip, problemDir, [`solutions/${fileName}`], rootPrefix)
     if (!entry) continue
 
     let content = readEntryText(entry).replace(/^\uFEFF/, '')
@@ -802,12 +790,7 @@ function mergeJudgeConfig(
   /**
    * 从 yaml 取数值字段：config.yaml 优先，其次 problem.yaml，再否则用 default
    */
-  const getNumber = (
-    key: string,
-    min: number,
-    max: number,
-    fallback: number
-  ): number => {
+  const getNumber = (key: string, min: number, max: number, fallback: number): number => {
     // config.yaml 优先
     const cv = configYaml?.[key]
     if (cv !== undefined && cv !== null && !Array.isArray(cv)) {
@@ -827,11 +810,7 @@ function mergeJudgeConfig(
    * 从 yaml 取枚举字段：config.yaml 优先，其次 problem.yaml，非法/缺失用 default
    * comparison_mode 额外支持 special_judge 等别名
    */
-  const getEnum = <T extends string>(
-    key: string,
-    validValues: readonly T[],
-    fallback: T
-  ): T => {
+  const getEnum = <T extends string>(key: string, validValues: readonly T[], fallback: T): T => {
     const tryResolve = (raw: unknown): T | null => {
       if (key === 'comparison_mode') {
         const normalized = normalizeComparisonMode(raw)
@@ -849,12 +828,13 @@ function mergeJudgeConfig(
 
   return {
     timeLimit: getNumber('time_limit', TIME_LIMIT_MIN, TIME_LIMIT_MAX, TIME_LIMIT_DEFAULT),
-    memoryLimit: getNumber('memory_limit', MEMORY_LIMIT_MIN, MEMORY_LIMIT_MAX, MEMORY_LIMIT_DEFAULT),
-    comparisonMode: getEnum(
-      'comparison_mode',
-      VALID_COMPARISON_MODES,
-      'default'
+    memoryLimit: getNumber(
+      'memory_limit',
+      MEMORY_LIMIT_MIN,
+      MEMORY_LIMIT_MAX,
+      MEMORY_LIMIT_DEFAULT
     ),
+    comparisonMode: getEnum('comparison_mode', VALID_COMPARISON_MODES, 'default'),
     realPrecision: getNumber(
       'real_precision',
       REAL_PRECISION_MIN,
@@ -898,9 +878,7 @@ function parseOneProblem(
   const problemYaml = parseDsojYaml(problemYamlText)
 
   // 3. 读取必需字段：title（index.json 可兜底）
-  const titleFromYaml = typeof problemYaml.title === 'string'
-    ? problemYaml.title.trim()
-    : ''
+  const titleFromYaml = typeof problemYaml.title === 'string' ? problemYaml.title.trim() : ''
   const title = titleFromYaml || indexMeta?.title?.trim() || ''
   if (!title) {
     throw new ApiError(
@@ -915,24 +893,15 @@ function parseOneProblem(
     findFileUnderProblemDir(zip, problemDir, ['description.md'], rootPrefix)
   )
   if (!description.trim()) {
-    throw new ApiError(
-      'EMPTY_DESCRIPTION',
-      `题目目录 ${problemDir} 的 description.md 为空`,
-      400
-    )
+    throw new ApiError('EMPTY_DESCRIPTION', `题目目录 ${problemDir} 的 description.md 为空`, 400)
   }
-  const background = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['background.md'], rootPrefix)
-  ) || undefined
-  const input = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['input.md'], rootPrefix)
-  )
-  const output = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['output.md'], rootPrefix)
-  )
-  const hint = readEntryText(
-    findFileUnderProblemDir(zip, problemDir, ['hint.md'], rootPrefix)
-  ) || undefined
+  const background =
+    readEntryText(findFileUnderProblemDir(zip, problemDir, ['background.md'], rootPrefix)) ||
+    undefined
+  const input = readEntryText(findFileUnderProblemDir(zip, problemDir, ['input.md'], rootPrefix))
+  const output = readEntryText(findFileUnderProblemDir(zip, problemDir, ['output.md'], rootPrefix))
+  const hint =
+    readEntryText(findFileUnderProblemDir(zip, problemDir, ['hint.md'], rootPrefix)) || undefined
 
   // 5. 读取 config.yaml（可选）
   const configEntry = findFileUnderProblemDir(zip, problemDir, ['config.yaml'], rootPrefix)
@@ -942,12 +911,7 @@ function parseOneProblem(
   const judgeConfig = mergeJudgeConfig(problemYaml, configYaml)
 
   // 7. 提取测试用例（忽略 quality.json / generator.py 等过程产物）
-  const testcasesDir = findSubdirUnderProblemDir(
-    zip,
-    problemDir,
-    TESTCASES_DIR_NAMES,
-    rootPrefix
-  )
+  const testcasesDir = findSubdirUnderProblemDir(zip, problemDir, TESTCASES_DIR_NAMES, rootPrefix)
   let testCases: ImportedTestCase[] = []
   if (testcasesDir) {
     testCases = extractTestcases(zip, rootPrefix + testcasesDir)
@@ -1036,8 +1000,13 @@ function parseOneProblem(
   // 11. 解析 tags（yaml 优先，index.json 兜底）
   const rawTags = problemYaml.tags
   let tags: string[] = Array.isArray(rawTags)
-    ? rawTags.map(String).map(s => s.trim()).filter(Boolean)
-    : (typeof rawTags === 'string' && rawTags.trim() ? [rawTags.trim()] : [])
+    ? rawTags
+        .map(String)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : typeof rawTags === 'string' && rawTags.trim()
+      ? [rawTags.trim()]
+      : []
   if (tags.length === 0 && indexMeta?.tags?.length) {
     tags = indexMeta.tags
   }
@@ -1049,27 +1018,26 @@ function parseOneProblem(
   }
 
   // 12. 解析 difficulty
-  const rawDifficulty = typeof problemYaml.difficulty === 'string'
-    ? problemYaml.difficulty.trim()
-    : (indexMeta?.difficulty ? String(indexMeta.difficulty).trim() : '')
+  const rawDifficulty =
+    typeof problemYaml.difficulty === 'string'
+      ? problemYaml.difficulty.trim()
+      : indexMeta?.difficulty
+        ? String(indexMeta.difficulty).trim()
+        : ''
   const difficulty = isValidDifficulty(rawDifficulty) ? rawDifficulty : '入门'
 
   // 13. 其它字段
-  const source = typeof problemYaml.source === 'string'
-    ? problemYaml.source.trim()
-    : 'DSOJ Pack'
+  const source = typeof problemYaml.source === 'string' ? problemYaml.source.trim() : 'DSOJ Pack'
   const dirSlug = problemDir.replace(PROBLEMS_DIR, '').replace(/\/$/, '')
-  const problemNumberRaw = typeof problemYaml.problem_number === 'string'
-    ? problemYaml.problem_number.trim()
-    : ''
+  const problemNumberRaw =
+    typeof problemYaml.problem_number === 'string' ? problemYaml.problem_number.trim() : ''
   const problemNumber =
     problemNumberRaw ||
     indexMeta?.pid?.trim() ||
     (dirSlug && !/^\d{4}-/.test(dirSlug) ? dirSlug : undefined)
 
-  const rawVisibility = typeof problemYaml.visibility === 'string'
-    ? problemYaml.visibility.trim().toLowerCase()
-    : ''
+  const rawVisibility =
+    typeof problemYaml.visibility === 'string' ? problemYaml.visibility.trim().toLowerCase() : ''
   const visibility = (VALID_VISIBILITIES as readonly string[]).includes(rawVisibility)
     ? (rawVisibility as 'public' | 'private' | 'contest')
     : undefined
@@ -1162,11 +1130,7 @@ export function parseDsojArchiveDetailed(archive: ArchiveLike): DsojParseJobResu
   for (const entry of archive.getEntries()) {
     if (entry.isDirectory) continue
     if (!isStrictSafePath(entry.entryName)) {
-      throw new ApiError(
-        'UNSAFE_ZIP_ENTRY',
-        `归档内文件名不安全: ${entry.entryName}`,
-        400
-      )
+      throw new ApiError('UNSAFE_ZIP_ENTRY', `归档内文件名不安全: ${entry.entryName}`, 400)
     }
   }
 
@@ -1230,11 +1194,7 @@ export function parseDsojArchiveDetailed(archive: ArchiveLike): DsojParseJobResu
       })
     } catch (err: unknown) {
       const reason =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : '未知错误'
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : '未知错误'
       results.push({ ok: false, index: i, dir: job.dir, reason, title: job.meta?.title })
     }
   }
@@ -1265,11 +1225,7 @@ export function parseDsojArchive(archive: ArchiveLike): ImportedProblem[] {
   }
   if (results.length === 0) {
     const detail = errors.map((e) => `${e.dir}: ${e.reason}`).join('; ')
-    throw new ApiError(
-      'ALL_PROBLEMS_FAILED',
-      `题包中所有题目解析失败。详情: ${detail}`,
-      400
-    )
+    throw new ApiError('ALL_PROBLEMS_FAILED', `题包中所有题目解析失败。详情: ${detail}`, 400)
   }
   return results
 }

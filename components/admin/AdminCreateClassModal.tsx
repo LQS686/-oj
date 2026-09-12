@@ -184,7 +184,7 @@ export default function AdminCreateClassModal({
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-6">
             {error && (
               <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -193,7 +193,7 @@ export default function AdminCreateClassModal({
             )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
+              <label className="block text-label text-foreground mb-1.5">
                 班级名称 <span className="text-error">*</span>
               </label>
               <input
@@ -209,7 +209,7 @@ export default function AdminCreateClassModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5 flex items-center gap-1.5">
+              <label className="block text-label text-foreground mb-1.5 flex items-center gap-1.5">
                 <Megaphone className="w-4 h-4 text-muted-foreground" />
                 班级公告
               </label>
@@ -224,7 +224,7 @@ export default function AdminCreateClassModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">头像 URL</label>
+              <label className="block text-label text-foreground mb-1.5">头像 URL</label>
               <input
                 type="url"
                 value={formData.avatar}
@@ -236,7 +236,7 @@ export default function AdminCreateClassModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">最大成员数</label>
+                <label className="block text-label text-foreground mb-1.5">最大成员数</label>
                 <input
                   type="number"
                   value={formData.maxMembers}
@@ -250,13 +250,15 @@ export default function AdminCreateClassModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">可见性</label>
+                <label className="block text-label text-foreground mb-1.5">可见性</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, isPublic: true })}
                     className={`p-3 rounded-lg border text-left text-sm transition-colors ${
-                      formData.isPublic ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                      formData.isPublic
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/40'
                     }`}
                   >
                     <div className="flex items-center gap-2 font-medium">
@@ -270,7 +272,9 @@ export default function AdminCreateClassModal({
                     type="button"
                     onClick={() => setFormData({ ...formData, isPublic: false })}
                     className={`p-3 rounded-lg border text-left text-sm transition-colors ${
-                      !formData.isPublic ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                      !formData.isPublic
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/40'
                     }`}
                   >
                     <div className="flex items-center gap-2 font-medium">

@@ -59,16 +59,16 @@ export type SystemSettings = typeof defaultSettings
 
 /** 规范化 failFast 字符串 */
 export function normalizeFailFast(raw: unknown): FailFastMode {
-  const s = String(raw ?? 'off').trim().toLowerCase()
+  const s = String(raw ?? 'off')
+    .trim()
+    .toLowerCase()
   if (s === 'hard') return 'hard'
   if (s === 'all' || s === 'any') return 'all'
   return 'off'
 }
 
 /** 合并 DB/请求中的 judge 片段到完整 JudgeSettings */
-export function mergeJudgeSettings(
-  partial?: Partial<JudgeSettings> | null,
-): JudgeSettings {
+export function mergeJudgeSettings(partial?: Partial<JudgeSettings> | null): JudgeSettings {
   const src = partial && typeof partial === 'object' ? partial : {}
   return {
     jobTimeout: clampInt(src.jobTimeout, 30, 3600, defaultJudgeSettings.jobTimeout),
@@ -79,16 +79,11 @@ export function mergeJudgeSettings(
       src.largeCaseConcurrency,
       1,
       8,
-      defaultJudgeSettings.largeCaseConcurrency,
+      defaultJudgeSettings.largeCaseConcurrency
     ),
     rejudgeTimes: clampInt(src.rejudgeTimes, 0, 5, defaultJudgeSettings.rejudgeTimes),
     extraTimeRatio: clampFloat(src.extraTimeRatio, 0, 1, defaultJudgeSettings.extraTimeRatio),
-    compileTimeout: clampInt(
-      src.compileTimeout,
-      5000,
-      120000,
-      defaultJudgeSettings.compileTimeout,
-    ),
+    compileTimeout: clampInt(src.compileTimeout, 5000, 120000, defaultJudgeSettings.compileTimeout),
     ioSlackMaxMs: clampInt(src.ioSlackMaxMs, 5000, 120000, defaultJudgeSettings.ioSlackMaxMs),
     deadCheckMs: clampInt(src.deadCheckMs, 2000, 30000, defaultJudgeSettings.deadCheckMs),
     closeFallbackMs: clampInt(src.closeFallbackMs, 200, 5000, defaultJudgeSettings.closeFallbackMs),
@@ -96,7 +91,7 @@ export function mergeJudgeSettings(
       src.largeCaseBytes,
       256 * 1024,
       64 * 1024 * 1024,
-      defaultJudgeSettings.largeCaseBytes,
+      defaultJudgeSettings.largeCaseBytes
     ),
   }
 }

@@ -25,7 +25,7 @@ async function findPublicProblemIdsByTagFuzzy(keyword: string): Promise<string[]
       .collection('Problem')
       .find(
         { visibility: 'public', tags: { $elemMatch: { $regex: regex } } },
-        { projection: { _id: 1 } },
+        { projection: { _id: 1 } }
       )
       .toArray()
     return docs.map((d) => String(d._id))
@@ -111,9 +111,7 @@ export async function listPublicProblems(filter: {
     })
     // 按请求顺序去重（大小写不敏感）
     const byNumber = new Map(
-      items
-        .filter((p) => !!p.problemNumber)
-        .map((p) => [p.problemNumber!.toUpperCase(), p])
+      items.filter((p) => !!p.problemNumber).map((p) => [p.problemNumber!.toUpperCase(), p])
     )
     const ordered = unique
       .map((n) => byNumber.get(n.toUpperCase()))
@@ -147,10 +145,16 @@ export async function listPublicProblems(filter: {
   }
   // 多值筛选（逗号分隔）：难度 OR、标签 OR（hasSome = 命中任意标签）
   const difficulties = difficulty
-    ? difficulty.split(',').map((s) => s.trim()).filter(Boolean)
+    ? difficulty
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
     : []
   const tags = tag
-    ? tag.split(',').map((s) => s.trim()).filter(Boolean)
+    ? tag
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
     : []
   if (difficulties.length > 0) where.difficulty = { in: difficulties }
   if (tags.length > 0) where.tags = { hasSome: tags }
@@ -204,10 +208,12 @@ export async function listPublicProblems(filter: {
       const liveAc = acMap.get(p.id) ?? 0
       if (p.totalSubmit !== liveSubmit || p.totalAccepted !== liveAc) {
         // 不 await：写库失败不影响列表返回，下次列表会再次检测并回填
-        prisma.problem.update({
-          where: { id: p.id },
-          data: { totalSubmit: liveSubmit, totalAccepted: liveAc },
-        }).catch(() => {})
+        prisma.problem
+          .update({
+            where: { id: p.id },
+            data: { totalSubmit: liveSubmit, totalAccepted: liveAc },
+          })
+          .catch(() => {})
       }
     }
     // 覆盖返回值，确保前端拿到实时数据

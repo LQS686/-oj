@@ -35,11 +35,9 @@ export default function FilterBar({ children, activeCount = 0, onReset, onApply 
           aria-label="打开筛选"
         >
           <Filter className="w-5 h-5" />
-          <span className="text-sm font-medium">筛选</span>
+          <span className="text-label">筛选</span>
           {activeCount > 0 && (
-            <span className="badge-primary badge min-w-[20px] h-[20px] text-xs">
-              {activeCount}
-            </span>
+            <span className="badge-primary badge min-w-[20px] h-[20px] text-xs">{activeCount}</span>
           )}
         </button>
 
@@ -56,7 +54,7 @@ export default function FilterBar({ children, activeCount = 0, onReset, onApply 
               aria-label="筛选抽屉"
             >
               <div className="flex items-center justify-between p-4 border-b border-border">
-                <h3 className="text-base font-bold text-foreground">筛选</h3>
+                <h3 className="text-section-title text-foreground">筛选</h3>
                 <button
                   onClick={() => setDrawerOpen(false)}
                   className="p-2 hover:bg-muted rounded-lg transition-colors"
@@ -66,9 +64,7 @@ export default function FilterBar({ children, activeCount = 0, onReset, onApply 
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {children}
-              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">{children}</div>
 
               <div className="flex items-center gap-3 p-4 border-t border-border bg-background">
                 <button
@@ -104,9 +100,7 @@ export default function FilterBar({ children, activeCount = 0, onReset, onApply 
   // 会创建 stacking context，导致下拉被下方列表遮挡；card-flat 两者皆无
   return (
     <div className="card-flat p-4">
-      <div className="flex gap-4 flex-wrap items-center">
-        {children}
-      </div>
+      <div className="flex gap-4 flex-wrap items-center">{children}</div>
     </div>
   )
 }

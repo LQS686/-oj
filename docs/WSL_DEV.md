@@ -32,10 +32,10 @@ docker compose logs -f app
 
 ### 两套目录
 
-| 路径 | 用途 |
-|------|------|
-| `E:\桌面\dsoj`（WSL 内 `/mnt/e/桌面/dsoj`） | Cursor 编辑；**编辑以这里为准** |
-| `~/dsoj` | WSL 运行副本；**`npm run dev` / `docker compose` 建议在这里** |
+| 路径                                        | 用途                                                          |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| `E:\桌面\dsoj`（WSL 内 `/mnt/e/桌面/dsoj`） | Cursor 编辑；**编辑以这里为准**                               |
+| `~/dsoj`                                    | WSL 运行副本；**`npm run dev` / `docker compose` 建议在这里** |
 
 为什么复制到家目录：在 `/mnt/e` 上跑 `node_modules` 又慢又容易坏；评测需要 Linux 原生文件系统。
 

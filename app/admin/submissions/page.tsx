@@ -1,20 +1,21 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { useRouter } from 'next/navigation'
 import { DataTable, FilterBar, AdminPageShell, type Column } from '@/components/admin'
 import { fetchWithCookie } from '@/lib/api/base'
-import { Search, User, FileText, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Search, User, FileText, Clock, Eye, RotateCcw, Loader2 } from 'lucide-react'
 import { formatDateTime, formatMemory, formatTime } from '@/lib/utils'
-import { getStatusText } from '@/lib/status'
 import {
   isAcceptedStatus,
   isNonFinalSubmissionStatus,
   NON_FINAL_STATUS_QUERY,
-  SubmissionStatus,
 } from '@/lib/constants/submission-status'
+import SubmissionStatusBadge from '@/components/submission/SubmissionStatusBadge'
+import { useDialog } from '@/components/common'
 
 interface Submission {
   id: string
@@ -56,6 +57,9 @@ export default function AdminSubmissionsPage() {
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
   const [totalByStatus, setTotalByStatus] = useState<Record<string, number>>({})
+  // 列表内重测：记录正在重测的行，避免重复点击
+  const [rejudgingId, setRejudgingId] = useState<string | null>(null)
+  const dialog = useDialog()
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -109,46 +113,48 @@ export default function AdminSubmissionsPage() {
     void fetchSubmissions()
   }, [fetchSubmissions])
 
-  const getStatusIcon = (status: string) => {
-    if (isAcceptedStatus(status)) {
-      return <CheckCircle className="w-4 h-4 text-secondary" />
-    }
-    if (
-      status === SubmissionStatus.WRONG_ANSWER ||
-      status === SubmissionStatus.RUNTIME_ERROR ||
-      status === SubmissionStatus.COMPILE_ERROR ||
-      status === SubmissionStatus.TIME_LIMIT_EXCEEDED ||
-      status === SubmissionStatus.MEMORY_LIMIT_EXCEEDED
-    ) {
-      return <XCircle className="w-4 h-4 text-error" />
-    }
-    return <AlertCircle className="w-4 h-4 text-info" />
-  }
-
-  const getStatusColor = (status: string) => {
-    if (isAcceptedStatus(status)) return 'tag-success'
-    if (
-      status === SubmissionStatus.WRONG_ANSWER ||
-      status === SubmissionStatus.RUNTIME_ERROR ||
-      status === SubmissionStatus.TIME_LIMIT_EXCEEDED ||
-      status === SubmissionStatus.MEMORY_LIMIT_EXCEEDED
-    ) {
-      return 'tag-error'
-    }
-    if (status === SubmissionStatus.COMPILE_ERROR) return 'tag-warning'
-    if (isNonFinalSubmissionStatus(status)) return 'tag-info'
-    return 'tag'
-  }
-
-  const sumByNormalizedStatus = (counts: Record<string, number>, match: (status: string) => boolean) =>
-    Object.entries(counts).reduce(
-      (sum, [status, n]) => (match(status) ? sum + n : sum),
-      0
-    )
+  const sumByNormalizedStatus = (
+    counts: Record<string, number>,
+    match: (status: string) => boolean
+  ) => Object.entries(counts).reduce((sum, [status, n]) => (match(status) ? sum + n : sum), 0)
 
   const globalTotal = Object.values(totalByStatus).reduce((sum, n) => sum + n, 0)
-  const activeCount =
-    (searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (language ? 1 : 0)
+  const activeCount = (searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (language ? 1 : 0)
+
+  const handleRejudge = useCallback(
+    async (submissionId: string) => {
+      const ok = await dialog.confirm({
+        title: '重新评测',
+        message: '将使用当前代码与题目测试点重新入队评测，原结果会被覆盖。确定继续？',
+        tone: 'warning',
+        confirmText: '开始重测',
+        confirmVariant: 'destructive',
+      })
+      if (!ok) return
+
+      setRejudgingId(submissionId)
+      try {
+        const response = await fetchWithCookie(`/api/admin/submissions/${submissionId}/rejudge`, {
+          method: 'POST',
+        })
+        const data = await response.json()
+        if (!data.success) {
+          await dialog.alert({
+            title: '重测失败',
+            message: data.error || '无法重新评测',
+            tone: 'error',
+          })
+          return
+        }
+        await fetchSubmissions()
+      } catch {
+        await dialog.alert({ title: '重测失败', message: '网络错误', tone: 'error' })
+      } finally {
+        setRejudgingId(null)
+      }
+    },
+    [dialog, fetchSubmissions]
+  )
 
   const columns: Column<Submission>[] = [
     {
@@ -183,19 +189,18 @@ export default function AdminSubmissionsPage() {
       render: (value) => (
         <div className="flex items-center gap-2">
           <User className="w-4 h-4 text-muted-foreground" />
-          <span className="text-foreground">{(value as Submission['user'] | null | undefined)?.nickname || (value as Submission['user'] | null | undefined)?.username || '—'}</span>
+          <span className="text-foreground">
+            {(value as Submission['user'] | null | undefined)?.nickname ||
+              (value as Submission['user'] | null | undefined)?.username ||
+              '—'}
+          </span>
         </div>
       ),
     },
     {
       key: 'status',
       label: '状态',
-      render: (value) => (
-        <div className="flex items-center gap-2" title={getStatusText(value as string)}>
-          {getStatusIcon(value as string)}
-          <span className={`tag ${getStatusColor(value as string)}`}>{getStatusText(value as string)}</span>
-        </div>
-      ),
+      render: (value) => <SubmissionStatusBadge status={value as string} />,
     },
     {
       key: 'score',
@@ -225,6 +230,37 @@ export default function AdminSubmissionsPage() {
         <div className="flex items-center gap-2 text-muted-foreground whitespace-nowrap">
           <Clock className="w-4 h-4 shrink-0" />
           <span className="text-sm">{formatDateTime(value as string)}</span>
+        </div>
+      ),
+    },
+    {
+      key: '__actions',
+      label: '操作',
+      className: 'w-24',
+      render: (_value, submission) => (
+        <div className="flex items-center gap-1">
+          <Link
+            href={`/admin/submissions/${submission.id}`}
+            className="btn-icon-sm text-muted-foreground hover:text-primary-light hover:bg-muted transition-colors inline-flex"
+            title="查看详情"
+            aria-label="查看详情"
+          >
+            <Eye className="w-4 h-4" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => handleRejudge(submission.id)}
+            disabled={rejudgingId === submission.id}
+            className="btn-icon-sm text-muted-foreground hover:text-primary-light hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="重新评测"
+            aria-label="重新评测"
+          >
+            {rejudgingId === submission.id ? (
+              <Loader2 className="w-4 h-4 animate-icon-spin" />
+            ) : (
+              <RotateCcw className="w-4 h-4" />
+            )}
+          </button>
         </div>
       ),
     },
@@ -274,7 +310,7 @@ export default function AdminSubmissionsPage() {
                 setStatusFilter(group.key)
                 setPage(1)
               }}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`btn btn-sm transition-colors ${
                 statusFilter === group.key
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
@@ -335,9 +371,7 @@ export default function AdminSubmissionsPage() {
         idKey="id"
         loading={loading}
         emptyMessage={
-          searchQuery || statusFilter !== 'all' || language
-            ? '没有找到匹配的记录'
-            : '暂无提交记录'
+          searchQuery || statusFilter !== 'all' || language ? '没有找到匹配的记录' : '暂无提交记录'
         }
         onRowClick={(row) => router.push(`/admin/submissions/${row.id}`)}
         pagination={{

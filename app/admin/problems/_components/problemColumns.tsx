@@ -30,7 +30,7 @@ export function buildProblemColumns({
       render: (_value, problem) => (
         <div className="flex items-center gap-2">
           {problem.problemNumber && (
-            <span className="font-mono text-sm font-medium text-muted-foreground">
+            <span className="font-mono text-label text-muted-foreground">
               {problem.problemNumber}
             </span>
           )}
@@ -56,7 +56,10 @@ export function buildProblemColumns({
         return (
           <div className="flex flex-wrap items-center gap-1">
             {tags.slice(0, 3).map((tag, idx) => (
-              <span key={idx} className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+              <span
+                key={idx}
+                className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded"
+              >
                 {tag}
               </span>
             ))}
@@ -82,9 +85,7 @@ export function buildProblemColumns({
       label: '创建时间',
       sortable: true,
       render: (value) => (
-        <span className="text-sm text-muted-foreground">
-          {formatDate(value as string)}
-        </span>
+        <span className="text-sm text-muted-foreground">{formatDate(value as string)}</span>
       ),
     },
     {
@@ -95,14 +96,17 @@ export function buildProblemColumns({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onToggleVisibility(problem.id, problem.visibility || (problem.isPublic ? 'public' : 'private'))
+              onToggleVisibility(
+                problem.id,
+                problem.visibility || (problem.isPublic ? 'public' : 'private')
+              )
             }}
-            className={`p-2.5 rounded-lg transition-colors ${
+            className={`btn-icon transition-colors ${
               problem.visibility === 'public' || (!problem.visibility && problem.isPublic)
                 ? 'text-secondary-light hover:bg-secondary/10'
                 : problem.visibility === 'contest'
-                ? 'text-accent-light hover:bg-accent/10'
-                : 'text-muted-foreground hover:bg-muted'
+                  ? 'text-accent-light hover:bg-accent/10'
+                  : 'text-muted-foreground hover:bg-muted'
             }`}
             title="切换可见性"
           >
@@ -119,7 +123,7 @@ export function buildProblemColumns({
               e.stopPropagation()
               onTestcases(problem.id)
             }}
-            className="p-2.5 text-primary hover:bg-primary/5 rounded-lg transition-colors"
+            className="btn-icon text-primary hover:bg-primary/5 transition-colors"
             title="测试数据"
           >
             <Database className="w-4 h-4" />
@@ -129,7 +133,7 @@ export function buildProblemColumns({
               e.stopPropagation()
               onEdit(problem.id)
             }}
-            className="p-2.5 text-primary hover:bg-primary/5 rounded-lg transition-colors"
+            className="btn-icon text-primary hover:bg-primary/5 transition-colors"
             title="编辑"
           >
             <Edit className="w-4 h-4" />
@@ -139,7 +143,7 @@ export function buildProblemColumns({
               e.stopPropagation()
               onDelete(problem)
             }}
-            className="p-2.5 text-error hover:bg-error/10 rounded-lg transition-colors"
+            className="btn-icon text-error hover:bg-error/10 transition-colors"
             title="删除"
           >
             <Trash2 className="w-4 h-4" />

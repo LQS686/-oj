@@ -1,4 +1,4 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -7,10 +7,10 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: "http",
-        hostname: "localhost",
-        port: "",
-        pathname: "/**",
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '',
+        pathname: '/**',
       },
     ],
     // 禁用 SVG 加载：SVG 可内嵌 <script>，存在 XSS 风险。
@@ -38,18 +38,18 @@ const nextConfig: NextConfig = {
       // img-src 白名单：允许常见 OJ 题库图床（洛谷/Codeforces/AtCoder/Hydro/牛客等）加载题目图片
       // 题面常含跨域图片资源，白名单需覆盖主流图床域名，否则 CSP 会静默拦截图片加载
       "img-src 'self' data: blob: http://localhost:* " +
-        "https://*.googleusercontent.com " + // Google 头像
-        "https://cdn.luogu.com.cn https://*.cdn.luogu.com.cn " + // 洛谷图床
-        "https://codeforces.com https://*.codeforces.com " + // Codeforces
-        "https://atcoder.jp https://*.atcoder.jp " + // AtCoder
-        "https://*.hydro.org.cn " + // Hydro OJ
-        "https://*.nowcoder.com https://*.nosdn.net " + // 牛客
-        "https://img-blog.csdnimg.cn https://*.csdnimg.cn " + // CSDN 图床（部分题面引用）
-        "https://i.loli.net https://*.i.loli.net " + // sm.ms 图床
-        "https://githubusercontent.com https://raw.githubusercontent.com https://*.githubusercontent.com " + // GitHub
-        "https://pic.leetcode-cn.com https://*.leetcode-cn.com " + // 力扣
-        "https://*.oi-wiki.org " + // OI-Wiki
-        "https://bing.com https://*.bing.com", // 必应图片
+        'https://*.googleusercontent.com ' + // Google 头像
+        'https://cdn.luogu.com.cn https://*.cdn.luogu.com.cn ' + // 洛谷图床
+        'https://codeforces.com https://*.codeforces.com ' + // Codeforces
+        'https://atcoder.jp https://*.atcoder.jp ' + // AtCoder
+        'https://*.hydro.org.cn ' + // Hydro OJ
+        'https://*.nowcoder.com https://*.nosdn.net ' + // 牛客
+        'https://img-blog.csdnimg.cn https://*.csdnimg.cn ' + // CSDN 图床（部分题面引用）
+        'https://i.loli.net https://*.i.loli.net ' + // sm.ms 图床
+        'https://githubusercontent.com https://raw.githubusercontent.com https://*.githubusercontent.com ' + // GitHub
+        'https://pic.leetcode-cn.com https://*.leetcode-cn.com ' + // 力扣
+        'https://*.oi-wiki.org ' + // OI-Wiki
+        'https://bing.com https://*.bing.com', // 必应图片
       "connect-src 'self' http://localhost:* ws://localhost:* https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net",
       "font-src 'self' data: https://fonts.gstatic.com",
       "object-src 'none'",
@@ -60,53 +60,54 @@ const nextConfig: NextConfig = {
       // 该指令会强制浏览器将 HTTP 请求升级为 HTTPS，导致 HTTP 部署环境下
       // 静态资源（CSS/JS）请求变为 https:// 协议而加载失败（ERR_CONNECTION_REFUSED）。
       // 在域名备案完成、切换到 HTTPS 后方可考虑添加此指令。
-    ].join("; ");
+    ].join('; ')
 
     return [
       {
-        source: "/:path*",
+        source: '/:path*',
         headers: [
           {
-            key: "X-Frame-Options",
-            value: "DENY",
+            key: 'X-Frame-Options',
+            value: 'DENY',
           },
           {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
           },
           {
-            key: "X-XSS-Protection",
-            value: "1; mode=block",
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
           },
           {
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
           },
           {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), sync-xhr=()",
+            key: 'Permissions-Policy',
+            value:
+              'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), sync-xhr=()',
           },
           // HSTS：仅显式 FORCE_HSTS=true 时启用，避免 HTTP 部署被浏览器强制升级
           ...(process.env.FORCE_HSTS === 'true'
             ? [
                 {
-                  key: "Strict-Transport-Security",
-                  value: "max-age=31536000; includeSubDomains",
+                  key: 'Strict-Transport-Security',
+                  value: 'max-age=31536000; includeSubDomains',
                 },
               ]
             : []),
           {
-            key: "Content-Security-Policy",
+            key: 'Content-Security-Policy',
             value: cspDirectives,
           },
         ],
       },
-    ];
+    ]
   },
 
   typescript: {
     ignoreBuildErrors: false,
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

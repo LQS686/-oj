@@ -6,7 +6,14 @@
  *
  * 迁移到 withApi 中间件模式
  */
-import { withApi, ok, readJson, readQuery, throw403, resolveViewerFromRequest } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readJson,
+  readQuery,
+  throw403,
+  resolveViewerFromRequest,
+} from '@/lib/api/withApi'
 import { canManageContent } from '@/lib/permissions'
 import { toInt } from '@/lib/api/validation'
 import { validateContestTimeFields } from '@/lib/contest/admin'
@@ -23,10 +30,7 @@ export const GET = withApi.public(async (req) => {
 
   // 公开路由不强制登录，但若用户已登录则附带 isRegistered（经 tokenVersion/ban）
   const viewer = await resolveViewerFromRequest(req)
-  const data = await listPublicContests(
-    { page, limit, status, keyword },
-    viewer?.user.id
-  )
+  const data = await listPublicContests({ page, limit, status, keyword }, viewer?.user.id)
   return ok(data)
 })
 
@@ -71,4 +75,3 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
 
   return ok(contest, { status: 201 })
 })
-

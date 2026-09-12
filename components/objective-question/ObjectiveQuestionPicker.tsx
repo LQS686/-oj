@@ -4,10 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { ChevronUp, ChevronDown, X, Search, ListPlus, Plus } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
-import {
-  moveProblemInOrder,
-  removeProblemFromOrder,
-} from '@/lib/assignment/problemSelection'
+import { moveProblemInOrder, removeProblemFromOrder } from '@/lib/assignment/problemSelection'
 import {
   OBJECTIVE_QUESTION_TYPES,
   OBJECTIVE_QUESTION_TYPE_LABELS,
@@ -162,8 +159,7 @@ export default function ObjectiveQuestionPicker({
 
   const selectedIdSet = useMemo(() => new Set(value), [value])
   const selectedOrdered = useMemo(
-    () =>
-      value.map((id) => knownItems.get(id)).filter(Boolean) as ObjectiveQuestionPickItem[],
+    () => value.map((id) => knownItems.get(id)).filter(Boolean) as ObjectiveQuestionPickItem[],
     [value, knownItems]
   )
 
@@ -240,9 +236,7 @@ export default function ObjectiveQuestionPicker({
     <div className="flex flex-col gap-3">
       {/* 搜索添加 */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-muted-foreground mb-2">
-          搜索添加客观题
-        </label>
+        <label className="block text-label text-muted-foreground mb-2">搜索添加客观题</label>
         <div className="flex gap-2">
           <div className="relative flex-1 min-w-0">
             <input
@@ -275,13 +269,9 @@ export default function ObjectiveQuestionPicker({
         ) : (
           <div className="rounded-lg border border-border divide-y divide-border max-h-72 overflow-y-auto">
             {searchLoading && results.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                搜索客观题中…
-              </div>
+              <div className="py-6 text-center text-sm text-muted-foreground">搜索客观题中…</div>
             ) : results.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                暂无匹配的客观题
-              </div>
+              <div className="py-6 text-center text-sm text-muted-foreground">暂无匹配的客观题</div>
             ) : (
               <>
                 {results.map((q) => {
@@ -305,7 +295,7 @@ export default function ObjectiveQuestionPicker({
                         >
                           {OBJECTIVE_QUESTION_TYPE_LABELS[q.type]}
                         </span>
-                        <span className="truncate text-sm font-medium text-foreground">
+                        <span className="truncate text-subsection-title text-foreground">
                           {q.title}
                         </span>
                       </div>

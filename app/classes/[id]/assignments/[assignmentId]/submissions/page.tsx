@@ -15,462 +15,453 @@ import type { Assignment } from '@/types/models'
 import { ClassWorkspaceShell, CreateModalShell } from '@/components/common'
 
 interface Submission {
- id: string
- problem: {
- id: string
- title: string
- problemNumber?: string
- }
- userId: string
- user: {
- id: string
- username: string
- nickname?: string
- }
- language: string
- code: string
- status: string
- score: number
- time: number
- memory: number
- passedTests?: number
- totalTests?: number
- message?: string
- submittedAt: string
- isLate: boolean
- assignmentSubmissionId?: string
- // Phase 1：作业计时字段
- timeElapsedMs?: number
- isFirstAc?: boolean
+  id: string
+  problem: {
+    id: string
+    title: string
+    problemNumber?: string
+  }
+  userId: string
+  user: {
+    id: string
+    username: string
+    nickname?: string
+  }
+  language: string
+  code: string
+  status: string
+  score: number
+  time: number
+  memory: number
+  passedTests?: number
+  totalTests?: number
+  message?: string
+  submittedAt: string
+  isLate: boolean
+  assignmentSubmissionId?: string
+  // Phase 1：作业计时字段
+  timeElapsedMs?: number
+  isFirstAc?: boolean
 }
 
-export default function AssignmentSubmissionsPage({ params }: { params: Promise<{ id: string; assignmentId: string }> }) {
- const { id: classId, assignmentId } = use(params)
- const router = useRouter()
- const searchParams = useSearchParams()
- const { user } = useUser()
+export default function AssignmentSubmissionsPage({
+  params,
+}: {
+  params: Promise<{ id: string; assignmentId: string }>
+}) {
+  const { id: classId, assignmentId } = use(params)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user } = useUser()
 
- const userIdParam = searchParams.get('userId')
- const problemIdParam = searchParams.get('problemId')
- const statusParam = searchParams.get('status')
+  const userIdParam = searchParams.get('userId')
+  const problemIdParam = searchParams.get('problemId')
+  const statusParam = searchParams.get('status')
 
- const isFromLeaderboard = !!(userIdParam && problemIdParam)
+  const isFromLeaderboard = !!(userIdParam && problemIdParam)
 
- const [submissions, setSubmissions] = useState<Submission[]>([])
- const [assignment, setAssignment] = useState<Assignment | null>(null)
- const [loading, setLoading] = useState(true)
- const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
- const [showCodeModal, setShowCodeModal] = useState(false)
- const [targetUser, setTargetUser] = useState<{ username: string; nickname?: string } | null>(null)
- const [targetProblem, setTargetProblem] = useState<{ title: string; problemNumber?: string } | null>(null)
+  const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [assignment, setAssignment] = useState<Assignment | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
+  const [showCodeModal, setShowCodeModal] = useState(false)
+  const [targetUser, setTargetUser] = useState<{ username: string; nickname?: string } | null>(null)
+  const [targetProblem, setTargetProblem] = useState<{
+    title: string
+    problemNumber?: string
+  } | null>(null)
 
- const [filterUserId, setFilterUserId] = useState(userIdParam || '')
- const [filterProblemId, setFilterProblemId] = useState(problemIdParam || '')
- const [filterStatus, setFilterStatus] = useState(statusParam || '')
+  const [filterUserId, setFilterUserId] = useState(userIdParam || '')
+  const [filterProblemId, setFilterProblemId] = useState(problemIdParam || '')
+  const [filterStatus, setFilterStatus] = useState(statusParam || '')
 
- useEffect(() => {
- const fetchAssignment = async () => {
- try {
- const response = await fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`)
- const data = await response.json()
- if (data.success) {
- setAssignment(data.data?.assignment ?? data.data)
- }
- } catch (error) {
- logger.error('获取作业信息失败', error)
- }
- }
- fetchAssignment()
- }, [classId, assignmentId])
+  useEffect(() => {
+    const fetchAssignment = async () => {
+      try {
+        const response = await fetchWithCookie(
+          `/api/classes/${classId}/assignments/${assignmentId}`
+        )
+        const data = await response.json()
+        if (data.success) {
+          setAssignment(data.data?.assignment ?? data.data)
+        }
+      } catch (error) {
+        logger.error('获取作业信息失败', error)
+      }
+    }
+    fetchAssignment()
+  }, [classId, assignmentId])
 
- const fetchSubmissions = useCallback(async (showLoading = true) => {
- try {
- if (showLoading) setLoading(true)
+  const fetchSubmissions = useCallback(
+    async (showLoading = true) => {
+      try {
+        if (showLoading) setLoading(true)
 
- const params = new URLSearchParams()
- if (filterUserId) params.append('userId', filterUserId)
- if (filterProblemId) params.append('problemId', filterProblemId)
- if (filterStatus) params.append('status', filterStatus)
- params.append('page', '1')
- params.append('pageSize', '50')
+        const params = new URLSearchParams()
+        if (filterUserId) params.append('userId', filterUserId)
+        if (filterProblemId) params.append('problemId', filterProblemId)
+        if (filterStatus) params.append('status', filterStatus)
+        params.append('page', '1')
+        params.append('pageSize', '50')
 
- const response = await fetchWithCookie(
- `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
- { cache: 'no-store' }
- )
- const data = await response.json()
+        const response = await fetchWithCookie(
+          `/api/classes/${classId}/assignments/${assignmentId}/submissions?${params}`,
+          { cache: 'no-store' }
+        )
+        const data = await response.json()
 
- if (data.success) {
- const submissionsList = data.data.submissions || []
- setSubmissions(submissionsList)
+        if (data.success) {
+          const submissionsList = data.data.submissions || []
+          setSubmissions(submissionsList)
 
- if (isFromLeaderboard && submissionsList.length > 0) {
- const firstSubmission = submissionsList[0]
- setTargetUser({
- username: firstSubmission.user.username,
- nickname: firstSubmission.user.nickname
- })
- setTargetProblem({
- title: firstSubmission.problem.title,
- problemNumber: firstSubmission.problem.problemNumber
- })
- }
- }
- } catch (error) {
- logger.error('获取提交记录失败', error)
- } finally {
- if (showLoading) setLoading(false)
- }
- }, [classId, assignmentId, filterUserId, filterProblemId, filterStatus, isFromLeaderboard])
+          if (isFromLeaderboard && submissionsList.length > 0) {
+            const firstSubmission = submissionsList[0]
+            setTargetUser({
+              username: firstSubmission.user.username,
+              nickname: firstSubmission.user.nickname,
+            })
+            setTargetProblem({
+              title: firstSubmission.problem.title,
+              problemNumber: firstSubmission.problem.problemNumber,
+            })
+          }
+        }
+      } catch (error) {
+        logger.error('获取提交记录失败', error)
+      } finally {
+        if (showLoading) setLoading(false)
+      }
+    },
+    [classId, assignmentId, filterUserId, filterProblemId, filterStatus, isFromLeaderboard]
+  )
 
- useDeferredEffect(() => {
- void fetchSubmissions()
- }, [fetchSubmissions])
+  useDeferredEffect(() => {
+    void fetchSubmissions()
+  }, [fetchSubmissions])
 
- // WebSocket：按主 Submission.id 合并列表；重连时整表刷新补上断连窗口
- useSubmissionSocket({
- userId: user?.id || '',
- enabled: !!user,
- onConnected: () => {
- void fetchSubmissions(false)
- },
- onSubmissionUpdate: (data) => {
- if (!data?.id) return
- setSubmissions((prev) => {
- if (!Array.isArray(prev)) return prev
- const idx = prev.findIndex((s) => s?.id === data.id)
- if (idx === -1) return prev
- const next = prev.slice()
- next[idx] = {
- ...next[idx],
- status: data.status,
- score: typeof data.score === 'number' ? data.score : next[idx].score,
- time: typeof data.time === 'number' ? data.time : next[idx].time,
- memory: typeof data.memory === 'number' ? data.memory : next[idx].memory,
- passedTests: typeof data.passedTests === 'number' ? data.passedTests : next[idx].passedTests,
- totalTests: typeof data.totalTests === 'number' ? data.totalTests : next[idx].totalTests,
- message: data.message ?? next[idx].message,
- }
- return next
- })
- },
- })
+  // WebSocket：按主 Submission.id 合并列表；重连时整表刷新补上断连窗口
+  useSubmissionSocket({
+    userId: user?.id || '',
+    enabled: !!user,
+    onConnected: () => {
+      void fetchSubmissions(false)
+    },
+    onSubmissionUpdate: (data) => {
+      if (!data?.id) return
+      setSubmissions((prev) => {
+        if (!Array.isArray(prev)) return prev
+        const idx = prev.findIndex((s) => s?.id === data.id)
+        if (idx === -1) return prev
+        const next = prev.slice()
+        next[idx] = {
+          ...next[idx],
+          status: data.status,
+          score: typeof data.score === 'number' ? data.score : next[idx].score,
+          time: typeof data.time === 'number' ? data.time : next[idx].time,
+          memory: typeof data.memory === 'number' ? data.memory : next[idx].memory,
+          passedTests:
+            typeof data.passedTests === 'number' ? data.passedTests : next[idx].passedTests,
+          totalTests: typeof data.totalTests === 'number' ? data.totalTests : next[idx].totalTests,
+          message: data.message ?? next[idx].message,
+        }
+        return next
+      })
+    },
+  })
 
- const getStatusInfo = (status: string, score: number) => {
- if (isNonFinalSubmissionStatus(status)) {
- return {
- icon: <Clock className="w-5 h-5 animate-pulse" />,
- color: 'text-primary',
- bg: 'bg-primary/10',
- label: status
- }
- }
- switch (status) {
- case 'AC':
- return {
- icon: <CheckCircle className="w-5 h-5" />,
- color: 'text-secondary',
- bg: 'bg-secondary/20',
- label: 'AC'
- }
- case 'WA':
- return {
- icon: <XCircle className="w-5 h-5" />,
- color: 'text-error',
- bg: 'bg-error/20',
- label: 'WA'
- }
- case 'TLE':
- return {
- icon: <Clock className="w-5 h-5" />,
- color: 'text-accent',
- bg: 'bg-accent/20',
- label: 'TLE'
- }
- case 'MLE':
- return {
- icon: <AlertCircle className="w-5 h-5" />,
- color: 'text-accent',
- bg: 'bg-accent/20',
- label: 'MLE'
- }
- case 'RE':
- return {
- icon: <XCircle className="w-5 h-5" />,
- color: 'text-error',
- bg: 'bg-error/20',
- label: 'RE'
- }
- case 'SE':
- return {
- icon: <AlertCircle className="w-5 h-5" />,
- color: 'text-muted-foreground',
- bg: 'bg-muted',
- label: '系统错误'
- }
- case 'removed':
- return {
- icon: <XCircle className="w-5 h-5" />,
- color: 'text-muted-foreground',
- bg: 'bg-muted',
- label: '题目已移除'
- }
- default:
- if (score > 0 && score < 100) {
- return {
- icon: <AlertCircle className="w-5 h-5" />,
- color: 'text-accent',
- bg: 'bg-accent/20',
- label: `${score}分`
- }
- }
- return {
- icon: <XCircle className="w-5 h-5" />,
- color: 'text-muted-foreground',
- bg: 'bg-muted',
- label: status
- }
- }
- }
+  const getStatusInfo = (status: string, score: number) => {
+    if (isNonFinalSubmissionStatus(status)) {
+      return {
+        icon: <Clock className="w-5 h-5 animate-pulse" />,
+        color: 'text-primary',
+        bg: 'bg-primary/10',
+        label: status,
+      }
+    }
+    switch (status) {
+      case 'AC':
+        return {
+          icon: <CheckCircle className="w-5 h-5" />,
+          color: 'text-secondary',
+          bg: 'bg-secondary/20',
+          label: 'AC',
+        }
+      case 'WA':
+        return {
+          icon: <XCircle className="w-5 h-5" />,
+          color: 'text-error',
+          bg: 'bg-error/20',
+          label: 'WA',
+        }
+      case 'TLE':
+        return {
+          icon: <Clock className="w-5 h-5" />,
+          color: 'text-accent',
+          bg: 'bg-accent/20',
+          label: 'TLE',
+        }
+      case 'MLE':
+        return {
+          icon: <AlertCircle className="w-5 h-5" />,
+          color: 'text-accent',
+          bg: 'bg-accent/20',
+          label: 'MLE',
+        }
+      case 'RE':
+        return {
+          icon: <XCircle className="w-5 h-5" />,
+          color: 'text-error',
+          bg: 'bg-error/20',
+          label: 'RE',
+        }
+      case 'SE':
+        return {
+          icon: <AlertCircle className="w-5 h-5" />,
+          color: 'text-muted-foreground',
+          bg: 'bg-muted',
+          label: '系统错误',
+        }
+      case 'removed':
+        return {
+          icon: <XCircle className="w-5 h-5" />,
+          color: 'text-muted-foreground',
+          bg: 'bg-muted',
+          label: '题目已移除',
+        }
+      default:
+        if (score > 0 && score < 100) {
+          return {
+            icon: <AlertCircle className="w-5 h-5" />,
+            color: 'text-accent',
+            bg: 'bg-accent/20',
+            label: `${score}分`,
+          }
+        }
+        return {
+          icon: <XCircle className="w-5 h-5" />,
+          color: 'text-muted-foreground',
+          bg: 'bg-muted',
+          label: status,
+        }
+    }
+  }
 
- const viewCode = (submission: Submission) => {
- setSelectedSubmission(submission)
- setShowCodeModal(true)
- }
+  const viewCode = (submission: Submission) => {
+    setSelectedSubmission(submission)
+    setShowCodeModal(true)
+  }
 
- return (
- <ClassWorkspaceShell
- classId={classId}
- title={assignment?.title ? `${assignment.title} · 提交` : '提交记录'}
- icon={Code}
- >
- <button
- onClick={() => {
- // 返回作业详情页的题目 tab（作业详情页支持 ?tab=problems 或 ?tab=completion）
- // 从完成情况统计跳来时返回 completion，否则返回 problems
- const returnTab = isFromLeaderboard ? 'completion' : 'problems'
- router.push(`/classes/${classId}/assignments/${assignmentId}?tab=${returnTab}`)
- }}
- className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
- >
- <ArrowLeft className="w-4 h-4" />
- 返回作业详情
- </button>
+  return (
+    <ClassWorkspaceShell
+      classId={classId}
+      title={assignment?.title ? `${assignment.title} · 提交` : '提交记录'}
+      icon={Code}
+    >
+      <button
+        onClick={() => {
+          // 返回作业详情页的题目 tab（作业详情页支持 ?tab=problems 或 ?tab=completion）
+          // 从完成情况统计跳来时返回 completion，否则返回 problems
+          const returnTab = isFromLeaderboard ? 'completion' : 'problems'
+          router.push(`/classes/${classId}/assignments/${assignmentId}?tab=${returnTab}`)
+        }}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        返回作业详情
+      </button>
 
- <div className="card p-6 mb-6">
- <h1 className="text-xl md:text-2xl font-bold text-foreground mb-2 hidden sm:block">
- {isFromLeaderboard && targetUser && targetProblem ? (
- `${assignment?.title} - ${targetProblem.title}(${targetProblem.problemNumber}) - ${targetUser.nickname || targetUser.username}的提交记录`
- ) : (
- `${assignment?.title} - 提交记录`
- )}
- </h1>
- <p className="text-muted-foreground text-sm">
- {isFromLeaderboard && targetUser ? (
- `查看 ${targetUser.nickname || targetUser.username} 在 ${targetProblem?.title} 题目上的所有提交`
- ) : (
- '查看作业相关的所有提交记录'
- )}
- </p>
- </div>
+      <div className="card p-5 mb-6">
+        <h2 className="text-xl font-bold text-foreground mb-2">
+          {isFromLeaderboard && targetUser && targetProblem
+            ? `${assignment?.title} - ${targetProblem.title}(${targetProblem.problemNumber}) - ${targetUser.nickname || targetUser.username}的提交记录`
+            : `${assignment?.title} - 提交记录`}
+        </h2>
+        <p className="text-muted-foreground text-sm">
+          {isFromLeaderboard && targetUser
+            ? `查看 ${targetUser.nickname || targetUser.username} 在 ${targetProblem?.title} 题目上的所有提交`
+            : '查看作业相关的所有提交记录'}
+        </p>
+      </div>
 
- {!isFromLeaderboard && (
- <div className="card p-6 mb-6">
- <div className="flex items-center gap-2 mb-4">
- <Filter className="w-5 h-5 text-muted-foreground" />
- <h2 className="text-lg font-semibold text-foreground">筛选条件</h2>
- </div>
- <div className="grid md:grid-cols-3 gap-4">
- <div>
- <label className="block text-sm font-medium text-foreground mb-2">
- 用户ID
- </label>
- <input
- type="text"
- value={filterUserId}
- onChange={(e) => setFilterUserId(e.target.value)}
- placeholder="输入用户ID筛选"
- className="input w-full"
- />
- </div>
- <div>
- <label className="block text-sm font-medium text-foreground mb-2">
- 题目ID
- </label>
- <input
- type="text"
- value={filterProblemId}
- onChange={(e) => setFilterProblemId(e.target.value)}
- placeholder="输入题目ID筛选"
- className="input w-full"
- />
- </div>
- <div>
- <label className="block text-sm font-medium text-foreground mb-2">
- 状态
- </label>
- <select
- value={filterStatus}
- onChange={(e) => setFilterStatus(e.target.value)}
- className="input w-full"
- >
- <option value="">全部状态</option>
- <option value="AC">AC (通过)</option>
- <option value="WA">WA (答案错误)</option>
- <option value="TLE">TLE (超时)</option>
- <option value="MLE">MLE (内存超限)</option>
- <option value="RE">RE (运行错误)</option>
- <option value="SE">SE (系统错误)</option>
- <option value="removed">removed (题目已移除)</option>
- </select>
- </div>
- </div>
- </div>
- )}
+      {!isFromLeaderboard && (
+        <div className="card p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-section-title text-foreground">筛选条件</h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-label text-foreground mb-2">用户ID</label>
+              <input
+                type="text"
+                value={filterUserId}
+                onChange={(e) => setFilterUserId(e.target.value)}
+                placeholder="输入用户ID筛选"
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-label text-foreground mb-2">题目ID</label>
+              <input
+                type="text"
+                value={filterProblemId}
+                onChange={(e) => setFilterProblemId(e.target.value)}
+                placeholder="输入题目ID筛选"
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-label text-foreground mb-2">状态</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="input w-full"
+              >
+                <option value="">全部状态</option>
+                <option value="AC">AC (通过)</option>
+                <option value="WA">WA (答案错误)</option>
+                <option value="TLE">TLE (超时)</option>
+                <option value="MLE">MLE (内存超限)</option>
+                <option value="RE">RE (运行错误)</option>
+                <option value="SE">SE (系统错误)</option>
+                <option value="removed">removed (题目已移除)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
- <div className="card overflow-hidden">
- {loading ? (
- <div className="text-center py-12">
- <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
- <p className="text-muted-foreground">加载中...</p>
- </div>
- ) : submissions.length === 0 ? (
- <div className="text-center py-12 text-muted-foreground">
- 暂无提交记录
- </div>
- ) : (
- <div className="overflow-x-auto">
- <table className="min-w-full divide-y divide-border">
- <thead className="bg-muted">
- <tr>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 提交时间
- </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 用户
- </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 题目
- </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 语言
- </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 状态
- </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 用时
- </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 得分
- </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 时间/内存
- </th>
- <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
- 操作
- </th>
- </tr>
- </thead>
- <tbody className="divide-y divide-border">
- {submissions.map((submission) => {
- const statusInfo = getStatusInfo(submission.status, submission.score)
- return (
- <tr key={submission.id} className="hover:bg-muted">
- <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
- {formatDateTime(submission.submittedAt)}
- {submission.isLate && (
- <span className="ml-2 text-xs text-error">(逾期)</span>
- )}
- </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
- {submission.user.nickname || submission.user.username}
- </td>
- <td className="px-6 py-4 text-sm text-foreground">
- <div>
- <div className="font-medium">{submission.problem.title}</div>
- {submission.problem.problemNumber && (
- <div className="text-xs text-muted-foreground">
- {submission.problem.problemNumber}
- </div>
- )}
- </div>
- </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
- {submission.language}
- </td>
- <td className="px-6 py-4 whitespace-nowrap">
- <div className={`flex items-center gap-2 ${statusInfo.color}`}>
- {statusInfo.icon}
- <span className="font-medium">{statusInfo.label}</span>
- </div>
- </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
- {submission.isFirstAc && submission.timeElapsedMs ? (
- <span className="inline-flex items-center gap-1 text-secondary">
- <Clock className="w-3 h-3" />
- {formatDurationMs(submission.timeElapsedMs)}
- </span>
- ) : (
- <span className="text-muted-foreground/60">—</span>
- )}
- </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm">
- <span className={`px-2 py-1 rounded text-sm font-medium ${
- submission.score === 100
- ? 'bg-secondary/20 text-secondary'
- : submission.score > 0
- ? 'bg-accent/20 text-accent'
- : 'bg-muted text-muted-foreground'
- }`}>
- {submission.score}
- </span>
- </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
- <div>{formatTime(submission.time ?? 0)}</div>
- <div className="text-xs text-muted-foreground">{formatMemory(submission.memory ?? 0)}</div>
- </td>
- <td className="px-6 py-4 whitespace-nowrap text-sm">
- <button
- onClick={() => viewCode(submission)}
- className="flex items-center gap-1 text-primary hover:text-primary-light font-medium"
- >
- <Code className="w-4 h-4" />
- 查看代码
- </button>
- </td>
- </tr>
- )
- })}
- </tbody>
- </table>
- </div>
- )}
- </div>
+      <div className="card overflow-hidden">
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">加载中...</p>
+          </div>
+        ) : submissions.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">暂无提交记录</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table min-w-full divide-y divide-border">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left">提交时间</th>
+                  <th className="text-left">用户</th>
+                  <th className="text-left">题目</th>
+                  <th className="text-left">语言</th>
+                  <th className="text-left">状态</th>
+                  <th className="text-left">用时</th>
+                  <th className="text-left">得分</th>
+                  <th className="text-left">时间/内存</th>
+                  <th className="text-left">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {submissions.map((submission) => {
+                  const statusInfo = getStatusInfo(submission.status, submission.score)
+                  return (
+                    <tr key={submission.id} className="hover:bg-muted">
+                      <td className="whitespace-nowrap text-sm text-foreground">
+                        {formatDateTime(submission.submittedAt)}
+                        {submission.isLate && (
+                          <span className="ml-2 text-xs text-error">(逾期)</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap text-sm text-foreground">
+                        {submission.user.nickname || submission.user.username}
+                      </td>
+                      <td className="text-sm text-foreground">
+                        <div>
+                          <div className="font-medium">{submission.problem.title}</div>
+                          {submission.problem.problemNumber && (
+                            <div className="text-xs text-muted-foreground">
+                              {submission.problem.problemNumber}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap text-sm text-foreground">
+                        {submission.language}
+                      </td>
+                      <td className="whitespace-nowrap">
+                        <div className={`flex items-center gap-2 ${statusInfo.color}`}>
+                          {statusInfo.icon}
+                          <span className="font-medium">{statusInfo.label}</span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap text-sm text-foreground">
+                        {submission.isFirstAc && submission.timeElapsedMs ? (
+                          <span className="inline-flex items-center gap-1 text-secondary">
+                            <Clock className="w-3 h-3" />
+                            {formatDurationMs(submission.timeElapsedMs)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/60">—</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap text-sm">
+                        <span
+                          className={`px-2 py-1 rounded text-label ${
+                            submission.score === 100
+                              ? 'bg-secondary/20 text-secondary'
+                              : submission.score > 0
+                                ? 'bg-accent/20 text-accent'
+                                : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {submission.score}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap text-sm text-foreground">
+                        <div>{formatTime(submission.time ?? 0)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatMemory(submission.memory ?? 0)}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => viewCode(submission)}
+                          className="flex items-center gap-1 text-primary hover:text-primary-light font-medium"
+                        >
+                          <Code className="w-4 h-4" />
+                          查看代码
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
- {showCodeModal && selectedSubmission && (
- <CreateModalShell
- open
- onClose={() => setShowCodeModal(false)}
- title="提交代码"
- icon={Code}
- labelledById="assignment-submission-code-modal"
- maxWidthClass="max-w-4xl"
- >
- <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
- <div className="text-sm text-muted-foreground space-y-1">
- <div>题目：{selectedSubmission.problem.title}</div>
- <div>用户：{selectedSubmission.user.nickname || selectedSubmission.user.username}</div>
- <div>语言：{selectedSubmission.language}</div>
- <div>状态：{getStatusInfo(selectedSubmission.status, selectedSubmission.score).label}</div>
- <div>得分：{selectedSubmission.score} / 100</div>
- </div>
- <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
- <code className="text-sm text-foreground">{selectedSubmission.code}</code>
- </pre>
- </div>
- </CreateModalShell>
- )}
- </ClassWorkspaceShell>
- )
+      {showCodeModal && selectedSubmission && (
+        <CreateModalShell
+          open
+          onClose={() => setShowCodeModal(false)}
+          title="提交代码"
+          icon={Code}
+          labelledById="assignment-submission-code-modal"
+          maxWidthClass="max-w-4xl"
+        >
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
+            <div className="text-sm text-muted-foreground space-y-1">
+              <div>题目：{selectedSubmission.problem.title}</div>
+              <div>
+                用户：{selectedSubmission.user.nickname || selectedSubmission.user.username}
+              </div>
+              <div>语言：{selectedSubmission.language}</div>
+              <div>
+                状态：{getStatusInfo(selectedSubmission.status, selectedSubmission.score).label}
+              </div>
+              <div>得分：{selectedSubmission.score} / 100</div>
+            </div>
+            <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
+              <code className="text-sm text-foreground">{selectedSubmission.code}</code>
+            </pre>
+          </div>
+        </CreateModalShell>
+      )}
+    </ClassWorkspaceShell>
+  )
 }

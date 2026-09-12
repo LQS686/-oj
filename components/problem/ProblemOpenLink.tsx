@@ -33,9 +33,7 @@ export default function ProblemOpenLink({
     <Link
       href={href}
       title={docTitle}
-      {...(openInNewTab
-        ? { target: '_blank' as const, rel: 'noopener noreferrer' }
-        : {})}
+      {...(openInNewTab ? { target: '_blank' as const, rel: 'noopener noreferrer' } : {})}
       {...rest}
     >
       {children}

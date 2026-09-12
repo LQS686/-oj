@@ -56,10 +56,7 @@ export interface SolutionViewUser {
  *
  * @returns 最高分（0 表示无提交或全为 0 分）
  */
-export async function getUserBestScore(
-  userId: string,
-  problemId: string
-): Promise<number> {
+export async function getUserBestScore(userId: string, problemId: string): Promise<number> {
   if (!userId || !problemId) {
     return 0
   }
@@ -67,7 +64,7 @@ export async function getUserBestScore(
   const submission = await prisma.submission.findFirst({
     where: { userId, problemId },
     orderBy: { score: 'desc' },
-    select: { score: true }
+    select: { score: true },
   })
 
   return submission?.score ?? 0
@@ -129,7 +126,7 @@ export async function decideSolutionView(
     return {
       allowed: true,
       reason: 'ADMIN',
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 
@@ -138,7 +135,7 @@ export async function decideSolutionView(
     return {
       allowed: false,
       reason: 'ASSIGNMENT_CONTEXT',
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 
@@ -147,7 +144,7 @@ export async function decideSolutionView(
     return {
       allowed: false,
       reason: 'CONTEST_CONTEXT',
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 
@@ -157,7 +154,7 @@ export async function decideSolutionView(
       allowed: false,
       reason: 'NO_SUBMISSION',
       bestScore: 0,
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 
@@ -167,7 +164,7 @@ export async function decideSolutionView(
       allowed: false,
       reason: bestScore === 0 ? 'NO_SUBMISSION' : 'LOW_SCORE',
       bestScore,
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 
@@ -175,7 +172,7 @@ export async function decideSolutionView(
     allowed: true,
     reason: 'ENOUGH_SCORE',
     bestScore,
-    requiredScore: REQUIRED_SOLUTION_SCORE
+    requiredScore: REQUIRED_SOLUTION_SCORE,
   }
 }
 
@@ -192,7 +189,7 @@ export async function canViewSolutions(
     return {
       allowed: true,
       reason: 'ADMIN',
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 
@@ -201,14 +198,14 @@ export async function canViewSolutions(
     return {
       allowed: false,
       reason: 'ASSIGNMENT_CONTEXT',
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
   if (options.isContestContext === true) {
     return {
       allowed: false,
       reason: 'CONTEST_CONTEXT',
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 
@@ -218,7 +215,7 @@ export async function canViewSolutions(
       allowed: false,
       reason: 'NO_SUBMISSION',
       bestScore: 0,
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 
@@ -229,7 +226,7 @@ export async function canViewSolutions(
     return {
       allowed: true,
       reason: 'ENOUGH_SCORE',
-      requiredScore: REQUIRED_SOLUTION_SCORE
+      requiredScore: REQUIRED_SOLUTION_SCORE,
     }
   }
 

@@ -13,9 +13,9 @@ services:
     # 默认仅绑定本机回环，避免 0.0.0.0 直接暴露应用端口；生产应经反向代理。
     # 需要外部访问时设 APP_HOST_BIND=0.0.0.0
     ports:
-      - "${APP_HOST_BIND:-127.0.0.1}:${APP_HOST_PORT:-3000}:3000"
+      - '${APP_HOST_BIND:-127.0.0.1}:${APP_HOST_PORT:-3000}:3000'
     expose:
-      - "3000"
+      - '3000'
     # .env 中 JUDGE_* / LOG_LEVEL / TRUSTED_PROXIES 等一并注入；下方 environment 覆盖敏感与必填项
     env_file:
       - .env
@@ -43,7 +43,7 @@ services:
     # 若上调 JUDGE_MAX_CONCURRENT 或题目 memoryLimit 较大，需同步调大 app 内存上限；
     # 评测内存门控（lib/judge/memory-gate.ts）会在宿主/容器内存压力过大时自动暂停派发防 OOM。
     mem_limit: 2.0g
-    cpus: "3"
+    cpus: '3'
     pids_limit: 512
     networks:
       - oj-network
@@ -58,10 +58,10 @@ services:
       - app_uploads:/app/public/uploads
       - app_testdata:/app/data/testdata
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "5"
+        max-size: '10m'
+        max-file: '5'
     healthcheck:
       # P0 修复（2026-07）：改用静态页面 /healthcheck-static 替代 /api/health
       #   之前用 /api/health 反复失败：
@@ -75,12 +75,12 @@ services:
       #     - 容器编排层真正判断"进程还活着"
       test:
         [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:3000/healthcheck-static",
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:3000/healthcheck-static',
         ]
       interval: 30s
       timeout: 10s
@@ -94,7 +94,7 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:?err}
       - MONGO_APP_USER=${MONGO_APP_USER:-ojuser}
       - MONGO_APP_PASSWORD=${MONGO_APP_PASSWORD:?err}
-    entrypoint: ["/bin/bash", "/scripts/mongo-init.sh"]
+    entrypoint: ['/bin/bash', '/scripts/mongo-init.sh']
     command: --replSet rs0 --bind_ip_all --auth --keyFile /etc/mongo/keyfile
     restart: always
     mem_limit: 1g
@@ -109,15 +109,15 @@ services:
       # 部署脚本会在首次运行时生成 ./mongo-keyfile
       - ./mongo-keyfile:/tmp/mongo-keyfile:ro
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "5"
+        max-size: '10m'
+        max-file: '5'
     healthcheck:
       # 启用 --auth 后无凭证 ping 常失败；且须要求 PRIMARY（仅 ping 在未 initiate 时也可能成功）
       test:
         [
-          "CMD-SHELL",
+          'CMD-SHELL',
           'mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.hello().isWritablePrimary" | grep -q true',
         ]
       interval: 10s
@@ -137,19 +137,13 @@ services:
     volumes:
       - redis_data:/data
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "5"
+        max-size: '10m'
+        max-file: '5'
     healthcheck:
       # 密码走环境变量，避免出现在 docker inspect / ps 命令行参数中
-      test:
-        [
-          "CMD",
-          "sh",
-          "-c",
-          'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG',
-        ]
+      test: ['CMD', 'sh', '-c', 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
       interval: 30s
       timeout: 10s
       retries: 3

@@ -31,16 +31,14 @@ export function ObjectiveQuestionFilterBar({
       <div className="flex flex-wrap items-end gap-4 w-full">
         {/* 1. 关键词搜索（题号 / 题干） */}
         <div className="flex-1 min-w-[220px]">
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            搜索
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">搜索</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="搜索题号 / 题干..."
               value={filters.keyword}
-              onChange={e => onFiltersChange({ keyword: e.target.value })}
+              onChange={(e) => onFiltersChange({ keyword: e.target.value })}
               className="input pl-9 py-2 text-sm w-full"
             />
           </div>
@@ -48,12 +46,10 @@ export function ObjectiveQuestionFilterBar({
 
         {/* 2. 题型下拉 */}
         <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            题型
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">题型</label>
           <select
             value={filters.type}
-            onChange={e =>
+            onChange={(e) =>
               onFiltersChange({
                 type: e.target.value as ObjectiveQuestionFilters['type'],
               })
@@ -61,7 +57,7 @@ export function ObjectiveQuestionFilterBar({
             className="input py-2 text-sm min-w-[8rem]"
           >
             <option value="all">全部题型</option>
-            {OBJECTIVE_QUESTION_TYPES.map(t => (
+            {OBJECTIVE_QUESTION_TYPES.map((t) => (
               <option key={t} value={t}>
                 {OBJECTIVE_QUESTION_TYPE_LABELS[t]}
               </option>
@@ -71,12 +67,10 @@ export function ObjectiveQuestionFilterBar({
 
         {/* 3. 难度下拉 */}
         <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            难度
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">难度</label>
           <select
             value={filters.difficulty}
-            onChange={e =>
+            onChange={(e) =>
               onFiltersChange({
                 difficulty: e.target.value as ObjectiveQuestionFilters['difficulty'],
               })
@@ -84,7 +78,7 @@ export function ObjectiveQuestionFilterBar({
             className="input py-2 text-sm min-w-[7rem]"
           >
             <option value="all">全部难度</option>
-            {OBJECTIVE_DIFFICULTIES.map(d => (
+            {OBJECTIVE_DIFFICULTIES.map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>

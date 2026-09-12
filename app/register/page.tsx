@@ -58,10 +58,12 @@ export default function RegisterPage() {
     e.preventDefault()
     setError('')
 
-    if (!isSelfRegistrationOpen({
-      allowRegistration: settings.allowRegistration,
-      needsBootstrap,
-    })) {
+    if (
+      !isSelfRegistrationOpen({
+        allowRegistration: settings.allowRegistration,
+        needsBootstrap,
+      })
+    ) {
       setError('系统已关闭注册功能')
       return
     }
@@ -84,9 +86,20 @@ export default function RegisterPage() {
       return
     }
     if (
-      ['12345678', 'password', '123456789', '1234567890', 'qwerty', 'abc123', '111111', '1234567', '12345', '123456', 'password1', 'qwerty123'].includes(
-        formData.password.toLowerCase()
-      )
+      [
+        '12345678',
+        'password',
+        '123456789',
+        '1234567890',
+        'qwerty',
+        'abc123',
+        '111111',
+        '1234567',
+        '12345',
+        '123456',
+        'password1',
+        'qwerty123',
+      ].includes(formData.password.toLowerCase())
     ) {
       setError('密码过于简单，请使用更强的密码')
       return
@@ -138,7 +151,7 @@ export default function RegisterPage() {
             : '加入我们，开启编程之旅'
       }
     >
-      <div className="card-static rounded-lg p-6 md:p-10 shadow-2xl transition-all duration-300 animate-modal-in">
+      <div className="card-static p-5 md:p-8 shadow-2xl transition-all duration-300 animate-modal-in">
         {settingsLoading ? (
           <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
             <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-icon-spin" />
@@ -151,7 +164,7 @@ export default function RegisterPage() {
                 <Ban className="w-6 h-6 text-muted-foreground" />
               </div>
               <div>
-                <h2 className="text-2xl font-extrabold text-foreground">暂不开放注册</h2>
+                <h1 className="text-page-title text-foreground">暂不开放注册</h1>
                 <p className="text-sm text-muted-foreground">管理员已关闭新用户注册</p>
               </div>
             </div>
@@ -162,7 +175,10 @@ export default function RegisterPage() {
               前往登录
             </Link>
             <div className="mt-6 text-center">
-              <Link href="/" className="text-sm text-muted-foreground hover:text-primary-light transition-colors">
+              <Link
+                href="/"
+                className="text-sm text-muted-foreground hover:text-primary-light transition-colors"
+              >
                 返回首页
               </Link>
             </div>
@@ -174,9 +190,9 @@ export default function RegisterPage() {
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-extrabold text-foreground">
+                <h1 className="text-page-title text-foreground">
                   {needsBootstrap ? '创建管理员账号' : '注册账号'}
-                </h2>
+                </h1>
                 <p className="text-sm text-muted-foreground">
                   {needsBootstrap ? '首个注册用户将自动成为系统管理员' : '创建你的账号'}
                 </p>
@@ -190,9 +206,9 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label htmlFor="reg-username" className="block text-sm font-semibold text-foreground mb-2.5">
+                <label htmlFor="reg-username" className="block text-label text-foreground mb-2.5">
                   用户名 <span className="text-error">*</span>
                 </label>
                 <div className="relative">
@@ -212,7 +228,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label htmlFor="reg-email" className="block text-sm font-semibold text-foreground mb-2.5">
+                <label htmlFor="reg-email" className="block text-label text-foreground mb-2.5">
                   邮箱 <span className="text-error">*</span>
                 </label>
                 <div className="relative">
@@ -230,7 +246,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label htmlFor="reg-nickname" className="block text-sm font-semibold text-foreground mb-2.5">
+                <label htmlFor="reg-nickname" className="block text-label text-foreground mb-2.5">
                   昵称（可选）
                 </label>
                 <div className="relative">
@@ -247,7 +263,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label htmlFor="reg-password" className="block text-sm font-semibold text-foreground mb-2.5">
+                <label htmlFor="reg-password" className="block text-label text-foreground mb-2.5">
                   密码 <span className="text-error">*</span>
                 </label>
                 <div className="relative">
@@ -288,7 +304,10 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label htmlFor="reg-confirm-password" className="block text-sm font-semibold text-foreground mb-2.5">
+                <label
+                  htmlFor="reg-confirm-password"
+                  className="block text-label text-foreground mb-2.5"
+                >
                   确认密码 <span className="text-error">*</span>
                 </label>
                 <div className="relative">
@@ -308,7 +327,11 @@ export default function RegisterPage() {
                     aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all duration-200 hover:scale-110"
                   >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
                 {formData.confirmPassword && (
@@ -350,14 +373,19 @@ export default function RegisterPage() {
                     注册中...
                   </>
                 ) : (
-                  <span className="transition-transform duration-200 group-hover:scale-105">注册</span>
+                  <span className="transition-transform duration-200 group-hover:scale-105">
+                    注册
+                  </span>
                 )}
               </button>
             </form>
 
             <div className="mt-8 text-center">
               <span className="text-muted-foreground">已有账号？</span>
-              <Link href="/login" className="text-primary-light hover:text-primary font-bold ml-1.5 transition-colors duration-200 group">
+              <Link
+                href="/login"
+                className="text-primary-light hover:text-primary font-bold ml-1.5 transition-colors duration-200 group"
+              >
                 <span className="group-hover:underline">立即登录</span>
               </Link>
             </div>

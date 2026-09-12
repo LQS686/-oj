@@ -54,9 +54,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     throw400('VALIDATION', '不支持的语言')
   }
   const contestId =
-    typeof body.contestId === 'string' && body.contestId.trim()
-      ? body.contestId.trim()
-      : undefined
+    typeof body.contestId === 'string' && body.contestId.trim() ? body.contestId.trim() : undefined
 
   // 题目 ID 可能是 MongoDB ObjectId（24 字符 hex）或 problemNumber（如 "P1001"）
   // 直接对非 ObjectId 字符串调用 findUnique({ where: { id } }) 会触发
@@ -131,8 +129,12 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
     testCases = safeProblem.samples
       .filter(
         (s): s is { input: string; output: string } =>
-          s != null && typeof s === 'object' && 'input' in s && 'output' in s
-          && typeof s.input === 'string' && typeof s.output === 'string'
+          s != null &&
+          typeof s === 'object' &&
+          'input' in s &&
+          'output' in s &&
+          typeof s.input === 'string' &&
+          typeof s.output === 'string'
       )
       .map((s, idx) => ({
         id: `problem-sample-${idx}`,

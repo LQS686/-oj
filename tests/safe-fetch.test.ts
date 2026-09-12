@@ -191,9 +191,7 @@ describe('safeFetch - SSRF 防护', () => {
     }
     mockHttpRequest.mockImplementation(noResponseImpl)
     mockHttpsRequest.mockImplementation(noResponseImpl)
-    await expect(
-      safeFetch('https://api.example.com/x', { timeoutMs: 50 })
-    ).rejects.toThrow()
+    await expect(safeFetch('https://api.example.com/x', { timeoutMs: 50 })).rejects.toThrow()
   })
 
   it('应支持 AbortSignal', async () => {

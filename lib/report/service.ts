@@ -85,7 +85,13 @@ export interface ReportFilter {
 export async function listReports(
   filter: ReportFilter = {},
   options: ListOptions = {}
-): Promise<PaginatedResult<Prisma.ContentReportGetPayload<{ include: { reporter: { select: { id: true; username: true; nickname: true } } } }>>> {
+): Promise<
+  PaginatedResult<
+    Prisma.ContentReportGetPayload<{
+      include: { reporter: { select: { id: true; username: true; nickname: true } } }
+    }>
+  >
+> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
   const where: Prisma.ContentReportWhereInput = {}

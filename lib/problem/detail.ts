@@ -66,8 +66,7 @@ export async function getProblemDetailData(
   // 优先用实时聚合（已按封榜截断）；无数据时回退 denormalized
   const totalSubmissions = liveTotal > 0 ? liveTotal : p.totalSubmit
   const acCount = liveTotal > 0 ? liveAc : p.totalAccepted
-  const acRate =
-    totalSubmissions > 0 ? Math.round((acCount / totalSubmissions) * 100) : 0
+  const acRate = totalSubmissions > 0 ? Math.round((acCount / totalSubmissions) * 100) : 0
 
   return {
     id: p.id,

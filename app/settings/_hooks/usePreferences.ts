@@ -69,9 +69,7 @@ export function usePreferences({ enabled, showMessage }: UsePreferencesOptions) 
       })
       const data = await response.json()
       if (data.success) {
-        const next = data.data
-          ? normalizePreferences(data.data)
-          : preferences
+        const next = data.data ? normalizePreferences(data.data) : preferences
         setPreferences(next)
         persistDefaultCodeLanguage(next.defaultCodeLanguage)
         showMessage('success', '偏好已保存')

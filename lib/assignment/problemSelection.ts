@@ -65,7 +65,11 @@ export function addProblemsByNumbers(
   return { ids, notFound, added }
 }
 
-export function toggleProblemInOrder(orderedIds: string[], problemId: string, selected: boolean): string[] {
+export function toggleProblemInOrder(
+  orderedIds: string[],
+  problemId: string,
+  selected: boolean
+): string[] {
   if (selected) {
     if (orderedIds.includes(problemId)) return orderedIds
     return [...orderedIds, problemId]
@@ -73,7 +77,11 @@ export function toggleProblemInOrder(orderedIds: string[], problemId: string, se
   return orderedIds.filter((id) => id !== problemId)
 }
 
-export function moveProblemInOrder(orderedIds: string[], index: number, direction: 'up' | 'down'): string[] {
+export function moveProblemInOrder(
+  orderedIds: string[],
+  index: number,
+  direction: 'up' | 'down'
+): string[] {
   const next = [...orderedIds]
   const j = direction === 'up' ? index - 1 : index + 1
   if (j < 0 || j >= next.length) return orderedIds

@@ -22,13 +22,7 @@ import {
   resolveFailFastMode,
   shouldFailFast,
 } from './pool'
-import {
-  compileSpj,
-  cleanupSpj,
-  runSpj,
-  ensureUserOutputFile,
-  isSpecialJudgeMode,
-} from './spj'
+import { compileSpj, cleanupSpj, runSpj, ensureUserOutputFile, isSpecialJudgeMode } from './spj'
 
 // 评测进度 DB 持久化节流：评测中定期把已完成测点数写入 Submission.passedTests，
 // 使刷新页面/轮询兜底能读到真实进度（而非恒为 0）。
@@ -48,24 +42,26 @@ function persistJudgeProgressThrottled(
   if (passedTests >= totalTests && totalTests > 0) {
     progressDbThrottle.delete(submissionId) // 终态后不再需要节流状态
   }
-  void import('@/lib/mongodb-direct').then(({ updateSubmissionDirect }) =>
-    updateSubmissionDirect(
-      submissionId,
-      { passedTests, totalTests },
-      {
-        onlyFromStatuses: [
-          SubmissionStatus.PENDING,
-          SubmissionStatus.JUDGING,
-          SubmissionStatus.RUNNING,
-        ],
-      }
+  void import('@/lib/mongodb-direct')
+    .then(({ updateSubmissionDirect }) =>
+      updateSubmissionDirect(
+        submissionId,
+        { passedTests, totalTests },
+        {
+          onlyFromStatuses: [
+            SubmissionStatus.PENDING,
+            SubmissionStatus.JUDGING,
+            SubmissionStatus.RUNNING,
+          ],
+        }
+      )
     )
-  ).catch((err) => {
-    logger.warn('持久化评测进度失败', {
-      submissionId,
-      error: err instanceof Error ? err.message : String(err),
+    .catch((err) => {
+      logger.warn('持久化评测进度失败', {
+        submissionId,
+        error: err instanceof Error ? err.message : String(err),
+      })
     })
-  })
 }
 
 type CaseVerdict = {
@@ -84,7 +80,11 @@ type CaseVerdict = {
  * 每段先 trim + 截断到 maxLenPerSegment，再过滤空串，最后用 sep 连接。
  * 避免单段过长遮蔽其他段信息（如编译 stderr 过长掩盖编译状态标签）。
  */
-function mergeNonEmptyStrings(parts: Array<string | undefined | null>, sep = '\n', maxLenPerSegment = 2000): string {
+function mergeNonEmptyStrings(
+  parts: Array<string | undefined | null>,
+  sep = '\n',
+  maxLenPerSegment = 2000
+): string {
   const valid = parts
     .map((p) => (typeof p === 'string' ? p.trim() : ''))
     .map((p) => (p.length > maxLenPerSegment ? p.slice(0, maxLenPerSegment) : p))
@@ -112,7 +112,10 @@ function mergeNonEmptyStrings(parts: Array<string | undefined | null>, sep = '\n
  *
  * 项目约束：错误消息中 stderr 截断到 2000 字符（项目硬约束）
  */
-function formatRuntimeErrorMessage(executorError: string | undefined, programOutput: string): string {
+function formatRuntimeErrorMessage(
+  executorError: string | undefined,
+  programOutput: string
+): string {
   // 合并 executor 错误与程序输出（UBSan 可能输出到 stdout 而非 stderr）
   const combined = [executorError, programOutput].filter(Boolean).join('\n')
   if (!combined) return '运行时错误'
@@ -180,17 +183,29 @@ async function runOnce(
   tcMemoryLimit: number,
   files: { inputPath: string; expectedPath: string; expectedBytes: number },
   signal?: AbortSignal,
-  spjPath?: string | null,
-): Promise<{ status: ResultState; score: number; time: number; memory: number; message: string; outputCorrect: boolean; exceedsTimeLimit: boolean; aborted?: boolean }> {
+  spjPath?: string | null
+): Promise<{
+  status: ResultState
+  score: number
+  time: number
+  memory: number
+  message: string
+  outputCorrect: boolean
+  exceedsTimeLimit: boolean
+  aborted?: boolean
+}> {
   if (signal?.aborted) {
     return {
       status: 'SE',
       score: 0,
       time: 0,
       memory: 0,
-      message: typeof signal.reason === 'string' && signal.reason !== 'fail-fast'
-        ? (signal.reason === 'job-aborted' ? '评测已中止' : signal.reason)
-        : '已跳过（前面测点已失败）',
+      message:
+        typeof signal.reason === 'string' && signal.reason !== 'fail-fast'
+          ? signal.reason === 'job-aborted'
+            ? '评测已中止'
+            : signal.reason
+          : '已跳过（前面测点已失败）',
       outputCorrect: false,
       exceedsTimeLimit: false,
       aborted: true,
@@ -216,9 +231,12 @@ async function runOnce(
         score: 0,
         time: 0,
         memory: 0,
-        message: typeof signal?.reason === 'string' && signal.reason !== 'fail-fast'
-          ? (signal.reason === 'job-aborted' ? '评测已中止' : signal.reason)
-          : '已跳过（前面测点已失败）',
+        message:
+          typeof signal?.reason === 'string' && signal.reason !== 'fail-fast'
+            ? signal.reason === 'job-aborted'
+              ? '评测已中止'
+              : signal.reason
+            : '已跳过（前面测点已失败）',
         outputCorrect: false,
         exceedsTimeLimit: false,
         aborted: true,
@@ -226,21 +244,61 @@ async function runOnce(
     }
     // 细粒度状态判定
     if (executeResult.cannotStart) {
-      return { status: 'CSP', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '无法启动程序', outputCorrect: false, exceedsTimeLimit: false }
+      return {
+        status: 'CSP',
+        score: 0,
+        time: executeResult.time,
+        memory: executeResult.memory,
+        message: executeResult.error || '无法启动程序',
+        outputCorrect: false,
+        exceedsTimeLimit: false,
+      }
     }
     if (executeResult.timeout) {
       const tleMsg = executeResult.error || '超出时间限制'
-      return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: tleMsg, outputCorrect: false, exceedsTimeLimit: false }
+      return {
+        status: 'TLE',
+        score: 0,
+        time: executeResult.time,
+        memory: executeResult.memory,
+        message: tleMsg,
+        outputCorrect: false,
+        exceedsTimeLimit: false,
+      }
     }
     if (executeResult.outputLimitExceeded) {
-      return { status: 'OLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '超出输出限制', outputCorrect: false, exceedsTimeLimit: false }
+      return {
+        status: 'OLE',
+        score: 0,
+        time: executeResult.time,
+        memory: executeResult.memory,
+        message: executeResult.error || '超出输出限制',
+        outputCorrect: false,
+        exceedsTimeLimit: false,
+      }
     }
     if (executeResult.memoryExceeded) {
-      return { status: 'MLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: executeResult.error || '超出内存限制', outputCorrect: false, exceedsTimeLimit: false }
+      return {
+        status: 'MLE',
+        score: 0,
+        time: executeResult.time,
+        memory: executeResult.memory,
+        message: executeResult.error || '超出内存限制',
+        outputCorrect: false,
+        exceedsTimeLimit: false,
+      }
     }
     if (executeResult.runtimeError) {
       const reMsg = formatRuntimeErrorMessage(executeResult.error, executeResult.output)
-      return { status: 'RE', score: 0, time: executeResult.time, memory: executeResult.memory, message: reMsg, outputCorrect: false, exceedsTimeLimit: false }
+      return {
+        status: 'RE',
+        score: 0,
+        time: executeResult.time,
+        memory: executeResult.memory,
+        message: reMsg,
+        outputCorrect: false,
+        exceedsTimeLimit: false,
+      }
     }
 
     // 文件对文件流式比对 / Special Judge
@@ -254,7 +312,7 @@ async function runOnce(
         const outFile = await ensureUserOutputFile(
           executeResult.artifacts?.outputPath,
           executeResult.artifacts?.outputPath ? undefined : executeResult.output,
-          join(process.cwd(), 'temp', 'judge'),
+          join(process.cwd(), 'temp', 'judge')
         )
         if (outFile.ephemeral) ephemeralUserOut = outFile.path
         compareResult = await runSpj({
@@ -290,7 +348,15 @@ async function runOnce(
     const outputCorrect = compareResult.score > 0
 
     if (executeResult.exceedsTimeLimit) {
-      return { status: 'TLE', score: 0, time: executeResult.time, memory: executeResult.memory, message: '超出时间限制', outputCorrect, exceedsTimeLimit: true }
+      return {
+        status: 'TLE',
+        score: 0,
+        time: executeResult.time,
+        memory: executeResult.memory,
+        message: '超出时间限制',
+        outputCorrect,
+        exceedsTimeLimit: true,
+      }
     }
 
     return {
@@ -314,7 +380,7 @@ async function judgeOneCaseWithFiles(
   compiledPath: string,
   files: NonNullable<Awaited<ReturnType<typeof materializeTestCaseToDisk>>>,
   signal?: AbortSignal,
-  spjPath?: string | null,
+  spjPath?: string | null
 ): Promise<CaseVerdict> {
   try {
     const tcTimeLimit = testCase.timeLimit ?? job.timeLimit
@@ -328,7 +394,7 @@ async function judgeOneCaseWithFiles(
       tcMemoryLimit,
       files,
       signal,
-      spjPath,
+      spjPath
     )
 
     if (verdict.aborted) {
@@ -357,7 +423,7 @@ async function judgeOneCaseWithFiles(
         tcMemoryLimit,
         files,
         signal,
-        spjPath,
+        spjPath
       )
       if (verdict.aborted) {
         return {
@@ -416,7 +482,7 @@ async function judgeOneCaseWithFiles(
 // 执行评测
 export async function executeJudge(
   job: JudgeJob,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal }
 ): Promise<JudgeResult> {
   // B-P2-12：评测开始即清理上一次残留的节流条目（幂等），
   // 覆盖「上轮 fail-fast / 异常 / 中止」未能走到删除分支的泄漏场景
@@ -484,7 +550,10 @@ export async function executeJudge(
     compileResult = await compileCode(job.code, job.language)
 
     if (!compileResult.success) {
-      logger.warn(`编译失败`, { compileState: compileResult.compileState, stderr: compileResult.stderr })
+      logger.warn(`编译失败`, {
+        compileState: compileResult.compileState,
+        stderr: compileResult.stderr,
+      })
       const compileState = compileResult.compileState
       const stateLabel = COMPILE_STATE_MESSAGES[compileState] || ''
       const detail = compileResult.error || '编译错误'
@@ -596,17 +665,39 @@ export async function executeJudge(
     const skippedMessage = () =>
       abortReasonMessage(
         caseSignal.reason,
-        failFastMode === 'off' ? '评测已中止' : '已跳过（前面测点已失败）',
+        failFastMode === 'off' ? '评测已中止' : '已跳过（前面测点已失败）'
       )
 
     try {
-      const caseVerdicts = await mapPool(
-        job.testCases,
-        cfgConcurrency,
-        async (testCase, index) => {
-          logger.debug(`测试用例`, { index: index + 1, total: job.testCases.length })
+      const caseVerdicts = await mapPool(job.testCases, cfgConcurrency, async (testCase, index) => {
+        logger.debug(`测试用例`, { index: index + 1, total: job.testCases.length })
 
+        if (caseSignal.aborted) {
+          finishedCount++
+          emitJudgeProgress(job.userId, {
+            submissionId: job.submissionId,
+            currentTest: finishedCount,
+            totalTests: job.testCases.length,
+            status: 'JUDGING',
+          })
+          persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
+          return {
+            testId: testCase.id,
+            status: 'SE' as const,
+            score: 0,
+            time: 0,
+            memory: 0,
+            message: skippedMessage(),
+            skipped: true,
+          }
+        }
+
+        let heldLarge = false
+        try {
+          // 先落盘以得知真实体积，再决定是否占用大测点槽位
+          const files = await materializeTestCaseToDisk(testCase.id)
           if (caseSignal.aborted) {
+            if (files) await cleanupMaterializedTestCase(files)
             finishedCount++
             emitJudgeProgress(job.userId, {
               submissionId: job.submissionId,
@@ -626,12 +717,11 @@ export async function executeJudge(
             }
           }
 
-          let heldLarge = false
-          try {
-            // 先落盘以得知真实体积，再决定是否占用大测点槽位
-            const files = await materializeTestCaseToDisk(testCase.id)
+          const weight = files ? Math.max(files.inputBytes ?? 0, files.expectedBytes) : 0
+          if (weight >= cfgLargeBytes) {
+            await acquireLargeSlot()
+            heldLarge = true
             if (caseSignal.aborted) {
-              if (files) await cleanupMaterializedTestCase(files)
               finishedCount++
               emitJudgeProgress(job.userId, {
                 submissionId: job.submissionId,
@@ -650,116 +740,83 @@ export async function executeJudge(
                 skipped: true,
               }
             }
+          }
 
-            const weight = files
-              ? Math.max(files.inputBytes ?? 0, files.expectedBytes)
-              : 0
-            if (weight >= cfgLargeBytes) {
-              await acquireLargeSlot()
-              heldLarge = true
-              if (caseSignal.aborted) {
-                finishedCount++
-                emitJudgeProgress(job.userId, {
-                  submissionId: job.submissionId,
-                  currentTest: finishedCount,
-                  totalTests: job.testCases.length,
-                  status: 'JUDGING',
-                })
-                persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
-                return {
-                  testId: testCase.id,
-                  status: 'SE' as const,
-                  score: 0,
-                  time: 0,
-                  memory: 0,
-                  message: skippedMessage(),
-                  skipped: true,
-                }
-              }
-            }
-
-            const verdict = files
-              ? await judgeOneCaseWithFiles(
-                  testCase,
-                  job,
-                  compiledPath,
-                  files,
-                  caseSignal,
-                  spjPath,
-                )
-              : {
-                  testId: testCase.id,
-                  status: 'SE' as const,
-                  score: 0,
-                  time: 0,
-                  memory: 0,
-                  message: '测试点不存在或已删除',
-                }
-
-            finishedCount++
-            emitJudgeProgress(job.userId, {
-              submissionId: job.submissionId,
-              currentTest: finishedCount,
-              totalTests: job.testCases.length,
-              status: 'JUDGING',
-            })
-            persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
-            if (verdict.skipped) {
-              // abort 中途结束的并行测点
-            } else if (verdict.status === 'AC') {
-              logger.debug(`通过`, { time: verdict.time, memory: verdict.memory, testId: testCase.id })
-            } else {
-              // 非 AC 测点打 info（含 message），便于在服务端日志直接定位 TLE/MLE/RE 成因
-              logger.info(`测试失败`, {
-                status: verdict.status,
-                message: verdict.message,
+          const verdict = files
+            ? await judgeOneCaseWithFiles(testCase, job, compiledPath, files, caseSignal, spjPath)
+            : {
                 testId: testCase.id,
-                time: verdict.time,
-                memory: verdict.memory,
-              })
-              if (
-                !verdict.skipped &&
-                shouldFailFast(verdict.status, failFastMode) &&
-                !abortController.signal.aborted
-              ) {
-                logger.info('fail-fast：中止剩余测点', {
-                  status: verdict.status,
-                  testId: testCase.id,
-                  mode: failFastMode,
-                })
-                abortController.abort('fail-fast')
+                status: 'SE' as const,
+                score: 0,
+                time: 0,
+                memory: 0,
+                message: '测试点不存在或已删除',
               }
-            }
-            return verdict
-          } catch (error) {
-            finishedCount++
-            emitJudgeProgress(job.userId, {
-              submissionId: job.submissionId,
-              currentTest: finishedCount,
-              totalTests: job.testCases.length,
-              status: 'JUDGING',
+
+          finishedCount++
+          emitJudgeProgress(job.userId, {
+            submissionId: job.submissionId,
+            currentTest: finishedCount,
+            totalTests: job.testCases.length,
+            status: 'JUDGING',
+          })
+          persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
+          if (verdict.skipped) {
+            // abort 中途结束的并行测点
+          } else if (verdict.status === 'AC') {
+            logger.debug(`通过`, {
+              time: verdict.time,
+              memory: verdict.memory,
+              testId: testCase.id,
             })
-            persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
-            logger.error(`测试执行错误`, error)
+          } else {
+            // 非 AC 测点打 info（含 message），便于在服务端日志直接定位 TLE/MLE/RE 成因
+            logger.info(`测试失败`, {
+              status: verdict.status,
+              message: verdict.message,
+              testId: testCase.id,
+              time: verdict.time,
+              memory: verdict.memory,
+            })
             if (
-              !abortController.signal.aborted &&
-              shouldFailFast('SE', failFastMode)
+              !verdict.skipped &&
+              shouldFailFast(verdict.status, failFastMode) &&
+              !abortController.signal.aborted
             ) {
+              logger.info('fail-fast：中止剩余测点', {
+                status: verdict.status,
+                testId: testCase.id,
+                mode: failFastMode,
+              })
               abortController.abort('fail-fast')
             }
-            return {
-              testId: testCase.id,
-              status: 'SE' as ResultState,
-              score: 0,
-              time: 0,
-              memory: 0,
-              message: error instanceof Error ? error.message : '系统错误',
-            }
-          } finally {
-            if (heldLarge) releaseLargeSlot()
           }
+          return verdict
+        } catch (error) {
+          finishedCount++
+          emitJudgeProgress(job.userId, {
+            submissionId: job.submissionId,
+            currentTest: finishedCount,
+            totalTests: job.testCases.length,
+            status: 'JUDGING',
+          })
+          persistJudgeProgressThrottled(job.submissionId, finishedCount, job.testCases.length)
+          logger.error(`测试执行错误`, error)
+          if (!abortController.signal.aborted && shouldFailFast('SE', failFastMode)) {
+            abortController.abort('fail-fast')
+          }
+          return {
+            testId: testCase.id,
+            status: 'SE' as ResultState,
+            score: 0,
+            time: 0,
+            memory: 0,
+            message: error instanceof Error ? error.message : '系统错误',
+          }
+        } finally {
+          if (heldLarge) releaseLargeSlot()
         }
-      )
+      })
 
       // 整单被队列超时中止：直接 SE，避免把跳过测点误报成 WA
       if (jobSignal?.aborted) {
@@ -816,8 +873,9 @@ export async function executeJudge(
           result.status = 'PC'
           logger.info(`部分正确`, { score: result.score, total: totalFullScore })
         } else {
-          const failedTest = caseVerdicts.find((t) => t.status !== 'AC' && t.status !== 'PC' && !t.skipped)
-            ?? caseVerdicts.find((t) => t.status === 'PC' && !t.skipped)
+          const failedTest =
+            caseVerdicts.find((t) => t.status !== 'AC' && t.status !== 'PC' && !t.skipped) ??
+            caseVerdicts.find((t) => t.status === 'PC' && !t.skipped)
           const statusMap: Record<string, ResultState> = {
             WA: 'WA',
             TLE: 'TLE',
@@ -830,7 +888,7 @@ export async function executeJudge(
             CSP: 'CSP',
             PC: 'PC',
           }
-          result.status = failedTest?.status ? (statusMap[failedTest.status] || 'WA') : 'WA'
+          result.status = failedTest?.status ? statusMap[failedTest.status] || 'WA' : 'WA'
           logger.info(`部分通过`, { passed: result.passedTests, total: result.totalTests })
         }
       }
@@ -861,7 +919,9 @@ export async function executeJudge(
       try {
         await cleanupSpj(spjCompileResult.compiledPath)
       } catch (err) {
-        logger.warn('清理 SPJ 产物失败', { error: err instanceof Error ? err.message : String(err) })
+        logger.warn('清理 SPJ 产物失败', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
     }
   }
@@ -948,10 +1008,8 @@ export async function cleanupOldTempFiles() {
             await fs.unlink(filePath)
             logger.debug(`已清理过期临时文件`, { filename: file.name })
           }
-        } catch {
-        }
+        } catch {}
       }
     }
-  } catch {
-  }
+  } catch {}
 }

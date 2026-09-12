@@ -17,7 +17,12 @@ interface EditUserModalProps {
  * 编辑用户角色对话框。
  * 系统管理员可将用户提升为 ADMIN；普通管理员仅能选择 TEACHER/STUDENT。
  */
-export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess }: EditUserModalProps) {
+export function EditUserModal({
+  user,
+  operatorIsSystemAdmin,
+  onClose,
+  onSuccess,
+}: EditUserModalProps) {
   const dialog = useDialog()
   const [editRole, setEditRole] = useState(user.role)
   const [saving, setSaving] = useState(false)
@@ -28,7 +33,7 @@ export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess 
       const response = await fetchWithCookie(`/api/admin/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: editRole })
+        body: JSON.stringify({ role: editRole }),
       })
 
       const data = await response.json()
@@ -64,7 +69,7 @@ export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess 
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-2">用户名</label>
+          <label className="block text-label text-muted-foreground mb-2">用户名</label>
           <input
             type="text"
             value={user.username}
@@ -73,12 +78,8 @@ export function EditUserModal({ user, operatorIsSystemAdmin, onClose, onSuccess 
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-2">角色</label>
-          <select
-            value={editRole}
-            onChange={(e) => setEditRole(e.target.value)}
-            className="input"
-          >
+          <label className="block text-label text-muted-foreground mb-2">角色</label>
+          <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="input">
             <option value="STUDENT">学生</option>
             <option value="TEACHER">教师</option>
             {operatorIsSystemAdmin && <option value="ADMIN">管理员</option>}

@@ -14,11 +14,7 @@ interface BatchDeleteModalProps {
 }
 
 /** 批量删除用户的确认对话框。 */
-export function BatchDeleteModal({
-  userIds,
-  onClose,
-  onSuccess,
-}: BatchDeleteModalProps) {
+export function BatchDeleteModal({ userIds, onClose, onSuccess }: BatchDeleteModalProps) {
   const dialog = useDialog()
   const [operating, setOperating] = useState(false)
 
@@ -31,8 +27,8 @@ export function BatchDeleteModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userIds: Array.from(userIds)
-        })
+          userIds: Array.from(userIds),
+        }),
       })
 
       const data = await response.json()
@@ -72,8 +68,8 @@ export function BatchDeleteModal({
       }
     >
       <p className="text-muted-foreground">
-        确定要删除选中的 <span className="text-foreground font-medium">{userIds.size}</span> 个用户吗？
-        此操作无法撤销。
+        确定要删除选中的 <span className="text-foreground font-medium">{userIds.size}</span>{' '}
+        个用户吗？ 此操作无法撤销。
       </p>
     </Modal>
   )

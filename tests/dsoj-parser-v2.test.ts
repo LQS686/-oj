@@ -48,10 +48,7 @@ describe('parseDsojZip v2', () => {
     const zip = new AdmZip()
     zip.addFile(
       'pack.yaml',
-      Buffer.from(
-        `format: dsoj-pack\nversion: 2.0\nproblem_count: 1\nindex: index.json\n`,
-        'utf-8'
-      )
+      Buffer.from(`format: dsoj-pack\nversion: 2.0\nproblem_count: 1\nindex: index.json\n`, 'utf-8')
     )
     zip.addFile(
       'index.json',
@@ -71,7 +68,10 @@ describe('parseDsojZip v2', () => {
         'utf-8'
       )
     )
-    zip.addFile('problems/P1/description.md', Buffer.from('# demo problem description here', 'utf-8'))
+    zip.addFile(
+      'problems/P1/description.md',
+      Buffer.from('# demo problem description here', 'utf-8')
+    )
     // 两组展示样例（含 sampleN 命名，曾被严格正则丢掉）
     zip.addFile('problems/P1/samples/1.in', Buffer.from('sample-in-1\n', 'utf-8'))
     zip.addFile('problems/P1/samples/1.out', Buffer.from('sample-out-1\n', 'utf-8'))
@@ -104,7 +104,10 @@ describe('parseDsojZip v2', () => {
         'utf-8'
       )
     )
-    zip.addFile('problems/P2/description.md', Buffer.from('# nested samples description ok', 'utf-8'))
+    zip.addFile(
+      'problems/P2/description.md',
+      Buffer.from('# nested samples description ok', 'utf-8')
+    )
     zip.addFile('problems\\P2\\samples\\1\\in.txt', Buffer.from('n1\n', 'utf-8'))
     zip.addFile('problems\\P2\\samples\\1\\out.txt', Buffer.from('n1o\n', 'utf-8'))
     zip.addFile('problems\\P2\\samples\\2\\input.txt', Buffer.from('n2\n', 'utf-8'))
@@ -153,7 +156,10 @@ describe('parseDsojZip v2', () => {
         'utf-8'
       )
     )
-    zip.addFile('problems/LP9/description.md', Buffer.from('# empty input sample description', 'utf-8'))
+    zip.addFile(
+      'problems/LP9/description.md',
+      Buffer.from('# empty input sample description', 'utf-8')
+    )
     zip.addFile('problems/LP9/samples/1.in', Buffer.from('', 'utf-8'))
     zip.addFile('problems/LP9/samples/1.out', Buffer.from('0\n', 'utf-8'))
     zip.addFile('problems/LP9/testcases/1.in', Buffer.from('', 'utf-8'))
@@ -186,10 +192,7 @@ describe('parseDsojZip v2', () => {
     const zip = new AdmZip()
     zip.addFile(
       'pack.yaml',
-      Buffer.from(
-        `format: dsoj-pack\nversion: 2.0\nproblem_count: 1\nindex: index.json\n`,
-        'utf-8'
-      )
+      Buffer.from(`format: dsoj-pack\nversion: 2.0\nproblem_count: 1\nindex: index.json\n`, 'utf-8')
     )
     zip.addFile(
       'index.json',
@@ -209,7 +212,10 @@ describe('parseDsojZip v2', () => {
         'utf-8'
       )
     )
-    zip.addFile('problems/P1/description.md', Buffer.from('# demo problem description here', 'utf-8'))
+    zip.addFile(
+      'problems/P1/description.md',
+      Buffer.from('# demo problem description here', 'utf-8')
+    )
     zip.addFile('problems/P1/testcases/1.in', Buffer.from('1\n', 'utf-8'))
     zip.addFile('problems/P1/testcases/1.out', Buffer.from('1\n', 'utf-8'))
 
@@ -281,10 +287,16 @@ spj_kind: bracket_construct
         'utf-8'
       )
     )
-    zip.addFile('problems/PSPJ/description.md', Buffer.from('# auto spj problem description', 'utf-8'))
+    zip.addFile(
+      'problems/PSPJ/description.md',
+      Buffer.from('# auto spj problem description', 'utf-8')
+    )
     zip.addFile(
       'problems/PSPJ/checker.cpp',
-      Buffer.from('#include "testlib.h"\nint main(int argc,char**argv){registerTestlibCmd(argc,argv);quitf(_ok,"ok");}\n', 'utf-8')
+      Buffer.from(
+        '#include "testlib.h"\nint main(int argc,char**argv){registerTestlibCmd(argc,argv);quitf(_ok,"ok");}\n',
+        'utf-8'
+      )
     )
     zip.addFile('problems/PSPJ/testcases/1.in', Buffer.from('1\n', 'utf-8'))
     zip.addFile('problems/PSPJ/testcases/1.out', Buffer.from('1\n', 'utf-8'))
@@ -305,7 +317,10 @@ spj_kind: bracket_construct
         'utf-8'
       )
     )
-    zip.addFile('problems/PBAD/description.md', Buffer.from('# bad spj missing checker file', 'utf-8'))
+    zip.addFile(
+      'problems/PBAD/description.md',
+      Buffer.from('# bad spj missing checker file', 'utf-8')
+    )
     zip.addFile('problems/PBAD/testcases/1.in', Buffer.from('1\n', 'utf-8'))
     zip.addFile('problems/PBAD/testcases/1.out', Buffer.from('1\n', 'utf-8'))
 
@@ -325,7 +340,8 @@ spj_kind: bracket_construct
         const childAbs = path.join(dir, childRel)
         const st = fs.statSync(childAbs)
         if (st.isDirectory()) walk(childRel)
-        else zip.addFile(`problems/LB3758/${childRel.replace(/\\/g, '/')}`, fs.readFileSync(childAbs))
+        else
+          zip.addFile(`problems/LB3758/${childRel.replace(/\\/g, '/')}`, fs.readFileSync(childAbs))
       }
     }
     walk('')
@@ -366,7 +382,10 @@ describe('parseDsojArchiveDetailed 解析错误不再静默', () => {
         'utf-8'
       )
     )
-    zip.addFile('problems/P1/description.md', Buffer.from('# first problem description ok', 'utf-8'))
+    zip.addFile(
+      'problems/P1/description.md',
+      Buffer.from('# first problem description ok', 'utf-8')
+    )
     zip.addFile('problems/P1/testcases/1.in', Buffer.from('1\n', 'utf-8'))
     zip.addFile('problems/P1/testcases/1.out', Buffer.from('1\n', 'utf-8'))
     // P2：缺 description.md → 解析失败
@@ -383,7 +402,10 @@ describe('parseDsojArchiveDetailed 解析错误不再静默', () => {
         'utf-8'
       )
     )
-    zip.addFile('problems/P3/description.md', Buffer.from('# third problem description ok', 'utf-8'))
+    zip.addFile(
+      'problems/P3/description.md',
+      Buffer.from('# third problem description ok', 'utf-8')
+    )
     zip.addFile('problems/P3/testcases/1.in', Buffer.from('1\n', 'utf-8'))
     zip.addFile('problems/P3/testcases/1.out', Buffer.from('1\n', 'utf-8'))
     return zip

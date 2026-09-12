@@ -23,21 +23,19 @@ export function ListEmptyState({
   tone = 'default',
 }: ListEmptyStateProps) {
   return (
-    <div className="card-static rounded-xl border border-border px-6 py-8 text-center max-w-md mx-auto">
+    <div className="card-static border border-border px-6 py-8 text-center max-w-md mx-auto">
       {Icon && (
         <div
           className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 ${
             tone === 'error' ? 'bg-error/10' : 'bg-muted'
           }`}
         >
-          <Icon className={`w-5 h-5 ${tone === 'error' ? 'text-error' : 'text-muted-foreground'}`} />
+          <Icon
+            className={`w-5 h-5 ${tone === 'error' ? 'text-error' : 'text-muted-foreground'}`}
+          />
         </div>
       )}
-      <p
-        className={`text-sm font-medium mb-1 ${
-          tone === 'error' ? 'text-error' : 'text-foreground'
-        }`}
-      >
+      <p className={`text-label mb-1 ${tone === 'error' ? 'text-error' : 'text-foreground'}`}>
         {title}
       </p>
       {description ? (

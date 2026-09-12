@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import Dropdown from '@/components/common/Dropdown'
 import { usePathname, useRouter } from 'next/navigation'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { canAccessAdmin, isSystemAdmin, isSystemAdminOnlyPath } from '@/lib/permissions'
 import { formatDateTime } from '@/lib/utils'
+import { resolvePageTitle } from '@/lib/page-titles'
 import {
   LayoutDashboard,
   FileText,
@@ -26,7 +28,7 @@ import {
   Flag,
   ListChecks,
 } from 'lucide-react'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useUser } from '@/contexts/UserContext'
 import type { Notification } from '@/types/models'
@@ -55,7 +57,7 @@ const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
       { icon: ListChecks, label: '客观题管理', href: '/admin/objective-questions' },
       { icon: ShieldCheck, label: '题解审核', href: '/admin/reviews' },
       { icon: Flag, label: '举报管理', href: '/admin/reports' },
-    ]
+    ],
   },
   {
     label: '运营管理',
@@ -65,15 +67,15 @@ const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
       { icon: GraduationCap, label: '班级管理', href: '/admin/classes' },
       { icon: Users, label: '用户管理', href: '/admin/users' },
       { icon: Megaphone, label: '系统公告', href: '/admin/announcements', systemAdminOnly: true },
-    ]
+    ],
   },
   {
     label: '系统管理',
     items: [
       { icon: FileCode, label: '提交记录', href: '/admin/submissions' },
       { icon: Settings, label: '系统设置', href: '/admin/settings', systemAdminOnly: true },
-    ]
-  }
+    ],
+  },
 ]
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
@@ -83,12 +85,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const canAccess = canAccessAdmin(user)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [, setMounted] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
-  const [notificationOpen, setNotificationOpen] = useState(false)
   const [notifications, setNotifications] = useState<(Notification & { message?: string })[]>([])
-  const userMenuRef = useRef<HTMLDivElement>(null)
-  const notificationRef = useRef<HTMLDivElement>(null)
 
   const fetchNotificationList = useCallback(async () => {
     try {
@@ -148,29 +146,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [])
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false)
-      }
-      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
-        setNotificationOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
   useDeferredEffect(() => {
     if (!user || !canAccess) return
     void fetchNotificationList()
   }, [user, canAccess, fetchNotificationList])
-
-  useDeferredEffect(() => {
-    if (notificationOpen) {
-      void fetchNotificationList()
-    }
-  }, [notificationOpen, fetchNotificationList])
 
   const handleLogout = async () => {
     try {
@@ -187,9 +166,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // 按角色过滤菜单项：默认 SYSTEM_ADMIN/ADMIN 可见，systemAdminOnly 项仅 SYSTEM_ADMIN 可见
   const visibleGroups = menuGroups
-    .map((g) => ({ ...g, items: g.items.filter((item) => (item.systemAdminOnly ? isSystemAdmin(user) : true)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((item) => (item.systemAdminOnly ? isSystemAdmin(user) : true)),
+    }))
     .filter((g) => g.items.length > 0)
-  const allMenuItems = visibleGroups.flatMap((g) => g.items)
 
   // 移动端点击导航项后自动收回侧边栏（桌面端保持原状态）
   const closeSidebarOnMobile = () => {
@@ -209,12 +190,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="h-screen overflow-hidden flex">
-      <aside className={`fixed left-0 top-0 h-screen z-40 flex flex-col border-r bg-background-secondary transition-[transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        sidebarOpen ? 'w-72 translate-x-0' : '-translate-x-full md:translate-x-0 md:w-20'
-      }`}>
+      <aside
+        className={`fixed left-0 top-0 h-screen z-40 flex flex-col border-r bg-background-secondary transition-[transform,width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          sidebarOpen ? 'w-72 translate-x-0' : '-translate-x-full md:translate-x-0 md:w-20'
+        }`}
+      >
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <div className="p-4">
-            <div className={`flex items-center mb-8 transition-all duration-300 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
+            <div
+              className={`flex items-center mb-8 transition-all duration-300 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}
+            >
               {sidebarOpen ? (
                 <>
                   <div className="flex items-center gap-3 min-w-0">
@@ -222,13 +207,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       <LayoutDashboard className="w-5 h-5 text-white" />
                     </div>
                     <div className="min-w-0 overflow-hidden">
-                      <h1 className="text-lg font-bold text-foreground truncate whitespace-nowrap">管理后台</h1>
+                      <div className="text-section-title text-foreground truncate whitespace-nowrap">
+                        管理后台
+                      </div>
                       <p className="text-xs text-muted-foreground whitespace-nowrap">大山 OJ</p>
                     </div>
                   </div>
                   <button
                     onClick={() => setSidebarOpen(false)}
-                    className="p-2 hover:bg-muted rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 flex-shrink-0"
+                    className="btn-icon hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 flex-shrink-0"
                     aria-label="收起侧边栏"
                   >
                     <X className="w-5 h-5 text-muted-foreground" />
@@ -237,7 +224,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               ) : (
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="p-2 hover:bg-muted rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="btn-icon hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
                   aria-label="展开侧边栏"
                 >
                   <Menu className="w-5 h-5 text-muted-foreground" />
@@ -248,20 +235,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <nav className="space-y-1">
               {visibleGroups.map((group, groupIdx) => (
                 <div key={group.label}>
-                  {groupIdx > 0 && (
-                    <div className="my-3 border-t border-border" />
-                  )}
-                  <div className={`overflow-hidden transition-[max-height,opacity,margin] duration-300 ${
-                    sidebarOpen ? 'max-h-8 opacity-100 my-0' : 'max-h-0 opacity-0 my-0'
-                  }`}>
+                  {groupIdx > 0 && <div className="my-3 border-t border-border" />}
+                  <div
+                    className={`overflow-hidden transition-[max-height,opacity,margin] duration-300 ${
+                      sidebarOpen ? 'max-h-8 opacity-100 my-0' : 'max-h-0 opacity-0 my-0'
+                    }`}
+                  >
                     <p className="px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
                       {group.label}
                     </p>
                   </div>
                   {group.items.map((item) => {
                     const Icon = item.icon
-                    const isActive = pathname === item.href ||
-                                   (item.href !== '/admin' && pathname.startsWith(item.href + '/'))
+                    const isActive =
+                      pathname === item.href ||
+                      (item.href !== '/admin' && pathname.startsWith(item.href + '/'))
 
                     return (
                       <Link
@@ -278,9 +266,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         }`}
                       >
                         <Icon className="w-5 h-5 flex-shrink-0" />
-                        <span className={`font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                          sidebarOpen ? 'opacity-100 max-w-[180px]' : 'opacity-0 max-w-0'
-                        }`}>
+                        <span
+                          className={`font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                            sidebarOpen ? 'opacity-100 max-w-[180px]' : 'opacity-0 max-w-0'
+                          }`}
+                        >
                           {item.label}
                         </span>
                       </Link>
@@ -302,9 +292,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             } text-foreground hover:bg-muted`}
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            <span className={`font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-              sidebarOpen ? 'opacity-100 max-w-[180px]' : 'opacity-0 max-w-0'
-            }`}>
+            <span
+              className={`font-medium truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                sidebarOpen ? 'opacity-100 max-w-[180px]' : 'opacity-0 max-w-0'
+              }`}
+            >
               返回主站
             </span>
           </Link>
@@ -319,145 +311,150 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         />
       )}
 
-      <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
-        sidebarOpen ? 'md:ml-72' : 'md:ml-20'
-      }`}>
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className={`flex-1 overflow-y-auto transition-all duration-300 focus:outline-none ${
+          sidebarOpen ? 'md:ml-72' : 'md:ml-20'
+        }`}
+      >
         <header className="sticky top-0 z-20 border-b bg-background-secondary border-border">
           <div className="px-4 md:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="md:hidden p-3 -ml-2 rounded-lg hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 flex-shrink-0"
+                  className="btn-icon-lg md:hidden -ml-2 hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 flex-shrink-0"
                   aria-label={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
                 >
-                  {sidebarOpen ? <X className="w-5 h-5 text-foreground" /> : <Menu className="w-5 h-5 text-foreground" />}
+                  {sidebarOpen ? (
+                    <X className="w-5 h-5 text-foreground" />
+                  ) : (
+                    <Menu className="w-5 h-5 text-foreground" />
+                  )}
                 </button>
-                <h2 className="text-xl md:text-2xl font-bold text-foreground truncate">
-                  {allMenuItems.find(item =>
-                    pathname === item.href ||
-                    (item.href !== '/admin' && pathname.startsWith(item.href + '/'))
-                  )?.label || '管理后台'}
-                </h2>
+                {/* 后台每页的唯一 H1：直接取路由级标题，因此能区分
+                    「创建题目 / 编辑题目 / 测试数据管理」等子页，
+                    并与浏览器标签标题（DocumentTitleProvider）保持同一来源。
+                    与公共页面使用同一套标题尺寸。 */}
+                <h1 className="text-page-title text-foreground truncate">
+                  {resolvePageTitle(pathname)}
+                </h1>
               </div>
               <div className="flex items-center gap-2">
-                <div className="relative" ref={notificationRef}>
-                  <button
-                    onClick={() => setNotificationOpen(!notificationOpen)}
-                    className="btn-ghost btn p-2.5 relative group"
-                    aria-label="通知"
-                  >
-                    <Bell className="w-5 h-5" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 badge-primary badge min-w-[18px] h-[18px] text-[10px]">
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                      </span>
-                    )}
-                  </button>
-
-                  {notificationOpen && (
-                    <div className="absolute right-0 mt-2 w-80 rounded-xl border z-50 shadow-lg bg-background-secondary border-border">
-                      <div className="p-3 border-b border-border">
-                        <h3 className="font-medium text-foreground">通知</h3>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        {notifications.length > 0 ? (
-                          notifications.map((n) => (
-                            <div key={n.id} className="px-4 py-3 hover:bg-muted border-b border-border last:border-0">
-                              <p className="text-sm text-foreground">{n.title || n.message || '新通知'}</p>
-                              <p className="text-xs text-muted-foreground mt-1">{formatDateTime(n.createdAt)}</p>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="p-4 text-center text-muted-foreground text-sm">暂无通知</div>
-                        )}
-                      </div>
-                      <Link
-                        href="/notifications"
-                        className="block p-3 text-center text-sm text-primary hover:text-primary-dark transition-colors border-t border-border"
-                        onClick={() => setNotificationOpen(false)}
-                      >
-                        查看全部通知
-                      </Link>
-                    </div>
-                  )}
-                </div>
-
-                <div className="relative" ref={userMenuRef}>
-                  <button
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-primary/10 transition-all duration-200 group"
-                    aria-label="用户菜单"
-                  >
-                    {user.avatar && !avatarError ? (
-                      <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
-                        <img
-                          src={user.avatar}
-                          alt="Avatar"
-                          width={40}
-                          height={40}
-                          className="object-cover w-full h-full"
-                          loading="lazy"
-                          onError={() => setAvatarError(true)}
-                        />
-                      </div>
-                    ) : (
-                      <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
-                        <div className="avatar-fallback text-sm">
-                          {user.username?.charAt(0).toUpperCase()}
-                        </div>
-                      </div>
-                    )}
-                    <div className="hidden md:flex flex-col items-start">
-                      <span className="text-sm font-semibold text-foreground leading-tight group-hover:text-primary-light transition-colors duration-300">
-                        {user.nickname || user.username}
-                      </span>
-                      <span className="text-xs text-muted-foreground leading-tight group-hover:text-primary/70 transition-colors duration-300">
-                        {getRoleLabel(user?.role)}
-                      </span>
-                    </div>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 hidden md:block group-hover:text-primary-light ${userMenuOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-52 rounded-xl border py-1.5 z-50 shadow-lg bg-background-secondary border-border">
-                      <Link
-                        href={`/user/${user.id}`}
-                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <UserCircle className="w-[18px] h-[18px]" />
-                        个人主页
-                      </Link>
-                      {isSystemAdmin(user) && (
-                        <Link
-                          href="/admin/settings"
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <Settings className="w-[18px] h-[18px]" />
-                          系统设置
-                        </Link>
+                <Dropdown
+                  role="dialog"
+                  label="通知"
+                  className="w-80"
+                  onOpenChange={(open) => {
+                    if (open) void fetchNotificationList()
+                  }}
+                  trigger={(triggerProps) => (
+                    <button
+                      {...triggerProps}
+                      className="btn-ghost btn btn-icon relative group"
+                      aria-label="通知"
+                    >
+                      <Bell className="w-5 h-5" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 badge-primary badge min-w-[18px] h-[18px] text-[10px]">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
                       )}
-                      <Link
-                        href="/"
-                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <LogOut className="w-[18px] h-[18px]" />
-                        返回主站
-                      </Link>
-                      <div className="my-1 border-t border-border" />
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-error hover:bg-error/10 transition-colors"
-                      >
-                        <LogOut className="w-[18px] h-[18px]" />
-                        退出登录
-                      </button>
-                    </div>
+                    </button>
                   )}
-                </div>
+                >
+                  <div className="p-3 border-b border-border">
+                    <h3 className="font-medium text-foreground">通知</h3>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {notifications.length > 0 ? (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          data-dropdown-close="true"
+                          className="px-4 py-3 hover:bg-muted border-b border-border last:border-0"
+                        >
+                          <p className="text-sm text-foreground">
+                            {n.title || n.message || '新通知'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDateTime(n.createdAt)}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-muted-foreground text-sm">暂无通知</div>
+                    )}
+                  </div>
+                  <Link
+                    href="/notifications"
+                    className="block p-3 text-center text-sm text-primary hover:text-primary-dark transition-colors border-t border-border"
+                  >
+                    查看全部通知
+                  </Link>
+                </Dropdown>
+
+                <Dropdown
+                  label="用户菜单"
+                  className="w-52 py-1.5"
+                  trigger={(triggerProps) => (
+                    <button
+                      {...triggerProps}
+                      className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-primary/10 transition-all duration-200 group"
+                      aria-label="用户菜单"
+                    >
+                      {user.avatar && !avatarError ? (
+                        <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
+                          <img
+                            src={user.avatar}
+                            alt="Avatar"
+                            width={40}
+                            height={40}
+                            className="object-cover w-full h-full"
+                            loading="lazy"
+                            onError={() => setAvatarError(true)}
+                          />
+                        </div>
+                      ) : (
+                        <div className="avatar avatar-md border-2 border-primary/30 group-hover:border-primary transition-all duration-300">
+                          <div className="avatar-fallback text-sm">
+                            {user.username?.charAt(0).toUpperCase()}
+                          </div>
+                        </div>
+                      )}
+                      <div className="hidden md:flex flex-col items-start">
+                        <span className="text-subsection-title text-foreground leading-tight group-hover:text-primary-light transition-colors duration-300">
+                          {user.nickname || user.username}
+                        </span>
+                        <span className="text-xs text-muted-foreground leading-tight group-hover:text-primary/70 transition-colors duration-300">
+                          {getRoleLabel(user?.role)}
+                        </span>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200 hidden md:block group-hover:text-primary-light" />
+                    </button>
+                  )}
+                >
+                  <Link href={`/user/${user.id}`} className="dropdown-item">
+                    <UserCircle className="w-[18px] h-[18px]" />
+                    个人主页
+                  </Link>
+                  {isSystemAdmin(user) && (
+                    <Link href="/admin/settings" className="dropdown-item">
+                      <Settings className="w-[18px] h-[18px]" />
+                      系统设置
+                    </Link>
+                  )}
+                  <Link href="/" className="dropdown-item">
+                    <LogOut className="w-[18px] h-[18px]" />
+                    返回主站
+                  </Link>
+                  <div className="my-1 border-t border-border" />
+                  <button onClick={handleLogout} className="dropdown-item destructive w-full">
+                    <LogOut className="w-[18px] h-[18px]" />
+                    退出登录
+                  </button>
+                </Dropdown>
               </div>
             </div>
           </div>

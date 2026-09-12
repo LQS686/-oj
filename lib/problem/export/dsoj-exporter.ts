@@ -241,18 +241,18 @@ export function createDsojArchiveWriter(
  *
  * 注意：所有 include 字段固定加载，序列化阶段根据 options 决定是否写入归档。
  */
-async function loadProblemBatch(
-  ids: string[]
-): Promise<Prisma.ProblemGetPayload<{
-  include: {
-    testCases: { orderBy: { orderIndex: 'asc' } }
-    solutions: {
-      orderBy: ({ isOfficial: 'desc' } | { views: 'desc' } | { createdAt: 'desc' })[]
-      take: number
-      include: { author: { select: { nickname: true, username: true } } }
+async function loadProblemBatch(ids: string[]): Promise<
+  Prisma.ProblemGetPayload<{
+    include: {
+      testCases: { orderBy: { orderIndex: 'asc' } }
+      solutions: {
+        orderBy: ({ isOfficial: 'desc' } | { views: 'desc' } | { createdAt: 'desc' })[]
+        take: number
+        include: { author: { select: { nickname: true; username: true } } }
+      }
     }
-  }
-}>[]> {
+  }>[]
+> {
   const problems = await prisma.problem.findMany({
     where: { id: { in: ids } },
     include: {
@@ -288,7 +288,9 @@ type ExportSample = {
  *   支持的值类型：string / number / string[] / null
  *   字符串值若含特殊字符（:、#、引号、前后空格）会自动加引号
  */
-function serializeYaml(data: Record<string, string | number | string[] | null | undefined>): string {
+function serializeYaml(
+  data: Record<string, string | number | string[] | null | undefined>
+): string {
   const lines: string[] = []
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined || value === null) continue
@@ -318,7 +320,8 @@ function serializeYaml(data: Record<string, string | number | string[] | null | 
 function quoteIfNeeded(s: string): string {
   if (s === '') return "''"
   // 需要加引号的场景：含冒号+空格、#、引号、前后空格、看起来像数字（避免被解析为 number）
-  const needsQuote = /^[\s]|[\s]$/.test(s) ||
+  const needsQuote =
+    /^[\s]|[\s]$/.test(s) ||
     /[:#]/.test(s) ||
     /['"]/.test(s) ||
     /^\d/.test(s) ||
@@ -336,10 +339,7 @@ function quoteIfNeeded(s: string): string {
 /**
  * 生成题目目录名：直接使用题号（v2 稳定 PID）
  */
-function makeProblemDirName(problem: {
-  problemNumber: string | null
-  id: string
-}): string {
+function makeProblemDirName(problem: { problemNumber: string | null; id: string }): string {
   return makePackDirName(problem.problemNumber, problem.id)
 }
 
@@ -367,10 +367,7 @@ function serializeOneProblem(
     problem.comparisonMode === 'special-judge' ||
     (typeof problem.spjCode === 'string' && problem.spjCode.trim().length > 0)
   const exportTags = Array.isArray(problem.tags) ? [...problem.tags] : []
-  if (
-    isSpj &&
-    !exportTags.some((t) => String(t).toLowerCase() === 'special judge')
-  ) {
+  if (isSpj && !exportTags.some((t) => String(t).toLowerCase() === 'special judge')) {
     exportTags.push('Special Judge')
   }
   const problemYaml = serializeYaml({
@@ -512,15 +509,16 @@ function serializeOneProblem(
 
     problem.solutions.forEach((sol, idx) => {
       if (!sol || typeof sol.content !== 'string' || !sol.content.trim()) return
-      const lid = String(sol.id || `s${idx + 1}`).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || `s${idx + 1}`
+      const lid =
+        String(sol.id || `s${idx + 1}`)
+          .replace(/[^a-zA-Z0-9_-]/g, '')
+          .slice(0, 32) || `s${idx + 1}`
       const fileName = `${lid}.md`
       const title = String(sol.title || `题解 ${idx + 1}`).trim() || `题解 ${idx + 1}`
       // 站内无点赞字段时，用浏览量近似 thumb_up（仅供索引排序）
       const thumbUp = typeof sol.views === 'number' ? sol.views : 0
       const trimmed = sol.content.trim()
-      const body = trimmed.startsWith('#')
-        ? `${trimmed}\n`
-        : `# ${title}\n\n${trimmed}\n`
+      const body = trimmed.startsWith('#') ? `${trimmed}\n` : `# ${title}\n\n${trimmed}\n`
 
       files.push({
         path: `${base}solutions/${fileName}`,

@@ -23,11 +23,7 @@ export function authCookieName(secure: boolean = isSecureAuthCookie()): string {
 const AUTH_MAX_AGE = 7 * 24 * 60 * 60
 const REMEMBER_MAX_AGE = 30 * 24 * 60 * 60
 
-export function setAuthCookie(
-  response: NextResponse,
-  token: string,
-  rememberMe = false
-): void {
+export function setAuthCookie(response: NextResponse, token: string, rememberMe = false): void {
   const secure = isSecureAuthCookie()
   const name = authCookieName(secure)
   response.cookies.set(name, token, {
@@ -65,8 +61,8 @@ export function readAuthTokenFromCookieHeader(cookieHeader: string): string | nu
 }
 
 /** SSR / cookies()：按当前安全模式读取会话 token */
-export function readAuthTokenFromCookieStore(
-  cookieStore: { get: (name: string) => { value: string } | undefined }
-): string | null {
+export function readAuthTokenFromCookieStore(cookieStore: {
+  get: (name: string) => { value: string } | undefined
+}): string | null {
   return cookieStore.get(authCookieName())?.value || null
 }

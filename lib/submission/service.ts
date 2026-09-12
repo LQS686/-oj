@@ -100,17 +100,22 @@ export async function listSubmissions(
 }
 
 export async function getSubmissionById(id: string) {
-  return cache.get('submission:byId', [id], async () => {
-    const row = await prisma.submission.findUnique({
-      where: { id },
-      include: { user: { select: { id: true, username: true, nickname: true, avatar: true } } },
-    })
-    if (!row?.user) return row
-    return {
-      ...row,
-      user: { ...row.user, avatar: sanitizeAvatarUrl(row.user.avatar) },
-    }
-  }, { ttl: 30_000 })
+  return cache.get(
+    'submission:byId',
+    [id],
+    async () => {
+      const row = await prisma.submission.findUnique({
+        where: { id },
+        include: { user: { select: { id: true, username: true, nickname: true, avatar: true } } },
+      })
+      if (!row?.user) return row
+      return {
+        ...row,
+        user: { ...row.user, avatar: sanitizeAvatarUrl(row.user.avatar) },
+      }
+    },
+    { ttl: 30_000 }
+  )
 }
 
 export async function createSubmission(data: {
@@ -293,7 +298,10 @@ export async function listSubmissionsAdvanced(
   if (filter.userId) where.userId = filter.userId
   if (filter.language) where.language = filter.language
   if (filter.status) {
-    const statuses = filter.status.split(',').map((s) => s.trim()).filter(Boolean)
+    const statuses = filter.status
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
     if (statuses.length === 1) where.status = statuses[0]
     else if (statuses.length > 1) where.status = { in: statuses }
   }
@@ -333,7 +341,10 @@ export async function listSubmissionsAdvanced(
     const or: Prisma.SubmissionWhereInput[] = []
     if (userIds.length) or.push({ userId: { in: userIds } })
     if (problemIds.length) or.push({ problemId: { in: problemIds } })
-    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), { OR: or }]
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      { OR: or },
+    ]
   }
 
   const [submissions, total] = await Promise.all([
@@ -364,7 +375,9 @@ export async function listSubmissionsAdvanced(
 
   const validSubmissions = submissions.filter((sub) => sub.problem !== null)
   if (validSubmissions.length < submissions.length) {
-    logger.warn(`发现 ${submissions.length - validSubmissions.length} 条无效提交记录（对应题目不存在）`)
+    logger.warn(
+      `发现 ${submissions.length - validSubmissions.length} 条无效提交记录（对应题目不存在）`
+    )
   }
   return {
     submissions: validSubmissions,
@@ -470,11 +483,7 @@ export async function rejudgeSubmission(submissionId: string) {
     cache.deleteByPrefix(CacheKeys.problem.statusCounts(submission.problemId))
     cache.delete(CacheKeys.problem.stats(submission.problemId))
 
-    wasOnlyAc = await isFirstAccepted(
-      submission.problemId,
-      submission.userId,
-      submission.id
-    )
+    wasOnlyAc = await isFirstAccepted(submission.problemId, submission.userId, submission.id)
     if (wasOnlyAc) {
       await prisma.user.updateMany({
         where: { id: submission.userId, solvedCount: { gt: 0 } },
@@ -697,9 +706,7 @@ export async function getFirstWaTestCaseForDownload(
     }
   }
 
-  const waIndex = detail.testResults.findIndex(
-    (r) => r.status === SubmissionStatus.WRONG_ANSWER
-  )
+  const waIndex = detail.testResults.findIndex((r) => r.status === SubmissionStatus.WRONG_ANSWER)
   if (waIndex < 0) {
     throw AppError.badRequest('NO_WA_TESTCASE', '该提交没有 WA 测试点可下载')
   }
@@ -771,7 +778,10 @@ export async function listAdminSubmissions(filter: {
   const where: Prisma.SubmissionWhereInput = {}
   if (filter.language) where.language = filter.language
   if (filter.status && filter.status !== 'all') {
-    const statuses = filter.status.split(',').map((s) => s.trim()).filter(Boolean)
+    const statuses = filter.status
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
     if (statuses.length === 1) {
       where.status = statuses[0]
     } else if (statuses.length > 1) {
@@ -823,7 +833,10 @@ export async function listAdminSubmissions(filter: {
     const or: Prisma.SubmissionWhereInput[] = []
     if (userIds.length) or.push({ userId: { in: userIds } })
     if (problemIds.length) or.push({ problemId: { in: problemIds } })
-    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), { OR: or }]
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      { OR: or },
+    ]
   }
   // 全局状态统计（不受 status 筛选影响），用于前端统计卡显示全局数字
   const statusGroups = await prisma.submission.groupBy({

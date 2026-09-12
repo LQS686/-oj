@@ -13,9 +13,6 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
   const pageSize = Math.min(toInt(q.pageSize || q.limit, 'pageSize', 20), MAX_PAGE_SIZE)
   const unreadOnly = toBool(q.unreadOnly)
 
-  const data = await listNotifications(
-    { userId: user.id, unreadOnly },
-    { page, pageSize }
-  )
+  const data = await listNotifications({ userId: user.id, unreadOnly }, { page, pageSize })
   return ok(data)
 })

@@ -58,82 +58,89 @@ export async function getProblemStats(
   const baseWhere = await buildProblemSubmissionWhere(problemId, options)
   const cacheKey = [problemId, options.contestId || '', options.viewer?.id || 'guest']
 
-  return cache.get('problem:stats', cacheKey, async () => {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const recentWhere = {
-      AND: [baseWhere, { submittedAt: { gte: sevenDaysAgo } }],
-    }
-    const acWhere = { AND: [baseWhere, { status: 'AC' as const }] }
-
-    const [statusGroups, languageGroups, recentSubmissions, acAgg] = await Promise.all([
-      prisma.submission.groupBy({
-        by: ['status'],
-        where: baseWhere,
-        _count: { status: true },
-      }),
-      prisma.submission.groupBy({
-        by: ['language'],
-        where: baseWhere,
-        _count: { language: true },
-      }),
-      prisma.submission.findMany({
-        where: recentWhere,
-        select: { status: true, submittedAt: true },
-        // C-P2-10：近 7 天趋势只需按天聚合计数，加 take 上限防极端提交量拖垮内存
-        take: 5000,
-      }),
-      prisma.submission.aggregate({
-        where: acWhere,
-        _avg: { time: true, memory: true },
-      }),
-    ])
-
-    const statusCounts: Record<string, number> = {}
-    statusGroups.forEach((g) => { statusCounts[g.status] = g._count.status })
-
-    const languageCounts: Record<string, number> = {}
-    languageGroups.forEach((g) => { languageCounts[g.language] = g._count.language })
-
-    const totalSubmissions = Object.values(statusCounts).reduce((s, n) => s + n, 0)
-    const acCount = statusCounts['AC'] || 0
-    const acRate = totalSubmissions > 0
-      ? Math.round((acCount / totalSubmissions) * 1000) / 10
-      : 0
-
-    const trendMap = new Map<string, { count: number; acCount: number }>()
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date()
-      d.setHours(0, 0, 0, 0)
-      d.setDate(d.getDate() - i)
-      trendMap.set(formatDateLocal(d), { count: 0, acCount: 0 })
-    }
-    recentSubmissions.forEach((s) => {
-      const d = new Date(s.submittedAt)
-      d.setHours(0, 0, 0, 0)
-      const key = formatDateLocal(d)
-      const entry = trendMap.get(key)
-      if (entry) {
-        entry.count++
-        if (s.status === 'AC') entry.acCount++
+  return cache.get(
+    'problem:stats',
+    cacheKey,
+    async () => {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      const recentWhere = {
+        AND: [baseWhere, { submittedAt: { gte: sevenDaysAgo } }],
       }
-    })
-    const recentTrend = Array.from(trendMap.entries()).map(([date, v]) => ({
-      date: date.slice(5).replace('-', '/'),
-      count: v.count,
-      acCount: v.acCount,
-    }))
+      const acWhere = { AND: [baseWhere, { status: 'AC' as const }] }
 
-    return {
-      statusCounts,
-      languageCounts,
-      totalSubmissions,
-      acCount,
-      acRate,
-      recentTrend,
-      avgTimeMs: acAgg._avg.time ? Math.round(acAgg._avg.time) : 0,
-      avgMemoryKb: acAgg._avg.memory ? Math.round(acAgg._avg.memory) : 0,
-    }
-  }, { ttl: 10_000 })
+      const [statusGroups, languageGroups, recentSubmissions, acAgg] = await Promise.all([
+        prisma.submission.groupBy({
+          by: ['status'],
+          where: baseWhere,
+          _count: { status: true },
+        }),
+        prisma.submission.groupBy({
+          by: ['language'],
+          where: baseWhere,
+          _count: { language: true },
+        }),
+        prisma.submission.findMany({
+          where: recentWhere,
+          select: { status: true, submittedAt: true },
+          // C-P2-10：近 7 天趋势只需按天聚合计数，加 take 上限防极端提交量拖垮内存
+          take: 5000,
+        }),
+        prisma.submission.aggregate({
+          where: acWhere,
+          _avg: { time: true, memory: true },
+        }),
+      ])
+
+      const statusCounts: Record<string, number> = {}
+      statusGroups.forEach((g) => {
+        statusCounts[g.status] = g._count.status
+      })
+
+      const languageCounts: Record<string, number> = {}
+      languageGroups.forEach((g) => {
+        languageCounts[g.language] = g._count.language
+      })
+
+      const totalSubmissions = Object.values(statusCounts).reduce((s, n) => s + n, 0)
+      const acCount = statusCounts['AC'] || 0
+      const acRate = totalSubmissions > 0 ? Math.round((acCount / totalSubmissions) * 1000) / 10 : 0
+
+      const trendMap = new Map<string, { count: number; acCount: number }>()
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        d.setDate(d.getDate() - i)
+        trendMap.set(formatDateLocal(d), { count: 0, acCount: 0 })
+      }
+      recentSubmissions.forEach((s) => {
+        const d = new Date(s.submittedAt)
+        d.setHours(0, 0, 0, 0)
+        const key = formatDateLocal(d)
+        const entry = trendMap.get(key)
+        if (entry) {
+          entry.count++
+          if (s.status === 'AC') entry.acCount++
+        }
+      })
+      const recentTrend = Array.from(trendMap.entries()).map(([date, v]) => ({
+        date: date.slice(5).replace('-', '/'),
+        count: v.count,
+        acCount: v.acCount,
+      }))
+
+      return {
+        statusCounts,
+        languageCounts,
+        totalSubmissions,
+        acCount,
+        acRate,
+        recentTrend,
+        avgTimeMs: acAgg._avg.time ? Math.round(acAgg._avg.time) : 0,
+        avgMemoryKb: acAgg._avg.memory ? Math.round(acAgg._avg.memory) : 0,
+      }
+    },
+    { ttl: 10_000 }
+  )
 }
 
 /** 重算单题 denormalized totalSubmit / totalAccepted */

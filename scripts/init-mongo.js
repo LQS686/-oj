@@ -16,7 +16,7 @@ try {
   print('[INFO] 副本集尚未初始化，开始 rs.initiate...')
   rs.initiate({
     _id: 'rs0',
-    members: [{ _id: 0, host: 'mongo:27017' }]
+    members: [{ _id: 0, host: 'mongo:27017' }],
   })
   print('[INFO] rs.initiate 已发起，等待 PRIMARY...')
 }
@@ -49,9 +49,7 @@ try {
   appDb.createUser({
     user: appUser,
     pwd: appPwd,
-    roles: [
-      { role: 'readWrite', db: dbName }
-    ]
+    roles: [{ role: 'readWrite', db: dbName }],
   })
   print(`[SUCCESS] 数据库用户 '${appUser}' 创建成功`)
 } catch (error) {

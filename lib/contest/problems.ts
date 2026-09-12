@@ -30,8 +30,7 @@ export async function listContestProblemsWithStatus(
     (!!viewerRole && canAccessAdmin({ role: viewerRole })) ||
     (!!currentUserId && currentUserId === contest?.authorId)
   const sealed = contest ? isContestSealed(contest) : false
-  const sealCutoff =
-    sealed && !bypassSeal && contest?.sealRankTime ? contest.sealRankTime : null
+  const sealCutoff = sealed && !bypassSeal && contest?.sealRankTime ? contest.sealRankTime : null
 
   const contestProblems = await prisma.contestProblem.findMany({
     where: { contestId },

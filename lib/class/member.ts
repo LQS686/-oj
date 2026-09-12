@@ -28,10 +28,7 @@ export interface MemberListFilter {
 /**
  * 列出班级成员（带用户信息）
  */
-export async function listClassMembers(
-  classId: string,
-  filter: MemberListFilter = {}
-) {
+export async function listClassMembers(classId: string, filter: MemberListFilter = {}) {
   const { role, search, active, sortBy = 'joinedAt', sortOrder = 'desc' } = filter
 
   const where: Prisma.ClassMemberWhereInput = { classId }
@@ -142,8 +139,7 @@ export async function removeClassMember(classId: string, userId: string) {
     where: { classId_userId: { classId, userId } },
   })
   if (!target) return { ok: false, reason: '该用户不是班级成员' } as const
-  if (isClassOwnerRole(target.role))
-    return { ok: false, reason: '不能移除班级创建人' } as const
+  if (isClassOwnerRole(target.role)) return { ok: false, reason: '不能移除班级创建人' } as const
   await prisma.classMember.delete({
     where: { classId_userId: { classId, userId } },
   })
@@ -170,11 +166,7 @@ export async function updateClassMemberRole(
       where: { classId, role: { in: ['owner', 'admin'] } },
     })
     if (ownerCount <= 1) {
-      throw new ApiError(
-        'LAST_OWNER',
-        '不能降级班级唯一的班主任，请先转让班主任后再操作',
-        400
-      )
+      throw new ApiError('LAST_OWNER', '不能降级班级唯一的班主任，请先转让班主任后再操作', 400)
     }
   }
   return prisma.classMember.update({

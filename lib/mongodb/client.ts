@@ -115,9 +115,7 @@ export async function withRetry<T>(
     const mayRetry =
       options.idempotent === true &&
       retries > 0 &&
-      (err.name === 'MongoNetworkError' ||
-        err.name === 'MongoTimeoutError' ||
-        err.code === 10107) // NotWritablePrimary
+      (err.name === 'MongoNetworkError' || err.name === 'MongoTimeoutError' || err.code === 10107) // NotWritablePrimary
 
     if (mayRetry) {
       logger.warn(`Database operation failed, retrying... (${retries} attempts left)`, {

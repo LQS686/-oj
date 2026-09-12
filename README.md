@@ -118,14 +118,15 @@ ENCRYPTION_KEY=
 > 详见 `app/api/auth/register/route.ts` 的 `isFirstUser` 判定逻辑。
 
 > ⚠️ **生产环境强制校验**（`lib/env.ts` 启动时检查）：`JWT_SECRET`（≥32）、`REDIS_URL`、`ENCRYPTION_KEY`；禁止 `FORCE_SECURE_COOKIE=false`。生产评测统一走 `docker compose`（应用容器内 runner.sh + dsoj-watch 沙箱隔离）。**请勿在 Windows 宿主上直接跑评测。**
+
 ## Docker 部署
 
 **推荐（按环境选择脚本）：**
 
-| 场景 | 脚本 |
-|------|------|
-| WSL / Linux | `sudo bash scripts/deploy.sh` 或 `docker compose up -d --build` |
-| 宝塔面板 | `sudo bash scripts/bt-deploy.sh https://你的域名`（详见 [docs/BT_DEPLOY.md](docs/BT_DEPLOY.md)） |
+| 场景        | 脚本                                                                                             |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| WSL / Linux | `sudo bash scripts/deploy.sh` 或 `docker compose up -d --build`                                  |
+| 宝塔面板    | `sudo bash scripts/bt-deploy.sh https://你的域名`（详见 [docs/BT_DEPLOY.md](docs/BT_DEPLOY.md)） |
 
 手动部署：
 
@@ -137,11 +138,11 @@ docker compose up -d --build
 docker compose logs -f app
 ```
 
-| 服务  | 端口   | 说明 |
-| ----- | ------ | ---- |
-| app   | 3000   | Next.js 应用（自定义 server + Socket.IO） |
-| mongo | 内部   | MongoDB 7 副本集（默认不映射宿主端口） |
-| redis | 内部   | Redis 缓存（默认不映射宿主端口） |
+| 服务  | 端口 | 说明                                      |
+| ----- | ---- | ----------------------------------------- |
+| app   | 3000 | Next.js 应用（自定义 server + Socket.IO） |
+| mongo | 内部 | MongoDB 7 副本集（默认不映射宿主端口）    |
+| redis | 内部 | Redis 缓存（默认不映射宿主端口）          |
 
 > 反向代理（80/443）由**宿主机 Nginx / 宝塔**承担，compose 内不含 nginx 服务。
 
@@ -196,6 +197,7 @@ docker compose logs -f app
 - **评测隔离** — 选手程序与 SPJ checker 使用白名单 `spawnEnv`，不继承应用环境变量；Docker 路径 drop capabilities / 只读挂载
 - **日志** — `logger` 请求上下文走 AsyncLocalStorage，避免并发请求 `requestId` 串扰
 - **加密** — `crypto.randomBytes` / `randomInt`；生产禁止关闭 Secure Cookie
+
 ## 项目结构
 
 ```

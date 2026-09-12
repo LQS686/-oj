@@ -7,7 +7,5 @@ export default async function TrainingProblemDetailRedirect({
   params: Promise<{ id: string; problemId: string }>
 }) {
   const { id, problemId } = await params
-  redirect(
-    `/training/${id}?tab=problems&problem=${encodeURIComponent(problemId)}`
-  )
+  redirect(`/training/${id}?tab=problems&problem=${encodeURIComponent(problemId)}`)
 }

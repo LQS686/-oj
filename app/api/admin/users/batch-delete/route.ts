@@ -6,10 +6,7 @@
  * - 跳过超级管理员
  */
 import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
-import {
-  batchDeleteUsers,
-  filterUserIdsForBatchAction,
-} from '@/lib/user/service'
+import { batchDeleteUsers, filterUserIdsForBatchAction } from '@/lib/user/service'
 
 export const POST = withApi.admin(async (req, _ctx, { user }) => {
   const body = await readJson<{ userIds?: string[] }>(req)

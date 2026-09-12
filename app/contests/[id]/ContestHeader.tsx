@@ -77,16 +77,15 @@ export default function ContestHeader({
     [...tabs]
       .filter((t): t is typeof t & { href: string } => !!t.href)
       .sort((a, b) => b.href.length - a.href.length)
-      .find((t) =>
-        t.key === 'overview' ? pathname === t.href : pathname.startsWith(t.href)
-      )?.key ?? 'overview'
+      .find((t) => (t.key === 'overview' ? pathname === t.href : pathname.startsWith(t.href)))
+      ?.key ?? 'overview'
 
   return (
     <EntityDetailHeader
       layoutId="contest-view-tab-indicator"
       title={
         <>
-          <h1 className="text-lg font-bold text-foreground truncate">{contest.title}</h1>
+          <h1 className="text-page-title text-foreground truncate">{contest.title}</h1>
           <span className={`shrink-0 text-xs ${statusConfig.tag}`}>{statusConfig.status}</span>
           <span className="tag tag-primary text-xs shrink-0">{contest.type}</span>
         </>
@@ -101,7 +100,7 @@ export default function ContestHeader({
               aria-live="polite"
             >
               <span className="text-muted-foreground whitespace-nowrap">{countdown.label}</span>
-              <span className="font-mono text-sm font-semibold text-foreground tabular-nums tracking-tight">
+              <span className="font-mono text-subsection-title text-foreground tabular-nums tracking-tight">
                 {countdown.display}
               </span>
             </div>

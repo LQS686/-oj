@@ -33,8 +33,12 @@ export default function AssignmentProblemPicker({
       emptyText="尚未添加题目，请在上方搜索或输入题号后点击「添加」"
       renderSelectedItem={(problem, index) => (
         <>
-          <span className="text-xs text-muted-foreground w-6 shrink-0 tabular-nums">{index + 1}.</span>
-          <span className="text-xs font-mono text-muted-foreground shrink-0">{problem.problemNumber}</span>
+          <span className="text-xs text-muted-foreground w-6 shrink-0 tabular-nums">
+            {index + 1}.
+          </span>
+          <span className="text-xs font-mono text-muted-foreground shrink-0">
+            {problem.problemNumber}
+          </span>
           <span className="truncate flex-1 min-w-0 font-medium">{problem.title}</span>
           <div className="flex items-center shrink-0">
             <button

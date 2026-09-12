@@ -3,13 +3,8 @@
 import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { motion, AnimatePresence } from 'motion/react'
-import {
-  AlertCircle,
-  Wifi,
-  CheckCircle2,
-  FileCode,
-  Edit3,
-} from 'lucide-react'
+import { ListEmptyState } from '@/components/common'
+import { AlertCircle, Wifi, CheckCircle2, FileCode, Edit3 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
@@ -44,16 +39,17 @@ import dynamic from 'next/dynamic'
 
 // 懒加载重组件：CodeMirror 编辑器、KaTeX 之外的 tab 面板按需下载，
 // 减小题面首屏 JS 体积，让题面文本（ProblemDescription）优先渲染。
-const ProblemSubmitColumn = dynamic(
-  () => import('@/components/problem/ProblemSubmitColumn'),
-  {
-    ssr: false,
-    loading: () => <EditorSkeleton />,
-  }
-)
+const ProblemSubmitColumn = dynamic(() => import('@/components/problem/ProblemSubmitColumn'), {
+  ssr: false,
+  loading: () => <EditorSkeleton />,
+})
 const SubmissionList = dynamic(() => import('@/components/problem/SubmissionList'), { ssr: false })
-const SolutionTabPanel = dynamic(() => import('@/components/problem/SolutionTabPanel'), { ssr: false })
-const ProblemStatsPanel = dynamic(() => import('@/components/problem/ProblemStatsPanel'), { ssr: false })
+const SolutionTabPanel = dynamic(() => import('@/components/problem/SolutionTabPanel'), {
+  ssr: false,
+})
+const ProblemStatsPanel = dynamic(() => import('@/components/problem/ProblemStatsPanel'), {
+  ssr: false,
+})
 
 function EditorSkeleton() {
   return (
@@ -67,14 +63,22 @@ function EditorSkeleton() {
 const PRESET = WORKSPACE_PRESETS.library
 const languageOptions = WORKSPACE_LANGUAGE_OPTIONS
 
-function getStorageKey(problemId: string, classId: string | null, assignmentId: string | null): string {
+function getStorageKey(
+  problemId: string,
+  classId: string | null,
+  assignmentId: string | null
+): string {
   if (classId && assignmentId) {
     return `code_class_${classId}_${assignmentId}_${problemId}`
   }
   return `code_problem_${problemId}`
 }
 
-function getLanguageStorageKey(problemId: string, classId: string | null, assignmentId: string | null): string {
+function getLanguageStorageKey(
+  problemId: string,
+  classId: string | null,
+  assignmentId: string | null
+): string {
   if (classId && assignmentId) {
     return `lang_class_${classId}_${assignmentId}_${problemId}`
   }
@@ -93,7 +97,7 @@ export default function ProblemPageClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useUser()
-  
+
   const fromAssignment = searchParams.get('fromAssignment')
   const classId = searchParams.get('classId')
   const assignmentTitle = searchParams.get('assignmentTitle')
@@ -120,8 +124,7 @@ export default function ProblemPageClient({
   })
 
   const desktopTabs = useMemo(
-    () =>
-      PRESET.desktopTabs.filter((tab) => !(isAssignmentContext && tab === 'solutions')),
+    () => PRESET.desktopTabs.filter((tab) => !(isAssignmentContext && tab === 'solutions')),
     [isAssignmentContext]
   )
 
@@ -209,7 +212,7 @@ export default function ProblemPageClient({
 
     const langKey = getLanguageStorageKey(problem.id, classId, fromAssignment)
     const savedLang = localStorage.getItem(langKey)
-    if (savedLang && languageOptions.some(l => l.value === savedLang)) {
+    if (savedLang && languageOptions.some((l) => l.value === savedLang)) {
       setLanguage(savedLang)
       return
     }
@@ -250,18 +253,18 @@ export default function ProblemPageClient({
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [activeTab])
-  
+
   const fetchSubmissions = async () => {
     try {
       setSubmissionsLoading(true)
-      
+
       let url: string
       if (fromAssignment && classId) {
         url = `/api/classes/${classId}/assignments/${fromAssignment}/submissions?problemId=${problemId}`
-        
+
         const response = await fetchWithCookie(url, { cache: 'no-store' })
         const data = await response.json()
-        
+
         if (data.success) {
           setSubmissions(data.data.submissions || [])
         } else {
@@ -275,10 +278,10 @@ export default function ProblemPageClient({
           return
         }
         url = `/api/problems/${problemId}/submissions?userId=${user.id}`
-        
+
         const response = await fetchWithCookie(url, { cache: 'no-store' })
         const data = await response.json()
-        
+
         if (data.success) {
           setSubmissions(data.data.submissions || [])
         } else {
@@ -318,8 +321,7 @@ export default function ProblemPageClient({
     onRefreshAfterFinal: () => {
       void fetchSubmissions()
     },
-    mergeListOnUpdate: (prev, data) =>
-      defaultMergeSubmissionList(prev, data, { language }),
+    mergeListOnUpdate: (prev, data) => defaultMergeSubmissionList(prev, data, { language }),
   })
 
   const handleSubmit = useCallback(async () => {
@@ -353,7 +355,7 @@ export default function ProblemPageClient({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(submitBody)
+        body: JSON.stringify(submitBody),
       })
 
       const data = await response.json()
@@ -435,22 +437,24 @@ export default function ProblemPageClient({
   if (problemError || !problem) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center card-static rounded-lg p-12 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8 text-error" />
-          </div>
-          <p className="text-error text-lg mb-6">{problemError || '题目不存在'}</p>
-          <button onClick={() => router.back()} className="btn-primary btn" type="button">
-            返回
-          </button>
-        </div>
+        <ListEmptyState
+          tone="error"
+          icon={AlertCircle}
+          title={problemError || '题目不存在'}
+          action={
+            <button onClick={() => router.back()} className="btn-primary btn" type="button">
+              返回
+            </button>
+          }
+        />
       </div>
     )
   }
 
-  const acceptRate = problem.totalSubmit > 0 
-    ? ((problem.totalAccepted / problem.totalSubmit) * 100).toFixed(1) 
-    : '0.0'
+  const acceptRate =
+    problem.totalSubmit > 0
+      ? ((problem.totalAccepted / problem.totalSubmit) * 100).toFixed(1)
+      : '0.0'
 
   return (
     <div className="min-h-screen pb-20 lg:pb-8">
@@ -459,11 +463,11 @@ export default function ProblemPageClient({
           <span className="font-mono text-sm font-bold text-primary-light bg-primary/10 px-3 py-1 rounded-lg">
             {problem.problemNumber || problem.id}
           </span>
-          <h1 className="text-xl font-bold text-foreground md:text-2xl">{problem.title}</h1>
+          <h1 className="text-page-title text-foreground">{problem.title}</h1>
           {canEditProblem && problem?.id && (
             <Link
               href={`/admin/problems/${problem.id}/edit`}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-primary-light hover:bg-primary/10 transition-colors"
+              className="inline-flex items-center gap-1 btn btn-sm text-primary-light hover:bg-primary/10 transition-colors"
             >
               <Edit3 className="w-3.5 h-3.5" /> 编辑
             </Link>
@@ -545,7 +549,9 @@ export default function ProblemPageClient({
                   transition={{ duration: 0.2 }}
                 >
                   <SubmissionList
-                    submissions={submissions as import('@/components/problem/SubmissionList').SubmissionListItem[]}
+                    submissions={
+                      submissions as import('@/components/problem/SubmissionList').SubmissionListItem[]
+                    }
                     loading={submissionsLoading}
                     error={null}
                     user={user}

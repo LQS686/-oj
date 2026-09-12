@@ -139,7 +139,12 @@ export async function deleteNotification(id: string, userId: string) {
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {
-  return cache.get('notification:unread', [userId], async () => {
-    return prisma.notification.count({ where: { userId, isRead: false } })
-  }, { ttl: 30_000 })
+  return cache.get(
+    'notification:unread',
+    [userId],
+    async () => {
+      return prisma.notification.count({ where: { userId, isRead: false } })
+    },
+    { ttl: 30_000 }
+  )
 }

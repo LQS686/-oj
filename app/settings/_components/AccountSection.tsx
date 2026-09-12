@@ -3,7 +3,12 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
 import { Mail, Lock, Shield, Eye, EyeOff, ChevronDown } from 'lucide-react'
-import type { EmailChangeState, SettingsFormData, SettingsUser, ShowPasswordsState } from '../_types'
+import type {
+  EmailChangeState,
+  SettingsFormData,
+  SettingsUser,
+  ShowPasswordsState,
+} from '../_types'
 
 interface AccountSectionProps {
   user: SettingsUser | null
@@ -46,12 +51,12 @@ export function AccountSection({
     >
       <div className="flex items-center gap-2">
         <Shield className="w-4 h-4 text-primary-light" />
-        <h2 className="text-base font-semibold text-foreground">账号安全</h2>
+        <h2 className="text-section-title text-foreground">账号安全</h2>
       </div>
 
       {/* 邮箱 */}
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">登录邮箱</h3>
+        <h3 className="text-subsection-title text-foreground">登录邮箱</h3>
         <div className="relative">
           <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -94,9 +99,7 @@ export function AccountSection({
                 type={showPasswords.emailPassword ? 'text' : 'password'}
                 placeholder="当前密码"
                 value={emailChange.currentPassword}
-                onChange={(e) =>
-                  onEmailChange({ ...emailChange, currentPassword: e.target.value })
-                }
+                onChange={(e) => onEmailChange({ ...emailChange, currentPassword: e.target.value })}
                 className="input pl-10 pr-11"
               />
               <button
@@ -142,7 +145,7 @@ export function AccountSection({
 
       {/* 密码 */}
       <section className="space-y-3 pt-2 border-t border-border">
-        <h3 className="text-sm font-semibold text-foreground">修改密码</h3>
+        <h3 className="text-subsection-title text-foreground">修改密码</h3>
         <div className="space-y-3 max-w-md">
           <PasswordInput
             placeholder="当前密码"

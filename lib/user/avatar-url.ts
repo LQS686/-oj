@@ -6,10 +6,7 @@
 /** 读取路径二次校验：非白名单头像 URL 对外置空，防止历史脏数据钓鱼 */
 export function sanitizeAvatarUrl(avatar: string | null | undefined): string | null {
   if (!avatar) return null
-  if (
-    avatar.startsWith('/uploads/avatars/') ||
-    avatar.startsWith('/api/placeholder/')
-  ) {
+  if (avatar.startsWith('/uploads/avatars/') || avatar.startsWith('/api/placeholder/')) {
     return avatar
   }
   return null

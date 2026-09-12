@@ -19,7 +19,7 @@ async function logAccess(
     req?.headers.get('x-real-ip') || null
   )
   const userAgent = req?.headers.get('user-agent') || 'unknown'
-  
+
   logger.info(`[Audit] ${action} | User: ${userId || 'Guest'} | Resource: ${resource} | IP: ${ip}`)
 
   try {
@@ -30,23 +30,26 @@ async function logAccess(
         resource,
         details: details || undefined,
         ip,
-        userAgent
-      }
+        userAgent,
+      },
     })
   } catch (err) {
     // 审计日志写入失败不应阻断主流程，仅记录告警
-    logger.warn('[contest-auth] 审计日志写入失败', err instanceof Error ? { message: err.message } : { error: err })
+    logger.warn(
+      '[contest-auth] 审计日志写入失败',
+      err instanceof Error ? { message: err.message } : { error: err }
+    )
   }
 }
 
 export async function checkContestAccess(
-  contestId: string, 
+  contestId: string,
   currentUser: JWTPayload | null,
   req?: NextRequest
-): Promise<{ 
-  allowed: boolean; 
-  error?: string; 
-  status?: number; 
+): Promise<{
+  allowed: boolean
+  error?: string
+  status?: number
   contest?: Prisma.ContestGetPayload<object>
 }> {
   const resourcePath = req?.nextUrl?.pathname || `/contests/${contestId}`
@@ -62,7 +65,9 @@ export async function checkContestAccess(
   const now = new Date()
   const isStarted = now >= contest.startTime
   const isEnded = now > contest.endTime
-  const isAdmin = canAccessAdmin(currentUser ? { id: currentUser.userId, role: currentUser.role } : null) || contest.authorId === currentUser?.userId
+  const isAdmin =
+    canAccessAdmin(currentUser ? { id: currentUser.userId, role: currentUser.role } : null) ||
+    contest.authorId === currentUser?.userId
 
   if (isAdmin) {
     return { allowed: true, contest }
@@ -70,7 +75,9 @@ export async function checkContestAccess(
 
   // 1. 比赛未开始：严格隐藏
   if (!isStarted) {
-    await logAccess('ACCESS_DENIED_NOT_STARTED', resourcePath, currentUser?.userId, req, { contestId })
+    await logAccess('ACCESS_DENIED_NOT_STARTED', resourcePath, currentUser?.userId, req, {
+      contestId,
+    })
     return { allowed: false, error: '比赛尚未开始', status: 403 }
   }
 
@@ -78,7 +85,10 @@ export async function checkContestAccess(
   // Requirement: "对所有用户（不包括未注册用户）完全可见" -> 必须登录
   if (isEnded && contest.isPublic) {
     if (!currentUser) {
-      await logAccess('ACCESS_DENIED_GUEST', resourcePath, undefined, req, { contestId, reason: 'Login required for ended public contest' })
+      await logAccess('ACCESS_DENIED_GUEST', resourcePath, undefined, req, {
+        contestId,
+        reason: 'Login required for ended public contest',
+      })
       return { allowed: false, error: '请先登录', status: 401 }
     }
     return { allowed: true, contest }
@@ -100,7 +110,9 @@ export async function checkContestAccess(
   })
 
   if (!participant) {
-    await logAccess('ACCESS_DENIED_NOT_REGISTERED', resourcePath, currentUser.userId, req, { contestId })
+    await logAccess('ACCESS_DENIED_NOT_REGISTERED', resourcePath, currentUser.userId, req, {
+      contestId,
+    })
     return { allowed: false, error: '请先报名参赛', status: 403 }
   }
 

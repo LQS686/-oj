@@ -57,7 +57,7 @@ function ResetPasswordForm() {
     return (
       <div className="text-center py-8">
         <AlertCircle className="w-12 h-12 text-error mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-foreground mb-2">链接无效</h3>
+        <h1 className="text-page-title text-foreground mb-2">链接无效</h1>
         <p className="text-muted-foreground mb-6">重置链接缺失或已损坏，请重新发起密码重置。</p>
         <Link href="/forgot-password" className="btn-primary btn inline-flex">
           重新发起
@@ -67,13 +67,16 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="card-static rounded-lg p-8 md:p-10">
+    <div className="card-static p-5 md:p-8">
       <div className="flex items-center gap-3 mb-8">
-        <Link href="/login" className="text-muted-foreground hover:text-foreground transition-colors">
+        <Link
+          href="/login"
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h2 className="text-2xl font-extrabold text-foreground">重置密码</h2>
+          <h1 className="text-page-title text-foreground">重置密码</h1>
           <p className="text-sm text-muted-foreground">设置你的新密码</p>
         </div>
       </div>
@@ -83,7 +86,7 @@ function ResetPasswordForm() {
           <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-8 h-8 text-success" />
           </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">密码重置成功</h3>
+          <h1 className="text-page-title text-foreground mb-2">密码重置成功</h1>
           <p className="text-muted-foreground mb-6">即将跳转到登录页，请使用新密码登录。</p>
         </div>
       ) : (
@@ -95,9 +98,9 @@ function ResetPasswordForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-3">新密码</label>
+              <label className="block text-label text-foreground mb-3">新密码</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
@@ -113,7 +116,7 @@ function ResetPasswordForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-3">确认新密码</label>
+              <label className="block text-label text-foreground mb-3">确认新密码</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
@@ -152,7 +155,11 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <GuestAuthShell>
-      <Suspense fallback={<div className="card-static rounded-lg p-8 text-center text-muted-foreground">加载中…</div>}>
+      <Suspense
+        fallback={
+          <div className="card-static px-6 py-8 text-center text-muted-foreground">加载中…</div>
+        }
+      >
         <ResetPasswordForm />
       </Suspense>
     </GuestAuthShell>

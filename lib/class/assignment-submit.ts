@@ -85,11 +85,7 @@ export async function submitAssignmentCode(input: SubmitAssignmentInput) {
     const elapsed = now.getTime() - new Date(recentSubmission.submittedAt).getTime()
     if (elapsed < SUBMIT_RATE_LIMIT_MS) {
       const waitSec = Math.ceil((SUBMIT_RATE_LIMIT_MS - elapsed) / 1000)
-      throw new ApiError(
-        'SUBMIT_TOO_FREQUENT',
-        `提交过于频繁，请 ${waitSec} 秒后重试`,
-        429
-      )
+      throw new ApiError('SUBMIT_TOO_FREQUENT', `提交过于频繁，请 ${waitSec} 秒后重试`, 429)
     }
   }
 

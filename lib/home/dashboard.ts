@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { listPublicContests } from '@/lib/contest/service'
 import { listPublicAnnouncements, type PublicAnnouncementItem } from '@/lib/announcement/service'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
+import { getSolvedProblemCount } from '@/lib/user/solved-count'
 
 function isAccepted(status: string): boolean {
   return status === SubmissionStatus.ACCEPTED || status === 'AC'
@@ -55,7 +56,7 @@ export interface HomeDashboardData {
 async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { rank: true, solvedCount: true },
+    select: { rank: true },
   })
 
   const now = new Date()
@@ -67,7 +68,7 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
   prevWeekStart.setDate(prevWeekStart.getDate() - 7)
 
   // 仅拉取近两周提交做周通过率；今日/累计 AC 用聚合，避免拉全量历史
-  const [weekSubs, prevWeekSubs, todayAcGroups, distinctAc] = await Promise.all([
+  const [weekSubs, prevWeekSubs, todayAcGroups, solvedProblems] = await Promise.all([
     prisma.submission.findMany({
       where: { userId, submittedAt: { gte: weekStart } },
       select: { status: true },
@@ -88,13 +89,12 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
       },
     }),
     // C-P2-9：累计 AC 去重改用 groupBy（按 problemId 聚合），替代全量 distinct 拉取
-    prisma.submission.groupBy({
-      by: ['problemId'],
-      where: { userId, status: SubmissionStatus.ACCEPTED },
-    }),
+    // 累计 AC / 解题数：与个人主页共用 getSolvedProblemCount，
+    // 保证「首页累计 AC」与「个人主页解题」永远是同一个数字
+    getSolvedProblemCount(userId),
   ])
 
-  const totalSolved = distinctAc.length
+  const totalSolved = solvedProblems
 
   const weekRate =
     weekSubs.length > 0
@@ -102,7 +102,9 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
       : 0
   const prevRate =
     prevWeekSubs.length > 0
-      ? Math.round((prevWeekSubs.filter((s) => isAccepted(s.status)).length / prevWeekSubs.length) * 100)
+      ? Math.round(
+          (prevWeekSubs.filter((s) => isAccepted(s.status)).length / prevWeekSubs.length) * 100
+        )
       : null
   const weeklyPassRateDelta = prevRate !== null ? weekRate - prevRate : null
 
@@ -110,7 +112,7 @@ async function computeUserStats(userId: string): Promise<HomeDashboardStats> {
     todaySolved: todayAcGroups.length,
     weeklyPassRate: weekRate,
     weeklyPassRateDelta,
-    totalSolved: user?.solvedCount || totalSolved,
+    totalSolved,
     weeklySubmissions: weekSubs.length,
     rank: user?.rank ?? '新手',
   }

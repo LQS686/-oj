@@ -71,7 +71,7 @@ function createTransporter(cfg: {
     host: cfg.host,
     port: cfg.port,
     secure: cfg.secure,
-    auth: { user: cfg.user, pass: cfg.pass }
+    auth: { user: cfg.user, pass: cfg.pass },
   })
 }
 
@@ -93,7 +93,7 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
     logger.warn('[email] 检测到 SSL 配置与端口不匹配，已自动修正', {
       port: cfg.port,
       original: cfg.secure,
-      corrected: correctedSecure
+      corrected: correctedSecure,
     })
   }
   const effectiveCfg = { ...cfg, secure: correctedSecure }
@@ -111,7 +111,7 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
       to,
       subject: opts.subject,
       html: opts.html,
-      text: opts.text
+      text: opts.text,
     })
   }
 
@@ -122,39 +122,50 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err || '发送失败')
     // 检测疑似 SSL/版本不匹配错误，切换 secure 重试一次
-    const looksLikeSslError = /wrong version number|SSL|TLS|EBADNAME|EPROTO|ECONNRESET/i.test(errMsg)
+    const looksLikeSslError = /wrong version number|SSL|TLS|EBADNAME|EPROTO|ECONNRESET/i.test(
+      errMsg
+    )
     if (looksLikeSslError) {
       const flippedSecure = !effectiveCfg.secure
       logger.warn('[email] 首次发送失败，切换 SSL 重试', {
         port: effectiveCfg.port,
         originalSecure: effectiveCfg.secure,
         retrySecure: flippedSecure,
-        firstError: errMsg
+        firstError: errMsg,
       })
       try {
         const retryTransporter = createTransporter({ ...effectiveCfg, secure: flippedSecure })
         const info2 = await sendOnce(retryTransporter)
-        logger.info('[email] 切换 SSL 后发送成功', { to, subject: opts.subject, secure: flippedSecure })
+        logger.info('[email] 切换 SSL 后发送成功', {
+          to,
+          subject: opts.subject,
+          secure: flippedSecure,
+        })
         return { success: true, messageId: info2.messageId }
       } catch (err2: unknown) {
         const err2Msg = err2 instanceof Error ? err2.message : String(err2 || '发送失败')
         logger.error('[email] 切换 SSL 重试仍失败', {
-          to, subject: opts.subject,
-          host: effectiveCfg.host, port: effectiveCfg.port,
+          to,
+          subject: opts.subject,
+          host: effectiveCfg.host,
+          port: effectiveCfg.port,
           triedSecure: [effectiveCfg.secure, flippedSecure],
-          errors: [errMsg, err2Msg]
+          errors: [errMsg, err2Msg],
         })
         return {
           success: false,
-          error: `SMTP 连接失败（已尝试两种 SSL 模式）。请检查：1) 端口与 SSL 是否匹配（465→开, 587→关）；2) 授权码是否正确；3) 网络是否可达。最后错误：${err2Msg}`
+          error: `SMTP 连接失败（已尝试两种 SSL 模式）。请检查：1) 端口与 SSL 是否匹配（465→开, 587→关）；2) 授权码是否正确；3) 网络是否可达。最后错误：${err2Msg}`,
         }
       }
     }
 
     logger.error('[email] 邮件发送失败', {
-      to, subject: opts.subject,
-      host: effectiveCfg.host, port: effectiveCfg.port, secure: effectiveCfg.secure,
-      error: errMsg
+      to,
+      subject: opts.subject,
+      host: effectiveCfg.host,
+      port: effectiveCfg.port,
+      secure: effectiveCfg.secure,
+      error: errMsg,
     })
     return { success: false, error: errMsg }
   }
@@ -181,6 +192,6 @@ export async function sendTestEmail(to: string): Promise<SendMailResult> {
         <p style="color: #6b7280; font-size: 12px;">这是一封系统自动发送的邮件，请勿直接回复。</p>
       </div>
     `,
-    text: `测试邮件\n\n这是来自 ${siteName} 的测试邮件，说明 SMTP 配置正常工作。\n发送时间：${time}`
+    text: `测试邮件\n\n这是来自 ${siteName} 的测试邮件，说明 SMTP 配置正常工作。\n发送时间：${time}`,
   })
 }

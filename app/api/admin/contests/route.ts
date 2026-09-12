@@ -31,21 +31,35 @@ export const POST = withApi.admin(async (req, _ctx, { user }) => {
     sealRankTime?: string | null
   }>(req)
   const {
-    title, description, type, startTime, endTime, isPublic, password, problems, sealRankTime,
+    title,
+    description,
+    type,
+    startTime,
+    endTime,
+    isPublic,
+    password,
+    problems,
+    sealRankTime,
   } = body
 
   if (!title || !description || !startTime || !endTime || !type) {
     throw400('MISSING_FIELDS', '请填写所有必填字段')
   }
 
-  const contest = await adminCreateContest({
-    title: title!,
-    description: description!,
-    type: type!,
-    startTime: startTime!,
-    endTime: endTime!,
-    isPublic, password, problems, sealRankTime,
-  }, user.id)
+  const contest = await adminCreateContest(
+    {
+      title: title!,
+      description: description!,
+      type: type!,
+      startTime: startTime!,
+      endTime: endTime!,
+      isPublic,
+      password,
+      problems,
+      sealRankTime,
+    },
+    user.id
+  )
 
   return ok(contest)
 })

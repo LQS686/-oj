@@ -101,8 +101,8 @@ function TrainingDetailPageContent() {
   const [activeTab, setActiveTab] = useState<Tab>(() =>
     searchParams.get('tab') === 'problems' ? 'problems' : 'intro'
   )
-  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(
-    () => searchParams.get('problem')
+  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(() =>
+    searchParams.get('problem')
   )
 
   useDocumentTitle(training?.title)
@@ -204,9 +204,7 @@ function TrainingDetailPageContent() {
     if (!training?.problems.length) return null
     const attempted = training.problems.find((p) => p.status === 'ATTEMPTED')
     if (attempted) return attempted
-    const notStarted = training.problems.find(
-      (p) => !p.status || p.status === 'NOT_STARTED'
-    )
+    const notStarted = training.problems.find((p) => !p.status || p.status === 'NOT_STARTED')
     return notStarted || training.problems[0]
   }, [training])
 
@@ -232,7 +230,11 @@ function TrainingDetailPageContent() {
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-error mx-auto mb-3" />
           <p className="text-foreground mb-4">{error}</p>
-          <button type="button" onClick={() => void fetchDetail()} className="btn btn-primary btn-sm">
+          <button
+            type="button"
+            onClick={() => void fetchDetail()}
+            className="btn btn-primary btn-sm"
+          >
             <RefreshCw className="w-4 h-4" />
             重试
           </button>
@@ -292,7 +294,10 @@ function TrainingDetailPageContent() {
       : []),
     { label: '加入', icon: Users, value: formatCount(training.joinCount) },
     { label: '浏览', icon: Eye, value: formatCount(training.viewCount) },
-    { label: '更新', value: <span className="text-xs font-normal">{formatDate(training.updatedAt)}</span> },
+    {
+      label: '更新',
+      value: <span className="text-xs font-normal">{formatDate(training.updatedAt)}</span>,
+    },
   ]
 
   return (
@@ -370,9 +375,9 @@ function TrainingDetailPageContent() {
                   }
                 />
 
-                <section className="card-static p-5 rounded-xl space-y-5">
+                <section className="card-static p-5 space-y-4">
                   <div className="flex flex-wrap items-end justify-between gap-3">
-                    <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <h2 className="text-subsection-title text-foreground flex items-center gap-2">
                       <ListOrdered className="w-4 h-4 text-primary-light" />
                       题目构成
                     </h2>
@@ -386,8 +391,7 @@ function TrainingDetailPageContent() {
                       {training.problems.map((item, idx) => {
                         const id = item.problem?.id
                         if (!id) return null
-                        const letter =
-                          LETTERS[item.orderIndex] || LETTERS[idx] || String(idx + 1)
+                        const letter = LETTERS[item.orderIndex] || LETTERS[idx] || String(idx + 1)
                         const st = item.status
                         return (
                           <button
@@ -404,13 +408,9 @@ function TrainingDetailPageContent() {
                             }`}
                           >
                             <span className="font-mono font-bold">{letter}</span>
-                            {item.required && (
-                              <span className="text-xs opacity-80">必做</span>
-                            )}
+                            {item.required && <span className="text-xs opacity-80">必做</span>}
                             {item.problem?.difficulty && (
-                              <span className="text-xs opacity-70">
-                                {item.problem.difficulty}
-                              </span>
+                              <span className="text-xs opacity-70">{item.problem.difficulty}</span>
                             )}
                           </button>
                         )
@@ -451,7 +451,7 @@ function TrainingDetailPageContent() {
             }
             aside={
               <>
-                <div className="card-static p-4 space-y-3 rounded-xl">
+                <div className="card-static p-4 space-y-4">
                   <JoinTrainingButton
                     trainingId={training.id}
                     initialJoined={training.isJoined}
@@ -486,9 +486,9 @@ function TrainingDetailPageContent() {
                 </div>
 
                 {user && progress.totalProblems > 0 && (
-                  <div className="card-static p-4 rounded-xl">
+                  <div className="card-static p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-foreground">学习进度</span>
+                      <span className="text-subsection-title text-foreground">学习进度</span>
                       <ProgressCircle
                         solved={progress.solvedCount}
                         total={progress.totalProblems}
@@ -535,11 +535,7 @@ function ProgressStat({
   tone: 'success' | 'error' | 'muted'
 }) {
   const cls =
-    tone === 'success'
-      ? 'text-success'
-      : tone === 'error'
-        ? 'text-error'
-        : 'text-muted-foreground'
+    tone === 'success' ? 'text-success' : tone === 'error' ? 'text-error' : 'text-muted-foreground'
   return (
     <div className="flex items-center justify-between">
       <span className="text-muted-foreground">{label}</span>

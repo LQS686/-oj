@@ -5,27 +5,27 @@
 
 ## 1. 文件命名
 
-| 类别             | 风格          | 示例                          |
-| ---------------- | ------------- | ----------------------------- |
-| React 组件       | PascalCase    | `UserCard.tsx`、`ProblemList.tsx` |
-| 工具 / Hook      | camelCase     | `useCurrentUser.ts`、`formatDate.ts` |
-| 业务模块（lib/） | kebab-case 目录 + 固定文件名 | `lib/auth/service.ts` |
-| 类型定义文件     | camelCase     | `common.ts`、`api.ts` |
-| 文档             | SCREAMING_SNAKE | `NAMING_CONVENTION.md`     |
-| 脚本             | kebab-case    | `migrate-team-to-class.ts` |
+| 类别             | 风格                         | 示例                                 |
+| ---------------- | ---------------------------- | ------------------------------------ |
+| React 组件       | PascalCase                   | `UserCard.tsx`、`ProblemList.tsx`    |
+| 工具 / Hook      | camelCase                    | `useCurrentUser.ts`、`formatDate.ts` |
+| 业务模块（lib/） | kebab-case 目录 + 固定文件名 | `lib/auth/service.ts`                |
+| 类型定义文件     | camelCase                    | `common.ts`、`api.ts`                |
+| 文档             | SCREAMING_SNAKE              | `NAMING_CONVENTION.md`               |
+| 脚本             | kebab-case                   | `migrate-team-to-class.ts`           |
 
 > ⚠️ 已废弃命名：`lib/` 根目录的 PascalCase 工具文件需迁入业务模块目录。
 
 ## 2. 目录命名
 
-| 类别             | 风格         |
-| ---------------- | ------------ |
-| `app/`           | kebab-case（路由段）/ `[id]` 动态段 |
-| `lib/<domain>/`  | kebab-case  |
-| `components/<domain>/` | kebab-case |
-| `hooks/`         | （单数）camelCase hook 文件 |
-| `types/`         | （单数）camelCase 类型文件 |
-| `scripts/`       | kebab-case |
+| 类别                   | 风格                                |
+| ---------------------- | ----------------------------------- |
+| `app/`                 | kebab-case（路由段）/ `[id]` 动态段 |
+| `lib/<domain>/`        | kebab-case                          |
+| `components/<domain>/` | kebab-case                          |
+| `hooks/`               | （单数）camelCase hook 文件         |
+| `types/`               | （单数）camelCase 类型文件          |
+| `scripts/`             | kebab-case                          |
 
 ## 3. 变量与函数
 
@@ -41,12 +41,12 @@
 
 TypeScript 保留字禁止作为标识符；本项目常见冲突及解决方案：
 
-| 保留字 | 解决方案            | 示例                  |
-| ------ | ------------------- | --------------------- |
-| `class` | 使用 `classData` / `classInfo` | `const classData = await getClass(id)` |
-| `function` | 使用 `fn` / `handler` | `const handler: Handler = ...` |
-| `new` | 使用 `newData` / `record` | `const newData = ...` |
-| `delete` | 使用 `remove` | `removeUser(id)` |
+| 保留字     | 解决方案                       | 示例                                   |
+| ---------- | ------------------------------ | -------------------------------------- |
+| `class`    | 使用 `classData` / `classInfo` | `const classData = await getClass(id)` |
+| `function` | 使用 `fn` / `handler`          | `const handler: Handler = ...`         |
+| `new`      | 使用 `newData` / `record`      | `const newData = ...`                  |
+| `delete`   | 使用 `remove`                  | `removeUser(id)`                       |
 
 ESLint 规则已开启 `no-shadow-restricted-names`。
 

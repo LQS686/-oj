@@ -45,10 +45,7 @@ export async function getClassNote(noteId: string) {
   return prisma.classNote.findUnique({ where: { id: noteId } })
 }
 
-export async function listClassNotes(
-  classId: string,
-  filter: ListClassNotesFilter = {}
-) {
+export async function listClassNotes(classId: string, filter: ListClassNotesFilter = {}) {
   const { category, search, onlyMine, authorId, skip = 0, take = 50 } = filter
 
   const where: Prisma.ClassNoteWhereInput = { classId }

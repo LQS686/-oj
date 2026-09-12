@@ -54,11 +54,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
     }
     if (problemIds.length > DSOJ_EXPORT_MAX_PROBLEMS) {
       const { fail } = await import('@/lib/api/response')
-      return fail(
-        'TOO_MANY_IDS',
-        `单次题包导出最多 ${DSOJ_EXPORT_MAX_PROBLEMS} 题`,
-        400
-      )
+      return fail('TOO_MANY_IDS', `单次题包导出最多 ${DSOJ_EXPORT_MAX_PROBLEMS} 题`, 400)
     }
 
     // 归档格式：zip（默认）/ tar.xz
@@ -99,9 +95,7 @@ export const GET = withApi.admin(async (req, _ctx) => {
           error: err instanceof Error ? err.message : String(err),
         })
         // 通过 destroy 传播错误到下游 PassThrough
-        passthrough.destroy(
-          err instanceof Error ? err : new Error(String(err))
-        )
+        passthrough.destroy(err instanceof Error ? err : new Error(String(err)))
       }
     })()
 
@@ -127,7 +121,11 @@ export const GET = withApi.admin(async (req, _ctx) => {
   // 默认：CSV 报表导出（硬顶 5000，可用 ids / limit 收窄）
   const idsParam = searchParams.get('ids') || ''
   const idFilter = idsParam
-    ? idsParam.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 5000)
+    ? idsParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 5000)
     : undefined
   const limitRaw = parseInt(searchParams.get('limit') || '5000', 10)
   const take = Math.min(5000, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 5000))

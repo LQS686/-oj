@@ -16,9 +16,7 @@ export const GET = withApi.public(async (req, ctx) => {
   if (!id) throw400('INVALID_ID', '无效的题目ID')
 
   const session = getUserFromRequest(req)
-  const viewer = session?.userId
-    ? await getCachedUser(session.userId, session.tokenVersion)
-    : null
+  const viewer = session?.userId ? await getCachedUser(session.userId, session.tokenVersion) : null
 
   const contestId = req.nextUrl.searchParams.get('contestId') || undefined
   const problem = await requireAccessibleProblem(id, viewer, { contestId })

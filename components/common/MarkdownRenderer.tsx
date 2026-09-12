@@ -5,14 +5,6 @@ interface MarkdownRendererProps {
   className?: string
 }
 
-export default function MarkdownRenderer({
-  content,
-  className,
-}: MarkdownRendererProps) {
-  return (
-    <MarkdownContent
-      content={content}
-      className={className}
-    />
-  )
+export default function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+  return <MarkdownContent content={content} className={className} />
 }

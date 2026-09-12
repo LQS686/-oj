@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, AdminPageShell } from '@/components/admin'
-import { useDialog, RouteSuspenseFallback } from '@/components/common'
+import { ListEmptyState, useDialog, RouteSuspenseFallback } from '@/components/common'
 import { ListChecks, Plus, SearchX } from 'lucide-react'
 import { useObjectiveQuestionList } from './_hooks/useObjectiveQuestionList'
 import { ObjectiveQuestionFilterBar } from './_components/ObjectiveQuestionFilterBar'
@@ -47,7 +47,7 @@ function AdminObjectiveQuestionsPageContent() {
   // 筛选变化时重置到第 1 页，避免停留在空页
   const handleFiltersChange = useCallback(
     (patch: Partial<ObjectiveQuestionFilters>) => {
-      setFilters(prev => ({ ...prev, ...patch }))
+      setFilters((prev) => ({ ...prev, ...patch }))
       setPage(1)
     },
     [setPage]
@@ -63,11 +63,8 @@ function AdminObjectiveQuestionsPageContent() {
   useEffect(() => {
     const params = filtersToQueryParams(filters)
     const queryString = new URLSearchParams(params).toString()
-    const newUrl = queryString
-      ? `?${queryString}`
-      : '/admin/objective-questions'
-    const currentSearch =
-      typeof window !== 'undefined' ? window.location.search : ''
+    const newUrl = queryString ? `?${queryString}` : '/admin/objective-questions'
+    const currentSearch = typeof window !== 'undefined' ? window.location.search : ''
     const currentPath = currentSearch
       ? `/admin/objective-questions${currentSearch}`
       : '/admin/objective-questions'
@@ -80,9 +77,7 @@ function AdminObjectiveQuestionsPageContent() {
   const handleDelete = useCallback(
     async (question: ObjectiveQuestionRow) => {
       const ok = await dialog.confirm({
-        message: `确定要删除 ${
-          question.questionNumber || '该题目'
-        } 吗？此操作无法撤销。`,
+        message: `确定要删除 ${question.questionNumber || '该题目'} 吗？此操作无法撤销。`,
         tone: 'warning',
         confirmText: '删除',
         confirmVariant: 'destructive',
@@ -143,11 +138,9 @@ function AdminObjectiveQuestionsPageContent() {
       {/* 页头：标题 + 描述 + 创建入口 */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-foreground tracking-tight">
-            客观题管理
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            管理单选、多选、判断、填空题题库，供班级作业引用
+          {/* 标题由 AdminLayout 顶栏提供（本页唯一 H1），此处只保留说明，避免同名标题重复出现 */}
+          <p className="text-sm text-muted-foreground">
+            管理单选、多选、判断、填空题库，供班级作业引用
           </p>
         </div>
         <button
@@ -178,30 +171,21 @@ function AdminObjectiveQuestionsPageContent() {
       </div>
 
       {isEmpty ? (
-        <div className="card px-6 py-16 text-center">
-          <ListChecks className="w-10 h-10 mx-auto text-muted-foreground/50" />
-          {hasActiveFilters ? (
-            <>
-              <p className="mt-3 text-foreground font-medium">
-                没有找到匹配的客观题
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                没有符合当前筛选条件的题目，请调整筛选条件
-              </p>
-              <button
-                onClick={handleReset}
-                className="btn btn-ghost mt-4 gap-1.5"
-              >
+        <ListEmptyState
+          icon={ListChecks}
+          title={hasActiveFilters ? '没有找到匹配的客观题' : '暂无客观题'}
+          description={
+            hasActiveFilters
+              ? '没有符合当前筛选条件的题目，请调整筛选条件'
+              : '题库还是空的，创建第一道客观题吧'
+          }
+          action={
+            hasActiveFilters ? (
+              <button onClick={handleReset} className="btn btn-ghost mt-4 gap-1.5">
                 <SearchX className="w-4 h-4" />
                 清除筛选
               </button>
-            </>
-          ) : (
-            <>
-              <p className="mt-3 text-foreground font-medium">暂无客观题</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                题库还是空的，创建第一道客观题吧
-              </p>
+            ) : (
               <button
                 onClick={() => router.push('/admin/objective-questions/create')}
                 className="btn btn-primary mt-4 gap-1.5"
@@ -209,9 +193,9 @@ function AdminObjectiveQuestionsPageContent() {
                 <Plus className="w-4 h-4" />
                 创建第一道题
               </button>
-            </>
-          )}
-        </div>
+            )
+          }
+        />
       ) : (
         <DataTable<ObjectiveQuestionRow>
           data={questions}
@@ -223,9 +207,7 @@ function AdminObjectiveQuestionsPageContent() {
               ? '没有找到匹配的客观题，请调整筛选条件'
               : '暂无客观题，点击"创建题目"添加第一道题目'
           }
-          onRowClick={(row) =>
-            router.push(`/admin/objective-questions/${row.id}/edit`)
-          }
+          onRowClick={(row) => router.push(`/admin/objective-questions/${row.id}/edit`)}
           pagination={{
             page,
             pageSize,

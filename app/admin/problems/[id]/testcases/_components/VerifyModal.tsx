@@ -31,9 +31,9 @@ export function VerifyModal({
   onLanguageChange,
   onVerify,
 }: VerifyModalProps) {
-  const lang = (LANG_OPTIONS.some((l) => l.value === solutionLanguage)
-    ? solutionLanguage
-    : 'cpp') as CodeLanguage
+  const lang = (
+    LANG_OPTIONS.some((l) => l.value === solutionLanguage) ? solutionLanguage : 'cpp'
+  ) as CodeLanguage
 
   return (
     <Modal
@@ -74,14 +74,18 @@ export function VerifyModal({
         <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm text-foreground">
           <p className="font-medium mb-1">将执行以下操作：</p>
           <ul className="list-disc list-inside space-y-0.5 text-muted-foreground text-xs sm:text-sm">
-            <li>使用标程跑完<strong className="text-foreground">已保存</strong>的全部测试点输入</li>
-            <li>成功后<strong className="text-foreground">覆盖</strong>各测试点的输出数据</li>
+            <li>
+              使用标程跑完<strong className="text-foreground">已保存</strong>的全部测试点输入
+            </li>
+            <li>
+              成功后<strong className="text-foreground">覆盖</strong>各测试点的输出数据
+            </li>
             <li>将标程代码保存到题目（stdCode），供导出与后续验证</li>
           </ul>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">标程语言</label>
+          <label className="block text-label text-foreground mb-1.5">标程语言</label>
           <select
             value={lang}
             onChange={(e) => onLanguageChange(e.target.value)}
@@ -97,7 +101,7 @@ export function VerifyModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
+          <label className="block text-label text-foreground mb-1.5">
             标程代码 <span className="text-error">*</span>
           </label>
           <CodeEditor

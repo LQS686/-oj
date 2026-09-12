@@ -11,11 +11,7 @@ import { isValidDifficulty } from '@/lib/constants'
 import AdmZip from 'adm-zip'
 import { logger } from '@/lib/logger'
 import { importOneProblem } from './service'
-import {
-  parseDsojArchiveDetailed,
-  type ArchiveLike,
-  type DsojParseJobResult,
-} from './dsoj-parser'
+import { parseDsojArchiveDetailed, type ArchiveLike, type DsojParseJobResult } from './dsoj-parser'
 import {
   parseTarXzBuffer,
   detectArchiveFormat,
@@ -23,12 +19,7 @@ import {
   MAX_ARCHIVE_TOTAL_BYTES,
   MAX_ARCHIVE_ENTRIES,
 } from './tarxz-archive'
-import type {
-  ImportFormat,
-  ImportOptions,
-  ImportedProblemResult,
-  ImportStreamEvent,
-} from './types'
+import type { ImportFormat, ImportOptions, ImportedProblemResult, ImportStreamEvent } from './types'
 
 export const VALID_IMPORT_FORMATS: ImportFormat[] = ['dsoj']
 const VALID_DUPLICATE_POLICIES = ['skip', 'overwrite', 'duplicate'] as const

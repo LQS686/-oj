@@ -70,10 +70,7 @@ export const WORKSPACE_PRESETS: Record<WorkspacePresetId, WorkspacePreset> = {
   },
 }
 
-const DESKTOP_TAB_META: Record<
-  WorkspaceDesktopTab,
-  { label: string; icon: LucideIcon }
-> = {
+const DESKTOP_TAB_META: Record<WorkspaceDesktopTab, { label: string; icon: LucideIcon }> = {
   description: { label: '题目描述', icon: BookOpen },
   solutions: { label: '题解', icon: MessageSquare },
   submissions: { label: '提交记录', icon: ListChecks },
@@ -105,7 +102,7 @@ export function ProblemWorkspaceSelectedTitle({
       <span className="shrink-0 w-6 h-6 rounded-md bg-primary/10 text-primary-light font-mono text-xs font-bold flex items-center justify-center">
         {letter}
       </span>
-      <span className="truncate text-sm font-medium text-foreground" title={title}>
+      <span className="truncate text-subsection-title text-foreground" title={title}>
         {title}
       </span>
     </div>
@@ -141,10 +138,8 @@ export function ProblemWorkspaceDesktopTabs({
             key={key}
             type="button"
             onClick={() => onChange(key)}
-            className={`flex items-center gap-1.5 ${pad} text-sm font-medium transition-all duration-300 relative cursor-pointer whitespace-nowrap ${
-              isActive
-                ? 'text-primary-light'
-                : 'text-muted-foreground hover:text-foreground'
+            className={`flex items-center gap-1.5 ${pad} text-label transition-all duration-300 relative cursor-pointer whitespace-nowrap ${
+              isActive ? 'text-primary-light' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {isActive && (
@@ -174,8 +169,7 @@ export function ProblemWorkspaceMobileTabs({
   activeTab: WorkspaceTab
   onChange: (tab: WorkspaceTab) => void
 }) {
-  const cols =
-    tabs.length <= 3 ? 'grid-cols-3' : tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-5'
+  const cols = tabs.length <= 3 ? 'grid-cols-3' : tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-5'
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background-secondary border-t border-border z-40 lg:hidden">

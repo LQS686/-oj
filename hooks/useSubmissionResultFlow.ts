@@ -8,14 +8,7 @@
  * （补上断连窗口内已发出的事件，不是周期性轮询兜底）。
  */
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { fetchWithCookie } from '@/lib/api/base'
 import {
   SubmissionStatus,
@@ -186,10 +179,7 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
     const prev = lastResultRef.current
     if (prev?.submissionId === result.submissionId && prev.status === result.status) {
       // 同状态重复推送（如补 timeElapsedMs）仍合并字段
-      if (
-        result.timeElapsedMs != null &&
-        prev.timeElapsedMs !== result.timeElapsedMs
-      ) {
+      if (result.timeElapsedMs != null && prev.timeElapsedMs !== result.timeElapsedMs) {
         const merged = { ...prev, timeElapsedMs: result.timeElapsedMs }
         lastResultRef.current = merged
         setLastResult(merged)
@@ -315,10 +305,7 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
       if (!payload?.id) return
 
       // 提交中但尚未 bind：缓存更新，避免 CE 等快评测丢事件
-      if (
-        submittingRef.current &&
-        !currentSubmissionIdRef.current
-      ) {
+      if (submittingRef.current && !currentSubmissionIdRef.current) {
         earlyUpdatesRef.current.set(payload.id, payload)
         return
       }
@@ -341,11 +328,7 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
         return
       }
       setJudgeProgress((prev) => {
-        if (
-          prev &&
-          prev.totalTests === data.totalTests &&
-          data.currentTest <= prev.currentTest
-        ) {
+        if (prev && prev.totalTests === data.totalTests && data.currentTest <= prev.currentTest) {
           return prev
         }
         return {
@@ -353,14 +336,15 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
           totalTests: data.totalTests,
         }
       })
-      setJudgeStatus((prev) =>
-        prev ?? {
-          submissionId: data.submissionId,
-          status: SubmissionStatus.JUDGING,
-          passedTests: 0,
-          totalTests: data.totalTests,
-          testResults: [],
-        }
+      setJudgeStatus(
+        (prev) =>
+          prev ?? {
+            submissionId: data.submissionId,
+            status: SubmissionStatus.JUDGING,
+            passedTests: 0,
+            totalTests: data.totalTests,
+            testResults: [],
+          }
       )
     },
   })
@@ -424,24 +408,27 @@ export function useSubmissionResultFlow<T extends SubmissionListRow = Submission
     return epoch
   }, [openModalOnSubmit])
 
-  const bindSubmission = useCallback((epoch: number, submissionId: string): boolean => {
-    if (epoch !== submitEpochRef.current) return false
-    currentSubmissionIdRef.current = submissionId
-    setCurrentSubmissionId(submissionId)
-    const early = earlyUpdatesRef.current.get(submissionId)
-    earlyUpdatesRef.current.delete(submissionId)
-    if (early) {
-      // 微任务中应用，确保 state 已绑定
-      Promise.resolve().then(() => {
-        if (currentSubmissionIdRef.current === submissionId) {
-          applySocketPayload(early)
-        }
-      })
-    } else {
-      void syncCurrentSubmission()
-    }
-    return true
-  }, [applySocketPayload, syncCurrentSubmission])
+  const bindSubmission = useCallback(
+    (epoch: number, submissionId: string): boolean => {
+      if (epoch !== submitEpochRef.current) return false
+      currentSubmissionIdRef.current = submissionId
+      setCurrentSubmissionId(submissionId)
+      const early = earlyUpdatesRef.current.get(submissionId)
+      earlyUpdatesRef.current.delete(submissionId)
+      if (early) {
+        // 微任务中应用，确保 state 已绑定
+        Promise.resolve().then(() => {
+          if (currentSubmissionIdRef.current === submissionId) {
+            applySocketPayload(early)
+          }
+        })
+      } else {
+        void syncCurrentSubmission()
+      }
+      return true
+    },
+    [applySocketPayload, syncCurrentSubmission]
+  )
 
   const abortSubmitSession = useCallback(() => {
     submittingRef.current = false

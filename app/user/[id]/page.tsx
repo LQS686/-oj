@@ -32,7 +32,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDate } from '@/lib/utils'
 import SubmissionHeatmap from '@/components/user/SubmissionHeatmap'
-import { EducationalPageShell, PageLoading } from '@/components/common'
+import { EducationalPageShell, ListEmptyState, PageLoading } from '@/components/common'
 import { useUser } from '@/contexts/UserContext'
 import { getRoleLabel, getRoleColor } from '@/lib/permissions'
 import { isAcceptedStatus } from '@/lib/constants/submission-status'
@@ -61,9 +61,7 @@ export default function UserProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [activityData, setActivityData] = useState<ActivityData[]>([])
   const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([])
-  const [difficultyDistribution, setDifficultyDistribution] = useState<DifficultyDistribution[]>(
-    []
-  )
+  const [difficultyDistribution, setDifficultyDistribution] = useState<DifficultyDistribution[]>([])
   const [yearActivity, setYearActivity] = useState<Record<string, number>>({})
 
   const isOwn = !!me && me.id === id
@@ -139,28 +137,32 @@ export default function UserProfilePage() {
   if (error || !user) {
     return (
       <EducationalPageShell title="用户主页" width="standard">
-        <div className="card-static rounded-xl p-10 text-center max-w-md mx-auto">
-          <div className="w-14 h-14 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-7 h-7 text-error" />
-          </div>
-          <h1 className="text-lg font-bold text-foreground mb-2">无法访问用户主页</h1>
-          <p className="text-muted-foreground text-sm">{error || '用户不存在'}</p>
-        </div>
+        <ListEmptyState
+          tone="error"
+          icon={AlertCircle}
+          title="无法访问用户主页"
+          description={error || '用户不存在'}
+        />
       </EducationalPageShell>
     )
   }
 
-  const solved = user.acceptedSubmissions || user.solvedCount || 0
+  // 解题 = AC 去重题数（solvedCount，与首页「累计 AC」同源）。
+  // acceptedSubmissions 是「AC 提交条数」，两者不可混用：
+  // 之前 解题 取的是 acceptedSubmissions，导致同一账号首页显示 1、个人主页显示 3。
+  const solved = user.solvedCount || 0
+  const accepted = user.acceptedSubmissions || 0
   const submits = user._count?.submissions || 0
-  const passRate = submits > 0 ? ((solved / submits) * 100).toFixed(1) : '0'
+  // 通过率的分母是提交条数，分子必须是 AC 提交条数（而不是解题数）
+  const passRate = submits > 0 ? ((accepted / submits) * 100).toFixed(1) : '0'
   const accent = user.color || 'var(--primary)'
   const displayName = user.nickname || user.username
 
   return (
-    <EducationalPageShell title={displayName} width="default">
-      <div className="space-y-4">
+    <EducationalPageShell title={displayName} width="default" visuallyHiddenTitle>
+      <div className="space-y-6">
         {/* 身份头图 */}
-        <section className="card-static rounded-xl p-5 md:p-6">
+        <section className="card-static p-5">
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 sm:items-start">
             <div
               className="w-20 h-20 rounded-2xl shrink-0 flex items-center justify-center text-white text-2xl font-bold overflow-hidden border border-border"
@@ -175,9 +177,7 @@ export default function UserProfilePage() {
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 gap-y-1.5">
-                <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">
-                  {displayName}
-                </h1>
+                <div className="text-page-title text-foreground truncate">{displayName}</div>
                 {user.role && (
                   <span className={`tag text-xs ${getRoleColor(user.role)}`}>
                     {getRoleLabel(user.role)}
@@ -235,10 +235,10 @@ export default function UserProfilePage() {
         </section>
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_18rem] gap-4 items-start">
-          <div className="space-y-4 min-w-0">
+          <div className="space-y-6 min-w-0">
             {/* 热力图优先：比 7 日图信息密度更高 */}
-            <section className="card-static rounded-xl p-4 md:p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <section className="card-static p-5">
+              <h2 className="text-subsection-title text-foreground mb-3 flex items-center gap-2">
                 <Flame className="w-4 h-4 text-primary-light" />
                 提交日历
                 <span className="text-xs font-normal text-muted-foreground">近一年</span>
@@ -246,8 +246,8 @@ export default function UserProfilePage() {
               <SubmissionHeatmap data={yearActivity} days={365} color={user.color || undefined} />
             </section>
 
-            <section className="card-static rounded-xl p-4 md:p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <section className="card-static p-5">
+              <h2 className="text-subsection-title text-foreground mb-3 flex items-center gap-2">
                 <Code className="w-4 h-4 text-primary-light" />
                 最近提交
               </h2>
@@ -255,13 +255,13 @@ export default function UserProfilePage() {
                 <div className="py-10 text-center text-sm text-muted-foreground">暂无提交记录</div>
               ) : (
                 <div className="overflow-x-auto -mx-1">
-                  <table className="w-full text-sm">
+                  <table className="table w-full text-sm">
                     <thead>
                       <tr className="text-xs text-muted-foreground border-b border-border">
-                        <th className="text-left font-medium py-2 px-2">题目</th>
-                        <th className="text-left font-medium py-2 px-2 w-24">状态</th>
-                        <th className="text-left font-medium py-2 px-2 w-20">语言</th>
-                        <th className="text-right font-medium py-2 px-2 w-28">时间</th>
+                        <th className="text-left">题目</th>
+                        <th className="text-left w-24">状态</th>
+                        <th className="text-left w-20">语言</th>
+                        <th className="text-right w-28">时间</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -270,7 +270,7 @@ export default function UserProfilePage() {
                           key={submission.id}
                           className="border-b border-border/60 last:border-0 hover:bg-muted/30"
                         >
-                          <td className="py-2.5 px-2">
+                          <td>
                             <Link
                               href={`/problems/${submission.realProblemId || submission.problemId}`}
                               className="group inline-flex items-baseline gap-1.5 min-w-0 max-w-full"
@@ -283,17 +283,13 @@ export default function UserProfilePage() {
                               </span>
                             </Link>
                           </td>
-                          <td className="py-2.5 px-2">
-                            <span
-                              className={`tag text-xs ${statusTagClass(submission.status)}`}
-                            >
+                          <td>
+                            <span className={`tag text-xs ${statusTagClass(submission.status)}`}>
                               {submission.status}
                             </span>
                           </td>
-                          <td className="py-2.5 px-2 text-muted-foreground text-xs">
-                            {submission.language}
-                          </td>
-                          <td className="py-2.5 px-2 text-right text-xs text-muted-foreground whitespace-nowrap">
+                          <td className="text-muted-foreground text-xs">{submission.language}</td>
+                          <td className="text-right text-xs text-muted-foreground whitespace-nowrap">
                             {submission.time}
                           </td>
                         </tr>
@@ -305,26 +301,24 @@ export default function UserProfilePage() {
             </section>
           </div>
 
-          <aside className="space-y-4 xl:sticky xl:top-20">
-            <section className="card-static rounded-xl p-4">
-              <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary-light" />
-                近 7 天通过
+          <aside className="space-y-6 xl:sticky xl:top-20">
+            <section className="card-static p-4">
+              <h2 className="text-subsection-title text-foreground mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary-light" />近 7 天通过
               </h2>
               <div className="h-[140px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={activityData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                  <AreaChart
+                    data={activityData}
+                    margin={{ top: 4, right: 4, left: -18, bottom: 0 }}
+                  >
                     <defs>
                       <linearGradient id="profileAcFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.35} />
                         <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="var(--border)"
-                    />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                     <XAxis
                       dataKey="date"
                       axisLine={false}
@@ -365,8 +359,8 @@ export default function UserProfilePage() {
             </section>
 
             {difficultyDistribution.length > 0 && (
-              <section className="card-static rounded-xl p-4">
-                <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <section className="card-static p-4">
+                <h2 className="text-subsection-title text-foreground mb-3 flex items-center gap-2">
                   <Target className="w-4 h-4 text-primary-light" />
                   已解决难度
                 </h2>
@@ -398,7 +392,7 @@ export default function UserProfilePage() {
             {isOwn && (
               <Link
                 href="/settings"
-                className="card-static rounded-xl p-3.5 flex items-center justify-between text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                className="card-static p-4 flex items-center justify-between text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
               >
                 <span className="inline-flex items-center gap-2">
                   <Settings className="w-4 h-4" />
@@ -418,7 +412,7 @@ function StatCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-muted/25 px-3 py-2.5 text-center">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-lg font-bold text-foreground tabular-nums mt-0.5">{value}</div>
+      <div className="text-section-title text-foreground tabular-nums mt-0.5">{value}</div>
     </div>
   )
 }

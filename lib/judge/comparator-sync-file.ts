@@ -248,7 +248,7 @@ function tryHashFastAc(
   userPath: string,
   stdPath: string,
   fullScore: number,
-  minBytes = 64 * 1024,
+  minBytes = 64 * 1024
 ): CompareResult | null {
   try {
     const us = statSync(userPath).size
@@ -269,7 +269,7 @@ export function compareFilesSync(
   stdPath: string,
   fullScore: number,
   mode: ComparisonMode,
-  realPrecision = 3,
+  realPrecision = 3
 ): CompareResult {
   // default / strict：先尝试哈希快路径（ignore-spaces / real-number 语义不能用原始哈希）
   if (mode === 'default' || mode === 'strict' || !mode) {
@@ -297,7 +297,11 @@ export function compareFilesSync(
   }
 }
 
-function compareDefault(user: SyncFileReader, std: SyncFileReader, fullScore: number): CompareResult {
+function compareDefault(
+  user: SyncFileReader,
+  std: SyncFileReader,
+  fullScore: number
+): CompareResult {
   for (;;) {
     const lineNum = user.line()
     const uLen = user.readLine()
@@ -320,13 +324,19 @@ function compareDefault(user: SyncFileReader, std: SyncFileReader, fullScore: nu
   }
 }
 
-function compareStrict(user: SyncFileReader, std: SyncFileReader, fullScore: number): CompareResult {
+function compareStrict(
+  user: SyncFileReader,
+  std: SyncFileReader,
+  fullScore: number
+): CompareResult {
   for (;;) {
     const userEof = user.eof()
     const stdEof = std.eof()
     if (userEof && stdEof) return { score: fullScore, status: 'AC', message: '' }
-    if (userEof && !stdEof) return { score: 0, status: 'WA', message: `第 ${std.line()} 行，选手输出内容不足` }
-    if (!userEof && stdEof) return { score: 0, status: 'OLE', message: `第 ${user.line()} 行，选手输出内容过多` }
+    if (userEof && !stdEof)
+      return { score: 0, status: 'WA', message: `第 ${std.line()} 行，选手输出内容不足` }
+    if (!userEof && stdEof)
+      return { score: 0, status: 'OLE', message: `第 ${user.line()} 行，选手输出内容过多` }
 
     const lineNum = user.line()
     const uLen = user.readLine()
@@ -341,7 +351,11 @@ function compareStrict(user: SyncFileReader, std: SyncFileReader, fullScore: num
   }
 }
 
-function compareIgnoreSpaces(user: SyncFileReader, std: SyncFileReader, fullScore: number): CompareResult {
+function compareIgnoreSpaces(
+  user: SyncFileReader,
+  std: SyncFileReader,
+  fullScore: number
+): CompareResult {
   for (;;) {
     const userToken = user.nextToken()
     const stdToken = std.nextToken()
@@ -364,8 +378,10 @@ function compareIgnoreSpaces(user: SyncFileReader, std: SyncFileReader, fullScor
     }
     const userEmpty = userToken === '' && user.eof()
     const stdEmpty = stdToken === '' && std.eof()
-    if (userEmpty && !stdEmpty) return { score: 0, status: 'WA', message: `第 ${std.line()} 行，选手输出内容不足` }
-    if (stdEmpty && !userEmpty) return { score: 0, status: 'OLE', message: `第 ${user.line()} 行，选手输出内容过多` }
+    if (userEmpty && !stdEmpty)
+      return { score: 0, status: 'WA', message: `第 ${std.line()} 行，选手输出内容不足` }
+    if (stdEmpty && !userEmpty)
+      return { score: 0, status: 'OLE', message: `第 ${user.line()} 行，选手输出内容过多` }
     return {
       score: 0,
       status: 'WA',
@@ -378,7 +394,7 @@ function compareRealNumbers(
   user: SyncFileReader,
   std: SyncFileReader,
   fullScore: number,
-  realPrecision: number,
+  realPrecision: number
 ): CompareResult {
   const eps = Math.pow(10, -realPrecision)
   for (;;) {
@@ -397,13 +413,23 @@ function compareRealNumbers(
     const userEmpty = userToken === '' && user.eof()
     const stdEmpty = stdToken === '' && std.eof()
     if (userEmpty && stdEmpty) return { score: fullScore, status: 'AC', message: '' }
-    if (userEmpty && !stdEmpty) return { score: 0, status: 'WA', message: `第 ${std.line()} 行，选手输出内容不足` }
-    if (!userEmpty && stdEmpty) return { score: 0, status: 'OLE', message: `第 ${user.line()} 行，选手输出内容过多` }
+    if (userEmpty && !stdEmpty)
+      return { score: 0, status: 'WA', message: `第 ${std.line()} 行，选手输出内容不足` }
+    if (!userEmpty && stdEmpty)
+      return { score: 0, status: 'OLE', message: `第 ${user.line()} 行，选手输出内容过多` }
     if (userToken.length > 0 && !FLOAT_REGEX.test(userToken)) {
-      return { score: 0, status: 'WA', message: `第 ${user.line()} 行，无效的数字格式: ${userToken}` }
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${user.line()} 行，无效的数字格式: ${userToken}`,
+      }
     }
     if (stdToken.length > 0 && !FLOAT_REGEX.test(stdToken)) {
-      return { score: 0, status: 'WA', message: `第 ${std.line()} 行，标准答案含无效数字格式: ${stdToken}` }
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${std.line()} 行，标准答案含无效数字格式: ${stdToken}`,
+      }
     }
     const a = parseFloat(userToken)
     const b = parseFloat(stdToken)

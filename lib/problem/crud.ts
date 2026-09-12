@@ -13,37 +13,44 @@ import { logger } from '@/lib/logger'
 export async function listProblemTags(): Promise<string[]> {
   // 标签集合来自全库扫描，代价高且变化频率低：缓存 5 分钟（与 listTags 历史策略一致），
   // clearProblemCache 已通过 deleteByPrefix('problem:tags') 在题目增删改时失效。
-  return cache.get(CacheKeys.problem.tags(), [], async () => {
-    const problems = await prisma.problem.findMany({
-      where: { visibility: 'public' },
-      select: { tags: true },
-    })
+  return cache.get(
+    CacheKeys.problem.tags(),
+    [],
+    async () => {
+      const problems = await prisma.problem.findMany({
+        where: { visibility: 'public' },
+        select: { tags: true },
+      })
 
-    const tagSet = new Set<string>()
-    problems.forEach((p) => {
-      if (Array.isArray(p.tags)) {
-        p.tags.forEach((tag) => {
-          if (tag && typeof tag === 'string' && tag.trim()) {
-            tagSet.add(tag.trim())
-          }
-        })
-      }
-    })
+      const tagSet = new Set<string>()
+      problems.forEach((p) => {
+        if (Array.isArray(p.tags)) {
+          p.tags.forEach((tag) => {
+            if (tag && typeof tag === 'string' && tag.trim()) {
+              tagSet.add(tag.trim())
+            }
+          })
+        }
+      })
 
-    return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-CN'))
-  }, { ttl: 5 * 60_000 })
+      return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+    },
+    { ttl: 5 * 60_000 }
+  )
 }
 
 export async function getProblemById(id: string) {
-  return cache.get('problem:byId', [id], async () => {
-    return prisma.problem.findUnique({ where: { id } })
-  }, { ttl: 60_000 })
+  return cache.get(
+    'problem:byId',
+    [id],
+    async () => {
+      return prisma.problem.findUnique({ where: { id } })
+    },
+    { ttl: 60_000 }
+  )
 }
 
-export async function createProblem(
-  data: Prisma.ProblemUncheckedCreateInput,
-  authorId: string
-) {
+export async function createProblem(data: Prisma.ProblemUncheckedCreateInput, authorId: string) {
   const problem = await prisma.problem.create({ data: { ...data, authorId } })
   clearProblemCache(problem.id)
   return problem
@@ -90,17 +97,25 @@ export async function getProblemStatusCounts(
     options.viewer?.id || 'guest',
     // 封榜状态约 10s 变化；短 TTL
   ]
-  return cache.get('problem:statusCounts', cacheKey, async () => {
-    const groups = await prisma.submission.groupBy({
-      by: ['status'],
-      where,
-      _count: { status: true },
-    })
-    return groups.reduce((acc: Record<string, number>, g) => {
-      acc[g.status] = g._count.status
-      return acc
-    }, {} as Record<string, number>)
-  }, { ttl: 10_000 })
+  return cache.get(
+    'problem:statusCounts',
+    cacheKey,
+    async () => {
+      const groups = await prisma.submission.groupBy({
+        by: ['status'],
+        where,
+        _count: { status: true },
+      })
+      return groups.reduce(
+        (acc: Record<string, number>, g) => {
+          acc[g.status] = g._count.status
+          return acc
+        },
+        {} as Record<string, number>
+      )
+    },
+    { ttl: 10_000 }
+  )
 }
 
 /**
@@ -112,11 +127,13 @@ export async function getProblemStatusCounts(
  *
  * 返回 null 表示当前筛选条件下没有可用题目。
  */
-export async function getRandomPublicProblem(filter: {
-  search?: string
-  difficulty?: string
-  tag?: string
-} = {}): Promise<{ id: string; problemNumber: string | null } | null> {
+export async function getRandomPublicProblem(
+  filter: {
+    search?: string
+    difficulty?: string
+    tag?: string
+  } = {}
+): Promise<{ id: string; problemNumber: string | null } | null> {
   const where: Prisma.ProblemWhereInput = { visibility: 'public' }
   if (filter.search) {
     where.OR = [

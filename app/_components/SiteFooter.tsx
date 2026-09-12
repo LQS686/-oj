@@ -3,7 +3,13 @@
 import Link from 'next/link'
 import { PageContainer } from '@/components/layout'
 
-export function SiteFooter({ siteName, siteDescription }: { siteName: string; siteDescription: string }) {
+export function SiteFooter({
+  siteName,
+  siteDescription,
+}: {
+  siteName: string
+  siteDescription: string
+}) {
   return (
     <footer className="mt-auto border-t border-border bg-muted/20">
       <PageContainer variant="full">
@@ -21,7 +27,9 @@ export function SiteFooter({ siteName, siteDescription }: { siteName: string; si
             </div>
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-foreground text-sm leading-tight">{siteName}</span>
-              <span className="text-xs text-muted-foreground leading-snug mt-0.5">{siteDescription}</span>
+              <span className="text-xs text-muted-foreground leading-snug mt-0.5">
+                {siteDescription}
+              </span>
             </div>
           </div>
 

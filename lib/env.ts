@@ -102,7 +102,7 @@ function checkJudgeAndMongoReplica(): string[] {
     if (!/replicaSet\s*=/.test(dbUrl)) {
       warnings.push(
         'DATABASE_URL 未包含 replicaSet 参数。事务操作将失败。' +
-        '请在 MongoDB 连接字符串中追加 ?replicaSet=rs0'
+          '请在 MongoDB 连接字符串中追加 ?replicaSet=rs0'
       )
     }
   }
@@ -189,7 +189,9 @@ export function validateEnvironment(): EnvironmentCheckResult {
   validated = true
   // 校验 Prisma client 是否正确生成（warn 而非 throw：旧 client 仍可工作，仅功能降级）
   if (!(prisma as { solutionView?: unknown }).solutionView) {
-    logger.warn('⚠️  Prisma client 未正确生成（缺少 solutionView 模型）。请运行: npx prisma generate')
+    logger.warn(
+      '⚠️  Prisma client 未正确生成（缺少 solutionView 模型）。请运行: npx prisma generate'
+    )
   }
   logger.info('[env] 环境变量校验通过', {
     NODE_ENV: process.env.NODE_ENV || 'development',

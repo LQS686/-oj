@@ -8,8 +8,7 @@ import { Shield, AlertCircle, Info } from 'lucide-react'
 import type { ClassMember, ClassPermissions } from '@/types/models'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import { ClassWorkspaceShell, PageLoading, useDialog } from '@/components/common'
-import { useClass } from '@/hooks/useClass'
+import { ClassWorkspaceShell, ListEmptyState, PageLoading, useDialog } from '@/components/common'
 import { useUser } from '@/contexts/UserContext'
 import { classRoleDisplayLabel, isClassAdminRole } from '@/lib/class/roles'
 import { loginPathFromLocation } from '@/lib/navigation'
@@ -57,7 +56,6 @@ export default function MemberPermissionsPage() {
   const router = useRouter()
   const classId = params.id as string
   const memberId = params.memberId as string
-  const { classData } = useClass(classId)
   const { user } = useUser()
 
   const [permissions, setPermissions] = useState<Permissions>({
@@ -105,9 +103,7 @@ export default function MemberPermissionsPage() {
           }
         }
 
-        const currentMember = user?.id
-          ? members.find((m) => m.userId === user.id)
-          : undefined
+        const currentMember = user?.id ? members.find((m) => m.userId === user.id) : undefined
         if (currentMember) {
           setCurrentUserRole(currentMember.role)
         }
@@ -180,26 +176,24 @@ export default function MemberPermissionsPage() {
 
   if (!isClassAdminRole(currentUserRole)) {
     return (
-      <ClassWorkspaceShell
-        classId={classId}
-        className={classData?.name}
-        title="权限配置"
-        icon={Shield}
-      >
-        <div className="card-static rounded-lg p-8 text-center border border-border">
-          <AlertCircle className="w-10 h-10 text-error mx-auto mb-3" />
-          <p className="text-error mb-4">权限不足</p>
-          <Link href={`/classes/${classId}/members`} className="btn btn-primary">
-            返回成员列表
-          </Link>
-        </div>
+      <ClassWorkspaceShell classId={classId} title="权限配置" icon={Shield}>
+        <ListEmptyState
+          tone="error"
+          icon={AlertCircle}
+          title="权限不足"
+          action={
+            <Link href={`/classes/${classId}/members`} className="btn btn-primary">
+              返回成员列表
+            </Link>
+          }
+        />
       </ClassWorkspaceShell>
     )
   }
 
   if (!memberInfo) {
     return (
-      <ClassWorkspaceShell classId={classId} className={classData?.name} title="权限配置" icon={Shield}>
+      <ClassWorkspaceShell classId={classId} title="权限配置" icon={Shield}>
         <p className="text-error text-center py-8">成员不存在</p>
       </ClassWorkspaceShell>
     )
@@ -210,7 +204,6 @@ export default function MemberPermissionsPage() {
   return (
     <ClassWorkspaceShell
       classId={classId}
-      className={classData?.name}
       title="配置成员权限"
       description={`${memberName} · ${roleLabel(memberInfo.role)}`}
       icon={Shield}
@@ -231,7 +224,7 @@ export default function MemberPermissionsPage() {
 
       <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">权限项</h2>
+          <h2 className="text-subsection-title text-foreground">权限项</h2>
         </div>
 
         <div className="divide-y divide-border">
@@ -254,7 +247,7 @@ export default function MemberPermissionsPage() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm font-medium text-foreground">{permission.title}</h3>
+                    <h3 className="text-subsection-title text-foreground">{permission.title}</h3>
                     {isDisabled && (
                       <span className="tag text-xs">
                         {memberInfo.role === 'owner' ? '班主任默认拥有' : '助教默认拥有'}
@@ -308,7 +301,9 @@ export default function MemberPermissionsPage() {
       </div>
 
       {memberInfo.role === 'owner' && (
-        <p className="mt-3 text-center text-sm text-muted-foreground">班主任拥有所有权限，无法修改</p>
+        <p className="mt-3 text-center text-sm text-muted-foreground">
+          班主任拥有所有权限，无法修改
+        </p>
       )}
       {memberInfo.role === 'assistant' && currentUserRole !== 'owner' && (
         <p className="mt-3 text-center text-sm text-muted-foreground">仅班主任可修改助教权限</p>

@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "katex/dist/katex.min.css";
+@import 'tailwindcss';
+@import 'katex/dist/katex.min.css';
 
 /* KaTeX 公式渲染：
    - 不自定义 font-size，使用 KaTeX 默认的 1.21em，上下标比例由 KaTeX 内部保证。
@@ -7,46 +7,57 @@
      破坏数学符号间的精细间距，导致上下标视觉上与主体大小接近。 */
 .markdown-body .katex-html,
 .markdown-body .katex-html * {
- letter-spacing: 0;
+  letter-spacing: 0;
 }
 /* 中英文混排时公式与中文间留出半角空隙，避免粘连（特别是在 "的概率为 $\\frac{...}$" 这种情形） */
 .markdown-body .katex + .katex,
 .markdown-body :not(.katex) + .katex,
 .markdown-body .katex + :not(.katex) {
- margin-left: 0.15em;
- margin-right: 0.15em;
+  margin-left: 0.15em;
+  margin-right: 0.15em;
 }
 
 :root {
-  --primary: #4F6AE8;
-  --primary-dark: #3D54C7;
-  --primary-light: #6B82F0;
-  --primary-50: #EEF1FE;
-  --primary-100: #DDE3FD;
-  --primary-foreground: #FFFFFF;
+  --primary: #4f6ae8;
+  --primary-dark: #3d54c7;
+  --primary-light: #6b82f0;
+  --primary-50: #eef1fe;
+  --primary-100: #dde3fd;
+  --primary-foreground: #ffffff;
 
-  --secondary: #0D9488;
-  --secondary-dark: #0A7A70;
-  --secondary-light: #2DD4BF;
+  --secondary: #0d9488;
+  --secondary-dark: #0a7a70;
+  --secondary-light: #2dd4bf;
 
-  --accent: #E67E22;
-  --accent-dark: #C96A15;
-  --accent-light: #F0983A;
+  --accent: #e67e22;
+  --accent-dark: #c96a15;
+  --accent-light: #f0983a;
 
-  --success: #0D9488;
-  --warning: #D97706;
-  --error: #DC2626;
-  --info: #0284C7;
+  --success: #0d9488;
+  --warning: #d97706;
+  --error: #dc2626;
+  --info: #0284c7;
 
-  --background: #F5F6F8;
-  --background-secondary: #FFFFFF;
-  --foreground: #1A1D23;
-  --muted: #E8EAEF;
-  --muted-foreground: #6B7280;
-  --border: #D4D7DD;
-  --input: #FFFFFF;
-  --card: #FFFFFF;
-  --card-foreground: #1A1D23;
+  /* 提示气泡（tooltip）：明暗两种主题下都需要「深底 + 浅字」，
+     独立成 token，避免在使用处写裸色值（bg-[#333] 之类）。 */
+  --tooltip: #333333;
+  --tooltip-foreground: #ffffff;
+
+  --background: #f5f6f8;
+  --background-secondary: #ffffff;
+  --foreground: #1a1d23;
+  --muted: #e8eaef;
+  /* 次要文字：原 #6b7280 在页面底色 #f5f6f8 上仅 4.47:1、在 --muted #e8eaef 上仅 4.02:1，
+     均低于 AA 正文 4.5:1。改为 #5f6773 后：底 5.29 / muted 4.75 / 白 5.72 全部达标。 */
+  --muted-foreground: #5f6773;
+  --border: #d4d7dd;
+  /* 表单控件边界：控件边界属于「识别控件所必需的视觉信息」，需满足非文本对比 3:1
+     （WCAG 1.4.11）。原 --border #d4d7dd 在白底仅 1.44:1。
+     卡片、分割线属装饰性边界，不受该条款约束，仍用 --border 以保持原有浅色观感。 */
+  --border-strong: #8a92a1;
+  --input: #ffffff;
+  --card: #ffffff;
+  --card-foreground: #1a1d23;
 
   /* 字体栈：Inter 渲染英文/数字（拉丁字符），其后明确列出中文字体
      供浏览器在渲染中文时直接命中（避免 Inter 无中文字形时仍用其 metrics
@@ -56,14 +67,13 @@
      - Hiragino Sans GB：macOS 旧版备选
      - Source Han Sans CN / Noto Sans CJK SC：Linux 常见中文字体
      最后才回退到 system-ui / sans-serif 兜底 */
-  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans CN', 'Noto Sans CJK SC', system-ui, sans-serif;
+  --font-sans:
+    'Inter', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans CN',
+    'Noto Sans CJK SC', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
   --font-display: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
 
-  --radius: 0.5rem;
-  --radius-sm: 0.375rem;
-  --radius-lg: 0.625rem;
-  --radius-xl: 0.75rem;
+  /* 圆角刻度不在 :root 声明：统一由下方 @theme 定义（唯一来源，见「圆角刻度」注释） */
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -85,50 +95,55 @@
   --shadow-glow-lg: 0 0 40px rgba(79, 106, 232, 0.2);
 
   /* Difficulty colors */
-  --difficulty-easy: #16A34A;
-  --difficulty-easy-bg: #F0FDF4;
-  --difficulty-medium-easy: #0EA5E9;
-  --difficulty-medium-easy-bg: #F0F9FF;
-  --difficulty-medium: #D97706;
-  --difficulty-medium-bg: #FFFBEB;
-  --difficulty-medium-hard: #EA580C;
-  --difficulty-medium-hard-bg: #FFF7ED;
-  --difficulty-hard: #DC2626;
-  --difficulty-hard-bg: #FEF2F2;
-  --difficulty-expert: #9333EA;
-  --difficulty-expert-bg: #FAF5FF;
+  --difficulty-easy: #16a34a;
+  --difficulty-easy-bg: #f0fdf4;
+  --difficulty-medium-easy: #0ea5e9;
+  --difficulty-medium-easy-bg: #f0f9ff;
+  --difficulty-medium: #d97706;
+  --difficulty-medium-bg: #fffbeb;
+  --difficulty-medium-hard: #ea580c;
+  --difficulty-medium-hard-bg: #fff7ed;
+  --difficulty-hard: #dc2626;
+  --difficulty-hard-bg: #fef2f2;
+  --difficulty-expert: #9333ea;
+  --difficulty-expert-bg: #faf5ff;
 }
 
 .dark {
-  --primary: #818CF8;
-  --primary-dark: #6B82F0;
-  --primary-light: #A5B4FC;
-  --primary-50: #1E1B4B;
-  --primary-100: #312E81;
-  --primary-foreground: #FFFFFF;
+  --primary: #818cf8;
+  --primary-dark: #6b82f0;
+  --primary-light: #a5b4fc;
+  --primary-50: #1e1b4b;
+  --primary-100: #312e81;
+  --primary-foreground: #ffffff;
 
-  --secondary: #2DD4BF;
-  --secondary-dark: #0D9488;
-  --secondary-light: #5EEAD4;
+  --secondary: #2dd4bf;
+  --secondary-dark: #0d9488;
+  --secondary-light: #5eead4;
 
-  --accent: #F59E0B;
-  --accent-dark: #D97706;
-  --accent-light: #FCD34D;
+  --accent: #f59e0b;
+  --accent-dark: #d97706;
+  --accent-light: #fcd34d;
 
-  --success: #2DD4BF;
-  --warning: #FBBF24;
-  --error: #F87171;
-  --info: #38BDF8;
+  --success: #2dd4bf;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #38bdf8;
+
+  --tooltip: #1a1a1a;
+  --tooltip-foreground: #ffffff;
 
   --background: #111318;
-  --background-secondary: #1A1D24;
-  --foreground: #E5E7EB;
-  --muted: #1E2028;
-  --muted-foreground: #9CA3AF;
-  --border: #2D3139;
-  --input: #1A1D24;
-  --card: #1A1D24;
-  --card-foreground: #E5E7EB;
+  --background-secondary: #1a1d24;
+  --foreground: #e5e7eb;
+  --muted: #1e2028;
+  --muted-foreground: #9ca3af;
+  --border: #2d3139;
+  /* 表单控件边界：暗色 --border 在卡片底 #1a1d24 上仅约 1.3:1，不满足 3:1 */
+  --border-strong: #6b7280;
+  --input: #1a1d24;
+  --card: #1a1d24;
+  --card-foreground: #e5e7eb;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -137,17 +152,17 @@
   --shadow-glow: 0 0 20px rgba(129, 140, 248, 0.15);
   --shadow-glow-lg: 0 0 40px rgba(129, 140, 248, 0.2);
 
-  --difficulty-easy: #4ADE80;
+  --difficulty-easy: #4ade80;
   --difficulty-easy-bg: rgba(74, 222, 128, 0.1);
-  --difficulty-medium-easy: #38BDF8;
+  --difficulty-medium-easy: #38bdf8;
   --difficulty-medium-easy-bg: rgba(56, 189, 248, 0.1);
-  --difficulty-medium: #FBBF24;
+  --difficulty-medium: #fbbf24;
   --difficulty-medium-bg: rgba(251, 191, 36, 0.1);
-  --difficulty-medium-hard: #FB923C;
+  --difficulty-medium-hard: #fb923c;
   --difficulty-medium-hard-bg: rgba(251, 146, 60, 0.1);
-  --difficulty-hard: #F87171;
+  --difficulty-hard: #f87171;
   --difficulty-hard-bg: rgba(248, 113, 113, 0.1);
-  --difficulty-expert: #C084FC;
+  --difficulty-expert: #c084fc;
   --difficulty-expert-bg: rgba(192, 132, 252, 0.1);
 }
 
@@ -168,6 +183,8 @@
   --color-warning: var(--warning);
   --color-error: var(--error);
   --color-info: var(--info);
+  --color-tooltip: var(--tooltip);
+  --color-tooltip-foreground: var(--tooltip-foreground);
   --color-background: var(--background);
   --color-background-secondary: var(--background-secondary);
   --color-foreground: var(--foreground);
@@ -182,11 +199,42 @@
   --font-mono: var(--font-mono);
   --font-display: var(--font-display);
 
-  --radius-sm: var(--radius-sm);
-  --radius: var(--radius);
-  --radius-md: calc(var(--radius) + 4px);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
+  /* 页面标题（H1）唯一尺寸来源。全站只允许两级页面标题：
+   *   text-page-title    24px —— 内容页（列表 / 详情 / 表单 / 工作台）
+   *   text-status-title  30px —— 状态页（403 / 404 / 错误边界）
+   * 新增页面必须从这两级里选，不得再自定 H1 字号。 */
+  --text-page-title: 1.5rem;
+  --text-page-title--line-height: 1.35;
+  --text-page-title--font-weight: 700;
+  --text-status-title: 1.875rem;
+  --text-status-title--line-height: 1.3;
+  --text-status-title--font-weight: 700;
+
+  /* 区块标题（H2）与子区块标题（H3）唯一尺寸来源。全站只允许三级标题：
+   *   text-page-title       24px —— 页面标题（H1，由 PageShell 渲染）
+   *   text-section-title    16px —— 区块标题（H2）
+   *   text-subsection-title 14px —— 子区块标题（H3）
+   * 历史问题：同一个「区块标题」在 /settings、/help 用 H2 + text-base，
+   * 在 /contests、/training、/announcements 用 H3 + text-sm 或 text-base，
+   * 还有 text-xs/tracking-wide、text-lg/font-bold 等写法，导致同层级标题
+   * 在不同页面上字号、字重、颜色、底部间距各不相同。
+   * 现在新增区块标题必须用上表中的 `text-section-title` / `text-subsection-title`
+   * 工具类，不得再自定 H2/H3 的字号与字重（由 eslint-rules/uicraft.js 守护）。 */
+  --text-section-title: 1rem;
+  --text-section-title--line-height: 1.4;
+  --text-section-title--font-weight: 600;
+  --text-subsection-title: 0.875rem;
+  --text-subsection-title--line-height: 1.4;
+  --text-subsection-title--font-weight: 600;
+
+  /* 表单字段标签 / 小强调文字唯一尺寸来源（14px / 500）。
+   * 与 text-subsection-title 同为 14px，但字重不同：
+   *   标题（H2/H3）用 600 以建立层级，字段标签用 500 保持安静。
+   * 历史问题：字段标签在各处写成 `text-sm font-medium text-foreground`，
+   * 与「小标题」混用同一组字号/字重，无法区分层级也容易被误改。 */
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.5;
+  --text-label--font-weight: 500;
 
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
@@ -205,10 +253,10 @@
 
   /* 语义化页面宽度 token
    * Tailwind v4 命名空间是 --max-width-*（生成 max-w-*），不是 --max-w-* */
-  --max-width-page-full: 80rem;       /* 1280px：多栏工作台、列表、详情等宽内容页面 */
+  --max-width-page-full: 80rem; /* 1280px：多栏工作台、列表、详情等宽内容页面 */
   --max-width-page-workspace: 90rem; /* 1440px：作业/做题三栏工作台 */
-  --max-width-page-standard: 64rem;  /* 1024px：题解、设置、笔记、用户主页等标准阅读页面 */
-  --max-width-page-form: 56rem;      /* 896px：表单、创建、编辑等窄表单页面 */
+  --max-width-page-standard: 64rem; /* 1024px：题解、设置、笔记、用户主页等标准阅读页面 */
+  --max-width-page-form: 56rem; /* 896px：表单、创建、编辑等窄表单页面 */
 
   /* 层叠层级（约定）：sticky < dock < dropdown < navbar < overlay < modal < drawer < toast */
   --navbar-height: 3.5rem; /* 56px，与 Navbar h-14 / body padding-top 对齐 */
@@ -220,6 +268,26 @@
   --z-modal: 120;
   --z-drawer: 130;
   --z-toast: 1000;
+}
+
+/* ===== 圆角刻度：全站唯一来源 =====
+   历史问题：原 @theme inline 里是自引用写法（--radius-lg: var(--radius-lg)），
+   实测刻度已退化——rounded-md 与 rounded-lg 同为 12px，rounded-xl 却是 20px。
+   刻度无法推理，作者只能各页面自选 2 / 4 / 8 / 12 / 20px，
+   圆角因此成为「每个页面各写各的」最直观的来源。
+   现在改为字面量、单调递增的刻度；工具类 rounded-* 与组件类
+   （.btn / .card / .input / .tag / .status-tag …）共用同一组变量，
+   改这一处即全站生效。
+   注意：必须用普通 @theme（非 inline），Tailwind 才会把变量输出到 :root，
+   组件 CSS 中的 var(--radius-*) 才有值。 */
+@theme {
+  --radius-xs: 4px; /* 微元素：行内代码、极小标记 */
+  --radius-sm: 6px; /* 控件：按钮 / 输入框 / 标签 */
+  --radius: 6px; /* 裸 rounded 的别名，等同 sm */
+  --radius-md: 8px; /* 容器：列表行 / 下拉面板 / 内嵌卡片 */
+  --radius-lg: 12px; /* 卡片与面板（.card 默认） */
+  --radius-xl: 16px; /* 浮层：弹窗 / 大容器 */
+  --radius-2xl: 20px; /* 英雄区等超大容器 */
 }
 
 * {
@@ -247,7 +315,8 @@ body {
   flex-direction: column;
 }
 
-code, pre {
+code,
+pre {
   font-family: var(--font-mono);
 }
 
@@ -263,19 +332,19 @@ code, pre {
   }
   .prose code::before,
   .prose code::after {
-    content: "" !important;
+    content: '' !important;
   }
   .prose code {
     background: rgba(79, 106, 232, 0.08);
     color: var(--primary);
     padding: 0.15rem 0.5rem;
-    border-radius: 0.25rem;
+    border-radius: var(--radius-xs);
     font-size: 0.85rem;
     font-weight: 500;
     border: 1px solid rgba(79, 106, 232, 0.12);
   }
   .prose pre {
-    background: #F8F9FA;
+    background: #f8f9fa;
     color: var(--foreground);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -318,7 +387,12 @@ code, pre {
   .dark .prose td {
     color: var(--foreground);
   }
-  .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4,
+  .prose h5,
+  .prose h6 {
     font-weight: 700;
     color: var(--foreground);
     line-height: 1.4;
@@ -343,50 +417,87 @@ code, pre {
   }
 }
 
+/* ===== 表格统一：全站唯一来源 =====
+   历史问题：各页面的 <th>/<td> 各自写内边距与表头排版
+   （px-3 / px-4 / px-6 与 py-2 / py-3 / py-4 混用，表头 12px/14px、500/600、
+   大写或不大写都有），同一份产品里表格密度与表头观感不一致。
+
+   用法：给 <table> 加 `table` 类，表头排版与单元格内边距即由这里统一；
+   语义差异（text-right/text-center 对齐、whitespace-nowrap、sticky 列）继续写在单元格上。
+
+   为什么这段不放进 @layer components：
+   Tailwind 的 utility 在 @layer utilities，层级高于 components，
+   于是散在各单元格上的历史工具类会把 components 里的规则压掉。
+   这段放在「无层级」（unlayered）里，层级高于任何 @layer，
+   因此表格可以逐个文件加 `table` 类渐进迁移，不必一次性清干净。
+   后续收尾：把各单元格上已失效的内边距/表头排版工具类删掉。 */
+.table thead th {
+  padding: 0.75rem 1rem; /* 12px 16px，与卡片 p-4 的横向节奏对齐 */
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 0.75rem 1rem;
+}
+
 @layer components {
-  .card {
-    background: var(--card);
-    color: var(--card-foreground);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out);
-    position: relative;
-    overflow: hidden;
-  }
+  /* ===== 主色不透明度：只用 5 的倍数 =====
+     现状：主色浅底全站大量使用 bg-primary/5、/10、/15、/20、/25、/30…，
+     唯独 /8 与 /12 两个值不在这条刻度上——肉眼几乎看不出差别，
+     却让"到底哪一档才是选中态"无从判断。
+     约定（新代码）：
+       /5   极浅底（表格行 hover、整块区域高亮）
+       /10  填充（胶囊/徽标底、图标容器底）
+       /15  选中或强调（选中行底、描边，与 .tag-primary 的描边一致）
+     需要更深时继续按 5 递增（/20、/30…），或用 --primary-50 / --primary-100 命名色阶。 */
 
-  .card:hover {
-    border-color: var(--primary);
-    box-shadow: var(--shadow-md), 0 0 0 1px rgba(79, 106, 232, 0.1);
-    transform: translateY(-2px);
-  }
+  /* ===== 卡片：全站只有一种表面，交互反馈由调用处声明 =====
+     历史问题：.card（hover 抬升 2px + 主色描边环）与 .card-static（抬升 1px）
+     视觉与行为都不同，于是后台统一用 .card、前台统一用 .card-static，
+     同一个产品出现两套卡片，改一处不会影响另一处。
+     现在三者共用同一表面定义，hover 统一为「主色描边 + 阴影加深」；
+     是否可点、要不要指针/缩放反馈，交给调用处的 hover: / cursor- 类。
+     .card-flat 保持完全惰性，用于题面等需要安静阅读、不被悬浮打扰的区域。
 
-  .card-static {
-    background: var(--card);
-    color: var(--card-foreground);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out);
-  }
-
-  .card-static:hover {
-    border-color: var(--primary);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
-  }
-
-  /* card-flat：和 card-static 视觉一致，但鼠标移上去不浮动、不变色、不加阴影
-     用于题面区等需要安静阅读、不希望被交互打扰的卡片 */
+     命名约定（新代码）：
+       .card        默认选择，通用卡片表面
+       .card-flat   需要完全惰性（无 hover 反馈）时
+       .card-static  等价于 .card 的历史别名，仅为兼容存量用法保留，新代码不再使用 */
+  .card,
+  .card-static,
   .card-flat {
     background: var(--card);
     color: var(--card-foreground);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition:
+      box-shadow 200ms var(--ease-out),
+      border-color 200ms var(--ease-out);
+    position: relative;
   }
+
+  /* 安静阅读表面：连阴影也去掉。
+     注意：不再像旧 .card 那样统一加 overflow:hidden —— 那会裁掉卡片内的
+     下拉菜单、徽标与焦点环；需要裁剪的调用处请自行加 overflow-hidden。 */
+  .card-flat {
+    box-shadow: none;
+  }
+
+  .card:hover,
+  .card-static:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md);
+  }
+
   .card-flat:hover {
     border-color: var(--border);
-    box-shadow: var(--shadow-sm);
-    transform: none;
+    box-shadow: none;
   }
 
   .btn {
@@ -398,8 +509,15 @@ code, pre {
     font-size: 0.875rem;
     line-height: 1.25rem;
     padding: 0.5rem 1rem;
+    /* 固定高度：此前高度由 padding + line-height 推导，
+       同一个 .btn 在不同容器里量出 37.33 / 38.33px 两种值。
+       给档位写死高度后，五档量值恒定，不再受容器影响。 */
+    height: 2.375rem;
     border-radius: var(--radius-sm);
-    transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out), background 150ms var(--ease-out);
+    transition:
+      transform 150ms var(--ease-out),
+      box-shadow 150ms var(--ease-out),
+      background 150ms var(--ease-out);
     cursor: pointer;
     outline: none;
     border: 1px solid transparent;
@@ -418,22 +536,75 @@ code, pre {
     transition-duration: 75ms;
   }
 
+  /* ===== 按钮：只允许 3 个文字档 + 2 个图标档 =====
+     历史问题：页面里直接给 <button> 写 p-1 / p-1.5 / p-2 / p-2.5，
+     同一个「表格行操作」在不同页面量出 24 / 28 / 32 / 36px 四种高度；
+     圆角也是 rounded / rounded-md / rounded-lg 混用
+     （连 .btn 与 .btn-sm 本身都不同：6px vs 4px）。
+
+     封闭档位（新代码只能选这五个，尺寸与圆角都由这里定义）：
+       btn-sm      32px  次要操作、表格内操作、紧凑工具条
+       btn         38px  默认
+       btn-lg      44px  主要 CTA（hero / 空态主按钮）
+       btn-icon    36×36 图标操作，单个 svg，无文字
+       btn-icon-sm 28×28 密集列表内的图标操作（一行多个图标时）
+     全部圆角统一 var(--radius-sm)。 */
+  .btn-lg {
+    padding: 0.6875rem 1.25rem;
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+    height: 2.75rem;
+  }
+
+  /* 图标档位自带居中，不依赖 .btn：
+     这些按钮历史上就是裸 <button>，且 .btn 的 overflow:hidden 会裁掉
+     按钮内部的 Tooltip / 下拉浮层，所以这里不引入 overflow 与位移。 */
+  .btn-icon,
+  .btn-icon-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition:
+      background 150ms var(--ease-out),
+      color 150ms var(--ease-out);
+  }
+
+  .btn-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .btn-icon-sm {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  /* 移动端图标按钮：触控目标需 ≥44px（WCAG 2.5.8），
+     桌面端普通图标按钮用 .btn-icon（36px）。 */
+  .btn-icon-lg {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
   .btn-sm {
     padding: 0.375rem 0.75rem;
     font-size: 0.8125rem;
     line-height: 1.125rem;
-    border-radius: calc(var(--radius-sm) - 2px);
+    height: 2rem;
+    border-radius: var(--radius-sm);
     gap: 0.25rem;
   }
 
+  /* 焦点环：静态双圈描边即满足 WCAG 2.4.7「焦点可见」，
+     不再叠加无限脉冲动画——持续闪动对前庭敏感用户不友好，也容易与 loading 动效混淆。 */
   .btn:focus-visible {
-    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
-    animation: focus-pulse 1.5s var(--ease-in-out) infinite;
-  }
-
-  @keyframes focus-pulse {
-    0%, 100% { box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary); }
-    50% { box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary-light); }
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px var(--primary);
   }
 
   .btn:disabled {
@@ -497,8 +668,8 @@ code, pre {
   }
 
   .btn-destructive:hover:not(:disabled) {
-    background: #B91C1C;
-    border-color: #B91C1C;
+    background: #b91c1c;
+    border-color: #b91c1c;
   }
 
   .input {
@@ -507,9 +678,12 @@ code, pre {
     font-size: 0.875rem;
     background: var(--input);
     color: var(--foreground);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    transition: border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out);
+    transition:
+      border-color 200ms var(--ease-out),
+      box-shadow 200ms var(--ease-out),
+      transform 200ms var(--ease-out);
     outline: none;
   }
 
@@ -532,16 +706,24 @@ code, pre {
     cursor: not-allowed;
   }
 
+  /* 可选行（导航 / 侧栏 Tab / 分段项）的唯一定义。
+     历史问题：这类「一行可点项」的高度都由 padding + line-height 推导，
+     量出 39 / 40 / 41px 三种值（.nav-link 与设置页 Tab 就差了 1px）。
+     这里写死 40px，新代码直接复用 .nav-link 或对齐 h-10。 */
   .nav-link {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
     padding: 0.5rem 0.75rem;
+    height: 2.5rem;
     font-size: 0.875rem;
     font-weight: 500;
     color: var(--muted-foreground);
     border-radius: var(--radius-sm);
-    transition: color 150ms var(--ease-out), background 150ms var(--ease-out), border-color 150ms var(--ease-out);
+    transition:
+      color 150ms var(--ease-out),
+      background 150ms var(--ease-out),
+      border-color 150ms var(--ease-out);
     cursor: pointer;
     border-bottom: 2px solid transparent;
   }
@@ -565,9 +747,14 @@ code, pre {
     font-size: 0.75rem;
     font-weight: 600;
     border-radius: var(--radius-sm);
-    transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out), background 150ms var(--ease-out);
+    transition:
+      transform 150ms var(--ease-out),
+      box-shadow 150ms var(--ease-out),
+      background 150ms var(--ease-out);
     background: var(--muted);
     color: var(--muted-foreground);
+    /* 标签是原子单位：窄列里绝不允许折行（中文会退化成逐字换行） */
+    white-space: nowrap;
   }
 
   .tag:hover {
@@ -619,9 +806,15 @@ code, pre {
   }
 
   @keyframes badge-pop {
-    0% { transform: scale(0); }
-    60% { transform: scale(1.2); }
-    100% { transform: scale(1); }
+    0% {
+      transform: scale(0);
+    }
+    60% {
+      transform: scale(1.2);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
 
   .badge-primary {
@@ -681,7 +874,9 @@ code, pre {
     color: var(--foreground);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
+    transition:
+      background 150ms var(--ease-out),
+      color 150ms var(--ease-out);
     text-align: left;
     background: transparent;
     border: none;
@@ -750,12 +945,7 @@ code, pre {
   }
 
   .skeleton {
-    background: linear-gradient(
-      90deg,
-      var(--muted) 0%,
-      var(--border) 50%,
-      var(--muted) 100%
-    );
+    background: linear-gradient(90deg, var(--muted) 0%, var(--border) 50%, var(--muted) 100%);
     background-size: 200% 100%;
     animation: skeleton-loading 1.5s ease-in-out infinite;
     border-radius: var(--radius-sm);
@@ -780,14 +970,37 @@ code, pre {
     border-radius: var(--radius-sm);
   }
 
-  .difficulty-easy { background: var(--difficulty-easy-bg); color: var(--difficulty-easy); }
-  .difficulty-medium-easy { background: var(--difficulty-medium-easy-bg); color: var(--difficulty-medium-easy); }
-  .difficulty-medium { background: var(--difficulty-medium-bg); color: var(--difficulty-medium); }
-  .difficulty-medium-hard { background: var(--difficulty-medium-hard-bg); color: var(--difficulty-medium-hard); }
-  .difficulty-hard { background: var(--difficulty-hard-bg); color: var(--difficulty-hard); }
-  .difficulty-expert { background: var(--difficulty-expert-bg); color: var(--difficulty-expert); }
+  .difficulty-easy {
+    background: var(--difficulty-easy-bg);
+    color: var(--difficulty-easy);
+  }
+  .difficulty-medium-easy {
+    background: var(--difficulty-medium-easy-bg);
+    color: var(--difficulty-medium-easy);
+  }
+  .difficulty-medium {
+    background: var(--difficulty-medium-bg);
+    color: var(--difficulty-medium);
+  }
+  .difficulty-medium-hard {
+    background: var(--difficulty-medium-hard-bg);
+    color: var(--difficulty-medium-hard);
+  }
+  .difficulty-hard {
+    background: var(--difficulty-hard-bg);
+    color: var(--difficulty-hard);
+  }
+  .difficulty-expert {
+    background: var(--difficulty-expert-bg);
+    color: var(--difficulty-expert);
+  }
 
-  /* Status tags */
+  /* ===== 判题结论徽标：全站唯一配色来源（文案由 lib/status.ts 提供）=====
+     硬性要求：通过 / 部分正确 / 答案错误 / 运行错误 / 超时 / 超内存 / 编译错误
+     必须互相可区分，不得多个结论共用同一颜色。
+     色相复用 --difficulty-* 这套语义色（它本身就是「差异明显的 6 色」），
+     因此 .status-* 与难度标签共享色板，改一处两边一致。
+     少见的 PE / OLE / CSP 与最接近的结论共用色相，属有意为之。 */
   .status-tag {
     display: inline-flex;
     align-items: center;
@@ -796,22 +1009,82 @@ code, pre {
     font-size: 0.75rem;
     font-weight: 600;
     border-radius: var(--radius-sm);
+    /* 判题结论是原子单位：必须整词显示，且不参与压缩，
+       否则在窄列里会被挤成逐字换行（「答案错误」竖排成一列） */
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
-  .status-ac { background: var(--difficulty-easy-bg); color: var(--difficulty-easy); }
-  .status-wa { background: var(--difficulty-hard-bg); color: var(--difficulty-hard); }
-  .status-tle { background: var(--difficulty-medium-bg); color: var(--difficulty-medium); }
-  .status-mle { background: var(--difficulty-expert-bg); color: var(--difficulty-expert); }
-  .status-re { background: var(--difficulty-hard-bg); color: var(--difficulty-hard); }
-  .status-ce { background: var(--difficulty-expert-bg); color: var(--difficulty-expert); }
-  .status-pending { background: var(--primary-50); color: var(--primary); }
+  /* 通过 —— 绿 */
+  .status-ac {
+    background: var(--difficulty-easy-bg);
+    color: var(--difficulty-easy);
+  }
+  /* 部分正确 —— 天蓝 */
+  .status-pc {
+    background: var(--difficulty-medium-easy-bg);
+    color: var(--difficulty-medium-easy);
+  }
+  /* 答案错误 —— 红 */
+  .status-wa {
+    background: var(--difficulty-hard-bg);
+    color: var(--difficulty-hard);
+  }
+  /* 运行错误 —— 橙 */
+  .status-re {
+    background: var(--difficulty-medium-hard-bg);
+    color: var(--difficulty-medium-hard);
+  }
+  /* 超时 —— 琥珀 */
+  .status-tle {
+    background: var(--difficulty-medium-bg);
+    color: var(--difficulty-medium);
+  }
+  /* 超内存 —— 紫 */
+  .status-mle {
+    background: var(--difficulty-expert-bg);
+    color: var(--difficulty-expert);
+  }
+  /* 编译错误 —— 中性灰（不对应测试点结果，故不带色相） */
+  .status-ce {
+    background: var(--muted);
+    color: var(--muted-foreground);
+  }
+  /* 格式错误 / 输出超限 —— 琥珀（与「超时」同属输出规模问题） */
+  .status-pe {
+    background: var(--difficulty-medium-bg);
+    color: var(--difficulty-medium);
+  }
+  .status-ole {
+    background: var(--difficulty-medium-bg);
+    color: var(--difficulty-medium);
+  }
+  /* 无法启动 —— 红 */
+  .status-csp {
+    background: var(--difficulty-hard-bg);
+    color: var(--difficulty-hard);
+  }
+  /* 系统错误 / 已移除 —— 中性灰 */
+  .status-se {
+    background: var(--muted);
+    color: var(--muted-foreground);
+  }
+  .status-removed {
+    background: var(--muted);
+    color: var(--muted-foreground);
+  }
+  /* 等待评测 / 评测中 / 运行中 —— 主色 */
+  .status-pending {
+    background: var(--primary-50);
+    color: var(--primary);
+  }
 }
 
 @layer utilities {
   .custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
-  scroll-behavior: auto;
+    scroll-behavior: auto;
   }
 
   .custom-scrollbar::-webkit-scrollbar {
@@ -825,7 +1098,7 @@ code, pre {
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
     background: var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -862,7 +1135,9 @@ code, pre {
   }
 
   .focus-ring:focus-visible {
-    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px var(--primary);
   }
 
   .no-scrollbar {
@@ -928,16 +1203,36 @@ code, pre {
     animation: stagger-item 0.3s var(--ease-out) forwards;
     will-change: transform, opacity;
   }
-  .animate-stagger-in > *:nth-child(1) { animation-delay: 0ms; }
-  .animate-stagger-in > *:nth-child(2) { animation-delay: 50ms; }
-  .animate-stagger-in > *:nth-child(3) { animation-delay: 100ms; }
-  .animate-stagger-in > *:nth-child(4) { animation-delay: 150ms; }
-  .animate-stagger-in > *:nth-child(5) { animation-delay: 200ms; }
-  .animate-stagger-in > *:nth-child(6) { animation-delay: 250ms; }
-  .animate-stagger-in > *:nth-child(7) { animation-delay: 300ms; }
-  .animate-stagger-in > *:nth-child(8) { animation-delay: 350ms; }
-  .animate-stagger-in > *:nth-child(9) { animation-delay: 400ms; }
-  .animate-stagger-in > *:nth-child(10) { animation-delay: 450ms; }
+  .animate-stagger-in > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .animate-stagger-in > *:nth-child(2) {
+    animation-delay: 50ms;
+  }
+  .animate-stagger-in > *:nth-child(3) {
+    animation-delay: 100ms;
+  }
+  .animate-stagger-in > *:nth-child(4) {
+    animation-delay: 150ms;
+  }
+  .animate-stagger-in > *:nth-child(5) {
+    animation-delay: 200ms;
+  }
+  .animate-stagger-in > *:nth-child(6) {
+    animation-delay: 250ms;
+  }
+  .animate-stagger-in > *:nth-child(7) {
+    animation-delay: 300ms;
+  }
+  .animate-stagger-in > *:nth-child(8) {
+    animation-delay: 350ms;
+  }
+  .animate-stagger-in > *:nth-child(9) {
+    animation-delay: 400ms;
+  }
+  .animate-stagger-in > *:nth-child(10) {
+    animation-delay: 450ms;
+  }
 
   @keyframes stagger-item {
     from {
@@ -973,8 +1268,12 @@ code, pre {
   }
 
   @keyframes backdrop-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   /* Pulse glow for live/active states */
@@ -983,35 +1282,34 @@ code, pre {
   }
 
   @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(79, 106, 232, 0.4); }
-    50% { box-shadow: 0 0 0 8px rgba(79, 106, 232, 0); }
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(79, 106, 232, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgba(79, 106, 232, 0);
+    }
   }
 
   /* Shimmer effect for loading skeletons */
   .animate-shimmer {
     animation: shimmer 2s infinite;
-    background: linear-gradient(
-      90deg,
-      var(--muted) 0%,
-      var(--border) 50%,
-      var(--muted) 100%
-    );
+    background: linear-gradient(90deg, var(--muted) 0%, var(--border) 50%, var(--muted) 100%);
     background-size: 200% 100%;
   }
 
   @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 
   .animate-shimmer {
     animation: shimmer 2s infinite;
-    background: linear-gradient(
-      90deg,
-      var(--muted) 0%,
-      var(--border) 50%,
-      var(--muted) 100%
-    );
+    background: linear-gradient(90deg, var(--muted) 0%, var(--border) 50%, var(--muted) 100%);
     background-size: 200% 100%;
   }
 
@@ -1021,8 +1319,12 @@ code, pre {
   }
 
   @keyframes icon-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   /* Ripple effect container */
@@ -1035,7 +1337,11 @@ code, pre {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.3) 0%, transparent 60%);
+    background: radial-gradient(
+      circle at var(--ripple-x, 50%) var(--ripple-y, 50%),
+      rgba(255, 255, 255, 0.3) 0%,
+      transparent 60%
+    );
     opacity: 0;
     transition: opacity 300ms;
   }
@@ -1200,7 +1506,10 @@ code, pre {
   border: none;
   cursor: pointer;
   opacity: 0.7;
-  transition: opacity 150ms ease, color 150ms ease, background 150ms ease;
+  transition:
+    opacity 150ms ease,
+    color 150ms ease,
+    background 150ms ease;
 }
 
 .markdown-body .markdown-code-shell:hover .markdown-code-copy,
@@ -1300,7 +1609,7 @@ code, pre {
   padding-left: 0;
 }
 
-.markdown-body li.task-list-item input[type="checkbox"] {
+.markdown-body li.task-list-item input[type='checkbox'] {
   margin-right: 0.5rem;
 }
 

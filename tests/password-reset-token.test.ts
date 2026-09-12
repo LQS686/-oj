@@ -4,10 +4,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest'
 import jwt from 'jsonwebtoken'
-import {
-  signPasswordResetToken,
-  verifyPasswordResetToken,
-} from '../lib/auth'
+import { signPasswordResetToken, verifyPasswordResetToken } from '../lib/auth'
 
 const JWT_SECRET = 'test-secret-key-abcdefghijklmnopqrstuvwxyz012345'
 
@@ -48,11 +45,10 @@ describe('signPasswordResetToken / verifyPasswordResetToken', () => {
   })
 
   it('缺少 purpose / userId / tokenVersion 的载荷校验失败', () => {
-    const noPurpose = jwt.sign(
-      { userId: 'u1', tokenVersion: 0 },
-      JWT_SECRET,
-      { algorithm: 'HS256', expiresIn: '30m' }
-    )
+    const noPurpose = jwt.sign({ userId: 'u1', tokenVersion: 0 }, JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: '30m',
+    })
     expect(verifyPasswordResetToken(noPurpose)).toBeNull()
 
     const wrongType = jwt.sign(

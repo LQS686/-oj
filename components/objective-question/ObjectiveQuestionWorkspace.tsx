@@ -118,25 +118,21 @@ export default function ObjectiveQuestionWorkspace({
   const [selectedKey, setSelectedKey] = useState<string | null>(() => {
     if (question.type !== 'single-choice' || !submission) return null
     const first = submission.answer[0]
-    return typeof first === 'string' &&
-      (question.options ?? []).some((o) => o.key === first)
+    return typeof first === 'string' && (question.options ?? []).some((o) => o.key === first)
       ? first
       : null
   })
   const [selectedKeys, setSelectedKeys] = useState<string[]>(() => {
     if (question.type !== 'multiple-choice' || !submission) return []
     const keys = (question.options ?? []).map((o) => o.key)
-    return submission.answer.filter(
-      (v): v is string => typeof v === 'string' && keys.includes(v)
-    )
+    return submission.answer.filter((v): v is string => typeof v === 'string' && keys.includes(v))
   })
   const [trueFalseValue, setTrueFalseValue] = useState<boolean | null>(() => {
     if (question.type !== 'true-false' || !submission) return null
     const first = submission.answer[0]
     return typeof first === 'boolean' ? first : null
   })
-  const blankCount =
-    question.type === 'fill-blank' ? countFillBlanks(question.title) : 0
+  const blankCount = question.type === 'fill-blank' ? countFillBlanks(question.title) : 0
   const [fillValues, setFillValues] = useState<string[]>(() => {
     if (question.type !== 'fill-blank' || blankCount <= 0) return []
     if (!submission) return Array.from({ length: blankCount }, () => '')
@@ -208,8 +204,8 @@ export default function ObjectiveQuestionWorkspace({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-3 items-start">
       {/* 中栏：题面与作答 */}
-      <div className="card-flat rounded-lg overflow-hidden min-w-0">
-        <div className="p-5 lg:p-6 space-y-5">
+      <div className="card-flat overflow-hidden min-w-0">
+        <div className="p-5 lg:p-6 space-y-6">
           {/* 元信息行 */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
             <span className={`tag ${OBJECTIVE_QUESTION_TYPE_TAG_CLASSES[question.type]}`}>
@@ -274,10 +270,7 @@ export default function ObjectiveQuestionWorkspace({
                       >
                         {option.key}
                       </span>
-                      <MarkdownContent
-                        content={option.content}
-                        className="min-w-0 flex-1"
-                      />
+                      <MarkdownContent content={option.content} className="min-w-0 flex-1" />
                     </button>
                   )
                 })}
@@ -316,10 +309,7 @@ export default function ObjectiveQuestionWorkspace({
                       >
                         {option.key}
                       </span>
-                      <MarkdownContent
-                        content={option.content}
-                        className="min-w-0 flex-1 pr-6"
-                      />
+                      <MarkdownContent content={option.content} className="min-w-0 flex-1 pr-6" />
                       {selected && (
                         <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0">
                           <Check className="w-3.5 h-3.5" />
@@ -370,7 +360,7 @@ export default function ObjectiveQuestionWorkspace({
                   <div key={index} className="flex items-center gap-3">
                     <label
                       htmlFor={`${question.id}-blank-${index}`}
-                      className="shrink-0 text-sm font-medium text-muted-foreground"
+                      className="shrink-0 text-label text-muted-foreground"
                     >
                       空{circledNumber(index + 1)}
                     </label>
@@ -396,7 +386,7 @@ export default function ObjectiveQuestionWorkspace({
 
       {/* 右栏：提交与结果 */}
       <div className="lg:sticky lg:top-[72px] min-w-0">
-        <div className="card-static rounded-lg overflow-hidden">
+        <div className="card-static overflow-hidden">
           <div className="p-4 space-y-3">
             {/* 提交按钮 */}
             <button

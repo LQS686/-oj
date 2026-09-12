@@ -18,11 +18,14 @@ export const bodyParser = false
  * POST /api/admin/testcases/upload - 上传测试点压缩包
  */
 export const POST = withApi.admin(async (req, _ctx, { user: _user }) => {
-
   // A-P1-1 修复：读取 body 前先检查 Content-Length，超过上限直接拒绝，避免超大请求全量读入内存（OOM）
   const contentLength = Number(req.headers.get('content-length') || 0)
   if (contentLength > MAX_CONTENT_LENGTH) {
-    throw new ApiError('PAYLOAD_TOO_LARGE', `上传文件过大（最大 ${MAX_UPLOAD_BYTES / 1024 / 1024}MB）`, 413)
+    throw new ApiError(
+      'PAYLOAD_TOO_LARGE',
+      `上传文件过大（最大 ${MAX_UPLOAD_BYTES / 1024 / 1024}MB）`,
+      413
+    )
   }
 
   logger.info('📥 收到测试点上传请求')

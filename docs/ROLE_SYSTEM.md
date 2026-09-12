@@ -112,13 +112,13 @@ API 路由应使用 [lib/api/withApi.ts](../lib/api/withApi.ts) 提供的包装�
 ```ts
 // 后台接口：SYSTEM_ADMIN / ADMIN 可访问
 export const GET = withApi.admin(async (req, { user }) => {
-  return ok(await listUsers());
-});
+  return ok(await listUsers())
+})
 
 // 系统设置接口：仅 SYSTEM_ADMIN
 export const PATCH = withApi.systemAdmin(async (req, { user }) => {
-  return ok(await updateSystemSettings(await readJson(req)));
-});
+  return ok(await updateSystemSettings(await readJson(req)))
+})
 ```
 
 ## 6. Middleware 拦截规则

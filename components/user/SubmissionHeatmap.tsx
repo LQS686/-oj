@@ -34,13 +34,7 @@ interface DayCell {
 
 // 5 个颜色等级：从无活动到高活动
 // 使用 CSS 变量保持主题一致性，level 0 使用 muted 灰色，1-4 使用主色不同透明度
-const LEVEL_BG = [
-  'bg-muted/40',
-  'bg-primary/25',
-  'bg-primary/50',
-  'bg-primary/75',
-  'bg-primary',
-]
+const LEVEL_BG = ['bg-muted/40', 'bg-primary/25', 'bg-primary/50', 'bg-primary/75', 'bg-primary']
 
 const LEVEL_BORDER = [
   'border-border/40',
@@ -95,10 +89,11 @@ function buildGrid(data: Record<string, number>, totalDays: number): DayCell[][]
     const week: DayCell[] = []
     for (let i = 0; i < 7; i++) {
       const dateStr = formatDate(cursor)
-      const inRange = cursor <= today && cursor >= new Date(today.getTime() - totalDays * 24 * 60 * 60 * 1000)
+      const inRange =
+        cursor <= today && cursor >= new Date(today.getTime() - totalDays * 24 * 60 * 60 * 1000)
       week.push({
         date: dateStr,
-        count: inRange ? (data[dateStr] || 0) : 0,
+        count: inRange ? data[dateStr] || 0 : 0,
         month: cursor.getMonth(),
         dayOfWeek: cursor.getDay(),
       })
@@ -112,17 +107,27 @@ function buildGrid(data: Record<string, number>, totalDays: number): DayCell[][]
 /**
  * 月份缩写（中文）
  */
-const MONTH_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+const MONTH_LABELS = [
+  '1月',
+  '2月',
+  '3月',
+  '4月',
+  '5月',
+  '6月',
+  '7月',
+  '8月',
+  '9月',
+  '10月',
+  '11月',
+  '12月',
+]
 
 /**
  * 工作日标签（左侧）
  */
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
-export default function SubmissionHeatmap({
-  data,
-  days = 365,
-}: SubmissionHeatmapProps) {
+export default function SubmissionHeatmap({ data, days = 365 }: SubmissionHeatmapProps) {
   const [hovered, setHovered] = useState<DayCell | null>(null)
 
   const weeks = useMemo(() => buildGrid(data, days), [data, days])
@@ -181,20 +186,26 @@ export default function SubmissionHeatmap({
     <div className="space-y-4">
       {/* 顶部统计概览 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="card-static p-3 rounded-lg text-center">
-          <div className="text-xl font-bold text-foreground tabular-nums">{stats.totalSubmissions}</div>
+        <div className="card-static p-4 text-center">
+          <div className="text-xl font-bold text-foreground tabular-nums">
+            {stats.totalSubmissions}
+          </div>
           <div className="text-xs text-muted-foreground mt-1">年度提交</div>
         </div>
-        <div className="card-static p-3 rounded-lg text-center">
+        <div className="card-static p-4 text-center">
           <div className="text-xl font-bold text-foreground tabular-nums">{stats.activeDays}</div>
           <div className="text-xs text-muted-foreground mt-1">活跃天数</div>
         </div>
-        <div className="card-static p-3 rounded-lg text-center">
-          <div className="text-xl font-bold text-secondary-light tabular-nums">{stats.maxStreak}</div>
+        <div className="card-static p-4 text-center">
+          <div className="text-xl font-bold text-secondary-light tabular-nums">
+            {stats.maxStreak}
+          </div>
           <div className="text-xs text-muted-foreground mt-1">最长连续</div>
         </div>
-        <div className="card-static p-3 rounded-lg text-center">
-          <div className="text-xl font-bold text-primary-light tabular-nums">{stats.currentStreak}</div>
+        <div className="card-static p-4 text-center">
+          <div className="text-xl font-bold text-primary-light tabular-nums">
+            {stats.currentStreak}
+          </div>
           <div className="text-xs text-muted-foreground mt-1">当前连续</div>
         </div>
       </div>
@@ -240,7 +251,7 @@ export default function SubmissionHeatmap({
                     return (
                       <div
                         key={cell.date}
-                        className={`w-[12px] h-[12px] rounded-[2px] border ${LEVEL_BG[level]} ${LEVEL_BORDER[level]} hover:ring-1 hover:ring-primary/40 hover:scale-125 transition-transform cursor-default`}
+                        className={`w-[12px] h-[12px] rounded-xs border ${LEVEL_BG[level]} ${LEVEL_BORDER[level]} hover:ring-1 hover:ring-primary/40 hover:scale-125 transition-transform cursor-default`}
                         onMouseEnter={() => setHovered(cell)}
                         onMouseLeave={() => setHovered(null)}
                       />
@@ -257,7 +268,7 @@ export default function SubmissionHeatmap({
             {LEVEL_BG.map((bg, i) => (
               <div
                 key={i}
-                className={`w-[12px] h-[12px] rounded-[2px] border ${bg} ${LEVEL_BORDER[i]}`}
+                className={`w-[12px] h-[12px] rounded-xs border ${bg} ${LEVEL_BORDER[i]}`}
               />
             ))}
             <span className="text-[10px] text-muted-foreground">较多</span>

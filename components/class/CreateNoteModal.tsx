@@ -82,9 +82,7 @@ export default function CreateNoteModal({
     try {
       setLoading(true)
       const response = await fetchWithCookie(
-        isEdit
-          ? `/api/classes/${classId}/notes/${editNote!.id}`
-          : `/api/classes/${classId}/notes`,
+        isEdit ? `/api/classes/${classId}/notes/${editNote!.id}` : `/api/classes/${classId}/notes`,
         {
           method: isEdit ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -124,7 +122,7 @@ export default function CreateNoteModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
+            <label className="block text-label text-foreground mb-1.5">
               笔记标题 <span className="text-error">*</span>
             </label>
             <input
@@ -141,7 +139,7 @@ export default function CreateNoteModal({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">分类</label>
+              <label className="block text-label text-foreground mb-1.5">分类</label>
               <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -155,7 +153,7 @@ export default function CreateNoteModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">标签</label>
+              <label className="block text-label text-foreground mb-1.5">标签</label>
               <div className="relative">
                 <input
                   type="text"
@@ -170,7 +168,7 @@ export default function CreateNoteModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
+            <label className="block text-label text-foreground mb-1.5">
               笔记内容 <span className="text-error">*</span>
             </label>
             <textarea

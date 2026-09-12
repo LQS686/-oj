@@ -24,7 +24,10 @@ export const POST = withApi.public(async (req) => {
       })
       clearUserCache(session.userId)
     } catch (e) {
-      logger.warn('登出吊销 tokenVersion 失败（忽略，cookie 仍会清除）', e instanceof Error ? e : new Error(String(e)))
+      logger.warn(
+        '登出吊销 tokenVersion 失败（忽略，cookie 仍会清除）',
+        e instanceof Error ? e : new Error(String(e))
+      )
     }
   }
 

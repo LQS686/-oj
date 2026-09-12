@@ -2,16 +2,13 @@
 
 import { useEffect } from 'react'
 import { formatAssignmentDocumentTitle } from '@/lib/document-title'
-import {
-  DEFAULT_SITE_TITLE,
-  formatPageDocumentTitle,
-  resolvePageTitle,
-} from '@/lib/page-titles'
+import { DEFAULT_SITE_TITLE, formatPageDocumentTitle, resolvePageTitle } from '@/lib/page-titles'
+import { assertDocumentTitle } from '@/lib/document-title-assert'
 
 export type DocumentTitleMode = 'page' | 'assignment'
 
 /**
- * 设置当前页浏览器标签标题；卸载时恢复为默认或上一标题
+ * 设置当前页浏览器标签标题；卸载时恢复
  * @param mode assignment 使用作业专用格式（可带班级名）
  */
 export function useDocumentTitle(
@@ -30,22 +27,13 @@ export function useDocumentTitle(
         ? formatAssignmentDocumentTitle(title, className)
         : formatPageDocumentTitle(title)
     const prev = document.title
-    document.title = next
+    const cancel = assertDocumentTitle(next)
 
     return () => {
+      cancel()
       document.title = prev || DEFAULT_SITE_TITLE
     }
   }, [title, enabled, mode, className])
-}
-
-/**
- * 根据当前 pathname 设置标签标题（用于全局 Provider）
- */
-export function usePathnameDocumentTitle(pathname: string) {
-  useEffect(() => {
-    const pageTitle = resolvePageTitle(pathname)
-    document.title = formatPageDocumentTitle(pageTitle)
-  }, [pathname])
 }
 
 export { DEFAULT_SITE_TITLE, formatPageDocumentTitle, resolvePageTitle }

@@ -58,9 +58,9 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
   const [defaultDifficulty, setDefaultDifficulty] = useState<string>('入门')
   const [onDuplicate, setOnDuplicate] = useState<'skip' | 'overwrite' | 'duplicate'>('skip')
 
-  const created = results.filter(r => r.status === 'created').length
-  const skipped = results.filter(r => r.status === 'skipped').length
-  const failed = results.filter(r => r.status === 'failed').length
+  const created = results.filter((r) => r.status === 'created').length
+  const skipped = results.filter((r) => r.status === 'skipped').length
+  const failed = results.filter((r) => r.status === 'failed').length
   const done = results.length
   const percent = total > 0 ? Math.round((done / total) * 100) : 0
 
@@ -79,7 +79,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
         break
       case 'item': {
         const r = event.result
-        if (r) setResults(prev => [...prev, r])
+        if (r) setResults((prev) => [...prev, r])
         break
       }
       case 'done':
@@ -114,10 +114,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
       const formData = new FormData()
       formData.append('file', file)
       formData.append('format', 'dsoj')
-      formData.append(
-        'options',
-        JSON.stringify({ visibility, defaultDifficulty, onDuplicate })
-      )
+      formData.append('options', JSON.stringify({ visibility, defaultDifficulty, onDuplicate }))
 
       const response = await fetchWithCookie('/api/admin/problems/import', {
         method: 'POST',
@@ -166,7 +163,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
     } catch (e) {
       setError(e instanceof Error ? e.message : '网络错误，请稍后重试')
     } finally {
-      setPhase(p => (p === 'streaming' ? 'done' : p))
+      setPhase((p) => (p === 'streaming' ? 'done' : p))
       setSubmitting(false)
     }
   }
@@ -189,7 +186,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
       maxWidthClass="max-w-3xl"
     >
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-6">
           {/* DSOJ 说明 */}
           <div className="p-4 rounded-lg bg-muted/50 border border-border">
             <div className="flex items-center gap-2 mb-1">
@@ -225,9 +222,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
 
           {/* 文件上传 */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              选择文件
-            </label>
+            <label className="block text-label text-foreground mb-2">选择文件</label>
             <div
               onClick={() => fileInputRef.current?.click()}
               className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
@@ -243,13 +238,17 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
                 <div className="flex items-center justify-center gap-2 text-sm">
                   <CheckCircle2 className="w-4 h-4 text-secondary" />
                   <span className="text-foreground font-medium">{file.name}</span>
-                  <span className="text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+                  <span className="text-muted-foreground">
+                    ({(file.size / 1024).toFixed(1)} KB)
+                  </span>
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
                   <Upload className="w-6 h-6 mx-auto mb-2 opacity-50" />
                   点击选择文件
-                  <span className="block text-xs mt-1">支持 .zip / .tar.xz / .txz 文件，最大 50MB</span>
+                  <span className="block text-xs mt-1">
+                    支持 .zip / .tar.xz / .txz 文件，最大 50MB
+                  </span>
                 </div>
               )}
             </div>
@@ -258,12 +257,10 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
           {/* 通用选项 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">
-                可见性
-              </label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">可见性</label>
               <select
                 value={visibility}
-                onChange={e => setVisibility(e.target.value as 'public' | 'private' | 'contest')}
+                onChange={(e) => setVisibility(e.target.value as 'public' | 'private' | 'contest')}
                 className="input text-sm"
               >
                 <option value="private">隐藏（推荐导入后再校对）</option>
@@ -277,11 +274,13 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
               </label>
               <select
                 value={defaultDifficulty}
-                onChange={e => setDefaultDifficulty(e.target.value)}
+                onChange={(e) => setDefaultDifficulty(e.target.value)}
                 className="input text-sm"
               >
-                {DIFFICULTIES.map(d => (
-                  <option key={d} value={d}>{d}</option>
+                {DIFFICULTIES.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
                 ))}
               </select>
             </div>
@@ -291,7 +290,9 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
               </label>
               <select
                 value={onDuplicate}
-                onChange={e => setOnDuplicate(e.target.value as 'skip' | 'overwrite' | 'duplicate')}
+                onChange={(e) =>
+                  setOnDuplicate(e.target.value as 'skip' | 'overwrite' | 'duplicate')
+                }
                 className="input text-sm"
               >
                 <option value="skip">跳过（推荐）</option>
@@ -307,7 +308,9 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
               <div className="flex items-center justify-between text-sm">
                 <span className="text-foreground font-medium flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  {total > 0 ? `正在导入第 ${Math.min(done + 1, total)}/${total} 题…` : '正在解析题包…'}
+                  {total > 0
+                    ? `正在导入第 ${Math.min(done + 1, total)}/${total} 题…`
+                    : '正在解析题包…'}
                 </span>
                 <span className="text-muted-foreground tabular-nums">{percent}%</span>
               </div>
@@ -319,9 +322,13 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
               </div>
               {lastResult && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  {lastResult.status === 'created' && <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />}
+                  {lastResult.status === 'created' && (
+                    <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />
+                  )}
                   {lastResult.status === 'skipped' && <SkipForward className="w-4 h-4 shrink-0" />}
-                  {lastResult.status === 'failed' && <XCircle className="w-4 h-4 text-error shrink-0" />}
+                  {lastResult.status === 'failed' && (
+                    <XCircle className="w-4 h-4 text-error shrink-0" />
+                  )}
                   <span className="truncate">
                     {lastResult.status === 'created' && '导入成功：'}
                     {lastResult.status === 'skipped' && '跳过：'}
@@ -366,31 +373,35 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
               </div>
 
               <div className="max-h-64 overflow-y-auto border border-border rounded-lg">
-                <table className="w-full text-sm">
+                <table className="table w-full text-sm">
                   <thead className="bg-muted sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">状态</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">题号</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">标题</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">说明</th>
+                      <th className="text-left">状态</th>
+                      <th className="text-left">题号</th>
+                      <th className="text-left">标题</th>
+                      <th className="text-left">说明</th>
                     </tr>
                   </thead>
                   <tbody>
                     {results.map((r, i) => (
                       <tr key={i} className="border-t border-border">
-                        <td className="px-3 py-2">
-                          {r.status === 'created' && <CheckCircle2 className="w-4 h-4 text-secondary" />}
-                          {r.status === 'skipped' && <SkipForward className="w-4 h-4 text-muted-foreground" />}
+                        <td>
+                          {r.status === 'created' && (
+                            <CheckCircle2 className="w-4 h-4 text-secondary" />
+                          )}
+                          {r.status === 'skipped' && (
+                            <SkipForward className="w-4 h-4 text-muted-foreground" />
+                          )}
                           {r.status === 'failed' && <XCircle className="w-4 h-4 text-error" />}
                         </td>
-                        <td className="px-3 py-2 text-muted-foreground font-mono text-xs">
+                        <td className="text-muted-foreground font-mono text-xs">
                           {r.problemNumber || '-'}
                         </td>
-                        <td className="px-3 py-2 text-foreground">
+                        <td className="text-foreground">
                           {r.title.slice(0, 40)}
                           {r.title.length > 40 ? '...' : ''}
                         </td>
-                        <td className="px-3 py-2 text-muted-foreground text-xs">
+                        <td className="text-muted-foreground text-xs">
                           {r.reason || (r.status === 'created' ? '导入成功' : '-')}
                         </td>
                       </tr>

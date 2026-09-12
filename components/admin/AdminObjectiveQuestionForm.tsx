@@ -43,15 +43,13 @@ function defaultOptionContents(): string[] {
 function parseTags(input: string): string[] {
   return input
     .split(/[,，]/)
-    .map(t => t.trim())
+    .map((t) => t.trim())
     .filter(Boolean)
 }
 
 /** 填空空位 label：空①、空②…（超过 10 个用「空 11」） */
 function blankLabel(index: number): string {
-  return index < CIRCLED_NUMBERS.length
-    ? `空${CIRCLED_NUMBERS[index]}`
-    : `空 ${index + 1}`
+  return index < CIRCLED_NUMBERS.length ? `空${CIRCLED_NUMBERS[index]}` : `空 ${index + 1}`
 }
 
 export interface AdminObjectiveQuestionFormProps {
@@ -61,9 +59,7 @@ export interface AdminObjectiveQuestionFormProps {
 }
 
 /** 表单行内错误（字段名 → 中文提示） */
-type FormErrors = Partial<
-  Record<'title' | 'options' | 'answer' | 'tags' | 'score', string>
->
+type FormErrors = Partial<Record<'title' | 'options' | 'answer' | 'tags' | 'score', string>>
 
 export default function AdminObjectiveQuestionForm({
   mode,
@@ -100,7 +96,7 @@ export default function AdminObjectiveQuestionForm({
 
   /** 清除指定字段的行内错误（输入变化时调用） */
   const clearError = useCallback((field: keyof FormErrors) => {
-    setErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev))
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev))
   }, [])
 
   /** 详情回填：answer Json → 表单结构 */
@@ -109,23 +105,15 @@ export default function AdminObjectiveQuestionForm({
     setType(detail.type)
     setTitle(detail.title)
     if (detail.type === 'single-choice' || detail.type === 'multiple-choice') {
-      const contents = (detail.options || []).map(o => o.content)
-      setOptionContents(
-        contents.length >= MIN_OPTIONS ? contents : defaultOptionContents()
-      )
-      const keys = (detail.options || []).map(o => o.key)
-      const indexes = (detail.answer as string[])
-        .map(k => keys.indexOf(k))
-        .filter(i => i >= 0)
+      const contents = (detail.options || []).map((o) => o.content)
+      setOptionContents(contents.length >= MIN_OPTIONS ? contents : defaultOptionContents())
+      const keys = (detail.options || []).map((o) => o.key)
+      const indexes = (detail.answer as string[]).map((k) => keys.indexOf(k)).filter((i) => i >= 0)
       setSelectedIndexes(indexes)
     } else if (detail.type === 'true-false') {
-      setTrueFalseAnswer(
-        typeof detail.answer[0] === 'boolean' ? detail.answer[0] : null
-      )
+      setTrueFalseAnswer(typeof detail.answer[0] === 'boolean' ? detail.answer[0] : null)
     } else {
-      setFillAnswers(
-        Array.isArray(detail.answer) ? (detail.answer as string[]) : []
-      )
+      setFillAnswers(Array.isArray(detail.answer) ? (detail.answer as string[]) : [])
     }
     setDifficulty(detail.difficulty || '简单')
     setTagsInput((detail.tags || []).join(','))
@@ -141,9 +129,7 @@ export default function AdminObjectiveQuestionForm({
     const load = async () => {
       try {
         setLoading(true)
-        const response = await fetchWithCookie(
-          `/api/admin/objective-questions/${questionId}`
-        )
+        const response = await fetchWithCookie(`/api/admin/objective-questions/${questionId}`)
         const data = await response.json()
         if (cancelled) return
         if (!response.ok || !data.success) {
@@ -191,22 +177,20 @@ export default function AdminObjectiveQuestionForm({
 
   const handleAddOption = () => {
     if (optionContents.length >= MAX_OPTIONS) return
-    setOptionContents(prev => [...prev, ''])
+    setOptionContents((prev) => [...prev, ''])
   }
 
   const handleRemoveOption = (index: number) => {
     if (optionContents.length <= MIN_OPTIONS) return
-    setOptionContents(prev => prev.filter((_, i) => i !== index))
+    setOptionContents((prev) => prev.filter((_, i) => i !== index))
     // 删除选项后：移除其答案标记，其后的下标前移
-    setSelectedIndexes(prev =>
-      prev
-        .filter(i => i !== index)
-        .map(i => (i > index ? i - 1 : i))
+    setSelectedIndexes((prev) =>
+      prev.filter((i) => i !== index).map((i) => (i > index ? i - 1 : i))
     )
   }
 
   const handleOptionContentChange = (index: number, content: string) => {
-    setOptionContents(prev => prev.map((c, i) => (i === index ? content : c)))
+    setOptionContents((prev) => prev.map((c, i) => (i === index ? content : c)))
   }
 
   /** 标记正确答案：单选 radio（互斥），多选 checkbox（可多选） */
@@ -215,9 +199,9 @@ export default function AdminObjectiveQuestionForm({
     if (type === 'single-choice') {
       setSelectedIndexes([index])
     } else {
-      setSelectedIndexes(prev =>
+      setSelectedIndexes((prev) =>
         prev.includes(index)
-          ? prev.filter(i => i !== index)
+          ? prev.filter((i) => i !== index)
           : [...prev, index].sort((a, b) => a - b)
       )
     }
@@ -225,7 +209,7 @@ export default function AdminObjectiveQuestionForm({
 
   /** 填空答案输入（按空位下标写入） */
   const handleFillAnswerChange = (index: number, value: string) => {
-    setFillAnswers(prev => {
+    setFillAnswers((prev) => {
       const next = [...prev]
       next[index] = value
       return next
@@ -248,7 +232,7 @@ export default function AdminObjectiveQuestionForm({
     if (type === 'single-choice' || type === 'multiple-choice') {
       if (optionContents.length < MIN_OPTIONS || optionContents.length > MAX_OPTIONS) {
         errs.options = `选项数量必须在 ${MIN_OPTIONS}-${MAX_OPTIONS} 个之间`
-      } else if (optionContents.some(c => !c.trim())) {
+      } else if (optionContents.some((c) => !c.trim())) {
         errs.options = '选项内容不能为空'
       }
       if (type === 'single-choice' && selectedIndexes.length !== 1) {
@@ -261,7 +245,9 @@ export default function AdminObjectiveQuestionForm({
         errs.answer = '请选择判断题答案'
       }
     } else if (blankCount > 0) {
-      if (Array.from({ length: blankCount }, (_, i) => fillAnswers[i] ?? '').some(a => !a.trim())) {
+      if (
+        Array.from({ length: blankCount }, (_, i) => fillAnswers[i] ?? '').some((a) => !a.trim())
+      ) {
         errs.answer = '每个空位的答案不能为空'
       }
     }
@@ -290,15 +276,11 @@ export default function AdminObjectiveQuestionForm({
         key: OPTION_LETTERS[i],
         content: content.trim(),
       }))
-      answer = [...selectedIndexes]
-        .sort((a, b) => a - b)
-        .map(i => OPTION_LETTERS[i])
+      answer = [...selectedIndexes].sort((a, b) => a - b).map((i) => OPTION_LETTERS[i])
     } else if (type === 'true-false') {
       answer = [trueFalseAnswer as boolean]
     } else {
-      answer = Array.from({ length: blankCount }, (_, i) =>
-        (fillAnswers[i] ?? '').trim()
-      )
+      answer = Array.from({ length: blankCount }, (_, i) => (fillAnswers[i] ?? '').trim())
     }
     return {
       type,
@@ -324,9 +306,7 @@ export default function AdminObjectiveQuestionForm({
     setSubmitting(true)
     try {
       const response = await fetchWithCookie(
-        isEdit
-          ? `/api/admin/objective-questions/${questionId}`
-          : '/api/admin/objective-questions',
+        isEdit ? `/api/admin/objective-questions/${questionId}` : '/api/admin/objective-questions',
         {
           method: isEdit ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -354,16 +334,16 @@ export default function AdminObjectiveQuestionForm({
     return <PageLoading label="加载题目…" />
   }
 
-  const fieldLabel = 'block text-sm font-medium text-foreground mb-1.5'
+  const fieldLabel = 'block text-label text-foreground mb-1.5'
   const errorText = 'mt-1 text-xs text-error'
 
   return (
     <form onSubmit={handleSubmit} className="card divide-y divide-border" noValidate>
       {/* 基本信息 */}
-      <section className="p-5 sm:p-6 space-y-5">
+      <section className="p-5 sm:p-6 space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-foreground">基本信息</h2>
+            <h2 className="text-section-title text-foreground">基本信息</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">题型、题干与元信息</p>
           </div>
           {/* 编辑模式：题号只读展示（服务端生成，不可修改） */}
@@ -379,10 +359,10 @@ export default function AdminObjectiveQuestionForm({
             </label>
             <select
               value={type}
-              onChange={e => handleTypeChange(e.target.value as ObjectiveQuestionType)}
+              onChange={(e) => handleTypeChange(e.target.value as ObjectiveQuestionType)}
               className="input"
             >
-              {OBJECTIVE_QUESTION_TYPES.map(t => (
+              {OBJECTIVE_QUESTION_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {OBJECTIVE_QUESTION_TYPE_LABELS[t]}
                 </option>
@@ -395,10 +375,10 @@ export default function AdminObjectiveQuestionForm({
             </label>
             <select
               value={difficulty}
-              onChange={e => setDifficulty(e.target.value)}
+              onChange={(e) => setDifficulty(e.target.value)}
               className="input"
             >
-              {OBJECTIVE_DIFFICULTIES.map(d => (
+              {OBJECTIVE_DIFFICULTIES.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
@@ -414,7 +394,7 @@ export default function AdminObjectiveQuestionForm({
               value={score}
               min={1}
               max={100}
-              onChange={e => {
+              onChange={(e) => {
                 const n = parseInt(e.target.value, 10)
                 setScore(Number.isFinite(n) ? n : 0)
                 clearError('score')
@@ -431,7 +411,7 @@ export default function AdminObjectiveQuestionForm({
           </label>
           <textarea
             value={title}
-            onChange={e => {
+            onChange={(e) => {
               setTitle(e.target.value)
               clearError('title')
             }}
@@ -442,7 +422,8 @@ export default function AdminObjectiveQuestionForm({
           {errors.title && <p className={errorText}>{errors.title}</p>}
           {type === 'fill-blank' && (
             <p className="mt-1.5 text-xs text-muted-foreground">
-              用 <code className="px-1 rounded bg-muted">____</code>（4 个以上连续下划线）标记空位，提交后将渲染为编号空位；当前空位数：
+              用 <code className="px-1 rounded bg-muted">____</code>（4
+              个以上连续下划线）标记空位，提交后将渲染为编号空位；当前空位数：
               <span className="font-medium text-foreground">{blankCount}</span>
             </p>
           )}
@@ -452,7 +433,7 @@ export default function AdminObjectiveQuestionForm({
       {/* 答案设置（按题型） */}
       <section className="p-5 sm:p-6 space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-foreground">
+          <h2 className="text-section-title text-foreground">
             {isChoice ? '选项与答案' : '标准答案'}
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
@@ -496,7 +477,7 @@ export default function AdminObjectiveQuestionForm({
                       <input
                         type="text"
                         value={content}
-                        onChange={e => handleOptionContentChange(index, e.target.value)}
+                        onChange={(e) => handleOptionContentChange(index, e.target.value)}
                         placeholder={`选项 ${letter} 内容`}
                         className="input"
                       />
@@ -544,10 +525,12 @@ export default function AdminObjectiveQuestionForm({
         {type === 'true-false' && (
           <div className="space-y-2">
             <div className="inline-flex border border-border rounded-lg overflow-hidden">
-              {([
-                { v: true, l: '正确' },
-                { v: false, l: '错误' },
-              ] as const).map(opt => {
+              {(
+                [
+                  { v: true, l: '正确' },
+                  { v: false, l: '错误' },
+                ] as const
+              ).map((opt) => {
                 const selected = trueFalseAnswer === opt.v
                 return (
                   <button
@@ -590,23 +573,21 @@ export default function AdminObjectiveQuestionForm({
                       isEmpty ? 'border-error/40' : 'border-border'
                     }`}
                   >
-                    <span className="w-14 shrink-0 text-sm font-medium text-muted-foreground">
+                    <span className="w-14 shrink-0 text-label text-muted-foreground">
                       {blankLabel(index)}
                     </span>
                     <div className="flex-1 min-w-0">
                       <input
                         type="text"
                         value={value}
-                        onChange={e => {
+                        onChange={(e) => {
                           handleFillAnswerChange(index, e.target.value)
                           clearError('answer')
                         }}
                         placeholder={`第 ${index + 1} 空的答案`}
                         className="input"
                       />
-                      {isEmpty && (
-                        <p className="mt-1 text-xs text-error">答案不能为空</p>
-                      )}
+                      {isEmpty && <p className="mt-1 text-xs text-error">答案不能为空</p>}
                     </div>
                   </div>
                 )
@@ -617,9 +598,9 @@ export default function AdminObjectiveQuestionForm({
       </section>
 
       {/* 标签与解析 */}
-      <section className="p-5 sm:p-6 space-y-5">
+      <section className="p-5 sm:p-6 space-y-6">
         <div>
-          <h2 className="text-base font-semibold text-foreground">标签与解析</h2>
+          <h2 className="text-section-title text-foreground">标签与解析</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">分类标签与题目解析（选填）</p>
         </div>
 
@@ -629,7 +610,7 @@ export default function AdminObjectiveQuestionForm({
             <input
               type="text"
               value={tagsInput}
-              onChange={e => {
+              onChange={(e) => {
                 setTagsInput(e.target.value)
                 clearError('tags')
               }}
@@ -642,7 +623,7 @@ export default function AdminObjectiveQuestionForm({
             <label className={fieldLabel}>解析（选填）</label>
             <textarea
               value={explanation}
-              onChange={e => setExplanation(e.target.value)}
+              onChange={(e) => setExplanation(e.target.value)}
               rows={4}
               placeholder="题目解析，将展示给学生在练习后查看…"
               className="input resize-y"
@@ -667,7 +648,11 @@ export default function AdminObjectiveQuestionForm({
           className="btn btn-primary gap-1.5 disabled:opacity-50 min-w-[7.5rem]"
         >
           {submitting ? (
-            isEdit ? '保存中…' : '创建中…'
+            isEdit ? (
+              '保存中…'
+            ) : (
+              '创建中…'
+            )
           ) : (
             <>
               <Save className="w-4 h-4" />

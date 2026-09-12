@@ -81,7 +81,9 @@ export default function EditAssignmentModal({
     endTime: '',
     allowLateSubmission: false,
   })
-  const [assignmentStatus, setAssignmentStatus] = useState<'upcoming' | 'active' | 'ended' | null>(null)
+  const [assignmentStatus, setAssignmentStatus] = useState<'upcoming' | 'active' | 'ended' | null>(
+    null
+  )
 
   const loadAssignment = useCallback(async () => {
     if (!assignmentId) return
@@ -149,19 +151,22 @@ export default function EditAssignmentModal({
 
     try {
       setLoading(true)
-      const response = await fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          startTime: formData.startTime ? new Date(formData.startTime) : undefined,
-          endTime,
-          problemIds: selectedProblems,
-          objectiveQuestionIds,
-          allowLateSubmission: formData.allowLateSubmission,
-        }),
-      })
+      const response = await fetchWithCookie(
+        `/api/classes/${classId}/assignments/${assignmentId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: formData.title,
+            description: formData.description,
+            startTime: formData.startTime ? new Date(formData.startTime) : undefined,
+            endTime,
+            problemIds: selectedProblems,
+            objectiveQuestionIds,
+            allowLateSubmission: formData.allowLateSubmission,
+          }),
+        }
+      )
       const data = await response.json()
       if (data.success) {
         onSaved()
@@ -188,9 +193,12 @@ export default function EditAssignmentModal({
     if (!ok) return
     try {
       setLoading(true)
-      const response = await fetchWithCookie(`/api/classes/${classId}/assignments/${assignmentId}`, {
-        method: 'DELETE',
-      })
+      const response = await fetchWithCookie(
+        `/api/classes/${classId}/assignments/${assignmentId}`,
+        {
+          method: 'DELETE',
+        }
+      )
       const data = await response.json()
       if (data.success) {
         onDeleted?.()
@@ -219,129 +227,134 @@ export default function EditAssignmentModal({
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-            <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60">
-              {assignmentStatus && (
-                <div className={`rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${
+          <div className="px-5 pt-4 pb-3 space-y-3 border-b border-border/60">
+            {assignmentStatus && (
+              <div
+                className={`rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${
                   assignmentStatus === 'upcoming'
                     ? 'border-border bg-muted text-muted-foreground'
                     : assignmentStatus === 'active'
-                    ? 'border-secondary/30 bg-secondary/10 text-secondary'
-                    : 'border-accent/30 bg-accent/10 text-accent'
-                }`}>
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>
-                    当前状态：
-                    {assignmentStatus === 'upcoming' && '未开始（学生暂时无法提交）'}
-                    {assignmentStatus === 'active' && '进行中（学生可正常提交）'}
-                    {assignmentStatus === 'ended' && '已结束（题目列表已锁定，仅可修改标题/描述/时间）'}
-                  </span>
-                </div>
-              )}
+                      ? 'border-secondary/30 bg-secondary/10 text-secondary'
+                      : 'border-accent/30 bg-accent/10 text-accent'
+                }`}
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>
+                  当前状态：
+                  {assignmentStatus === 'upcoming' && '未开始（学生暂时无法提交）'}
+                  {assignmentStatus === 'active' && '进行中（学生可正常提交）'}
+                  {assignmentStatus === 'ended' &&
+                    '已结束（题目列表已锁定，仅可修改标题/描述/时间）'}
+                </span>
+              </div>
+            )}
+            <div>
+              <label className="block text-label text-foreground mb-1.5">
+                作业标题 <span className="text-error">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="input w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-label text-foreground mb-1.5">作业说明</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="要求、参考资料、注意事项等（支持 Markdown）"
+                rows={5}
+                className="input w-full resize-y min-h-[6rem]"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  作业标题 <span className="text-error">*</span>
+                <label className="block text-label text-foreground mb-1.5">开始时间</label>
+                <input
+                  type="datetime-local"
+                  value={formData.startTime}
+                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-label text-foreground mb-1.5">
+                  截止时间 <span className="text-error">*</span>
                 </label>
                 <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  type="datetime-local"
+                  value={formData.endTime}
+                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                   className="input w-full"
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">作业说明</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="要求、参考资料、注意事项等（支持 Markdown）"
-                  rows={5}
-                  className="input w-full resize-y min-h-[6rem]"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">开始时间</label>
-                  <input
-                    type="datetime-local"
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="input w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    截止时间 <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="input w-full"
-                    required
-                  />
-                </div>
-              </div>
-              <label className="flex items-start gap-2.5 cursor-pointer rounded-lg border border-border bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.allowLateSubmission}
-                  onChange={(e) => setFormData({ ...formData, allowLateSubmission: e.target.checked })}
-                  className="mt-0.5"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-foreground">允许逾期提交</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    开启后，作业结束后学生仍可提交，但提交记录会被标记为「逾期」。
-                  </div>
-                </div>
-              </label>
             </div>
-
-            <div className="px-5 py-3">
-              <label className="block text-sm font-medium text-foreground mb-2">
-                编程题
-              </label>
-              <AssignmentProblemPicker
-                orderedIds={selectedProblems}
-                onChange={setSelectedProblems}
-                problems={problems}
-                problemsLoading={false}
+            <label className="flex items-start gap-2.5 cursor-pointer rounded-lg border border-border bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.allowLateSubmission}
+                onChange={(e) =>
+                  setFormData({ ...formData, allowLateSubmission: e.target.checked })
+                }
+                className="mt-0.5"
               />
-            </div>
-
-            <div className="px-5 py-3 border-t border-border/60">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <label className="block text-sm font-medium text-foreground shrink-0">客观题</label>
-                {canAccessAdmin(user) && (
-                  <a
-                    href="/admin/objective-questions"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                    title="管理客观题库"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    管理客观题库
-                  </a>
-                )}
+              <div className="flex-1">
+                <div className="text-label text-foreground">允许逾期提交</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  开启后，作业结束后学生仍可提交，但提交记录会被标记为「逾期」。
+                </div>
               </div>
-              <ObjectiveQuestionPicker
-                value={objectiveQuestionIds}
-                onChange={setObjectiveQuestionIds}
-                items={objectiveItems}
-              />
-            </div>
+            </label>
+          </div>
 
-            <div className="px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
-              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex gap-2 text-xs text-muted-foreground">
-                <AlertCircle className="w-4 h-4 shrink-0 text-primary mt-0.5" />
-                <span>按题号添加；可调整顺序后保存。</span>
-              </div>
-              {error && (
-                <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">{error}</div>
+          <div className="px-5 py-3">
+            <label className="block text-label text-foreground mb-2">编程题</label>
+            <AssignmentProblemPicker
+              orderedIds={selectedProblems}
+              onChange={setSelectedProblems}
+              problems={problems}
+              problemsLoading={false}
+            />
+          </div>
+
+          <div className="px-5 py-3 border-t border-border/60">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <label className="block text-label text-foreground shrink-0">客观题</label>
+              {canAccessAdmin(user) && (
+                <a
+                  href="/admin/objective-questions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  title="管理客观题库"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  管理客观题库
+                </a>
               )}
             </div>
+            <ObjectiveQuestionPicker
+              value={objectiveQuestionIds}
+              onChange={setObjectiveQuestionIds}
+              items={objectiveItems}
+            />
+          </div>
+
+          <div className="px-5 pb-2 space-y-2 border-t border-border/60 pt-3">
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex gap-2 text-xs text-muted-foreground">
+              <AlertCircle className="w-4 h-4 shrink-0 text-primary mt-0.5" />
+              <span>按题号添加；可调整顺序后保存。</span>
+            </div>
+            {error && (
+              <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">
+                {error}
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-3 px-5 py-4 border-t border-border">
             <button type="submit" disabled={loading} className="btn btn-primary flex-1">

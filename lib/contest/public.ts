@@ -7,6 +7,7 @@ import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { CacheKeys } from '@/lib/constants/cache-keys'
 import { canAccessAdmin } from '@/lib/permissions'
+import { isObjectId } from '@/lib/api/validation'
 
 /* ============================================================================
  * 列表 / 详情 / 创建 / 更新 / 删除 业务层封装
@@ -115,6 +116,10 @@ export async function getContestDetailWithRegistration(
   contestId: string,
   viewer?: { id: string; role?: string | null } | null
 ) {
+  // 非法 ObjectId（如 /contests/999999）直接视为不存在，
+  // 否则 Prisma 转型错误会冒泡成 500 而不是优雅的 404
+  if (!isObjectId(contestId)) return null
+
   const contest = await prisma.contest.findUnique({
     where: { id: contestId },
     include: {
@@ -181,9 +186,7 @@ export async function updateContestWithProblems(
       const { ApiError } = await import('@/lib/api/withApi')
       throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
     }
-    const invalid = found.filter(
-      (p) => p.visibility !== 'public' && p.visibility !== 'contest'
-    )
+    const invalid = found.filter((p) => p.visibility !== 'public' && p.visibility !== 'contest')
     if (invalid.length > 0) {
       const { ApiError } = await import('@/lib/api/withApi')
       throw new ApiError('INVALID_PROBLEMS', '竞赛只能添加公开或竞赛可见题目', 400)
@@ -197,11 +200,8 @@ export async function updateContestWithProblems(
       select: { startTime: true, endTime: true },
     })
     const start =
-      contestData.startTime instanceof Date
-        ? contestData.startTime
-        : existing?.startTime
-    const end =
-      contestData.endTime instanceof Date ? contestData.endTime : existing?.endTime
+      contestData.startTime instanceof Date ? contestData.startTime : existing?.startTime
+    const end = contestData.endTime instanceof Date ? contestData.endTime : existing?.endTime
     const seal = contestData.sealRankTime
     if (start && end && (seal.getTime() < start.getTime() || seal.getTime() > end.getTime())) {
       const { ApiError } = await import('@/lib/api/withApi')

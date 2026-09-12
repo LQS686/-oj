@@ -12,11 +12,13 @@
  *   4. 近 7 天提交趋势（recharts AreaChart，区分总提交与 AC 数）
  *
  * 设计要点：
- *   - 与项目色彩语义一致：AC=secondary（绿）、WA=error（红）、TLE=warning（橙）、其他=muted
+ *   - 判题结论的文案与配色统一取自 lib/status.ts / globals.css 的 .status-*
+ *     （通过=绿、部分正确=天蓝、答案错误=红、运行错误=橙、超时=琥珀、超内存=紫、编译错误=灰）
  *   - 统计数字使用 font-mono tabular-nums 保持等宽对齐
  *   - 加载/错误/空态都做了处理
  */
 import { useEffect, useState } from 'react'
+import { getStatusText } from '@/lib/status'
 import {
   BarChart3,
   TrendingUp,
@@ -49,29 +51,95 @@ interface ProblemStats {
   avgMemoryKb: number
 }
 
-// 状态显示配置：颜色、显示名、排序优先级
-// 颜色与项目色彩语义保持一致（lib/status.ts）
-const STATUS_CONFIG: Record<string, { label: string; color: string; bgClass: string; textClass: string; order: number }> = {
-  AC:          { label: 'Accepted',           color: '#10b981', bgClass: 'bg-secondary',    textClass: 'text-secondary-light',    order: 1 },
-  WA:          { label: 'Wrong Answer',       color: '#ef4444', bgClass: 'bg-error',       textClass: 'text-error',              order: 2 },
-  TLE:         { label: 'Time Limit Exceeded',color: '#f59e0b', bgClass: 'bg-warning',     textClass: 'text-warning',            order: 3 },
-  MLE:         { label: 'Memory Limit Exceeded',color:'#f59e0b',bgClass: 'bg-warning',     textClass: 'text-warning',            order: 4 },
-  RE:          { label: 'Runtime Error',      color: '#a855f7', bgClass: 'bg-accent',      textClass: 'text-accent-light',       order: 5 },
-  CE:          { label: 'Compile Error',      color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 6 },
-  PENDING:     { label: 'Pending',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 7 },
-  JUDGING:     { label: 'Judging',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 8 },
-  RUNNING:     { label: 'Running',            color: '#6b7280', bgClass: 'bg-muted',       textClass: 'text-muted-foreground',   order: 9 },
+// 状态显示配置：显示名取自 lib/status.ts（判题结论单一来源），
+// 颜色需为具体色值供图表库使用，因此这里以字面量镜像 globals.css 的 .status-* 色板；
+// 调整判题配色时请同步 globals.css 的 .status-* 与本表。
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; color: string; bgClass: string; textClass: string; order: number }
+> = {
+  AC: {
+    label: getStatusText('AC'),
+    color: '#16A34A',
+    bgClass: 'bg-secondary',
+    textClass: 'text-secondary-light',
+    order: 1,
+  },
+  WA: {
+    label: getStatusText('WA'),
+    color: '#DC2626',
+    bgClass: 'bg-error',
+    textClass: 'text-error',
+    order: 2,
+  },
+  TLE: {
+    label: getStatusText('TLE'),
+    color: '#D97706',
+    bgClass: 'bg-warning',
+    textClass: 'text-warning',
+    order: 3,
+  },
+  MLE: {
+    label: getStatusText('MLE'),
+    color: '#9333EA',
+    bgClass: 'bg-warning',
+    textClass: 'text-warning',
+    order: 4,
+  },
+  RE: {
+    label: getStatusText('RE'),
+    color: '#EA580C',
+    bgClass: 'bg-accent',
+    textClass: 'text-accent-light',
+    order: 5,
+  },
+  CE: {
+    label: getStatusText('CE'),
+    color: '#6B7280',
+    bgClass: 'bg-muted',
+    textClass: 'text-muted-foreground',
+    order: 6,
+  },
+  PENDING: {
+    label: getStatusText('PENDING'),
+    color: '#6B7280',
+    bgClass: 'bg-muted',
+    textClass: 'text-muted-foreground',
+    order: 7,
+  },
+  JUDGING: {
+    label: getStatusText('JUDGING'),
+    color: '#6B7280',
+    bgClass: 'bg-muted',
+    textClass: 'text-muted-foreground',
+    order: 8,
+  },
+  RUNNING: {
+    label: getStatusText('RUNNING'),
+    color: '#6B7280',
+    bgClass: 'bg-muted',
+    textClass: 'text-muted-foreground',
+    order: 9,
+  },
 }
 
 // 语言显示配置
 const LANGUAGE_CONFIG: Record<string, { label: string; color: string }> = {
-  cpp:    { label: 'C++',     color: '#818cf8' },
-  c:      { label: 'C',       color: '#06b6d4' },
-  python: { label: 'Python',  color: '#f59e0b' },
+  cpp: { label: 'C++', color: '#818cf8' },
+  c: { label: 'C', color: '#06b6d4' },
+  python: { label: 'Python', color: '#f59e0b' },
 }
 
 function getStatusConfig(status: string) {
-  return STATUS_CONFIG[status] || { label: status, color: '#6b7280', bgClass: 'bg-muted', textClass: 'text-muted-foreground', order: 99 }
+  return (
+    STATUS_CONFIG[status] || {
+      label: status,
+      color: '#6b7280',
+      bgClass: 'bg-muted',
+      textClass: 'text-muted-foreground',
+      order: 99,
+    }
+  )
 }
 
 function getLanguageConfig(lang: string) {
@@ -124,7 +192,9 @@ export default function ProblemStatsPanel({
       }
     }
     fetchStats()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [problemId, contestId])
 
   if (loading) {
@@ -132,7 +202,7 @@ export default function ProblemStatsPanel({
       <div className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="card-static p-4 rounded-lg">
+            <div key={i} className="card-static p-4">
               <div className="skeleton h-8 w-16 mb-2 rounded"></div>
               <div className="skeleton h-3 w-12 rounded"></div>
             </div>
@@ -180,7 +250,7 @@ export default function ProblemStatsPanel({
     <div className="space-y-6">
       {/* 顶部指标卡 */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="card-static p-4 rounded-lg">
+        <div className="card-static p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
             <Send className="w-3.5 h-3.5" />
             <span>总提交</span>
@@ -189,7 +259,7 @@ export default function ProblemStatsPanel({
             {stats.totalSubmissions}
           </div>
         </div>
-        <div className="card-static p-4 rounded-lg">
+        <div className="card-static p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>AC 数</span>
@@ -198,7 +268,7 @@ export default function ProblemStatsPanel({
             {stats.acCount}
           </div>
         </div>
-        <div className="card-static p-4 rounded-lg">
+        <div className="card-static p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
             <BarChart3 className="w-3.5 h-3.5" />
             <span>AC 率</span>
@@ -207,7 +277,7 @@ export default function ProblemStatsPanel({
             {stats.acRate}%
           </div>
         </div>
-        <div className="card-static p-4 rounded-lg">
+        <div className="card-static p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
             <Timer className="w-3.5 h-3.5" />
             <span>AC 平均耗时</span>
@@ -216,7 +286,7 @@ export default function ProblemStatsPanel({
             {formatTime(stats.avgTimeMs)}
           </div>
         </div>
-        <div className="card-static p-4 rounded-lg">
+        <div className="card-static p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs mb-2">
             <MemoryStick className="w-3.5 h-3.5" />
             <span>AC 平均内存</span>
@@ -229,8 +299,8 @@ export default function ProblemStatsPanel({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 状态分布 */}
-        <div className="card-static p-5 rounded-lg">
-          <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+        <div className="card-static p-5">
+          <h4 className="text-subsection-title text-foreground mb-4 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-primary-light" />
             状态分布
           </h4>
@@ -258,8 +328,8 @@ export default function ProblemStatsPanel({
         </div>
 
         {/* 语言分布 */}
-        <div className="card-static p-5 rounded-lg">
-          <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+        <div className="card-static p-5">
+          <h4 className="text-subsection-title text-foreground mb-4 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-primary-light" />
             语言分布
           </h4>
@@ -292,10 +362,9 @@ export default function ProblemStatsPanel({
       </div>
 
       {/* 近 7 天提交趋势 */}
-      <div className="card-static p-5 rounded-lg">
-        <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-primary-light" />
-          近 7 天提交趋势
+      <div className="card-static p-5">
+        <h4 className="text-subsection-title text-foreground mb-4 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-primary-light" />近 7 天提交趋势
         </h4>
         <div className="h-[220px] w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -310,9 +379,25 @@ export default function ProblemStatsPanel({
                   <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)" />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} stroke="#94A3B8" fontSize={12} />
-              <YAxis axisLine={false} tickLine={false} allowDecimals={false} stroke="#94A3B8" fontSize={12} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="rgba(148, 163, 184, 0.1)"
+              />
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                stroke="#94A3B8"
+                fontSize={12}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+                stroke="#94A3B8"
+                fontSize={12}
+              />
               <Tooltip
                 contentStyle={{
                   borderRadius: '12px',

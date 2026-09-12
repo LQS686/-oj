@@ -42,13 +42,7 @@ export default function PageContainer({
   className = '',
   children,
 }: PageContainerProps) {
-  const classes = [
-    'w-full',
-    'mx-auto',
-    'px-4 sm:px-6 lg:px-8',
-    VARIANT_CLASS[variant],
-    className,
-  ]
+  const classes = ['w-full', 'mx-auto', 'px-4 sm:px-6 lg:px-8', VARIANT_CLASS[variant], className]
     .filter(Boolean)
     .join(' ')
 

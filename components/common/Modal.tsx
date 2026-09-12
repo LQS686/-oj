@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback, useId, useRef } from 'react'
 import { X } from 'lucide-react'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 export type ModalSize = 'sm' | 'md' | 'lg'
 
@@ -62,36 +63,18 @@ export default function Modal({
   className = '',
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
+  // 用 useId 生成标题 id：原先硬编码 'modal-title'，同时打开两个弹窗时会出现重复 id
+  const titleId = useId()
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
-      if (closeOnEsc && e.key === 'Escape') {
-        onClose()
-        return
-      }
-      // Tab 焦点循环：焦点在首/末可聚焦元素时循环到另一侧（基础焦点陷阱）
-      if (e.key === 'Tab') {
-        const container = dialogRef.current
-        if (!container) return
-        const focusable = Array.from(
-          container.querySelectorAll<HTMLElement>(
-            'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
-          )
-        )
-        if (focusable.length === 0) return
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
-      }
+      if (closeOnEsc && e.key === 'Escape') onClose()
     },
     [closeOnEsc, onClose]
   )
+
+  // 焦点陷阱（首次聚焦 + Tab 循环 + 关闭后还原）统一由 hook 负责
+  useFocusTrap(dialogRef, open)
 
   useEffect(() => {
     if (!open) return
@@ -99,20 +82,9 @@ export default function Modal({
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    // 记录打开前的活动元素，关闭后还原焦点
-    const prevActive = document.activeElement as HTMLElement | null
-    // 初始聚焦容器内首个可聚焦元素（无则聚焦容器本身）
-    const container = dialogRef.current
-    const first = container?.querySelector<HTMLElement>(
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
-    )
-    if (first) first.focus()
-    else container?.focus()
-
     return () => {
       document.removeEventListener('keydown', handleKey)
       document.body.style.overflow = prevOverflow
-      prevActive?.focus?.()
     }
   }, [open, handleKey])
 
@@ -132,12 +104,15 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={typeof title === 'string' ? 'modal-title' : undefined}
+        aria-labelledby={title ? titleId : undefined}
       >
         {(title || !hideCloseButton) && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
             {title ? (
-              <h2 id="modal-title" className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <h2
+                id={titleId}
+                className="text-lg font-semibold text-foreground flex items-center gap-2"
+              >
                 {icon}
                 {title}
               </h2>

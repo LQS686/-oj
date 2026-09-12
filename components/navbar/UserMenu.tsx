@@ -74,7 +74,9 @@ export default function UserMenu() {
     return (
       <>
         <Link href={loginPath(pathname)} className="btn-ghost btn group">
-          <span className="group-hover:text-primary-light transition-colors duration-300">登录</span>
+          <span className="group-hover:text-primary-light transition-colors duration-300">
+            登录
+          </span>
         </Link>
         {allowRegistration && (
           <Link href="/register" className="btn-primary btn group">
@@ -88,7 +90,7 @@ export default function UserMenu() {
 
   return (
     <>
-      <Link href="/notifications" className="btn-ghost btn p-3 relative group">
+      <Link href="/notifications" className="btn-ghost btn btn-icon-lg relative group">
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 badge-primary badge min-w-[18px] h-[18px] text-[10px]">
@@ -98,8 +100,10 @@ export default function UserMenu() {
       </Link>
 
       <Dropdown
-        trigger={
+        label="用户菜单"
+        trigger={(triggerProps) => (
           <button
+            {...triggerProps}
             className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-primary/10 transition-all duration-200 group"
             aria-label="用户菜单"
           >
@@ -123,7 +127,7 @@ export default function UserMenu() {
               </div>
             )}
             <div className="hidden sm:flex flex-col items-start">
-              <span className="text-sm font-semibold text-foreground leading-tight group-hover:text-primary-light transition-colors duration-300">
+              <span className="text-subsection-title text-foreground leading-tight group-hover:text-primary-light transition-colors duration-300">
                 {user.nickname || user.username}
               </span>
               <span className="text-xs text-muted-foreground leading-tight group-hover:text-primary/70 transition-colors duration-300">
@@ -134,7 +138,7 @@ export default function UserMenu() {
               className={`w-4 h-4 text-muted-foreground transition-transform duration-200 hidden sm:block group-hover:text-primary-light`}
             />
           </button>
-        }
+        )}
       >
         <div className="min-w-[200px]">
           {canAccessAdminUser && (

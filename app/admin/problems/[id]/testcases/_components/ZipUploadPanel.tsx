@@ -26,15 +26,13 @@ export function ZipUploadPanel({ uploading, result, onUpload }: ZipUploadPanelPr
 
   return (
     <section className="card p-4">
-      <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+      <h3 className="text-subsection-title text-foreground mb-3 flex items-center gap-2">
         <Upload className="w-4 h-4 text-primary" />
         批量上传
       </h3>
       <div
         className={`border-2 border-dashed rounded-lg p-5 text-center transition-colors cursor-pointer ${
-          dragOver
-            ? 'border-primary bg-primary/5'
-            : 'border-border hover:bg-muted/60'
+          dragOver ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/60'
         }`}
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {
@@ -65,7 +63,7 @@ export function ZipUploadPanel({ uploading, result, onUpload }: ZipUploadPanelPr
           ) : (
             <Upload className="w-7 h-7 text-muted-foreground" />
           )}
-          <span className="text-sm font-medium text-foreground">
+          <span className="text-subsection-title text-foreground">
             {uploading ? '正在解析压缩包…' : '点击或拖拽上传 ZIP'}
           </span>
           <span className="text-xs text-muted-foreground">

@@ -18,7 +18,7 @@ export function DeleteProblemModal({ problem, onClose, onSuccess }: DeleteProble
   const handleDelete = async () => {
     try {
       const response = await fetchWithCookie(`/api/admin/problems/${problem.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
 
       const data = await response.json()

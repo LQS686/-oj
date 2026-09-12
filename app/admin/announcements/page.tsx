@@ -8,7 +8,9 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
 import { Plus, Edit, Trash2, Pin, Eye, EyeOff } from 'lucide-react'
 import { formatDateTime, toLocalDatetimeInput } from '@/lib/utils'
+import { markdownToPlainText } from '@/lib/markdown/plain-text'
 import { useDialog } from '@/components/common/DialogProvider'
+import { ListEmptyState } from '@/components/common'
 import Modal from '@/components/common/Modal'
 import { useUser } from '@/contexts/UserContext'
 import { canManageSystemAnnouncements } from '@/lib/permissions'
@@ -189,170 +191,173 @@ export default function AdminAnnouncementsPage() {
   }
 
   return (
-      <AdminPageShell width="form" className="space-y-6">
-        <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            <Plus className="w-4 h-4" />
-            新建公告
-          </button>
-        </div>
+    <AdminPageShell width="form" className="space-y-6">
+      <div className="flex justify-end">
+        <button type="button" className="btn btn-primary" onClick={openCreate}>
+          <Plus className="w-4 h-4" />
+          新建公告
+        </button>
+      </div>
 
-        {error && <p className="text-error">{error}</p>}
+      {error && <p className="text-error">{error}</p>}
 
-        {loading ? (
-          <p className="text-muted-foreground">加载中…</p>
-        ) : items.length === 0 ? (
-          <div className="card-static rounded-xl p-10 text-center text-muted-foreground">
-            暂无公告，点击「新建公告」发布第一条
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {items.map((row) => (
-              <div key={row.id} className="card-static rounded-xl p-5">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      {row.isPinned && (
-                        <span className="inline-flex items-center gap-1 text-xs text-primary">
-                          <Pin className="w-3 h-3" /> 置顶
+      {loading ? (
+        <p className="text-muted-foreground">加载中…</p>
+      ) : items.length === 0 ? (
+        <ListEmptyState title="暂无公告，点击「新建公告」发布第一条" />
+      ) : (
+        <div className="space-y-3">
+          {items.map((row) => (
+            <div key={row.id} className="card-static p-5">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    {row.isPinned && (
+                      <span className="inline-flex items-center gap-1 text-xs text-primary">
+                        <Pin className="w-3 h-3" /> 置顶
+                      </span>
+                    )}
+                    {(() => {
+                      const status = getPublicStatus(row)
+                      return (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${status.className}`}>
+                          {status.label}
                         </span>
-                      )}
-                      {(() => {
-                        const status = getPublicStatus(row)
-                        return (
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${status.className}`}>
-                            {status.label}
-                          </span>
-                        )
-                      })()}
-                    </div>
-                    <h3 className="font-semibold text-foreground">{row.title}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">
-                      {row.content}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {row.authorName} · 更新于 {formatDateTime(row.updatedAt)}
-                    </p>
+                      )
+                    })()}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      className="p-2 rounded-lg hover:bg-muted"
-                      title={row.isPublished ? '下架' : '发布'}
-                      onClick={() => togglePublished(row)}
-                    >
-                      {row.isPublished ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className="p-2 rounded-lg hover:bg-muted"
-                      onClick={() => openEdit(row)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-2 rounded-lg hover:bg-muted text-error"
-                      onClick={() => setDeleteTarget(row)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <h3 className="font-semibold text-foreground">{row.title}</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                    {markdownToPlainText(row.content)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {row.authorName} · 更新于 {formatDateTime(row.updatedAt)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    className="btn-icon hover:bg-muted"
+                    title={row.isPublished ? '下架' : '发布'}
+                    onClick={() => togglePublished(row)}
+                  >
+                    {row.isPublished ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon hover:bg-muted"
+                    onClick={() => openEdit(row)}
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon hover:bg-muted text-error"
+                    onClick={() => setDeleteTarget(row)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        {modalOpen && (
-          <Modal
-            open
-            onClose={() => setModalOpen(false)}
-            title={editing ? '编辑公告' : '新建公告'}
-            size="lg"
-            closeOnOverlayClick={!saving}
-            closeOnEsc={!saving}
-            footer={
-              <div className="flex justify-end gap-2 w-full">
-                <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)}>
-                  取消
-                </button>
-                <button type="button" className="btn btn-primary" disabled={saving} onClick={handleSave}>
-                  {saving ? '保存中…' : '保存'}
-                </button>
-              </div>
-            }
-          >
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">标题</label>
-                <input
-                  className="input w-full mt-1"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">内容</label>
-                <textarea
-                  className="input w-full mt-1 min-h-[160px]"
-                  value={form.content}
-                  onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">过期时间（可选）</label>
-                <input
-                  type="datetime-local"
-                  className="input w-full mt-1"
-                  value={form.expiresAt}
-                  onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.isPinned}
-                  onChange={(e) => setForm((f) => ({ ...f, isPinned: e.target.checked }))}
-                />
-                置顶
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.isPublished}
-                  onChange={(e) => setForm((f) => ({ ...f, isPublished: e.target.checked }))}
-                />
-                立即发布
-              </label>
             </div>
-          </Modal>
-        )}
+          ))}
+        </div>
+      )}
 
-        {deleteTarget && (
-          <Modal
-            open
-            onClose={() => setDeleteTarget(null)}
-            title="确认删除"
-            size="sm"
-            footer={
-              <div className="flex justify-end gap-2 w-full">
-                <button type="button" className="btn btn-outline" onClick={() => setDeleteTarget(null)}>
-                  取消
-                </button>
-                <button type="button" className="btn btn-destructive" onClick={handleDelete}>
-                  删除
-                </button>
-              </div>
-            }
-          >
-            <p className="text-muted-foreground">确定删除公告「{deleteTarget.title}」？</p>
-          </Modal>
-        )}
-      </AdminPageShell>
+      {modalOpen && (
+        <Modal
+          open
+          onClose={() => setModalOpen(false)}
+          title={editing ? '编辑公告' : '新建公告'}
+          size="lg"
+          closeOnOverlayClick={!saving}
+          closeOnEsc={!saving}
+          footer={
+            <div className="flex justify-end gap-2 w-full">
+              <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={saving}
+                onClick={handleSave}
+              >
+                {saving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="text-label">标题</label>
+              <input
+                className="input w-full mt-1"
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-label">内容</label>
+              <textarea
+                className="input w-full mt-1 min-h-[160px]"
+                value={form.content}
+                onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-label">过期时间（可选）</label>
+              <input
+                type="datetime-local"
+                className="input w-full mt-1"
+                value={form.expiresAt}
+                onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.isPinned}
+                onChange={(e) => setForm((f) => ({ ...f, isPinned: e.target.checked }))}
+              />
+              置顶
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.isPublished}
+                onChange={(e) => setForm((f) => ({ ...f, isPublished: e.target.checked }))}
+              />
+              立即发布
+            </label>
+          </div>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <Modal
+          open
+          onClose={() => setDeleteTarget(null)}
+          title="确认删除"
+          size="sm"
+          footer={
+            <div className="flex justify-end gap-2 w-full">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setDeleteTarget(null)}
+              >
+                取消
+              </button>
+              <button type="button" className="btn btn-destructive" onClick={handleDelete}>
+                删除
+              </button>
+            </div>
+          }
+        >
+          <p className="text-muted-foreground">确定删除公告「{deleteTarget.title}」？</p>
+        </Modal>
+      )}
+    </AdminPageShell>
   )
 }

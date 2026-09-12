@@ -47,7 +47,9 @@ export function formatProblemDocumentTitle(
     }
     case 'class': {
       const cls = context.className?.trim()
-      return cls ? `${name} - ${cls} - ${SITE_TITLE_SUFFIX}` : `${name} - 班级 - ${SITE_TITLE_SUFFIX}`
+      return cls
+        ? `${name} - ${cls} - ${SITE_TITLE_SUFFIX}`
+        : `${name} - 班级 - ${SITE_TITLE_SUFFIX}`
     }
     case 'assignment': {
       const hw = context.assignmentTitle?.trim()
@@ -65,5 +67,8 @@ export function formatAssignmentDocumentTitle(
 ): string {
   const name = assignmentTitle.trim() || '作业'
   const cls = className?.trim()
-  return cls ? `${name} - ${cls} - ${SITE_TITLE_SUFFIX}` : `${name} - 作业 - ${SITE_TITLE_SUFFIX}`
+  // 作业名与班级名相同时（教师常见命名习惯）不重复展示为「X - X - 站点」
+  return cls && cls !== name
+    ? `${name} - ${cls} - ${SITE_TITLE_SUFFIX}`
+    : `${name} - 作业 - ${SITE_TITLE_SUFFIX}`
 }

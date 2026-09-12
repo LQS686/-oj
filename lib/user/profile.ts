@@ -27,53 +27,66 @@ export interface UserProfile {
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
-  return cache.get('user:profile', [userId], async () => {
-    const row = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        avatar: true,
-        bio: true,
-        email: true,
-        role: true,
-        isBanned: true,
-        rank: true,
-        color: true,
-        createdAt: true,
-      },
-    })
-    if (!row) return null
-    return { ...row, avatar: sanitizeAvatarUrl(row.avatar) }
-  }, { ttl: 60_000 })
+  return cache.get(
+    'user:profile',
+    [userId],
+    async () => {
+      const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          username: true,
+          nickname: true,
+          avatar: true,
+          bio: true,
+          email: true,
+          role: true,
+          isBanned: true,
+          rank: true,
+          color: true,
+          createdAt: true,
+        },
+      })
+      if (!row) return null
+      return { ...row, avatar: sanitizeAvatarUrl(row.avatar) }
+    },
+    { ttl: 60_000 }
+  )
 }
 
 export async function getUserStats(userId: string) {
-  return cache.get('user:stats', [userId], async () => {
-    const [solvedDistinct, submissions, contests, user] = await Promise.all([
-      prisma.submission.findMany({
-        where: { userId, status: 'AC' },
-        distinct: ['problemId'],
-        select: { problemId: true },
-      }),
-      prisma.submission.count({ where: { userId } }),
-      prisma.contestParticipant.count({ where: { userId } }),
-      prisma.user.findUnique({ where: { id: userId }, select: { solvedCount: true } }),
-    ])
-    return {
-      solved: user?.solvedCount ?? solvedDistinct.length,
-      submissions,
-      contests,
-    }
-  }, { ttl: 30_000 })
+  return cache.get(
+    'user:stats',
+    [userId],
+    async () => {
+      const [solvedDistinct, submissions, contests, user] = await Promise.all([
+        prisma.submission.findMany({
+          where: { userId, status: 'AC' },
+          distinct: ['problemId'],
+          select: { problemId: true },
+        }),
+        prisma.submission.count({ where: { userId } }),
+        prisma.contestParticipant.count({ where: { userId } }),
+        prisma.user.findUnique({ where: { id: userId }, select: { solvedCount: true } }),
+      ])
+      return {
+        solved: user?.solvedCount ?? solvedDistinct.length,
+        submissions,
+        contests,
+      }
+    },
+    { ttl: 30_000 }
+  )
 }
 
-export async function updateUserProfile(userId: string, data: Partial<{
-  nickname: string
-  bio: string
-  avatar: string
-}>): Promise<{ id: string; nickname: string | null; bio: string | null; avatar: string | null }> {
+export async function updateUserProfile(
+  userId: string,
+  data: Partial<{
+    nickname: string
+    bio: string
+    avatar: string
+  }>
+): Promise<{ id: string; nickname: string | null; bio: string | null; avatar: string | null }> {
   if (data.avatar !== undefined) {
     const ok =
       data.avatar === '' ||

@@ -24,7 +24,10 @@ export function resolveClientIp(
   }
 
   if (forwarded) {
-    const ips = forwarded.split(',').map((ip) => ip.trim()).filter(Boolean)
+    const ips = forwarded
+      .split(',')
+      .map((ip) => ip.trim())
+      .filter(Boolean)
     if (ips.length > 0) {
       // 右侧 N 个由受信任代理追加；客户端 IP 在倒数第 N 个
       // 例：TRUSTED=1 且 "forged, real" → 取 real（下标 length-1）

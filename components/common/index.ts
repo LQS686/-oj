@@ -33,6 +33,8 @@ export {
 export { ClassWorkspaceShell, classOverviewNav } from './ClassWorkspaceShell'
 export type { ClassWorkspaceShellProps, ClassNavItem } from './ClassWorkspaceShell'
 export { GuestAuthShell } from './GuestAuthShell'
+export { ModalDeepLink } from './ModalDeepLink'
+export type { ModalDeepLinkProps } from './ModalDeepLink'
 
 // 公共模态框组件
 export { default as Modal } from './Modal'

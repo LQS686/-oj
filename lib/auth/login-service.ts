@@ -36,13 +36,17 @@ function memoryLockGet(key: string): number {
 function memoryLockIncr(key: string): number {
   const now = Date.now()
   const entry = memoryLockStore.get(key)
-  const next = entry && entry.expiresAt >= now
-    ? { count: entry.count + 1, expiresAt: entry.expiresAt }
-    : { count: 1, expiresAt: now + LOCKOUT_DURATION_SEC * 1000 }
+  const next =
+    entry && entry.expiresAt >= now
+      ? { count: entry.count + 1, expiresAt: entry.expiresAt }
+      : { count: 1, expiresAt: now + LOCKOUT_DURATION_SEC * 1000 }
   memoryLockStore.set(key, next)
   // LRU 上限保护：防止攻击者用随机用户名撑爆内存
   if (memoryLockStore.size > MEMORY_LOCK_MAX_ENTRIES) {
-    const oldest = [...memoryLockStore.keys()].slice(0, memoryLockStore.size - MEMORY_LOCK_MAX_ENTRIES)
+    const oldest = [...memoryLockStore.keys()].slice(
+      0,
+      memoryLockStore.size - MEMORY_LOCK_MAX_ENTRIES
+    )
     for (const k of oldest) memoryLockStore.delete(k)
   }
   return next.count
@@ -61,7 +65,10 @@ export function __resetMemoryLockStoreForTests(): void {
 }
 
 export class LoginError extends Error {
-  constructor(message: string, public code: string = 'AUTH_ERROR') {
+  constructor(
+    message: string,
+    public code: string = 'AUTH_ERROR'
+  ) {
     super(message)
     this.name = 'LoginError'
   }
@@ -119,10 +126,7 @@ async function checkAccountLockout(usernameOrEmail: string): Promise<void> {
         lockoutMinutes: minutes,
         key,
       })
-      throw new LoginError(
-        '用户名或密码错误',
-        'UNAUTHORIZED'
-      )
+      throw new LoginError('用户名或密码错误', 'UNAUTHORIZED')
     }
   } catch (e) {
     if (e instanceof LoginError) throw e

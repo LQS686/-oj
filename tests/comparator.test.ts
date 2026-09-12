@@ -8,9 +8,15 @@ async function cmp(
   userOutput: string,
   expectedOutput: string,
   comparisonMode: CompareInput['comparisonMode'],
-  realPrecision?: number,
+  realPrecision?: number
 ): Promise<CompareResult> {
-  return compareOutput({ userOutput, expectedOutput, fullScore: FULL, comparisonMode, realPrecision })
+  return compareOutput({
+    userOutput,
+    expectedOutput,
+    fullScore: FULL,
+    comparisonMode,
+    realPrecision,
+  })
 }
 
 describe('compareOutput - default 模式', () => {
@@ -175,7 +181,7 @@ describe('compareOutput - 边界', () => {
   it('超长输出中部不匹配 → WA', async () => {
     const expected = Array.from({ length: 20000 }, (_, i) => 'line ' + i).join('\n')
     const user = Array.from({ length: 20000 }, (_, i) =>
-      i === 10000 ? 'line WRONG' : 'line ' + i,
+      i === 10000 ? 'line WRONG' : 'line ' + i
     ).join('\n')
     const r = await cmp(user, expected, 'default')
     expect(r.status).toBe('WA')

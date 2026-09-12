@@ -26,19 +26,19 @@ export async function isFirstAcInAssignment(
 ): Promise<boolean> {
   return withRetry(
     async () => {
-    const client = await getMongoClient() // 使用主库客户端，避免复制延迟导致并发 AC 重复计数
-    const db = client.db()
+      const client = await getMongoClient() // 使用主库客户端，避免复制延迟导致并发 AC 重复计数
+      const db = client.db()
 
-    const existing = await db.collection('ClassAssignmentSubmission').findOne({
-      assignmentId: new ObjectId(assignmentId),
-      problemId: new ObjectId(problemId),
-      userId: new ObjectId(userId),
-      status: 'AC',
-      _id: { $ne: new ObjectId(currentSubmissionId) },
-    })
+      const existing = await db.collection('ClassAssignmentSubmission').findOne({
+        assignmentId: new ObjectId(assignmentId),
+        problemId: new ObjectId(problemId),
+        userId: new ObjectId(userId),
+        status: 'AC',
+        _id: { $ne: new ObjectId(currentSubmissionId) },
+      })
 
-    return !existing
-  },
+      return !existing
+    },
     3,
     { idempotent: true }
   )
@@ -121,69 +121,67 @@ export async function updateClassAssignmentSubmissionDirect(
 ): Promise<UpdateClassAssignmentSubmissionDirectResult> {
   return withRetry(
     async () => {
-    const client = await getMongoClient()
-    const db = client.db()
+      const client = await getMongoClient()
+      const db = client.db()
 
-    const sanitized: Record<string, unknown> = {}
-    const allowedFields = [
-      'status',
-      'score',
-      'time',
-      'memory',
-      'passedTests',
-      'message',
-      'isFirstAc',
-      'timeElapsedMs',
-    ]
-    for (const key of allowedFields) {
-      if (key in data && data[key as keyof typeof data] !== undefined) {
-        sanitized[key] = data[key as keyof typeof data]
-      }
-    }
-
-    const filter: Record<string, unknown> = { _id: new ObjectId(submissionId) }
-    if (options?.onlyFromStatuses && options.onlyFromStatuses.length > 0) {
-      filter.status = { $in: options.onlyFromStatuses }
-    }
-
-    // 状态机守卫（与 updateSubmissionDirect 一致）
-    // forceStatus：管理员重测，允许终态 → PENDING
-    if (
-      typeof sanitized.status === 'string' &&
-      !options?.forceStatus &&
-      !options?.onlyFromStatuses?.length
-    ) {
-      const current = await db.collection('ClassAssignmentSubmission').findOne(
-        { _id: new ObjectId(submissionId) },
-        { projection: { status: 1 } }
-      )
-      const currentStatus = (current?.status as string | undefined) ?? ''
-      const nextStatus = sanitized.status as string
-      if (currentStatus && !canSubmissionTransition(currentStatus, nextStatus)) {
-        logger.warn(
-          `非法状态转换: ClassAssignmentSubmission ${submissionId} ${currentStatus} -> ${nextStatus}`
-        )
-        if (
-          currentStatus !== SubmissionStatus.PENDING &&
-          currentStatus !== SubmissionStatus.JUDGING &&
-          currentStatus !== SubmissionStatus.RUNNING
-        ) {
-          throw new Error(
-            `非法状态转换: ${currentStatus} -> ${nextStatus} (submissionId=${submissionId})`
-          )
+      const sanitized: Record<string, unknown> = {}
+      const allowedFields = [
+        'status',
+        'score',
+        'time',
+        'memory',
+        'passedTests',
+        'message',
+        'isFirstAc',
+        'timeElapsedMs',
+      ]
+      for (const key of allowedFields) {
+        if (key in data && data[key as keyof typeof data] !== undefined) {
+          sanitized[key] = data[key as keyof typeof data]
         }
       }
-    }
 
-    const result = await db.collection('ClassAssignmentSubmission').updateOne(
-      filter,
-      { $set: sanitized }
-    )
-    return {
-      matched: result.matchedCount > 0,
-      modified: result.modifiedCount > 0,
-    }
-  },
+      const filter: Record<string, unknown> = { _id: new ObjectId(submissionId) }
+      if (options?.onlyFromStatuses && options.onlyFromStatuses.length > 0) {
+        filter.status = { $in: options.onlyFromStatuses }
+      }
+
+      // 状态机守卫（与 updateSubmissionDirect 一致）
+      // forceStatus：管理员重测，允许终态 → PENDING
+      if (
+        typeof sanitized.status === 'string' &&
+        !options?.forceStatus &&
+        !options?.onlyFromStatuses?.length
+      ) {
+        const current = await db
+          .collection('ClassAssignmentSubmission')
+          .findOne({ _id: new ObjectId(submissionId) }, { projection: { status: 1 } })
+        const currentStatus = (current?.status as string | undefined) ?? ''
+        const nextStatus = sanitized.status as string
+        if (currentStatus && !canSubmissionTransition(currentStatus, nextStatus)) {
+          logger.warn(
+            `非法状态转换: ClassAssignmentSubmission ${submissionId} ${currentStatus} -> ${nextStatus}`
+          )
+          if (
+            currentStatus !== SubmissionStatus.PENDING &&
+            currentStatus !== SubmissionStatus.JUDGING &&
+            currentStatus !== SubmissionStatus.RUNNING
+          ) {
+            throw new Error(
+              `非法状态转换: ${currentStatus} -> ${nextStatus} (submissionId=${submissionId})`
+            )
+          }
+        }
+      }
+
+      const result = await db
+        .collection('ClassAssignmentSubmission')
+        .updateOne(filter, { $set: sanitized })
+      return {
+        matched: result.matchedCount > 0,
+        modified: result.modifiedCount > 0,
+      }
+    },
     3,
     { idempotent: true }
   )
@@ -206,24 +204,23 @@ export async function updateClassAssignmentDirect(
 ) {
   return withRetry(
     async () => {
-    const client = await getMongoClient()
-    const db = client.db()
+      const client = await getMongoClient()
+      const db = client.db()
 
-    const updateData: Record<string, unknown> = { ...data }
+      const updateData: Record<string, unknown> = { ...data }
 
-    if (data.problemIds) {
-      updateData.problemIds = data.problemIds.map(id => new ObjectId(id))
-    }
+      if (data.problemIds) {
+        updateData.problemIds = data.problemIds.map((id) => new ObjectId(id))
+      }
 
-    if (data.objectiveQuestionIds) {
-      updateData.objectiveQuestionIds = data.objectiveQuestionIds.map(id => new ObjectId(id))
-    }
+      if (data.objectiveQuestionIds) {
+        updateData.objectiveQuestionIds = data.objectiveQuestionIds.map((id) => new ObjectId(id))
+      }
 
-    await db.collection('ClassAssignment').updateOne(
-      { _id: new ObjectId(assignmentId) },
-      { $set: updateData }
-    )
-  },
+      await db
+        .collection('ClassAssignment')
+        .updateOne({ _id: new ObjectId(assignmentId) }, { $set: updateData })
+    },
     3,
     { idempotent: true }
   )
@@ -236,53 +233,51 @@ export async function updateClassAssignmentDirect(
 export async function deleteClassAssignmentDirect(assignmentId: string) {
   return withRetry(
     async () => {
-    const client = await getMongoClient()
-    const db = client.db()
+      const client = await getMongoClient()
+      const db = client.db()
 
-    await client.withSession(async (session) => {
-      await session.withTransaction(async () => {
-        const assignmentObjectId = new ObjectId(assignmentId)
+      await client.withSession(async (session) => {
+        await session.withTransaction(async () => {
+          const assignmentObjectId = new ObjectId(assignmentId)
 
-        // 1. 查询所有 ClassAssignmentSubmission 的 ID（用于清理主 Submission 表引用）
-        const submissions = await db
-          .collection('ClassAssignmentSubmission')
-          .find({ assignmentId: assignmentObjectId }, { session })
-          .toArray()
-        const submissionIds = submissions.map((s) => s._id)
+          // 1. 查询所有 ClassAssignmentSubmission 的 ID（用于清理主 Submission 表引用）
+          const submissions = await db
+            .collection('ClassAssignmentSubmission')
+            .find({ assignmentId: assignmentObjectId }, { session })
+            .toArray()
+          const submissionIds = submissions.map((s) => s._id)
 
-        // 2. 删除 ClassAssignmentProblemProgress（计时记录）
-        await db
-          .collection('ClassAssignmentProblemProgress')
-          .deleteMany({ assignmentId: assignmentObjectId }, { session })
-
-        // 3. 删除 ClassAssignmentProblem（单题配置表，Phase 2+ 预留）
-        await db
-          .collection('ClassAssignmentProblem')
-          .deleteMany({ assignmentId: assignmentObjectId }, { session })
-
-        // 4. 置空主 Submission 表中的 assignmentSubmissionId 引用（保留 Submission 记录本身）
-        if (submissionIds.length > 0) {
+          // 2. 删除 ClassAssignmentProblemProgress（计时记录）
           await db
-            .collection('Submission')
-            .updateMany(
-              { assignmentSubmissionId: { $in: submissionIds } },
-              { $unset: { assignmentSubmissionId: '' } },
-              { session }
-            )
-        }
+            .collection('ClassAssignmentProblemProgress')
+            .deleteMany({ assignmentId: assignmentObjectId }, { session })
 
-        // 6. 删除 ClassAssignmentSubmission（原有逻辑）
-        await db
-          .collection('ClassAssignmentSubmission')
-          .deleteMany({ assignmentId: assignmentObjectId }, { session })
+          // 3. 删除 ClassAssignmentProblem（单题配置表，Phase 2+ 预留）
+          await db
+            .collection('ClassAssignmentProblem')
+            .deleteMany({ assignmentId: assignmentObjectId }, { session })
 
-        // 7. 删除 ClassAssignment 本身（原有逻辑）
-        await db
-          .collection('ClassAssignment')
-          .deleteOne({ _id: assignmentObjectId }, { session })
+          // 4. 置空主 Submission 表中的 assignmentSubmissionId 引用（保留 Submission 记录本身）
+          if (submissionIds.length > 0) {
+            await db
+              .collection('Submission')
+              .updateMany(
+                { assignmentSubmissionId: { $in: submissionIds } },
+                { $unset: { assignmentSubmissionId: '' } },
+                { session }
+              )
+          }
+
+          // 6. 删除 ClassAssignmentSubmission（原有逻辑）
+          await db
+            .collection('ClassAssignmentSubmission')
+            .deleteMany({ assignmentId: assignmentObjectId }, { session })
+
+          // 7. 删除 ClassAssignment 本身（原有逻辑）
+          await db.collection('ClassAssignment').deleteOne({ _id: assignmentObjectId }, { session })
+        })
       })
-    })
-  },
+    },
     3,
     { idempotent: true }
   )
@@ -294,13 +289,13 @@ export async function deleteClassAssignmentDirect(assignmentId: string) {
 export async function deleteClassAssignmentSubmissionDirect(submissionId: string) {
   return withRetry(
     async () => {
-    const client = await getMongoClient()
-    const db = client.db()
+      const client = await getMongoClient()
+      const db = client.db()
 
-    await db.collection('ClassAssignmentSubmission').deleteOne({
-      _id: new ObjectId(submissionId)
-    })
-  },
+      await db.collection('ClassAssignmentSubmission').deleteOne({
+        _id: new ObjectId(submissionId),
+      })
+    },
     3,
     { idempotent: true }
   )

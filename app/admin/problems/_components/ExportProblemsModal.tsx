@@ -93,12 +93,10 @@ export function ExportProblemsModal({
       variant="admin"
     >
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-6">
           {/* 模式选择 */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              导出格式
-            </label>
+            <label className="block text-label text-foreground mb-2">导出格式</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {/* DSOJ 题包 ZIP */}
               <button
@@ -108,9 +106,7 @@ export function ExportProblemsModal({
                   setError('')
                 }}
                 className={`relative p-3 rounded-lg border text-left transition-all ${
-                  mode === 'dsoj'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:bg-muted'
+                  mode === 'dsoj' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'
                 }`}
               >
                 {mode === 'dsoj' && (
@@ -122,9 +118,7 @@ export function ExportProblemsModal({
                       mode === 'dsoj' ? 'text-primary' : 'text-muted-foreground'
                     }`}
                   />
-                  <span className="font-medium text-foreground text-sm">
-                    DSOJ 题包
-                  </span>
+                  <span className="font-medium text-foreground text-sm">DSOJ 题包</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   完整题包格式，含题面、测试点、标程（ZIP / tar.xz 可选）
@@ -139,9 +133,7 @@ export function ExportProblemsModal({
                   setError('')
                 }}
                 className={`relative p-3 rounded-lg border text-left transition-all ${
-                  mode === 'csv'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:bg-muted'
+                  mode === 'csv' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'
                 }`}
               >
                 {mode === 'csv' && (
@@ -167,9 +159,7 @@ export function ExportProblemsModal({
             <div className="space-y-3 p-4 rounded-lg bg-muted/50 border border-border">
               {/* 导出范围 */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  导出范围
-                </label>
+                <label className="block text-label text-foreground mb-2">导出范围</label>
                 <div className="space-y-2">
                   {/* 选中题目 */}
                   <label
@@ -178,9 +168,7 @@ export function ExportProblemsModal({
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:bg-muted'
                     } ${
-                      selectedIds.length === 0
-                        ? 'opacity-50 cursor-not-allowed'
-                        : 'cursor-pointer'
+                      selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                     }`}
                   >
                     <input
@@ -197,9 +185,7 @@ export function ExportProblemsModal({
                         选中题目 ({selectedIds.length} 个)
                       </div>
                       {selectedIds.length === 0 && (
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          未选择题目
-                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">未选择题目</div>
                       )}
                     </div>
                   </label>
@@ -221,9 +207,7 @@ export function ExportProblemsModal({
                       className="mt-0.5"
                     />
                     <div className="text-sm">
-                      <div className="text-foreground font-medium">
-                        全部题目 ({totalCount} 个)
-                      </div>
+                      <div className="text-foreground font-medium">全部题目 ({totalCount} 个)</div>
                     </div>
                   </label>
 
@@ -250,40 +234,32 @@ export function ExportProblemsModal({
 
               {/* 包含内容 */}
               <div className="border-t border-border pt-3">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  包含内容
-                </label>
+                <label className="block text-label text-foreground mb-2">包含内容</label>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={includeStdCode}
-                      onChange={e => setIncludeStdCode(e.target.checked)}
+                      onChange={(e) => setIncludeStdCode(e.target.checked)}
                       className="rounded"
                     />
-                    <span className="text-sm text-foreground">
-                      包含标程代码 (std.cpp)
-                    </span>
+                    <span className="text-sm text-foreground">包含标程代码 (std.cpp)</span>
                   </label>
                   <label className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={includeTestCases}
-                      onChange={e => setIncludeTestCases(e.target.checked)}
+                      onChange={(e) => setIncludeTestCases(e.target.checked)}
                       className="rounded"
                     />
-                    <span className="text-sm text-foreground">
-                      包含测试点 (testcases/)
-                    </span>
+                    <span className="text-sm text-foreground">包含测试点 (testcases/)</span>
                   </label>
                 </div>
               </div>
 
               {/* 压缩格式 */}
               <div className="border-t border-border pt-3">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  压缩格式
-                </label>
+                <label className="block text-label text-foreground mb-2">压缩格式</label>
                 <div className="grid grid-cols-2 gap-2">
                   {/* ZIP */}
                   <button
@@ -331,7 +307,8 @@ export function ExportProblemsModal({
           {mode === 'csv' && (
             <div className="p-4 rounded-lg bg-muted/50 border border-border">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                导出全部题目的元数据 CSV 报表，包含字段：ID、标题、来源、创建时间、更新时间、提交数、AC 数
+                导出全部题目的元数据 CSV
+                报表，包含字段：ID、标题、来源、创建时间、更新时间、提交数、AC 数
               </p>
             </div>
           )}
@@ -345,11 +322,7 @@ export function ExportProblemsModal({
         </div>
 
         <div className="shrink-0 border-t border-border px-5 py-4 flex justify-end gap-3">
-          <button
-            onClick={handleClose}
-            disabled={exporting}
-            className="btn btn-ghost"
-          >
+          <button onClick={handleClose} disabled={exporting} className="btn btn-ghost">
             {exporting ? '关闭' : '取消'}
           </button>
           <button

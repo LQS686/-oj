@@ -152,7 +152,12 @@ export default function CreateSolutionModal({
   const titleValid = titleLength >= TITLE_MIN && titleLength <= TITLE_MAX
   const contentValid = contentLength >= CONTENT_MIN && contentLength <= CONTENT_MAX
   const canSubmit =
-    titleValid && contentValid && !submitting && !loading && !!problemId && (!isEdit || !!solutionId)
+    titleValid &&
+    contentValid &&
+    !submitting &&
+    !loading &&
+    !!problemId &&
+    (!isEdit || !!solutionId)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -185,7 +190,8 @@ export default function CreateSolutionModal({
           if (!canManageContent(user)) {
             await dialog.alert({
               tone: 'info',
-              message: '题解已更新，将重新进入审核。管理员审核通过后才会再次展示给其他用户，你仍可随时查看自己的题解。',
+              message:
+                '题解已更新，将重新进入审核。管理员审核通过后才会再次展示给其他用户，你仍可随时查看自己的题解。',
             })
           }
           onSaved?.()
@@ -207,7 +213,8 @@ export default function CreateSolutionModal({
             if (!isEdit && !canManageContent(user)) {
               await dialog.alert({
                 tone: 'info',
-                message: '题解已提交，管理员审核通过后将展示给其他用户。你可以在下方列表查看自己的题解。',
+                message:
+                  '题解已提交，管理员审核通过后将展示给其他用户。你可以在下方列表查看自己的题解。',
               })
             }
             onCreated?.(newId)
@@ -246,7 +253,7 @@ export default function CreateSolutionModal({
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-6">
             {error && (
               <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -256,7 +263,7 @@ export default function CreateSolutionModal({
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="solution-title" className="block text-sm font-medium text-foreground">
+                <label htmlFor="solution-title" className="block text-label text-foreground">
                   题解标题 <span className="text-error">*</span>
                 </label>
                 <span
@@ -289,7 +296,7 @@ export default function CreateSolutionModal({
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-foreground">
+                <label className="block text-label text-foreground">
                   题解内容 <span className="text-error">*</span>
                 </label>
                 <span
@@ -328,7 +335,7 @@ export default function CreateSolutionModal({
                 className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-background-secondary/60 hover:bg-background-secondary transition-colors"
                 aria-expanded={formData.codeOpen}
               >
-                <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <span className="flex items-center gap-2 text-subsection-title text-foreground">
                   <Code2 className="w-4 h-4 text-primary-light" />
                   配套代码（可选）
                 </span>
@@ -341,7 +348,10 @@ export default function CreateSolutionModal({
               {formData.codeOpen && (
                 <div className="p-4 space-y-3 border-t border-border">
                   <div className="flex items-center gap-3">
-                    <label htmlFor="code-language" className="text-sm text-muted-foreground whitespace-nowrap">
+                    <label
+                      htmlFor="code-language"
+                      className="text-sm text-muted-foreground whitespace-nowrap"
+                    >
                       代码语言
                     </label>
                     <select

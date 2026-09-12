@@ -95,9 +95,7 @@ export default function ContestCard({ contest, nowMs }: ContestCardProps) {
   const visual = statusVisual(countdown.phase)
   const StatusIcon = visual.icon
   const href =
-    countdown.phase === 'ended'
-      ? `/contests/${contest.id}/rank`
-      : `/contests/${contest.id}`
+    countdown.phase === 'ended' ? `/contests/${contest.id}/rank` : `/contests/${contest.id}`
 
   const startMs = new Date(contest.startTime).getTime()
   const endMs = new Date(contest.endTime).getTime()
@@ -117,7 +115,7 @@ export default function ContestCard({ contest, nowMs }: ContestCardProps) {
     <Link
       href={href}
       className={cn(
-        'group relative card-static rounded-xl overflow-hidden border border-border',
+        'group relative card-static overflow-hidden border border-border',
         'flex flex-col min-h-[11.5rem] transition-all duration-200',
         'hover:border-primary/35 hover:shadow-sm'
       )}
@@ -147,7 +145,7 @@ export default function ContestCard({ contest, nowMs }: ContestCardProps) {
         </div>
 
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-foreground line-clamp-1 group-hover:text-primary-light transition-colors">
+          <h3 className="text-section-title text-foreground line-clamp-1 group-hover:text-primary-light transition-colors">
             {contest.title}
           </h3>
           {desc ? (

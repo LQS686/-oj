@@ -31,7 +31,11 @@ export interface MaterializedTestCase {
 }
 
 /** 测点磁盘体积（用于自适应并发；未缓存时返回 0） */
-export function peekTestCaseDiskBytes(id: string): { inputBytes: number; outputBytes: number; cached: boolean } {
+export function peekTestCaseDiskBytes(id: string): {
+  inputBytes: number
+  outputBytes: number
+  cached: boolean
+} {
   try {
     if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
       return { inputBytes: 0, outputBytes: 0, cached: false }
@@ -213,7 +217,9 @@ export async function materializeTestCaseToDisk(id: string): Promise<Materialize
   }
 }
 
-export async function cleanupMaterializedTestCase(files: MaterializedTestCase | null | undefined): Promise<void> {
+export async function cleanupMaterializedTestCase(
+  files: MaterializedTestCase | null | undefined
+): Promise<void> {
   if (!files) return
   // 磁盘缓存只读复用，勿删
   if (files.fromCache) return
@@ -227,7 +233,9 @@ export async function cleanupMaterializedTestCase(files: MaterializedTestCase | 
 }
 
 /** @deprecated 仅 pretest/兼容；正式评测请用 materializeTestCaseToDisk */
-export async function loadTestCaseForJudge(id: string): Promise<{ input: string; output: string } | null> {
+export async function loadTestCaseForJudge(
+  id: string
+): Promise<{ input: string; output: string } | null> {
   const tc = await prisma.testCase.findUnique({
     where: { id },
     select: { input: true, output: true },

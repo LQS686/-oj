@@ -3,13 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useRef, useEffect, useState } from 'react'
-import {
-  BookOpen,
-  Trophy,
-  Dumbbell,
-  GraduationCap,
-  BarChart3
-} from 'lucide-react'
+import { BookOpen, Trophy, Dumbbell, GraduationCap, BarChart3 } from 'lucide-react'
 
 interface NavLink {
   href: string

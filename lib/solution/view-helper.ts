@@ -49,16 +49,14 @@ export async function recordUniqueView(
       data: {
         solutionId,
         userId: userId ?? undefined,
-        viewerKey
-      }
+        viewerKey,
+      },
     })
     return true
   } catch (err: unknown) {
     // 唯一约束冲突 = 重复浏览
     const code =
-      err && typeof err === 'object' && 'code' in err
-        ? String((err as { code: unknown }).code)
-        : ''
+      err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : ''
     if (code === 'P2002') return false
     logger.error('记录题解浏览失败', err)
     return false

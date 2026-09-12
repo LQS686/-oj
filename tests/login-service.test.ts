@@ -88,46 +88,51 @@ describe('loginUser', () => {
   })
 
   it('应抛出 LoginError(BAD_REQUEST) 当缺 username', async () => {
-    await expect(
-      loginUser({ username: '', password: 'pwd123' })
-    ).rejects.toThrow(LoginError)
-    await expect(
-      loginUser({ username: '', password: 'pwd123' })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' })
+    await expect(loginUser({ username: '', password: 'pwd123' })).rejects.toThrow(LoginError)
+    await expect(loginUser({ username: '', password: 'pwd123' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    })
   })
 
   it('应抛出 LoginError(BAD_REQUEST) 当缺 password', async () => {
-    await expect(
-      loginUser({ username: 'alice', password: '' })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' })
+    await expect(loginUser({ username: 'alice', password: '' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    })
   })
 
   it('应抛出 LoginError(BAD_REQUEST) 当 username 长度 > 100', async () => {
     const longName = 'a'.repeat(101)
-    await expect(
-      loginUser({ username: longName, password: 'pwd123' })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' })
+    await expect(loginUser({ username: longName, password: 'pwd123' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    })
   })
 
   it('应抛出 LoginError(UNAUTHORIZED) 当 lockout 计数 ≥ 5（对外不区分账号锁定，防枚举）', async () => {
     mockRedis.get.mockResolvedValue('5')
     mockRedis.ttl.mockResolvedValue(300)
-    await expect(
-      loginUser({ username: 'alice', password: 'pwd123' })
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
+    await expect(loginUser({ username: 'alice', password: 'pwd123' })).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    })
   })
 
   it('锁定计数按 userId 归一化：用邮箱登录命中同一锁定（双标识符共享计数）', async () => {
     // 只有 userId 维度的计数达到阈值；输入标识符维度未锁定——
     // 修复前交替用用户名/邮箱各失败 5 次可绕过锁定，修复后共享 userId 计数
-    mockRedis.get.mockImplementation(async (key: string) =>
-      key.includes(':u1') ? '5' : null
-    )
+    mockRedis.get.mockImplementation(async (key: string) => (key.includes(':u1') ? '5' : null))
     mockRedis.ttl.mockResolvedValue(300)
     fakePrisma.user.findFirst.mockResolvedValue({
-      id: 'u1', username: 'alice', email: 'alice@example.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rank: 'gray',
-      color: '#999', role: 'USER', isBanned: false, tokenVersion: 0,
+      id: 'u1',
+      username: 'alice',
+      email: 'alice@example.com',
+      password: 'hash',
+      nickname: null,
+      avatar: null,
+      bio: null,
+      rank: 'gray',
+      color: '#999',
+      role: 'USER',
+      isBanned: false,
+      tokenVersion: 0,
       createdAt: new Date(),
     })
     // 密码设为正确：若回归旧实现（按输入标识符查锁），流程将走到密码比对
@@ -141,45 +146,71 @@ describe('loginUser', () => {
 
   it('应抛出 LoginError(UNAUTHORIZED) 当用户不存在', async () => {
     fakePrisma.user.findFirst.mockResolvedValue(null)
-    await expect(
-      loginUser({ username: 'ghost', password: 'pwd123' })
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
+    await expect(loginUser({ username: 'ghost', password: 'pwd123' })).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    })
     // 验证失败被记录
     expect(mockMulti.incr).toHaveBeenCalled()
   })
 
   it('应抛出 LoginError(FORBIDDEN) 当用户被封禁', async () => {
     fakePrisma.user.findFirst.mockResolvedValue({
-      id: 'u1', username: 'banned', email: 'b@b.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rank: 'gray',
-      color: '#999', role: 'USER', isBanned: true, tokenVersion: 0,
+      id: 'u1',
+      username: 'banned',
+      email: 'b@b.com',
+      password: 'hash',
+      nickname: null,
+      avatar: null,
+      bio: null,
+      rank: 'gray',
+      color: '#999',
+      role: 'USER',
+      isBanned: true,
+      tokenVersion: 0,
       createdAt: new Date(),
     })
-    await expect(
-      loginUser({ username: 'banned', password: 'pwd123' })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(loginUser({ username: 'banned', password: 'pwd123' })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
   })
 
   it('应抛出 LoginError(UNAUTHORIZED) 当密码错误', async () => {
     fakePrisma.user.findFirst.mockResolvedValue({
-      id: 'u1', username: 'alice', email: 'a@a.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rank: 'gray',
-      color: '#999', role: 'USER', isBanned: false, tokenVersion: 0,
+      id: 'u1',
+      username: 'alice',
+      email: 'a@a.com',
+      password: 'hash',
+      nickname: null,
+      avatar: null,
+      bio: null,
+      rank: 'gray',
+      color: '#999',
+      role: 'USER',
+      isBanned: false,
+      tokenVersion: 0,
       createdAt: new Date(),
     })
     bcryptCompare.mockResolvedValue(false)
-    await expect(
-      loginUser({ username: 'alice', password: 'wrong' })
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
+    await expect(loginUser({ username: 'alice', password: 'wrong' })).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    })
     expect(mockMulti.incr).toHaveBeenCalled()
   })
 
   it('应返回 user + token 当登录成功', async () => {
     fakePrisma.user.findFirst.mockResolvedValue({
-      id: 'u1', username: 'alice', email: 'a@a.com', password: 'hash',
-      nickname: 'Alice', avatar: 'https://img/a.png', bio: 'hi',
-      rank: 'green', color: '#0f0',
-      role: 'SYSTEM_ADMIN', isBanned: false, tokenVersion: 1,
+      id: 'u1',
+      username: 'alice',
+      email: 'a@a.com',
+      password: 'hash',
+      nickname: 'Alice',
+      avatar: 'https://img/a.png',
+      bio: 'hi',
+      rank: 'green',
+      color: '#0f0',
+      role: 'SYSTEM_ADMIN',
+      isBanned: false,
+      tokenVersion: 1,
       createdAt: new Date('2024-01-01T00:00:00Z'),
     })
     bcryptCompare.mockResolvedValue(true)
@@ -196,9 +227,18 @@ describe('loginUser', () => {
 
   it('应允许通过 email 登录', async () => {
     fakePrisma.user.findFirst.mockResolvedValue({
-      id: 'u1', username: 'alice', email: 'a@a.com', password: 'hash',
-      nickname: null, avatar: null, bio: null, rank: 'gray',
-      color: '#999', role: 'USER', isBanned: false, tokenVersion: 0,
+      id: 'u1',
+      username: 'alice',
+      email: 'a@a.com',
+      password: 'hash',
+      nickname: null,
+      avatar: null,
+      bio: null,
+      rank: 'gray',
+      color: '#999',
+      role: 'USER',
+      isBanned: false,
+      tokenVersion: 0,
       createdAt: new Date(),
     })
     bcryptCompare.mockResolvedValue(true)

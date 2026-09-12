@@ -68,7 +68,7 @@ export function ensureDsojWatchBinary(): boolean {
         `[ -x "${DSOJ_WATCH_BIN}" ]`,
       ].join('\n'),
     ],
-    { encoding: 'utf8' },
+    { encoding: 'utf8' }
   )
 
   if (locked.status !== 0) {

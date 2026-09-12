@@ -51,13 +51,7 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
 
   let result: { url: string; size: number }
   try {
-    result = await mergeChunks(
-      safeUploadId,
-      safeTotalChunks,
-      user.id,
-      safeFilename,
-      owner.fileSize
-    )
+    result = await mergeChunks(safeUploadId, safeTotalChunks, user.id, safeFilename, owner.fileSize)
   } catch (e) {
     // 合并失败也释放 uploadId，避免占满 30 分钟 TTL
     await consumeAvatarUpload(safeUploadId)

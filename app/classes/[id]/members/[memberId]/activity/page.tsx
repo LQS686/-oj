@@ -6,8 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { TrendingUp, Award, FileText, BarChart3, Clock, Target } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
-import { ClassWorkspaceShell, PageLoading } from '@/components/common'
-import { useClass } from '@/hooks/useClass'
+import { ClassWorkspaceShell, ListEmptyState, PageLoading } from '@/components/common'
 import { formatDateTime } from '@/lib/utils'
 import { classRoleDisplayLabel } from '@/lib/class/roles'
 import { loginPathFromLocation } from '@/lib/navigation'
@@ -46,7 +45,6 @@ export default function MemberActivityPage() {
   const router = useRouter()
   const classId = params.id as string
   const memberId = params.memberId as string
-  const { classData } = useClass(classId)
 
   const [data, setData] = useState<ActivityPayload | null>(null)
   const [loading, setLoading] = useState(true)
@@ -91,7 +89,6 @@ export default function MemberActivityPage() {
     return (
       <ClassWorkspaceShell
         classId={classId}
-        className={classData?.name}
         title="活动统计"
         icon={BarChart3}
         actions={
@@ -100,20 +97,23 @@ export default function MemberActivityPage() {
           </Link>
         }
       >
-        <div className="card-static rounded-lg p-8 text-center border border-border">
-          <Target className="w-10 h-10 text-error mx-auto mb-3" />
-          <p className="text-error mb-4">{error}</p>
-          <button type="button" onClick={() => fetchActivityStats()} className="btn btn-primary">
-            重试
-          </button>
-        </div>
+        <ListEmptyState
+          tone="error"
+          icon={Target}
+          title={error}
+          action={
+            <button type="button" onClick={() => fetchActivityStats()} className="btn btn-primary">
+              重试
+            </button>
+          }
+        />
       </ClassWorkspaceShell>
     )
   }
 
   if (!data) {
     return (
-      <ClassWorkspaceShell classId={classId} className={classData?.name} title="活动统计" icon={BarChart3}>
+      <ClassWorkspaceShell classId={classId} title="活动统计" icon={BarChart3}>
         <p className="text-error text-center py-8">数据加载失败</p>
       </ClassWorkspaceShell>
     )
@@ -127,7 +127,6 @@ export default function MemberActivityPage() {
   return (
     <ClassWorkspaceShell
       classId={classId}
-      className={classData?.name}
       title={`${displayName} · 活动统计`}
       description={`角色：${classRoleDisplayLabel(member.role)}`}
       icon={BarChart3}
@@ -138,7 +137,7 @@ export default function MemberActivityPage() {
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="card-static rounded-lg p-4 border border-border">
+        <div className="card-static p-4 border border-border">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">总提交次数</span>
             <BarChart3 className="w-4 h-4 text-accent" />
@@ -147,7 +146,7 @@ export default function MemberActivityPage() {
           <p className="text-xs text-muted-foreground mt-1">班级作业提交</p>
         </div>
 
-        <div className="card-static rounded-lg p-4 border border-border">
+        <div className="card-static p-4 border border-border">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">AC 率</span>
             <TrendingUp className="w-4 h-4 text-secondary" />
@@ -157,11 +156,14 @@ export default function MemberActivityPage() {
             {stats.acCount} / {stats.totalSubmissions} 次通过
           </p>
           <div className="w-full bg-muted rounded-full h-1.5 mt-2">
-            <div className="bg-secondary h-1.5 rounded-full" style={{ width: `${acceptanceRate}%` }} />
+            <div
+              className="bg-secondary h-1.5 rounded-full"
+              style={{ width: `${acceptanceRate}%` }}
+            />
           </div>
         </div>
 
-        <div className="card-static rounded-lg p-4 border border-border">
+        <div className="card-static p-4 border border-border">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">笔记发布</span>
             <FileText className="w-4 h-4 text-info" />
@@ -172,7 +174,7 @@ export default function MemberActivityPage() {
       </div>
 
       <div className="bg-card rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+        <h2 className="text-subsection-title text-foreground mb-4 flex items-center gap-2">
           <Clock className="w-4 h-4 text-primary" />
           最近活动
         </h2>
@@ -182,7 +184,10 @@ export default function MemberActivityPage() {
         ) : (
           <ul className="divide-y divide-border">
             {recentActivities.map((item, index) => (
-              <li key={`${item.type}-${item.createdAt}-${index}`} className="py-3 flex items-start gap-3">
+              <li
+                key={`${item.type}-${item.createdAt}-${index}`}
+                className="py-3 flex items-start gap-3"
+              >
                 <span className="mt-0.5">
                   {item.type === 'note' ? (
                     <FileText className="w-4 h-4 text-info" />

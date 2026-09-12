@@ -8,11 +8,8 @@ import {
   FileText,
   User,
   Calendar,
-  CheckCircle,
-  XCircle,
   AlertTriangle,
   Code,
-  Clock,
   Filter,
   X,
   Eye,
@@ -20,16 +17,16 @@ import {
   Shield,
 } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
-import { getStatusText } from '@/lib/status'
-import {
-  isAcceptedStatus,
-  isNonFinalSubmissionStatus,
-  NON_FINAL_STATUS_QUERY,
-  SubmissionStatus,
-} from '@/lib/constants/submission-status'
+import { NON_FINAL_STATUS_QUERY } from '@/lib/constants/submission-status'
+import SubmissionStatusBadge from '@/components/submission/SubmissionStatusBadge'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
-import { EducationalPageShell, PageLoading, RouteSuspenseFallback, Modal } from '@/components/common'
+import {
+  EducationalPageShell,
+  PageLoading,
+  RouteSuspenseFallback,
+  Modal,
+} from '@/components/common'
 import { loginPath } from '@/lib/navigation'
 import { canAccessAdmin } from '@/lib/permissions'
 
@@ -187,40 +184,6 @@ function SubmissionsContent() {
     void fetchSubmissions()
   }, [fetchSubmissions, user, userLoading, requiresAuth])
 
-  const getStatusBadge = (status: string) => {
-    const text = getStatusText(status)
-    if (isAcceptedStatus(status)) {
-      return (
-        <span className="tag tag-success">
-          <CheckCircle className="w-3 h-3" />
-          {text}
-        </span>
-      )
-    }
-    if (status === SubmissionStatus.WRONG_ANSWER) {
-      return (
-        <span className="tag tag-error">
-          <XCircle className="w-3 h-3" />
-          {text}
-        </span>
-      )
-    }
-    if (isNonFinalSubmissionStatus(status)) {
-      return (
-        <span className="tag tag-info">
-          <Clock className="w-3 h-3" />
-          {text}
-        </span>
-      )
-    }
-    return (
-      <span className="tag tag-warning">
-        <AlertTriangle className="w-3 h-3" />
-        {text}
-      </span>
-    )
-  }
-
   const clearContextFilters = () => {
     setStatusGroup('all')
     setLanguage('')
@@ -233,16 +196,18 @@ function SubmissionsContent() {
   const hasContextFilter = !!(problemId || userId || statusParam || assignmentId)
   const hasLocalFilter = statusGroup !== 'all' || !!language || !!keyword
   const activeFilterCount =
-    (statusGroup !== 'all' ? 1 : 0) + (language ? 1 : 0) + (keyword ? 1 : 0) + (problemId ? 1 : 0) + (userId ? 1 : 0)
+    (statusGroup !== 'all' ? 1 : 0) +
+    (language ? 1 : 0) +
+    (keyword ? 1 : 0) +
+    (problemId ? 1 : 0) +
+    (userId ? 1 : 0)
 
   if (userLoading || (requiresAuth && !user)) {
     return <PageLoading label="加载中..." />
   }
 
   const backHref =
-    assignmentId && classId
-      ? `/classes/${classId}/assignments/${assignmentId}`
-      : undefined
+    assignmentId && classId ? `/classes/${classId}/assignments/${assignmentId}` : undefined
 
   return (
     <EducationalPageShell
@@ -276,7 +241,7 @@ function SubmissionsContent() {
                       setStatusGroup(group.key)
                       setPage(1)
                     }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    className={`btn btn-sm transition-colors ${
                       statusGroup === group.key
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:text-foreground'
@@ -346,40 +311,58 @@ function SubmissionsContent() {
         </div>
       }
     >
-      <div className="card-static overflow-hidden rounded-lg border border-border animate-fadeIn">
+      <div className="card-static overflow-hidden border border-border animate-fadeIn">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px]">
+          <table className="table w-full min-w-[960px]">
             <thead className="bg-muted border-b border-border">
               <tr>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">提交ID</th>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">题目</th>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">用户</th>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">状态</th>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">分数</th>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">语言</th>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">用时 · 内存</th>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">提交时间</th>
-                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">操作</th>
+                <th className="text-left">提交ID</th>
+                <th className="text-left">题目</th>
+                <th className="text-left">用户</th>
+                <th className="text-left">状态</th>
+                <th className="text-left">分数</th>
+                <th className="text-left">语言</th>
+                <th className="text-left">用时 · 内存</th>
+                <th className="text-left">提交时间</th>
+                <th className="text-left">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-36 rounded bg-muted" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-20 rounded bg-muted" /></td>
-                    <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-muted" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-8 rounded bg-muted" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-12 rounded bg-muted" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-24 rounded bg-muted" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-28 rounded bg-muted" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-8 rounded bg-muted" /></td>
+                    <td>
+                      <div className="h-4 w-16 rounded bg-muted" />
+                    </td>
+                    <td>
+                      <div className="h-4 w-36 rounded bg-muted" />
+                    </td>
+                    <td>
+                      <div className="h-4 w-20 rounded bg-muted" />
+                    </td>
+                    <td>
+                      <div className="h-5 w-20 rounded-full bg-muted" />
+                    </td>
+                    <td>
+                      <div className="h-4 w-8 rounded bg-muted" />
+                    </td>
+                    <td>
+                      <div className="h-4 w-12 rounded bg-muted" />
+                    </td>
+                    <td>
+                      <div className="h-4 w-24 rounded bg-muted" />
+                    </td>
+                    <td>
+                      <div className="h-4 w-28 rounded bg-muted" />
+                    </td>
+                    <td>
+                      <div className="h-4 w-8 rounded bg-muted" />
+                    </td>
                   </tr>
                 ))
               ) : submissions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-16 text-center">
+                  <td colSpan={9} className="text-center py-8">
                     <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground/25" />
                     <p className="text-base font-medium text-foreground mb-1">没有找到提交记录</p>
                     <p className="text-sm text-muted-foreground">
@@ -394,7 +377,7 @@ function SubmissionsContent() {
               ) : (
                 submissions.map((submission) => (
                   <tr key={submission.id} className="hover:bg-muted/60 transition-colors">
-                    <td className="px-4 py-2.5">
+                    <td>
                       <Link
                         href={`/submission/${submission.id}`}
                         className="inline-flex"
@@ -405,7 +388,7 @@ function SubmissionsContent() {
                         </code>
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td>
                       <Link
                         href={`/problem/${submission.problem.id}`}
                         className="text-primary-light hover:text-primary transition-colors"
@@ -418,7 +401,7 @@ function SubmissionsContent() {
                         {submission.problem.title}
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td>
                       <Link
                         href={`/user/${submission.user.id}`}
                         className="text-foreground hover:text-primary-light transition-colors inline-flex items-center gap-1"
@@ -427,29 +410,29 @@ function SubmissionsContent() {
                         {submission.user.nickname || submission.user.username}
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5" title={getStatusText(submission.status)}>
-                      {getStatusBadge(submission.status)}
+                    <td>
+                      <SubmissionStatusBadge status={submission.status} />
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td>
                       <span className="font-mono font-semibold tabular-nums text-foreground">
                         {submission.score}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td>
                       <span className="tag">{submission.language}</span>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td>
                       <span className="font-mono text-sm text-foreground tabular-nums">
                         {formatTime(submission.time ?? 0)} · {formatMemory(submission.memory ?? 0)}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td>
                       <span className="text-sm text-muted-foreground inline-flex items-center gap-1 whitespace-nowrap">
                         <Calendar className="w-3 h-3 shrink-0" />
                         {formatDateTime(submission.submittedAt)}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td>
                       {assignmentId ? (
                         <button
                           type="button"
@@ -488,7 +471,7 @@ function SubmissionsContent() {
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="btn btn-outline py-1.5 px-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn-sm btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 上一页
               </button>
@@ -496,7 +479,7 @@ function SubmissionsContent() {
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="btn btn-outline py-1.5 px-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn-sm btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 下一页
               </button>
@@ -517,75 +500,79 @@ function SubmissionsContent() {
           }
           size="lg"
         >
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="rounded-lg border border-border p-4">
-                  <p className="text-sm text-muted-foreground mb-1">提交用户</p>
-                  <p className="font-medium text-foreground flex items-center gap-2">
-                    <User className="w-4 h-4 text-primary" />
-                    {selectedSubmission.user.nickname || selectedSubmission.user.username}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                  <p className="text-sm text-muted-foreground mb-1">题目</p>
-                  <p className="font-medium text-foreground">{selectedSubmission.problem.title}</p>
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                  <p className="text-sm text-muted-foreground mb-1">语言</p>
-                  <span className="tag">{selectedSubmission.language}</span>
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                  <p className="text-sm text-muted-foreground mb-1">状态</p>
-                  {getStatusBadge(selectedSubmission.status)}
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                  <p className="text-sm text-muted-foreground mb-1">得分</p>
-                  <p className="font-medium text-foreground">
-                    <span className="text-2xl font-bold tabular-nums">{selectedSubmission.score}</span>
-                    {selectedSubmission.passedTests !== undefined &&
-                      selectedSubmission.totalTests !== undefined && (
-                        <span className="text-sm text-muted-foreground ml-2">
-                          ({selectedSubmission.passedTests}/{selectedSubmission.totalTests} 通过)
-                        </span>
-                      )}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                  <p className="text-sm text-muted-foreground mb-1">提交时间</p>
-                  <p className="font-medium text-foreground flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    {formatDateTime(selectedSubmission.submittedAt)}
-                  </p>
-                </div>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground mb-1">提交用户</p>
+              <p className="font-medium text-foreground flex items-center gap-2">
+                <User className="w-4 h-4 text-primary" />
+                {selectedSubmission.user.nickname || selectedSubmission.user.username}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground mb-1">题目</p>
+              <p className="font-medium text-foreground">{selectedSubmission.problem.title}</p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground mb-1">语言</p>
+              <span className="tag">{selectedSubmission.language}</span>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground mb-1">状态</p>
+              <SubmissionStatusBadge status={selectedSubmission.status} />
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground mb-1">得分</p>
+              <p className="font-medium text-foreground">
+                <span className="text-2xl font-bold tabular-nums">{selectedSubmission.score}</span>
+                {selectedSubmission.passedTests !== undefined &&
+                  selectedSubmission.totalTests !== undefined && (
+                    <span className="text-sm text-muted-foreground ml-2">
+                      ({selectedSubmission.passedTests}/{selectedSubmission.totalTests} 通过)
+                    </span>
+                  )}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground mb-1">提交时间</p>
+              <p className="font-medium text-foreground flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                {formatDateTime(selectedSubmission.submittedAt)}
+              </p>
+            </div>
+          </div>
+
+          {selectedSubmission.code && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Code className="w-5 h-5 text-primary" />
+                <h4 className="font-semibold text-foreground">代码</h4>
               </div>
-
-              {selectedSubmission.code && (
-                <div className="mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Code className="w-5 h-5 text-primary" />
-                    <h4 className="font-semibold text-foreground">代码</h4>
-                  </div>
-                  <div className="bg-background-secondary rounded-lg overflow-hidden border border-border">
-                    <div className="px-4 py-2 bg-muted text-muted-foreground text-sm border-b border-border">
-                      {selectedSubmission.language}
-                    </div>
-                    <pre className="p-4 overflow-x-auto max-h-80 custom-scrollbar">
-                      <code className="text-foreground text-sm font-mono">{selectedSubmission.code}</code>
-                    </pre>
-                  </div>
+              <div className="bg-background-secondary rounded-lg overflow-hidden border border-border">
+                <div className="px-4 py-2 bg-muted text-muted-foreground text-sm border-b border-border">
+                  {selectedSubmission.language}
                 </div>
-              )}
+                <pre className="p-4 overflow-x-auto max-h-80 custom-scrollbar">
+                  <code className="text-foreground text-sm font-mono">
+                    {selectedSubmission.code}
+                  </code>
+                </pre>
+              </div>
+            </div>
+          )}
 
-              {selectedSubmission.message && (
-                <div>
-                  <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-error" />
-                    错误信息
-                  </h4>
-                  <div className="bg-error/10 border border-error/20 rounded-lg p-4">
-                    <pre className="text-sm text-error whitespace-pre-wrap">{selectedSubmission.message}</pre>
-                  </div>
-                </div>
-              )}
+          {selectedSubmission.message && (
+            <div>
+              <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-error" />
+                错误信息
+              </h4>
+              <div className="bg-error/10 border border-error/20 rounded-lg p-4">
+                <pre className="text-sm text-error whitespace-pre-wrap">
+                  {selectedSubmission.message}
+                </pre>
+              </div>
+            </div>
+          )}
         </Modal>
       )}
     </EducationalPageShell>

@@ -18,12 +18,8 @@ export default function AdminCreateObjectiveQuestionPage() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-foreground tracking-tight">
-            创建客观题
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            题号将在保存后自动生成
-          </p>
+          {/* 页面标题由 AdminLayout 顶栏提供（唯一 H1），此处只保留说明 */}
+          <p className="text-sm text-muted-foreground">题号将在保存后自动生成</p>
         </div>
       </header>
 

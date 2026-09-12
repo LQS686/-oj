@@ -21,7 +21,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
               key={tab.id}
               type="button"
               onClick={() => onTabChange(tab.id)}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`shrink-0 inline-flex items-center gap-1.5 h-10 px-3 rounded-lg text-label transition-colors ${
                 isActive
                   ? 'bg-primary/15 text-primary-light'
                   : 'text-muted-foreground hover:bg-muted'
@@ -44,7 +44,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
                 <button
                   type="button"
                   onClick={() => onTabChange(tab.id)}
-                  className={`relative w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                  className={`relative w-full flex items-center gap-2.5 h-10 px-3 rounded-lg text-left transition-colors ${
                     isActive
                       ? 'text-primary-light'
                       : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
@@ -58,7 +58,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
                     />
                   )}
                   <Icon className="relative z-10 w-4 h-4 shrink-0" />
-                  <span className="relative z-10 text-sm font-medium">{tab.label}</span>
+                  <span className="relative z-10 text-label">{tab.label}</span>
                 </button>
               </li>
             )

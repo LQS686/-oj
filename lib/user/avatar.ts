@@ -43,10 +43,12 @@ export async function uploadUserAvatar(
   const buffer = Buffer.from(await file.arrayBuffer())
   // 魔数校验
   const magic = (ext: string) => {
-    if (ext === '.png') return buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47
-    if (ext === '.jpg' || ext === '.jpeg') return buffer[0] === 0xFF && buffer[1] === 0xD8
+    if (ext === '.png')
+      return buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47
+    if (ext === '.jpg' || ext === '.jpeg') return buffer[0] === 0xff && buffer[1] === 0xd8
     if (ext === '.gif') return buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46
-    if (ext === '.webp') return buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46
+    if (ext === '.webp')
+      return buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46
     return false
   }
   if (!magic(ext)) {
@@ -162,10 +164,7 @@ export async function deleteAvatarHistory(userId: string, historyId: string): Pr
     select: { avatar: true },
   })
   if (user?.avatar && record.url && user.avatar === record.url) {
-    throw AppError.badRequest(
-      'AVATAR_IN_USE',
-      '该头像正在使用中，请先切换到其他头像后再删除'
-    )
+    throw AppError.badRequest('AVATAR_IN_USE', '该头像正在使用中，请先切换到其他头像后再删除')
   }
 
   await prisma.avatarHistory.delete({ where: { id: historyId } })

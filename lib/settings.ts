@@ -19,9 +19,7 @@ export { defaultJudgeSettings, normalizeFailFast } from '@/lib/settings-defaults
 
 function normalizeMerged(raw: Record<string, unknown>): SystemSettings {
   const judgeRaw =
-    raw.judge && typeof raw.judge === 'object'
-      ? (raw.judge as Partial<JudgeSettings>)
-      : undefined
+    raw.judge && typeof raw.judge === 'object' ? (raw.judge as Partial<JudgeSettings>) : undefined
   const merged = {
     ...defaultSettings,
     ...raw,

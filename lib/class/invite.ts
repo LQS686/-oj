@@ -32,11 +32,7 @@ export async function createOrReactivateDirectInvite(input: {
     const elapsed = Date.now() - new Date(lastAt).getTime()
     if (elapsed < cooldownMs) {
       const minutes = Math.ceil((cooldownMs - elapsed) / 60000)
-      throw new ApiError(
-        'INVITE_COOLDOWN',
-        `对该用户的邀请冷却中，请 ${minutes} 分钟后再试`,
-        429
-      )
+      throw new ApiError('INVITE_COOLDOWN', `对该用户的邀请冷却中，请 ${minutes} 分钟后再试`, 429)
     }
     const updated = await updateDirectInvite(existingInvite.id, {
       inviterId: input.inviterId,

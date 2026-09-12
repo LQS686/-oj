@@ -42,50 +42,59 @@ function isActive(now: Date, publishedAt: Date | null, expiresAt: Date | null): 
 
 /** 首页 / 公开：已发布且在有效期内 */
 export async function listPublicAnnouncements(limit = 8): Promise<PublicAnnouncementItem[]> {
-  return cache.get('announcement:public', [limit], async () => {
-    const now = new Date()
-    // 避免 Mongo optional DateTime 上 null + isSet 组合过滤在部分环境下抛错；
-    // 公告量小，先取已发布再在内存按有效期裁剪。
-    const rows = await prisma.systemAnnouncement.findMany({
-      where: { isPublished: true },
-      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
-      take: Math.min(Math.max(limit * 3, 24), 100),
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        isPinned: true,
-        publishedAt: true,
-        expiresAt: true,
-        createdAt: true,
-      },
-    })
+  return cache
+    .get(
+      'announcement:public',
+      [limit],
+      async () => {
+        const now = new Date()
+        // 避免 Mongo optional DateTime 上 null + isSet 组合过滤在部分环境下抛错；
+        // 公告量小，先取已发布再在内存按有效期裁剪。
+        const rows = await prisma.systemAnnouncement.findMany({
+          where: { isPublished: true },
+          orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+          take: Math.min(Math.max(limit * 3, 24), 100),
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            isPinned: true,
+            publishedAt: true,
+            expiresAt: true,
+            createdAt: true,
+          },
+        })
 
-    return rows
-      .filter((r) => isActive(now, r.publishedAt, r.expiresAt))
-      .sort((a, b) => {
-        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
-        const ap = a.publishedAt?.getTime() ?? a.createdAt.getTime()
-        const bp = b.publishedAt?.getTime() ?? b.createdAt.getTime()
-        return bp - ap
-      })
-      .slice(0, limit)
-      .map((r) => ({
-        id: r.id,
-        title: r.title,
-        content: r.content,
-        isPinned: r.isPinned,
-        publishedAt: r.publishedAt?.toISOString() ?? null,
-        createdAt: r.createdAt.toISOString(),
-      }))
-  }, { ttl: PUBLIC_LIST_TTL }).catch((error) => {
-    logger.error('[announcement] listPublicAnnouncements failed', error)
-    return [] as PublicAnnouncementItem[]
-  })
+        return rows
+          .filter((r) => isActive(now, r.publishedAt, r.expiresAt))
+          .sort((a, b) => {
+            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
+            const ap = a.publishedAt?.getTime() ?? a.createdAt.getTime()
+            const bp = b.publishedAt?.getTime() ?? b.createdAt.getTime()
+            return bp - ap
+          })
+          .slice(0, limit)
+          .map((r) => ({
+            id: r.id,
+            title: r.title,
+            content: r.content,
+            isPinned: r.isPinned,
+            publishedAt: r.publishedAt?.toISOString() ?? null,
+            createdAt: r.createdAt.toISOString(),
+          }))
+      },
+      { ttl: PUBLIC_LIST_TTL }
+    )
+    .catch((error) => {
+      logger.error('[announcement] listPublicAnnouncements failed', error)
+      return [] as PublicAnnouncementItem[]
+    })
 }
 
 /** 公开公告详情（仅已发布且在有效期内） */
-export async function getPublicAnnouncementById(id: string): Promise<PublicAnnouncementDetail | null> {
+export async function getPublicAnnouncementById(
+  id: string
+): Promise<PublicAnnouncementDetail | null> {
   const now = new Date()
   let row
   try {
@@ -156,7 +165,7 @@ export async function createAnnouncement(input: {
       content: input.content,
       isPinned: input.isPinned ?? false,
       isPublished: published,
-      publishedAt: published ? (input.publishedAt ?? now) : input.publishedAt ?? null,
+      publishedAt: published ? (input.publishedAt ?? now) : (input.publishedAt ?? null),
       expiresAt: input.expiresAt ?? null,
       authorId: input.authorId,
     },
@@ -164,14 +173,7 @@ export async function createAnnouncement(input: {
   clearAnnouncementCache()
 
   // 实时推送：仅当公告已发布且在有效期内时推送 'published' 事件
-  if (
-    isPubliclyVisible(
-      created.isPublished,
-      created.publishedAt,
-      created.expiresAt,
-      now
-    )
-  ) {
+  if (isPubliclyVisible(created.isPublished, created.publishedAt, created.expiresAt, now)) {
     void broadcastAnnouncementChange({
       type: 'published',
       id: created.id,
@@ -219,8 +221,18 @@ export async function updateAnnouncement(
 
   // 实时推送：根据状态变化决定事件类型
   const now = new Date()
-  const wasVisible = isPubliclyVisible(existing.isPublished, existing.publishedAt, existing.expiresAt, now)
-  const nowVisible = isPubliclyVisible(updated.isPublished, updated.publishedAt, updated.expiresAt, now)
+  const wasVisible = isPubliclyVisible(
+    existing.isPublished,
+    existing.publishedAt,
+    existing.expiresAt,
+    now
+  )
+  const nowVisible = isPubliclyVisible(
+    updated.isPublished,
+    updated.publishedAt,
+    updated.expiresAt,
+    now
+  )
 
   if (!wasVisible && nowVisible) {
     // 从不可见变为可见：等同于新发布

@@ -33,32 +33,43 @@ export const GET = withApi.admin(async (req) => {
   // 非法分页参数（NaN / 非正数）回落 undefined，由 service 层使用默认值
   const parsedPage = pageStr ? parseInt(pageStr, 10) : undefined
   const parsedPageSize = pageSizeStr ? parseInt(pageSizeStr, 10) : undefined
-  const page = Number.isFinite(parsedPage) && (parsedPage as number) > 0
-    ? parsedPage as number
-    : undefined
-  const pageSize = Number.isFinite(parsedPageSize) && (parsedPageSize as number) > 0
-    ? parsedPageSize as number
-    : undefined
+  const page =
+    Number.isFinite(parsedPage) && (parsedPage as number) > 0 ? (parsedPage as number) : undefined
+  const pageSize =
+    Number.isFinite(parsedPageSize) && (parsedPageSize as number) > 0
+      ? (parsedPageSize as number)
+      : undefined
   const tags = tagsParam
-    ? tagsParam.split(',').map(s => s.trim()).filter(Boolean)
+    ? tagsParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
     : undefined
   const difficulty = difficultyParam
-    ? difficultyParam.split(',').map(s => s.trim()).filter(Boolean)
+    ? difficultyParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
     : undefined
   const sources = sourceParam
-    ? sourceParam.split(',').map(s => s.trim()).filter(Boolean)
+    ? sourceParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
     : undefined
 
-  return ok(await listAllProblemsForAdmin({
-    q,
-    page,
-    pageSize,
-    tagIds: tags,
-    difficulty,
-    visibility,
-    sources,
-    completeness,
-  }))
+  return ok(
+    await listAllProblemsForAdmin({
+      q,
+      page,
+      pageSize,
+      tagIds: tags,
+      difficulty,
+      visibility,
+      sources,
+      completeness,
+    })
+  )
 })
 
 /**

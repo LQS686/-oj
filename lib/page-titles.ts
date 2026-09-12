@@ -10,26 +10,31 @@ type TitleRule = {
 
 /** 静态路由与模式路由的浏览器标签标题（不含后缀时已带逻辑名） */
 const RULES: TitleRule[] = [
-  // 管理后台（更具体优先）
-  { test: /^\/admin\/problems\/[^/]+\/testcases$/, title: '测试用例 - 题目管理' },
+  // 管理后台（更具体的子路由必须排在父路由之前）
+  { test: /^\/admin\/problems\/[^/]+\/testcases$/, title: '测试数据管理' },
   { test: /^\/admin\/problems\/[^/]+\/edit$/, title: '编辑题目' },
   { test: /^\/admin\/problems\/create$/, title: '创建题目' },
   { test: /^\/admin\/problems$/, title: '题目管理' },
+  { test: /^\/admin\/objective-questions\/[^/]+\/edit$/, title: '编辑客观题' },
+  { test: /^\/admin\/objective-questions\/create$/, title: '创建客观题' },
+  { test: /^\/admin\/objective-questions$/, title: '客观题管理' },
   { test: /^\/admin\/contests\/[^/]+\/edit$/, title: '编辑竞赛' },
   { test: /^\/admin\/contests\/create$/, title: '创建竞赛' },
   { test: /^\/admin\/contests$/, title: '竞赛管理' },
   { test: /^\/admin\/trainings\/categories$/, title: '题单分类' },
   { test: /^\/admin\/trainings\/create$/, title: '创建题单' },
-  { test: /^\/admin\/trainings\/[^/]+$/, title: '题单管理' },
+  { test: /^\/admin\/trainings\/[^/]+$/, title: '编辑题单' },
   { test: /^\/admin\/trainings$/, title: '题单管理' },
-  { test: /^\/admin\/users\/[^/]+\/permissions$/, title: '用户权限' },
-  { test: /^\/admin\/users$/, title: '用户管理' },
+  { test: /^\/admin\/classes\/create$/, title: '创建班级' },
   { test: /^\/admin\/classes$/, title: '班级管理' },
+  { test: /^\/admin\/users$/, title: '用户管理' },
   { test: /^\/admin\/submissions\/[^/]+$/, title: '提交详情' },
   { test: /^\/admin\/submissions$/, title: '提交记录' },
+  { test: /^\/admin\/reviews$/, title: '题解审核' },
+  { test: /^\/admin\/reports$/, title: '举报管理' },
   { test: /^\/admin\/announcements$/, title: '系统公告' },
   { test: /^\/admin\/settings$/, title: '系统设置' },
-  { test: /^\/admin$/, title: '管理后台' },
+  { test: /^\/admin$/, title: '仪表盘' },
 
   // 竞赛
   {
@@ -72,6 +77,8 @@ const RULES: TitleRule[] = [
   { test: /^\/problems\/[^/]+\/solutions\/new$/, title: '发布题解' },
   { test: /^\/problems\/[^/]+\/solutions\/[^/]+\/edit$/, title: '编辑题解' },
   { test: /^\/problems\/[^/]+\/solutions\/[^/]+$/, title: '题解' },
+  { test: /^\/problems\/[^/]+\/solutions$/, title: '题解列表' },
+  { test: /^\/problems\/[^/]+$/, title: '题目' },
   // 列表页已重定向到 /problem/:id?tab=solutions，标题由题目页接管
   { test: /^\/problems$/, title: '题库' },
 
@@ -97,6 +104,7 @@ const RULES: TitleRule[] = [
   { test: /^\/login$/, title: '登录' },
   { test: /^\/register$/, title: '注册' },
   { test: /^\/forgot-password$/, title: '找回密码' },
+  { test: /^\/reset-password$/, title: '重置密码' },
   { test: /^\/help$/, title: '使用帮助' },
   { test: /^\/403$/, title: '无权限' },
   { test: /^\/$/, title: '首页' },

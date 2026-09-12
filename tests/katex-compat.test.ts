@@ -26,18 +26,13 @@ import rehypeRaw from 'rehype-raw'
 import rehypeKatex from 'rehype-katex'
 
 // ESM 下 __dirname 不可用（vitest 内联注入不跨版本稳定），用 import.meta.dirname
-const root = import.meta.dirname
-  ? path.resolve(import.meta.dirname, '..')
-  : process.cwd()
+const root = import.meta.dirname ? path.resolve(import.meta.dirname, '..') : process.cwd()
 
 describe('KaTeX 版本一致性（上下标缩放回归保护）', () => {
   const pkg = JSON.parse(
     fs.readFileSync(path.join(root, 'node_modules/katex/package.json'), 'utf8')
   )
-  const katexCss = fs.readFileSync(
-    path.join(root, 'node_modules/katex/dist/katex.min.css'),
-    'utf8'
-  )
+  const katexCss = fs.readFileSync(path.join(root, 'node_modules/katex/dist/katex.min.css'), 'utf8')
 
   it('katex 为 0.16.x（与 rehype-katex 内部一致，避免 0.18 CSS 错配）', () => {
     expect(pkg.version).toMatch(/^0\.16\./)
@@ -53,10 +48,14 @@ describe('KaTeX 版本一致性（上下标缩放回归保护）', () => {
 
   it('渲染出的公式 HTML 含上下标结构类（vlist-t / sizing reset-size6 size3）', () => {
     const html = renderToStaticMarkup(
-      React.createElement(ReactMarkdown, {
-        remarkPlugins: [remarkGfm, remarkMath],
-        rehypePlugins: [rehypeRaw, [rehypeKatex, { strict: 'ignore' }]],
-      }, '$x^2 + a_i$')
+      React.createElement(
+        ReactMarkdown,
+        {
+          remarkPlugins: [remarkGfm, remarkMath],
+          rehypePlugins: [rehypeRaw, [rehypeKatex, { strict: 'ignore' }]],
+        },
+        '$x^2 + a_i$'
+      )
     )
     expect(html).toContain('class="vlist-t')
     expect(html).toContain('sizing reset-size6 size3')

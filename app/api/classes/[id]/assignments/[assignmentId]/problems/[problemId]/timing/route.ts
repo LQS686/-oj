@@ -25,11 +25,7 @@ import {
   getCurrentClassMember,
   getAssignmentStatus,
 } from '@/lib/class/service'
-import {
-  startOrResumeTiming,
-  pauseTiming,
-  getProgress,
-} from '@/lib/gamification/timing'
+import { startOrResumeTiming, pauseTiming, getProgress } from '@/lib/gamification/timing'
 
 type TimingAction = 'start' | 'pause' | 'resume'
 
@@ -37,7 +33,12 @@ type TimingAction = 'start' | 'pause' | 'resume'
  * 公共校验：班级成员 + 作业存在 + 题目属于作业 + 作业时间窗口状态
  * 返回 { assignment, member, status } 供 handler 使用
  */
-async function validateTimingContext(classId: string, assignmentId: string, problemId: string, userId: string) {
+async function validateTimingContext(
+  classId: string,
+  assignmentId: string,
+  problemId: string,
+  userId: string
+) {
   if (!isObjectId(classId) || !isObjectId(assignmentId) || !isObjectId(problemId)) {
     throw400('INVALID_ID', '无效的 ID')
   }

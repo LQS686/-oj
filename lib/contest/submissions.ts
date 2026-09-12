@@ -7,10 +7,7 @@ import type { Prisma } from '@prisma/client'
 import { cache } from '@/lib/cache'
 import { logger } from '@/lib/logger'
 import { ApiError } from '@/lib/api/errors'
-import {
-  createSubmissionDirect,
-  incrementProblemSubmitCount,
-} from '@/lib/mongodb-direct'
+import { createSubmissionDirect, incrementProblemSubmitCount } from '@/lib/mongodb-direct'
 import { addJudgeJob } from '@/lib/judge/queue'
 import { SubmissionStatus } from '@/lib/constants/submission-status'
 import { parseComparisonMode } from '@/lib/judge/types'
@@ -136,7 +133,10 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
   if (typeof input.code !== 'string' || input.code.length > MAX_CODE_LENGTH) {
     throw new ApiError('VALIDATION', '代码长度不合法（最大 50000 字符）', 400)
   }
-  if (typeof input.language !== 'string' || !ALLOWED_LANGUAGES.includes(input.language as AllowedLanguage)) {
+  if (
+    typeof input.language !== 'string' ||
+    !ALLOWED_LANGUAGES.includes(input.language as AllowedLanguage)
+  ) {
     throw new ApiError('VALIDATION', '不支持的语言', 400)
   }
   const contest = await prisma.contest.findUnique({ where: { id: input.contestId } })
@@ -236,7 +236,10 @@ export async function submitContestCode(input: SubmitContestCodeInput) {
     })
     logger.info(`竞赛提交 ${submission.id} 已加入评测队列`)
   } catch (queueError) {
-    logger.error('加入评测队列失败，回滚提交记录与计数', queueError instanceof Error ? queueError : new Error(String(queueError)))
+    logger.error(
+      '加入评测队列失败，回滚提交记录与计数',
+      queueError instanceof Error ? queueError : new Error(String(queueError))
+    )
     try {
       if (sealedNow) {
         await prisma.submission.delete({ where: { id: submission.id } })

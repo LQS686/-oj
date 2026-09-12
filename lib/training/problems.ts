@@ -61,10 +61,7 @@ export async function createTrainingWithProblems(input: TrainingCreateInput) {
   return training
 }
 
-export async function updateTrainingAndProblems(
-  id: string,
-  input: TrainingUpdateInput
-) {
+export async function updateTrainingAndProblems(id: string, input: TrainingUpdateInput) {
   const updated = await prisma.training.update({
     where: { id },
     data: {
@@ -132,8 +129,8 @@ export async function addTrainingProblems(
     where: { trainingId },
     select: { problemId: true },
   })
-  const existingIds = new Set(existingProblems.map(e => e.problemId))
-  const toCreate = data.filter(item => !existingIds.has(item.problemId))
+  const existingIds = new Set(existingProblems.map((e) => e.problemId))
+  const toCreate = data.filter((item) => !existingIds.has(item.problemId))
   let count = 0
   if (toCreate.length > 0) {
     const result = await prisma.trainingProblem.createMany({ data: toCreate })
@@ -155,7 +152,7 @@ export async function reorderTrainingProblems(
 ) {
   cache.delete(byIdKey(trainingId))
   await prisma.$transaction(
-    orderMap.map(item =>
+    orderMap.map((item) =>
       prisma.trainingProblem.update({
         where: { trainingId_problemId: { trainingId, problemId: item.problemId } },
         data: { orderIndex: item.orderIndex },

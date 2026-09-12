@@ -8,7 +8,9 @@ import { createClass, findClassByName, listClasses } from '@/lib/class/service'
 import { canCreateClass } from '@/lib/permissions'
 
 export const GET = withApi.public(async (req) => {
-  const q = readQuery<{ page?: string; pageSize?: string; search?: string; myClasses?: string }>(req)
+  const q = readQuery<{ page?: string; pageSize?: string; search?: string; myClasses?: string }>(
+    req
+  )
   const page = Math.max(1, parseInt(q.page || '1') || 1)
   const pageSize = Math.min(50, Math.max(1, parseInt(q.pageSize || '20') || 20))
   const myClasses = q.myClasses === 'true'

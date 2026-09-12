@@ -3,7 +3,16 @@
  *
  * PUT：校验密码 + 唯一性 + 改绑冷却后，仅通过 Prisma 更新
  */
-import { withApi, ok, fail, readJson, throw400, throw401, throw404, throw409 } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  fail,
+  readJson,
+  throw400,
+  throw401,
+  throw404,
+  throw409,
+} from '@/lib/api/withApi'
 import bcrypt from 'bcryptjs'
 import { getUserWithPassword, changeCurrentUserEmail, isEmailTaken } from '@/lib/user/service'
 import { AppError } from '@/lib/errors'

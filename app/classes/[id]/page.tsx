@@ -24,7 +24,13 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import Link from 'next/link'
 import AssignmentOpenLink from '@/components/assignment/AssignmentOpenLink'
-import { ClassWorkspaceShell, PageLoading, useDialog, RouteSuspenseFallback } from '@/components/common'
+import {
+  ClassWorkspaceShell,
+  ListEmptyState,
+  PageLoading,
+  useDialog,
+  RouteSuspenseFallback,
+} from '@/components/common'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import ClassManageInlinePanel from '@/components/class/ClassManageInlinePanel'
 import CreateAssignmentModal from '@/components/class/CreateAssignmentModal'
@@ -46,7 +52,10 @@ interface Assignment {
 }
 
 // 三态作业状态判定：与后端 getAssignmentStatus 一致
-function getAssignmentStatus(startTime?: string | null, endTime?: string | null): 'upcoming' | 'active' | 'ended' {
+function getAssignmentStatus(
+  startTime?: string | null,
+  endTime?: string | null
+): 'upcoming' | 'active' | 'ended' {
   const now = Date.now()
   if (startTime && new Date(startTime).getTime() > now) return 'upcoming'
   if (endTime && new Date(endTime).getTime() < now) return 'ended'
@@ -107,7 +116,9 @@ function ClassDetailContent() {
   const [notes, setNotes] = useState<Note[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
   const [notesLoading, setNotesLoading] = useState(false)
-  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'upcoming' | 'active' | 'ended'>('all')
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'upcoming' | 'active' | 'ended'>(
+    'all'
+  )
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false)
   const [editAssignmentOpen, setEditAssignmentOpen] = useState(false)
   const [editAssignmentId, setEditAssignmentId] = useState<string | null>(null)
@@ -275,28 +286,28 @@ function ClassDetailContent() {
     }
   }
 
-  const canManageTarget = useCallback(
-    (targetRole: string, operatorRole: string) => {
-      const op = normalizeClassRoleToApi(operatorRole)
-      const tgt = normalizeClassRoleToApi(targetRole)
-      if (op === 'owner') return tgt !== 'owner'
-      if (op === 'assistant') return tgt === 'student'
-      return false
-    },
-    []
-  )
+  const canManageTarget = useCallback((targetRole: string, operatorRole: string) => {
+    const op = normalizeClassRoleToApi(operatorRole)
+    const tgt = normalizeClassRoleToApi(targetRole)
+    if (op === 'owner') return tgt !== 'owner'
+    if (op === 'assistant') return tgt === 'student'
+    return false
+  }, [])
 
   if (loading) return <PageLoading label="加载班级中..." />
 
   if (error || !classData) {
     return (
       <ClassWorkspaceShell classId={classId} title="班级" icon={Users}>
-        <div className="card-static rounded-lg p-8 text-center border border-border">
-          <p className="text-foreground font-medium mb-4">{error || '班级不存在'}</p>
-          <Link href="/classes" className="btn btn-primary">
-            返回班级列表
-          </Link>
-        </div>
+        <ListEmptyState
+          tone="error"
+          title={error || '班级不存在'}
+          action={
+            <Link href="/classes" className="btn btn-primary">
+              返回班级列表
+            </Link>
+          }
+        />
       </ClassWorkspaceShell>
     )
   }
@@ -339,7 +350,6 @@ function ClassDetailContent() {
   return (
     <ClassWorkspaceShell
       classId={classId}
-      className={classData.name}
       title={classData.name}
       icon={Users}
       showBack={false}
@@ -370,14 +380,12 @@ function ClassDetailContent() {
             onChanged={fetchClassDetail}
           />
         ) : (
-          <div className="card-static rounded-lg p-8 text-center text-muted-foreground text-sm">
-            仅班级管理员或老师可访问管理功能
-          </div>
+          <ListEmptyState title="仅班级管理员或老师可访问管理功能" />
         )
       ) : (
         <div className="space-y-3">
           {/* 公告：空态单行，有内容时再展开，避免空卡片占高 */}
-          <div className="rounded-xl border border-border bg-card px-3.5 py-2.5 flex items-start gap-2.5">
+          <div className="rounded-xl border border-border bg-card px-4 py-3 flex items-start gap-2.5">
             <Megaphone className="w-4 h-4 text-primary-light shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-2">
@@ -399,9 +407,9 @@ function ClassDetailContent() {
               {/* 作业优先加宽，笔记次之；去掉无效的 3 列空位 */}
               <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-3">
                 {/* 作业 */}
-                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col min-h-0">
+                <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden flex flex-col min-h-0">
                   <div className="px-3.5 py-2.5 border-b border-border flex items-center justify-between gap-2">
-                    <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <h2 className="text-subsection-title text-foreground flex items-center gap-1.5">
                       <FileText className="w-4 h-4" /> 作业
                       <span className="text-xs font-normal text-muted-foreground">
                         ({assignments.length})
@@ -430,7 +438,13 @@ function ClassDetailContent() {
                               : 'bg-muted text-muted-foreground hover:text-foreground'
                           }`}
                         >
-                          {f === 'all' ? '全部' : f === 'upcoming' ? '未开始' : f === 'active' ? '进行中' : '已结束'}
+                          {f === 'all'
+                            ? '全部'
+                            : f === 'upcoming'
+                              ? '未开始'
+                              : f === 'active'
+                                ? '进行中'
+                                : '已结束'}
                         </button>
                       ))}
                     </div>
@@ -498,11 +512,13 @@ function ClassDetailContent() {
                 </div>
 
                 {/* 笔记 */}
-                <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col min-h-0">
+                <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden flex flex-col min-h-0">
                   <div className="px-3.5 py-2.5 border-b border-border flex items-center justify-between gap-2">
-                    <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <h2 className="text-subsection-title text-foreground flex items-center gap-1.5">
                       <BookOpen className="w-4 h-4" /> 笔记
-                      <span className="text-xs font-normal text-muted-foreground">({notes.length})</span>
+                      <span className="text-xs font-normal text-muted-foreground">
+                        ({notes.length})
+                      </span>
                     </h2>
                     {user && isClassAdmin && (
                       <button
@@ -542,12 +558,14 @@ function ClassDetailContent() {
               </div>
 
               {/* 成员：宽屏双列，行高收紧 */}
-              <div className="card-static rounded-xl border border-border overflow-hidden">
+              <div className="card-static border border-border overflow-hidden">
                 <div className="px-3.5 py-2.5 border-b border-border flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <h2 className="text-subsection-title text-foreground flex items-center gap-1.5">
                     <Users className="w-4 h-4" /> 班级成员
                   </h2>
-                  <span className="text-xs text-muted-foreground">{classData.members.length} 人</span>
+                  <span className="text-xs text-muted-foreground">
+                    {classData.members.length} 人
+                  </span>
                 </div>
                 <div className="p-2 max-h-64 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-0.5">
                   {sortedMembers.map((m) => {
@@ -559,7 +577,11 @@ function ClassDetailContent() {
                         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50 text-sm"
                       >
                         {m.avatar ? (
-                          <img src={m.avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+                          <img
+                            src={m.avatar}
+                            alt=""
+                            className="w-7 h-7 rounded-full object-cover shrink-0"
+                          />
                         ) : (
                           <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
                             <User className="w-3.5 h-3.5 text-primary" />
@@ -610,8 +632,8 @@ function ClassDetailContent() {
             </div>
 
             {/* 侧栏：左右对齐的紧凑元信息 */}
-            <aside className="rounded-xl border border-border bg-card p-3 space-y-3 lg:sticky lg:top-[72px]">
-              <h2 className="text-xs font-semibold text-foreground tracking-wide">班级详情</h2>
+            <aside className="rounded-xl border border-border bg-card p-4 space-y-3 lg:sticky lg:top-[72px]">
+              <h2 className="text-subsection-title text-foreground">班级详情</h2>
               {classData.description?.trim() ? (
                 <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">
                   {classData.description}
@@ -650,7 +672,9 @@ function ClassDetailContent() {
                   <dt className="text-muted-foreground inline-flex items-center gap-1">
                     <Calendar className="w-3 h-3" /> 创建
                   </dt>
-                  <dd className="text-foreground tabular-nums">{formatDate(classData.createdAt)}</dd>
+                  <dd className="text-foreground tabular-nums">
+                    {formatDate(classData.createdAt)}
+                  </dd>
                 </div>
               </dl>
             </aside>

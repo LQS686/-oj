@@ -108,9 +108,7 @@ export default function ProblemPicker({
     <div className="flex flex-col gap-3">
       {/* 搜索添加 */}
       <div className="relative">
-        <label className="block text-sm font-medium text-muted-foreground mb-2">
-          搜索添加题目
-        </label>
+        <label className="block text-label text-muted-foreground mb-2">搜索添加题目</label>
         <div className="relative">
           <input
             type="text"
@@ -134,14 +132,20 @@ export default function ProblemPicker({
                   <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded text-sm group-hover:bg-primary/10 group-hover:text-primary-light transition-colors">
                     {problem.problemNumber}
                   </span>
-                  <span className="font-medium text-foreground group-hover:text-primary-light">{problem.title}</span>
+                  <span className="font-medium text-foreground group-hover:text-primary-light">
+                    {problem.title}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`text-xs px-2 py-1 rounded font-medium ${
-                    problem.difficulty === '入门' ? 'bg-secondary/10 text-secondary-light' :
-                    problem.difficulty.includes('普及') ? 'bg-accent/10 text-accent-light' :
-                    'bg-error/10 text-error'
-                  }`}>
+                  <span
+                    className={`text-xs px-2 py-1 rounded font-medium ${
+                      problem.difficulty === '入门'
+                        ? 'bg-secondary/10 text-secondary-light'
+                        : problem.difficulty.includes('普及')
+                          ? 'bg-accent/10 text-accent-light'
+                          : 'bg-error/10 text-error'
+                    }`}
+                  >
                     {problem.difficulty}
                   </span>
                   <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary-light" />
@@ -154,11 +158,10 @@ export default function ProblemPicker({
 
       {/* 批量添加 */}
       <div className="space-y-2">
-        <label className="block text-sm font-bold text-primary-light">
-          批量添加题目
-        </label>
+        <label className="block text-sm font-bold text-primary-light">批量添加题目</label>
         <p className="text-xs text-muted-foreground">
-          输入题号，英文或中文逗号分隔，如 <span className="font-mono text-foreground">P1001,P1002,P1005</span>
+          输入题号，英文或中文逗号分隔，如{' '}
+          <span className="font-mono text-foreground">P1001,P1002,P1005</span>
           ，将按输入顺序加入。
         </p>
         <div className="flex gap-2">
@@ -173,7 +176,11 @@ export default function ProblemPicker({
             className="input w-full min-w-0 flex-1 text-sm"
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleBatchAdd())}
           />
-          <button type="button" onClick={handleBatchAdd} className="btn btn-primary btn-sm shrink-0 inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleBatchAdd}
+            className="btn btn-primary btn-sm shrink-0 inline-flex items-center gap-1"
+          >
             <ListPlus className="w-4 h-4" />
             添加
           </button>
@@ -194,7 +201,10 @@ export default function ProblemPicker({
           ) : (
             <div className="rounded-lg border border-border divide-y divide-border">
               {selectedOrdered.map((problem, index) => (
-                <div key={problem.id} className="flex items-center gap-2 px-3 py-2.5 text-sm bg-card hover:bg-muted/30">
+                <div
+                  key={problem.id}
+                  className="flex items-center gap-2 px-3 py-2.5 text-sm bg-card hover:bg-muted/30"
+                >
                   {renderSelectedItem?.(problem, index)}
                 </div>
               ))}

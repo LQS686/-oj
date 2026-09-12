@@ -49,10 +49,7 @@ export const INITIAL_EMAIL_CHANGE = {
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function isCodeLanguage(value: unknown): value is CodeLanguageValue {
-  return (
-    typeof value === 'string' &&
-    CODE_LANGUAGE_OPTIONS.some((o) => o.value === value)
-  )
+  return typeof value === 'string' && CODE_LANGUAGE_OPTIONS.some((o) => o.value === value)
 }
 
 /** 将 API 偏好归一为当前 Preferences（仅接受 cpp / c / python） */

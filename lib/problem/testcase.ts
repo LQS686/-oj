@@ -45,7 +45,9 @@ export async function saveTestcases(problemId: string, testcases: TestcaseData[]
     problemId,
     input: tc.input,
     output: tc.output,
-    score: tc.score ?? (idx === testcases.length - 1 ? 100 - equalScore * (testcases.length - 1) : equalScore),
+    score:
+      tc.score ??
+      (idx === testcases.length - 1 ? 100 - equalScore * (testcases.length - 1) : equalScore),
     orderIndex: idx,
   }))
   await prisma.testCase.createMany({ data })
@@ -81,7 +83,10 @@ export async function uploadTestcaseFile(problemId: string, _fileName: string, c
 /**
  * 计算测试用例分数总和
  */
-export async function calculateScore(problemId: string, submissionOutputs: string[]): Promise<number> {
+export async function calculateScore(
+  problemId: string,
+  submissionOutputs: string[]
+): Promise<number> {
   const testcases = await listTestcases(problemId)
   if (!testcases.length) return 0
   let total = 0
@@ -130,7 +135,7 @@ export async function redistributeAllProblemScores(): Promise<void> {
     const BATCH_SIZE = 10
     for (let i = 0; i < problems.length; i += BATCH_SIZE) {
       const batch = problems.slice(i, i + BATCH_SIZE)
-      await Promise.allSettled(batch.map(p => redistributeTestScores(p.id)))
+      await Promise.allSettled(batch.map((p) => redistributeTestScores(p.id)))
     }
     logger.info(`已重新分配 ${problems.length} 个题目的测试用例分数`)
   } catch (error) {
@@ -196,17 +201,21 @@ export interface ValidationResult {
   totalSize?: number
 }
 
-export function validateFileName(fileName: string): { valid: boolean; number?: number; type?: 'in' | 'out' } {
+export function validateFileName(fileName: string): {
+  valid: boolean
+  number?: number
+  type?: 'in' | 'out'
+} {
   const lower = fileName.toLowerCase()
   // 支持 .in/.out 与 .input/.output
   let type: 'in' | 'out' | undefined
   let nameWithoutExt: string
   if (lower.endsWith('.input')) {
     type = 'in'
-    nameWithoutExt = fileName.slice(0, -('.input'.length))
+    nameWithoutExt = fileName.slice(0, -'.input'.length)
   } else if (lower.endsWith('.output')) {
     type = 'out'
-    nameWithoutExt = fileName.slice(0, -('.output'.length))
+    nameWithoutExt = fileName.slice(0, -'.output'.length)
   } else {
     const ext = path.extname(fileName).toLowerCase()
     if (ext !== '.in' && ext !== '.out') return { valid: false }
@@ -225,7 +234,10 @@ export function validateLineEndings(content: string): boolean {
 export async function parseTestCaseZip(zipBuffer: Buffer): Promise<ValidationResult> {
   try {
     if (zipBuffer.length > TESTCASE_UPLOAD_CONFIG.MAX_FILE_SIZE) {
-      return { success: false, error: `压缩包大小超过限制（最大${TESTCASE_UPLOAD_CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB）` }
+      return {
+        success: false,
+        error: `压缩包大小超过限制（最大${TESTCASE_UPLOAD_CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB）`,
+      }
     }
 
     const zip = new AdmZip(zipBuffer)
@@ -236,10 +248,16 @@ export async function parseTestCaseZip(zipBuffer: Buffer): Promise<ValidationRes
     // 先按 entry 数量做早期校验，防止 zip bomb（解压前）
     const fileEntries = zipEntries.filter((e) => !e.isDirectory)
     if (fileEntries.length > TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES * 2) {
-      return { success: false, error: `测试点数量超过限制（最多${TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES}对）` }
+      return {
+        success: false,
+        error: `测试点数量超过限制（最多${TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES}对）`,
+      }
     }
 
-    const testCaseMap = new Map<number, { in?: Buffer; out?: Buffer; inName?: string; outName?: string }>()
+    const testCaseMap = new Map<
+      number,
+      { in?: Buffer; out?: Buffer; inName?: string; outName?: string }
+    >()
     let totalUnzipSize = 0
 
     // P0 修复：Zip Slip 路径穿越防护
@@ -314,7 +332,10 @@ export async function parseTestCaseZip(zipBuffer: Buffer): Promise<ValidationRes
 
     if (testCases.length === 0) return { success: false, error: '压缩包中没有有效的测试点文件' }
     if (testCases.length > TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES) {
-      return { success: false, error: `测试点数量超过限制（最多${TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES}对）` }
+      return {
+        success: false,
+        error: `测试点数量超过限制（最多${TESTCASE_UPLOAD_CONFIG.MAX_TESTCASES}对）`,
+      }
     }
     testCases.sort((a, b) => a.number - b.number)
     return { success: true, testCases, totalSize: totalUnzipSize }
@@ -331,7 +352,9 @@ export async function saveTestCaseFiles(
 ): Promise<{ success: boolean; error?: string; paths?: string[] }> {
   try {
     const problemDir = path.join(baseDir, problemId)
-    const dirExists = await access(problemDir).then(() => true).catch(() => false)
+    const dirExists = await access(problemDir)
+      .then(() => true)
+      .catch(() => false)
     if (!dirExists) await mkdir(problemDir, { recursive: true })
     const savedPaths: string[] = []
     for (const tc of testCases) {
@@ -354,7 +377,9 @@ export async function deleteTestCaseFiles(
 ): Promise<void> {
   try {
     const problemDir = path.join(baseDir, problemId)
-    const dirExists = await access(problemDir).then(() => true).catch(() => false)
+    const dirExists = await access(problemDir)
+      .then(() => true)
+      .catch(() => false)
     if (dirExists) await rm(problemDir, { recursive: true, force: true })
   } catch (error) {
     logger.error('删除测试点文件失败', error)

@@ -1,50 +1,51 @@
-import type { Metadata } from "next"
-import "./globals.css"
-import Navbar from "@/components/Navbar"
-import { UserProvider } from "@/contexts/UserContext"
-import { SettingsProvider } from "@/contexts/SettingsContext"
-import { SwrProvider } from "@/components/SwrProvider"
-import { Toaster } from "react-hot-toast"
-import DocumentTitleProvider from "@/components/DocumentTitleProvider"
-import { SITE_TITLE_SUFFIX } from "@/lib/document-title"
-import PageTransition from "@/components/common/PageTransition"
-import NavigationProgress from "@/components/common/NavigationProgress"
-import { DialogProvider } from "@/components/common/DialogProvider"
-import { getServerSessionUser } from "@/lib/auth/server-session"
+import type { Metadata } from 'next'
+import './globals.css'
+import Navbar from '@/components/Navbar'
+import { UserProvider } from '@/contexts/UserContext'
+import { SettingsProvider } from '@/contexts/SettingsContext'
+import { SwrProvider } from '@/components/SwrProvider'
+import { Toaster } from 'react-hot-toast'
+import DocumentTitleProvider from '@/components/DocumentTitleProvider'
+import { SITE_TITLE_SUFFIX } from '@/lib/document-title'
+import PageTransition from '@/components/common/PageTransition'
+import MainLandmark from '@/components/layout/MainLandmark'
+import NavigationProgress from '@/components/common/NavigationProgress'
+import { DialogProvider } from '@/components/common/DialogProvider'
+import { getServerSessionUser } from '@/lib/auth/server-session'
 
 const siteBaseUrl =
-  process.env.NEXT_PUBLIC_BASE_URL ||
-  process.env.FRONTEND_URL ||
-  "http://localhost:3000"
+  process.env.NEXT_PUBLIC_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:3000'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteBaseUrl),
   title: `首页 - ${SITE_TITLE_SUFFIX}`,
-  description: "代码如山·算法为径。大山 OJ 是一站式在线编程学习与竞赛平台，从入门到顶峰的清晰成长路径。",
-  keywords: ["大山 OJ", "OJ", "编程", "算法", "竞赛", "题库", "在线评测", "学习平台", "训练"],
-  authors: [{ name: "Dashan OJ Team" }],
+  description:
+    '代码如山·算法为径。大山 OJ 是一站式在线编程学习与竞赛平台，从入门到顶峰的清晰成长路径。',
+  keywords: ['大山 OJ', 'OJ', '编程', '算法', '竞赛', '题库', '在线评测', '学习平台', '训练'],
+  authors: [{ name: 'Dashan OJ Team' }],
   icons: {
-    icon: [{ url: "/logos/dsojlogo.png", type: "image/png" }],
-    shortcut: "/logos/dsojlogo.png",
-    apple: "/logos/dsojlogo.png",
+    icon: [{ url: '/logos/dsojlogo.png', type: 'image/png' }],
+    shortcut: '/logos/dsojlogo.png',
+    apple: '/logos/dsojlogo.png',
   },
   openGraph: {
     title: `首页 - ${SITE_TITLE_SUFFIX}`,
-    description: "代码如山·算法为径。大山 OJ 是一站式在线编程学习与竞赛平台，从入门到顶峰的清晰成长路径。",
-    type: "website",
-    locale: "zh_CN",
+    description:
+      '代码如山·算法为径。大山 OJ 是一站式在线编程学习与竞赛平台，从入门到顶峰的清晰成长路径。',
+    type: 'website',
+    locale: 'zh_CN',
     images: [
       {
-        url: "/logos/dsojlogo.png",
+        url: '/logos/dsojlogo.png',
         width: 1024,
         height: 1024,
-        alt: "大山 OJ Logo",
+        alt: '大山 OJ Logo',
       },
     ],
   },
   twitter: {
-    card: "summary_large_image",
-    images: ["/logos/dsojlogo.png"],
+    card: 'summary_large_image',
+    images: ['/logos/dsojlogo.png'],
   },
 }
 
@@ -66,6 +67,14 @@ export default async function RootLayout({
         />
       </head>
       <body className="antialiased">
+        {/* 跳到主内容：键盘用户的第一个可聚焦元素，避免每页都要 Tab 穿过整条导航。
+            目标 #main-content 由 PageShell（前台）与 AdminLayout（后台）的 <main> 提供。 */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg"
+        >
+          跳到主内容
+        </a>
         <SwrProvider>
           <SettingsProvider>
             <UserProvider initialUser={initialUser}>
@@ -73,7 +82,9 @@ export default async function RootLayout({
                 <DocumentTitleProvider />
                 <NavigationProgress />
                 <Navbar />
-                <PageTransition>{children}</PageTransition>
+                <PageTransition>
+                  <MainLandmark>{children}</MainLandmark>
+                </PageTransition>
               </DialogProvider>
               <Toaster
                 position="top-right"

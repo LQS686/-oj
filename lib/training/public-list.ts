@@ -5,11 +5,7 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
-import type {
-  TrainingListItem,
-  PaginatedResponse,
-  TrainingCategoryType,
-} from './types'
+import type { TrainingListItem, PaginatedResponse, TrainingCategoryType } from './types'
 
 /* ============================================================================
  * 高级查询：公开列表（带分类/标签/作者/题目计数/用户进度）
@@ -32,10 +28,7 @@ export async function listPublicTrainingsAdvanced(
   // 公开题单：isPublic + published；登录用户额外可看到自己创建的私有/草稿
   const visibility: Prisma.TrainingWhereInput = filter.userId
     ? {
-        OR: [
-          { isPublic: true, status: 'published' },
-          { authorId: filter.userId },
-        ],
+        OR: [{ isPublic: true, status: 'published' }, { authorId: filter.userId }],
       }
     : { isPublic: true, status: 'published' }
 
@@ -130,14 +123,20 @@ export async function listPublicTrainingsAdvanced(
           })
         : []
     const acSet = new Set(
-      submissions.filter((s: { status: string }) => s.status === 'AC').map((s: { problemId: string }) => s.problemId)
+      submissions
+        .filter((s: { status: string }) => s.status === 'AC')
+        .map((s: { problemId: string }) => s.problemId)
     )
     const attSet = new Set(submissions.map((s: { problemId: string }) => s.problemId))
 
     for (const t of trainings) {
       const tProblems = allProblems.filter((p: { trainingId: string }) => p.trainingId === t.id)
-      const solvedCount = tProblems.filter((p: { problemId: string }) => acSet.has(p.problemId)).length
-      const attemptedCount = tProblems.filter((p: { problemId: string }) => attSet.has(p.problemId)).length
+      const solvedCount = tProblems.filter((p: { problemId: string }) =>
+        acSet.has(p.problemId)
+      ).length
+      const attemptedCount = tProblems.filter((p: { problemId: string }) =>
+        attSet.has(p.problemId)
+      ).length
       progressMap.set(t.id, {
         solvedCount,
         attemptedCount,
@@ -165,9 +164,7 @@ export async function listPublicTrainingsAdvanced(
       problemCount: problemTotal,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
-      author: t.author
-        ? { ...t.author, avatar: sanitizeAvatarUrl(t.author.avatar) }
-        : t.author,
+      author: t.author ? { ...t.author, avatar: sanitizeAvatarUrl(t.author.avatar) } : t.author,
       category: t.category,
       userProgress: p
         ? {

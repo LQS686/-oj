@@ -127,12 +127,14 @@ class Cache {
   }
 
   private generateKey(prefix: string, ...args: unknown[]): string {
-    const serializedArgs = args.map(arg => {
-      if (typeof arg === 'object' && arg !== null) {
-        return JSON.stringify(arg)
-      }
-      return String(arg)
-    }).join(':')
+    const serializedArgs = args
+      .map((arg) => {
+        if (typeof arg === 'object' && arg !== null) {
+          return JSON.stringify(arg)
+        }
+        return String(arg)
+      })
+      .join(':')
     return `${prefix}:${serializedArgs}`
   }
 
@@ -175,7 +177,12 @@ class Cache {
     }
   }
 
-  async get<T>(prefix: string, args: unknown[], fn: () => Promise<T>, options: CacheOptions = {}): Promise<T> {
+  async get<T>(
+    prefix: string,
+    args: unknown[],
+    fn: () => Promise<T>,
+    options: CacheOptions = {}
+  ): Promise<T> {
     const key = options.key || this.generateKey(prefix, ...args)
     const now = Date.now()
     const ttl = options.ttl || 5 * 60 * 1000

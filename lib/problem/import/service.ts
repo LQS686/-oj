@@ -13,20 +13,13 @@ import { isValidDifficulty, normalizeDifficulty, type Difficulty } from '@/lib/c
 import { clearProblemCache } from '../admin'
 import { redistributeTestScores } from '../testcase'
 import { invalidateProblemTestCaseCache } from '@/lib/judge/testcase-loader'
-import type {
-  ImportedProblem,
-  ImportedProblemResult,
-  ImportOptions,
-} from './types'
+import type { ImportedProblem, ImportedProblemResult, ImportOptions } from './types'
 
 /**
  * 题目规范化：补全默认值、清理空字段、确保字段类型正确。
  * 难度仅接受洛谷 8 档；缺省用 options.defaultDifficulty；显式非法值直接报错（不做旧档映射）。
  */
-function normalizeImportedProblem(
-  raw: ImportedProblem,
-  options: ImportOptions
-): ImportedProblem {
+function normalizeImportedProblem(raw: ImportedProblem, options: ImportOptions): ImportedProblem {
   const title = (raw.title || '').trim()
   if (!title) {
     throw new Error('题目标题为空')
@@ -56,7 +49,7 @@ function normalizeImportedProblem(
     title,
     description,
     difficulty,
-    tags: Array.isArray(raw.tags) ? raw.tags.filter(Boolean).map(t => String(t).trim()) : [],
+    tags: Array.isArray(raw.tags) ? raw.tags.filter(Boolean).map((t) => String(t).trim()) : [],
     timeLimit: Number.isFinite(raw.timeLimit) && raw.timeLimit > 0 ? raw.timeLimit : 1000,
     memoryLimit: Number.isFinite(raw.memoryLimit) && raw.memoryLimit > 0 ? raw.memoryLimit : 128,
     samples: Array.isArray(raw.samples) ? raw.samples : [],
@@ -111,9 +104,10 @@ async function generateNextProblemNumber(): Promise<string> {
 /**
  * 组装正式评测点分数：若每点都带合法 score 且总和为 100 则保留；否则均分 100
  */
-function buildTestCasesData(
-  problem: ImportedProblem
-): { rows: Array<{ input: string; output: string; isSample: false; score: number; orderIndex: number }>; customScores: boolean } {
+function buildTestCasesData(problem: ImportedProblem): {
+  rows: Array<{ input: string; output: string; isSample: false; score: number; orderIndex: number }>
+  customScores: boolean
+} {
   const normalTcs = problem.testCases.map((tc) => ({
     input: tc.input,
     output: tc.output,
@@ -122,9 +116,7 @@ function buildTestCasesData(
   const allCustom = normalTcs.every(
     (tc) => typeof tc.score === 'number' && Number.isFinite(tc.score) && tc.score > 0
   )
-  const customSum = allCustom
-    ? normalTcs.reduce((sum, tc) => sum + (tc.score as number), 0)
-    : 0
+  const customSum = allCustom ? normalTcs.reduce((sum, tc) => sum + (tc.score as number), 0) : 0
   if (allCustom && normalTcs.length > 0 && customSum === 100) {
     return {
       customScores: true,
@@ -399,13 +391,15 @@ async function isProblemDataUnchanged(
   if (JSON.stringify(existing.tags ?? []) !== JSON.stringify(imported.tags ?? [])) return false
   if (existing.timeLimit !== imported.timeLimit) return false
   if (existing.memoryLimit !== imported.memoryLimit) return false
-  if ((existing.comparisonMode ?? 'default') !== (imported.comparisonMode ?? 'default')) return false
+  if ((existing.comparisonMode ?? 'default') !== (imported.comparisonMode ?? 'default'))
+    return false
   if ((existing.realPrecision ?? 3) !== (imported.realPrecision ?? 3)) return false
   if (norm(existing.stdCode) !== norm(imported.stdCode)) return false
   if (norm(existing.stdLang) !== norm(imported.stdLang)) return false
   if (norm(existing.spjCode) !== norm(imported.spjCode)) return false
   // samples 是 Json 类型，序列化后比对
-  if (JSON.stringify(existing.samples ?? []) !== JSON.stringify(imported.samples ?? [])) return false
+  if (JSON.stringify(existing.samples ?? []) !== JSON.stringify(imported.samples ?? []))
+    return false
 
   // 2. 比对测试点数量（快速判断，数量不同直接判为不一致）
   const existingTcCount = await prisma.testCase.count({ where: { problemId: existingId } })

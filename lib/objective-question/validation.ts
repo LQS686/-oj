@@ -43,7 +43,7 @@ const OPTION_KEY_PATTERN = /^[A-Z]$/
  * 所有错误信息为中文，可直接展示给前端。
  */
 export function validateObjectiveQuestionPayload(
-  input: unknown,
+  input: unknown
 ): { ok: true; data: ValidatedObjectiveQuestionInput } | { ok: false; error: string } {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
     return { ok: false, error: '载荷必须是对象' }
@@ -244,7 +244,7 @@ export function validateObjectiveAnswerShape(
   type: ObjectiveQuestionType,
   answer: unknown,
   options: ObjectiveQuestionOption[] | null,
-  expectedBlankCount?: number,
+  expectedBlankCount?: number
 ): boolean {
   if (!Array.isArray(answer)) {
     return false

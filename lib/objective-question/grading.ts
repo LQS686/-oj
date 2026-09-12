@@ -14,7 +14,7 @@ import { normalizeFillBlankAnswer, type ObjectiveAnswer, type ObjectiveQuestionT
 export function gradeObjectiveAnswer(
   type: ObjectiveQuestionType,
   referenceAnswer: ObjectiveAnswer,
-  studentAnswer: ObjectiveAnswer,
+  studentAnswer: ObjectiveAnswer
 ): { isCorrect: boolean } {
   switch (type) {
     case 'single-choice': {

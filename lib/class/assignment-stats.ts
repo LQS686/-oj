@@ -156,8 +156,7 @@ export async function listClassAssignmentsWithStats(
       },
       createdAt: a.createdAt,
       createdBy: a.createdBy,
-      createdByName:
-        creatorMap.get(a.createdBy || '') || a.createdBy || '-',
+      createdByName: creatorMap.get(a.createdBy || '') || a.createdBy || '-',
     }
   })
 
@@ -172,35 +171,29 @@ export async function listClassAssignmentsWithStats(
   }
 }
 
-export async function getClassAssignmentDetail(
-  classId: string,
-  assignmentId: string
-) {
-  const [assignment, members, submissions, objectiveSubmissionsRaw] =
-    await Promise.all([
-      prisma.classAssignment.findUnique({
-        where: { id: assignmentId, classId },
-      }),
-      prisma.classMember.findMany({
-        where: { classId },
-        include: {
-          user: { select: { username: true, nickname: true, avatar: true } },
-        },
-      }),
-      prisma.classAssignmentSubmission.findMany({
-        where: { assignmentId, ...ACTIVE_SUBMISSION_WHERE },
-      }),
-      // 客观题提交（@@unique(assignmentId,userId,questionId)：同题仅保留最新作答）
-      prisma.classAssignmentObjectiveSubmission.findMany({
-        where: { assignmentId },
-      }),
-    ])
+export async function getClassAssignmentDetail(classId: string, assignmentId: string) {
+  const [assignment, members, submissions, objectiveSubmissionsRaw] = await Promise.all([
+    prisma.classAssignment.findUnique({
+      where: { id: assignmentId, classId },
+    }),
+    prisma.classMember.findMany({
+      where: { classId },
+      include: {
+        user: { select: { username: true, nickname: true, avatar: true } },
+      },
+    }),
+    prisma.classAssignmentSubmission.findMany({
+      where: { assignmentId, ...ACTIVE_SUBMISSION_WHERE },
+    }),
+    // 客观题提交（@@unique(assignmentId,userId,questionId)：同题仅保留最新作答）
+    prisma.classAssignmentObjectiveSubmission.findMany({
+      where: { assignmentId },
+    }),
+  ])
   if (!assignment) return null
 
   // 客观题提交模型无 user relation，手动批量回填 user 信息（与 member 查询同款字段）
-  const objectiveUserIds = Array.from(
-    new Set(objectiveSubmissionsRaw.map((s) => s.userId))
-  )
+  const objectiveUserIds = Array.from(new Set(objectiveSubmissionsRaw.map((s) => s.userId)))
   const objectiveUsers = objectiveUserIds.length
     ? await prisma.user.findMany({
         where: { id: { in: objectiveUserIds } },
@@ -217,10 +210,7 @@ export async function getClassAssignmentDetail(
 }
 
 /** 计算作业统计数据：整体 / 题目 / 成员 / 趋势 */
-export async function computeAssignmentStatistics(
-  classId: string,
-  assignmentId: string
-) {
+export async function computeAssignmentStatistics(classId: string, assignmentId: string) {
   const assignment = await prisma.classAssignment.findUnique({
     where: { id: assignmentId, classId },
   })
@@ -266,20 +256,18 @@ export async function computeAssignmentStatistics(
   ).length
 
   // 平均分 / 正确率：按「每题最高分」汇总（逾期记 0）
-  const memberScores = Array.from(memberCompletionMap.entries()).map(
-    ([userId, solvedSet]) => {
-      const ms = submissionsByUser.get(userId) || []
-      const bestByProblem = new Map<string, number>()
-      for (const s of ms) {
-        const score = s.isLate ? 0 : s.score || 0
-        bestByProblem.set(s.problemId, Math.max(bestByProblem.get(s.problemId) || 0, score))
-      }
-      const totalScore = Array.from(bestByProblem.values()).reduce((a, b) => a + b, 0)
-      const avgScore = totalProblems > 0 ? totalScore / totalProblems : 0
-      const accuracy = totalProblems > 0 ? (solvedSet.size / totalProblems) * 100 : 0
-      return { avgScore, accuracy }
+  const memberScores = Array.from(memberCompletionMap.entries()).map(([userId, solvedSet]) => {
+    const ms = submissionsByUser.get(userId) || []
+    const bestByProblem = new Map<string, number>()
+    for (const s of ms) {
+      const score = s.isLate ? 0 : s.score || 0
+      bestByProblem.set(s.problemId, Math.max(bestByProblem.get(s.problemId) || 0, score))
     }
-  )
+    const totalScore = Array.from(bestByProblem.values()).reduce((a, b) => a + b, 0)
+    const avgScore = totalProblems > 0 ? totalScore / totalProblems : 0
+    const accuracy = totalProblems > 0 ? (solvedSet.size / totalProblems) * 100 : 0
+    return { avgScore, accuracy }
+  })
 
   const avgScore =
     memberScores.length > 0
@@ -397,9 +385,7 @@ export async function computeAssignmentStatistics(
     row.count++
     if (s.status === 'AC') row.acCount++
   })
-  const submissionTrend = Array.from(trendMap.values()).sort((a, b) =>
-    a.date.localeCompare(b.date)
-  )
+  const submissionTrend = Array.from(trendMap.values()).sort((a, b) => a.date.localeCompare(b.date))
 
   return {
     overall: {

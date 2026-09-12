@@ -1,7 +1,15 @@
 /**
  * /api/trainings/[id] - 训练计划详情
  */
-import { withApi, ok, readJson, throw400, throw403, ApiError, resolveViewerFromRequest } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readJson,
+  throw400,
+  throw403,
+  ApiError,
+  resolveViewerFromRequest,
+} from '@/lib/api/withApi'
 import {
   getTrainingWithProblemStatuses,
   updateTrainingAndProblems,
@@ -43,8 +51,7 @@ export const PUT = withApi.auth(async (req, ctx, { user }) => {
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
 
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
-  const canEdit =
-    canManageContent(user) && (canAccessAdmin(u) || found.authorId === user.id)
+  const canEdit = canManageContent(user) && (canAccessAdmin(u) || found.authorId === user.id)
 
   if (!canEdit) {
     throw403('无权限编辑训练计划')
@@ -85,8 +92,7 @@ export const DELETE = withApi.auth(async (_req, ctx, { user }) => {
   if (!found) throw new ApiError('NOT_FOUND', '训练计划不存在', 404)
 
   const u = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } })
-  const canDelete =
-    canManageContent(user) && (canAccessAdmin(u) || found.authorId === user.id)
+  const canDelete = canManageContent(user) && (canAccessAdmin(u) || found.authorId === user.id)
 
   if (!canDelete) {
     throw403('无权限删除训练计划')

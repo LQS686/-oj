@@ -10,6 +10,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/contests`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${baseUrl}/training`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
     { url: `${baseUrl}/rank`, lastModified: now, changeFrequency: 'daily', priority: 0.6 },
-    { url: `${baseUrl}/announcements`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
+    {
+      url: `${baseUrl}/announcements`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    },
   ]
 }

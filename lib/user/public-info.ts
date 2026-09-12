@@ -8,6 +8,7 @@ import type bcrypt from 'bcryptjs'
 import { AppError } from '@/lib/errors'
 import { validatePassword } from '@/lib/api/validation'
 import { clearUserCache } from './profile'
+import { getSolvedProblemCount } from './solved-count'
 import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 
 /* ============================================================================
@@ -18,7 +19,7 @@ import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
  * 获取用户公开资料（含发帖/题目/AC 提交数）
  */
 export async function getUserPublicInfo(userId: string) {
-  const [user, acceptedSubmissionsCount] = await Promise.all([
+  const [user, acceptedSubmissionsCount, solvedProblems] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -41,12 +42,16 @@ export async function getUserPublicInfo(userId: string) {
       },
     }),
     prisma.submission.count({ where: { userId, status: 'AC' } }),
+    getSolvedProblemCount(userId),
   ])
   if (!user) return null
   const { sanitizeAvatarUrl } = await import('@/lib/user/avatar-url')
   return {
     ...user,
     avatar: sanitizeAvatarUrl(user.avatar),
+    // 解题数以 getSolvedProblemCount 为准（AC 去重题数），覆盖原始计数列，
+    // 避免漂移；也绝不能拿 acceptedSubmissions（AC 提交条数）冒充解题数。
+    solvedCount: solvedProblems,
     acceptedSubmissions: acceptedSubmissionsCount,
   }
 }
@@ -142,15 +147,21 @@ export async function getUserFullStats(userId: string) {
 
   // Build status counts from groupBy
   const statusCount: Record<string, number> = {}
-  statusGroups.forEach((g) => { statusCount[g.status] = g._count.id })
+  statusGroups.forEach((g) => {
+    statusCount[g.status] = g._count.id
+  })
 
   // Build language counts from groupBy
   const languageCount: Record<string, number> = {}
-  languageGroups.forEach((g) => { languageCount[g.language] = g._count.id })
+  languageGroups.forEach((g) => {
+    languageCount[g.language] = g._count.id
+  })
 
   // AC unique problems (deduplicated)
   const acProblemsMap = new Map<string, boolean>()
-  acProblemIds.forEach((s) => { acProblemsMap.set(s.problemId, true) })
+  acProblemIds.forEach((s) => {
+    acProblemsMap.set(s.problemId, true)
+  })
 
   // Difficulty distribution from AC submissions
   const solvedDifficultyMap = new Map<string, string | null>()
@@ -449,7 +460,10 @@ function sanitizePreferences(raw: Record<string, unknown>): Record<string, unkno
 /**
  * 合并并更新用户偏好
  */
-export async function updateUserPreferencesCollection(userId: string, body: Record<string, unknown>) {
+export async function updateUserPreferencesCollection(
+  userId: string,
+  body: Record<string, unknown>
+) {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     throw AppError.badRequest('INVALID_DATA', '无效的偏好设置数据')
   }
@@ -467,10 +481,12 @@ export async function updateUserPreferencesCollection(userId: string, body: Reco
     }
     updatedPrefs[key] = body[key]
   }
-  await db.collection('UserPreferences').updateOne(
-    { userId },
-    { $set: { preferences: updatedPrefs, updatedAt: new Date() } },
-    { upsert: true }
-  )
+  await db
+    .collection('UserPreferences')
+    .updateOne(
+      { userId },
+      { $set: { preferences: updatedPrefs, updatedAt: new Date() } },
+      { upsert: true }
+    )
   return updatedPrefs
 }

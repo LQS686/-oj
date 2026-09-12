@@ -49,9 +49,7 @@ const Navbar = () => {
             <Link
               href="/help"
               className={`btn-ghost btn p-3 group ${
-                pathname === '/help' || pathname?.startsWith('/help/')
-                  ? 'text-primary-light'
-                  : ''
+                pathname === '/help' || pathname?.startsWith('/help/') ? 'text-primary-light' : ''
               }`}
               aria-label="使用帮助"
               title="使用帮助"

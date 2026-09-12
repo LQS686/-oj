@@ -169,7 +169,11 @@ export default function DirectInviteDetailPage() {
         {classData && (
           <div className="flex items-center gap-4 p-5 border-b border-border">
             {classData.avatar ? (
-              <img src={classData.avatar} alt={classData.name} className="w-14 h-14 rounded-full object-cover" />
+              <img
+                src={classData.avatar}
+                alt={classData.name}
+                className="w-14 h-14 rounded-full object-cover"
+              />
             ) : (
               <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center">
                 <Users className="w-7 h-7 text-white" />
@@ -178,13 +182,15 @@ export default function DirectInviteDetailPage() {
             <div className="flex-1 min-w-0">
               <h2 className="text-lg font-semibold text-foreground truncate">{classData.name}</h2>
               {classData.description && (
-                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{classData.description}</p>
+                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                  {classData.description}
+                </p>
               )}
             </div>
           </div>
         )}
 
-        <div className="p-5 space-y-5">
+        <div className="p-5 space-y-6">
           {inviter && (
             <div className="flex items-center gap-3">
               {inviter.avatar ? (

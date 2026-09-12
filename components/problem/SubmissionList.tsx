@@ -161,9 +161,11 @@ function TestPointBlock({
   const label = shortStatus(result.status)
   const tip = testPointTooltipText(result, index)
   const blockRef = useRef<HTMLDivElement>(null)
-  const [tipPos, setTipPos] = useState<{ left: number; top: number; place: 'above' | 'below' } | null>(
-    null
-  )
+  const [tipPos, setTipPos] = useState<{
+    left: number
+    top: number
+    place: 'above' | 'below'
+  } | null>(null)
 
   const showTip = () => {
     const el = blockRef.current
@@ -218,12 +220,11 @@ function TestPointBlock({
         createPortal(
           <div
             role="tooltip"
-            className="pointer-events-none fixed z-[200] w-max max-w-[min(18rem,80vw)] rounded px-2.5 py-1.5 text-left text-[11px] leading-snug text-white whitespace-pre-wrap break-words shadow-lg bg-[#333]/95 dark:bg-[#1a1a1a]/95"
+            className="pointer-events-none fixed z-[200] w-max max-w-[min(18rem,80vw)] rounded px-2.5 py-1.5 text-left text-[11px] leading-snug text-tooltip-foreground whitespace-pre-wrap break-words shadow-lg bg-tooltip/95"
             style={{
               left: tipPos.left,
               top: tipPos.top,
-              transform:
-                tipPos.place === 'above' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+              transform: tipPos.place === 'above' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
             }}
           >
             {tip}
@@ -298,16 +299,14 @@ function ExpandedDetail({
       {(data.message || isCe) && (
         <div
           className={`rounded-lg border p-3 flex gap-2.5 ${
-            isCe || !isAc
-              ? 'bg-error/5 border-error/25'
-              : 'bg-accent/10 border-accent/25'
+            isCe || !isAc ? 'bg-error/5 border-error/25' : 'bg-accent/10 border-accent/25'
           }`}
         >
           <AlertTriangle
             className={`w-4 h-4 shrink-0 mt-0.5 ${isCe || !isAc ? 'text-error' : 'text-accent'}`}
           />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-foreground mb-1">
+            <div className="text-subsection-title text-foreground mb-1">
               {isCe ? '编译信息' : '评测信息'}
             </div>
             <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
@@ -320,13 +319,13 @@ function ExpandedDetail({
       {showTests && (
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="text-sm font-medium text-foreground">测试点信息</div>
+            <div className="text-subsection-title text-foreground">测试点信息</div>
             {firstWaIndex >= 0 && (
               <button
                 type="button"
                 onClick={() => void handleDownloadWa()}
                 disabled={waDownloading}
-                className="btn btn-outline text-xs py-1 px-2.5 gap-1"
+                className="btn btn-sm btn-outline gap-1"
                 title="仅可下载第一个 WA 测试点"
               >
                 {waDownloading ? (
@@ -338,9 +337,7 @@ function ExpandedDetail({
               </button>
             )}
           </div>
-          {waDownloadError && (
-            <p className="mb-2 text-xs text-error">{waDownloadError}</p>
-          )}
+          {waDownloadError && <p className="mb-2 text-xs text-error">{waDownloadError}</p>}
           {testResults.length > 0 ? (
             <div className="grid gap-1.5 grid-cols-4 sm:grid-cols-6 md:grid-cols-8">
               {testResults.map((r, i) => (
@@ -358,7 +355,7 @@ function ExpandedDetail({
 
       <div>
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="text-sm font-medium text-foreground inline-flex items-center gap-1.5">
+          <div className="text-subsection-title text-foreground inline-flex items-center gap-1.5">
             <Code2 className="w-4 h-4 text-primary" />
             源代码
             <span className="text-xs font-normal text-muted-foreground">
@@ -373,7 +370,7 @@ function ExpandedDetail({
                 e.stopPropagation()
                 void handleCopy()
               }}
-              className="btn btn-outline text-xs py-1 px-2.5 gap-1"
+              className="btn btn-sm btn-outline gap-1"
             >
               {copied ? (
                 <>
@@ -557,7 +554,7 @@ export default function SubmissionList({
   }
 
   return (
-    <div className="card-static rounded-lg divide-y divide-border">
+    <div className="card-static divide-y divide-border">
       {submissions.map((sub) => {
         const statusConfig = getStatusConfig(sub.status)
         const passed = sub.passedTests ?? 0

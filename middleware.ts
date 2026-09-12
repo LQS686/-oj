@@ -29,11 +29,12 @@ const API_RATE_LIMITS: Record<string, { maxRequests: number; windowMs: number }>
  *  - 删除原 '/api/comments'（无此路由）
  *  - 实际路由为 /api/contests/[id]/register（报名），不是 /api/contests/[id]/join
  */
-const REGEX_RATE_LIMITS: { pattern: RegExp; config: { maxRequests: number; windowMs: number } }[] = [
-  { pattern: /^\/api\/contests\/[^/]+\/register$/, config: { maxRequests: 10, windowMs: 60000 } },
-  // 管理写操作加严：默认 100/min 对批处理过松
-  { pattern: /^\/api\/admin(?:\/|$)/, config: { maxRequests: 30, windowMs: 60000 } },
-]
+const REGEX_RATE_LIMITS: { pattern: RegExp; config: { maxRequests: number; windowMs: number } }[] =
+  [
+    { pattern: /^\/api\/contests\/[^/]+\/register$/, config: { maxRequests: 10, windowMs: 60000 } },
+    // 管理写操作加严：默认 100/min 对批处理过松
+    { pattern: /^\/api\/admin(?:\/|$)/, config: { maxRequests: 30, windowMs: 60000 } },
+  ]
 
 /**
  * 查找匹配的限流配置：先精确匹配，未命中再走正则规则。
@@ -86,9 +87,8 @@ export async function middleware(request: NextRequest) {
 
   // P1 修复：注入 requestId，便于全链路日志追踪
   const incomingRequestId = request.headers.get('x-request-id')
-  const requestId = incomingRequestId && incomingRequestId.length <= 128
-    ? incomingRequestId
-    : crypto.randomUUID()
+  const requestId =
+    incomingRequestId && incomingRequestId.length <= 128 ? incomingRequestId : crypto.randomUUID()
   logger.setContext({ requestId })
 
   // 拦截 /admin/* 页面路由（不含 /api/admin/*）：
@@ -158,14 +158,12 @@ export async function middleware(request: NextRequest) {
     // 生产走 nginx 追加 X-Forwarded-For，正常用户必有真实 IP；真正 unknown 的
     // 请求仅受 withApi 业务层限流（login/register/forgot/submissions 等）兜底。
     const isUnknown = ip === 'unknown'
-    const rateKey = isUnknown
-      ? `mw:unknown:${crypto.randomUUID()}`
-      : `mw:${ip}:${pathname}`
+    const rateKey = isUnknown ? `mw:unknown:${crypto.randomUUID()}` : `mw:${ip}:${pathname}`
 
     const result = await checkRateLimit(rateKey, {
       maxRequests: baseConfig.maxRequests,
       windowMs: baseConfig.windowMs,
-      keyPrefix: 'middleware'
+      keyPrefix: 'middleware',
     })
 
     if (!result.success) {
@@ -174,7 +172,7 @@ export async function middleware(request: NextRequest) {
           success: false,
           error: '请求过于频繁，请稍后再试',
           retryAfter: result.retryAfter,
-          code: 'RATE_LIMITED'
+          code: 'RATE_LIMITED',
         }),
         {
           status: 429,
@@ -183,7 +181,7 @@ export async function middleware(request: NextRequest) {
             'Retry-After': String(result.retryAfter || 60),
             'X-RateLimit-Limit': String(result.limit),
             'X-RateLimit-Remaining': String(result.remaining),
-          }
+          },
         }
       )
     }

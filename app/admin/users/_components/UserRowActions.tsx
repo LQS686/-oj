@@ -29,14 +29,12 @@ export function UserRowActions({
   const canReset = operatorIsSystemAdmin && user.role !== 'SYSTEM_ADMIN'
 
   return (
-    <div className="flex items-center justify-start gap-2" onClick={e => e.stopPropagation()}>
+    <div className="flex items-center justify-start gap-2" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => onEdit(user)}
         disabled={locked}
-        className={`p-2.5 rounded-lg transition-colors ${
-          locked
-            ? 'text-muted-foreground cursor-not-allowed'
-            : 'text-primary hover:bg-primary/5'
+        className={`btn-icon transition-colors ${
+          locked ? 'text-muted-foreground cursor-not-allowed' : 'text-primary hover:bg-primary/5'
         }`}
         title={locked ? lockReason : '编辑'}
       >
@@ -46,7 +44,7 @@ export function UserRowActions({
         <button
           onClick={() => onReset(user)}
           disabled={!canReset}
-          className={`p-2.5 rounded-lg transition-colors ${
+          className={`btn-icon transition-colors ${
             !canReset
               ? 'text-muted-foreground cursor-not-allowed'
               : 'text-accent hover:bg-accent/10'
@@ -59,10 +57,8 @@ export function UserRowActions({
       <button
         onClick={() => onDelete(user)}
         disabled={locked}
-        className={`p-2.5 rounded-lg transition-colors ${
-          locked
-            ? 'text-muted-foreground cursor-not-allowed'
-            : 'text-error hover:bg-error/10'
+        className={`btn-icon transition-colors ${
+          locked ? 'text-muted-foreground cursor-not-allowed' : 'text-error hover:bg-error/10'
         }`}
         title={locked ? lockReason : '删除'}
       >

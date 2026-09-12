@@ -16,11 +16,7 @@ type Options = {
   onNotification?: (notification: NotificationData) => void
 }
 
-export function useUnreadNotifications({
-  userId,
-  enabled = true,
-  onNotification,
-}: Options) {
+export function useUnreadNotifications({ userId, enabled = true, onNotification }: Options) {
   const [unreadCount, setUnreadCount] = useState(0)
   const userIdRef = useRef(userId)
   const onNotificationRef = useRef(onNotification)

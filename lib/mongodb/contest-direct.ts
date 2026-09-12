@@ -41,15 +41,9 @@ export async function createContestDirect(data: {
     if (found.length !== data.problemIds.length) {
       throw new ApiError('INVALID_PROBLEMS', '存在无效的题目 ID', 400)
     }
-    const invalid = found.filter(
-      (p) => p.visibility !== 'public' && p.visibility !== 'contest'
-    )
+    const invalid = found.filter((p) => p.visibility !== 'public' && p.visibility !== 'contest')
     if (invalid.length > 0) {
-      throw new ApiError(
-        'INVALID_PROBLEMS',
-        '竞赛只能添加公开或竞赛可见题目',
-        400
-      )
+      throw new ApiError('INVALID_PROBLEMS', '竞赛只能添加公开或竞赛可见题目', 400)
     }
   }
 

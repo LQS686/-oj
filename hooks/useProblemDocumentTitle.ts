@@ -8,6 +8,7 @@ import {
 } from '@/lib/document-title'
 
 import { DEFAULT_SITE_TITLE } from '@/lib/page-titles'
+import { assertDocumentTitle } from '@/lib/document-title-assert'
 
 const DEFAULT_TITLE = DEFAULT_SITE_TITLE
 
@@ -31,9 +32,10 @@ export function useProblemDocumentTitle(
     const ctx = ctxKey ? (JSON.parse(ctxKey) as ProblemTabTitleContext) : undefined
     const next = formatProblemDocumentTitle(title, ctx)
     const prev = document.title
-    document.title = next
+    const cancel = assertDocumentTitle(next)
 
     return () => {
+      cancel()
       document.title = prev || DEFAULT_TITLE
     }
   }, [title, ctxKey])

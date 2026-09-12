@@ -1,9 +1,10 @@
-import js from '@eslint/js';
-import tsParser from '@typescript-eslint/parser';
-import tsPlugin from '@typescript-eslint/eslint-plugin';
-import reactPlugin from 'eslint-plugin-react';
-import reactHooksPlugin from 'eslint-plugin-react-hooks';
-import globals from 'globals';
+import js from '@eslint/js'
+import tsParser from '@typescript-eslint/parser'
+import tsPlugin from '@typescript-eslint/eslint-plugin'
+import reactPlugin from 'eslint-plugin-react'
+import reactHooksPlugin from 'eslint-plugin-react-hooks'
+import globals from 'globals'
+import uicraftPlugin from './eslint-rules/uicraft.js'
 
 export default [
   {
@@ -32,8 +33,9 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
-      'react': reactPlugin,
+      react: reactPlugin,
       'react-hooks': reactHooksPlugin,
+      local: uicraftPlugin,
     },
     rules: {
       ...js.configs.recommended.rules,
@@ -77,6 +79,23 @@ export default [
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-useless-escape': 'warn',
       'no-control-regex': 'warn',
+
+      // UI 设计规矩（与 components/layout/PageShell.tsx 的约定、globals.css 的 token 配套）
+      // 实现见 eslint-rules/uicraft.js。请勿用 eslint-disable 绕过，先补 token 或改用外壳组件。
+      'local/no-h1-with-page-shell': 'error',
+      'local/no-arbitrary-design-values': 'error',
+      'local/no-inline-hex-color': 'error',
+      'local/no-adhoc-title-typography': 'error',
+      'local/no-off-scale-card-padding': 'error',
+      'local/no-off-scale-card-stack': 'error',
+    },
+  },
+  {
+    // global-error.tsx 需要替换整个文档，不能依赖应用 CSS，故允许内联样式色值
+    files: ['app/global-error.tsx'],
+    plugins: { local: uicraftPlugin },
+    rules: {
+      'local/no-inline-hex-color': 'off',
     },
   },
   {
@@ -92,7 +111,7 @@ export default [
       'no-control-regex': 'warn',
       'no-prototype-builtins': 'warn',
       'prefer-const': 'warn',
-      'eqeqeq': ['warn', 'always', { null: 'ignore' }],
+      eqeqeq: ['warn', 'always', { null: 'ignore' }],
     },
   },
   {
@@ -132,4 +151,4 @@ export default [
       '**/*.config.ts',
     ],
   },
-];
+]

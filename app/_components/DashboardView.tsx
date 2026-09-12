@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
+import { ListEmptyState } from '@/components/common'
 import {
   Users,
   Clock,
@@ -101,12 +102,19 @@ export function DashboardView() {
 
   if (error || !data) {
     return (
-      <div className="card-static rounded-xl p-6 text-center">
-        <p className="text-error mb-3 text-sm">{error || '暂无数据'}</p>
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => window.location.reload()}>
-          重试
-        </button>
-      </div>
+      <ListEmptyState
+        tone="error"
+        title={error || '暂无数据'}
+        action={
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => window.location.reload()}
+          >
+            重试
+          </button>
+        }
+      />
     )
   }
 
@@ -124,7 +132,7 @@ export function DashboardView() {
   return (
     <div className="space-y-6">
       {/* 欢迎条 */}
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="relative overflow-hidden rounded-lg border border-border bg-card">
         <div
           className="pointer-events-none absolute inset-0"
           aria-hidden
@@ -150,7 +158,7 @@ export function DashboardView() {
               <Mountain className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg md:text-xl font-bold text-foreground tracking-tight truncate">
+              <h1 className="text-page-title text-foreground tracking-tight truncate">
                 {welcomeTitle}
               </h1>
               <p className="text-xs md:text-sm text-muted-foreground mt-0.5 truncate">
@@ -183,7 +191,7 @@ export function DashboardView() {
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 animate-stagger-in">
-        <div className="card-static rounded-xl p-4">
+        <div className="card-static p-4">
           <div className="flex items-center gap-2.5 mb-2.5">
             <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
               <CheckCircle2 className="w-4.5 h-4.5 w-[18px] h-[18px] text-primary" />
@@ -191,10 +199,12 @@ export function DashboardView() {
             <span className="text-sm text-muted-foreground font-medium">今日解题</span>
           </div>
           <div className="text-2xl font-bold text-foreground tabular-nums">{stats.todaySolved}</div>
-          <div className="text-xs text-muted-foreground mt-1">本周提交 {stats.weeklySubmissions} 次</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            本周提交 {stats.weeklySubmissions} 次
+          </div>
         </div>
 
-        <div className="card-static rounded-xl p-4">
+        <div className="card-static p-4">
           <div className="flex items-center gap-2.5 mb-2.5">
             <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
               <Mountain className="w-[18px] h-[18px] text-primary-foreground" />
@@ -208,7 +218,7 @@ export function DashboardView() {
           <div className="text-xs text-muted-foreground mt-1">历史通过</div>
         </div>
 
-        <div className="card-static rounded-xl p-4">
+        <div className="card-static p-4">
           <div className="flex items-center gap-2.5 mb-2.5">
             <div className="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center">
               <TrendingUp className="w-[18px] h-[18px] text-secondary" />
@@ -224,9 +234,7 @@ export function DashboardView() {
           ) : stats.weeklyPassRateDelta !== null ? (
             <div
               className={`text-xs mt-1 ${
-                stats.weeklyPassRateDelta >= 0
-                  ? 'text-secondary'
-                  : 'text-muted-foreground'
+                stats.weeklyPassRateDelta >= 0 ? 'text-secondary' : 'text-muted-foreground'
               }`}
             >
               较上周 {stats.weeklyPassRateDelta >= 0 ? '+' : ''}
@@ -243,8 +251,11 @@ export function DashboardView() {
       {recentAssignments.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-foreground">近期作业</h2>
-            <Link href="/classes" className="text-sm text-primary hover:underline flex items-center gap-1">
+            <h2 className="text-section-title text-foreground">近期作业</h2>
+            <Link
+              href="/classes"
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
               查看全部 <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
@@ -253,17 +264,21 @@ export function DashboardView() {
               <Link
                 key={item.id}
                 href={`/classes/${item.classId}/assignments/${item.id}`}
-                className="card-static rounded-xl p-4 block hover:border-primary/30 transition-colors"
+                className="card-static p-4 block hover:border-primary/30 transition-colors"
               >
                 <div className="flex items-center justify-between mb-2 gap-2">
-                  <h3 className="text-sm font-semibold text-foreground truncate flex-1">{item.title}</h3>
+                  <h3 className="text-subsection-title text-foreground truncate flex-1">
+                    {item.title}
+                  </h3>
                   <StatusBadge status={item.status} />
                 </div>
                 <p className="text-xs text-muted-foreground mb-3 truncate">{item.className}</p>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
                     <Clock className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{item.deadline ? `截止 ${item.deadline}` : '无截止时间'}</span>
+                    <span className="truncate">
+                      {item.deadline ? `截止 ${item.deadline}` : '无截止时间'}
+                    </span>
                   </div>
                   <div className="text-xs text-muted-foreground tabular-nums shrink-0">
                     {item.submitted}/{item.total} 已提交
@@ -278,8 +293,11 @@ export function DashboardView() {
       {upcomingContests.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-foreground">即将开始的竞赛</h2>
-            <Link href="/contests" className="text-sm text-primary hover:underline flex items-center gap-1">
+            <h2 className="text-section-title text-foreground">即将开始的竞赛</h2>
+            <Link
+              href="/contests"
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
               查看全部 <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
@@ -288,14 +306,16 @@ export function DashboardView() {
               <Link
                 key={item.id}
                 href={`/contests/${item.id}`}
-                className="card-static rounded-xl p-4 block hover:border-primary/30 transition-colors"
+                className="card-static p-4 block hover:border-primary/30 transition-colors"
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary">
                     {item.type}
                   </span>
                 </div>
-                <h3 className="text-sm font-semibold text-foreground mb-2 line-clamp-2">{item.title}</h3>
+                <h3 className="text-subsection-title text-foreground mb-2 line-clamp-2">
+                  {item.title}
+                </h3>
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Calendar className="w-3.5 h-3.5" />

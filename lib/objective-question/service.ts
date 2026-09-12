@@ -75,9 +75,7 @@ const LIST_SELECT = {
 function normalizePagination(page?: number, pageSize?: number) {
   const p = Number.isFinite(page) ? Math.max(1, Math.floor(page as number)) : 1
   const rawSize =
-    Number.isFinite(pageSize) && (pageSize as number) > 0
-      ? Math.floor(pageSize as number)
-      : 20
+    Number.isFinite(pageSize) && (pageSize as number) > 0 ? Math.floor(pageSize as number) : 20
   return { page: p, pageSize: Math.min(Math.max(1, rawSize), 100) }
 }
 
@@ -90,15 +88,12 @@ function buildListWhere(
   keyword: string | undefined,
   type: string | undefined,
   difficulty: string | undefined,
-  tag?: string,
+  tag?: string
 ): Prisma.ObjectiveQuestionWhereInput {
   const where: Prisma.ObjectiveQuestionWhereInput = {}
   const kw = keyword?.trim()
   if (kw) {
-    where.OR = [
-      { questionNumber: kw },
-      { title: { contains: kw, mode: 'insensitive' as const } },
-    ]
+    where.OR = [{ questionNumber: kw }, { title: { contains: kw, mode: 'insensitive' as const } }]
   }
   if (type) where.type = type
   if (difficulty) where.difficulty = difficulty
@@ -148,7 +143,7 @@ function toObjectiveQuestionDetail(q: {
  * 按题号升序；select 明确排除 answer / explanation
  */
 export async function listObjectiveQuestions(
-  params: ObjectiveQuestionListParams,
+  params: ObjectiveQuestionListParams
 ): Promise<ObjectiveQuestionListResult> {
   const { page, pageSize } = normalizePagination(params.page, params.pageSize)
   const where = buildListWhere(params.keyword, params.type, params.difficulty, params.tag)
@@ -190,7 +185,7 @@ export async function listObjectiveQuestions(
  * 按题号升序；select 明确排除 answer / explanation，响应绝不包含答案
  */
 export async function listObjectiveQuestionsPublic(
-  params: ObjectiveQuestionPublicListParams,
+  params: ObjectiveQuestionPublicListParams
 ): Promise<ObjectiveQuestionListResult> {
   const { page, pageSize } = normalizePagination(params.page, params.pageSize)
   const where = buildListWhere(params.keyword, params.type, params.difficulty)
@@ -221,7 +216,7 @@ export async function listObjectiveQuestionsPublic(
 
 /** 客观题详情（含 answer / explanation，供管理端编辑回填）；不存在返回 null */
 export async function getObjectiveQuestionDetail(
-  id: string,
+  id: string
 ): Promise<ObjectiveQuestionDetail | null> {
   const question = await prisma.objectiveQuestion.findUnique({ where: { id } })
   return question ? toObjectiveQuestionDetail(question) : null
@@ -236,7 +231,7 @@ export async function getObjectiveQuestionDetail(
  */
 export async function createObjectiveQuestion(
   input: ValidatedObjectiveQuestionInput,
-  authorId: string,
+  authorId: string
 ): Promise<ObjectiveQuestionDetail> {
   const rows = await prisma.objectiveQuestion.findMany({
     select: { questionNumber: true },
@@ -283,7 +278,7 @@ export async function createObjectiveQuestion(
 /** 更新客观题（questionNumber / authorId 不可改）；不存在返回 null */
 export async function updateObjectiveQuestion(
   id: string,
-  input: ValidatedObjectiveQuestionInput,
+  input: ValidatedObjectiveQuestionInput
 ): Promise<ObjectiveQuestionDetail | null> {
   try {
     const question = await prisma.objectiveQuestion.update({
@@ -307,9 +302,7 @@ export async function updateObjectiveQuestion(
 }
 
 /** 删除客观题；被作业引用时抛 IN_USE（400），不存在返回 null */
-export async function deleteObjectiveQuestion(
-  id: string,
-): Promise<ObjectiveQuestionDetail | null> {
+export async function deleteObjectiveQuestion(id: string): Promise<ObjectiveQuestionDetail | null> {
   // 引用检查：被作业引用的题目禁止删除（保护作业完整性）
   const usageCount = await prisma.classAssignment.count({
     where: { objectiveQuestionIds: { has: id } },

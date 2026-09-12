@@ -19,10 +19,7 @@ import {
 } from 'lucide-react'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
-import {
-  distributeTestCaseScores,
-  ensureTotalScoreIs100,
-} from '@/lib/problem/testcase-scoring'
+import { distributeTestCaseScores, ensureTotalScoreIs100 } from '@/lib/problem/testcase-scoring'
 import { AdminPageShell } from '@/components/admin'
 import { PageLoading, useDialog } from '@/components/common'
 import { ZipUploadPanel } from './_components/ZipUploadPanel'
@@ -449,14 +446,14 @@ export default function ProblemTestCasesPage() {
   }
 
   return (
-    <AdminPageShell width="wide" className="space-y-5">
+    <AdminPageShell width="wide" className="space-y-6">
       {/* 顶栏 */}
       <div className="card p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           <button
             type="button"
             onClick={() => void handleBack()}
-            className="p-2 -ml-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className="btn-icon -ml-1 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
             aria-label="返回"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -465,9 +462,9 @@ export default function ProblemTestCasesPage() {
             <Database className="w-5 h-5 text-primary-foreground" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-lg font-bold text-foreground flex flex-wrap items-center gap-2">
-              测试数据管理
-              <span className="text-sm font-normal text-muted-foreground truncate max-w-[16rem]">
+            {/* 标题「测试数据管理」由 AdminLayout 顶栏提供（唯一 H1），此处只保留题目与状态 */}
+            <div className="text-sm text-foreground flex flex-wrap items-center gap-2">
+              <span className="font-mono text-muted-foreground truncate max-w-[16rem]">
                 {problemTitle}
               </span>
               {dirty && (
@@ -475,14 +472,12 @@ export default function ProblemTestCasesPage() {
                   未保存
                 </span>
               )}
-            </h1>
+            </div>
             <p className="text-sm text-muted-foreground">
               共 {testCases.length} 个测试点 · 总分{' '}
               <span
                 className={`font-mono tabular-nums font-semibold ${
-                  totalScore === 100 || testCases.length === 0
-                    ? 'text-secondary'
-                    : 'text-warning'
+                  totalScore === 100 || testCases.length === 0 ? 'text-secondary' : 'text-warning'
                 }`}
               >
                 {totalScore}
@@ -530,7 +525,11 @@ export default function ProblemTestCasesPage() {
             disabled={submitting || !dirty}
             className="btn btn-primary gap-1.5 disabled:opacity-50"
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
             保存
           </button>
         </div>
@@ -550,16 +549,15 @@ export default function ProblemTestCasesPage() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-1 space-y-4">
-          <ZipUploadPanel
-            uploading={uploading}
-            result={uploadResult}
-            onUpload={handleFileUpload}
-          />
-          <section className="card p-4 text-sm text-muted-foreground space-y-2">
-            <h3 className="text-sm font-semibold text-foreground">提示</h3>
+        <div className="xl:col-span-1 space-y-6">
+          <ZipUploadPanel uploading={uploading} result={uploadResult} onUpload={handleFileUpload} />
+          <section className="card p-4 text-sm text-muted-foreground space-y-4">
+            <h3 className="text-subsection-title text-foreground">提示</h3>
             <ul className="list-disc list-inside space-y-1 text-xs leading-relaxed">
-              <li>ZIP 内文件需成对，如 <code className="text-foreground">1.in</code> / <code className="text-foreground">1.out</code></li>
+              <li>
+                ZIP 内文件需成对，如 <code className="text-foreground">1.in</code> /{' '}
+                <code className="text-foreground">1.out</code>
+              </li>
               <li>总分建议为 100；可用「自动均分」快速分配</li>
               <li>标程验证会覆盖输出并保存标程代码，请先保存输入</li>
               <li>勾选「样例」的测试点会用于前台在线测试</li>
@@ -569,7 +567,7 @@ export default function ProblemTestCasesPage() {
 
         <div className="xl:col-span-2 card overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold text-foreground">测试点列表</h3>
+            <h3 className="text-subsection-title text-foreground">测试点列表</h3>
             <div className="flex items-center gap-1.5">
               {testCases.length > 0 && (
                 <>
@@ -615,9 +613,7 @@ export default function ProblemTestCasesPage() {
                   total={testCases.length}
                   tc={tc}
                   expanded={!!expanded[idx]}
-                  onToggle={() =>
-                    setExpanded((prev) => ({ ...prev, [idx]: !prev[idx] }))
-                  }
+                  onToggle={() => setExpanded((prev) => ({ ...prev, [idx]: !prev[idx] }))}
                   onChange={(patch) => updateCase(idx, patch)}
                   onRemove={() => void handleRemoveTestCase(idx)}
                   onDuplicate={() => handleDuplicate(idx)}

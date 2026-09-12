@@ -13,9 +13,7 @@ export const GET = withApi.public(async (req, ctx) => {
 
   // 可选登录：公开题无需登录；私有/班级/竞赛题需通过访问校验
   const session = getUserFromRequest(req)
-  const viewer = session?.userId
-    ? await getCachedUser(session.userId, session.tokenVersion)
-    : null
+  const viewer = session?.userId ? await getCachedUser(session.userId, session.tokenVersion) : null
   const contestId = req.nextUrl.searchParams.get('contestId') || undefined
 
   // 详情组装（含可见性校验 + 实时提交统计）已下沉到 service，供 API 与页面 SSR 共用

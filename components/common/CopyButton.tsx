@@ -32,12 +32,7 @@ export default function CopyButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => void handleCopy()}
-      className={className}
-      aria-label="复制"
-    >
+    <button type="button" onClick={() => void handleCopy()} className={className} aria-label="复制">
       {copied ? (
         <>
           <Check className={`${iconClassName} text-secondary-light`} />

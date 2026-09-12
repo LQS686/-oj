@@ -5,7 +5,14 @@
  * 难度校验对齐洛谷 8 档标准（lib/constants.ts 为唯一真相源）：
  *   入门 / 普及- / 普及 / 普及+ / 提高 / 提高+ / 省选 / NOI
  */
-import { required, optional, toInt, ValidationError, validateObjectId, asRecord } from '@/lib/api/validation'
+import {
+  required,
+  optional,
+  toInt,
+  ValidationError,
+  validateObjectId,
+  asRecord,
+} from '@/lib/api/validation'
 import { isValidDifficulty, DIFFICULTIES } from '@/lib/constants'
 
 export function parseProblemListQuery(q: Record<string, string>) {
@@ -40,9 +47,7 @@ export function parseProblemCreate(body: unknown) {
     timeLimit: toInt(b.timeLimit, '时间限制', 1000),
     memoryLimit: toInt(b.memoryLimit, '内存限制', 256),
     comparisonMode:
-      b.comparisonMode && typeof b.comparisonMode === 'string'
-        ? b.comparisonMode
-        : 'default',
+      b.comparisonMode && typeof b.comparisonMode === 'string' ? b.comparisonMode : 'default',
     realPrecision: toInt(b.realPrecision, '浮点数精度', 3),
     visibility:
       b.visibility === 'public' || b.visibility === 'private' || b.visibility === 'contest'

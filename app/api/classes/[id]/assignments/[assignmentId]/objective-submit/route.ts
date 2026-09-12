@@ -118,8 +118,7 @@ export const POST = withApi.classRole(
     }
 
     // 6. 作答形状校验（填空题按题干空位数校验长度）
-    const expectedBlankCount =
-      type === 'fill-blank' ? countFillBlanks(question.title) : undefined
+    const expectedBlankCount = type === 'fill-blank' ? countFillBlanks(question.title) : undefined
     if (!validateObjectiveAnswerShape(type, rawAnswer, options, expectedBlankCount)) {
       throw new ApiError('INVALID_ANSWER', '作答格式不正确', 400)
     }

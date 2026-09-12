@@ -11,9 +11,12 @@ export function AnnouncementsGrid({ items }: { items: PublicAnnouncementItem[] }
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Megaphone className="w-4 h-4 text-primary" />
-          <h2 className="text-base font-bold text-foreground">系统公告</h2>
+          <h2 className="text-section-title text-foreground">系统公告</h2>
         </div>
-        <Link href="/announcements" className="text-xs text-primary hover:underline flex items-center gap-0.5">
+        <Link
+          href="/announcements"
+          className="text-xs text-primary hover:underline flex items-center gap-0.5"
+        >
           查看全部 <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -25,7 +28,7 @@ export function AnnouncementsGrid({ items }: { items: PublicAnnouncementItem[] }
             <Link
               key={item.id}
               href={`/announcements/${item.id}`}
-              className={`card-static rounded-lg px-3.5 py-2.5 block hover:border-primary/30 transition-colors ${
+              className={`card-static px-4 py-3 block hover:border-primary/30 transition-colors ${
                 item.isPinned ? 'ring-1 ring-primary/25' : ''
               }`}
             >
@@ -35,14 +38,14 @@ export function AnnouncementsGrid({ items }: { items: PublicAnnouncementItem[] }
                 ) : null}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-foreground truncate">{item.title}</h3>
+                    <h3 className="text-subsection-title text-foreground truncate">{item.title}</h3>
                     <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-                      {item.publishedAt
-                        ? formatDate(item.publishedAt)
-                        : formatDate(item.createdAt)}
+                      {item.publishedAt ? formatDate(item.publishedAt) : formatDate(item.createdAt)}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{item.content}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                    {item.content}
+                  </p>
                 </div>
               </div>
             </Link>

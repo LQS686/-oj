@@ -63,7 +63,10 @@ export async function getTrainingWithProblemStatuses(
   })
   if (!training) return null
 
-  const problemStatuses: Record<string, { status: TrainingProblemStatus; lastStatus: string | null; submittedAt: Date | null }> = {}
+  const problemStatuses: Record<
+    string,
+    { status: TrainingProblemStatus; lastStatus: string | null; submittedAt: Date | null }
+  > = {}
   let isJoined = false
   if (userId) {
     const enrollment = await prisma.trainingEnrollment.findUnique({
@@ -80,7 +83,10 @@ export async function getTrainingWithProblemStatuses(
         orderBy: { submittedAt: 'desc' },
       })
       // 与 listTrainingProblemsWithStatus 一致：任意历史 AC 即视为通过
-      const byProblem = new Map<string, { statuses: Set<string>; lastStatus: string; submittedAt: Date }>()
+      const byProblem = new Map<
+        string,
+        { statuses: Set<string>; lastStatus: string; submittedAt: Date }
+      >()
       for (const sub of submissions) {
         let entry = byProblem.get(sub.problemId)
         if (!entry) {
@@ -119,7 +125,9 @@ export async function getTrainingWithProblemStatuses(
 
   const totalProblems = problems.length
   const solvedCount = problems.filter((p) => p.status === 'AC').length
-  const attemptedCount = problems.filter((p) => p.status === 'AC' || p.status === 'ATTEMPTED').length
+  const attemptedCount = problems.filter(
+    (p) => p.status === 'AC' || p.status === 'ATTEMPTED'
+  ).length
 
   return {
     id: training.id,
@@ -192,9 +200,7 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
         statusesByProblem.get(sub.problemId)!.add(sub.status)
       }
       for (const [pid, statuses] of statusesByProblem) {
-        problemStatuses[pid] = statuses.has(SubmissionStatus.ACCEPTED)
-          ? 'AC'
-          : 'ATTEMPTED'
+        problemStatuses[pid] = statuses.has(SubmissionStatus.ACCEPTED) ? 'AC' : 'ATTEMPTED'
       }
     }
   }
@@ -211,10 +217,7 @@ export async function getTrainingProblems(trainingId: string, userId: string | n
 }
 
 /** 题单做题页：A/B/C 编号 + 通过/尝试状态（对齐竞赛题目列表） */
-export async function listTrainingProblemsWithStatus(
-  trainingId: string,
-  userId: string | null
-) {
+export async function listTrainingProblemsWithStatus(trainingId: string, userId: string | null) {
   const training = await prisma.training.findUnique({
     where: { id: trainingId },
     select: { id: true, title: true, status: true, isPublic: true, authorId: true },
@@ -270,7 +273,7 @@ export async function listTrainingProblemsWithStatus(
     title: tp.problem.title,
     problemNumber: tp.problem.problemNumber,
     difficulty: tp.problem.difficulty,
-    status: userId ? userSubmissionStatus[tp.problemId] ?? null : null,
+    status: userId ? (userSubmissionStatus[tp.problemId] ?? null) : null,
   }))
 
   return {
@@ -292,11 +295,14 @@ export async function getUserTrainingProgressDetail(
   const problemIds = training.problems.map((p) => p.problemId)
   const totalProblems = problemIds.length
 
-  const submissions = problemIds.length > 0 ? await prisma.submission.findMany({
-    where: { userId, problemId: { in: problemIds } },
-    select: { problemId: true, status: true, submittedAt: true },
-    orderBy: { submittedAt: 'desc' },
-  }) : []
+  const submissions =
+    problemIds.length > 0
+      ? await prisma.submission.findMany({
+          where: { userId, problemId: { in: problemIds } },
+          select: { problemId: true, status: true, submittedAt: true },
+          orderBy: { submittedAt: 'desc' },
+        })
+      : []
 
   const problemStatusMap = new Map<string, { status: string; submittedAt: Date }>()
   for (const sub of submissions) {
@@ -306,7 +312,10 @@ export async function getUserTrainingProgressDetail(
         status: sub.status,
         submittedAt: sub.submittedAt,
       })
-    } else if (sub.status === SubmissionStatus.ACCEPTED && existing.status !== SubmissionStatus.ACCEPTED) {
+    } else if (
+      sub.status === SubmissionStatus.ACCEPTED &&
+      existing.status !== SubmissionStatus.ACCEPTED
+    ) {
       existing.status = sub.status
       existing.submittedAt = sub.submittedAt
     }
@@ -324,19 +333,26 @@ export async function getUserTrainingProgressDetail(
         solvedCount++
         problemProgress.push({ problemId, status: 'AC', submittedAt: statusData.submittedAt })
       } else {
-        problemProgress.push({ problemId, status: statusData.status, submittedAt: statusData.submittedAt })
+        problemProgress.push({
+          problemId,
+          status: statusData.status,
+          submittedAt: statusData.submittedAt,
+        })
       }
     } else {
       problemProgress.push({ problemId, status: 'NOT_STARTED', submittedAt: null })
     }
   }
 
-  const recentSubmissions = problemIds.length > 0 ? await prisma.submission.findMany({
-    where: { userId, problemId: { in: problemIds } },
-    orderBy: { submittedAt: 'desc' },
-    take: 5,
-    select: { id: true, problemId: true, status: true, language: true, submittedAt: true },
-  }) : []
+  const recentSubmissions =
+    problemIds.length > 0
+      ? await prisma.submission.findMany({
+          where: { userId, problemId: { in: problemIds } },
+          orderBy: { submittedAt: 'desc' },
+          take: 5,
+          select: { id: true, problemId: true, status: true, language: true, submittedAt: true },
+        })
+      : []
 
   return {
     training: { id: training.id, title: training.title },

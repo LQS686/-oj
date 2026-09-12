@@ -262,7 +262,11 @@ function createStringStream(data: string): Readable {
   })
 }
 
-function openCompareStream(path: string | undefined, fallback: string | undefined, label: string): Readable {
+function openCompareStream(
+  path: string | undefined,
+  fallback: string | undefined,
+  label: string
+): Readable {
   if (path) {
     return createReadStream(path, { highWaterMark: BUFFER_SIZE })
   }
@@ -294,7 +298,7 @@ function buffersEqual(a: Buffer, b: Buffer): boolean {
 async function compareDefault(
   userReader: BufferedStreamReader,
   stdReader: BufferedStreamReader,
-  fullScore: number,
+  fullScore: number
 ): Promise<CompareResult> {
   while (true) {
     const lineNum = userReader.line()
@@ -319,7 +323,7 @@ async function compareDefault(
 async function compareStrict(
   userReader: BufferedStreamReader,
   stdReader: BufferedStreamReader,
-  fullScore: number,
+  fullScore: number
 ): Promise<CompareResult> {
   while (true) {
     const userEof = await userReader.eof()
@@ -352,7 +356,7 @@ async function compareStrict(
 async function compareIgnoreSpaces(
   userReader: BufferedStreamReader,
   stdReader: BufferedStreamReader,
-  fullScore: number,
+  fullScore: number
 ): Promise<CompareResult> {
   while (true) {
     const userToken = await userReader.nextUntilSpace()
@@ -402,7 +406,7 @@ async function compareRealNumbers(
   userReader: BufferedStreamReader,
   stdReader: BufferedStreamReader,
   fullScore: number,
-  realPrecision = 3,
+  realPrecision = 3
 ): Promise<CompareResult> {
   const eps = Math.pow(10, -realPrecision)
   while (true) {
@@ -432,17 +436,29 @@ async function compareRealNumbers(
     }
 
     if (userToken.length > 0 && !FLOAT_REGEX.test(userToken)) {
-      return { score: 0, status: 'WA', message: `第 ${userReader.line()} 行，无效的数字格式: ${userToken}` }
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${userReader.line()} 行，无效的数字格式: ${userToken}`,
+      }
     }
     if (stdToken.length > 0 && !FLOAT_REGEX.test(stdToken)) {
-      return { score: 0, status: 'WA', message: `第 ${stdReader.line()} 行，标准答案含无效数字格式: ${stdToken}` }
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${stdReader.line()} 行，标准答案含无效数字格式: ${stdToken}`,
+      }
     }
 
     const a = parseFloat(userToken)
     const b = parseFloat(stdToken)
 
     if (Number.isNaN(a) !== Number.isNaN(b) || Number.isFinite(a) !== Number.isFinite(b)) {
-      return { score: 0, status: 'WA', message: `第 ${userReader.line()} 行，期望 ${b} 但得到 ${a}` }
+      return {
+        score: 0,
+        status: 'WA',
+        message: `第 ${userReader.line()} 行，期望 ${b} 但得到 ${a}`,
+      }
     }
 
     if (Math.abs(a - b) <= Math.max(eps, eps * Math.abs(b))) {
@@ -463,12 +479,16 @@ export async function compareOutput(input: CompareInput): Promise<CompareResult>
       input.expectedOutputPath,
       input.fullScore,
       input.comparisonMode,
-      input.realPrecision ?? 3,
+      input.realPrecision ?? 3
     )
   }
 
   const userStream = openCompareStream(input.userOutputPath, input.userOutput, 'userOutput')
-  const stdStream = openCompareStream(input.expectedOutputPath, input.expectedOutput, 'expectedOutput')
+  const stdStream = openCompareStream(
+    input.expectedOutputPath,
+    input.expectedOutput,
+    'expectedOutput'
+  )
   const userReader = new BufferedStreamReader(userStream)
   const stdReader = new BufferedStreamReader(stdStream)
   try {
@@ -478,7 +498,12 @@ export async function compareOutput(input: CompareInput): Promise<CompareResult>
       case 'ignore-spaces':
         return await compareIgnoreSpaces(userReader, stdReader, input.fullScore)
       case 'real-number':
-        return await compareRealNumbers(userReader, stdReader, input.fullScore, input.realPrecision ?? 3)
+        return await compareRealNumbers(
+          userReader,
+          stdReader,
+          input.fullScore,
+          input.realPrecision ?? 3
+        )
       case 'default':
       default:
         return await compareDefault(userReader, stdReader, input.fullScore)

@@ -21,7 +21,6 @@ import {
   type SettingsTabId,
 } from './_utils'
 import { usePreferences } from './_hooks/usePreferences'
-import { SettingsHeader } from './_components/SettingsHeader'
 import { MessageBanner } from './_components/MessageBanner'
 import { SettingsTabs } from './_components/SettingsTabs'
 import { ProfileSection } from './_components/ProfileSection'
@@ -167,9 +166,20 @@ function SettingsPageContent() {
       return
     }
     if (
-      ['12345678', 'password', '123456789', '1234567890', 'qwerty', 'abc123', '111111', '1234567', '12345', '123456', 'password1', 'qwerty123'].includes(
-        formData.newPassword.toLowerCase()
-      )
+      [
+        '12345678',
+        'password',
+        '123456789',
+        '1234567890',
+        'qwerty',
+        'abc123',
+        '111111',
+        '1234567',
+        '12345',
+        '123456',
+        'password1',
+        'qwerty123',
+      ].includes(formData.newPassword.toLowerCase())
     ) {
       showMessage('error', '密码过于简单，请使用更强的密码')
       return
@@ -265,8 +275,11 @@ function SettingsPageContent() {
   }
 
   return (
-    <EducationalPageShell title="个人设置" width="standard">
-      <SettingsHeader />
+    <EducationalPageShell
+      title="个人设置"
+      width="standard"
+      description="管理资料、账号安全与做题偏好"
+    >
       <MessageBanner message={message} />
 
       {/* 单一卡片：侧栏 + 内容，避免多层卡片嵌套 */}

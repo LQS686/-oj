@@ -46,11 +46,11 @@ export function FilterToolbar({
         </div>
       </div>
       <div className="flex gap-1 p-1 rounded-lg bg-muted">
-        {ROLE_TABS.map(tab => (
+        {ROLE_TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onRoleFilterChange(tab.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+            className={`btn btn-sm transition-all ${
               roleFilter === tab.id
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'

@@ -240,10 +240,10 @@ export default function ClassManageInlinePanel({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       {/* 左：班级设置 */}
-      <section className="card-static rounded-xl border border-border overflow-hidden lg:sticky lg:top-[72px]">
+      <section className="card-static border border-border overflow-hidden lg:sticky lg:top-[72px]">
         <div className="px-4 py-3 border-b border-border flex items-center gap-2">
           <Settings className="w-4 h-4 text-primary-light" />
-          <h3 className="text-sm font-semibold text-foreground">班级设置</h3>
+          <h3 className="text-subsection-title text-foreground">班级设置</h3>
         </div>
         <div className="p-4 space-y-4">
           {settingsLoading || !settings ? (
@@ -277,7 +277,9 @@ export default function ClassManageInlinePanel({
 
               <div className="grid grid-cols-1 sm:grid-cols-[7.5rem_minmax(0,1fr)] gap-3 items-end">
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1.5">最大成员数</label>
+                  <label className="block text-xs font-medium text-foreground mb-1.5">
+                    最大成员数
+                  </label>
                   <input
                     type="number"
                     min={1}
@@ -360,13 +362,15 @@ export default function ClassManageInlinePanel({
 
       {/* 右：邀请 + 申请 */}
       <div className="space-y-4 min-w-0">
-        <section className="card-static rounded-xl border border-border overflow-hidden">
+        <section className="card-static border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <h3 className="text-subsection-title text-foreground flex items-center gap-2">
               <Mail className="w-4 h-4 text-primary-light" />
               邀请成员
             </h3>
-            <p className="text-xs text-muted-foreground mt-1">输入平台用户名发送邀请，对方接受后加入</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              输入平台用户名发送邀请，对方接受后加入
+            </p>
           </div>
           <div className="p-4 space-y-3 border-b border-border/60">
             <div className="flex gap-2">
@@ -379,7 +383,9 @@ export default function ClassManageInlinePanel({
                 }}
                 placeholder="对方用户名"
                 className="input flex-1 min-w-0 text-sm"
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), void sendDirectInvite())}
+                onKeyDown={(e) =>
+                  e.key === 'Enter' && (e.preventDefault(), void sendDirectInvite())
+                }
               />
               <button
                 type="button"
@@ -439,9 +445,9 @@ export default function ClassManageInlinePanel({
           </div>
         </section>
 
-        <section className="card-static rounded-xl border border-border overflow-hidden">
+        <section className="card-static border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <h3 className="text-subsection-title text-foreground flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-primary-light" />
               加入申请
               {pending.length > 0 && (

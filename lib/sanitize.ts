@@ -12,7 +12,7 @@ export function escapeHtml(str: string): string {
     '`': '&#x60;',
     '=': '&#x3D;',
   }
-  return str.replace(/[&<>"'`=/]/g, char => htmlEntities[char] || char)
+  return str.replace(/[&<>"'`=/]/g, (char) => htmlEntities[char] || char)
 }
 
 export function stripTags(str: string): string {
@@ -33,7 +33,7 @@ export function trimAll(obj: Record<string, unknown>): Record<string, unknown> {
     if (typeof value === 'string') {
       result[key] = value.trim()
     } else if (Array.isArray(value)) {
-      result[key] = value.map(item => {
+      result[key] = value.map((item) => {
         if (typeof item === 'string') {
           return item.trim()
         }

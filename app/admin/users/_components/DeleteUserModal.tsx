@@ -21,7 +21,7 @@ export function DeleteUserModal({ user, onClose, onSuccess }: DeleteUserModalPro
     setDeleting(true)
     try {
       const response = await fetchWithCookie(`/api/admin/users/${user.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
 
       const data = await response.json()

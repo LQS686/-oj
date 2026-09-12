@@ -6,7 +6,16 @@
  *      - 管理员：可查询任意 userId
  * POST 鉴权：提交代码（自动加入评测队列）
  */
-import { withApi, ok, readJson, readQuery, throw400, throw403, throw404, ApiError } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readJson,
+  readQuery,
+  throw400,
+  throw403,
+  throw404,
+  ApiError,
+} from '@/lib/api/withApi'
 import { submitCode, listSubmissionsAdvanced } from '@/lib/submission/service'
 import { toInt } from '@/lib/api/validation'
 import { logger } from '@/lib/logger'
@@ -64,7 +73,10 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
   if (typeof body.code !== 'string' || body.code.length > MAX_CODE_LENGTH) {
     throw400('VALIDATION', '代码长度不合法（最大 50000 字符）')
   }
-  if (typeof body.language !== 'string' || !(ALLOWED_LANGUAGES as readonly string[]).includes(body.language)) {
+  if (
+    typeof body.language !== 'string' ||
+    !(ALLOWED_LANGUAGES as readonly string[]).includes(body.language)
+  ) {
     throw400('VALIDATION', '不支持的语言')
   }
 

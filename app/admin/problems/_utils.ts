@@ -76,7 +76,10 @@ export function queryParamsToFilters(params: URLSearchParams): ProblemFilters {
   if (q) filters.searchQuery = q
   const difficulty = params.get('difficulty')
   if (difficulty) {
-    filters.difficultyFilter = difficulty.split(',').map(s => s.trim()).filter(Boolean)
+    filters.difficultyFilter = difficulty
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   }
   const visibility = params.get('visibility')
   if (visibility === 'public' || visibility === 'private' || visibility === 'contest') {
@@ -84,15 +87,25 @@ export function queryParamsToFilters(params: URLSearchParams): ProblemFilters {
   }
   const tags = params.get('tags')
   if (tags) {
-    filters.tags = tags.split(',').map(s => s.trim()).filter(Boolean)
+    filters.tags = tags
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   }
   const source = params.get('source')
   if (source) {
-    filters.sources = source.split(',').map(s => s.trim()).filter(Boolean)
+    filters.sources = source
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   }
   const completeness = params.get('completeness')
-  if (completeness === 'hasStd' || completeness === 'noStd' ||
-      completeness === 'hasTests' || completeness === 'noTests') {
+  if (
+    completeness === 'hasStd' ||
+    completeness === 'noStd' ||
+    completeness === 'hasTests' ||
+    completeness === 'noTests'
+  ) {
     filters.completeness = completeness
   }
   return filters

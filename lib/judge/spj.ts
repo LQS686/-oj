@@ -85,7 +85,14 @@ export async function compileSpj(spjCode: string): Promise<CompileResult> {
       outputPath,
     ]
 
-    const { exitCode, stderr } = await spawnCapture('g++', args, 30_000, tempDir, undefined, judgeSpawnEnv(tempDir))
+    const { exitCode, stderr } = await spawnCapture(
+      'g++',
+      args,
+      30_000,
+      tempDir,
+      undefined,
+      judgeSpawnEnv(tempDir)
+    )
     if (exitCode !== 0) {
       const filtered = stderr
         .replace(/(?:[a-zA-Z]:)?[^\s:]*temp[\\/]judge[\\/][^\s:]+/g, 'checker.cpp')
@@ -145,15 +152,7 @@ export interface RunSpjInput {
  * 运行 Testlib checker，解析退出码与部分分。
  */
 export async function runSpj(input: RunSpjInput): Promise<CompareResult> {
-  const {
-    checkerPath,
-    inputPath,
-    userOutputPath,
-    answerPath,
-    fullScore,
-    workDir,
-    signal,
-  } = input
+  const { checkerPath, inputPath, userOutputPath, answerPath, fullScore, workDir, signal } = input
 
   if (signal?.aborted) {
     return { score: 0, status: 'SE', message: '评测已中止' }
@@ -206,7 +205,7 @@ export async function runSpj(input: RunSpjInput): Promise<CompareResult> {
         SPJ_WALL_LIMIT_MS,
         cwd,
         signal,
-        judgeSpawnEnv(cwd),
+        judgeSpawnEnv(cwd)
       )
       // B-P1-1：同上的超时归一问题（非 Linux 兜底路径）
       exitCode = result.timedOut ? 152 : result.exitCode
@@ -239,7 +238,7 @@ export async function runSpj(input: RunSpjInput): Promise<CompareResult> {
 export async function ensureUserOutputFile(
   userOutputPath: string | undefined,
   userOutput: string | undefined,
-  workDir: string,
+  workDir: string
 ): Promise<{ path: string; ephemeral: boolean }> {
   if (userOutputPath && existsSync(userOutputPath)) {
     return { path: userOutputPath, ephemeral: false }
@@ -256,7 +255,7 @@ export function parseSpjExit(
   exitCode: number,
   stdout: string,
   stderr: string,
-  fullScore: number,
+  fullScore: number
 ): CompareResult {
   const message = truncateMessage(pickSpjMessage(stdout, stderr))
 
@@ -289,7 +288,8 @@ export function parseSpjExit(
         }
       }
       const score = Math.max(0, Math.min(fullScore, Math.round(fullScore * ratio)))
-      const status: ResultState = score >= fullScore && fullScore > 0 ? 'AC' : score > 0 ? 'PC' : 'WA'
+      const status: ResultState =
+        score >= fullScore && fullScore > 0 ? 'AC' : score > 0 ? 'PC' : 'WA'
       return {
         score,
         status,
@@ -365,9 +365,10 @@ async function runViaRunner(opts: {
   stderrPath: string
   signal?: AbortSignal
 }): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean }> {
-  const binName = opts.checkerPath.includes('/') || opts.checkerPath.includes('\\')
-    ? opts.checkerPath
-    : `./${opts.checkerPath}`
+  const binName =
+    opts.checkerPath.includes('/') || opts.checkerPath.includes('\\')
+      ? opts.checkerPath
+      : `./${opts.checkerPath}`
 
   const args = [
     opts.runnerPath,
@@ -405,7 +406,14 @@ async function runViaRunner(opts: {
       DSOJ_FORCE_ULIMIT_V: '1',
     }
 
-    const result = await spawnCapture('bash', args, SPJ_WALL_LIMIT_MS + 5_000, opts.cwd, opts.signal, env)
+    const result = await spawnCapture(
+      'bash',
+      args,
+      SPJ_WALL_LIMIT_MS + 5_000,
+      opts.cwd,
+      opts.signal,
+      env
+    )
     const stdout = existsSync(opts.stdoutPath)
       ? await readFile(opts.stdoutPath, 'utf8').catch(() => '')
       : ''
@@ -441,7 +449,7 @@ function spawnCapture(
   timeoutMs: number,
   cwd?: string,
   signal?: AbortSignal,
-  env?: NodeJS.ProcessEnv,
+  env?: NodeJS.ProcessEnv
 ): Promise<{ exitCode: number; stdout: string; stderr: string; timedOut?: boolean }> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {

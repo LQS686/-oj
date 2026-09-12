@@ -44,10 +44,13 @@ async function bootJudgeSystem() {
     await writeFile(probe, 'ok')
     await unlink(probe)
   } catch (e) {
-    logger.warn('⚠️ 测点磁盘缓存目录 data/testdata 不可写：评测将每次回源数据库，大测点性能异常。', {
-      error: e instanceof Error ? e.message : String(e),
-      fix: '容器部署请执行: docker compose exec -u root app chown -R 1001:1001 /app/data （bt-deploy.sh 会自动修复）',
-    })
+    logger.warn(
+      '⚠️ 测点磁盘缓存目录 data/testdata 不可写：评测将每次回源数据库，大测点性能异常。',
+      {
+        error: e instanceof Error ? e.message : String(e),
+        fix: '容器部署请执行: docker compose exec -u root app chown -R 1001:1001 /app/data （bt-deploy.sh 会自动修复）',
+      }
+    )
   }
 
   await import('./worker')

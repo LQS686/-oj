@@ -35,9 +35,7 @@ export function countActiveFilters(filters: ObjectiveQuestionFilters): number {
  * 将筛选条件序列化为 URL query string 参数对象。
  * 默认值不写入 URL（保持 URL 简洁）。
  */
-export function filtersToQueryParams(
-  filters: ObjectiveQuestionFilters,
-): Record<string, string> {
+export function filtersToQueryParams(filters: ObjectiveQuestionFilters): Record<string, string> {
   const params: Record<string, string> = {}
   if (filters.keyword.trim()) {
     params.keyword = filters.keyword.trim()
@@ -55,26 +53,18 @@ export function filtersToQueryParams(
  * 从 URL query string 参数恢复筛选条件。
  * 缺失或非法的参数使用默认值。
  */
-export function queryParamsToFilters(
-  params: URLSearchParams,
-): ObjectiveQuestionFilters {
+export function queryParamsToFilters(params: URLSearchParams): ObjectiveQuestionFilters {
   const filters: ObjectiveQuestionFilters = { ...DEFAULT_FILTERS }
   const keyword = params.get('keyword')
   if (keyword) filters.keyword = keyword
 
   const type = params.get('type')
-  if (
-    type &&
-    (OBJECTIVE_QUESTION_TYPES as readonly string[]).includes(type)
-  ) {
+  if (type && (OBJECTIVE_QUESTION_TYPES as readonly string[]).includes(type)) {
     filters.type = type as ObjectiveQuestionType
   }
 
   const difficulty = params.get('difficulty')
-  if (
-    difficulty &&
-    (OBJECTIVE_DIFFICULTIES as readonly string[]).includes(difficulty)
-  ) {
+  if (difficulty && (OBJECTIVE_DIFFICULTIES as readonly string[]).includes(difficulty)) {
     filters.difficulty = difficulty as ObjectiveDifficulty
   }
   return filters

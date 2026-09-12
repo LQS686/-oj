@@ -32,16 +32,16 @@ export function PreferencesSection({
     >
       <div className="flex items-center gap-2">
         <SlidersHorizontal className="w-4 h-4 text-primary-light" />
-        <h2 className="text-base font-semibold text-foreground">偏好设置</h2>
+        <h2 className="text-section-title text-foreground">偏好设置</h2>
       </div>
 
       <section className="space-y-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <div className="flex items-center gap-2 text-subsection-title text-foreground">
           <Code2 className="w-4 h-4 text-primary-light" />
           做题偏好
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">默认编程语言</label>
+          <label className="block text-label text-foreground mb-1.5">默认编程语言</label>
           <select
             className="input cursor-pointer max-w-xs"
             value={preferences.defaultCodeLanguage}
@@ -60,7 +60,7 @@ export function PreferencesSection({
       </section>
 
       <section className="space-y-1">
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
+        <div className="flex items-center gap-2 text-subsection-title text-foreground mb-2">
           <Bell className="w-4 h-4 text-primary-light" />
           站内通知
         </div>

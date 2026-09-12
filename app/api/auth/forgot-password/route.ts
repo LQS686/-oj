@@ -35,7 +35,8 @@ function resolveSiteBaseUrl(req: NextRequest): string {
   const scheme = rawProto.split(',')[0].trim() === 'http' ? 'http' : 'https'
   const rawHost = req.headers.get('x-forwarded-host') || req.nextUrl.host
   const host = rawHost.split(',')[0].trim().toLowerCase()
-  const hostOk = /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && !host.startsWith('.') && !host.includes('..')
+  const hostOk =
+    /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && !host.startsWith('.') && !host.includes('..')
   if (!hostOk) {
     return `${req.nextUrl.protocol}//${req.nextUrl.host}`
   }
@@ -100,7 +101,7 @@ export const POST = withApi.public(async (req) => {
         <p style="color: #6b7280; font-size: 12px;">这是一封系统自动发送的邮件，请勿直接回复。</p>
       </div>
     `,
-    text: `${siteName} 密码重置\n\n你好 ${user.username}，\n\n你正在重置 ${siteName} 账号的密码。请打开以下链接设置新密码（30 分钟内有效）：\n\n${resetUrl}\n\n如果不是你本人发起的请求，请忽略此邮件，你的密码不会被修改。\n\n（这是一封系统自动发送的邮件，请勿回复）`
+    text: `${siteName} 密码重置\n\n你好 ${user.username}，\n\n你正在重置 ${siteName} 账号的密码。请打开以下链接设置新密码（30 分钟内有效）：\n\n${resetUrl}\n\n如果不是你本人发起的请求，请忽略此邮件，你的密码不会被修改。\n\n（这是一封系统自动发送的邮件，请勿回复）`,
   })
 
   if (!result.success) {

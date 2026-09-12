@@ -2,10 +2,7 @@
  * /api/admin/announcements — 系统公告管理（仅 SYSTEM_ADMIN）
  */
 import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
-import {
-  createAnnouncement,
-  listAllAnnouncementsForAdmin,
-} from '@/lib/announcement/service'
+import { createAnnouncement, listAllAnnouncementsForAdmin } from '@/lib/announcement/service'
 
 export const GET = withApi.systemAdmin(async () => {
   const items = await listAllAnnouncementsForAdmin()

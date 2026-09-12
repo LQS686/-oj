@@ -13,397 +13,416 @@ import AdminCreateContestModal from '@/components/admin/AdminCreateContestModal'
 import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 
 interface Contest {
- id: string
- title: string
- description: string
- startTime: string
- endTime: string
- status: string
- isPublic: boolean
- _count?: {
- participants: number
- problems: number
- }
+  id: string
+  title: string
+  description: string
+  startTime: string
+  endTime: string
+  status: string
+  type: string
+  isPublic: boolean
+  _count?: {
+    participants: number
+    problems: number
+  }
 }
 
 function AdminContestsPageContent() {
- const dialog = useDialog()
- const router = useRouter()
- const scheduleForbiddenRedirect = useForbiddenRedirect()
- const searchParams = useSearchParams()
- const [contests, setContests] = useState<Contest[]>([])
- // C-P2-22：服务端返回 { list, total }，total 为竞赛总数（不受 take 截断影响）
- const [total, setTotal] = useState(0)
- const [loading, setLoading] = useState(true)
- const [error, setError] = useState('')
- const [searchQuery, setSearchQuery] = useState('')
- const [statusFilter, setStatusFilter] = useState('all')
- const [selectedContest, setSelectedContest] = useState<Contest | null>(null)
- const [showDeleteModal, setShowDeleteModal] = useState(false)
- const [createOpen, setCreateOpen] = useState(false)
- const [editContestId, setEditContestId] = useState<string | null>(() => {
-   if (typeof window === 'undefined') return null
-   return new URLSearchParams(window.location.search).get('edit')
- })
+  const dialog = useDialog()
+  const router = useRouter()
+  const scheduleForbiddenRedirect = useForbiddenRedirect()
+  const searchParams = useSearchParams()
+  const [contests, setContests] = useState<Contest[]>([])
+  // C-P2-22：服务端返回 { list, total }，total 为竞赛总数（不受 take 截断影响）
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedContest, setSelectedContest] = useState<Contest | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editContestId, setEditContestId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('edit')
+  })
 
- // 支持 ?create=1 / ?edit=<id> 自动打开弹窗（外部跳转入口）
- useDeferredEffect(() => {
-   if (searchParams.get('create') === '1') {
-     setCreateOpen(true)
-     setEditContestId(null)
-   }
-   const editId = searchParams.get('edit')
-   if (editId) {
-     setEditContestId(editId)
-     setCreateOpen(false)
-   }
-   if (searchParams.get('create') === '1' || editId) {
-     router.replace('/admin/contests', { scroll: false })
-   }
- }, [searchParams, router])
+  // 支持 ?create=1 / ?edit=<id> 自动打开弹窗（外部跳转入口）
+  useDeferredEffect(() => {
+    if (searchParams.get('create') === '1') {
+      setCreateOpen(true)
+      setEditContestId(null)
+    }
+    const editId = searchParams.get('edit')
+    if (editId) {
+      setEditContestId(editId)
+      setCreateOpen(false)
+    }
+    if (searchParams.get('create') === '1' || editId) {
+      router.replace('/admin/contests', { scroll: false })
+    }
+  }, [searchParams, router])
 
- const fetchContests = useCallback(async () => {
- try {
- setLoading(true)
- const response = await fetchWithCookie('/api/admin/contests')
+  const fetchContests = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await fetchWithCookie('/api/admin/contests')
 
- if (response.status === 403) {
- setError('需要管理员权限')
- scheduleForbiddenRedirect()
- return
- }
+      if (response.status === 403) {
+        setError('需要管理员权限')
+        scheduleForbiddenRedirect()
+        return
+      }
 
- const data = await response.json()
- if (data.success) {
- setContests(Array.isArray(data.data?.list) ? data.data.list : [])
- setTotal(typeof data.data?.total === 'number' ? data.data.total : 0)
- } else {
- setError(data.error || '获取竞赛列表失败')
- setContests([])
- }
- } catch {
- setError('网络错误')
- } finally {
- setLoading(false)
- }
- }, [scheduleForbiddenRedirect])
+      const data = await response.json()
+      if (data.success) {
+        setContests(Array.isArray(data.data?.list) ? data.data.list : [])
+        setTotal(typeof data.data?.total === 'number' ? data.data.total : 0)
+      } else {
+        setError(data.error || '获取竞赛列表失败')
+        setContests([])
+      }
+    } catch {
+      setError('网络错误')
+    } finally {
+      setLoading(false)
+    }
+  }, [scheduleForbiddenRedirect])
 
- useDeferredEffect(() => {
- fetchContests()
- }, [fetchContests])
+  useDeferredEffect(() => {
+    fetchContests()
+  }, [fetchContests])
 
- const handleToggleVisibility = async (contestId: string, currentVisibility: boolean) => {
- try {
- const response = await fetchWithCookie(`/api/admin/contests/${contestId}`, {
- method: 'PATCH',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({ isPublic: !currentVisibility })
- })
+  const handleToggleVisibility = async (contestId: string, currentVisibility: boolean) => {
+    try {
+      const response = await fetchWithCookie(`/api/admin/contests/${contestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: !currentVisibility }),
+      })
 
- const data = await response.json()
- if (data.success) {
- fetchContests()
- } else {
- await dialog.alert({ tone: 'error', message: data.error || '操作失败' })
- }
- } catch {
- await dialog.alert({ tone: 'error', message: '网络错误' })
- }
- }
+      const data = await response.json()
+      if (data.success) {
+        fetchContests()
+      } else {
+        await dialog.alert({ tone: 'error', message: data.error || '操作失败' })
+      }
+    } catch {
+      await dialog.alert({ tone: 'error', message: '网络错误' })
+    }
+  }
 
- const handleDeleteContest = async () => {
- if (!selectedContest) return
+  const handleDeleteContest = async () => {
+    if (!selectedContest) return
 
- try {
- const response = await fetchWithCookie(`/api/admin/contests/${selectedContest.id}`, {
- method: 'DELETE'
- })
+    try {
+      const response = await fetchWithCookie(`/api/admin/contests/${selectedContest.id}`, {
+        method: 'DELETE',
+      })
 
- const data = await response.json()
- if (data.success) {
- setShowDeleteModal(false)
- setSelectedContest(null)
- fetchContests()
- } else {
- await dialog.alert({ tone: 'error', message: data.error || '删除失败' })
- }
- } catch {
- await dialog.alert({ tone: 'error', message: '网络错误' })
- }
- }
+      const data = await response.json()
+      if (data.success) {
+        setShowDeleteModal(false)
+        setSelectedContest(null)
+        fetchContests()
+      } else {
+        await dialog.alert({ tone: 'error', message: data.error || '删除失败' })
+      }
+    } catch {
+      await dialog.alert({ tone: 'error', message: '网络错误' })
+    }
+  }
 
- const getStatusColor = (status: string) => {
- switch (status) {
- case 'UPCOMING': return 'tag-info'
- case 'ONGOING': return 'tag-success'
- case 'ENDED': return 'tag'
- default: return 'tag'
- }
- }
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'UPCOMING':
+        return 'tag-info'
+      case 'ONGOING':
+        return 'tag-success'
+      case 'ENDED':
+        return 'tag'
+      default:
+        return 'tag'
+    }
+  }
 
- const getStatusLabel = (status: string) => {
- switch (status) {
- case 'UPCOMING': return '未开始'
- case 'ONGOING': return '进行中'
- case 'ENDED': return '已结束'
- default: return status
- }
- }
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'UPCOMING':
+        return '未开始'
+      case 'ONGOING':
+        return '进行中'
+      case 'ENDED':
+        return '已结束'
+      default:
+        return status
+    }
+  }
 
- const getContestStatus = (startTime: string, endTime: string) => {
- const now = new Date()
- const start = new Date(startTime)
- const end = new Date(endTime)
- 
- if (now < start) return 'UPCOMING'
- if (now >= start && now <= end) return 'ONGOING'
- return 'ENDED'
- }
+  const getContestStatus = (startTime: string, endTime: string) => {
+    const now = new Date()
+    const start = new Date(startTime)
+    const end = new Date(endTime)
 
- const filteredContests = contests.filter(contest => {
- const matchesSearch = contest.title.toLowerCase().includes(searchQuery.toLowerCase())
- const status = getContestStatus(contest.startTime, contest.endTime)
- const matchesStatus = statusFilter === 'all' || status === statusFilter
- return matchesSearch && matchesStatus
- })
+    if (now < start) return 'UPCOMING'
+    if (now >= start && now <= end) return 'ONGOING'
+    return 'ENDED'
+  }
 
- const columns: Column<Contest>[] = [
- {
- key: 'title',
- label: '竞赛名称',
- sortable: true,
- render: (_value, contest) => (
- <div>
- <div className="text-foreground font-medium">{contest.title}</div>
- <div className="text-xs text-muted-foreground line-clamp-1">{contest.description}</div>
- </div>
- ),
- },
- {
- key: 'status',
- label: '状态',
- render: (_value, contest) => {
- const status = getContestStatus(contest.startTime, contest.endTime)
- return <span className={`tag ${getStatusColor(status)}`}>{getStatusLabel(status)}</span>
- },
- },
- {
- key: 'isPublic',
- label: '类型',
- render: (value) => (
- <span className={`tag ${value ? 'tag-success' : 'tag'}`}>
- {value ? '公开' : '私有'}
- </span>
- ),
- },
- {
- key: 'startTime',
- label: '时间',
- render: (_value, contest) => (
- <div className="text-sm text-muted-foreground">
- <div>{formatDate(contest.startTime)}</div>
- <div className="text-xs">
- {Math.ceil((new Date(contest.endTime).getTime() - new Date(contest.startTime).getTime()) / (1000 * 60 * 60))} 小时
- </div>
- </div>
- ),
- },
- {
- key: '_count',
- label: '参与者',
- render: (_value, contest) => (
- <span className="text-foreground">{contest._count?.participants || 0}</span>
- ),
- },
- {
- key: 'id' as keyof Contest,
- label: '操作',
- render: (_value, contest) => (
- <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
- <button
- onClick={(e) => {
- e.stopPropagation()
- handleToggleVisibility(contest.id, contest.isPublic)
- }}
- className={`p-2 rounded-lg transition-colors ${
- contest.isPublic
- ? 'text-secondary-light hover:bg-secondary/10'
- : 'text-muted-foreground hover:bg-muted'
- }`}
- title={contest.isPublic ? '公开' : '隐藏'}
- >
- {contest.isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
- </button>
- <button
- onClick={(e) => {
- e.stopPropagation()
- setEditContestId(contest.id)
- }}
- className="p-2 text-primary hover:bg-primary/5 rounded-lg transition-colors"
- title="编辑"
- >
- <Edit className="w-4 h-4" />
- </button>
- <button
- onClick={(e) => {
- e.stopPropagation()
- setSelectedContest(contest)
- setShowDeleteModal(true)
- }}
- className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
- title="删除"
- >
- <Trash2 className="w-4 h-4" />
- </button>
- </div>
- ),
- },
- ]
+  const filteredContests = contests.filter((contest) => {
+    const matchesSearch = contest.title.toLowerCase().includes(searchQuery.toLowerCase())
+    const status = getContestStatus(contest.startTime, contest.endTime)
+    const matchesStatus = statusFilter === 'all' || status === statusFilter
+    return matchesSearch && matchesStatus
+  })
 
- if (loading) {
- return (
- <div className="flex items-center justify-center min-h-screen">
- <div className="text-center">
- <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
- <p className="text-muted-foreground">加载中...</p>
- </div>
- </div>
- )
- }
+  const columns: Column<Contest>[] = [
+    {
+      key: 'title',
+      label: '竞赛名称',
+      sortable: true,
+      render: (_value, contest) => (
+        <div>
+          <div className="text-foreground font-medium">{contest.title}</div>
+          <div className="text-xs text-muted-foreground line-clamp-1">{contest.description}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: '状态',
+      render: (_value, contest) => {
+        const status = getContestStatus(contest.startTime, contest.endTime)
+        return <span className={`tag ${getStatusColor(status)}`}>{getStatusLabel(status)}</span>
+      },
+    },
+    {
+      key: 'type',
+      label: '类型',
+      // 这里要显示的是「赛制类型」（ACM 罚时制 / OI 总分制），
+      // 之前误绑 isPublic 显示成了「公开 / 私有」；可见性由操作列的眼睛按钮表达。
+      render: (_value, contest) => (
+        <span className={contest.type === 'ACM' ? 'tag tag-primary' : 'tag'}>
+          {contest.type === 'ACM' ? 'ACM' : 'OI'}
+        </span>
+      ),
+    },
+    {
+      key: 'startTime',
+      label: '时间',
+      render: (_value, contest) => (
+        <div className="text-sm text-muted-foreground">
+          <div>{formatDate(contest.startTime)}</div>
+          <div className="text-xs">
+            {Math.ceil(
+              (new Date(contest.endTime).getTime() - new Date(contest.startTime).getTime()) /
+                (1000 * 60 * 60)
+            )}{' '}
+            小时
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: '_count',
+      label: '参与者',
+      render: (_value, contest) => (
+        <span className="text-foreground">{contest._count?.participants || 0}</span>
+      ),
+    },
+    {
+      key: 'id' as keyof Contest,
+      label: '操作',
+      render: (_value, contest) => (
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleToggleVisibility(contest.id, contest.isPublic)
+            }}
+            className={`btn-icon transition-colors ${
+              contest.isPublic
+                ? 'text-secondary-light hover:bg-secondary/10'
+                : 'text-muted-foreground hover:bg-muted'
+            }`}
+            title={contest.isPublic ? '公开' : '隐藏'}
+          >
+            {contest.isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setEditContestId(contest.id)
+            }}
+            className="btn-icon text-primary hover:bg-primary/5 transition-colors"
+            title="编辑"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setSelectedContest(contest)
+              setShowDeleteModal(true)
+            }}
+            className="btn-icon text-error hover:bg-error/10 transition-colors"
+            title="删除"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
+  ]
 
- if (error) {
- return (
- <div className="flex items-center justify-center min-h-screen">
- <div className="text-center">
- <p className="text-error text-lg mb-2">{error}</p>
- {error.includes('权限') && <p className="text-muted-foreground">正在跳转...</p>}
- </div>
- </div>
- )
- }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">加载中...</p>
+        </div>
+      </div>
+    )
+  }
 
- return (
- <>
- <AdminPageShell width="list" className="space-y-6">
- <FilterBar activeCount={(searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)}>
- <div className="flex-1 min-w-[200px]">
- <div className="relative">
- <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
- <input
- type="text"
- placeholder="搜索竞赛名称..."
- value={searchQuery}
- onChange={(e) => setSearchQuery(e.target.value)}
- className="input pl-10"
- />
- </div>
- </div>
- <select
- value={statusFilter}
- onChange={(e) => setStatusFilter(e.target.value)}
- className="input w-auto"
- >
- <option value="all">全部状态</option>
- <option value="UPCOMING">未开始</option>
- <option value="ONGOING">进行中</option>
- <option value="ENDED">已结束</option>
- </select>
- <button
- onClick={() => setCreateOpen(true)}
- className="btn btn-primary flex items-center gap-2 ml-auto"
- >
- <Plus className="w-5 h-5" />
- 创建竞赛
- </button>
- </FilterBar>
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-error text-lg mb-2">{error}</p>
+          {error.includes('权限') && <p className="text-muted-foreground">正在跳转...</p>}
+        </div>
+      </div>
+    )
+  }
 
- <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">总竞赛数</div>
- <div className="text-2xl font-bold text-foreground mt-1">{total}</div>
- </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">进行中</div>
- <div className="text-2xl font-bold text-secondary-light mt-1">
- {contests.filter(c => getContestStatus(c.startTime, c.endTime) === 'ONGOING').length}
- </div>
- </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">未开始</div>
- <div className="text-2xl font-bold text-primary-light mt-1">
- {contests.filter(c => getContestStatus(c.startTime, c.endTime) === 'UPCOMING').length}
- </div>
- </div>
- <div className="card p-4">
- <div className="text-muted-foreground text-sm">已结束</div>
- <div className="text-2xl font-bold text-muted-foreground mt-1">
- {contests.filter(c => getContestStatus(c.startTime, c.endTime) === 'ENDED').length}
- </div>
- </div>
- </div>
+  return (
+    <>
+      <AdminPageShell width="list" className="space-y-6">
+        <FilterBar activeCount={(searchQuery ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0)}>
+          <div className="flex-1 min-w-[200px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="搜索竞赛名称..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input pl-10"
+              />
+            </div>
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="input w-auto"
+          >
+            <option value="all">全部状态</option>
+            <option value="UPCOMING">未开始</option>
+            <option value="ONGOING">进行中</option>
+            <option value="ENDED">已结束</option>
+          </select>
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="btn btn-primary flex items-center gap-2 ml-auto"
+          >
+            <Plus className="w-5 h-5" />
+            创建竞赛
+          </button>
+        </FilterBar>
 
- <DataTable<Contest>
- data={filteredContests}
- columns={columns}
- idKey="id"
- emptyMessage={searchQuery || statusFilter !== 'all' ? '没有找到匹配的竞赛' : '暂无竞赛'}
- onRowClick={(row) => setEditContestId(row.id)}
- />
- </AdminPageShell>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="card p-4">
+            <div className="text-muted-foreground text-sm">总竞赛数</div>
+            <div className="text-2xl font-bold text-foreground mt-1">{total}</div>
+          </div>
+          <div className="card p-4">
+            <div className="text-muted-foreground text-sm">进行中</div>
+            <div className="text-2xl font-bold text-secondary-light mt-1">
+              {
+                contests.filter((c) => getContestStatus(c.startTime, c.endTime) === 'ONGOING')
+                  .length
+              }
+            </div>
+          </div>
+          <div className="card p-4">
+            <div className="text-muted-foreground text-sm">未开始</div>
+            <div className="text-2xl font-bold text-primary-light mt-1">
+              {
+                contests.filter((c) => getContestStatus(c.startTime, c.endTime) === 'UPCOMING')
+                  .length
+              }
+            </div>
+          </div>
+          <div className="card p-4">
+            <div className="text-muted-foreground text-sm">已结束</div>
+            <div className="text-2xl font-bold text-muted-foreground mt-1">
+              {contests.filter((c) => getContestStatus(c.startTime, c.endTime) === 'ENDED').length}
+            </div>
+          </div>
+        </div>
 
- {showDeleteModal && selectedContest && (
- <Modal
- open
- onClose={() => {
- setShowDeleteModal(false)
- setSelectedContest(null)
- }}
- title="确认删除"
- footer={
- <div className="flex gap-3 justify-end w-full">
- <button
- onClick={() => {
- setShowDeleteModal(false)
- setSelectedContest(null)
- }}
- className="btn btn-ghost"
- >
- 取消
- </button>
- <button
- onClick={handleDeleteContest}
- className="btn btn-destructive"
- >
- 确认删除
- </button>
- </div>
- }
- >
- <p className="text-muted-foreground">
- 确定要删除竞赛 <span className="text-foreground font-medium">{selectedContest.title}</span> 吗？
- 此操作无法撤销。
- </p>
- </Modal>
- )}
+        <DataTable<Contest>
+          data={filteredContests}
+          columns={columns}
+          idKey="id"
+          emptyMessage={searchQuery || statusFilter !== 'all' ? '没有找到匹配的竞赛' : '暂无竞赛'}
+          onRowClick={(row) => setEditContestId(row.id)}
+        />
+      </AdminPageShell>
 
- <AdminCreateContestModal
- open={createOpen || !!editContestId}
- contestId={editContestId}
- onClose={() => {
- setCreateOpen(false)
- setEditContestId(null)
- }}
- onCreated={() => fetchContests()}
- onSaved={() => fetchContests()}
- />
- </>
- )
+      {showDeleteModal && selectedContest && (
+        <Modal
+          open
+          onClose={() => {
+            setShowDeleteModal(false)
+            setSelectedContest(null)
+          }}
+          title="确认删除"
+          footer={
+            <div className="flex gap-3 justify-end w-full">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setSelectedContest(null)
+                }}
+                className="btn btn-ghost"
+              >
+                取消
+              </button>
+              <button onClick={handleDeleteContest} className="btn btn-destructive">
+                确认删除
+              </button>
+            </div>
+          }
+        >
+          <p className="text-muted-foreground">
+            确定要删除竞赛{' '}
+            <span className="text-foreground font-medium">{selectedContest.title}</span> 吗？
+            此操作无法撤销。
+          </p>
+        </Modal>
+      )}
+
+      <AdminCreateContestModal
+        open={createOpen || !!editContestId}
+        contestId={editContestId}
+        onClose={() => {
+          setCreateOpen(false)
+          setEditContestId(null)
+        }}
+        onCreated={() => fetchContests()}
+        onSaved={() => fetchContests()}
+      />
+    </>
+  )
 }
 
 export default function AdminContestsPage() {
- return (
- <Suspense fallback={<RouteSuspenseFallback label="加载中..." />}>
- <AdminContestsPageContent />
- </Suspense>
- )
+  return (
+    <Suspense fallback={<RouteSuspenseFallback label="加载中..." />}>
+      <AdminContestsPageContent />
+    </Suspense>
+  )
 }

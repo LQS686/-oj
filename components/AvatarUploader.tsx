@@ -10,478 +10,490 @@ import { useDialog } from '@/components/common/DialogProvider'
 import { logger } from '@/lib/logger'
 
 interface UploadHistory {
- id: string
- url: string
- filename: string
- size: number
- createdAt: string
+  id: string
+  url: string
+  filename: string
+  size: number
+  createdAt: string
 }
 
 export default function AvatarUploader({
- currentAvatar,
- onAvatarUpdate,
- /** compact：设置页用的紧凑横条，避免占满半栏 */
- variant = 'default',
+  currentAvatar,
+  onAvatarUpdate,
+  /** compact：设置页用的紧凑横条，避免占满半栏 */
+  variant = 'default',
 }: {
- currentAvatar?: string | null
- onAvatarUpdate: (url: string) => void
- variant?: 'default' | 'compact'
+  currentAvatar?: string | null
+  onAvatarUpdate: (url: string) => void
+  variant?: 'default' | 'compact'
 }) {
- const isCompact = variant === 'compact'
- const dialog = useDialog()
- const [file, setFile] = useState<File | null>(null)
- const [preview, setPreview] = useState<string | null>(null)
- const [uploading, setUploading] = useState(false)
- const [progress, setProgress] = useState(0)
- const [error, setError] = useState<string | null>(null)
- const [history, setHistory] = useState<UploadHistory[]>([])
- const [showHistory, setShowHistory] = useState(false)
- const [deletingId, setDeletingId] = useState<string | null>(null)
- 
- const fileInputRef = useRef<HTMLInputElement>(null)
- const CHUNK_SIZE = 1024 * 1024 // 1MB
+  const isCompact = variant === 'compact'
+  const dialog = useDialog()
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [history, setHistory] = useState<UploadHistory[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
- const fetchHistory = useCallback(async () => {
- try {
- const res = await fetchWithCookie('/api/users/avatar/history')
- const data = await res.json()
- if (data.success) {
- setHistory(data.data)
- }
- } catch (err) {
- logger.error('Failed to fetch history', err)
- }
- }, [])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const CHUNK_SIZE = 1024 * 1024 // 1MB
 
- useDeferredEffect(() => {
- void fetchHistory()
- }, [fetchHistory])
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetchWithCookie('/api/users/avatar/history')
+      const data = await res.json()
+      if (data.success) {
+        setHistory(data.data)
+      }
+    } catch (err) {
+      logger.error('Failed to fetch history', err)
+    }
+  }, [])
 
- const compressImage = (file: File): Promise<File> => {
- return new Promise((resolve) => {
- const canvas = document.createElement('canvas')
- const ctx = canvas.getContext('2d')
- const img = new window.Image()
+  useDeferredEffect(() => {
+    void fetchHistory()
+  }, [fetchHistory])
 
- img.onload = () => {
- // 计算压缩后的尺寸，保持宽高比
- const maxWidth = 800
- const maxHeight = 800
- let width = img.width
- let height = img.height
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = new window.Image()
 
- if (width > maxWidth) {
- height = (height * maxWidth) / width
- width = maxWidth
- }
+      img.onload = () => {
+        // 计算压缩后的尺寸，保持宽高比
+        const maxWidth = 800
+        const maxHeight = 800
+        let width = img.width
+        let height = img.height
 
- if (height > maxHeight) {
- width = (width * maxHeight) / height
- height = maxHeight
- }
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
 
- canvas.width = width
- canvas.height = height
+        if (height > maxHeight) {
+          width = (width * maxHeight) / height
+          height = maxHeight
+        }
 
- // 绘制压缩后的图片
- ctx?.drawImage(img, 0, 0, width, height)
+        canvas.width = width
+        canvas.height = height
 
- // 将canvas转换为blob
- canvas.toBlob(
- (blob) => {
- if (blob) {
- const compressedFile = new File([blob], file.name, {
- type: file.type,
- lastModified: Date.now()
- })
- resolve(compressedFile)
- } else {
- resolve(file)
- }
- },
- file.type,
- 0.7 // 压缩质量
- )
- }
+        // 绘制压缩后的图片
+        ctx?.drawImage(img, 0, 0, width, height)
 
- img.src = URL.createObjectURL(file)
- })
- }
+        // 将canvas转换为blob
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: file.type,
+                lastModified: Date.now(),
+              })
+              resolve(compressedFile)
+            } else {
+              resolve(file)
+            }
+          },
+          file.type,
+          0.7 // 压缩质量
+        )
+      }
 
- const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
- const selectedFile = e.target.files?.[0]
- if (!selectedFile) return
-
- // Validation
- const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
- if (!validTypes.includes(selectedFile.type)) {
- setError('只支持 JPG, PNG, GIF, WebP 格式')
- return
- }
-
- if (selectedFile.size > 5 * 1024 * 1024) {
- setError('文件大小不能超过 5MB')
- return
- }
-
- setError(null)
-
- // 压缩图片
- const compressedFile = await compressImage(selectedFile)
- setFile(compressedFile)
-
- // Preview
- const reader = new FileReader()
- reader.onloadend = () => setPreview(reader.result as string)
- reader.readAsDataURL(compressedFile)
- }
-
- const uploadChunks = async (uploadId: string, file: File) => {
- const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
- 
- for (let i = 0; i < totalChunks; i++) {
- const start = i * CHUNK_SIZE
- const end = Math.min(start + CHUNK_SIZE, file.size)
- const chunk = file.slice(start, end)
- 
- const formData = new FormData()
- formData.append('uploadId', uploadId)
- formData.append('chunkIndex', i.toString())
- formData.append('file', chunk)
-
-  const res = await fetchWithCookie('/api/users/avatar/upload/chunk', {
- method: 'POST',
- body: formData
- })
- 
- if (!res.ok) throw new Error(`Chunk ${i} failed`)
- 
- // Update progress
- const percent = Math.round(((i + 1) / totalChunks) * 90) // 90% for upload, 10% for merge
- setProgress(percent)
- }
- }
-
- const handleUpload = async () => {
- if (!file) return
-
- setUploading(true)
- setProgress(0)
- setError(null)
-
- try {
- // 1. Init
-  const initRes = await fetchWithCookie('/api/users/avatar/upload/init', {
- method: 'POST',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({
- filename: file.name,
- fileSize: file.size
- })
- })
- 
- const initData = await initRes.json()
- if (!initData.success) throw new Error(initData.error)
- 
- const { uploadId } = initData.data
-
- // 2. Upload Chunks
- await uploadChunks(uploadId, file)
-
- // 3. Complete
-  const completeRes = await fetchWithCookie('/api/users/avatar/upload/complete', {
- method: 'POST',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({
- uploadId,
- filename: file.name,
- totalChunks: Math.ceil(file.size / CHUNK_SIZE)
- })
- })
-
- const completeData = await completeRes.json()
- if (!completeData.success) throw new Error(completeData.error)
-
- setProgress(100)
- onAvatarUpdate(completeData.data.avatar)
- setFile(null)
- setPreview(null)
- fetchHistory() // Refresh history
- 
- } catch (err: unknown) {
- const e = errorLike(err)
- setError(e.message || '上传失败')
- setProgress(0)
- } finally {
- setUploading(false)
- }
- }
-
- const handleHistorySelect = async (historyItem: UploadHistory) => {
- // Ideally we should have an API to "restore" old avatar, 
- // but for now we just update user to use this URL.
- // However, backend update is needed.
- // I'll assume passing the URL to onAvatarUpdate is enough for frontend, 
- // but backend state needs sync.
- // Let's call a simple update profile API or similar if we had one for just URL.
- // Or just re-upload? No, that's wasteful.
- // We can call the profile update API.
-
- try {
-  const res = await fetchWithCookie('/api/users/profile', {
-   method: 'PUT',
-   headers: { 'Content-Type': 'application/json' },
-   body: JSON.stringify({ avatar: historyItem.url }) // Assuming this API supports avatar update
-  })
-  if (res.ok) {
-   onAvatarUpdate(historyItem.url)
+      img.src = URL.createObjectURL(file)
+    })
   }
- } catch (e) {
-  console.error(e)
- }
- }
 
- const handleHistoryDelete = async (e: React.MouseEvent, historyItem: UploadHistory) => {
-  // 阻止冒泡，避免触发卡片的选择头像逻辑
-  e.stopPropagation()
-  // 模态框确认：删除不可恢复（含上传文件）
-  const ok = await dialog.confirm({
-    title: '删除历史头像',
-    message: '确定删除该历史头像？删除后将同步移除已上传的图片文件，且不可恢复。',
-    tone: 'warning',
-    confirmText: '删除',
-    confirmVariant: 'destructive',
-    cancelText: '取消',
-  })
-  if (!ok) return
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (!selectedFile) return
 
-  setDeletingId(historyItem.id)
-  try {
-   const res = await fetchWithCookie(`/api/users/avatar/history/${historyItem.id}`, {
-    method: 'DELETE',
-   })
-   const data = await res.json()
-   if (!res.ok || !data.success) {
-    throw new Error(data.error || '删除失败')
-   }
-   // 从列表中移除
-   setHistory((prev) => prev.filter((item) => item.id !== historyItem.id))
-  } catch (err: unknown) {
-   const e = errorLike(err)
-   setError(e.message || '删除头像历史失败')
-  } finally {
-   setDeletingId(null)
+    // Validation
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if (!validTypes.includes(selectedFile.type)) {
+      setError('只支持 JPG, PNG, GIF, WebP 格式')
+      return
+    }
+
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      setError('文件大小不能超过 5MB')
+      return
+    }
+
+    setError(null)
+
+    // 压缩图片
+    const compressedFile = await compressImage(selectedFile)
+    setFile(compressedFile)
+
+    // Preview
+    const reader = new FileReader()
+    reader.onloadend = () => setPreview(reader.result as string)
+    reader.readAsDataURL(compressedFile)
   }
- }
 
- return (
- <div className="w-full">
- <div
- className={
- isCompact
- ? 'flex flex-row gap-4 items-center'
- : 'flex flex-col md:flex-row gap-6 items-start'
- }
- >
- {/* Preview Area */}
- <div className="relative group shrink-0">
- <div
- className={`${
- isCompact ? 'w-20 h-20 border-2' : 'w-32 h-32 border-4'
- } rounded-full overflow-hidden border-border shadow-sm bg-muted flex items-center justify-center`}
- role="img"
- aria-label={currentAvatar ? '当前头像' : '无头像'}
- >
- {preview ? (
- <Image
- src={preview}
- alt="预览头像"
- width={isCompact ? 80 : 128}
- height={isCompact ? 80 : 128}
- className="object-cover w-full h-full"
- />
- ) : currentAvatar ? (
- <Image
- src={currentAvatar}
- alt="当前头像"
- width={isCompact ? 80 : 128}
- height={isCompact ? 80 : 128}
- className="object-cover w-full h-full"
- loading="lazy"
- />
- ) : (
- <div className="text-muted-foreground" aria-hidden="true">
- <Camera size={isCompact ? 28 : 48} />
- </div>
- )}
- </div>
+  const uploadChunks = async (uploadId: string, file: File) => {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
 
- <button
- onClick={() => fileInputRef.current?.click()}
- onKeyDown={(e) => {
- if (e.key === 'Enter' || e.key === ' ') {
- e.preventDefault()
- fileInputRef.current?.click()
- }
- }}
- className={`absolute bottom-0 right-0 bg-primary text-primary-foreground ${
- isCompact ? 'p-1.5' : 'p-2.5'
- } rounded-full hover:opacity-90 shadow-md transition-transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2`}
- title="选择图片"
- aria-label="选择头像图片"
- >
- <Camera size={isCompact ? 14 : 18} />
- </button>
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, file.size)
+      const chunk = file.slice(start, end)
 
- <input
- ref={fileInputRef}
- type="file"
- accept="image/*"
- onChange={handleFileChange}
- className="hidden"
- />
- </div>
+      const formData = new FormData()
+      formData.append('uploadId', uploadId)
+      formData.append('chunkIndex', i.toString())
+      formData.append('file', chunk)
 
- {/* Controls */}
- <div className={`flex-1 min-w-0 ${isCompact ? 'space-y-2' : 'space-y-4 w-full'}`}>
- <div>
- {!isCompact && <h3 className="text-lg font-medium text-foreground">头像设置</h3>}
- <p className={`text-sm text-muted-foreground ${isCompact ? '' : 'mt-1'}`}>
- {isCompact
- ? '点击相机更换头像 · JPG / PNG / GIF / WebP，最大 5MB'
- : '支持 JPG, PNG, GIF, WebP 格式，最大 5MB。'}
- </p>
- </div>
+      const res = await fetchWithCookie('/api/users/avatar/upload/chunk', {
+        method: 'POST',
+        body: formData,
+      })
 
- {error && (
- <div className="flex items-center gap-2 text-error text-sm bg-error/10 p-3 rounded-md">
- <AlertCircle size={16} />
- {error}
- </div>
- )}
+      if (!res.ok) throw new Error(`Chunk ${i} failed`)
 
- {file && (
- <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
- <div className="flex items-center justify-between mb-2">
- <span className="text-sm font-medium text-foreground truncate max-w-[200px]">{file.name}</span>
- <button 
- onClick={() => { setFile(null); setPreview(null); setError(null); }}
- className="text-muted-foreground hover:text-foreground"
- >
- <X size={16} />
- </button>
- </div>
- 
- {uploading ? (
- <div className="space-y-1">
- <div className="flex justify-between text-xs text-primary">
- <span>上传中...</span>
- <span>{progress}%</span>
- </div>
- <div className="h-2 bg-muted rounded-full overflow-hidden">
- <div 
- className="h-full bg-primary transition-all duration-300"
- style={{ width: `${progress}%` }}
- />
- </div>
- </div>
- ) : (
- <button
- onClick={handleUpload}
- onKeyDown={(e) => {
- if (e.key === 'Enter' || e.key === ' ') {
- e.preventDefault();
- handleUpload();
- }
- }}
- className="w-full flex items-center justify-center gap-2 btn btn-primary py-2 px-4 text-sm font-medium"
- aria-label="确认上传头像"
- >
- <Upload size={16} />
- 确认上传
- </button>
- )}
- </div>
- )}
+      // Update progress
+      const percent = Math.round(((i + 1) / totalChunks) * 90) // 90% for upload, 10% for merge
+      setProgress(percent)
+    }
+  }
 
- <div className={isCompact ? '' : 'pt-2 border-t border-border'}>
- <button
- onClick={() => setShowHistory(!showHistory)}
- onKeyDown={(e) => {
- if (e.key === 'Enter' || e.key === ' ') {
- e.preventDefault()
- setShowHistory(!showHistory)
- }
- }}
- className="flex items-center gap-1.5 text-sm text-primary-light hover:underline focus:outline-none"
- aria-expanded={showHistory}
- aria-label={showHistory ? '隐藏历史记录' : '查看上传历史'}
- >
- <History size={14} />
- {showHistory ? '隐藏历史上传' : '查看上传历史'}
- </button>
- </div>
- </div>
- </div>
+  const handleUpload = async () => {
+    if (!file) return
 
- {/* History List */}
- {showHistory && (
- <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
- <h4 className="text-sm font-medium text-foreground mb-3">历史头像</h4>
- <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
- {history.map((item) => (
- <div 
- key={item.id} 
- className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:ring-2 hover:ring-blue-500 hover:border-transparent transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
- role="button"
- tabIndex={0}
- onClick={() => handleHistorySelect(item)}
- onKeyDown={(e) => {
- if (e.key === 'Enter' || e.key === ' ') {
- e.preventDefault();
- handleHistorySelect(item);
- }
- }}
- aria-label="选择历史头像"
- >
- <Image 
- src={item.url} 
- alt={`历史头像 ${item.filename}`} 
- fill 
- className="object-cover"
- loading="lazy"
- />
- <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" aria-hidden="true" />
- <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
- <div className="bg-background p-1 rounded-full shadow-sm text-primary">
- <Check size={12} />
- </div>
- </div>
- {/* 删除按钮：右上角，hover 显示；点击删除 DB 记录 + 上传文件 */}
- <button
- type="button"
- disabled={deletingId === item.id}
- onClick={(e) => handleHistoryDelete(e, item)}
- className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity bg-error hover:bg-error/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground p-1.5 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-error focus:ring-offset-1"
- title="删除该历史头像"
- aria-label={`删除历史头像 ${item.filename}`}
- >
- {deletingId === item.id ? (
- <Loader2 size={12} className="animate-spin" />
- ) : (
- <Trash2 size={12} />
- )}
- </button>
- </div>
- ))}
- {history.length === 0 && (
- <div className="col-span-full text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-lg border border-dashed border-gray-200">
- 暂无历史记录
- </div>
- )}
- </div>
- </div>
- )}
- </div>
- )
+    setUploading(true)
+    setProgress(0)
+    setError(null)
+
+    try {
+      // 1. Init
+      const initRes = await fetchWithCookie('/api/users/avatar/upload/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          fileSize: file.size,
+        }),
+      })
+
+      const initData = await initRes.json()
+      if (!initData.success) throw new Error(initData.error)
+
+      const { uploadId } = initData.data
+
+      // 2. Upload Chunks
+      await uploadChunks(uploadId, file)
+
+      // 3. Complete
+      const completeRes = await fetchWithCookie('/api/users/avatar/upload/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uploadId,
+          filename: file.name,
+          totalChunks: Math.ceil(file.size / CHUNK_SIZE),
+        }),
+      })
+
+      const completeData = await completeRes.json()
+      if (!completeData.success) throw new Error(completeData.error)
+
+      setProgress(100)
+      onAvatarUpdate(completeData.data.avatar)
+      setFile(null)
+      setPreview(null)
+      fetchHistory() // Refresh history
+    } catch (err: unknown) {
+      const e = errorLike(err)
+      setError(e.message || '上传失败')
+      setProgress(0)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleHistorySelect = async (historyItem: UploadHistory) => {
+    // Ideally we should have an API to "restore" old avatar,
+    // but for now we just update user to use this URL.
+    // However, backend update is needed.
+    // I'll assume passing the URL to onAvatarUpdate is enough for frontend,
+    // but backend state needs sync.
+    // Let's call a simple update profile API or similar if we had one for just URL.
+    // Or just re-upload? No, that's wasteful.
+    // We can call the profile update API.
+
+    try {
+      const res = await fetchWithCookie('/api/users/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar: historyItem.url }), // Assuming this API supports avatar update
+      })
+      if (res.ok) {
+        onAvatarUpdate(historyItem.url)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleHistoryDelete = async (e: React.MouseEvent, historyItem: UploadHistory) => {
+    // 阻止冒泡，避免触发卡片的选择头像逻辑
+    e.stopPropagation()
+    // 模态框确认：删除不可恢复（含上传文件）
+    const ok = await dialog.confirm({
+      title: '删除历史头像',
+      message: '确定删除该历史头像？删除后将同步移除已上传的图片文件，且不可恢复。',
+      tone: 'warning',
+      confirmText: '删除',
+      confirmVariant: 'destructive',
+      cancelText: '取消',
+    })
+    if (!ok) return
+
+    setDeletingId(historyItem.id)
+    try {
+      const res = await fetchWithCookie(`/api/users/avatar/history/${historyItem.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || '删除失败')
+      }
+      // 从列表中移除
+      setHistory((prev) => prev.filter((item) => item.id !== historyItem.id))
+    } catch (err: unknown) {
+      const e = errorLike(err)
+      setError(e.message || '删除头像历史失败')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="w-full">
+      <div
+        className={
+          isCompact
+            ? 'flex flex-row gap-4 items-center'
+            : 'flex flex-col md:flex-row gap-6 items-start'
+        }
+      >
+        {/* Preview Area */}
+        <div className="relative group shrink-0">
+          <div
+            className={`${
+              isCompact ? 'w-20 h-20 border-2' : 'w-32 h-32 border-4'
+            } rounded-full overflow-hidden border-border shadow-sm bg-muted flex items-center justify-center`}
+            role="img"
+            aria-label={currentAvatar ? '当前头像' : '无头像'}
+          >
+            {preview ? (
+              <Image
+                src={preview}
+                alt="预览头像"
+                width={isCompact ? 80 : 128}
+                height={isCompact ? 80 : 128}
+                className="object-cover w-full h-full"
+              />
+            ) : currentAvatar ? (
+              <Image
+                src={currentAvatar}
+                alt="当前头像"
+                width={isCompact ? 80 : 128}
+                height={isCompact ? 80 : 128}
+                className="object-cover w-full h-full"
+                loading="lazy"
+              />
+            ) : (
+              <div className="text-muted-foreground" aria-hidden="true">
+                <Camera size={isCompact ? 28 : 48} />
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                fileInputRef.current?.click()
+              }
+            }}
+            className={`absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full ${
+              isCompact ? 'btn-icon-sm' : 'btn-icon'
+            } hover:opacity-90 shadow-md transition-transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2`}
+            title="选择图片"
+            aria-label="选择头像图片"
+          >
+            <Camera size={isCompact ? 14 : 18} />
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
+
+        {/* Controls */}
+        <div className={`flex-1 min-w-0 ${isCompact ? 'space-y-2' : 'space-y-4 w-full'}`}>
+          <div>
+            {!isCompact && <h3 className="text-section-title text-foreground">头像设置</h3>}
+            <p className={`text-sm text-muted-foreground ${isCompact ? '' : 'mt-1'}`}>
+              {isCompact
+                ? '点击相机更换头像 · JPG / PNG / GIF / WebP，最大 5MB'
+                : '支持 JPG, PNG, GIF, WebP 格式，最大 5MB。'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 text-error text-sm bg-error/10 p-3 rounded-md">
+              <AlertCircle size={16} />
+              {error}
+            </div>
+          )}
+
+          {file && (
+            <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-subsection-title text-foreground truncate max-w-[200px]">
+                  {file.name}
+                </span>
+                <button
+                  onClick={() => {
+                    setFile(null)
+                    setPreview(null)
+                    setError(null)
+                  }}
+                  className="btn-icon-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="取消选择"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {uploading ? (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-primary">
+                    <span>上传中...</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleUpload}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleUpload()
+                    }
+                  }}
+                  className="w-full btn btn-primary"
+                  aria-label="确认上传头像"
+                >
+                  <Upload size={16} />
+                  确认上传
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className={isCompact ? '' : 'pt-2 border-t border-border'}>
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setShowHistory(!showHistory)
+                }
+              }}
+              className="flex items-center gap-1.5 text-sm text-primary-light hover:underline focus:outline-none"
+              aria-expanded={showHistory}
+              aria-label={showHistory ? '隐藏历史记录' : '查看上传历史'}
+            >
+              <History size={14} />
+              {showHistory ? '隐藏历史上传' : '查看上传历史'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* History List */}
+      {showHistory && (
+        <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <h4 className="text-subsection-title text-foreground mb-3">历史头像</h4>
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
+            {history.map((item) => (
+              <div
+                key={item.id}
+                className="group relative aspect-square rounded-lg overflow-hidden border border-border cursor-pointer hover:ring-2 hover:ring-primary hover:border-transparent transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                role="button"
+                tabIndex={0}
+                onClick={() => handleHistorySelect(item)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleHistorySelect(item)
+                  }
+                }}
+                aria-label="选择历史头像"
+              >
+                <Image
+                  src={item.url}
+                  alt={`历史头像 ${item.filename}`}
+                  fill
+                  className="object-cover"
+                  loading="lazy"
+                />
+                <div
+                  className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-hidden="true"
+                >
+                  <div className="bg-background p-1 rounded-full shadow-sm text-primary">
+                    <Check size={12} />
+                  </div>
+                </div>
+                {/* 删除按钮：右上角，hover 显示；点击删除 DB 记录 + 上传文件 */}
+                <button
+                  type="button"
+                  disabled={deletingId === item.id}
+                  onClick={(e) => handleHistoryDelete(e, item)}
+                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity bg-error hover:bg-error/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground p-1.5 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-error focus:ring-offset-1"
+                  title="删除该历史头像"
+                  aria-label={`删除历史头像 ${item.filename}`}
+                >
+                  {deletingId === item.id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={12} />
+                  )}
+                </button>
+              </div>
+            ))}
+            {history.length === 0 && (
+              <div className="col-span-full text-center py-8 text-sm text-muted-foreground bg-muted rounded-lg border border-dashed border-border">
+                暂无历史记录
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }

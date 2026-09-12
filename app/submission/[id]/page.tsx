@@ -191,8 +191,10 @@ function TestPointRow({
             ) : (
               getTestStatusIcon(result.status)
             )}
-            <span className="text-sm font-medium text-foreground">#{index + 1}</span>
-            <span className="text-xs text-muted-foreground truncate">{getStatusText(result.status)}</span>
+            <span className="text-subsection-title text-foreground">#{index + 1}</span>
+            <span className="text-xs text-muted-foreground truncate">
+              {getStatusText(result.status)}
+            </span>
           </div>
           <div className="flex items-center gap-3 text-xs font-mono tabular-nums text-muted-foreground shrink-0">
             <span>{judging ? '—' : formatTime(result.time)}</span>
@@ -390,7 +392,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
           <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-error/10 flex items-center justify-center">
             <XCircle className="w-7 h-7 text-error" />
           </div>
-          <h2 className="text-lg font-bold text-foreground mb-2">加载失败</h2>
+          <h2 className="text-section-title text-foreground mb-2">加载失败</h2>
           <p className="text-sm text-muted-foreground mb-6 max-w-md">{error}</p>
           <button type="button" onClick={() => router.back()} className="btn btn-primary">
             返回
@@ -412,15 +414,12 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const judging = isNonFinalSubmissionStatus(submission.status)
   const problemHref = `/problem/${submission.problem.problemNumber || submission.problem.id}`
   const codeLines = submission.code ? submission.code.split('\n').length : 0
-  const showTests =
-    judging || !!(submission.testResults && submission.testResults.length > 0)
+  const showTests = judging || !!(submission.testResults && submission.testResults.length > 0)
   const firstWaIndex = findFirstWaIndex(submission.testResults)
   const canDownloadWa =
     firstWaIndex >= 0 &&
     !!user &&
-    (submission.user.id === user.id ||
-      user.role === 'SYSTEM_ADMIN' ||
-      user.role === 'ADMIN')
+    (submission.user.id === user.id || user.role === 'SYSTEM_ADMIN' || user.role === 'ADMIN')
 
   const handleDownloadWa = async () => {
     if (waDownloading) return
@@ -442,12 +441,12 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
           <button
             type="button"
             onClick={() => router.push('/submissions')}
-            className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+            className="btn btn-sm btn-outline gap-1.5"
           >
             <ArrowLeft className="w-4 h-4" />
             提交记录
           </button>
-          <Link href={problemHref} className="btn btn-primary text-sm py-1.5 px-3 gap-1.5">
+          <Link href={problemHref} className="btn btn-sm btn-primary gap-1.5">
             返回题目
           </Link>
           {judging && (
@@ -460,7 +459,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
         <header className="mb-4">
           <div className="flex flex-wrap items-center gap-2.5 mb-2">
-            <h1 className="text-xl font-bold text-foreground min-w-0">
+            <h1 className="text-page-title text-foreground min-w-0">
               {submission.problem.problemNumber && (
                 <span className="font-mono text-muted-foreground mr-1.5 text-base">
                   {submission.problem.problemNumber}
@@ -510,16 +509,14 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         {(submission.message || isCe) && (
           <div
             className={`mb-4 rounded-lg border p-3.5 flex gap-3 ${
-              isCe || !isAc
-                ? 'bg-error/5 border-error/25'
-                : 'bg-accent/10 border-accent/25'
+              isCe || !isAc ? 'bg-error/5 border-error/25' : 'bg-accent/10 border-accent/25'
             }`}
           >
             <AlertTriangle
               className={`w-5 h-5 shrink-0 mt-0.5 ${isCe || !isAc ? 'text-error' : 'text-accent'}`}
             />
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-foreground mb-1">
+              <div className="text-subsection-title text-foreground mb-1">
                 {isCe ? '编译信息' : '评测信息'}
               </div>
               <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words max-h-48 overflow-auto custom-scrollbar">
@@ -536,7 +533,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         >
           <section className="card-static p-4 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <h2 className="text-subsection-title text-foreground flex items-center gap-2">
                 <Code className="w-4 h-4 text-primary" />
                 提交代码
                 <span className="text-xs font-normal text-muted-foreground">
@@ -546,7 +543,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
               <button
                 type="button"
                 onClick={() => void handleCopyCode()}
-                className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+                className="btn btn-sm btn-outline gap-1.5"
                 disabled={!submission.code}
               >
                 {copied ? (
@@ -579,11 +576,11 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
           </section>
 
           {(showTests || submissionHistory.length > 0 || historyLoading) && (
-            <aside className="space-y-4 min-w-0">
+            <aside className="space-y-6 min-w-0">
               {showTests && (
                 <section className="card-static p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <h2 className="text-subsection-title text-foreground flex items-center gap-2">
                       <Target className="w-4 h-4 text-primary" />
                       测试点
                     </h2>
@@ -591,9 +588,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                       {submission.passedTests}/{submission.totalTests}
                     </span>
                   </div>
-                  {waDownloadError && (
-                    <p className="mb-2 text-xs text-error">{waDownloadError}</p>
-                  )}
+                  {waDownloadError && <p className="mb-2 text-xs text-error">{waDownloadError}</p>}
                   <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar">
                     {submission.testResults && submission.testResults.length > 0 ? (
                       submission.testResults.map((result, index) => (
@@ -617,7 +612,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
               )}
 
               <section className="card-static p-4">
-                <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <h2 className="text-subsection-title text-foreground mb-3 flex items-center gap-2">
                   <History className="w-4 h-4 text-accent" />
                   本题近期提交
                 </h2>

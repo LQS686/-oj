@@ -45,9 +45,7 @@ export async function listTrainings(
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
   const where: Prisma.TrainingWhereInput = {}
   if (filter.keyword) {
-    where.OR = [
-      { title: { contains: filter.keyword, mode: 'insensitive' } },
-    ]
+    where.OR = [{ title: { contains: filter.keyword, mode: 'insensitive' } }]
   }
   if (filter.isPublic !== undefined) where.isPublic = filter.isPublic
   if (filter.categoryId) where.categoryId = filter.categoryId
@@ -65,12 +63,17 @@ export async function listTrainings(
 }
 
 export async function getTrainingById(id: string) {
-  return cache.get('training:byId', [id], async () => {
-    return prisma.training.findUnique({
-      where: { id },
-      include: { problems: { include: { problem: true }, orderBy: { orderIndex: 'asc' } } },
-    })
-  }, { ttl: TRAINING_DETAIL_TTL })
+  return cache.get(
+    'training:byId',
+    [id],
+    async () => {
+      return prisma.training.findUnique({
+        where: { id },
+        include: { problems: { include: { problem: true }, orderBy: { orderIndex: 'asc' } } },
+      })
+    },
+    { ttl: TRAINING_DETAIL_TTL }
+  )
 }
 
 export async function createTraining(data: Prisma.TrainingUncheckedCreateInput) {

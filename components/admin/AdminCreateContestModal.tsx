@@ -26,7 +26,7 @@ const defaultForm = () => ({
   endTime: '',
   isPublic: true,
   password: '',
-  sealRankTime: ''
+  sealRankTime: '',
 })
 
 export default function AdminCreateContestModal({
@@ -67,7 +67,8 @@ export default function AdminCreateContestModal({
   }, [])
 
   const applyContest = useCallback((contest: Record<string, unknown>) => {
-    const hasPassword = !!contest.hasPassword || (typeof contest.password === 'string' && contest.password.length > 0)
+    const hasPassword =
+      !!contest.hasPassword || (typeof contest.password === 'string' && contest.password.length > 0)
     setFormData({
       title: typeof contest.title === 'string' ? contest.title : '',
       description: typeof contest.description === 'string' ? contest.description : '',
@@ -142,11 +143,17 @@ export default function AdminCreateContestModal({
         let page = 1
         const pageSize = 100
         for (;;) {
-          const response = await fetchWithCookie(`/api/admin/problems?page=${page}&pageSize=${pageSize}`)
+          const response = await fetchWithCookie(
+            `/api/admin/problems?page=${page}&pageSize=${pageSize}`
+          )
           const data = await response.json()
           if (!data.success) break
           const payload = data.data
-          const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []
+          const rows = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : []
           all.push(...rows)
           const totalPages = payload?.pagination?.totalPages ?? 1
           if (page >= totalPages || rows.length === 0) break
@@ -163,12 +170,17 @@ export default function AdminCreateContestModal({
     fetchProblems()
   }, [open])
 
-  const handleProblemsChange = useCallback((ids: string[]) => {
-    // 公开题从 allProblems 重建；编辑态/加载中竞赛可能含不在 allProblems 里的题目，从原 contestProblems 保留
-    const map = new Map(allProblems.map((p) => [p.id, p]))
-    const existing = new Map(contestProblems.map((p) => [p.id, p]))
-    setContestProblems(ids.map((id) => map.get(id) ?? existing.get(id)).filter((p): p is Problem => !!p))
-  }, [allProblems, contestProblems])
+  const handleProblemsChange = useCallback(
+    (ids: string[]) => {
+      // 公开题从 allProblems 重建；编辑态/加载中竞赛可能含不在 allProblems 里的题目，从原 contestProblems 保留
+      const map = new Map(allProblems.map((p) => [p.id, p]))
+      const existing = new Map(contestProblems.map((p) => [p.id, p]))
+      setContestProblems(
+        ids.map((id) => map.get(id) ?? existing.get(id)).filter((p): p is Problem => !!p)
+      )
+    },
+    [allProblems, contestProblems]
+  )
 
   const buildPayload = () => {
     const payload: Record<string, unknown> = {
@@ -245,7 +257,7 @@ export default function AdminCreateContestModal({
         <div className="px-5 py-16 text-center text-sm text-muted-foreground">加载竞赛中…</div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-6">
             {error && (
               <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -254,7 +266,7 @@ export default function AdminCreateContestModal({
             )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
+              <label className="block text-label text-foreground mb-1.5">
                 竞赛名称 <span className="text-error">*</span>
               </label>
               <input
@@ -268,9 +280,7 @@ export default function AdminCreateContestModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                竞赛描述
-              </label>
+              <label className="block text-label text-foreground mb-1.5">竞赛描述</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -282,9 +292,7 @@ export default function AdminCreateContestModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  赛制类型
-                </label>
+                <label className="block text-label text-foreground mb-1.5">赛制类型</label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -296,12 +304,12 @@ export default function AdminCreateContestModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  可见性
-                </label>
+                <label className="block text-label text-foreground mb-1.5">可见性</label>
                 <select
                   value={formData.isPublic ? 'public' : 'private'}
-                  onChange={(e) => setFormData({ ...formData, isPublic: e.target.value === 'public' })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, isPublic: e.target.value === 'public' })
+                  }
                   className="input w-full"
                 >
                   <option value="public">公开 (所有人可见)</option>
@@ -310,7 +318,7 @@ export default function AdminCreateContestModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="block text-label text-foreground mb-1.5">
                   开始时间 <span className="text-error">*</span>
                 </label>
                 <input
@@ -323,7 +331,7 @@ export default function AdminCreateContestModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="block text-label text-foreground mb-1.5">
                   结束时间 <span className="text-error">*</span>
                 </label>
                 <input
@@ -336,9 +344,7 @@ export default function AdminCreateContestModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  封榜时间 (可选)
-                </label>
+                <label className="block text-label text-foreground mb-1.5">封榜时间 (可选)</label>
                 <input
                   type="datetime-local"
                   value={formData.sealRankTime}
@@ -353,7 +359,7 @@ export default function AdminCreateContestModal({
 
             {!formData.isPublic && (
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="block text-label text-foreground mb-1.5">
                   参赛密码{' '}
                   {!(isEdit && existingHasPassword) && <span className="text-error">*</span>}
                 </label>
@@ -373,16 +379,16 @@ export default function AdminCreateContestModal({
             )}
 
             {/* 题目管理区 */}
-            <div className="card-static p-4 rounded-xl space-y-4">
+            <div className="card-static p-4 space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-3">
-                <h3 className="text-sm font-bold text-foreground">题目管理</h3>
+                <h3 className="text-subsection-title text-foreground">题目管理</h3>
                 <span className="tag">已添加 {contestProblems.length} 题</span>
               </div>
 
               <ProblemPicker
                 problems={allProblems}
                 problemsLoading={problemsLoading}
-                selectedIds={contestProblems.map(p => p.id)}
+                selectedIds={contestProblems.map((p) => p.id)}
                 selectedProblems={contestProblems}
                 onChange={handleProblemsChange}
                 emptyText="请使用上方工具添加题目到竞赛"
@@ -396,22 +402,37 @@ export default function AdminCreateContestModal({
                       </span>
                       <div className="flex flex-col flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-muted-foreground">{problem.problemNumber}</span>
-                          <span className="font-medium text-foreground text-sm">{problem.title}</span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {problem.problemNumber}
+                          </span>
+                          <span className="font-medium text-foreground text-sm">
+                            {problem.title}
+                          </span>
                         </div>
                         <div className="flex gap-2 mt-0.5">
-                          <span className={`tag text-xs ${
-                            vis === 'contest' ? 'tag-warning' :
-                              vis === 'public' ? 'tag-success' : ''
-                          }`}>
+                          <span
+                            className={`tag text-xs ${
+                              vis === 'contest'
+                                ? 'tag-warning'
+                                : vis === 'public'
+                                  ? 'tag-success'
+                                  : ''
+                            }`}
+                          >
                             {vis === 'contest' ? '竞赛' : vis === 'public' ? '公开' : '隐藏'}
                           </span>
-                          <span className="text-xs text-muted-foreground">{problem.difficulty}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {problem.difficulty}
+                          </span>
                         </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleProblemsChange(contestProblems.filter(p => p.id !== problem.id).map(p => p.id))}
+                        onClick={() =>
+                          handleProblemsChange(
+                            contestProblems.filter((p) => p.id !== problem.id).map((p) => p.id)
+                          )
+                        }
                         className="p-2 text-muted-foreground hover:text-error hover:bg-error/10 rounded-lg transition-colors shrink-0"
                         title="移除题目"
                       >

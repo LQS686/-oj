@@ -1,10 +1,10 @@
-import type { NextRequest } from 'next/server';
-import type * as Fs from 'fs';
-import type * as Path from 'path';
-import type * as AsyncHooks from 'node:async_hooks';
-import { resolveClientIp } from '@/lib/http/client-ip';
+import type { NextRequest } from 'next/server'
+import type * as Fs from 'fs'
+import type * as Path from 'path'
+import type * as AsyncHooks from 'node:async_hooks'
+import { resolveClientIp } from '@/lib/http/client-ip'
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 /**
  * 统一日志时间戳格式：本地时区 ISO 8601 带时区偏移
@@ -32,15 +32,15 @@ export function formatLogTimestamp(date: Date = new Date()): string {
 }
 
 export interface LogContext {
-  requestId?: string;
-  userId?: string;
-  [key: string]: unknown;
+  requestId?: string
+  userId?: string
+  [key: string]: unknown
 }
 
-const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error'];
-let fs: typeof Fs | null = null;
-let path: typeof Path | null = null;
-let LOG_DIR: string | null = null;
+const LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error']
+let fs: typeof Fs | null = null
+let path: typeof Path | null = null
+let LOG_DIR: string | null = null
 
 // 只在服务器端环境中导入 Node.js 核心模块
 if (typeof window === 'undefined') {
@@ -48,9 +48,7 @@ if (typeof window === 'undefined') {
   import('fs').then((module) => {
     fs = (module as { default?: typeof Fs }).default ?? (module as typeof Fs)
     import('path').then((pathModule) => {
-      path =
-        (pathModule as { default?: typeof Path }).default ??
-        (pathModule as typeof Path)
+      path = (pathModule as { default?: typeof Path }).default ?? (pathModule as typeof Path)
       LOG_DIR = path.join(process.cwd(), 'logs')
 
       // 确保日志目录存在
@@ -62,9 +60,9 @@ if (typeof window === 'undefined') {
 }
 
 function parseLogLevel(level: string | undefined): LogLevel {
-  if (!level) return 'info';
-  const normalized = level.toLowerCase() as LogLevel;
-  return LOG_LEVELS.includes(normalized) ? normalized : 'info';
+  if (!level) return 'info'
+  const normalized = level.toLowerCase() as LogLevel
+  return LOG_LEVELS.includes(normalized) ? normalized : 'info'
 }
 
 /**
@@ -103,16 +101,22 @@ function redactValue(value: unknown, seen: WeakSet<object> = new WeakSet()): unk
   seen.add(value as object)
 
   if (Array.isArray(value)) {
-    return value.map(v => redactValue(v, seen))
+    return value.map((v) => redactValue(v, seen))
   }
 
   const result: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     const lowerKey = k.toLowerCase()
-    const isSensitive = [...SENSITIVE_KEYS].some(s => lowerKey === s.toLowerCase() || lowerKey.includes(s.toLowerCase()))
+    const isSensitive = [...SENSITIVE_KEYS].some(
+      (s) => lowerKey === s.toLowerCase() || lowerKey.includes(s.toLowerCase())
+    )
     if (isSensitive && (typeof v === 'string' || typeof v === 'number')) {
       result[k] = REDACTED
-    } else if (typeof v === 'string' && v.length > 0 && (lowerKey.includes('bearer') || /^eyJ[A-Za-z0-9_-]{20,}/.test(v))) {
+    } else if (
+      typeof v === 'string' &&
+      v.length > 0 &&
+      (lowerKey.includes('bearer') || /^eyJ[A-Za-z0-9_-]{20,}/.test(v))
+    ) {
       // JWT-like 字符串（eyJ... 开头）也脱敏
       result[k] = REDACTED
     } else if (typeof v === 'object' && v !== null) {
@@ -125,11 +129,12 @@ function redactValue(value: unknown, seen: WeakSet<object> = new WeakSet()): unk
 }
 
 function resolveAsyncLocalStorageCtor():
-  | (new <T>() => { getStore(): T | undefined; enterWith(store: T): void })
-  | null {
-  const fromGlobal = (globalThis as typeof globalThis & {
-    AsyncLocalStorage?: new <T>() => { getStore(): T | undefined; enterWith(store: T): void }
-  }).AsyncLocalStorage
+  (new <T>() => { getStore(): T | undefined; enterWith(store: T): void }) | null {
+  const fromGlobal = (
+    globalThis as typeof globalThis & {
+      AsyncLocalStorage?: new <T>() => { getStore(): T | undefined; enterWith(store: T): void }
+    }
+  ).AsyncLocalStorage
   if (typeof fromGlobal === 'function') return fromGlobal
   // Node 下不依赖 polyfill 加载顺序；Edge / 浏览器无 async_hooks 则保持 null
   if (typeof process !== 'undefined' && process.versions?.node) {
@@ -148,18 +153,21 @@ function resolveAsyncLocalStorageCtor():
 }
 
 class Logger {
-  private level: LogLevel;
+  private level: LogLevel
   /** 无 ALS 时的进程级回退（Edge / 浏览器）；Node 请求上下文走 ALS */
-  private defaultContext: LogContext = {};
-  private readonly als: { getStore(): LogContext | undefined; enterWith(store: LogContext): void } | null
+  private defaultContext: LogContext = {}
+  private readonly als: {
+    getStore(): LogContext | undefined
+    enterWith(store: LogContext): void
+  } | null
 
   constructor() {
     if (process.env.LOG_LEVEL) {
-      this.level = parseLogLevel(process.env.LOG_LEVEL);
+      this.level = parseLogLevel(process.env.LOG_LEVEL)
     } else if (process.env.NODE_ENV === 'development') {
-      this.level = 'debug';
+      this.level = 'debug'
     } else {
-      this.level = 'info';
+      this.level = 'info'
     }
 
     const ALS = resolveAsyncLocalStorageCtor()
@@ -187,135 +195,144 @@ class Logger {
   }
 
   private formatMessage(level: LogLevel, message: string, meta?: unknown, context?: LogContext) {
-    const timestamp = formatLogTimestamp();
-    const mergedContext = redactValue({ ...this.activeContext(), ...context });
+    const timestamp = formatLogTimestamp()
+    const mergedContext = redactValue({ ...this.activeContext(), ...context })
     return {
       timestamp,
       level,
       message,
       ...(Object.keys(mergedContext as object).length > 0 && { context: mergedContext }),
       ...(meta != null ? { meta: redactValue(meta) } : {}),
-    };
+    }
   }
 
   private writeToFile(level: LogLevel, message: string, meta?: unknown, context?: LogContext) {
     // 只在服务器端环境中执行文件写入操作，并且确保 fs 和 path 已经加载
     if (typeof window === 'undefined' && fs && path && LOG_DIR) {
-      const logMessage = this.formatMessage(level, message, meta, context);
-      const logFilePath = path.join(LOG_DIR, `${level}.log`);
-      
+      const logMessage = this.formatMessage(level, message, meta, context)
+      const logFilePath = path.join(LOG_DIR, `${level}.log`)
+
       try {
-        fs.appendFileSync(logFilePath, JSON.stringify(logMessage) + '\n');
-        
+        fs.appendFileSync(logFilePath, JSON.stringify(logMessage) + '\n')
+
         // 检查文件大小，超过10MB则轮转
-        const stats = fs.statSync(logFilePath);
-        if (stats.size > 10 * 1024 * 1024) { // 10MB
-          const backupPath = path.join(LOG_DIR, `${level}.log.${Date.now()}`);
-          fs.renameSync(logFilePath, backupPath);
+        const stats = fs.statSync(logFilePath)
+        if (stats.size > 10 * 1024 * 1024) {
+          // 10MB
+          const backupPath = path.join(LOG_DIR, `${level}.log.${Date.now()}`)
+          fs.renameSync(logFilePath, backupPath)
         }
       } catch (error) {
-        console.error('Failed to write log to file:', error);
+        console.error('Failed to write log to file:', error)
       }
     }
   }
 
   debug(message: string, meta?: unknown, context?: LogContext) {
     if (this.shouldLog('debug')) {
-      const logMessage = this.formatMessage('debug', message, meta, context);
-      console.info(JSON.stringify(logMessage));
-      this.writeToFile('debug', message, meta, context);
+      const logMessage = this.formatMessage('debug', message, meta, context)
+      console.info(JSON.stringify(logMessage))
+      this.writeToFile('debug', message, meta, context)
     }
   }
 
   info(message: string, meta?: unknown, context?: LogContext) {
     if (this.shouldLog('info')) {
-      const logMessage = this.formatMessage('info', message, meta, context);
-      console.info(JSON.stringify(logMessage));
-      this.writeToFile('info', message, meta, context);
+      const logMessage = this.formatMessage('info', message, meta, context)
+      console.info(JSON.stringify(logMessage))
+      this.writeToFile('info', message, meta, context)
     }
   }
 
   warn(message: string, meta?: unknown, context?: LogContext) {
     if (this.shouldLog('warn')) {
-      const logMessage = this.formatMessage('warn', message, meta, context);
-      console.warn(JSON.stringify(logMessage));
-      this.writeToFile('warn', message, meta, context);
+      const logMessage = this.formatMessage('warn', message, meta, context)
+      console.warn(JSON.stringify(logMessage))
+      this.writeToFile('warn', message, meta, context)
     }
   }
 
   error(message: string, error?: unknown, context?: LogContext) {
     if (this.shouldLog('error')) {
-      let errorMeta: unknown = error;
+      let errorMeta: unknown = error
       if (error instanceof Error) {
-        const { name, message: errMsg, stack, ...rest } = error;
+        const { name, message: errMsg, stack, ...rest } = error
         errorMeta = {
           name,
           message: errMsg,
           stack,
-          ...rest
-        };
+          ...rest,
+        }
       }
       // 修复：errorMeta 也走脱敏（防止错误对象含敏感字段）
-      const redactedErrorMeta = redactValue(errorMeta);
-      const logMessage = this.formatMessage('error', message, redactedErrorMeta, context);
-      console.error(JSON.stringify(logMessage));
-      this.writeToFile('error', message, redactedErrorMeta, context);
+      const redactedErrorMeta = redactValue(errorMeta)
+      const logMessage = this.formatMessage('error', message, redactedErrorMeta, context)
+      console.error(JSON.stringify(logMessage))
+      this.writeToFile('error', message, redactedErrorMeta, context)
     }
   }
 
   // 记录请求日志
-  logRequest(request: NextRequest, responseStatus: number, responseTime: number, context?: LogContext) {
-    const url = request.url;
-    const method = request.method;
-    const userAgent = request.headers.get('user-agent');
+  logRequest(
+    request: NextRequest,
+    responseStatus: number,
+    responseTime: number,
+    context?: LogContext
+  ) {
+    const url = request.url
+    const method = request.method
+    const userAgent = request.headers.get('user-agent')
     const ip = resolveClientIp(
       request.headers.get('x-forwarded-for'),
       request.headers.get('x-real-ip')
-    );
-    
+    )
+
     const requestMeta = {
       url,
       method,
       status: responseStatus,
       responseTime,
       userAgent,
-      ip
-    };
-    
-    this.info('Request processed', requestMeta, context);
+      ip,
+    }
+
+    this.info('Request processed', requestMeta, context)
   }
 
   private shouldLog(level: LogLevel): boolean {
-    return LOG_LEVELS.indexOf(level) >= LOG_LEVELS.indexOf(this.level);
+    return LOG_LEVELS.indexOf(level) >= LOG_LEVELS.indexOf(this.level)
   }
 
   withContext(context: LogContext): ContextualLogger {
-    return new ContextualLogger(this, context);
+    return new ContextualLogger(this, context)
   }
 }
 
 class ContextualLogger {
-  constructor(private logger: Logger, private context: LogContext) {}
+  constructor(
+    private logger: Logger,
+    private context: LogContext
+  ) {}
 
   debug(message: string, meta?: unknown) {
-    this.logger.debug(message, meta, this.context);
+    this.logger.debug(message, meta, this.context)
   }
 
   info(message: string, meta?: unknown) {
-    this.logger.info(message, meta, this.context);
+    this.logger.info(message, meta, this.context)
   }
 
   warn(message: string, meta?: unknown) {
-    this.logger.warn(message, meta, this.context);
+    this.logger.warn(message, meta, this.context)
   }
 
   error(message: string, error?: unknown) {
-    this.logger.error(message, error, this.context);
+    this.logger.error(message, error, this.context)
   }
 
   logRequest(request: NextRequest, responseStatus: number, responseTime: number) {
-    this.logger.logRequest(request, responseStatus, responseTime, this.context);
+    this.logger.logRequest(request, responseStatus, responseTime, this.context)
   }
 }
 
-export const logger = new Logger();
+export const logger = new Logger()

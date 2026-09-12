@@ -76,20 +76,21 @@ export async function incrementProblemSubmitCount(problemId: string) {
   // $inc 非幂等：禁止 withRetry，避免网络重试双计
   const client = await getMongoClient()
   const db = client.db()
-  await db.collection('Problem').updateOne(
-    { _id: new ObjectId(problemId) },
-    { $inc: { totalSubmit: 1 } }
-  )
+  await db
+    .collection('Problem')
+    .updateOne({ _id: new ObjectId(problemId) }, { $inc: { totalSubmit: 1 } })
 }
 
 /** 入队失败等回滚路径：递减题目总提交数（不低于 0） */
 export async function decrementProblemSubmitCount(problemId: string) {
   const client = await getMongoClient()
   const db = client.db()
-  await db.collection('Problem').updateOne(
-    { _id: new ObjectId(problemId), totalSubmit: { $gt: 0 } },
-    { $inc: { totalSubmit: -1 } }
-  )
+  await db
+    .collection('Problem')
+    .updateOne(
+      { _id: new ObjectId(problemId), totalSubmit: { $gt: 0 } },
+      { $inc: { totalSubmit: -1 } }
+    )
 }
 
 export type UpdateSubmissionDirectResult = {
@@ -119,69 +120,65 @@ export async function updateSubmissionDirect(
 ): Promise<UpdateSubmissionDirectResult> {
   return withRetry(
     async () => {
-    const client = await getMongoClient()
-    const db = client.db()
+      const client = await getMongoClient()
+      const db = client.db()
 
-    const sanitized: Record<string, unknown> = {}
-    const allowedFields = [
-      'status',
-      'score',
-      'time',
-      'memory',
-      'passedTests',
-      'totalTests',
-      'message',
-      'testResults',
-    ]
-    for (const key of allowedFields) {
-      if (key in data && data[key as keyof typeof data] !== undefined) {
-        sanitized[key] = data[key as keyof typeof data]
-      }
-    }
-
-    const filter: Record<string, unknown> = { _id: new ObjectId(submissionId) }
-    if (options?.onlyFromStatuses && options.onlyFromStatuses.length > 0) {
-      filter.status = { $in: options.onlyFromStatuses }
-    }
-
-    // 状态机守卫（仅在非条件更新路径做读-改；onlyFromStatuses 已原子约束源状态）：
-    //   1) 若要更新 status，先读当前状态
-    //   2) 通过 canTransition 校验合法转换
-    //   3) 仅在 PENDING/JUDGING/RUNNING 下允许非合法转换（recover / 竞态）
-    //   4) forceStatus：管理员重测，允许终态 → PENDING
-    if (
-      typeof sanitized.status === 'string' &&
-      !options?.forceStatus &&
-      !options?.onlyFromStatuses?.length
-    ) {
-      const current = await db.collection('Submission').findOne(
-        { _id: new ObjectId(submissionId) },
-        { projection: { status: 1 } }
-      )
-      const currentStatus = (current?.status as string | undefined) ?? ''
-      const nextStatus = sanitized.status as string
-      if (currentStatus && !canSubmissionTransition(currentStatus, nextStatus)) {
-        if (
-          currentStatus !== SubmissionStatus.PENDING &&
-          currentStatus !== SubmissionStatus.JUDGING &&
-          currentStatus !== SubmissionStatus.RUNNING
-        ) {
-          throw new Error(
-            `非法状态转换: ${currentStatus} -> ${nextStatus} (submissionId=${submissionId})`
-          )
+      const sanitized: Record<string, unknown> = {}
+      const allowedFields = [
+        'status',
+        'score',
+        'time',
+        'memory',
+        'passedTests',
+        'totalTests',
+        'message',
+        'testResults',
+      ]
+      for (const key of allowedFields) {
+        if (key in data && data[key as keyof typeof data] !== undefined) {
+          sanitized[key] = data[key as keyof typeof data]
         }
       }
-    }
 
-    const result = await db.collection('Submission').updateOne(
-      filter,
-      { $set: sanitized }
-    )
-    return {
-      matched: result.matchedCount > 0,
-      modified: result.modifiedCount > 0,
-    }
-  },
+      const filter: Record<string, unknown> = { _id: new ObjectId(submissionId) }
+      if (options?.onlyFromStatuses && options.onlyFromStatuses.length > 0) {
+        filter.status = { $in: options.onlyFromStatuses }
+      }
+
+      // 状态机守卫（仅在非条件更新路径做读-改；onlyFromStatuses 已原子约束源状态）：
+      //   1) 若要更新 status，先读当前状态
+      //   2) 通过 canTransition 校验合法转换
+      //   3) 仅在 PENDING/JUDGING/RUNNING 下允许非合法转换（recover / 竞态）
+      //   4) forceStatus：管理员重测，允许终态 → PENDING
+      if (
+        typeof sanitized.status === 'string' &&
+        !options?.forceStatus &&
+        !options?.onlyFromStatuses?.length
+      ) {
+        const current = await db
+          .collection('Submission')
+          .findOne({ _id: new ObjectId(submissionId) }, { projection: { status: 1 } })
+        const currentStatus = (current?.status as string | undefined) ?? ''
+        const nextStatus = sanitized.status as string
+        if (currentStatus && !canSubmissionTransition(currentStatus, nextStatus)) {
+          if (
+            currentStatus !== SubmissionStatus.PENDING &&
+            currentStatus !== SubmissionStatus.JUDGING &&
+            currentStatus !== SubmissionStatus.RUNNING
+          ) {
+            throw new Error(
+              `非法状态转换: ${currentStatus} -> ${nextStatus} (submissionId=${submissionId})`
+            )
+          }
+        }
+      }
+
+      const result = await db.collection('Submission').updateOne(filter, { $set: sanitized })
+      return {
+        matched: result.matchedCount > 0,
+        modified: result.modifiedCount > 0,
+      }
+    },
     3,
     { idempotent: true }
   )
@@ -195,40 +192,45 @@ export async function incrementProblemAcceptedCount(problemId: string) {
   // $inc 非幂等：禁止 withRetry，避免网络重试双计
   const client = await getMongoClient()
   const db = client.db()
-  await db.collection('Problem').updateOne(
-    { _id: new ObjectId(problemId) },
-    { $inc: { totalAccepted: 1 } }
-  )
+  await db
+    .collection('Problem')
+    .updateOne({ _id: new ObjectId(problemId) }, { $inc: { totalAccepted: 1 } })
 }
 
 /** 重测回滚等路径：递减题目 AC 提交数（不低于 0） */
 export async function decrementProblemAcceptedCount(problemId: string) {
   const client = await getMongoClient()
   const db = client.db()
-  await db.collection('Problem').updateOne(
-    { _id: new ObjectId(problemId), totalAccepted: { $gt: 0 } },
-    { $inc: { totalAccepted: -1 } }
-  )
+  await db
+    .collection('Problem')
+    .updateOne(
+      { _id: new ObjectId(problemId), totalAccepted: { $gt: 0 } },
+      { $inc: { totalAccepted: -1 } }
+    )
 }
 
 /**
  * 检查用户是否首次 AC 此题 (读操作：可走从库)
  */
-export async function isFirstAccepted(problemId: string, userId: string, currentSubmissionId: string) {
+export async function isFirstAccepted(
+  problemId: string,
+  userId: string,
+  currentSubmissionId: string
+) {
   return withRetry(
     async () => {
-    const client = await getMongoClient() // 使用主库客户端，避免复制延迟导致并发 AC 重复计数
-    const db = client.db()
+      const client = await getMongoClient() // 使用主库客户端，避免复制延迟导致并发 AC 重复计数
+      const db = client.db()
 
-    const previousAC = await db.collection('Submission').findOne({
-      problemId: new ObjectId(problemId),
-      userId: new ObjectId(userId),
-      status: 'AC',
-      _id: { $ne: new ObjectId(currentSubmissionId) },
-    })
+      const previousAC = await db.collection('Submission').findOne({
+        problemId: new ObjectId(problemId),
+        userId: new ObjectId(userId),
+        status: 'AC',
+        _id: { $ne: new ObjectId(currentSubmissionId) },
+      })
 
-    return !previousAC
-  },
+      return !previousAC
+    },
     3,
     { idempotent: true }
   )

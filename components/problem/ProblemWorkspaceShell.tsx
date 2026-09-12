@@ -74,18 +74,14 @@ export default function ProblemWorkspaceShell({
       }`}
     >
       <div
-        className={`card-static rounded-lg overflow-hidden lg:sticky lg:top-[72px] ${
+        className={`card-static overflow-hidden lg:sticky lg:top-[72px] ${
           codeMode ? 'hidden lg:block' : 'lg:block'
         }`}
       >
         {leftSelector}
       </div>
 
-      <div
-        className={`card-flat rounded-lg overflow-hidden min-w-0 ${
-          codeMode ? 'hidden lg:block' : ''
-        }`}
-      >
+      <div className={`card-flat overflow-hidden min-w-0 ${codeMode ? 'hidden lg:block' : ''}`}>
         {leftHeader && (
           <div className="flex border-b border-border overflow-x-auto">{leftHeader}</div>
         )}
@@ -93,7 +89,7 @@ export default function ProblemWorkspaceShell({
       </div>
 
       <div className={`lg:sticky lg:top-[72px] min-w-0 ${codeMode ? '' : 'hidden lg:block'}`}>
-        <div className="card-static rounded-lg overflow-hidden">
+        <div className="card-static overflow-hidden">
           {metaHeader && <div className="border-b border-border">{metaHeader}</div>}
           {rightHeader && (
             <div
@@ -110,11 +106,7 @@ export default function ProblemWorkspaceShell({
     </div>
   ) : (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] gap-4 items-start">
-      <div
-        className={`card-flat rounded-lg overflow-hidden min-w-0 ${
-          codeMode ? 'hidden lg:block' : ''
-        }`}
-      >
+      <div className={`card-flat overflow-hidden min-w-0 ${codeMode ? 'hidden lg:block' : ''}`}>
         {leftHeader && (
           <div className="flex border-b border-border overflow-x-auto">{leftHeader}</div>
         )}
@@ -122,7 +114,7 @@ export default function ProblemWorkspaceShell({
       </div>
 
       <div className={`lg:sticky lg:top-[72px] min-w-0 ${codeMode ? '' : 'hidden lg:block'}`}>
-        <div className="card-static rounded-lg overflow-hidden">
+        <div className="card-static overflow-hidden">
           {metaHeader && <div className="border-b border-border">{metaHeader}</div>}
           {rightHeader && (
             <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border bg-muted">

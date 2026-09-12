@@ -4,14 +4,7 @@
  * - PUT    /api/classes/[id]/assignments/[assignmentId]
  * - DELETE /api/classes/[id]/assignments/[assignmentId]
  */
-import {
-  withApi,
-  ok,
-  readJson,
-  throw400,
-  throw403,
-  throw404,
-} from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
   assertClassOwner,
@@ -31,7 +24,13 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const memberRole = member!.role
   const memberPermissions = (member as { permissions?: Record<string, boolean> }).permissions || {}
 
-  const detail = await buildClassAssignmentDetail(id, assignmentId, user.id, memberRole, memberPermissions)
+  const detail = await buildClassAssignmentDetail(
+    id,
+    assignmentId,
+    user.id,
+    memberRole,
+    memberPermissions
+  )
   if (!detail) throw404('作业不存在')
   return ok(detail)
 })

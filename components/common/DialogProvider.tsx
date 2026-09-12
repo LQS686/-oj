@@ -1,21 +1,7 @@
 'use client'
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-import {
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Info,
-  type LucideIcon,
-} from 'lucide-react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { CheckCircle2, XCircle, AlertTriangle, Info, type LucideIcon } from 'lucide-react'
 import Modal from './Modal'
 
 /* ----------------------------- 类型定义 ----------------------------- */
@@ -230,10 +216,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
         <PromptDialog item={current} onClose={closePrompt} />
       )}
       {current && current.kind !== 'prompt' && (
-        <ActiveDialog
-          item={current}
-          onClose={(confirmed) => closeAlertOrConfirm(confirmed)}
-        />
+        <ActiveDialog item={current} onClose={(confirmed) => closeAlertOrConfirm(confirmed)} />
       )}
     </DialogContext.Provider>
   )
@@ -263,9 +246,7 @@ function ActiveDialog({
         : 'primary')
 
   const confirmText = options.confirmText ?? '确定'
-  const cancelText = !isAlert
-    ? (item.options as ConfirmOptions).cancelText ?? '取消'
-    : '取消'
+  const cancelText = !isAlert ? ((item.options as ConfirmOptions).cancelText ?? '取消') : '取消'
 
   const Footer = (
     <>
@@ -285,9 +266,7 @@ function ActiveDialog({
       open
       onClose={() => onClose(false)}
       title={title}
-      icon={
-        options.icon ?? <Icon className={`w-5 h-5 ${TONE_ICON_CLASS[tone]}`} />
-      }
+      icon={options.icon ?? <Icon className={`w-5 h-5 ${TONE_ICON_CLASS[tone]}`} />}
       footer={Footer}
       closeOnOverlayClick={isAlert ? true : false}
       size="sm"
@@ -326,11 +305,7 @@ function PromptDialog({
       <DialogButton variant="secondary" onClick={() => onClose(null)}>
         {options.cancelText ?? '取消'}
       </DialogButton>
-      <DialogButton
-        variant="primary"
-        disabled={!canSubmit}
-        onClick={() => onClose(value)}
-      >
+      <DialogButton variant="primary" disabled={!canSubmit} onClick={() => onClose(value)}>
         {options.confirmText ?? '确定'}
       </DialogButton>
     </>
@@ -341,9 +316,7 @@ function PromptDialog({
       open
       onClose={() => onClose(null)}
       title={title}
-      icon={
-        options.icon ?? <Icon className={`w-5 h-5 ${TONE_ICON_CLASS[tone]}`} />
-      }
+      icon={options.icon ?? <Icon className={`w-5 h-5 ${TONE_ICON_CLASS[tone]}`} />}
       footer={Footer}
       closeOnOverlayClick={false}
       size="sm"

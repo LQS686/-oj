@@ -7,6 +7,7 @@ import { AdminPageShell } from '@/components/admin'
 import { Flag, Check, X, Trash2, AlertCircle } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import { useDialog } from '@/components/common/DialogProvider'
+import { ListEmptyState } from '@/components/common'
 import Modal from '@/components/common/Modal'
 
 interface ReportRow {
@@ -158,23 +159,32 @@ export default function AdminReportsPage() {
       {loading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="card-static rounded-xl p-5 animate-pulse">
+            <div key={i} className="card-static p-5 animate-pulse">
               <div className="h-4 bg-muted rounded w-1/2 mb-3" />
               <div className="h-3 bg-muted rounded w-1/4" />
             </div>
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="card-static rounded-xl p-10 text-center text-muted-foreground">
-          {status === 'pending' ? '暂无待处理举报，全部干净' : '该状态下暂无举报记录'}
-        </div>
+        <ListEmptyState
+          icon={Flag}
+          title={status === 'pending' ? '暂无待处理举报' : '暂无举报记录'}
+          description={
+            status === 'pending'
+              ? '当前没有待处理的举报，一切正常。'
+              : '该状态下还没有举报记录，换个状态再看看。'
+          }
+        />
       ) : (
         <div className="space-y-3">
           {items.map((row) => {
-            const meta = STATUS_META[row.status] ?? { label: row.status, className: 'bg-muted text-muted-foreground' }
+            const meta = STATUS_META[row.status] ?? {
+              label: row.status,
+              className: 'bg-muted text-muted-foreground',
+            }
             const canHandle = row.status === 'pending'
             return (
-              <div key={row.id} className="card-static rounded-xl p-5">
+              <div key={row.id} className="card-static p-5">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">
@@ -184,7 +194,9 @@ export default function AdminReportsPage() {
                       <span className="text-xs px-2 py-0.5 rounded-md bg-error/10 text-error">
                         {row.reason}
                       </span>
-                      <span className="text-xs text-muted-foreground">{formatDateTime(row.createdAt)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDateTime(row.createdAt)}
+                      </span>
                     </div>
                     <h3 className="font-semibold text-foreground break-words">
                       {getTargetLabel(row.targetType)}：{row.targetTitle || '（内容已删除）'}
@@ -200,8 +212,11 @@ export default function AdminReportsPage() {
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
-                      举报人：{row.reporter.nickname || row.reporter.username}（{row.reporter.username}）
-                      {row.handleNote && <span className="text-primary/80"> · 处理备注：{row.handleNote}</span>}
+                      举报人：{row.reporter.nickname || row.reporter.username}（
+                      {row.reporter.username}）
+                      {row.handleNote && (
+                        <span className="text-primary/80"> · 处理备注：{row.handleNote}</span>
+                      )}
                     </p>
                   </div>
                   {canHandle && (
@@ -265,7 +280,11 @@ export default function AdminReportsPage() {
           closeOnEsc={!submitting}
           footer={
             <div className="flex justify-end gap-2 w-full">
-              <button type="button" className="btn btn-outline" onClick={() => setHandleTarget(null)}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setHandleTarget(null)}
+              >
                 取消
               </button>
               <button
@@ -281,10 +300,11 @@ export default function AdminReportsPage() {
         >
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              举报内容：{getTargetLabel(handleTarget.targetType)}「{handleTarget.targetTitle || '已删除'}」
+              举报内容：{getTargetLabel(handleTarget.targetType)}「
+              {handleTarget.targetTitle || '已删除'}」
             </p>
             <div>
-              <label className="text-sm font-medium">处理备注（选填，留痕备查）</label>
+              <label className="text-label">处理备注（选填，留痕备查）</label>
               <textarea
                 className="input w-full mt-1 min-h-[80px]"
                 placeholder="记录处理情况，便于审计追溯"

@@ -8,6 +8,7 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { useUser } from '@/contexts/UserContext'
 import { useDialog } from '@/components/common/DialogProvider'
 import { canAccessAdmin } from '@/lib/permissions'
+import { ListEmptyState } from '@/components/common'
 
 interface RankItem {
   rank: number
@@ -21,12 +22,15 @@ interface RankItem {
   totalScore: number
   penalty: number
   penaltyMinutes: number
-  problems: Record<string, {
-    status: string
-    time: number
-    tries: number
-    score: number
-  }>
+  problems: Record<
+    string,
+    {
+      status: string
+      time: number
+      tries: number
+      score: number
+    }
+  >
 }
 
 interface ContestProblem {
@@ -48,17 +52,41 @@ interface SealInfo {
 // 用于排名表头题号背景色与状态格边框，让用户快速识别"哪题是哪题"
 const PROBLEM_COLORS = [
   { bg: 'bg-red-500/15', text: 'text-red-600 dark:text-red-400', border: 'border-red-500/30' },
-  { bg: 'bg-orange-500/15', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-500/30' },
-  { bg: 'bg-amber-500/15', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/30' },
+  {
+    bg: 'bg-orange-500/15',
+    text: 'text-orange-600 dark:text-orange-400',
+    border: 'border-orange-500/30',
+  },
+  {
+    bg: 'bg-amber-500/15',
+    text: 'text-amber-600 dark:text-amber-400',
+    border: 'border-amber-500/30',
+  },
   { bg: 'bg-lime-500/15', text: 'text-lime-600 dark:text-lime-400', border: 'border-lime-500/30' },
-  { bg: 'bg-emerald-500/15', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/30' },
+  {
+    bg: 'bg-emerald-500/15',
+    text: 'text-emerald-600 dark:text-emerald-400',
+    border: 'border-emerald-500/30',
+  },
   { bg: 'bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-400', border: 'border-cyan-500/30' },
   { bg: 'bg-blue-500/15', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-500/30' },
-  { bg: 'bg-violet-500/15', text: 'text-violet-600 dark:text-violet-400', border: 'border-violet-500/30' },
-  { bg: 'bg-fuchsia-500/15', text: 'text-fuchsia-600 dark:text-fuchsia-400', border: 'border-fuchsia-500/30' },
+  {
+    bg: 'bg-violet-500/15',
+    text: 'text-violet-600 dark:text-violet-400',
+    border: 'border-violet-500/30',
+  },
+  {
+    bg: 'bg-fuchsia-500/15',
+    text: 'text-fuchsia-600 dark:text-fuchsia-400',
+    border: 'border-fuchsia-500/30',
+  },
   { bg: 'bg-pink-500/15', text: 'text-pink-600 dark:text-pink-400', border: 'border-pink-500/30' },
   { bg: 'bg-teal-500/15', text: 'text-teal-600 dark:text-teal-400', border: 'border-teal-500/30' },
-  { bg: 'bg-indigo-500/15', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-500/30' },
+  {
+    bg: 'bg-indigo-500/15',
+    text: 'text-indigo-600 dark:text-indigo-400',
+    border: 'border-indigo-500/30',
+  },
 ]
 
 function getProblemColor(index: number) {
@@ -207,8 +235,10 @@ export default function ContestRankPage() {
   }
 
   const getRankStyle = (rank: number) => {
-    if (rank === 1) return 'bg-gradient-to-br from-accent/20 to-accent-dark/20 text-accent-light border border-accent/30'
-    if (rank === 2) return 'bg-gradient-to-br from-muted/20 to-muted/40 text-muted-foreground border border-muted/30'
+    if (rank === 1)
+      return 'bg-gradient-to-br from-accent/20 to-accent-dark/20 text-accent-light border border-accent/30'
+    if (rank === 2)
+      return 'bg-gradient-to-br from-muted/20 to-muted/40 text-muted-foreground border border-muted/30'
     if (rank === 3) return 'bg-primary/20 text-primary-light border border-primary/30'
     return 'bg-muted text-muted-foreground'
   }
@@ -217,12 +247,18 @@ export default function ContestRankPage() {
   const exportCSV = () => {
     if (rankings.length === 0) return
 
-    const headers = ['排名', '用户名', '昵称', contestType === 'ACM' ? '解决数' : '总分', '罚时(min)']
+    const headers = [
+      '排名',
+      '用户名',
+      '昵称',
+      contestType === 'ACM' ? '解决数' : '总分',
+      '罚时(min)',
+    ]
     problems.forEach((p, idx) => {
       headers.push(String.fromCharCode(65 + idx))
     })
 
-    const rows = rankings.map(item => {
+    const rows = rankings.map((item) => {
       const row = [
         item.rank,
         item.user.username,
@@ -230,7 +266,7 @@ export default function ContestRankPage() {
         contestType === 'ACM' ? item.solved : item.totalScore,
         item.penaltyMinutes,
       ]
-      problems.forEach(p => {
+      problems.forEach((p) => {
         const ps = item.problems[p.id]
         if (!ps || ps.status === 'Unsubmitted') {
           row.push('-')
@@ -250,7 +286,7 @@ export default function ContestRankPage() {
       return s
     }
 
-    const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n')
+    const csv = [headers, ...rows].map((r) => r.map(escape).join(',')).join('\n')
     // 加 BOM 让 Excel 正确识别 UTF-8
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -261,43 +297,43 @@ export default function ContestRankPage() {
     URL.revokeObjectURL(url)
   }
 
-  if (loading && rankings.length === 0) return (
-    <div className="card rounded-lg p-8">
-      <div className="space-y-4">
-        {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} className="skeleton h-14 rounded-xl"></div>
-        ))}
+  if (loading && rankings.length === 0)
+    return (
+      <div className="card p-5">
+        <div className="space-y-6">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="skeleton h-14 rounded-xl"></div>
+          ))}
+        </div>
       </div>
-    </div>
-  )
+    )
 
-  if (error) return (
-    <div className="card rounded-lg p-12 text-center">
-      <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-6">
-        <AlertCircle className="w-8 h-8 text-error" />
-      </div>
-      <p className="text-error text-lg font-medium">{error}</p>
-    </div>
-  )
+  if (error) return <ListEmptyState tone="error" icon={AlertCircle} title={error} />
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* 封榜状态横幅（参考 HOJ ContestRank.vue sealRank 提示） */}
       {seal && seal.sealed && (
-        <div className={`card rounded-lg p-4 flex items-center justify-between gap-3 border ${
-          seal.isFrozenView
-            ? 'border-accent/30 bg-accent/5'
-            : 'border-primary/30 bg-primary/5'
-        }`}>
+        <div
+          className={`card p-4 flex items-center justify-between gap-3 border ${
+            seal.isFrozenView ? 'border-accent/30 bg-accent/5' : 'border-primary/30 bg-primary/5'
+          }`}
+        >
           <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-              seal.isFrozenView ? 'bg-accent/15 text-accent-light' : 'bg-primary/15 text-primary-light'
-            }`}>
+            <div
+              className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                seal.isFrozenView
+                  ? 'bg-accent/15 text-accent-light'
+                  : 'bg-primary/15 text-primary-light'
+              }`}
+            >
               <Lock className="w-5 h-5" />
             </div>
             <div>
               <div className="font-semibold text-foreground flex items-center gap-2">
-                {seal.isFrozenView ? '封榜中 — 你看到的是封榜快照' : '封榜中 — 管理员视角（实时数据）'}
+                {seal.isFrozenView
+                  ? '封榜中 — 你看到的是封榜快照'
+                  : '封榜中 — 管理员视角（实时数据）'}
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">
                 封榜时间：{formatSealTime(seal.sealRankTime)}
@@ -309,7 +345,7 @@ export default function ContestRankPage() {
             <button
               onClick={handleUnseal}
               disabled={unsealing}
-              className="btn btn-ghost px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 border border-primary/30 hover:bg-primary/10"
+              className="btn btn-sm btn-ghost flex items-center gap-1.5 border border-primary/30 hover:bg-primary/10"
               title="管理员手动解冻封榜"
             >
               <Unlock className="w-4 h-4" />
@@ -320,11 +356,11 @@ export default function ContestRankPage() {
       )}
 
       {/* 工具栏：自动刷新选择 + 手动刷新 + CSV 导出 + 最后更新时间 */}
-      <div className="card rounded-lg p-3 flex flex-wrap items-center gap-3 justify-between">
+      <div className="card p-4 flex flex-wrap items-center gap-3 justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">自动刷新</span>
           <div className="flex items-center gap-1">
-            {REFRESH_INTERVALS.map(opt => (
+            {REFRESH_INTERVALS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setRefreshInterval(opt.value)}
@@ -348,7 +384,7 @@ export default function ContestRankPage() {
           <button
             onClick={() => fetchRank()}
             disabled={isRefreshing}
-            className="btn btn-ghost px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5"
+            className="btn btn-sm btn-ghost flex items-center gap-1.5"
             title="手动刷新"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -356,7 +392,7 @@ export default function ContestRankPage() {
           </button>
           <button
             onClick={exportCSV}
-            className="btn btn-ghost px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5"
+            className="btn btn-sm btn-ghost flex items-center gap-1.5"
             title="导出 CSV"
           >
             <Download className="w-3.5 h-3.5" />
@@ -365,25 +401,24 @@ export default function ContestRankPage() {
         </div>
       </div>
 
-      <div className="card rounded-lg overflow-hidden">
+      <div className="card overflow-hidden">
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="min-w-full">
+          <table className="table min-w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="px-4 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-16 sticky left-0 bg-background-secondary z-10">
-                  排名
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-48 sticky left-16 bg-background-secondary z-10">
-                  用户
-                </th>
-                <th className="px-4 py-4 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider w-24">
-                  {contestType === 'ACM' ? '解决' : '分数'}
-                </th>
+                <th className="text-left w-16 sticky left-0 bg-background-secondary z-10">排名</th>
+                <th className="text-left w-48 sticky left-16 bg-background-secondary z-10">用户</th>
+                <th className="text-center w-24">{contestType === 'ACM' ? '解决' : '分数'}</th>
                 {problems.map((p, index) => {
                   const color = getProblemColor(index)
                   return (
-                    <th key={p.id} className={`px-4 py-4 text-center min-w-[80px] border-b-2 ${color.border}`}>
-                      <div className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-bold ${color.bg} ${color.text}`}>
+                    <th
+                      key={p.id}
+                      className={`px-4 py-4 text-center min-w-[80px] border-b-2 ${color.border}`}
+                    >
+                      <div
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-bold ${color.bg} ${color.text}`}
+                      >
                         {String.fromCharCode(65 + index)}
                       </div>
                     </th>
@@ -394,20 +429,22 @@ export default function ContestRankPage() {
             <tbody className="divide-y divide-border">
               {rankings.map((item) => (
                 <tr key={item.user.id} className="hover:bg-primary/5 transition-colors">
-                  <td className="px-4 py-4 whitespace-nowrap sticky left-0 bg-background z-10">
-                    <div className={`flex items-center justify-center w-9 h-9 rounded-xl font-bold text-sm ${getRankStyle(item.rank)}`}>
-                      {item.rank <= 3 ? (
-                        <Medal className="w-4 h-4" />
-                      ) : (
-                        item.rank
-                      )}
+                  <td className="whitespace-nowrap sticky left-0 bg-background z-10">
+                    <div
+                      className={`flex items-center justify-center w-9 h-9 rounded-xl font-bold text-sm ${getRankStyle(item.rank)}`}
+                    >
+                      {item.rank <= 3 ? <Medal className="w-4 h-4" /> : item.rank}
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap sticky left-16 bg-background z-10">
+                  <td className="whitespace-nowrap sticky left-16 bg-background z-10">
                     <div className="flex items-center gap-3">
                       <div className="avatar avatar-md">
                         {item.user.avatar ? (
-                          <img src={item.user.avatar} alt="" className="w-full h-full object-cover" />
+                          <img
+                            src={item.user.avatar}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <div className="avatar-fallback text-sm">
                             {item.user.nickname?.[0] || item.user.username?.[0] || '?'}
@@ -419,7 +456,7 @@ export default function ContestRankPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-center">
+                  <td className="whitespace-nowrap text-center">
                     <div className="font-bold text-primary-light text-lg">
                       {item.totalScore !== undefined ? item.totalScore : item.solved}
                     </div>
@@ -432,7 +469,11 @@ export default function ContestRankPage() {
                   {problems.map((p, pIdx) => {
                     const pStats = item.problems[p.id]
                     if (!pStats || pStats.status === 'Unsubmitted') {
-                      return <td key={p.id} className="px-4 py-4 text-center text-muted-foreground/50">-</td>
+                      return (
+                        <td key={p.id} className="text-center text-muted-foreground/50">
+                          -
+                        </td>
+                      )
                     }
 
                     const color = getProblemColor(pIdx)
@@ -440,7 +481,10 @@ export default function ContestRankPage() {
                     if (contestType === 'ACM') {
                       if (pStats.status === 'AC') {
                         return (
-                          <td key={p.id} className={`px-4 py-4 text-center bg-secondary/10 border-l-2 ${color.border}`}>
+                          <td
+                            key={p.id}
+                            className={`px-4 py-4 text-center bg-secondary/10 border-l-2 ${color.border}`}
+                          >
                             <div className="text-secondary-light font-bold">
                               +{pStats.tries > 0 ? pStats.tries : ''}
                             </div>
@@ -451,10 +495,11 @@ export default function ContestRankPage() {
                         )
                       }
                       return (
-                        <td key={p.id} className={`px-4 py-4 text-center bg-error/10 border-l-2 ${color.border}`}>
-                          <div className="text-error font-bold">
-                            -{pStats.tries}
-                          </div>
+                        <td
+                          key={p.id}
+                          className={`px-4 py-4 text-center bg-error/10 border-l-2 ${color.border}`}
+                        >
+                          <div className="text-error font-bold">-{pStats.tries}</div>
                         </td>
                       )
                     }
@@ -462,12 +507,19 @@ export default function ContestRankPage() {
                     const isAc = pStats.score === 100
                     const isZero = pStats.score === 0
                     return (
-                      <td key={p.id} className={`px-4 py-4 text-center ${isAc ? 'bg-secondary/10' : isZero ? 'bg-error/10' : 'bg-accent/10'} border-l-2 ${color.border}`}>
-                        <div className={`font-bold ${isAc ? 'text-secondary-light' : isZero ? 'text-error' : 'text-accent-light'}`}>
+                      <td
+                        key={p.id}
+                        className={`px-4 py-4 text-center ${isAc ? 'bg-secondary/10' : isZero ? 'bg-error/10' : 'bg-accent/10'} border-l-2 ${color.border}`}
+                      >
+                        <div
+                          className={`font-bold ${isAc ? 'text-secondary-light' : isZero ? 'text-error' : 'text-accent-light'}`}
+                        >
                           {pStats.score}
                         </div>
                         {pStats.time > 0 && (
-                          <div className={`text-xs ${isAc ? 'text-secondary-light/70' : isZero ? 'text-error/70' : 'text-accent-light/70'}`}>
+                          <div
+                            className={`text-xs ${isAc ? 'text-secondary-light/70' : isZero ? 'text-error/70' : 'text-accent-light/70'}`}
+                          >
                             {formatTimeMinutes(pStats.time)} min
                           </div>
                         )}

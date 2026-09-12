@@ -31,9 +31,7 @@ export default function ProblemMetaHeader({
   const showDifficulty = !hideDifficultyAndTags && !!difficulty
   const hasTags = !hideDifficultyAndTags && Array.isArray(tags) && tags.length > 0
   const needsCollapse = hasTags && tags!.length > TAG_COLLAPSE_THRESHOLD
-  const visibleTags = needsCollapse && !expanded
-    ? tags!.slice(0, TAG_COLLAPSE_THRESHOLD)
-    : tags!
+  const visibleTags = needsCollapse && !expanded ? tags!.slice(0, TAG_COLLAPSE_THRESHOLD) : tags!
   const hiddenCount = needsCollapse ? tags!.length - TAG_COLLAPSE_THRESHOLD : 0
 
   return (
@@ -48,9 +46,7 @@ export default function ProblemMetaHeader({
           {memoryLimit}MB
         </span>
         {showDifficulty && (
-          <span className={`difficulty-tag ${getDifficultyClass(difficulty!)}`}>
-            {difficulty}
-          </span>
+          <span className={`difficulty-tag ${getDifficultyClass(difficulty!)}`}>{difficulty}</span>
         )}
       </div>
 

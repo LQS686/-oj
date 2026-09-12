@@ -4,11 +4,16 @@
  * GET  公开：分页查询（仅公开、已发布）
  * POST 鉴权：仅管理员可创建（普通用户请通过后台管理页面）
  */
-import { withApi, ok, readJson, readQuery, throw400, throw403, resolveViewerFromRequest } from '@/lib/api/withApi'
 import {
-  createTrainingWithProblems,
-  listPublicTrainingsAdvanced,
-} from '@/lib/training/service'
+  withApi,
+  ok,
+  readJson,
+  readQuery,
+  throw400,
+  throw403,
+  resolveViewerFromRequest,
+} from '@/lib/api/withApi'
+import { createTrainingWithProblems, listPublicTrainingsAdvanced } from '@/lib/training/service'
 import { toInt } from '@/lib/api/validation'
 import type { TrainingCategoryType } from '@/lib/training/types'
 import { canAccessAdmin } from '@/lib/permissions'
@@ -38,9 +43,8 @@ export const GET = withApi.public(async (req) => {
     keyword: q.keyword,
     difficulty: q.difficulty,
     categoryId: q.categoryId,
-    categoryType: q.categoryType === 'official' || q.categoryType === 'contest'
-      ? q.categoryType
-      : undefined,
+    categoryType:
+      q.categoryType === 'official' || q.categoryType === 'contest' ? q.categoryType : undefined,
     isRecommended: q.recommended === 'true' ? true : undefined,
     joinedOnly: q.joined === 'true' ? true : undefined,
     userId,
@@ -73,9 +77,8 @@ export const POST = withApi.auth(async (req, _ctx, { user }) => {
     throw400('VALIDATION', '缺少必要参数（title/description）')
   }
 
-  const categoryType = body.categoryType === 'official' || body.categoryType === 'contest'
-    ? body.categoryType
-    : null
+  const categoryType =
+    body.categoryType === 'official' || body.categoryType === 'contest' ? body.categoryType : null
 
   const training = await createTrainingWithProblems({
     title: body.title,

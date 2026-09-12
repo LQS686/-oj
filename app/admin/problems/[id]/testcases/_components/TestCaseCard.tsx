@@ -49,12 +49,16 @@ export function TestCaseCard({
         <button
           type="button"
           onClick={onToggle}
-          className="p-1 rounded text-muted-foreground hover:text-foreground"
+          className="btn-icon-sm text-muted-foreground hover:text-foreground"
           aria-label={expanded ? '收起' : '展开'}
         >
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
-        <button type="button" onClick={onToggle} className="flex items-center gap-2 min-w-0 text-left flex-1">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex items-center gap-2 min-w-0 text-left flex-1"
+        >
           <span className="font-mono text-xs font-bold text-muted-foreground w-14 shrink-0">
             CASE {index + 1}
           </span>
@@ -77,7 +81,7 @@ export function TestCaseCard({
             type="button"
             onClick={() => onMove(-1)}
             disabled={index === 0}
-            className="p-1.5 rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+            className="btn-icon-sm text-muted-foreground hover:bg-muted disabled:opacity-30"
             title="上移"
           >
             <ArrowUp className="w-3.5 h-3.5" />
@@ -86,7 +90,7 @@ export function TestCaseCard({
             type="button"
             onClick={() => onMove(1)}
             disabled={index >= total - 1}
-            className="p-1.5 rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+            className="btn-icon-sm text-muted-foreground hover:bg-muted disabled:opacity-30"
             title="下移"
           >
             <ArrowDown className="w-3.5 h-3.5" />
@@ -94,7 +98,7 @@ export function TestCaseCard({
           <button
             type="button"
             onClick={onDuplicate}
-            className="p-1.5 rounded text-muted-foreground hover:bg-muted"
+            className="btn-icon-sm text-muted-foreground hover:bg-muted"
             title="复制"
           >
             <Copy className="w-3.5 h-3.5" />
@@ -102,7 +106,7 @@ export function TestCaseCard({
           <button
             type="button"
             onClick={onRemove}
-            className="p-1.5 rounded text-error hover:bg-error/10"
+            className="btn-icon-sm text-error hover:bg-error/10"
             title="删除"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -134,7 +138,9 @@ export function TestCaseCard({
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Output
                 </label>
-                <span className="text-xs text-muted-foreground tabular-nums">{outputLen} chars</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {outputLen} chars
+                </span>
               </div>
               <textarea
                 value={tc.output}

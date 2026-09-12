@@ -62,15 +62,10 @@ export interface AssignmentProblemProgressListProps {
   onSelectObjective?: (index: number) => void
 }
 
-function getBestSubmission(
-  problemId: string,
-  submissions: Submission[]
-): Submission | null {
+function getBestSubmission(problemId: string, submissions: Submission[]): Submission | null {
   const subs = submissions.filter((s) => s.problemId === problemId)
   if (subs.length === 0) return null
-  return subs.reduce((best, current) =>
-    (current.score || 0) > (best.score || 0) ? current : best
-  )
+  return subs.reduce((best, current) => ((current.score || 0) > (best.score || 0) ? current : best))
 }
 
 function toRailStatus(sub: Submission | null): ProblemLetterStatus {

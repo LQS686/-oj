@@ -111,7 +111,9 @@ export default function AdminProblemForm({
     setTags(Array.isArray(problem.tags) ? (problem.tags as string[]) : [])
     setTimeLimit(typeof problem.timeLimit === 'number' ? problem.timeLimit : 1000)
     setMemoryLimit(typeof problem.memoryLimit === 'number' ? problem.memoryLimit : 128)
-    setComparisonMode(typeof problem.comparisonMode === 'string' ? problem.comparisonMode : 'default')
+    setComparisonMode(
+      typeof problem.comparisonMode === 'string' ? problem.comparisonMode : 'default'
+    )
     setRealPrecision(typeof problem.realPrecision === 'number' ? problem.realPrecision : 3)
     setSpjCode(typeof problem.spjCode === 'string' ? problem.spjCode : '')
     const vis =
@@ -314,7 +316,7 @@ export default function AdminProblemForm({
     return <PageLoading label="加载题目…" />
   }
 
-  const fieldLabel = 'block text-sm font-medium text-foreground mb-1.5'
+  const fieldLabel = 'block text-label text-foreground mb-1.5'
 
   return (
     <AdminPageShell width="form" className="pb-10">
@@ -330,12 +332,10 @@ export default function AdminProblemForm({
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="min-w-0">
+            {/* 标题「创建题目 / 编辑题目」由 AdminLayout 顶栏提供（唯一 H1），此处只保留状态角标与说明 */}
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-foreground tracking-tight">
-                {isEdit ? '编辑题目' : '创建题目'}
-              </h1>
               {dirty && (
-                <span className="text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-md">
+                <span className="text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-md">
                   未保存
                 </span>
               )}
@@ -395,7 +395,11 @@ export default function AdminProblemForm({
             className="btn btn-primary text-sm gap-1.5 disabled:opacity-50"
           >
             {submitting ? (
-              isEdit ? '保存中…' : '创建中…'
+              isEdit ? (
+                '保存中…'
+              ) : (
+                '创建中…'
+              )
             ) : (
               <>
                 <Save className="w-4 h-4" />
@@ -408,9 +412,9 @@ export default function AdminProblemForm({
 
       <form id="admin-problem-form" onSubmit={handleSubmit} className="card divide-y divide-border">
         {/* 基本信息 */}
-        <section className="p-5 sm:p-6 space-y-5">
+        <section className="p-5 sm:p-6 space-y-6">
           <div>
-            <h2 className="text-base font-semibold text-foreground">基本信息</h2>
+            <h2 className="text-section-title text-foreground">基本信息</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">编号、难度与判题参数</p>
           </div>
 
@@ -524,14 +528,13 @@ export default function AdminProblemForm({
 
           {comparisonMode === 'special-judge' && (
             <div>
-              <label className={fieldLabel}>
-                Special Judge 源码（checker.cpp / Testlib）
-              </label>
+              <label className={fieldLabel}>Special Judge 源码（checker.cpp / Testlib）</label>
               <p className="text-xs text-gray-500 mb-2">
                 对齐洛谷：仅 C++，使用 <code className="px-1 rounded bg-gray-100">testlib.h</code>
-                （inf / ouf / ans），以 <code className="px-1 rounded bg-gray-100">quitf</code> /{' '}
-                <code className="px-1 rounded bg-gray-100">quitp</code> 结束。保存后会自动添加「Special
-                Judge」标签。
+                （inf / ouf / ans），以 <code className="px-1 rounded bg-gray-100">
+                  quitf
+                </code> / <code className="px-1 rounded bg-gray-100">quitp</code>{' '}
+                结束。保存后会自动添加「Special Judge」标签。
               </p>
               <textarea
                 value={spjCode}
@@ -602,9 +605,9 @@ export default function AdminProblemForm({
         </section>
 
         {/* 题面 */}
-        <section className="p-5 sm:p-6 space-y-5">
+        <section className="p-5 sm:p-6 space-y-6">
           <div>
-            <h2 className="text-base font-semibold text-foreground">题面描述</h2>
+            <h2 className="text-section-title text-foreground">题面描述</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">支持 Markdown 语法</p>
           </div>
 
@@ -672,7 +675,7 @@ export default function AdminProblemForm({
         <section className="p-5 sm:p-6 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-foreground">样例</h2>
+              <h2 className="text-section-title text-foreground">样例</h2>
               <p className="mt-0.5 text-sm text-muted-foreground">展示给选手的输入输出样例</p>
             </div>
             <button
@@ -689,7 +692,7 @@ export default function AdminProblemForm({
             {samples.map((sample, idx) => (
               <div key={idx} className="rounded-lg border border-border p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">样例 {idx + 1}</span>
+                  <span className="text-subsection-title text-foreground">样例 {idx + 1}</span>
                   {samples.length > 1 && (
                     <button
                       type="button"
@@ -755,7 +758,11 @@ export default function AdminProblemForm({
             className="btn btn-primary gap-1.5 disabled:opacity-50 min-w-[7.5rem]"
           >
             {submitting ? (
-              isEdit ? '保存中…' : '创建中…'
+              isEdit ? (
+                '保存中…'
+              ) : (
+                '创建中…'
+              )
             ) : (
               <>
                 <Save className="w-4 h-4" />

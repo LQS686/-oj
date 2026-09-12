@@ -4,11 +4,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import {
-  validateEmail,
-  validateUsername,
-  validatePassword,
-} from '@/lib/api/validation'
+import { validateEmail, validateUsername, validatePassword } from '@/lib/api/validation'
 import { getAssignableRoles } from './admin'
 
 /* ============================================================================

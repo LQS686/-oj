@@ -25,12 +25,8 @@ export default function AdminEditObjectiveQuestionPage({
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-foreground tracking-tight">
-            编辑客观题
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            修改题干、选项与标准答案
-          </p>
+          {/* 页面标题由 AdminLayout 顶栏提供（唯一 H1），此处只保留说明 */}
+          <p className="text-sm text-muted-foreground">修改题干、选项与标准答案</p>
         </div>
       </header>
 

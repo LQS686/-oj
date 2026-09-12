@@ -130,7 +130,12 @@ export async function verifyProblemWithStd(input: VerifyStdInput): Promise<Verif
           compiledPath: compiledPath!,
         })
 
-        if (runResult.exitCode === 0 && !runResult.timeout && !runResult.runtimeError && !runResult.memoryExceeded) {
+        if (
+          runResult.exitCode === 0 &&
+          !runResult.timeout &&
+          !runResult.runtimeError &&
+          !runResult.memoryExceeded
+        ) {
           updatedOutputs.push({ id: tc.id, output: runResult.output.replace(/\r\n/g, '\n') })
           passedCount++
           results.push({

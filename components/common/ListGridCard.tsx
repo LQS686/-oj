@@ -14,13 +14,13 @@ export const LIST_GRID_CLASS =
 export const LIST_GRID_SKELETON_CLASS = LIST_GRID_CLASS
 
 export const LIST_GRID_CARD_CLASS = cn(
-  'card-static rounded-xl p-4 flex flex-col overflow-hidden',
+  'card-static p-4 flex flex-col overflow-hidden',
   LIST_GRID_CARD_HEIGHT_CLASS,
   'hover:border-primary/30 transition-colors group'
 )
 
 export const LIST_GRID_CARD_TITLE =
-  'text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary-light transition-colors'
+  'text-subsection-title text-foreground line-clamp-2 group-hover:text-primary-light transition-colors'
 
 export const LIST_GRID_CARD_META_ROW =
   'flex items-center justify-between gap-1 mb-2 flex-wrap shrink-0'

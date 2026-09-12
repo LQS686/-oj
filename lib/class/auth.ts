@@ -80,15 +80,9 @@ export function isClassOwner(membership: ClassMembership | null): boolean {
  * owner/assistant（isTeacher）始终 true。
  * 学生：显式 false 拒绝；未配置时对基础位（提交/看笔记）默认 true。
  */
-const DEFAULT_TRUE_PERMISSIONS = new Set([
-  'canSubmit',
-  'canViewNotes',
-])
+const DEFAULT_TRUE_PERMISSIONS = new Set(['canSubmit', 'canViewNotes'])
 
-export function hasClassPermission(
-  membership: ClassMembership | null,
-  key: string
-): boolean {
+export function hasClassPermission(membership: ClassMembership | null, key: string): boolean {
   if (!membership) return false
   if (membership.isTeacher || membership.isAssistant) return true
   const flags = membership.permissions
@@ -108,8 +102,7 @@ export async function requireClassRole(
 
   const membership = await getClassMembership(classId, userId)
   if (!membership) return { ok: false, reason: '不是班级成员' }
-  if (!allowedRoles.includes(membership.role))
-    return { ok: false, reason: '权限不足' }
+  if (!allowedRoles.includes(membership.role)) return { ok: false, reason: '权限不足' }
   return { ok: true, membership }
 }
 

@@ -4,22 +4,22 @@ import { useState, useMemo, useRef, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useRouter } from 'next/navigation'
 import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
-import {
-  Search,
-  Check,
-  X,
-  BookOpen,
-  MoreHorizontal,
-  ChevronDown,
-  Tag,
-  Shuffle,
-} from 'lucide-react'
+import { Search, Check, X, BookOpen, MoreHorizontal, ChevronDown, Tag, Shuffle } from 'lucide-react'
 import { getDifficultyClass } from '@/lib/status'
 import { useUser } from '@/contexts/UserContext'
 import { DIFFICULTIES } from '@/lib/constants'
 import { fetchWithCookie } from '@/lib/api/base'
 import { useClickOutside } from '@/hooks/useClickOutside'
-import { EducationalPageShell, DenseListShell, denseListRowClass, ListEmptyState, useDialog, Modal, ListToolbar, Pagination } from '@/components/common'
+import {
+  EducationalPageShell,
+  DenseListShell,
+  denseListRowClass,
+  ListEmptyState,
+  useDialog,
+  Modal,
+  ListToolbar,
+  Pagination,
+} from '@/components/common'
 
 interface Problem {
   id: string
@@ -46,7 +46,9 @@ export default function ProblemsPage() {
   const [, setTotalProblems] = useState(0)
   const [availableTags, setAvailableTags] = useState<string[]>([])
 
-  const [problemStatus, setProblemStatus] = useState<{ [problemId: string]: { score: number, submitted: boolean } }>({})
+  const [problemStatus, setProblemStatus] = useState<{
+    [problemId: string]: { score: number; submitted: boolean }
+  }>({})
   const [loadingStatus, setLoadingStatus] = useState(false)
   const [difficultyOpen, setDifficultyOpen] = useState(false)
   const [tagModalOpen, setTagModalOpen] = useState(false)
@@ -110,11 +112,9 @@ export default function ProblemsPage() {
 
     try {
       setLoadingStatus(true)
-      const problemIds = problems.map(p => p.id).join(',')
+      const problemIds = problems.map((p) => p.id).join(',')
 
-      const response = await fetchWithCookie(
-        `/api/problems/status?problemIds=${problemIds}`
-      )
+      const response = await fetchWithCookie(`/api/problems/status?problemIds=${problemIds}`)
       const data = await response.json()
 
       if (data.success && data.data) {
@@ -160,8 +160,7 @@ export default function ProblemsPage() {
     }
   }, [user, problems, fetchProblemStatus])
 
-  const hasFilters =
-    !!searchQuery || selectedDifficulties.length > 0 || selectedTags.length > 0
+  const hasFilters = !!searchQuery || selectedDifficulties.length > 0 || selectedTags.length > 0
 
   const clearFilters = () => {
     setSearchQuery('')
@@ -203,9 +202,7 @@ export default function ProblemsPage() {
   }
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]
-    )
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]))
   }
 
   const filteredTagOptions = useMemo(() => {
@@ -326,13 +323,19 @@ export default function ProblemsPage() {
                 </div>
 
                 <div className="col-span-2 flex items-center gap-1.5 flex-wrap">
-                  {problem.tags && problem.tags.slice(0, 2).map((tag) => (
-                    <span key={tag} className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light transition-colors">
-                      {tag}
-                    </span>
-                  ))}
+                  {problem.tags &&
+                    problem.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light transition-colors"
+                      >
+                        {tag}
+                      </span>
+                    ))}
                   {problem.tags && problem.tags.length > 2 && (
-                    <span className="text-xs text-muted-foreground">+{problem.tags.length - 2}</span>
+                    <span className="text-xs text-muted-foreground">
+                      +{problem.tags.length - 2}
+                    </span>
                   )}
                 </div>
 
@@ -353,16 +356,22 @@ export default function ProblemsPage() {
                     }
                     const rate = Math.round((accepted / total) * 100)
                     const colorClass =
-                      rate >= 80 ? 'bg-secondary' :
-                      rate >= 60 ? 'bg-primary' :
-                      rate >= 40 ? 'bg-accent' :
-                      rate >= 1  ? 'bg-error' :
-                                   'bg-muted'
+                      rate >= 80
+                        ? 'bg-secondary'
+                        : rate >= 60
+                          ? 'bg-primary'
+                          : rate >= 40
+                            ? 'bg-accent'
+                            : rate >= 1
+                              ? 'bg-error'
+                              : 'bg-muted'
                     return (
                       <div className="w-full max-w-[100px]">
                         <div className="flex items-center justify-between text-xs text-muted-foreground mb-0.5">
                           <span className="font-mono tabular-nums">{rate}%</span>
-                          <span className="font-mono tabular-nums">{accepted}/{total}</span>
+                          <span className="font-mono tabular-nums">
+                            {accepted}/{total}
+                          </span>
                         </div>
                         <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                           <div
@@ -410,12 +419,16 @@ export default function ProblemsPage() {
                   <button
                     type="button"
                     onClick={() => setDifficultyOpen((o) => !o)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted transition-colors max-w-[9rem] truncate ${
-                      selectedDifficulties.length > 0 ? 'border-primary/40 text-primary' : 'text-foreground'
+                    className={`flex items-center gap-1.5 btn btn-sm border border-border bg-background hover:bg-muted transition-colors max-w-[9rem] truncate ${
+                      selectedDifficulties.length > 0
+                        ? 'border-primary/40 text-primary'
+                        : 'text-foreground'
                     }`}
                   >
                     <span className="truncate">{difficultyLabel}</span>
-                    <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${difficultyOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 transition-transform ${difficultyOpen ? 'rotate-180' : ''}`}
+                    />
                   </button>
                   {difficultyOpen && (
                     <div className="absolute right-0 sm:left-0 z-50 mt-1 w-52 max-h-72 overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
@@ -458,7 +471,7 @@ export default function ProblemsPage() {
                     setTagSearch('')
                     setTagModalOpen(true)
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted transition-colors max-w-[9rem] truncate ${
+                  className={`flex items-center gap-1.5 btn btn-sm border border-border bg-background hover:bg-muted transition-colors max-w-[9rem] truncate ${
                     selectedTags.length > 0 ? 'border-primary/40 text-primary' : 'text-foreground'
                   }`}
                 >
@@ -481,7 +494,7 @@ export default function ProblemsPage() {
                   type="button"
                   onClick={handleRandomProblem}
                   disabled={randomLoading}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium border border-primary/30 bg-primary/10 text-primary-light hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 btn btn-sm border border-primary/30 bg-primary/10 text-primary-light hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="随机跳转一道题目（尊重当前筛选条件）"
                 >
                   <Shuffle className={`w-4 h-4 ${randomLoading ? 'animate-pulse' : ''}`} />
@@ -510,65 +523,69 @@ export default function ProblemsPage() {
               >
                 清空已选
               </button>
-              <button type="button" onClick={() => setTagModalOpen(false)} className="btn btn-primary">
+              <button
+                type="button"
+                onClick={() => setTagModalOpen(false)}
+                className="btn btn-primary"
+              >
                 确定
               </button>
             </div>
           }
         >
-            <div className="pb-4 border-b border-border -mt-1 mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="搜索标签…"
-                  value={tagSearch}
-                  onChange={(e) => setTagSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
+          <div className="pb-4 border-b border-border -mt-1 mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="搜索标签…"
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {selectedTags.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => toggleTag(t)}
+                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/10 text-primary"
+                  >
+                    {t}
+                    <X className="w-3 h-3" />
+                  </button>
+                ))}
               </div>
-              {selectedTags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {selectedTags.map((t) => (
+            )}
+          </div>
+          <div>
+            {filteredTagOptions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">暂无匹配标签</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {filteredTagOptions.map((tag) => {
+                  const checked = selectedTags.includes(tag)
+                  return (
                     <button
-                      key={t}
+                      key={tag}
                       type="button"
-                      onClick={() => toggleTag(t)}
-                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/10 text-primary"
+                      onClick={() => toggleTag(tag)}
+                      className={`inline-flex items-center gap-1.5 btn btn-sm border transition-colors ${
+                        checked
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-muted/50 text-foreground hover:bg-muted'
+                      }`}
                     >
-                      {t}
-                      <X className="w-3 h-3" />
+                      {checked && <Check className="w-3.5 h-3.5" />}
+                      {tag}
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              {filteredTagOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">暂无匹配标签</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {filteredTagOptions.map((tag) => {
-                    const checked = selectedTags.includes(tag)
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => toggleTag(tag)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
-                          checked
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border bg-muted/50 text-foreground hover:bg-muted'
-                        }`}
-                      >
-                        {checked && <Check className="w-3.5 h-3.5" />}
-                        {tag}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </Modal>
       )}
     </>

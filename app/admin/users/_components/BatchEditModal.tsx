@@ -35,8 +35,8 @@ export function BatchEditModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userIds: Array.from(userIds),
-          role: batchEditRole
-        })
+          role: batchEditRole,
+        }),
       })
 
       const data = await response.json()
@@ -76,7 +76,8 @@ export function BatchEditModal({
       }
     >
       <p className="text-muted-foreground mb-4">
-        将选中的 <span className="text-foreground font-medium">{userIds.size}</span> 个用户的角色修改为：
+        将选中的 <span className="text-foreground font-medium">{userIds.size}</span>{' '}
+        个用户的角色修改为：
       </p>
       <select
         value={batchEditRole}

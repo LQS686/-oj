@@ -3,18 +3,10 @@
  * - PATCH  /api/classes/[id]/members/[memberId]  更新成员（备注/角色）或转让班主任
  * - DELETE /api/classes/[id]/members/[memberId]  移除成员
  */
-import {
-  withApi,
-  ok,
-  readJson,
-  throw400,
-} from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
 import { ApiError } from '@/lib/api/errors'
 import { isObjectId } from '@/lib/api/validation'
-import {
-  patchClassMember,
-  requireManageableTarget,
-} from '@/lib/class/service'
+import { patchClassMember, requireManageableTarget } from '@/lib/class/service'
 import {
   removeClassMember as removeClassMemberDirect,
   updateClassMemberRole,

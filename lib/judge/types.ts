@@ -7,17 +7,17 @@
  * 中间态与 SubmissionStatus 对齐：PENDING / JUDGING（禁止再写 Pending/Judging）。
  */
 export type ResultState =
-  | 'AC'   // Accepted (CorrectAnswer)
-  | 'WA'   // Wrong Answer
-  | 'TLE'  // Time Limit Exceeded
-  | 'MLE'  // Memory Limit Exceeded
-  | 'RE'   // Runtime Error
-  | 'CE'   // Compile Error
-  | 'SE'   // System Error
-  | 'PC'   // Partly Correct (部分正确，预留)
-  | 'PE'   // Presentation Error
-  | 'OLE'  // Output Limit Exceeded
-  | 'CSP'  // Cannot Start Program
+  | 'AC' // Accepted (CorrectAnswer)
+  | 'WA' // Wrong Answer
+  | 'TLE' // Time Limit Exceeded
+  | 'MLE' // Memory Limit Exceeded
+  | 'RE' // Runtime Error
+  | 'CE' // Compile Error
+  | 'SE' // System Error
+  | 'PC' // Partly Correct (部分正确，预留)
+  | 'PE' // Presentation Error
+  | 'OLE' // Output Limit Exceeded
+  | 'CSP' // Cannot Start Program
   | 'JUDGING'
   | 'PENDING'
 
@@ -38,11 +38,7 @@ export enum CompileState {
  * 参考 LemonLime Task::ComparisonMode；special-judge 走 Testlib checker
  */
 export type ComparisonMode =
-  | 'default'
-  | 'strict'
-  | 'ignore-spaces'
-  | 'real-number'
-  | 'special-judge'
+  'default' | 'strict' | 'ignore-spaces' | 'real-number' | 'special-judge'
 
 /**
  * 比较输入
@@ -145,8 +141,7 @@ export function parseComparisonMode(
   value: unknown,
   fallback: ComparisonMode = 'default'
 ): ComparisonMode {
-  return typeof value === 'string' &&
-    (COMPARISON_MODES as readonly string[]).includes(value)
+  return typeof value === 'string' && (COMPARISON_MODES as readonly string[]).includes(value)
     ? (value as ComparisonMode)
     : fallback
 }

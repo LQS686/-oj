@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { isObjectId } from '@/lib/api/validation'
 import { notFound } from 'next/navigation'
 import ContestHeaderShell from './ContestHeaderShell'
 import { resolveViewerFromCookies } from '@/lib/api/withApi'
@@ -12,6 +13,9 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
+  if (!isObjectId(id)) {
+    return { title: formatPageDocumentTitle('竞赛详情') }
+  }
   const contest = await prisma.contest.findUnique({
     where: { id },
     select: { title: true, isPublic: true, authorId: true },
@@ -48,6 +52,7 @@ export default async function ContestLayout({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  if (!isObjectId(id)) notFound()
 
   const contest = await prisma.contest.findUnique({
     where: { id },

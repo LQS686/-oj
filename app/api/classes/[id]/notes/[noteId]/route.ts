@@ -4,14 +4,7 @@
  * - PUT    /api/classes/[id]/notes/[noteId]
  * - DELETE /api/classes/[id]/notes/[noteId]
  */
-import {
-  withApi,
-  ok,
-  readJson,
-  throw400,
-  throw403,
-  throw404,
-} from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
 import {
   getClassById,
@@ -41,17 +34,14 @@ export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const member = await getCurrentClassMember(id, user.id)
   if (!classIsPublic && !member) throw403('无权访问该班级')
 
-  const { getClassMembership, hasClassPermission, isClassTeacher } = await import('@/lib/class/auth')
+  const { getClassMembership, hasClassPermission, isClassTeacher } =
+    await import('@/lib/class/auth')
   const membership = member ? await getClassMembership(id, user.id) : null
   if (membership?.isStudent && !hasClassPermission(membership, 'canViewNotes')) {
     throw403('当前账号无查看笔记权限')
   }
   const isStaff = isClassTeacher(membership)
-  if (
-    !safeNote.isPublic &&
-    safeNote.authorId !== user.id &&
-    !isStaff
-  ) {
+  if (!safeNote.isPublic && safeNote.authorId !== user.id && !isStaff) {
     throw404('笔记不存在')
   }
 

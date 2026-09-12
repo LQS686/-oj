@@ -40,9 +40,7 @@ export default function ProblemLetterRail({
   renderItemExtra,
 }: ProblemLetterRailProps) {
   if (problems.length === 0) {
-    return (
-      <div className="px-3 py-8 text-center text-sm text-muted-foreground">暂无题目</div>
-    )
+    return <div className="px-3 py-8 text-center text-sm text-muted-foreground">暂无题目</div>
   }
 
   return (

@@ -72,7 +72,7 @@ const SOURCES: SourceMeta[] = [
 export function SourceFilterCards({ active, onChange, isLoggedIn }: SourceFilterCardsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-      {SOURCES.map(s => {
+      {SOURCES.map((s) => {
         const Icon = s.icon
         const isActive = active === s.key
         const disabled = s.key === 'mine' && !isLoggedIn
@@ -88,9 +88,7 @@ export function SourceFilterCards({ active, onChange, isLoggedIn }: SourceFilter
             } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {/* 激活时的左侧色条 */}
-            {isActive && (
-              <span className={`absolute left-0 top-0 bottom-0 w-1 ${s.activeBg}`} />
-            )}
+            {isActive && <span className={`absolute left-0 top-0 bottom-0 w-1 ${s.activeBg}`} />}
 
             <div className="flex items-start gap-3">
               <div

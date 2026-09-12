@@ -39,7 +39,7 @@ export function ProfileSection({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-foreground truncate">{displayName}</h2>
+            <h2 className="text-section-title text-foreground truncate">{displayName}</h2>
             {user?.role && (
               <span className={`tag text-xs ${getRoleColor(user.role)}`}>
                 {getRoleLabel(user.role)}
@@ -67,7 +67,7 @@ export function ProfileSection({
 
       <div className="space-y-4 pt-2 border-t border-border">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">用户名</label>
+          <label className="block text-label text-foreground mb-1.5">用户名</label>
           <input
             type="text"
             value={user?.username || ''}
@@ -79,7 +79,7 @@ export function ProfileSection({
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-foreground">昵称</label>
+            <label className="text-label text-foreground">昵称</label>
             <span className="text-xs text-muted-foreground tabular-nums">
               {formData.nickname.length}/32
             </span>
@@ -96,7 +96,7 @@ export function ProfileSection({
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-foreground">个人简介</label>
+            <label className="text-label text-foreground">个人简介</label>
             <span className="text-xs text-muted-foreground tabular-nums">
               {formData.bio.length}/500
             </span>
@@ -112,7 +112,11 @@ export function ProfileSection({
         </div>
       </div>
 
-      <button onClick={onSubmit} disabled={loading} className="btn btn-primary w-full sm:w-auto min-w-[120px]">
+      <button
+        onClick={onSubmit}
+        disabled={loading}
+        className="btn btn-primary w-full sm:w-auto min-w-[120px]"
+      >
         {loading ? (
           <span className="flex items-center gap-2">
             <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

@@ -135,42 +135,42 @@ export default function CreateContestModal({
       if (isEdit && contestId) {
         try {
           const contestRes = await fetchWithCookie(`/api/contests/${contestId}`)
-        const contestData = await contestRes.json()
-        if (cancelled) return
-        if (!contestRes.ok || !contestData.success) {
-          const msg = contestData.error || '获取竞赛详情失败'
-          await dialog.alert({
-            tone: 'error',
-            message: typeof msg === 'string' ? msg : '获取竞赛详情失败',
-          })
-          onClose()
-          return
+          const contestData = await contestRes.json()
+          if (cancelled) return
+          if (!contestRes.ok || !contestData.success) {
+            const msg = contestData.error || '获取竞赛详情失败'
+            await dialog.alert({
+              tone: 'error',
+              message: typeof msg === 'string' ? msg : '获取竞赛详情失败',
+            })
+            onClose()
+            return
+          }
+
+          const problemsRes = await fetchWithCookie(`/api/contests/${contestId}/problems`)
+          const problemsData = await problemsRes.json()
+          if (cancelled) return
+
+          const problems: Problem[] = problemsData.success
+            ? (problemsData.data as Problem[]).map((p) => ({
+                id: p.id,
+                problemNumber: p.problemNumber,
+                title: p.title,
+                difficulty: p.difficulty,
+                tags: p.tags || [],
+              }))
+            : []
+
+          applyContest(contestData.data, problems)
+          setExistingHasPassword(!!(contestData.data as { hasPassword?: boolean }).hasPassword)
+        } catch {
+          if (!cancelled) {
+            await dialog.alert({ tone: 'error', message: '网络错误，请稍后重试' })
+            onClose()
+          }
+        } finally {
+          if (!cancelled) setLoading(false)
         }
-
-        const problemsRes = await fetchWithCookie(`/api/contests/${contestId}/problems`)
-        const problemsData = await problemsRes.json()
-        if (cancelled) return
-
-        const problems: Problem[] = problemsData.success
-          ? (problemsData.data as Problem[]).map((p) => ({
-              id: p.id,
-              problemNumber: p.problemNumber,
-              title: p.title,
-              difficulty: p.difficulty,
-              tags: p.tags || [],
-            }))
-          : []
-
-        applyContest(contestData.data, problems)
-        setExistingHasPassword(!!(contestData.data as { hasPassword?: boolean }).hasPassword)
-      } catch {
-        if (!cancelled) {
-          await dialog.alert({ tone: 'error', message: '网络错误，请稍后重试' })
-          onClose()
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
       }
     }
     void load()
@@ -179,12 +179,17 @@ export default function CreateContestModal({
     }
   }, [open, isEdit, contestId, resetForm, applyContest, dialog, onClose])
 
-  const handleProblemsChange = useCallback((ids: string[]) => {
-    // 公开题从 allProblems 重建；编辑态竞赛可能含非公开/已下架题目，从原 contestProblems 保留
-    const map = new Map(allProblems.map((p) => [p.id, p]))
-    const existing = new Map(contestProblems.map((p) => [p.id, p]))
-    setContestProblems(ids.map((id) => map.get(id) ?? existing.get(id)).filter((p): p is Problem => !!p))
-  }, [allProblems, contestProblems])
+  const handleProblemsChange = useCallback(
+    (ids: string[]) => {
+      // 公开题从 allProblems 重建；编辑态竞赛可能含非公开/已下架题目，从原 contestProblems 保留
+      const map = new Map(allProblems.map((p) => [p.id, p]))
+      const existing = new Map(contestProblems.map((p) => [p.id, p]))
+      setContestProblems(
+        ids.map((id) => map.get(id) ?? existing.get(id)).filter((p): p is Problem => !!p)
+      )
+    },
+    [allProblems, contestProblems]
+  )
 
   const buildPayload = () => {
     const duration = Math.floor(
@@ -199,7 +204,7 @@ export default function CreateContestModal({
       duration,
       isPublic: formData.isPublic,
       sealRankTime: formData.sealRankTime || null,
-      problemIds: contestProblems.map(p => p.id),
+      problemIds: contestProblems.map((p) => p.id),
     }
     // 密码语义：公开 -> 清除；私有且填写 -> 设置新密码；
     // 私有且留空 -> 编辑时保持原密码，新建时按空处理（由后端校验）
@@ -271,7 +276,7 @@ export default function CreateContestModal({
         <div className="px-5 py-16 text-center text-sm text-muted-foreground">加载竞赛中…</div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-6">
             {error && (
               <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -280,7 +285,7 @@ export default function CreateContestModal({
             )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
+              <label className="block text-label text-foreground mb-1.5">
                 竞赛名称 <span className="text-error">*</span>
               </label>
               <input
@@ -294,9 +299,7 @@ export default function CreateContestModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                竞赛描述
-              </label>
+              <label className="block text-label text-foreground mb-1.5">竞赛描述</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -308,9 +311,7 @@ export default function CreateContestModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  赛制类型
-                </label>
+                <label className="block text-label text-foreground mb-1.5">赛制类型</label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -322,12 +323,12 @@ export default function CreateContestModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  可见性
-                </label>
+                <label className="block text-label text-foreground mb-1.5">可见性</label>
                 <select
                   value={formData.isPublic ? 'public' : 'private'}
-                  onChange={(e) => setFormData({ ...formData, isPublic: e.target.value === 'public' })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, isPublic: e.target.value === 'public' })
+                  }
                   className="input w-full"
                 >
                   <option value="public">公开 (所有人可见)</option>
@@ -336,7 +337,7 @@ export default function CreateContestModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="block text-label text-foreground mb-1.5">
                   开始时间 <span className="text-error">*</span>
                 </label>
                 <input
@@ -349,7 +350,7 @@ export default function CreateContestModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="block text-label text-foreground mb-1.5">
                   结束时间 <span className="text-error">*</span>
                 </label>
                 <input
@@ -362,9 +363,7 @@ export default function CreateContestModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  封榜时间 (可选)
-                </label>
+                <label className="block text-label text-foreground mb-1.5">封榜时间 (可选)</label>
                 <input
                   type="datetime-local"
                   value={formData.sealRankTime}
@@ -379,7 +378,7 @@ export default function CreateContestModal({
 
             {!formData.isPublic && (
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
+                <label className="block text-label text-foreground mb-1.5">
                   参赛密码 <span className="text-error">*</span>
                 </label>
                 <input
@@ -394,16 +393,16 @@ export default function CreateContestModal({
             )}
 
             {/* 题目管理区 */}
-            <div className="card-static p-4 rounded-xl space-y-4">
+            <div className="card-static p-4 space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-3">
-                <h3 className="text-sm font-bold text-foreground">题目管理</h3>
+                <h3 className="text-subsection-title text-foreground">题目管理</h3>
                 <span className="tag">已添加 {contestProblems.length} 题</span>
               </div>
 
               <ProblemPicker
                 problems={allProblems}
                 problemsLoading={problemsLoading}
-                selectedIds={contestProblems.map(p => p.id)}
+                selectedIds={contestProblems.map((p) => p.id)}
                 selectedProblems={contestProblems}
                 onChange={handleProblemsChange}
                 emptyText="请使用上方工具搜索或批量添加题目"
@@ -414,14 +413,22 @@ export default function CreateContestModal({
                     </span>
                     <div className="flex flex-col flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">{problem.problemNumber}</span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {problem.problemNumber}
+                        </span>
                         <span className="font-medium text-foreground text-sm">{problem.title}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground/60 mt-0.5">{problem.difficulty}</span>
+                      <span className="text-xs text-muted-foreground/60 mt-0.5">
+                        {problem.difficulty}
+                      </span>
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleProblemsChange(contestProblems.filter(p => p.id !== problem.id).map(p => p.id))}
+                      onClick={() =>
+                        handleProblemsChange(
+                          contestProblems.filter((p) => p.id !== problem.id).map((p) => p.id)
+                        )
+                      }
                       className="p-2 text-muted-foreground hover:text-error hover:bg-error/10 rounded-lg transition-all shrink-0"
                       title="移除题目"
                     >
@@ -434,14 +441,20 @@ export default function CreateContestModal({
           </div>
 
           <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
-            <button type="submit" disabled={submitting} className="btn btn-primary flex-1 flex items-center justify-center gap-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn btn-primary flex-1 flex items-center justify-center gap-2"
+            >
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   {isEdit ? '保存中…' : '创建中…'}
                 </>
+              ) : isEdit ? (
+                '保存'
               ) : (
-                isEdit ? '保存' : '创建竞赛'
+                '创建竞赛'
               )}
             </button>
             <button type="button" onClick={onClose} className="btn btn-ghost">

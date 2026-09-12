@@ -116,7 +116,9 @@ export async function listAllUsersForAdmin(opts?: {
 /**
  * 校验入参中的角色字段
  */
-export function assertValidRole(role: string | undefined): asserts role is 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT' {
+export function assertValidRole(
+  role: string | undefined
+): asserts role is 'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT' {
   if (!role || !VALID_ADMIN_ROLES.includes(role)) {
     throw AppError.badRequest('INVALID_ROLE', '无效的角色类型')
   }
@@ -267,9 +269,9 @@ export async function filterUserIdsForBatchAction(
     )
   }
   // 跳过超级管理员；ADMIN 操作时还要跳过其他管理员
-  const protectedRoles = (isAdmin({ role: operatorRole })
-    ? ['SYSTEM_ADMIN', 'ADMIN']
-    : ['SYSTEM_ADMIN']) as Array<'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT'>
+  const protectedRoles = (
+    isAdmin({ role: operatorRole }) ? ['SYSTEM_ADMIN', 'ADMIN'] : ['SYSTEM_ADMIN']
+  ) as Array<'SYSTEM_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT'>
   const protectedUsers = await prisma.user.findMany({
     where: { id: { in: filtered }, role: { in: protectedRoles } },
     select: { id: true },

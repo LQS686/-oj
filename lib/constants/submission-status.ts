@@ -40,9 +40,7 @@ export const SubmissionStatus = {
 export type SubmissionStatusValue = (typeof SubmissionStatus)[keyof typeof SubmissionStatus]
 
 /** 全部合法状态集合（用于运行时校验与 Prisma 写入前断言） */
-export const ALL_SUBMISSION_STATUSES: ReadonlySet<string> = new Set(
-  Object.values(SubmissionStatus)
-)
+export const ALL_SUBMISSION_STATUSES: ReadonlySet<string> = new Set(Object.values(SubmissionStatus))
 
 /** 判断给定字符串是否为合法状态 */
 export function isSubmissionStatus(value: unknown): value is SubmissionStatusValue {
@@ -128,9 +126,7 @@ export function canTransition(from: string, to: string): boolean {
   const allowed = ALLOWED_TRANSITIONS[from]
   if (!allowed) {
     if (typeof console !== 'undefined') {
-      console.warn(
-        `[submission-status] canTransition 拒绝未知源状态: from=${from}, to=${to}`
-      )
+      console.warn(`[submission-status] canTransition 拒绝未知源状态: from=${from}, to=${to}`)
     }
     return false
   }

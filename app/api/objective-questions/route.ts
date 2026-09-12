@@ -26,12 +26,12 @@ export const GET = withApi.auth(async (req) => {
   // 非法分页参数（NaN / 非正数）回落 undefined，由 service 层使用默认值
   const parsedPage = pageStr ? parseInt(pageStr, 10) : undefined
   const parsedPageSize = pageSizeStr ? parseInt(pageSizeStr, 10) : undefined
-  const page = Number.isFinite(parsedPage) && (parsedPage as number) > 0
-    ? parsedPage as number
-    : undefined
-  const pageSize = Number.isFinite(parsedPageSize) && (parsedPageSize as number) > 0
-    ? parsedPageSize as number
-    : undefined
+  const page =
+    Number.isFinite(parsedPage) && (parsedPage as number) > 0 ? (parsedPage as number) : undefined
+  const pageSize =
+    Number.isFinite(parsedPageSize) && (parsedPageSize as number) > 0
+      ? (parsedPageSize as number)
+      : undefined
 
   return ok(await listObjectiveQuestionsPublic({ keyword, type, difficulty, page, pageSize }))
 })

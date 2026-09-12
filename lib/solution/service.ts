@@ -15,7 +15,9 @@ type SolutionWithAuthor = Prisma.SolutionGetPayload<{
   include: { author: { select: { id: true; username: true; nickname: true; avatar: true } } }
 }>
 
-function sanitizeSolutionAuthor<T extends { author?: { avatar?: string | null } | null }>(row: T): T {
+function sanitizeSolutionAuthor<T extends { author?: { avatar?: string | null } | null }>(
+  row: T
+): T {
   if (!row.author) return row
   return {
     ...row,
@@ -54,16 +56,24 @@ export async function listSolutions(
 }
 
 export async function getSolutionById(id: string) {
-  return cache.get('solution:byId', [id], async () => {
-    const row = await prisma.solution.findUnique({
-      where: { id },
-      include: { author: { select: { id: true, username: true, nickname: true, avatar: true } } },
-    })
-    return row ? sanitizeSolutionAuthor(row) : null
-  }, { ttl: 30_000 })
+  return cache.get(
+    'solution:byId',
+    [id],
+    async () => {
+      const row = await prisma.solution.findUnique({
+        where: { id },
+        include: { author: { select: { id: true, username: true, nickname: true, avatar: true } } },
+      })
+      return row ? sanitizeSolutionAuthor(row) : null
+    },
+    { ttl: 30_000 }
+  )
 }
 
-export async function createSolution(data: Omit<Prisma.SolutionUncheckedCreateInput, 'authorId'>, authorId: string) {
+export async function createSolution(
+  data: Omit<Prisma.SolutionUncheckedCreateInput, 'authorId'>,
+  authorId: string
+) {
   cache.deleteByPrefix('solution:list')
   return prisma.solution.create({ data: { ...data, authorId } })
 }
@@ -145,10 +155,8 @@ async function resolveSolutionHideFlags(
   problemId: string,
   clientAssignmentFlag: boolean
 ): Promise<{ isAssignmentContext: boolean; isContestContext: boolean }> {
-  const {
-    isUserInActiveAssignmentForProblem,
-    isUserInOngoingContestForProblem,
-  } = await import('./permissions')
+  const { isUserInActiveAssignmentForProblem, isUserInOngoingContestForProblem } =
+    await import('./permissions')
   let isAssignmentContext = clientAssignmentFlag
   let isContestContext = false
   if (viewer) {
@@ -180,10 +188,12 @@ export async function listSolutionsWithPermission(
   // 作者本人在该题有「已通过」题解时跳过 90 分门槛（待审核/驳回/下架不豁免）；
   // 列表过滤仍保证只展示「已通过 + 自己的全部状态」
   const isAuthor = viewer
-    ? await prisma.solution.findFirst({
-        where: { problemId: realProblemId, authorId: viewer.id, status: 'approved' },
-        select: { id: true },
-      }).then(Boolean)
+    ? await prisma.solution
+        .findFirst({
+          where: { problemId: realProblemId, authorId: viewer.id, status: 'approved' },
+          select: { id: true },
+        })
+        .then(Boolean)
     : false
   const permission = await canViewSolutions(viewer, realProblemId, { ...flags, isAuthor })
   if (!permission.allowed) {
@@ -243,7 +253,11 @@ export async function createUserSolution(input: CreateSolutionInput, authorId: s
   if (typeof input.title !== 'string' || input.title.length < 1 || input.title.length > 100) {
     throw AppError.badRequest('VALIDATION', '标题长度需在 1-100 字符之间')
   }
-  if (typeof input.content !== 'string' || input.content.length < 10 || input.content.length > 50000) {
+  if (
+    typeof input.content !== 'string' ||
+    input.content.length < 10 ||
+    input.content.length > 50000
+  ) {
     throw AppError.badRequest('VALIDATION', '内容长度需在 10-50000 字符之间')
   }
   // 代码片段防撑库：上限 512KB（附代码的题解）
@@ -352,12 +366,14 @@ export async function getSolutionDetailWithPermission(
   recordUniqueView(id, viewerUserId ?? null, ip)
     .then((isNew) => {
       if (isNew) {
-        return prisma.solution.update({
-          where: { id },
-          data: { views: { increment: 1 } },
-        }).then(() => {
-          clearSolutionCache(id)
-        })
+        return prisma.solution
+          .update({
+            where: { id },
+            data: { views: { increment: 1 } },
+          })
+          .then(() => {
+            clearSolutionCache(id)
+          })
       }
       return null
     })
@@ -403,10 +419,7 @@ export async function updateUserSolution(
   // 只要当前非待审核状态（已通过 / 已驳回 / 已下架），一律重置为 pending 并清空审核痕迹，
   // 防止「审核通过后私自改内容重新公开」绕过审核；管理员/教师编辑不重置（他们可直接通过/驳回）
   const isManagerEdit = isAdmin || isTeacher
-  const shouldRequeue =
-    isAuthor &&
-    !isManagerEdit &&
-    solution.status !== 'pending'
+  const shouldRequeue = isAuthor && !isManagerEdit && solution.status !== 'pending'
   const data: Prisma.SolutionUncheckedUpdateInput = {}
   if (shouldRequeue) {
     data.status = 'pending'
@@ -420,7 +433,11 @@ export async function updateUserSolution(
     data.title = input.title
   }
   if (input.content !== undefined) {
-    if (typeof input.content !== 'string' || input.content.length < 10 || input.content.length > 50000) {
+    if (
+      typeof input.content !== 'string' ||
+      input.content.length < 10 ||
+      input.content.length > 50000
+    ) {
       throw AppError.badRequest('VALIDATION', '内容长度需在 10-50000 字符之间')
     }
     data.content = input.content
@@ -493,19 +510,17 @@ export async function checkSolutionPermission(
   // 与列表逻辑一致：作者在该题有「已通过」题解时传入 isAuthor 豁免 90 分门槛，
   // 避免「预检拒绝但列表放行」的前后端不一致
   const isAuthor = viewer
-    ? await prisma.solution.findFirst({
-        where: { problemId: realProblemId, authorId: viewer.id, status: 'approved' },
-        select: { id: true },
-      }).then(Boolean)
+    ? await prisma.solution
+        .findFirst({
+          where: { problemId: realProblemId, authorId: viewer.id, status: 'approved' },
+          select: { id: true },
+        })
+        .then(Boolean)
     : false
-  const result = await canViewSolutions(
-    viewer,
-    realProblemId,
-    {
-      ...(await resolveSolutionHideFlags(viewer, realProblemId, isAssignmentContext)),
-      isAuthor,
-    },
-  )
+  const result = await canViewSolutions(viewer, realProblemId, {
+    ...(await resolveSolutionHideFlags(viewer, realProblemId, isAssignmentContext)),
+    isAuthor,
+  })
   return {
     allowed: result.allowed,
     reason: result.reason,
@@ -565,11 +580,7 @@ export type SolutionReviewAction = 'approve' | 'reject' | 'hide'
 /**
  * 管理后台：审核题解（通过 / 驳回 / 下架），写入审核备注并清缓存
  */
-export async function reviewSolution(
-  id: string,
-  action: SolutionReviewAction,
-  note?: string
-) {
+export async function reviewSolution(id: string, action: SolutionReviewAction, note?: string) {
   const solution = await prisma.solution.findUnique({
     where: { id },
     select: { id: true },

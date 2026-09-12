@@ -16,8 +16,7 @@ export default function ContestCountdownPanel({
 }: ContestCountdownPanelProps) {
   const state = useContestCountdown(startTime, endTime)
 
-  const Icon =
-    state.phase === 'running' ? Play : state.phase === 'upcoming' ? Timer : CheckCircle2
+  const Icon = state.phase === 'running' ? Play : state.phase === 'upcoming' ? Timer : CheckCircle2
 
   const barClass =
     state.phase === 'running'
@@ -28,7 +27,7 @@ export default function ContestCountdownPanel({
 
   return (
     <div
-      className={`card-static rounded-lg border border-border overflow-hidden ${className}`}
+      className={`card-static border border-border overflow-hidden ${className}`}
       aria-live="polite"
     >
       <div className="px-4 py-3 flex items-center justify-between gap-3">

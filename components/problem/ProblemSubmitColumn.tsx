@@ -49,9 +49,7 @@ export default function ProblemSubmitColumn({
   submitLabel,
 }: ProblemSubmitColumnProps) {
   const disabled = submitting || !user || !code.trim() || submitDisabled
-  const title =
-    submitDisabledTitle ||
-    (!user ? '请先登录' : submitting ? '正在评测中...' : '')
+  const title = submitDisabledTitle || (!user ? '请先登录' : submitting ? '正在评测中...' : '')
 
   return (
     <>

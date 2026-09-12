@@ -106,7 +106,11 @@ export async function requireClassAdminRole(classId: string, userId: string) {
 }
 
 /** 校验目标成员存在 + 当前操作者可管理其角色 */
-export async function requireManageableTarget(classId: string, memberId: string, operatorRole: string) {
+export async function requireManageableTarget(
+  classId: string,
+  memberId: string,
+  operatorRole: string
+) {
   const target = await prisma.classMember.findUnique({
     where: { classId_userId: { classId, userId: memberId } },
   })
@@ -154,7 +158,9 @@ export async function validateAssignmentProblems(problemIds: string[]) {
  * 逐项 ObjectId 格式校验 + 批量存在性查询（数量对不上视为不存在）。
  * 通过则返回去重规范化后的 id 数组，否则抛 ApiError。
  */
-export async function validateAssignmentObjectiveQuestions(questionIds: string[]): Promise<string[]> {
+export async function validateAssignmentObjectiveQuestions(
+  questionIds: string[]
+): Promise<string[]> {
   const uniqueIds = Array.from(new Set(questionIds))
   for (const id of uniqueIds) {
     if (!isObjectId(id)) {

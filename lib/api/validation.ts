@@ -96,7 +96,8 @@ export function validateEmail(email: string): boolean {
   if (email.length > 254) {
     return false
   }
-  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+  const emailRegex =
+    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
   return emailRegex.test(email)
 }
 
@@ -141,8 +142,18 @@ export function validatePassword(password: string): { valid: boolean; errors: st
   }
 
   const commonPasswords = [
-    '12345678', 'password', '123456789', '1234567890', 'qwerty',
-    'abc123', '111111', '1234567', '12345', '123456', 'password1', 'qwerty123'
+    '12345678',
+    'password',
+    '123456789',
+    '1234567890',
+    'qwerty',
+    'abc123',
+    '111111',
+    '1234567',
+    '12345',
+    '123456',
+    'password1',
+    'qwerty123',
   ]
   if (commonPasswords.includes(password.toLowerCase())) {
     errors.push('密码过于简单，请使用更强的密码')
@@ -150,6 +161,6 @@ export function validatePassword(password: string): { valid: boolean; errors: st
 
   return {
     valid: errors.length === 0,
-    errors
+    errors,
   }
 }

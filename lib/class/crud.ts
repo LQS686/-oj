@@ -146,11 +146,7 @@ export async function updateClass(classId: string, data: ClassUpdateInput) {
     }
     const currentCount = await prisma.classMember.count({ where: { classId } })
     if (n < currentCount) {
-      throw new ApiError(
-        'VALIDATION',
-        `maxMembers 不能低于当前人数（${currentCount}）`,
-        400
-      )
+      throw new ApiError('VALIDATION', `maxMembers 不能低于当前人数（${currentCount}）`, 400)
     }
     updateData.maxMembers = n
   }

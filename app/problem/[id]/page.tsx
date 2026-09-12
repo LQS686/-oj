@@ -10,11 +10,7 @@ import type { Problem } from '@/types/models'
 import ProblemDescription from '@/components/problem/ProblemDescription'
 import ProblemPageClient from './ProblemPageClient'
 
-export default async function ProblemPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export default async function ProblemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
   let data

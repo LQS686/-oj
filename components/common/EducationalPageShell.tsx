@@ -1,12 +1,15 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import Link from 'next/link'
 import type { LucideIcon } from 'lucide-react'
-import { PageContainer, type PageContainerVariant } from '@/components/layout'
+import { PageShell, type PageWidth } from '@/components/layout'
 
 /**
  * 用户端页面宽度语义（与 PageContainer / CSS token 对齐）
+ *
+ * 自 2026-09 起，本组件只是 `PageShell` 的兼容层：标题层级、H1 尺寸、
+ * 宽度语义统一由 PageShell 决定。新页面请直接使用 PageShell。
+ *
  * - default / list → 1280px 列表、排行、通知等
  * - standard       → 1024px 阅读、设置、用户主页、题解
  * - workspace      → 1440px 班级工作台、做题三栏
@@ -14,13 +17,7 @@ import { PageContainer, type PageContainerVariant } from '@/components/layout'
  * - bleed / full   → 仅统一边距，不限宽（极少用；班级请优先用 workspace）
  */
 export type EducationalPageWidth =
-  | 'default'
-  | 'list'
-  | 'standard'
-  | 'workspace'
-  | 'narrow'
-  | 'full'
-  | 'bleed'
+  'default' | 'list' | 'standard' | 'workspace' | 'narrow' | 'full' | 'bleed'
 
 export interface EducationalPageShellProps {
   title: string
@@ -34,88 +31,58 @@ export interface EducationalPageShellProps {
   children: ReactNode
   width?: EducationalPageWidth
   className?: string
-  /**
-   * 桌面端默认不重复渲染与顶栏同名的 H1；
-   * 实体页（班级名、用户名等）请设为 true，避免桌面端丢失页面身份。
-   */
-  showTitle?: boolean
+  /** 视觉隐藏 H1：仅当页面内已提供等价可见标题（如用户资料卡）时使用 */
+  visuallyHiddenTitle?: boolean
 }
 
-const WIDTH_TO_VARIANT: Record<
-  Exclude<EducationalPageWidth, 'full' | 'bleed'>,
-  PageContainerVariant
-> = {
+const WIDTH_MAP: Record<EducationalPageWidth, PageWidth> = {
   default: 'full',
   list: 'full',
   standard: 'standard',
   workspace: 'workspace',
   narrow: 'form',
-}
-
-function isBleed(width: EducationalPageWidth): boolean {
-  return width === 'full' || width === 'bleed'
+  full: 'bleed',
+  bleed: 'bleed',
 }
 
 /**
- * 教学向页面外壳：统一宽度、边距与信息密度。
+ * 教学向页面外壳（PageShell 的兼容别名）。
  *
- * 标题策略：
- * - 默认：桌面端不重复渲染与顶栏同名的 H1，仅移动端显示
- * - showTitle：班级/用户等实体页始终显示标题
+ * 历史问题已修复：
+ *   - 原先 `icon` / `iconClassName` / `description` 被接收后静默丢弃，现正常渲染。
+ *   - 原先 H1 在桌面端被 `sm:hidden` 隐藏（display:none，同时移出无障碍树），
+ *     导致列表页没有任何可用标题；现改为始终可见，大小统一为 text-page-title。
+ *   - 原先 `showTitle` 只影响移动端，语义混乱，已移除。
  */
 export function EducationalPageShell({
   title,
-  description: _description,
-  icon: _Icon,
-  iconClassName: _iconClassName = 'bg-primary text-primary-foreground',
+  description,
+  icon,
+  iconClassName,
   actions,
   backHref,
-  backLabel = '返回',
+  backLabel,
   toolbar,
   children,
   width = 'default',
   className = '',
-  showTitle = false,
+  visuallyHiddenTitle = false,
 }: EducationalPageShellProps) {
-  const body = (
-    <>
-      {backHref && (
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary mb-3 transition-all duration-200 hover:translate-x-[-2px]"
-        >
-          {backLabel}
-        </Link>
-      )}
-
-      <h1
-        className={`${showTitle ? 'block' : 'sm:hidden'} text-lg font-bold text-foreground mb-3 truncate`}
-      >
-        {title}
-      </h1>
-
-      {(toolbar || actions) && (
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
-          {toolbar && <div className="sm:flex-1 min-w-0">{toolbar}</div>}
-          {actions && (
-            <div className="flex items-center gap-2 flex-shrink-0 sm:ml-auto">{actions}</div>
-          )}
-        </div>
-      )}
-
-      <div>{children}</div>
-    </>
-  )
-
   return (
-    <div className={`min-h-[calc(100vh-var(--navbar-height))] bg-background ${className}`}>
-      {isBleed(width) ? (
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 md:py-6">{body}</div>
-      ) : (
-        <PageContainer variant={WIDTH_TO_VARIANT[width as keyof typeof WIDTH_TO_VARIANT]} className="py-4 md:py-6">
-          {body}
-        </PageContainer>
-      )}
-    </div>
+    <PageShell
+      title={title}
+      description={description}
+      icon={icon}
+      iconClassName={iconClassName}
+      actions={actions}
+      backHref={backHref}
+      backLabel={backLabel}
+      toolbar={toolbar}
+      width={WIDTH_MAP[width]}
+      className={className}
+      visuallyHiddenTitle={visuallyHiddenTitle}
+    >
+      {children}
+    </PageShell>
   )
 }

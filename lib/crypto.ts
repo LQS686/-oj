@@ -30,7 +30,7 @@ function getEncryptionKey(): Buffer {
   if (!keyStr) {
     throw new Error(
       'ENCRYPTION_KEY 环境变量未设置！请在 .env 文件中配置 32 字节密钥。\n' +
-        '生成方式: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"'
+        "生成方式: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
     )
   }
   ENCRYPTION_KEY = normalizeKey(keyStr)
@@ -61,12 +61,9 @@ export function encrypt(text: string): string {
   const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv)
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
   const tag = cipher.getAuthTag()
-  return [
-    FORMAT_PREFIX,
-    iv.toString('hex'),
-    tag.toString('hex'),
-    encrypted.toString('hex'),
-  ].join(':')
+  return [FORMAT_PREFIX, iv.toString('hex'), tag.toString('hex'), encrypted.toString('hex')].join(
+    ':'
+  )
 }
 
 /**

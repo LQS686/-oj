@@ -14,7 +14,10 @@ export const POST = withApi.admin(async (_req, ctx) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
-  const contest = await prisma.contest.findUnique({ where: { id }, select: { id: true, sealRankTime: true } })
+  const contest = await prisma.contest.findUnique({
+    where: { id },
+    select: { id: true, sealRankTime: true },
+  })
   if (!contest) throw404('竞赛不存在')
 
   await prisma.contest.update({

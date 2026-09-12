@@ -38,9 +38,20 @@ export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
       return
     }
     if (
-      ['12345678', 'password', '123456789', '1234567890', 'qwerty', 'abc123', '111111', '1234567', '12345', '123456', 'password1', 'qwerty123'].includes(
-        password.toLowerCase()
-      )
+      [
+        '12345678',
+        'password',
+        '123456789',
+        '1234567890',
+        'qwerty',
+        'abc123',
+        '111111',
+        '1234567',
+        '12345',
+        '123456',
+        'password1',
+        'qwerty123',
+      ].includes(password.toLowerCase())
     ) {
       await dialog.alert({ tone: 'warning', message: '密码过于简单，请使用更强的密码' })
       return
@@ -51,7 +62,7 @@ export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
       const response = await fetchWithCookie(`/api/admin/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ password }),
       })
 
       const data = await response.json()
@@ -89,7 +100,7 @@ export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
         为用户 <span className="text-foreground font-medium">{user.username}</span> 设置新密码
       </p>
       <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-2">新密码</label>
+        <label className="block text-label text-muted-foreground mb-2">新密码</label>
         <input
           type="password"
           value={password}

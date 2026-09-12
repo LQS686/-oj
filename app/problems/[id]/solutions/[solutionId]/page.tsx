@@ -24,7 +24,7 @@ import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import { PageContainer } from '@/components/layout'
 import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
 import ReportModal from '@/components/report/ReportModal'
-import { RouteSuspenseFallback } from '@/components/common'
+import { ListEmptyState, RouteSuspenseFallback } from '@/components/common'
 import { useDialog } from '@/components/common/DialogProvider'
 
 interface SolutionDetail {
@@ -182,8 +182,7 @@ function SolutionDetailPageContent() {
     }
   }
 
-  const canEditOrDelete =
-    !!user && !!solution && (user.id === solution.authorId || canEditPerm)
+  const canEditOrDelete = !!user && !!solution && (user.id === solution.authorId || canEditPerm)
 
   const problemLabel = problem
     ? [problem.problemNumber, problem.title].filter(Boolean).join(' ')
@@ -205,17 +204,16 @@ function SolutionDetailPageContent() {
   if (notFound || error || !solution) {
     return (
       <PageContainer variant="standard" className="pt-10 pb-16">
-        <div className="card-static rounded-xl p-10 text-center max-w-md mx-auto">
-          <div className="w-14 h-14 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-7 h-7 text-error" />
-          </div>
-          <p className="text-foreground font-medium mb-2">
-            {notFound ? '题解不存在' : error || '题解加载失败'}
-          </p>
-          <Link href={problemHref} className="btn btn-primary btn-sm mt-4 inline-flex">
-            返回题目
-          </Link>
-        </div>
+        <ListEmptyState
+          tone="error"
+          icon={AlertCircle}
+          title={notFound ? '题解不存在' : error || '题解加载失败'}
+          action={
+            <Link href={problemHref} className="btn btn-primary btn-sm mt-4 inline-flex">
+              返回题目
+            </Link>
+          }
+        />
       </PageContainer>
     )
   }
@@ -247,14 +245,12 @@ function SolutionDetailPageContent() {
         </div>
 
         {/* 文章主体：单卡片阅读流 */}
-        <article className="card-static rounded-xl overflow-hidden">
+        <article className="card-static overflow-hidden">
           <header className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 border-b border-border/80">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  {solution.isOfficial && (
-                    <span className="tag tag-warning text-xs">标程</span>
-                  )}
+                  {solution.isOfficial && <span className="tag tag-warning text-xs">标程</span>}
                   {solution.codeLanguage && (
                     <span className="tag tag-info text-xs inline-flex items-center gap-1">
                       <Code2 className="w-3 h-3" />
@@ -270,7 +266,7 @@ function SolutionDetailPageContent() {
                   </Link>
                 </div>
 
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-snug tracking-tight">
+                <h1 className="text-page-title text-foreground leading-snug tracking-tight">
                   {solution.title}
                 </h1>
               </div>
@@ -357,17 +353,14 @@ function SolutionDetailPageContent() {
           </header>
 
           <div className="px-5 sm:px-8 py-6 sm:py-8">
-            <MarkdownRenderer
-              content={solution.content || ''}
-              className="solution-article"
-            />
+            <MarkdownRenderer content={solution.content || ''} className="solution-article" />
           </div>
 
           {solution.code && (
             <section className="px-5 sm:px-8 pb-6 sm:pb-8">
               <div className="rounded-xl border border-border bg-muted/30 overflow-hidden">
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border/80 bg-muted/50">
-                  <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="inline-flex items-center gap-2 text-subsection-title text-foreground">
                     <FileCode className="w-4 h-4 text-primary" />
                     附件代码
                   </div>

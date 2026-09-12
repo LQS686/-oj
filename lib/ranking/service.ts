@@ -84,36 +84,87 @@ export async function listRankingByPeriod(
   page: number,
   limit: number
 ): Promise<RankingPage> {
-  return cache.get('ranking:list', [period, page, limit], async () => {
-    const start = periodStart(period)
+  return cache.get(
+    'ranking:list',
+    [period, page, limit],
+    async () => {
+      const start = periodStart(period)
 
-    // 总榜：直接读 denormalized solvedCount（含 0 分用户展示，与旧「解题榜」一致）
-    if (start === null) {
-      const [users, total] = await Promise.all([
-        prisma.user.findMany({
-          where: { isBanned: false },
-          skip: (page - 1) * limit,
-          take: limit,
-          orderBy: [{ solvedCount: 'desc' }, { id: 'asc' }],
+      // 总榜：直接读 denormalized solvedCount（含 0 分用户展示，与旧「解题榜」一致）
+      if (start === null) {
+        const [users, total] = await Promise.all([
+          prisma.user.findMany({
+            where: { isBanned: false },
+            skip: (page - 1) * limit,
+            take: limit,
+            orderBy: [{ solvedCount: 'desc' }, { id: 'asc' }],
+            select: USER_LIST_SELECT,
+          }),
+          prisma.user.count({ where: { isBanned: false } }),
+        ])
+
+        const rankedUsers: RankingUser[] = users.map((user, index) => ({
+          id: user.id,
+          username: user.username,
+          nickname: user.nickname,
+          solvedCount: user.solvedCount,
+          rank: user.rank,
+          color: user.color,
+          avatar: sanitizeAvatarUrl(user.avatar),
+          position: (page - 1) * limit + index + 1,
+          solvedProblems: user.solvedCount,
+        }))
+
+        return {
+          users: rankedUsers,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+          },
+        }
+      }
+
+      // 周期榜：按周期内 AC 去重题数降序，仅展示周期内有 AC 的用户
+      const solvedMap = await getPeriodSolvedMap(start)
+      const entries = Array.from(solvedMap.entries())
+        .filter(([, count]) => count > 0)
+        .sort((a, b) => b[1] - a[1])
+
+      const total = entries.length
+      const pageEntries = entries.slice((page - 1) * limit, (page - 1) * limit + limit)
+
+      let users: RankingUser[] = []
+      if (pageEntries.length > 0) {
+        const userIds = pageEntries.map(([userId]) => userId)
+        const rows = await prisma.user.findMany({
+          where: { id: { in: userIds }, isBanned: false },
           select: USER_LIST_SELECT,
-        }),
-        prisma.user.count({ where: { isBanned: false } }),
-      ])
+        })
+        const rowMap = new Map(rows.map((u) => [u.id, u]))
+        const scoreMap = new Map(pageEntries)
 
-      const rankedUsers: RankingUser[] = users.map((user, index) => ({
-        id: user.id,
-        username: user.username,
-        nickname: user.nickname,
-        solvedCount: user.solvedCount,
-        rank: user.rank,
-        color: user.color,
-        avatar: sanitizeAvatarUrl(user.avatar),
-        position: (page - 1) * limit + index + 1,
-        solvedProblems: user.solvedCount,
-      }))
+        users = pageEntries
+          .filter(([userId]) => rowMap.has(userId))
+          .map(([userId], index) => {
+            const user = rowMap.get(userId)!
+            return {
+              id: user.id,
+              username: user.username,
+              nickname: user.nickname,
+              solvedCount: scoreMap.get(userId) || 0,
+              rank: user.rank,
+              color: user.color,
+              avatar: sanitizeAvatarUrl(user.avatar),
+              position: (page - 1) * limit + index + 1,
+              solvedProblems: scoreMap.get(userId) || 0,
+            }
+          })
+      }
 
       return {
-        users: rankedUsers,
+        users,
         pagination: {
           page,
           limit,
@@ -121,96 +172,55 @@ export async function listRankingByPeriod(
           totalPages: Math.ceil(total / limit),
         },
       }
-    }
-
-    // 周期榜：按周期内 AC 去重题数降序，仅展示周期内有 AC 的用户
-    const solvedMap = await getPeriodSolvedMap(start)
-    const entries = Array.from(solvedMap.entries())
-      .filter(([, count]) => count > 0)
-      .sort((a, b) => b[1] - a[1])
-
-    const total = entries.length
-    const pageEntries = entries.slice((page - 1) * limit, (page - 1) * limit + limit)
-
-    let users: RankingUser[] = []
-    if (pageEntries.length > 0) {
-      const userIds = pageEntries.map(([userId]) => userId)
-      const rows = await prisma.user.findMany({
-        where: { id: { in: userIds }, isBanned: false },
-        select: USER_LIST_SELECT,
-      })
-      const rowMap = new Map(rows.map((u) => [u.id, u]))
-      const scoreMap = new Map(pageEntries)
-
-      users = pageEntries
-        .filter(([userId]) => rowMap.has(userId))
-        .map(([userId], index) => {
-          const user = rowMap.get(userId)!
-          return {
-            id: user.id,
-            username: user.username,
-            nickname: user.nickname,
-            solvedCount: scoreMap.get(userId) || 0,
-            rank: user.rank,
-            color: user.color,
-            avatar: sanitizeAvatarUrl(user.avatar),
-            position: (page - 1) * limit + index + 1,
-            solvedProblems: scoreMap.get(userId) || 0,
-          }
-        })
-    }
-
-    return {
-      users,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
-  }, { ttl: 60_000 })
+    },
+    { ttl: 60_000 }
+  )
 }
 
 /**
  * 当前用户的实时排名（按周期计算；total 读 solvedCount，周期榜按窗口内 AC 去重题数）
  */
 export async function getMyRankAdvanced(userId: string, period: RankingPeriod = 'total') {
-  return cache.get('ranking:myRankAdvanced', [userId, period], async () => {
-    const start = periodStart(period)
-    let myScore = 0
+  return cache.get(
+    'ranking:myRankAdvanced',
+    [userId, period],
+    async () => {
+      const start = periodStart(period)
+      let myScore = 0
 
-    if (start === null) {
-      const me = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { solvedCount: true },
-      })
-      if (!me) return null
-      myScore = me.solvedCount
-      const higher = await prisma.user.count({
-        where: { isBanned: false, solvedCount: { gt: myScore } },
-      })
-      return { rank: higher + 1, solvedCount: myScore, userId }
-    }
-
-    const solvedMap = await getPeriodSolvedMap(start)
-    // 周期榜需排除被封禁用户（与 total 榜一致）
-    myScore = solvedMap.get(userId) || 0
-    const bannedIds = new Set(
-      (
-        await prisma.user.findMany({
-          where: { isBanned: true },
-          select: { id: true },
+      if (start === null) {
+        const me = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { solvedCount: true },
         })
-      ).map((u) => u.id)
-    )
-    let higher = 0
-    for (const [uid, count] of solvedMap) {
-      if (bannedIds.has(uid)) continue
-      if (count > myScore) higher++
-    }
-    return { rank: higher + 1, solvedCount: myScore, userId }
-  }, { ttl: 30_000 })
+        if (!me) return null
+        myScore = me.solvedCount
+        const higher = await prisma.user.count({
+          where: { isBanned: false, solvedCount: { gt: myScore } },
+        })
+        return { rank: higher + 1, solvedCount: myScore, userId }
+      }
+
+      const solvedMap = await getPeriodSolvedMap(start)
+      // 周期榜需排除被封禁用户（与 total 榜一致）
+      myScore = solvedMap.get(userId) || 0
+      const bannedIds = new Set(
+        (
+          await prisma.user.findMany({
+            where: { isBanned: true },
+            select: { id: true },
+          })
+        ).map((u) => u.id)
+      )
+      let higher = 0
+      for (const [uid, count] of solvedMap) {
+        if (bannedIds.has(uid)) continue
+        if (count > myScore) higher++
+      }
+      return { rank: higher + 1, solvedCount: myScore, userId }
+    },
+    { ttl: 30_000 }
+  )
 }
 
 /**

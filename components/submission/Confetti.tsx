@@ -25,9 +25,16 @@ interface Particle {
 }
 
 const COLORS = [
-  '#10b981', '#22c55e', '#3b82f6', '#f59e0b',
-  '#ef4444', '#ec4899', '#8b5cf6', '#06b6d4',
-  '#f97316', '#84cc16',
+  '#10b981',
+  '#22c55e',
+  '#3b82f6',
+  '#f59e0b',
+  '#ef4444',
+  '#ec4899',
+  '#8b5cf6',
+  '#06b6d4',
+  '#f97316',
+  '#84cc16',
 ]
 
 /** 同一提交只庆祝一次，避免短时重复提交/重渲染叠多层彩纸 */
@@ -104,7 +111,8 @@ export default function Confetti({ trigger, duration = 3000, count = 120 }: Conf
       ctx.clearRect(0, 0, w, h)
 
       const fadeStart = duration * 0.6
-      const lifeFactor = elapsed < fadeStart ? 1 : Math.max(0, 1 - (elapsed - fadeStart) / (duration - fadeStart))
+      const lifeFactor =
+        elapsed < fadeStart ? 1 : Math.max(0, 1 - (elapsed - fadeStart) / (duration - fadeStart))
 
       particlesRef.current.forEach((p) => {
         p.vy += gravity

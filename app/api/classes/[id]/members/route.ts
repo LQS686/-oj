@@ -1,7 +1,14 @@
 /**
  * /api/classes/[id]/members - 班级成员列表
  */
-import { withApi, ok, readQuery, throw400, throw404, resolveViewerFromRequest } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readQuery,
+  throw400,
+  throw404,
+  resolveViewerFromRequest,
+} from '@/lib/api/withApi'
 import { listClassMembers, type MemberListFilter } from '@/lib/class/member'
 import { isObjectId } from '@/lib/api/validation'
 import { getClassById, getCurrentClassMember } from '@/lib/class/service'
@@ -10,7 +17,13 @@ export const GET = withApi.public(async (req, ctx) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的班级ID')
 
-  const q = readQuery<{ sortBy?: string; sortOrder?: string; role?: string; active?: string; search?: string }>(req)
+  const q = readQuery<{
+    sortBy?: string
+    sortOrder?: string
+    role?: string
+    active?: string
+    search?: string
+  }>(req)
   const viewer = await resolveViewerFromRequest(req)
   const authUserId = viewer?.user.id
 

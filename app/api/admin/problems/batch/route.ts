@@ -23,11 +23,17 @@ export const POST = withApi.admin(async (req, _ctx) => {
   const validated = validateBatchProblemInput({ ...body, isObjectId })
 
   if (validated.action === 'visibility') {
-    const updateRes = await batchUpdateProblemVisibility(validated.problemIds, validated.visibility!)
+    const updateRes = await batchUpdateProblemVisibility(
+      validated.problemIds,
+      validated.visibility!
+    )
     return ok({ updatedCount: updateRes.count, deletedCount: 0 })
   }
   if (validated.action === 'difficulty') {
-    const updateRes = await batchUpdateProblemDifficulty(validated.problemIds, validated.difficulty!)
+    const updateRes = await batchUpdateProblemDifficulty(
+      validated.problemIds,
+      validated.difficulty!
+    )
     return ok({ updatedCount: updateRes.count, deletedCount: 0 })
   }
   // delete

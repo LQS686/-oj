@@ -39,7 +39,7 @@ export function Pagination({ page, totalPages, onChange, compact = false }: Pagi
   const iconSize = compact ? 'w-4 h-4' : 'w-5 h-5'
 
   return (
-    <div className="flex items-center gap-2 card-static rounded-lg p-1">
+    <div className="flex items-center gap-2 card-static p-1">
       <button
         type="button"
         onClick={() => onChange(Math.max(1, current - 1))}

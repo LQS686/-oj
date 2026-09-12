@@ -5,9 +5,10 @@ import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
-import { Check, X, EyeOff, ShieldCheck, AlertCircle, ExternalLink } from 'lucide-react'
+import { Check, X, EyeOff, ShieldCheck, AlertCircle, ExternalLink, FileText } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import { useDialog } from '@/components/common/DialogProvider'
+import { ListEmptyState } from '@/components/common'
 import Modal from '@/components/common/Modal'
 
 interface ReviewRow {
@@ -166,22 +167,27 @@ export default function AdminReviewsPage() {
       {loading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="card-static rounded-xl p-5 animate-pulse">
+            <div key={i} className="card-static p-5 animate-pulse">
               <div className="h-4 bg-muted rounded w-1/2 mb-3" />
               <div className="h-3 bg-muted rounded w-1/4" />
             </div>
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="card-static rounded-xl p-10 text-center text-muted-foreground">
-          暂无题解，切换状态查看其他列表
-        </div>
+        <ListEmptyState
+          icon={FileText}
+          title="暂无题解"
+          description="当前状态没有待处理的题解，换个状态再看看。"
+        />
       ) : (
         <div className="space-y-3">
           {items.map((row) => {
-            const meta = STATUS_META[row.status] ?? { label: row.status, className: 'bg-muted text-muted-foreground' }
+            const meta = STATUS_META[row.status] ?? {
+              label: row.status,
+              className: 'bg-muted text-muted-foreground',
+            }
             return (
-              <div key={row.id} className="card-static rounded-xl p-5">
+              <div key={row.id} className="card-static p-5">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">
@@ -209,11 +215,15 @@ export default function AdminReviewsPage() {
                       </Link>
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 truncate">
-                      <Link href={`/problems/${row.problem.id}`} className="hover:text-primary transition-colors">
+                      <Link
+                        href={`/problems/${row.problem.id}`}
+                        className="hover:text-primary transition-colors"
+                      >
                         {row.problem.problemNumber ? `${row.problem.problemNumber} · ` : ''}
                         {row.problem.title}
                       </Link>
-                      {'  ·  '}作者：{row.author.nickname || row.author.username}（{row.author.username}）
+                      {'  ·  '}作者：{row.author.nickname || row.author.username}（
+                      {row.author.username}）
                     </p>
                     {row.reviewNote && (
                       <p className="text-xs text-warning mt-1.5 bg-warning/5 rounded-md px-2 py-1 inline-block">
@@ -298,10 +308,19 @@ export default function AdminReviewsPage() {
           closeOnEsc={!submitting}
           footer={
             <div className="flex justify-end gap-2 w-full">
-              <button type="button" className="btn btn-outline" onClick={() => setRejectTarget(null)}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setRejectTarget(null)}
+              >
                 取消
               </button>
-              <button type="button" className="btn btn-destructive" disabled={submitting} onClick={confirmReject}>
+              <button
+                type="button"
+                className="btn btn-destructive"
+                disabled={submitting}
+                onClick={confirmReject}
+              >
                 {submitting ? '提交中…' : '确认驳回'}
               </button>
             </div>
@@ -309,10 +328,11 @@ export default function AdminReviewsPage() {
         >
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              驳回「{rejectTarget.title}」后，该题解对其他用户不可见，作者仍可编辑修改后重新提交审核。
+              驳回「{rejectTarget.title}
+              」后，该题解对其他用户不可见，作者仍可编辑修改后重新提交审核。
             </p>
             <div>
-              <label className="text-sm font-medium">驳回原因（选填）</label>
+              <label className="text-label">驳回原因（选填）</label>
               <textarea
                 className="input w-full mt-1 min-h-[80px]"
                 placeholder="例如：题解内容与本题无关 / 包含违规内容"

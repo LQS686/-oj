@@ -59,12 +59,12 @@ export function getJudgeConfig(): ResolvedJudgeConfig {
 
   const jobTimeoutSec = Math.min(
     3600,
-    Math.max(30, envNumber('JUDGE_JOB_TIMEOUT') ?? db.jobTimeout),
+    Math.max(30, envNumber('JUDGE_JOB_TIMEOUT') ?? db.jobTimeout)
   )
   const failFast = normalizeFailFast(envString('JUDGE_FAIL_FAST') ?? db.failFast)
   const maxConcurrent = Math.min(
     16,
-    Math.max(1, Math.round(envNumber('JUDGE_MAX_CONCURRENT') ?? db.maxConcurrent)),
+    Math.max(1, Math.round(envNumber('JUDGE_MAX_CONCURRENT') ?? db.maxConcurrent))
   )
 
   const caseFromEnv = envNumber('JUDGE_CASE_CONCURRENCY')
@@ -82,39 +82,36 @@ export function getJudgeConfig(): ResolvedJudgeConfig {
 
   const largeCaseConcurrency = Math.min(
     8,
-    Math.max(
-      1,
-      Math.round(envNumber('JUDGE_LARGE_CASE_CONCURRENCY') ?? db.largeCaseConcurrency),
-    ),
+    Math.max(1, Math.round(envNumber('JUDGE_LARGE_CASE_CONCURRENCY') ?? db.largeCaseConcurrency))
   )
 
   const rejudgeTimes = Math.min(
     5,
-    Math.max(0, Math.round(envNumber('JUDGE_REJUDGE_TIMES') ?? db.rejudgeTimes)),
+    Math.max(0, Math.round(envNumber('JUDGE_REJUDGE_TIMES') ?? db.rejudgeTimes))
   )
   const extraTimeRatio = Math.min(
     1,
-    Math.max(0, envNumber('JUDGE_EXTRA_TIME_RATIO') ?? db.extraTimeRatio),
+    Math.max(0, envNumber('JUDGE_EXTRA_TIME_RATIO') ?? db.extraTimeRatio)
   )
   const compileTimeoutMs = Math.min(
     120000,
-    Math.max(5000, Math.round(envNumber('JUDGE_COMPILE_TIMEOUT') ?? db.compileTimeout)),
+    Math.max(5000, Math.round(envNumber('JUDGE_COMPILE_TIMEOUT') ?? db.compileTimeout))
   )
   const ioSlackMaxMs = Math.min(
     120000,
-    Math.max(5000, Math.round(envNumber('JUDGE_IO_SLACK_MAX_MS') ?? db.ioSlackMaxMs)),
+    Math.max(5000, Math.round(envNumber('JUDGE_IO_SLACK_MAX_MS') ?? db.ioSlackMaxMs))
   )
   const deadCheckMs = Math.min(
     30000,
-    Math.max(2000, Math.round(envNumber('JUDGE_DEAD_CHECK_MS') ?? db.deadCheckMs)),
+    Math.max(2000, Math.round(envNumber('JUDGE_DEAD_CHECK_MS') ?? db.deadCheckMs))
   )
   const closeFallbackMs = Math.min(
     2000,
-    Math.max(200, Math.round(envNumber('JUDGE_CLOSE_FALLBACK_MS') ?? db.closeFallbackMs)),
+    Math.max(200, Math.round(envNumber('JUDGE_CLOSE_FALLBACK_MS') ?? db.closeFallbackMs))
   )
   const largeCaseBytes = Math.max(
     256 * 1024,
-    Math.round(envNumber('JUDGE_LARGE_CASE_BYTES') ?? db.largeCaseBytes),
+    Math.round(envNumber('JUDGE_LARGE_CASE_BYTES') ?? db.largeCaseBytes)
   )
 
   return {

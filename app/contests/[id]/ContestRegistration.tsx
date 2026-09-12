@@ -81,7 +81,7 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
 
   if (loading || authLoading) {
     return (
-      <div className="card-static rounded-xl p-4">
+      <div className="card-static p-4">
         <div className="skeleton h-24 rounded-lg" />
       </div>
     )
@@ -89,13 +89,13 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
 
   if (!isLoggedIn) {
     return (
-      <div className="card-static rounded-xl p-4 space-y-3">
+      <div className="card-static p-4 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <LogIn className="w-5 h-5 text-primary-light" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground">请先登录</h3>
+            <h3 className="text-subsection-title text-foreground">请先登录</h3>
             <p className="text-xs text-muted-foreground mt-0.5">登录后即可报名参赛</p>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
   if (isRegistered) {
     const isStarted = startMs <= nowMs
     return (
-      <div className="card-static rounded-xl p-4 space-y-3">
+      <div className="card-static p-4 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
             <UserCheck className="w-5 h-5 text-secondary-light" />
@@ -142,9 +142,9 @@ export default function ContestRegistration({ contest }: { contest: Contest }) {
   }
 
   return (
-    <div className="card-static rounded-xl p-4 space-y-3">
+    <div className="card-static p-4 space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-foreground">报名参赛</h3>
+        <h3 className="text-subsection-title text-foreground">报名参赛</h3>
         {contest.hasPassword ? (
           <p className="text-xs text-muted-foreground mt-1">请输入竞赛密码后报名</p>
         ) : (

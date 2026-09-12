@@ -175,8 +175,10 @@ function TestPointRow({ result, index }: { result: TestResult; index: number }) 
             getTestStatusIcon(result.status)
           )}
           <div className="min-w-0">
-            <div className="text-sm font-medium text-foreground">测试点 #{index + 1}</div>
-            <div className="text-xs text-muted-foreground truncate">{getStatusText(result.status)}</div>
+            <div className="text-subsection-title text-foreground">测试点 #{index + 1}</div>
+            <div className="text-xs text-muted-foreground truncate">
+              {getStatusText(result.status)}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-4 text-xs shrink-0">
@@ -186,9 +188,12 @@ function TestPointRow({ result, index }: { result: TestResult; index: number }) 
           <span className="font-mono tabular-nums text-muted-foreground">
             {judging ? '—' : formatMemory(result.memory)}
           </span>
-          {hasMessage && (
-            expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          )}
+          {hasMessage &&
+            (expanded ? (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            ))}
         </div>
       </button>
       {expanded && result.message && (
@@ -214,7 +219,9 @@ function MetricCell({
   accent?: boolean
 }) {
   return (
-    <div className={`rounded-lg border p-3 ${accent ? 'border-secondary/35 bg-secondary/5' : 'border-border bg-card'}`}>
+    <div
+      className={`rounded-lg border p-3 ${accent ? 'border-secondary/35 bg-secondary/5' : 'border-border bg-card'}`}
+    >
       <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
         {label}
         {hint && (
@@ -223,7 +230,9 @@ function MetricCell({
           </span>
         )}
       </div>
-      <div className="text-xl font-bold font-mono tabular-nums text-foreground leading-tight">{value}</div>
+      <div className="text-xl font-bold font-mono tabular-nums text-foreground leading-tight">
+        {value}
+      </div>
     </div>
   )
 }
@@ -242,43 +251,46 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
   const [rejudging, setRejudging] = useState(false)
   const isRefreshingRef = useRef(false)
 
-  const fetchSubmission = useCallback(async (showRefreshing = false) => {
-    if (isRefreshingRef.current) return
-    isRefreshingRef.current = true
-    if (showRefreshing) setIsRefreshing(true)
-    try {
-      const response = await fetchWithCookie(`/api/submissions/${id}`)
-      const data = await response.json()
+  const fetchSubmission = useCallback(
+    async (showRefreshing = false) => {
+      if (isRefreshingRef.current) return
+      isRefreshingRef.current = true
+      if (showRefreshing) setIsRefreshing(true)
+      try {
+        const response = await fetchWithCookie(`/api/submissions/${id}`)
+        const data = await response.json()
 
-      if (data.success) {
-        setSubmission(data.data)
-        setError('')
-      } else {
-        if (response.status === 403) {
-          setError('需要管理员权限')
-          scheduleForbiddenRedirect()
-          return
-        }
-        if (response.status === 404) {
-          setSubmission((prev) => {
-            if (!prev) setError('提交记录不存在或已被删除。')
-            return prev
-          })
+        if (data.success) {
+          setSubmission(data.data)
+          setError('')
         } else {
-          setError(data.error || '加载失败')
+          if (response.status === 403) {
+            setError('需要管理员权限')
+            scheduleForbiddenRedirect()
+            return
+          }
+          if (response.status === 404) {
+            setSubmission((prev) => {
+              if (!prev) setError('提交记录不存在或已被删除。')
+              return prev
+            })
+          } else {
+            setError(data.error || '加载失败')
+          }
         }
+      } catch {
+        setSubmission((prev) => {
+          if (!prev) setError('网络错误，请稍后重试')
+          return prev
+        })
+      } finally {
+        setLoading(false)
+        isRefreshingRef.current = false
+        if (showRefreshing) setIsRefreshing(false)
       }
-    } catch {
-      setSubmission((prev) => {
-        if (!prev) setError('网络错误，请稍后重试')
-        return prev
-      })
-    } finally {
-      setLoading(false)
-      isRefreshingRef.current = false
-      if (showRefreshing) setIsRefreshing(false)
-    }
-  }, [id, scheduleForbiddenRedirect])
+    },
+    [id, scheduleForbiddenRedirect]
+  )
 
   useDeferredEffect(() => {
     void fetchSubmission()
@@ -405,7 +417,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
           <div className="w-14 h-14 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
             <XCircle className="w-7 h-7 text-error" />
           </div>
-          <h2 className="text-lg font-bold text-foreground mb-2">加载失败</h2>
+          <h2 className="text-section-title text-foreground mb-2">加载失败</h2>
           <p className="text-muted-foreground mb-6 max-w-md text-sm">{error}</p>
           <Link href="/admin/submissions" className="btn btn-primary">
             返回提交列表
@@ -425,27 +437,27 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
   const problemHref = `/problem/${submission.problem.problemNumber || submission.problem.id}`
 
   return (
-    <AdminPageShell width="wide" className="space-y-5">
+    <AdminPageShell width="wide" className="space-y-6">
       {/* 顶栏 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3 min-w-0">
           <Link
             href="/admin/submissions"
-            className="p-1.5 -ml-1.5 mt-0.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className="btn-icon-sm -ml-1.5 mt-0.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
             aria-label="返回提交列表"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h1 className="text-xl font-bold text-foreground truncate">
+              <h2 className="text-xl font-bold text-foreground truncate">
                 {submission.problem.problemNumber && (
                   <span className="font-mono text-muted-foreground mr-1.5 text-base">
                     {submission.problem.problemNumber}
                   </span>
                 )}
                 {submission.problem.title}
-              </h1>
+              </h2>
               <StatusBadge status={submission.status} />
               {judging && (
                 <span className="text-xs text-primary inline-flex items-center gap-1">
@@ -472,7 +484,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
             type="button"
             onClick={() => void fetchSubmission(true)}
             disabled={isRefreshing}
-            className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+            className="btn btn-sm btn-outline gap-1.5"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             刷新
@@ -481,7 +493,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
             type="button"
             onClick={() => void handleRejudge()}
             disabled={rejudging || judging}
-            className="btn btn-outline text-sm py-1.5 px-3 gap-1.5 disabled:opacity-50"
+            className="btn btn-sm btn-outline gap-1.5 disabled:opacity-50"
             title={judging ? '评测进行中' : '重新评测'}
           >
             {rejudging ? (
@@ -493,7 +505,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
           </button>
           <Link
             href={`/submission/${submission.id}`}
-            className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+            className="btn btn-sm btn-outline gap-1.5"
             target="_blank"
           >
             <ExternalLink className="w-4 h-4" />
@@ -533,16 +545,14 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
       {(submission.message || isCe) && (
         <div
           className={`rounded-lg border p-3.5 flex gap-3 ${
-            isCe || !isAc
-              ? 'bg-error/5 border-error/25'
-              : 'bg-accent/10 border-accent/25'
+            isCe || !isAc ? 'bg-error/5 border-error/25' : 'bg-accent/10 border-accent/25'
           }`}
         >
           <AlertTriangle
             className={`w-5 h-5 shrink-0 mt-0.5 ${isCe || !isAc ? 'text-error' : 'text-accent'}`}
           />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-foreground mb-1">
+            <div className="text-subsection-title text-foreground mb-1">
               {isCe ? '编译信息' : '评测信息'}
             </div>
             <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words max-h-56 overflow-auto custom-scrollbar">
@@ -554,9 +564,9 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
         {/* 左：元信息 + 测试点 */}
-        <div className="xl:col-span-2 space-y-5">
+        <div className="xl:col-span-2 space-y-6">
           <section className="card p-4">
-            <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <h2 className="text-subsection-title text-foreground mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" />
               基本信息
             </h2>
@@ -564,17 +574,24 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-muted-foreground shrink-0">提交 ID</dt>
                 <dd className="flex items-center gap-1.5 min-w-0">
-                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate" title={submission.id}>
+                  <code
+                    className="text-xs bg-muted px-1.5 py-0.5 rounded truncate"
+                    title={submission.id}
+                  >
                     {submission.id}
                   </code>
                   <button
                     type="button"
                     onClick={() => void handleCopyId()}
-                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                    className="btn-icon-sm text-muted-foreground hover:text-foreground hover:bg-muted"
                     title="复制完整 ID"
                     aria-label="复制提交 ID"
                   >
-                    {copiedId ? <Check className="w-3.5 h-3.5 text-secondary" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedId ? (
+                      <Check className="w-3.5 h-3.5 text-secondary" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
                   </button>
                 </dd>
               </div>
@@ -616,17 +633,21 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-muted-foreground">语言</dt>
-                <dd><span className="tag">{submission.language}</span></dd>
+                <dd>
+                  <span className="tag">{submission.language}</span>
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-muted-foreground">提交时间</dt>
-                <dd className="font-mono text-xs tabular-nums">{formatDateTime(submission.submittedAt)}</dd>
+                <dd className="font-mono text-xs tabular-nums">
+                  {formatDateTime(submission.submittedAt)}
+                </dd>
               </div>
             </dl>
           </section>
 
           <section className="card p-4">
-            <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <h2 className="text-subsection-title text-foreground mb-3 flex items-center gap-2">
               <Target className="w-4 h-4 text-secondary" />
               测试点统计
             </h2>
@@ -652,7 +673,9 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
             </div>
             <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
               <div className="text-center">
-                <div className="text-lg font-bold text-secondary tabular-nums">{submission.passedTests}</div>
+                <div className="text-lg font-bold text-secondary tabular-nums">
+                  {submission.passedTests}
+                </div>
                 <div className="text-xs text-muted-foreground">通过</div>
               </div>
               <div className="text-center">
@@ -660,7 +683,9 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
                 <div className="text-xs text-muted-foreground">未通过</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold text-primary tabular-nums">{submission.totalTests}</div>
+                <div className="text-lg font-bold text-primary tabular-nums">
+                  {submission.totalTests}
+                </div>
                 <div className="text-xs text-muted-foreground">总计</div>
               </div>
             </div>
@@ -669,7 +694,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
           {(judging || (submission.testResults && submission.testResults.length > 0)) && (
             <section className="card p-4">
               <div className="flex items-center justify-between mb-3 gap-2">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <h2 className="text-subsection-title text-foreground flex items-center gap-2">
                   <Target className="w-4 h-4 text-primary" />
                   测试点详情
                 </h2>
@@ -703,7 +728,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
         {/* 右：代码（首屏可见） */}
         <section className="xl:col-span-3 card p-4 flex flex-col min-h-[28rem]">
           <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <h2 className="text-subsection-title text-foreground flex items-center gap-2">
               <Code className="w-4 h-4 text-primary" />
               提交代码
               <span className="text-xs font-normal text-muted-foreground">
@@ -713,7 +738,7 @@ export default function AdminSubmissionDetailPage({ params }: { params: Promise<
             <button
               type="button"
               onClick={() => void handleCopyCode()}
-              className="btn btn-outline text-sm py-1.5 px-3 gap-1.5"
+              className="btn btn-sm btn-outline gap-1.5"
               disabled={!submission.code}
             >
               {copiedCode ? (

@@ -7,11 +7,7 @@
  */
 import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import {
-  adminDeleteClass,
-  adminUpdateClass,
-  getClassDetail,
-} from '@/lib/class/service'
+import { adminDeleteClass, adminUpdateClass, getClassDetail } from '@/lib/class/service'
 
 /**
  * GET /api/admin/classes/[id] - 获取班级详情（管理员）

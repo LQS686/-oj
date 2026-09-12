@@ -14,8 +14,7 @@ import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
  * ========================================================================== */
 
 export type CreateJoinRequestResult =
-  | { ok: true; requestId: string }
-  | { ok: false; error: string; code: number }
+  { ok: true; requestId: string } | { ok: false; error: string; code: number }
 
 export async function createOrReuseJoinRequest(
   classId: string,
@@ -165,7 +164,11 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
     throw new ApiError('BAD_REQUEST', '申请与班级不匹配', 400)
   }
   if (request.status !== 'pending') {
-    throw new ApiError('ALREADY_PROCESSED', `该申请已被${request.status === 'approved' ? '批准' : '拒绝'}`, 400)
+    throw new ApiError(
+      'ALREADY_PROCESSED',
+      `该申请已被${request.status === 'approved' ? '批准' : '拒绝'}`,
+      400
+    )
   }
   if (input.action === 'approve') {
     // 检查是否已存在成员
@@ -218,11 +221,7 @@ export async function decideClassJoinRequest(input: DecideJoinRequestInput) {
 /**
  * 申请者撤销自己提交的加入申请
  */
-export async function cancelClassJoinRequest(
-  classId: string,
-  requestId: string,
-  userId: string
-) {
+export async function cancelClassJoinRequest(classId: string, requestId: string, userId: string) {
   const request = await prisma.classJoinRequest.findUnique({ where: { id: requestId } })
   if (!request) throw new ApiError('NOT_FOUND', '申请不存在', 404)
   if (request.classId !== classId) {

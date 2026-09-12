@@ -83,7 +83,11 @@ class ApiClient {
     this.baseUrl = '/api'
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}, csrfRetried = false): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    csrfRetried = false
+  ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
     const method = (options.method || 'GET').toUpperCase()
 
@@ -288,10 +292,7 @@ class ApiClient {
 
 export const apiClient = new ApiClient()
 
-export async function fetchWithCookie(
-  url: string,
-  options: RequestInit = {}
-): Promise<Response> {
+export async function fetchWithCookie(url: string, options: RequestInit = {}): Promise<Response> {
   const method = (options.method || 'GET').toUpperCase()
   const headers = await withCsrfHeaders(method, {
     ...(options.headers as Record<string, string>),

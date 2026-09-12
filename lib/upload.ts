@@ -43,17 +43,32 @@ export function detectImageMime(buffer: Buffer): string | null {
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg'
   // PNG: 89 50 4E 47 0D 0A 1A 0A
   if (
-    buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 &&
-    buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a
-  ) return 'image/png'
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  )
+    return 'image/png'
   // GIF: 47 49 46 38 (GIF8)
-  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) return 'image/gif'
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38)
+    return 'image/gif'
   // WebP: 52 49 46 46 ?? ?? ?? ?? 57 45 42 50 (RIFF....WEBP)
   if (
     buffer.length >= 12 &&
-    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
-    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
-  ) return 'image/webp'
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  )
+    return 'image/webp'
   return null
 }
 
@@ -124,11 +139,7 @@ export async function processAvatar(
   }
 }
 
-export async function saveChunk(
-  uploadId: string,
-  chunkIndex: number,
-  buffer: Buffer
-) {
+export async function saveChunk(uploadId: string, chunkIndex: number, buffer: Buffer) {
   assertValidUploadId(uploadId)
   await ensureUploadDirs()
   const safeId = basename(uploadId)
@@ -175,7 +186,11 @@ export async function mergeChunks(
     })
 
     // 累加字节须与申报 fileSize 一致（允许分片编码误差 ≤ 0）
-    if (typeof expectedFileSize === 'number' && expectedFileSize > 0 && totalBytes !== expectedFileSize) {
+    if (
+      typeof expectedFileSize === 'number' &&
+      expectedFileSize > 0 &&
+      totalBytes !== expectedFileSize
+    ) {
       throw new ApiError(
         'SIZE_MISMATCH',
         `文件大小与申报不符（申报 ${expectedFileSize}，实际 ${totalBytes}）`,
@@ -213,7 +228,7 @@ export async function cleanOldTempFiles() {
     const files = await readdir(TEMP_DIR)
     const now = Date.now()
     const ONE_DAY = 24 * 60 * 60 * 1000
-    
+
     for (const file of files) {
       const filePath = join(TEMP_DIR, file)
       const stats = await stat(filePath)
@@ -249,8 +264,5 @@ export async function deleteAvatarFilesByUrl(avatarUrl: string): Promise<void> {
   const thumbFilename = `${baseName}_thumb${ext}`
   const thumbPath = join(UPLOAD_DIR, thumbFilename)
 
-  await Promise.all([
-    unlink(mainPath).catch(() => {}),
-    unlink(thumbPath).catch(() => {}),
-  ])
+  await Promise.all([unlink(mainPath).catch(() => {}), unlink(thumbPath).catch(() => {})])
 }

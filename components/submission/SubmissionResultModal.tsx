@@ -236,16 +236,16 @@ function MetricCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={`rounded-xl p-4 border transition-all ${
-        highlight
-          ? 'bg-secondary/5 border-secondary/30'
-          : 'bg-muted/40 border-border'
+        highlight ? 'bg-secondary/5 border-secondary/30' : 'bg-muted/40 border-border'
       }`}
     >
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
         {icon}
         <span>{label}</span>
       </div>
-      <div className={`text-xl font-bold font-mono ${highlight ? 'text-secondary-light' : 'text-foreground'}`}>
+      <div
+        className={`text-xl font-bold font-mono ${highlight ? 'text-secondary-light' : 'text-foreground'}`}
+      >
         {value}
       </div>
     </motion.div>
@@ -377,9 +377,7 @@ export default function SubmissionResultModal({
   }
 
   const progressPercent =
-    result && result.totalTests > 0
-      ? (result.passedTests / result.totalTests) * 100
-      : 0
+    result && result.totalTests > 0 ? (result.passedTests / result.totalTests) * 100 : 0
 
   return (
     <AnimatePresence mode="wait">
@@ -397,14 +395,12 @@ export default function SubmissionResultModal({
           aria-modal="true"
           aria-labelledby="submission-result-title"
         >
-          {isAC && !isJudging && result?.submissionId && (
-            <Confetti trigger={result.submissionId} />
-          )}
+          {isAC && !isJudging && result?.submissionId && <Confetti trigger={result.submissionId} />}
 
           <motion.div
             ref={dialogRef}
             tabIndex={-1}
-            className="card-static rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl"
+            className="card-static rounded-xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl"
             variants={panelVariants}
             initial="hidden"
             animate="visible"
@@ -412,7 +408,9 @@ export default function SubmissionResultModal({
             onClick={(e) => e.stopPropagation()}
           >
             {/* 顶部状态区 */}
-            <div className={`relative px-6 pt-8 pb-6 text-center border-b ${meta ? `${meta.bg} ${meta.border}` : 'bg-muted border-border'}`}>
+            <div
+              className={`relative px-6 pt-8 pb-6 text-center border-b ${meta ? `${meta.bg} ${meta.border}` : 'bg-muted border-border'}`}
+            >
               {!isJudging && meta && (
                 <button
                   type="button"
@@ -434,7 +432,10 @@ export default function SubmissionResultModal({
                     <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
                     <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent" />
                   </motion.div>
-                  <h2 id="submission-result-title" className="text-xl font-bold text-foreground mb-1">
+                  <h2
+                    id="submission-result-title"
+                    className="text-xl font-bold text-foreground mb-1"
+                  >
                     正在评测中...
                   </h2>
                   <p className="text-sm text-muted-foreground">
@@ -467,7 +468,10 @@ export default function SubmissionResultModal({
                   >
                     <StatusIcon meta={meta} />
                   </motion.div>
-                  <h2 id="submission-result-title" className={`text-2xl font-bold mb-1 ${meta.textCls}`}>
+                  <h2
+                    id="submission-result-title"
+                    className={`text-2xl font-bold mb-1 ${meta.textCls}`}
+                  >
                     {isAC ? '恭喜通过！' : meta.text}
                   </h2>
                   {meta.description && (
@@ -494,8 +498,8 @@ export default function SubmissionResultModal({
                         progressPercent === 100
                           ? 'bg-secondary'
                           : progressPercent > 0
-                          ? 'bg-accent'
-                          : 'bg-error'
+                            ? 'bg-accent'
+                            : 'bg-error'
                       }`}
                       initial={{ width: 0 }}
                       animate={{ width: `${progressPercent}%` }}
@@ -507,13 +511,15 @@ export default function SubmissionResultModal({
 
               {/* 三项关键指标（CE 不展示用时内存；作业 AC 时额外展示做题用时） */}
               {isFinal && result && (
-                <div className={`grid gap-3 ${
-                  isCE
-                    ? 'grid-cols-1'
-                    : (isAC && result.timeElapsedMs && result.timeElapsedMs > 0)
-                      ? 'grid-cols-4'
-                      : 'grid-cols-3'
-                } mb-5`}>
+                <div
+                  className={`grid gap-3 ${
+                    isCE
+                      ? 'grid-cols-1'
+                      : isAC && result.timeElapsedMs && result.timeElapsedMs > 0
+                        ? 'grid-cols-4'
+                        : 'grid-cols-3'
+                  } mb-5`}
+                >
                   <MetricCard
                     label="得分"
                     value={`${result.score}`}
@@ -557,7 +563,7 @@ export default function SubmissionResultModal({
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <AlertTriangle className="w-4 h-4 text-accent" />
-                    <h4 className="text-sm font-semibold text-foreground">
+                    <h4 className="text-subsection-title text-foreground">
                       {isCE ? '编译错误信息' : '评测信息'}
                     </h4>
                   </div>
@@ -577,20 +583,12 @@ export default function SubmissionResultModal({
             {/* 底部操作区 */}
             <div className="px-6 py-4 border-t border-border bg-muted/30 flex flex-wrap items-center justify-end gap-2">
               {isJudging ? (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="btn btn-ghost cursor-pointer"
-                >
+                <button type="button" onClick={onClose} className="btn btn-ghost cursor-pointer">
                   后台等待
                 </button>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="btn btn-ghost cursor-pointer"
-                  >
+                  <button type="button" onClick={onClose} className="btn btn-ghost cursor-pointer">
                     关闭
                   </button>
                   {onContinueSubmit && (

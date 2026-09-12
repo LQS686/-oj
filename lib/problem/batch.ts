@@ -67,7 +67,7 @@ export async function batchDeleteProblems(problemIds: string[]) {
   if (acUsers.length > 0) {
     // 按用户聚合每人对多少道题 AC（每道题回退 1）
     const userAcCount = new Map<string, number>()
-    acUsers.forEach(u => {
+    acUsers.forEach((u) => {
       userAcCount.set(u.userId, (userAcCount.get(u.userId) ?? 0) + 1)
     })
     await Promise.all(
@@ -85,8 +85,8 @@ export async function batchDeleteProblems(problemIds: string[]) {
 
   // 同步清理磁盘测试点文件（DB 已删，磁盘文件不再有用）
   // 失败仅 warn，不阻塞批量删除流程
-  await Promise.allSettled(problemIds.map(id => deleteTestCaseFiles(id))).then(settled => {
-    const failed = settled.filter(r => r.status === 'rejected')
+  await Promise.allSettled(problemIds.map((id) => deleteTestCaseFiles(id))).then((settled) => {
+    const failed = settled.filter((r) => r.status === 'rejected')
     if (failed.length > 0) {
       logger.warn(`[problem] 批量删除 ${failed.length}/${problemIds.length} 个题目的磁盘文件失败`)
     }
@@ -106,18 +106,19 @@ export function validateBatchProblemInput(input: {
   visibility?: string
   difficulty?: string
   isObjectId: (s: string) => boolean
-}): { action: BatchProblemAction; problemIds: string[]; visibility?: BatchProblemVisibility; difficulty?: string } {
+}): {
+  action: BatchProblemAction
+  problemIds: string[]
+  visibility?: BatchProblemVisibility
+  difficulty?: string
+} {
   const { action, problemIds, visibility, difficulty, isObjectId } = input
   if (!Array.isArray(problemIds) || problemIds.length === 0) {
     throw new ApiError('INVALID_PROBLEM_IDS', 'problemIds 必须是非空数组', 400)
   }
   const invalidIds = problemIds.filter((id) => !isObjectId(id))
   if (invalidIds.length > 0) {
-    throw new ApiError(
-      'INVALID_IDS',
-      `以下 ID 格式无效: ${invalidIds.slice(0, 3).join(', ')}`,
-      400
-    )
+    throw new ApiError('INVALID_IDS', `以下 ID 格式无效: ${invalidIds.slice(0, 3).join(', ')}`, 400)
   }
   switch (action) {
     case 'visibility': {

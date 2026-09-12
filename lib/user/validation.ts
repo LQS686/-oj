@@ -2,7 +2,14 @@
  * lib/user/validation.ts
  * 用户参数校验
  */
-import { required, optional, toBool, ValidationError, asRecord, validatePassword } from '@/lib/api/validation'
+import {
+  required,
+  optional,
+  toBool,
+  ValidationError,
+  asRecord,
+  validatePassword,
+} from '@/lib/api/validation'
 
 export function parseProfileUpdate(body: unknown) {
   const b = asRecord(body)

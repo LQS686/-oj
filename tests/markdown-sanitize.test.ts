@@ -34,12 +34,16 @@ function sanitizeHtml(html: string) {
 
 describe('markdownSanitizeSchema：禁止 style 属性', () => {
   it('剥离 span 上的 style（含 UI 覆盖与外部请求 CSS）', () => {
-    const { attrs } = sanitizeHtml('<span style="color:red;position:fixed;background-image:url(&quot;https://evil.example/x&quot;)">x</span>')
+    const { attrs } = sanitizeHtml(
+      '<span style="color:red;position:fixed;background-image:url(&quot;https://evil.example/x&quot;)">x</span>'
+    )
     expect(attrs.span).toBeDefined()
     expect(attrs.span).not.toContain('style')
   })
   it('任意标签上都不允许 style（含 div/table/img 白名单标签）', () => {
-    const { attrs } = sanitizeHtml('<div style="color:red">d</div><table style="width:100%"><tr><td style="text-align:center">t</td></tr></table><img src="https://example.com/a.png" style="opacity:0">')
+    const { attrs } = sanitizeHtml(
+      '<div style="color:red">d</div><table style="width:100%"><tr><td style="text-align:center">t</td></tr></table><img src="https://example.com/a.png" style="opacity:0">'
+    )
     for (const list of Object.values(attrs)) {
       expect(list).not.toContain('style')
     }
@@ -53,7 +57,9 @@ describe('markdownSanitizeSchema：禁止脚本与事件处理器', () => {
     expect(tags).toContain('p')
   })
   it('剥离 img 上的 onerror 等 on* 事件属性', () => {
-    const { attrs } = sanitizeHtml('<img src="https://example.com/a.png" onerror="alert(1)" onload="steal()">')
+    const { attrs } = sanitizeHtml(
+      '<img src="https://example.com/a.png" onerror="alert(1)" onload="steal()">'
+    )
     expect(attrs.img).toBeDefined()
     expect(attrs.img).not.toContain('onerror')
     expect(attrs.img).not.toContain('onload')
@@ -62,7 +68,9 @@ describe('markdownSanitizeSchema：禁止脚本与事件处理器', () => {
 
 describe('markdownSanitizeSchema：禁止危险协议链接', () => {
   it('剥离 javascript: 链接的 href', () => {
-    const { hrefs } = sanitizeHtml('<a href="javascript:alert(1)">x</a><a href="https://example.com">y</a>')
+    const { hrefs } = sanitizeHtml(
+      '<a href="javascript:alert(1)">x</a><a href="https://example.com">y</a>'
+    )
     expect(hrefs).toEqual(['https://example.com'])
   })
   it('剥离 img src 上的 javascript: 协议', () => {
@@ -74,7 +82,9 @@ describe('markdownSanitizeSchema：禁止危险协议链接', () => {
 
 describe('markdownSanitizeSchema：渲染必需内容保留（回归）', () => {
   it('保留 KaTeX MathML 标签', () => {
-    const { tags } = sanitizeHtml('<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>x</mi><mo>+</mo><mn>1</mn></mrow></math>')
+    const { tags } = sanitizeHtml(
+      '<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>x</mi><mo>+</mo><mn>1</mn></mrow></math>'
+    )
     for (const tag of ['math', 'mrow', 'mi', 'mo', 'mn']) {
       expect(tags).toContain(tag)
     }

@@ -23,9 +23,7 @@ export async function listContests(
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
   const where: Prisma.ContestWhereInput = {}
   if (filter.keyword) {
-    where.OR = [
-      { title: { contains: filter.keyword, mode: 'insensitive' } },
-    ]
+    where.OR = [{ title: { contains: filter.keyword, mode: 'insensitive' } }]
   }
   if (filter.isPublic !== undefined) where.isPublic = filter.isPublic
   if (filter.type) where.type = filter.type
@@ -51,15 +49,23 @@ export async function listContests(
 }
 
 export async function getContestById(id: string) {
-  return cache.get('contest:byId', [id], async () => {
-    return prisma.contest.findUnique({
-      where: { id },
-      include: { problems: { include: { problem: true }, orderBy: { orderIndex: 'asc' } } },
-    })
-  }, { ttl: 30_000 })
+  return cache.get(
+    'contest:byId',
+    [id],
+    async () => {
+      return prisma.contest.findUnique({
+        where: { id },
+        include: { problems: { include: { problem: true }, orderBy: { orderIndex: 'asc' } } },
+      })
+    },
+    { ttl: 30_000 }
+  )
 }
 
-export async function createContest(data: Omit<Prisma.ContestUncheckedCreateInput, 'authorId'>, authorId: string) {
+export async function createContest(
+  data: Omit<Prisma.ContestUncheckedCreateInput, 'authorId'>,
+  authorId: string
+) {
   // listContests 直接查库无缓存，无需清 'contest:list'（历史遗留的无效删除已移除）
   return prisma.contest.create({ data: { ...data, authorId } })
 }

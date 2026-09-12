@@ -20,11 +20,20 @@ interface ProblemStatsRowProps {
  * 统计全部由后端按当前筛选条件一次聚合返回（Mongo 下避免逐题 _count N+1），
  * 前端仅负责展示，不再对当前页数据做本地统计。
  */
-export function ProblemStatsRow({ totalAll, total, stats, hasActiveFilters }: ProblemStatsRowProps) {
+export function ProblemStatsRow({
+  totalAll,
+  total,
+  stats,
+  hasActiveFilters,
+}: ProblemStatsRowProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm px-1">
       <span className="text-muted-foreground">
-        共 <span className="text-lg font-bold text-foreground font-mono tabular-nums">{totalAll}</span> 题
+        共{' '}
+        <span className="text-section-title text-foreground font-mono tabular-nums">
+          {totalAll}
+        </span>{' '}
+        题
       </span>
       <span className="text-border">|</span>
       <span className="text-secondary-light">

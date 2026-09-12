@@ -4,10 +4,7 @@
 import { EventEmitter } from 'events'
 import { logger } from '@/lib/logger'
 import type { ResultState, ComparisonMode } from './types'
-import {
-  getJudgeConfig,
-  registerJudgeQueueRuntimeApplier,
-} from './config'
+import { getJudgeConfig, registerJudgeQueueRuntimeApplier } from './config'
 import { memoryGateOk } from './memory-gate'
 
 // 评测任务数据类型
@@ -19,20 +16,20 @@ export interface JudgeJob {
   language: string
   timeLimit: number
   memoryLimit: number
-  comparisonMode?: ComparisonMode    // 输出比较模式，默认 'default'
-  realPrecision?: number             // 浮点数比较精度，默认 3
+  comparisonMode?: ComparisonMode // 输出比较模式，默认 'default'
+  realPrecision?: number // 浮点数比较精度，默认 3
   /** Testlib checker 源码（comparisonMode=special-judge 时必填） */
   spjCode?: string | null
-  rejudgeTimes?: number              // 临界 TLE 重测次数，默认 0（关闭）
-  extraTimeRatio?: number            // 临界 TLE 容差比例，默认 0
+  rejudgeTimes?: number // 临界 TLE 重测次数，默认 0（关闭）
+  extraTimeRatio?: number // 临界 TLE 容差比例，默认 0
   testCases: Array<{
     id: string
     /** 可为空：正式评测由 judger 按 id 懒加载，避免队列持有全部大测点 */
     input: string
     output: string
     score: number
-    timeLimit?: number               // 单测点时间限制覆盖
-    memoryLimit?: number             // 单测点内存限制覆盖
+    timeLimit?: number // 单测点时间限制覆盖
+    memoryLimit?: number // 单测点内存限制覆盖
   }>
 }
 
@@ -99,11 +96,7 @@ class JudgeQueue extends EventEmitter {
   }
 
   /** 后台保存系统设置后热更新并发/超时/扫描间隔 */
-  applyRuntimeConfig(patch: {
-    maxConcurrent: number
-    jobTimeoutMs: number
-    deadCheckMs: number
-  }) {
+  applyRuntimeConfig(patch: { maxConcurrent: number; jobTimeoutMs: number; deadCheckMs: number }) {
     const prev = {
       maxConcurrent: this.maxConcurrent,
       jobTimeoutMs: this.jobTimeoutMs,
@@ -251,9 +244,9 @@ class JudgeQueue extends EventEmitter {
 
     this.queue.push(job)
     this.emit('waiting', job.id)
-    
+
     logger.info(`任务已加入队列`, { jobId: job.id, queueLength: this.queue.length })
-    
+
     this.scheduleProcess()
 
     return job.id
@@ -331,12 +324,16 @@ class JudgeQueue extends EventEmitter {
     } finally {
       this.isProcessing = false
       // 内存门控阻塞中不立即重试，等待 memRetryTimer 解除；其余情况继续调度
-      if (!this.memGateBlocked && this.queue.length > 0 && this.processing.size < this.maxConcurrent) {
+      if (
+        !this.memGateBlocked &&
+        this.queue.length > 0 &&
+        this.processing.size < this.maxConcurrent
+      ) {
         this.scheduleProcess()
       }
     }
   }
-  
+
   // 执行单个评测任务
   private async executeJob(job: QueuedJob, signal: AbortSignal) {
     try {
@@ -351,7 +348,9 @@ class JudgeQueue extends EventEmitter {
       // 竞态保护：若 job 已被 checkDeadJobs 标记为 failed/completed，
       // 则不再覆盖状态、不从 processing 删除、不重复 emit，直接返回结果。
       if (job.status === 'failed' || job.status === 'completed') {
-        logger.warn(`任务已被标记为 ${job.status}（可能被死任务检测器处理），跳过完成回调`, { jobId: job.id })
+        logger.warn(`任务已被标记为 ${job.status}（可能被死任务检测器处理），跳过完成回调`, {
+          jobId: job.id,
+        })
         return
       }
 
@@ -378,7 +377,9 @@ class JudgeQueue extends EventEmitter {
       // 竞态保护：若 job 已被 checkDeadJobs 标记为 failed/completed，
       // 则不覆盖状态、不重复 emit（避免数据库被多次更新）
       if (job.status === 'failed' || job.status === 'completed') {
-        logger.warn(`任务已被标记为 ${job.status}（可能被死任务检测器处理），跳过失败回调`, { jobId: job.id })
+        logger.warn(`任务已被标记为 ${job.status}（可能被死任务检测器处理），跳过失败回调`, {
+          jobId: job.id,
+        })
         return
       }
       // 标记失败
@@ -397,7 +398,7 @@ class JudgeQueue extends EventEmitter {
   // 获取任务状态
   async getJob(jobId: string): Promise<QueuedJob | null> {
     // 检查等待队列
-    const waiting = this.queue.find(j => j.id === jobId)
+    const waiting = this.queue.find((j) => j.id === jobId)
     if (waiting) return waiting
 
     // 检查处理中
@@ -424,7 +425,7 @@ class JudgeQueue extends EventEmitter {
   // 取消任务（等待中直接移除；执行中 abort 进程树并标失败）
   async cancel(jobId: string): Promise<boolean> {
     // 从等待队列中移除
-    const index = this.queue.findIndex(j => j.id === jobId)
+    const index = this.queue.findIndex((j) => j.id === jobId)
     if (index !== -1) {
       this.queue.splice(index, 1)
       logger.info(`任务已取消`, { jobId })

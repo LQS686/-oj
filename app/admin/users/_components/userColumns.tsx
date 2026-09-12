@@ -30,8 +30,12 @@ export function buildUserColumns({
       label: '用户',
       render: (_, user) => (
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)' }}>
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)',
+            }}
+          >
             <User className="w-5 h-5 text-foreground" />
           </div>
           <span className="text-foreground font-medium">{user.username}</span>
@@ -62,16 +66,19 @@ export function buildUserColumns({
     {
       key: '_count',
       label: '统计',
+      // 窄列里若不禁止折行会被逐字竖排（「提交 0」撑成 5 行），故整行 nowrap；
+      // 文案与移动端卡片保持一致
+      className: 'whitespace-nowrap',
       render: (_, user) => (
-        <div className="text-sm text-muted-foreground">
-          <div>提交: {user._count?.submissions || 0}</div>
-          <div>出题: {user._count?.problems || 0}</div>
-        </div>
+        <span className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+          提交 {user._count?.submissions || 0} · 出题 {user._count?.problems || 0}
+        </span>
       ),
     },
     {
       key: 'createdAt',
       label: '注册时间',
+      className: 'whitespace-nowrap',
       render: (value) => (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Calendar className="w-4 h-4" />
@@ -108,39 +115,41 @@ export function buildUserMobileCard({
   // 命名函数表达式：满足 react/display-name 规则（此为渲染回调，非真正的 React 组件）。
   return function renderUserMobileCard(row: UserType): ReactNode {
     return (
-    <div className="space-y-2">
-      <div>
-        <p className="text-xs text-muted-foreground">用户名</p>
-        <p className="text-sm font-medium text-foreground">{row.username}</p>
+      <div className="space-y-2">
+        <div>
+          <p className="text-xs text-muted-foreground">用户名</p>
+          <p className="text-subsection-title text-foreground">{row.username}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">邮箱</p>
+          <p className="text-sm text-foreground">{row.email}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">角色</p>
+          <span className={`tag ${getRoleDisplay(row.role).color}`}>
+            {getRoleDisplay(row.role).label}
+          </span>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">统计</p>
+          <p className="text-sm text-muted-foreground">
+            提交 {row._count?.submissions || 0} · 出题 {row._count?.problems || 0}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">注册时间</p>
+          <p className="text-sm text-muted-foreground">{formatDate(row.createdAt)}</p>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <UserRowActions
+            user={row}
+            operatorIsSystemAdmin={operatorIsSystemAdmin}
+            onEdit={onEdit}
+            onReset={onReset}
+            onDelete={onDelete}
+          />
+        </div>
       </div>
-      <div>
-        <p className="text-xs text-muted-foreground">邮箱</p>
-        <p className="text-sm text-foreground">{row.email}</p>
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">角色</p>
-        <span className={`tag ${getRoleDisplay(row.role).color}`}>{getRoleDisplay(row.role).label}</span>
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">统计</p>
-        <p className="text-sm text-muted-foreground">
-          提交 {row._count?.submissions || 0} · 出题 {row._count?.problems || 0}
-        </p>
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">注册时间</p>
-        <p className="text-sm text-muted-foreground">{formatDate(row.createdAt)}</p>
-      </div>
-      <div className="flex gap-2 pt-2">
-        <UserRowActions
-          user={row}
-          operatorIsSystemAdmin={operatorIsSystemAdmin}
-          onEdit={onEdit}
-          onReset={onReset}
-          onDelete={onDelete}
-        />
-      </div>
-    </div>
     )
   }
 }

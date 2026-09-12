@@ -8,18 +8,11 @@
  */
 import { withApi, ok, readJson, throw400, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import {
-  getAdminProblemById,
-  updateAdminProblem,
-  deleteAdminProblem,
-} from '@/lib/problem/service'
+import { getAdminProblemById, updateAdminProblem, deleteAdminProblem } from '@/lib/problem/service'
 import { resolveClientIp } from '@/lib/http/client-ip'
 
 function auditIpFromReq(req: Request): string | undefined {
-  const ip = resolveClientIp(
-    req.headers.get('x-forwarded-for'),
-    req.headers.get('x-real-ip')
-  )
+  const ip = resolveClientIp(req.headers.get('x-forwarded-for'), req.headers.get('x-real-ip'))
   return ip === 'unknown' ? undefined : ip
 }
 
@@ -64,5 +57,7 @@ export const DELETE = withApi.admin(async (req, ctx, { user }) => {
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的题目 ID 格式')
   // 传入 operator 信息用于审计日志
   const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
-  return ok(await deleteAdminProblem(id, { id: user.id, username: user.username, ip: ip ?? undefined }))
+  return ok(
+    await deleteAdminProblem(id, { id: user.id, username: user.username, ip: ip ?? undefined })
+  )
 })

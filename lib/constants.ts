@@ -16,41 +16,41 @@ export const MAX_CODE_LENGTH = 50000
 
 /** 难度档位（由易到难，对齐洛谷命名） */
 export const DIFFICULTIES = [
-  '入门',      // 红色 Red
-  '普及-',     // 橙色 Orange
-  '普及',      // 黄色 Yellow
-  '普及+',     // 绿色 Green（洛谷全称"普及+/提高-"，此处简化为"普及+"）
-  '提高',      // 青色 Cyan
-  '提高+',     // 蓝色 Blue（洛谷全称"提高+/省选-"，此处简化为"提高+"）
-  '省选',      // 紫色 Purple（洛谷全称"省选/NOI-"，此处简化为"省选"）
-  'NOI',       // 黑色 Black（洛谷全称"NOI/NOI+/CTS"）
+  '入门', // 红色 Red
+  '普及-', // 橙色 Orange
+  '普及', // 黄色 Yellow
+  '普及+', // 绿色 Green（洛谷全称"普及+/提高-"，此处简化为"普及+"）
+  '提高', // 青色 Cyan
+  '提高+', // 蓝色 Blue（洛谷全称"提高+/省选-"，此处简化为"提高+"）
+  '省选', // 紫色 Purple（洛谷全称"省选/NOI-"，此处简化为"省选"）
+  'NOI', // 黑色 Black（洛谷全称"NOI/NOI+/CTS"）
 ] as const
 
 /** 难度类型 */
-export type Difficulty = typeof DIFFICULTIES[number]
+export type Difficulty = (typeof DIFFICULTIES)[number]
 
 /** 难度档位颜色 CSS 类名（对齐洛谷官方颜色） */
 export const DIFFICULTY_COLORS: Record<Difficulty, string> = {
-  '入门': 'difficulty-easy',           // 红
-  '普及-': 'difficulty-medium-easy',    // 橙
-  '普及': 'difficulty-medium-easy',     // 黄
-  '普及+': 'difficulty-medium',         // 绿
-  '提高': 'difficulty-medium',           // 青
-  '提高+': 'difficulty-medium-hard',    // 蓝
-  '省选': 'difficulty-hard',            // 紫
-  'NOI': 'difficulty-expert',           // 黑
+  入门: 'difficulty-easy', // 红
+  '普及-': 'difficulty-medium-easy', // 橙
+  普及: 'difficulty-medium-easy', // 黄
+  '普及+': 'difficulty-medium', // 绿
+  提高: 'difficulty-medium', // 青
+  '提高+': 'difficulty-medium-hard', // 蓝
+  省选: 'difficulty-hard', // 紫
+  NOI: 'difficulty-expert', // 黑
 }
 
 /** 难度档位对应的洛谷颜色名（用于 UI 展示） */
 export const DIFFICULTY_LABELS: Record<Difficulty, { color: string; cn: string }> = {
-  '入门':  { color: '红', cn: '入门' },
+  入门: { color: '红', cn: '入门' },
   '普及-': { color: '橙', cn: '普及-' },
-  '普及':  { color: '黄', cn: '普及' },
+  普及: { color: '黄', cn: '普及' },
   '普及+': { color: '绿', cn: '普及+' },
-  '提高':  { color: '青', cn: '提高' },
+  提高: { color: '青', cn: '提高' },
   '提高+': { color: '蓝', cn: '提高+' },
-  '省选':  { color: '紫', cn: '省选' },
-  'NOI':   { color: '黑', cn: 'NOI' },
+  省选: { color: '紫', cn: '省选' },
+  NOI: { color: '黑', cn: 'NOI' },
 }
 
 /**

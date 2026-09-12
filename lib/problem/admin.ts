@@ -34,12 +34,11 @@ export async function listAllProblemsForAdmin(opts?: {
 }) {
   // 默认强制分页（page=1&pageSize=20），避免无分页参数时一次性返回全表
   // 对非法分页参数做防御（NaN / 负数 → 回落默认值），避免 Prisma 收到 NaN skip/take
-  const page = Number.isFinite(opts?.page)
-    ? Math.max(1, Math.floor(opts?.page as number))
-    : 1
-  const rawPageSize = Number.isFinite(opts?.pageSize) && (opts?.pageSize as number) > 0
-    ? Math.floor(opts?.pageSize as number)
-    : 20
+  const page = Number.isFinite(opts?.page) ? Math.max(1, Math.floor(opts?.page as number)) : 1
+  const rawPageSize =
+    Number.isFinite(opts?.pageSize) && (opts?.pageSize as number) > 0
+      ? Math.floor(opts?.pageSize as number)
+      : 20
   const pageSize = Math.min(Math.max(1, rawPageSize), 100)
   const take = pageSize
   const skip = (page - 1) * pageSize
@@ -64,7 +63,7 @@ export async function listAllProblemsForAdmin(opts?: {
   // 标签过滤：保持原前端 AND 语义（需同时拥有所有选中标签）。
   // Mongo 连接器不支持 hasEvery，用多个 has 条件组合 AND 实现（Mongo 支持数组字段 has 过滤）
   if (tagIds && tagIds.length > 0) {
-    const tagConditions: Prisma.ProblemWhereInput[] = tagIds.map(t => ({ tags: { has: t } }))
+    const tagConditions: Prisma.ProblemWhereInput[] = tagIds.map((t) => ({ tags: { has: t } }))
     const andConditions: Prisma.ProblemWhereInput[] = []
     // q 与标签同时存在时，把 OR（q 条件）移入 AND 首个分支，避免 where 自引用
     if (where.OR) {
@@ -106,9 +105,9 @@ export async function listAllProblemsForAdmin(opts?: {
   // hasTests / noTests 基于测点计数过滤（Mongo 连接器不支持 relation filter）
   let finalIds = snapshot.candidateIds
   if (completeness === 'hasTests') {
-    finalIds = snapshot.candidateIds.filter(id => (snapshot.countByProblem[id] ?? 0) > 0)
+    finalIds = snapshot.candidateIds.filter((id) => (snapshot.countByProblem[id] ?? 0) > 0)
   } else if (completeness === 'noTests') {
-    finalIds = snapshot.candidateIds.filter(id => (snapshot.countByProblem[id] ?? 0) === 0)
+    finalIds = snapshot.candidateIds.filter((id) => (snapshot.countByProblem[id] ?? 0) === 0)
   }
   const total = finalIds.length
 
@@ -124,9 +123,7 @@ export async function listAllProblemsForAdmin(opts?: {
   const data = await prisma.problem.findMany({
     // 无测点过滤时直接用 where（走索引），避免传递大数组 $in
     where:
-      completeness === 'hasTests' || completeness === 'noTests'
-        ? { id: { in: finalIds } }
-        : where,
+      completeness === 'hasTests' || completeness === 'noTests' ? { id: { in: finalIds } } : where,
     skip,
     take,
     orderBy: [{ problemNumber: 'asc' }, { createdAt: 'desc' }],
@@ -151,7 +148,7 @@ export async function listAllProblemsForAdmin(opts?: {
     },
   })
   // 合并测点数到每行（保持 _count.testCases 响应结构，兼容前端类型）
-  const rows = data.map(p => ({
+  const rows = data.map((p) => ({
     ...p,
     _count: { testCases: snapshot.countByProblem[p.id] ?? 0 },
   }))
@@ -200,38 +197,43 @@ async function getAdminProblemListSnapshot(
   where: Prisma.ProblemWhereInput,
   cacheKey: string
 ): Promise<AdminProblemListSnapshot> {
-  return cache.get(CacheKeys.problem.adminListSnapshot(), [cacheKey], async () => {
-    const [rows, grouped, totalAll] = await Promise.all([
-      prisma.problem.findMany({
-        where,
-        select: {
-          id: true,
-          visibility: true,
-          isPublic: true,
-          stdLang: true,
-          tags: true,
-          source: true,
-        },
-      }),
-      prisma.testCase.groupBy({
-        by: ['problemId'],
-        _count: { _all: true },
-      }),
-      prisma.problem.count(),
-    ])
+  return cache.get(
+    CacheKeys.problem.adminListSnapshot(),
+    [cacheKey],
+    async () => {
+      const [rows, grouped, totalAll] = await Promise.all([
+        prisma.problem.findMany({
+          where,
+          select: {
+            id: true,
+            visibility: true,
+            isPublic: true,
+            stdLang: true,
+            tags: true,
+            source: true,
+          },
+        }),
+        prisma.testCase.groupBy({
+          by: ['problemId'],
+          _count: { _all: true },
+        }),
+        prisma.problem.count(),
+      ])
 
-    const countByProblem: Record<string, number> = {}
-    for (const g of grouped) {
-      countByProblem[g.problemId] = g._count._all
-    }
+      const countByProblem: Record<string, number> = {}
+      for (const g of grouped) {
+        countByProblem[g.problemId] = g._count._all
+      }
 
-    return {
-      rows,
-      candidateIds: rows.map(r => r.id),
-      countByProblem,
-      totalAll,
-    }
-  }, { ttl: 30_000 })
+      return {
+        rows,
+        candidateIds: rows.map((r) => r.id),
+        countByProblem,
+        totalAll,
+      }
+    },
+    { ttl: 30_000 }
+  )
 }
 
 /** 内存聚合：统计（公开/隐藏/竞赛/有标程/有测试点）与标签/来源 */
@@ -345,10 +347,7 @@ export async function ensureAdminProblemNumber(problemNumber?: string): Promise<
   return `P${nextNumber}`
 }
 
-export async function createAdminProblem(
-  rawBody: Record<string, unknown>,
-  authorId: string
-) {
+export async function createAdminProblem(rawBody: Record<string, unknown>, authorId: string) {
   const body = trimAll(rawBody)
   const {
     problemNumber,
@@ -426,7 +425,11 @@ export async function createAdminProblem(
   const spjCode = rawSpjCode
   if (comparisonMode === 'special-judge') {
     if (typeof spjCode !== 'string' || !spjCode.trim()) {
-      throw new ApiError('MISSING_SPJ_CODE', 'Special Judge 模式下必须提供 checker.cpp 源码（spjCode）', 400)
+      throw new ApiError(
+        'MISSING_SPJ_CODE',
+        'Special Judge 模式下必须提供 checker.cpp 源码（spjCode）',
+        400
+      )
     }
     if (Buffer.byteLength(spjCode, 'utf8') > 512 * 1024) {
       throw new ApiError('SPJ_CODE_TOO_LARGE', 'Special Judge 代码过大（上限 512KB）', 400)
@@ -650,15 +653,25 @@ export async function updateAdminProblem(
       ? body.comparisonMode
       : existingProblem.comparisonMode
   const nextSpj =
-    body.spjCode !== undefined ? body.spjCode : (existingProblem as { spjCode?: string | null }).spjCode
+    body.spjCode !== undefined
+      ? body.spjCode
+      : (existingProblem as { spjCode?: string | null }).spjCode
   if (nextMode === 'special-judge') {
     if (typeof nextSpj !== 'string' || !nextSpj.trim()) {
-      throw new ApiError('MISSING_SPJ_CODE', 'Special Judge 模式下必须提供 checker.cpp 源码（spjCode）', 400)
+      throw new ApiError(
+        'MISSING_SPJ_CODE',
+        'Special Judge 模式下必须提供 checker.cpp 源码（spjCode）',
+        400
+      )
     }
     if (Buffer.byteLength(nextSpj, 'utf8') > 512 * 1024) {
       throw new ApiError('SPJ_CODE_TOO_LARGE', 'Special Judge 代码过大（上限 512KB）', 400)
     }
-  } else if (body.spjCode !== undefined && body.spjCode !== null && typeof body.spjCode !== 'string') {
+  } else if (
+    body.spjCode !== undefined &&
+    body.spjCode !== null &&
+    typeof body.spjCode !== 'string'
+  ) {
     throw new ApiError('INVALID_SPJ_CODE', 'spjCode 必须是字符串', 400)
   }
   if (body.visibility !== undefined && body.visibility !== null) {
@@ -753,10 +766,7 @@ export async function updateAdminProblem(
     await invalidateProblemTestCaseCache(id)
     if (body.testCases.length > 0) {
       // 仅当总分不是 100 时均分，避免覆盖用户手动设定的分数
-      const scoreSum = body.testCases.reduce(
-        (sum: number, tc) => sum + (Number(tc?.score) || 0),
-        0
-      )
+      const scoreSum = body.testCases.reduce((sum: number, tc) => sum + (Number(tc?.score) || 0), 0)
       if (scoreSum !== 100) {
         await redistributeTestScores(id)
       }
@@ -793,13 +803,15 @@ export async function updateAdminProblem(
     }
   }
 
-  return prisma.problem.findUnique({
-    where: { id },
-    include: { testCases: { orderBy: { orderIndex: 'asc' } } },
-  }).then((result) => {
-    clearProblemCache(id)
-    return result
-  })
+  return prisma.problem
+    .findUnique({
+      where: { id },
+      include: { testCases: { orderBy: { orderIndex: 'asc' } } },
+    })
+    .then((result) => {
+      clearProblemCache(id)
+      return result
+    })
 }
 
 export async function deleteAdminProblem(
@@ -824,7 +836,7 @@ export async function deleteAdminProblem(
   })
   if (acUsers.length > 0) {
     await prisma.user.updateMany({
-      where: { id: { in: acUsers.map(u => u.userId) } },
+      where: { id: { in: acUsers.map((u) => u.userId) } },
       data: { solvedCount: { decrement: 1 } },
     })
   }

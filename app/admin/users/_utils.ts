@@ -66,7 +66,7 @@ export const ROLE_BAR_COLOR: Record<string, string> = {
 export function getWeeklyGrowth(users: User[]): number {
   const now = Date.now()
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
-  return users.filter(u => {
+  return users.filter((u) => {
     const created = new Date(u.createdAt).getTime()
     return !isNaN(created) && now - created <= sevenDaysMs
   }).length

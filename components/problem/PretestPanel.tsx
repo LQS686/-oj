@@ -129,7 +129,7 @@ export default function PretestPanel({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors"
+          className="flex items-center gap-1.5 text-subsection-title text-foreground hover:text-primary transition-colors"
         >
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           <Play className="w-4 h-4 text-primary-light" />
@@ -191,7 +191,7 @@ export default function PretestPanel({
                 <>
                   <div className="flex items-center gap-3 flex-wrap text-sm">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium ${
+                      className={`inline-flex items-center gap-1.5 btn btn-sm font-medium ${
                         allPassed
                           ? 'bg-secondary/10 text-secondary border border-secondary/20'
                           : 'bg-error/10 text-error border border-error/20'
@@ -229,7 +229,7 @@ export default function PretestPanel({
                   {/* 编译错误：单独展示，不展开各点 */}
                   {result!.status === 'CE' && result!.compileError && (
                     <div className="rounded-lg border border-error/30 bg-error/5 overflow-hidden">
-                      <div className="px-3 py-2 bg-error/10 text-error text-sm font-medium flex items-center gap-1.5 border-b border-error/20">
+                      <div className="px-3 py-2 bg-error/10 text-error text-label flex items-center gap-1.5 border-b border-error/20">
                         <AlertCircle className="w-4 h-4" />
                         编译错误
                       </div>
@@ -290,7 +290,11 @@ function SampleResultCard({ index, result }: { index: number; result: PretestCas
             <MemoryStick className="w-3 h-3" />
             {formatMemory(result.memory)}
           </span>
-          {showDetail ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          {showDetail ? (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5" />
+          )}
         </div>
       </button>
 
@@ -333,18 +337,18 @@ function OutputBlock({
     tone === 'success'
       ? 'border-secondary/30 bg-secondary/5'
       : tone === 'error'
-      ? 'border-error/30 bg-error/5'
-      : tone === 'expected'
-      ? 'border-primary/30 bg-primary/5'
-      : 'border-border bg-muted/30'
+        ? 'border-error/30 bg-error/5'
+        : tone === 'expected'
+          ? 'border-primary/30 bg-primary/5'
+          : 'border-border bg-muted/30'
   const titleClass =
     tone === 'success'
       ? 'text-secondary'
       : tone === 'error'
-      ? 'text-error'
-      : tone === 'expected'
-      ? 'text-primary'
-      : 'text-muted-foreground'
+        ? 'text-error'
+        : tone === 'expected'
+          ? 'text-primary'
+          : 'text-muted-foreground'
 
   return (
     <div className={`rounded border ${toneClass} overflow-hidden`}>

@@ -40,12 +40,12 @@ export default function EntityDetailHeader({
   layoutId: string
 }) {
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden mb-3 shadow-sm">
+    <div className="bg-card rounded-lg border border-border overflow-hidden mb-3 shadow-sm">
       <div className="px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {titleLeading}
           {typeof title === 'string' ? (
-            <h1 className="text-lg font-bold text-foreground truncate">{title}</h1>
+            <h1 className="text-page-title text-foreground truncate">{title}</h1>
           ) : (
             <div className="flex items-center gap-2 min-w-0">{title}</div>
           )}
@@ -60,10 +60,8 @@ export default function EntityDetailHeader({
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = activeKey === tab.key
-          const className = `relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
-            isActive
-              ? 'text-primary-light'
-              : 'text-muted-foreground hover:text-foreground'
+          const className = `relative flex items-center gap-1.5 px-3 py-2.5 text-label whitespace-nowrap transition-colors ${
+            isActive ? 'text-primary-light' : 'text-muted-foreground hover:text-foreground'
           }`
           const content = (
             <>

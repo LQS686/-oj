@@ -35,11 +35,7 @@ import { logger } from '@/lib/logger'
  *
  * 幂等性：多次调用安全，不会累加错误时间
  */
-export async function startOrResumeTiming(
-  assignmentId: string,
-  problemId: string,
-  userId: string
-) {
+export async function startOrResumeTiming(assignmentId: string, problemId: string, userId: string) {
   const existing = await prisma.classAssignmentProblemProgress.findUnique({
     where: {
       assignmentId_problemId_userId: { assignmentId, problemId, userId },
@@ -91,11 +87,7 @@ export async function startOrResumeTiming(
  *   - 已暂停 → 无操作
  *   - 计时中 → timeElapsedMs += (now - lastResumedAt)，置 isPaused=true, lastResumedAt=null
  */
-export async function pauseTiming(
-  assignmentId: string,
-  problemId: string,
-  userId: string
-) {
+export async function pauseTiming(assignmentId: string, problemId: string, userId: string) {
   const existing = await prisma.classAssignmentProblemProgress.findUnique({
     where: {
       assignmentId_problemId_userId: { assignmentId, problemId, userId },
@@ -176,11 +168,11 @@ export async function finalizeTiming(
 
     return finalTimeMs
   } catch (err) {
-    logger.error(
-      'finalizeTiming 失败',
-      err instanceof Error ? err : new Error(String(err)),
-      { assignmentId, problemId, userId }
-    )
+    logger.error('finalizeTiming 失败', err instanceof Error ? err : new Error(String(err)), {
+      assignmentId,
+      problemId,
+      userId,
+    })
     return null
   }
 }
@@ -190,11 +182,7 @@ export async function finalizeTiming(
  *
  * 返回 progress 记录（含实时累计用时，即如果计时中会包含 lastResumedAt 到 now 的增量）
  */
-export async function getProgress(
-  assignmentId: string,
-  problemId: string,
-  userId: string
-) {
+export async function getProgress(assignmentId: string, problemId: string, userId: string) {
   const progress = await prisma.classAssignmentProblemProgress.findUnique({
     where: {
       assignmentId_problemId_userId: { assignmentId, problemId, userId },

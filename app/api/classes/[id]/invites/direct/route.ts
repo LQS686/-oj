@@ -63,12 +63,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   })
 
   const inviterUser = await getInviterProfile(user.id)
-  await sendClassDirectInviteNotification(
-    inviteeUserId,
-    inviterUser,
-    classDataName,
-    inviteId
-  )
+  await sendClassDirectInviteNotification(inviteeUserId, inviterUser, classDataName, inviteId)
 
   return ok({ inviteId }, { status: 201 })
 })

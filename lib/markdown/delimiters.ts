@@ -20,41 +20,137 @@
  */
 const BARE_MATH_COMMANDS: ReadonlySet<string> = new Set([
   // 比较关系
-  'le', 'leq', 'leqq', 'ge', 'geq', 'geqq',
-  'ne', 'neq', 'approx', 'sim', 'simeq', 'cong', 'propto',
+  'le',
+  'leq',
+  'leqq',
+  'ge',
+  'geq',
+  'geqq',
+  'ne',
+  'neq',
+  'approx',
+  'sim',
+  'simeq',
+  'cong',
+  'propto',
   // 算术
-  'pm', 'mp', 'times', 'div', 'cdot',
+  'pm',
+  'mp',
+  'times',
+  'div',
+  'cdot',
   // 微积分
-  'sum', 'prod', 'int', 'iint', 'oint', 'lim', 'sup', 'inf', 'min', 'max',
+  'sum',
+  'prod',
+  'int',
+  'iint',
+  'oint',
+  'lim',
+  'sup',
+  'inf',
+  'min',
+  'max',
   // 分式/根式
-  'frac', 'dfrac', 'tfrac', 'cfrac',
-  'sqrt', 'nthroot',
+  'frac',
+  'dfrac',
+  'tfrac',
+  'cfrac',
+  'sqrt',
+  'nthroot',
   // 希腊字母（小写）
-  'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
-  'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'rho', 'sigma',
-  'tau', 'phi', 'chi', 'psi', 'omega',
+  'alpha',
+  'beta',
+  'gamma',
+  'delta',
+  'epsilon',
+  'zeta',
+  'eta',
+  'theta',
+  'iota',
+  'kappa',
+  'lambda',
+  'mu',
+  'nu',
+  'xi',
+  'pi',
+  'rho',
+  'sigma',
+  'tau',
+  'phi',
+  'chi',
+  'psi',
+  'omega',
   // 希腊字母（大写）
-  'Gamma', 'Delta', 'Theta', 'Lambda', 'Sigma', 'Omega',
+  'Gamma',
+  'Delta',
+  'Theta',
+  'Lambda',
+  'Sigma',
+  'Omega',
   // 省略号
-  'ldots', 'cdots', 'dots', 'vdots', 'ddots',
+  'ldots',
+  'cdots',
+  'dots',
+  'vdots',
+  'ddots',
   // 集合/逻辑
-  'subset', 'subseteq', 'supset', 'supseteq', 'in', 'notin',
-  'forall', 'exists', 'emptyset', 'implies', 'iff', 'therefore', 'because',
+  'subset',
+  'subseteq',
+  'supset',
+  'supseteq',
+  'in',
+  'notin',
+  'forall',
+  'exists',
+  'emptyset',
+  'implies',
+  'iff',
+  'therefore',
+  'because',
   // 三角函数/对数
-  'sin', 'cos', 'tan', 'cot', 'sec', 'csc',
-  'arcsin', 'arccos', 'arctan',
-  'sinh', 'cosh', 'tanh', 'coth',
-  'log', 'ln', 'lg', 'exp',
+  'sin',
+  'cos',
+  'tan',
+  'cot',
+  'sec',
+  'csc',
+  'arcsin',
+  'arccos',
+  'arctan',
+  'sinh',
+  'cosh',
+  'tanh',
+  'coth',
+  'log',
+  'ln',
+  'lg',
+  'exp',
   // accents
-  'hat', 'bar', 'vec', 'dot', 'ddot', 'tilde',
-  'overline', 'underline',
+  'hat',
+  'bar',
+  'vec',
+  'dot',
+  'ddot',
+  'tilde',
+  'overline',
+  'underline',
   // 箭头
-  'leftarrow', 'rightarrow', 'leftrightarrow', 'Leftarrow', 'Rightarrow',
+  'leftarrow',
+  'rightarrow',
+  'leftrightarrow',
+  'Leftarrow',
+  'Rightarrow',
   'mapsto',
   // 三角/角
-  'triangle', 'angle', 'perp', 'parallel',
+  'triangle',
+  'angle',
+  'perp',
+  'parallel',
   // 其他常见
-  'ell', 'hbar', 'Re', 'Im',
+  'ell',
+  'hbar',
+  'Re',
+  'Im',
 ])
 
 /**
@@ -142,16 +238,23 @@ function wrapBareMath(content: string): string {
         const start = j
         j += 2
         while (j < content.length - 1) {
-          if (content[j] === '$' && content[j + 1] === '$') { j += 2; break }
+          if (content[j] === '$' && content[j + 1] === '$') {
+            j += 2
+            break
+          }
           j++
         }
         skipRanges.push([start, j])
         continue
       }
       if (content[j] === '$') {
-        const start = j; j++
+        const start = j
+        j++
         while (j < content.length) {
-          if (content[j] === '$') { j++; break }
+          if (content[j] === '$') {
+            j++
+            break
+          }
           j++
         }
         skipRanges.push([start, j])
@@ -169,12 +272,18 @@ function wrapBareMath(content: string): string {
   }
 
   // Phase 2: Find all bare math expressions
-  interface Expr { left: number; right: number; }
+  interface Expr {
+    left: number
+    right: number
+  }
   const expressions: Expr[] = []
 
   let i = 0
   while (i < content.length) {
-    if (isInSkipRange(i)) { i++; continue }
+    if (isInSkipRange(i)) {
+      i++
+      continue
+    }
 
     // Check for LaTeX command trigger
     const cmdMatch = content.slice(i).match(/^\\([a-zA-Z]+)/)
@@ -197,7 +306,10 @@ function wrapBareMath(content: string): string {
       }
     }
 
-    if (!triggerKind) { i++; continue }
+    if (!triggerKind) {
+      i++
+      continue
+    }
 
     // Expand left: include adjacent math characters
     let left = i

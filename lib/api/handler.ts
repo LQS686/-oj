@@ -138,9 +138,10 @@ export async function getCachedUser(
  * 从请求解析经 tokenVersion/ban 校验的查看者。
  * 用于 withApi.public 路由中的「软登录」个性化，避免仅 verifyToken。
  */
-export async function resolveViewerFromRequest(
-  req: { headers: Headers; cookies?: { get: (name: string) => { value: string } | undefined } }
-): Promise<{ user: AuthUser; tokenVersion: number } | null> {
+export async function resolveViewerFromRequest(req: {
+  headers: Headers
+  cookies?: { get: (name: string) => { value: string } | undefined }
+}): Promise<{ user: AuthUser; tokenVersion: number } | null> {
   const { getUserFromRequest } = await import('@/lib/auth')
   const session = getUserFromRequest(req as Parameters<typeof getUserFromRequest>[0])
   if (!session) return null

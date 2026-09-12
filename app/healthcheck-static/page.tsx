@@ -18,9 +18,5 @@ export const dynamic = 'force-static'
 export const revalidate = false
 
 export default function HealthCheckStatic() {
-  return (
-    <div style={{ fontFamily: 'monospace', padding: '20px' }}>
-      OK
-    </div>
-  )
+  return <div style={{ fontFamily: 'monospace', padding: '20px' }}>OK</div>
 }

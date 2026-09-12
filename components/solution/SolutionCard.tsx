@@ -98,9 +98,7 @@ export default function SolutionCard({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="avatar-fallback text-sm">
-                {getAuthorInitial(author?.nickname)}
-              </div>
+              <div className="avatar-fallback text-sm">{getAuthorInitial(author?.nickname)}</div>
             )}
           </div>
           <span className="font-medium text-foreground/80 text-sm truncate">
@@ -110,11 +108,13 @@ export default function SolutionCard({
 
         {/* 标题/摘要列：徽标 + 标题 + 语言 */}
         <div className="col-span-5 flex items-center gap-2 min-w-0">
-          <h3 className="text-sm font-semibold text-foreground line-clamp-1 group-hover:text-primary-light transition-colors flex-1 min-w-0">
+          <h3 className="text-subsection-title text-foreground line-clamp-1 group-hover:text-primary-light transition-colors flex-1 min-w-0">
             {title}
           </h3>
           {statusMeta && (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusMeta.className} flex-shrink-0`}>
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusMeta.className} flex-shrink-0`}
+            >
               {statusMeta.label}
             </span>
           )}
@@ -161,9 +161,7 @@ export default function SolutionCard({
       </div>
 
       {expandable && expanded && children && (
-        <div className="px-4 pb-4 pt-1 border-t border-border/60 bg-background/60">
-          {children}
-        </div>
+        <div className="px-4 pb-4 pt-1 border-t border-border/60 bg-background/60">{children}</div>
       )}
     </div>
   )

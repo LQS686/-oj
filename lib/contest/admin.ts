@@ -59,11 +59,19 @@ export function validateContestTimeFields(input: {
   }
 }
 
-export async function adminUpdateContest(
-  contestId: string,
-  body: AdminUpdateContestInput
-) {
-  const { title, description, type, startTime, endTime, isPublic, password, problems, sealRankTime, sealUnlocked } = body
+export async function adminUpdateContest(contestId: string, body: AdminUpdateContestInput) {
+  const {
+    title,
+    description,
+    type,
+    startTime,
+    endTime,
+    isPublic,
+    password,
+    problems,
+    sealRankTime,
+    sealUnlocked,
+  } = body
 
   const updateData: Prisma.ContestUpdateInput = {
     title,
@@ -134,9 +142,7 @@ export async function adminUpdateContest(
       throw new ApiError('INVALID_PROBLEMS', `题目不存在: ${missing.slice(0, 5).join(', ')}`, 400)
     }
     // 竞赛仅允许 public / contest 题；禁止后台隐藏草稿绕过可见性
-    const invalid = found.filter(
-      (p) => p.visibility !== 'public' && p.visibility !== 'contest'
-    )
+    const invalid = found.filter((p) => p.visibility !== 'public' && p.visibility !== 'contest')
     if (invalid.length > 0) {
       throw new ApiError(
         'INVALID_PROBLEMS',
@@ -266,10 +272,7 @@ export interface AdminCreateContestInput {
 }
 
 /** 管理员创建竞赛 */
-export async function adminCreateContest(
-  input: AdminCreateContestInput,
-  authorId: string
-) {
+export async function adminCreateContest(input: AdminCreateContestInput, authorId: string) {
   const start = new Date(input.startTime)
   const end = new Date(input.endTime)
   const duration = Math.floor((end.getTime() - start.getTime()) / 1000 / 60)
@@ -307,9 +310,7 @@ export async function adminCreateContest(
       const missing = input.problems.filter((id) => !foundIds.has(id))
       throw new ApiError('INVALID_PROBLEMS', `题目不存在: ${missing.slice(0, 5).join(', ')}`, 400)
     }
-    const invalid = found.filter(
-      (p) => p.visibility !== 'public' && p.visibility !== 'contest'
-    )
+    const invalid = found.filter((p) => p.visibility !== 'public' && p.visibility !== 'contest')
     if (invalid.length > 0) {
       throw new ApiError(
         'INVALID_PROBLEMS',
@@ -335,12 +336,13 @@ export async function adminCreateContest(
       authorId,
       sealRankTime,
       problems: {
-        create: input.problems && Array.isArray(input.problems)
-          ? input.problems.map((problemId, index) => ({
-              problemId,
-              orderIndex: index,
-            }))
-          : [],
+        create:
+          input.problems && Array.isArray(input.problems)
+            ? input.problems.map((problemId, index) => ({
+                problemId,
+                orderIndex: index,
+              }))
+            : [],
       },
     },
   })

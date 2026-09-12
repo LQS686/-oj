@@ -108,13 +108,11 @@ export default function ReportModal({
       ) : (
         <div className="space-y-4">
           {targetTitle && (
-            <p className="text-sm text-muted-foreground break-words">
-              举报内容：{targetTitle}
-            </p>
+            <p className="text-sm text-muted-foreground break-words">举报内容：{targetTitle}</p>
           )}
           {error && <p className="text-error text-sm">{error}</p>}
           <div>
-            <label className="text-sm font-medium">举报原因</label>
+            <label className="text-label">举报原因</label>
             <div className="grid grid-cols-2 gap-2 mt-1.5">
               {REASONS.map((r) => (
                 <button
@@ -133,7 +131,7 @@ export default function ReportModal({
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium">补充说明（选填，最多 500 字）</label>
+            <label className="text-label">补充说明（选填，最多 500 字）</label>
             <textarea
               className="input w-full mt-1 min-h-[90px]"
               placeholder="描述违规内容的具体情况，便于管理员核实"

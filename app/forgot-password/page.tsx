@@ -42,13 +42,16 @@ export default function ForgotPasswordPage() {
 
   return (
     <GuestAuthShell>
-      <div className="card-static rounded-lg p-8 md:p-10">
+      <div className="card-static p-5 md:p-8">
         <div className="flex items-center gap-3 mb-8">
-          <Link href="/login" className="text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/login"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h2 className="text-2xl font-extrabold text-foreground">忘记密码</h2>
+            <h1 className="text-page-title text-foreground">忘记密码</h1>
             <p className="text-sm text-muted-foreground">重置你的密码</p>
           </div>
         </div>
@@ -58,7 +61,7 @@ export default function ForgotPasswordPage() {
             <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-success" />
             </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">邮件已发送</h3>
+            <h1 className="text-page-title text-foreground mb-2">邮件已发送</h1>
             <p className="text-muted-foreground mb-6">
               如果该邮箱已注册，你将收到一封包含密码重置链接的邮件。
               <br />
@@ -83,7 +86,7 @@ export default function ForgotPasswordPage() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-semibold text-foreground mb-3">邮箱地址</label>
+                <label className="block text-label text-foreground mb-3">邮箱地址</label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <input
@@ -97,7 +100,11 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
 
-              <button type="submit" disabled={loading} className="btn-primary btn w-full py-3.5 text-base">
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary btn w-full py-3.5 text-base"
+              >
                 {loading ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

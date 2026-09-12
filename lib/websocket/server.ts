@@ -4,9 +4,9 @@
  */
 
 import type { Server as HTTPServer } from 'http'
-import type { Socket } from 'socket.io';
+import type { Socket } from 'socket.io'
 import { Server as SocketIOServer } from 'socket.io'
-import type { JWTPayload } from '@/lib/auth';
+import type { JWTPayload } from '@/lib/auth'
 import { verifyToken } from '@/lib/auth'
 import { canAccessAdmin } from '@/lib/permissions'
 import { logger } from '@/lib/logger'
@@ -87,8 +87,7 @@ setRateLimitTimer(setInterval(cleanupRateLimit, 60 * 1000))
 
 async function authenticateSocket(socket: Socket): Promise<JWTPayload | null> {
   try {
-    const token =
-      readAuthTokenFromCookieHeader(socket.handshake.headers.cookie || '')
+    const token = readAuthTokenFromCookieHeader(socket.handshake.headers.cookie || '')
 
     if (!token) {
       return null
@@ -127,7 +126,7 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
   if (!record || now > record.resetAt) {
     connectionRateLimit.set(ip, {
       count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW
+      resetAt: now + RATE_LIMIT_WINDOW,
     })
     return { allowed: true, remaining: RATE_LIMIT_MAX_CONNECTIONS - 1 }
   }
@@ -154,9 +153,10 @@ export function initWebSocketServer(httpServer: HTTPServer) {
   const ioInstance = new SocketIOServer(httpServer, {
     cors: {
       // P2 安全修复：开发环境不再使用通配 '*'，仅允许本地 Next.js 默认端口访问
-      origin: process.env.NODE_ENV === 'production'
-        ? process.env.FRONTEND_URL
-        : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      origin:
+        process.env.NODE_ENV === 'production'
+          ? process.env.FRONTEND_URL
+          : ['http://localhost:3000', 'http://127.0.0.1:3000'],
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -169,22 +169,25 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     maxHttpBufferSize: MAX_MESSAGE_SIZE,
   })
 
-  const connectedClients = new Map<string, {
-    socketId: string
-    userId: string | null
-    role: string | null
-    tokenVersion: number | null
-    /** 最近活跃时间（心跳刷新）；用于清理僵尸连接，勿用「建连年龄」 */
-    lastSeenAt: number
-    heartbeatCount: number
-    heartbeatWindowStart: number
-    isAuthenticated: boolean
-    watchedSubmissionId: string | null
-  }>()
+  const connectedClients = new Map<
+    string,
+    {
+      socketId: string
+      userId: string | null
+      role: string | null
+      tokenVersion: number | null
+      /** 最近活跃时间（心跳刷新）；用于清理僵尸连接，勿用「建连年龄」 */
+      lastSeenAt: number
+      heartbeatCount: number
+      heartbeatWindowStart: number
+      isAuthenticated: boolean
+      watchedSubmissionId: string | null
+    }
+  >()
 
   ioInstance.on('connection', async (socket) => {
     const clientIP = getClientIP(socket)
-    
+
     const rateCheck = checkRateLimit(clientIP)
     if (!rateCheck.allowed) {
       logger.warn(`连接被速率限制拒绝: IP=${clientIP}, Socket=${socket.id}`)
@@ -196,8 +199,10 @@ export function initWebSocketServer(httpServer: HTTPServer) {
     const auth = await authenticateSocket(socket)
     const isAuthenticated = auth !== null
 
-    logger.info(`✅ 客户端连接: ${socket.id}, IP=${clientIP}, 认证=${isAuthenticated}, 剩余配额=${rateCheck.remaining}`)
-    
+    logger.info(
+      `✅ 客户端连接: ${socket.id}, IP=${clientIP}, 认证=${isAuthenticated}, 剩余配额=${rateCheck.remaining}`
+    )
+
     connectedClients.set(socket.id, {
       socketId: socket.id,
       userId: auth?.userId ?? null,
@@ -234,18 +239,20 @@ export function initWebSocketServer(httpServer: HTTPServer) {
         client.lastSeenAt = Date.now()
         connectedClients.set(socket.id, client)
       }
-      
-      if (!ALLOWED_EVENT_TYPES.includes(eventName as typeof ALLOWED_EVENT_TYPES[number])) {
+
+      if (!ALLOWED_EVENT_TYPES.includes(eventName as (typeof ALLOWED_EVENT_TYPES)[number])) {
         logger.warn(`⚠️  未知消息类型: ${eventName}, Socket=${socket.id}`)
         return next()
       }
-      
+
       const messageSize = JSON.stringify(args).length
       if (messageSize > MAX_MESSAGE_SIZE) {
-        logger.warn(`⚠️  消息大小超限: ${messageSize} bytes, Socket=${socket.id}, 事件=${eventName}`)
+        logger.warn(
+          `⚠️  消息大小超限: ${messageSize} bytes, Socket=${socket.id}, 事件=${eventName}`
+        )
         return next(new Error('消息大小超过限制'))
       }
-      
+
       if (
         eventName === 'join' ||
         eventName === 'leave' ||
@@ -258,7 +265,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
           return next(new Error('未认证'))
         }
       }
-      
+
       next()
     })
 
@@ -283,13 +290,15 @@ export function initWebSocketServer(httpServer: HTTPServer) {
           socket.emit('error', { event: 'join', message: '缺少 userId 参数' })
           return
         }
-        
+
         if (client.userId && client.userId !== userId) {
-          logger.warn(`用户ID不匹配: Socket=${socket.id}, 认证用户=${client.userId}, 请求用户=${userId}`)
+          logger.warn(
+            `用户ID不匹配: Socket=${socket.id}, 认证用户=${client.userId}, 请求用户=${userId}`
+          )
           socket.emit('error', { event: 'join', message: '用户ID不匹配' })
           return
         }
-        
+
         const roomName = `user:${userId}`
         const alreadyInRoom = socket.rooms.has(roomName)
         if (!alreadyInRoom) {
@@ -415,7 +424,9 @@ export function initWebSocketServer(httpServer: HTTPServer) {
       }
 
       if (client.heartbeatCount > MAX_HEARTBEATS_PER_MINUTE) {
-        logger.warn(`检测到异常心跳模式: Socket=${socket.id}, 心跳次数=${client.heartbeatCount}/分钟`)
+        logger.warn(
+          `检测到异常心跳模式: Socket=${socket.id}, 心跳次数=${client.heartbeatCount}/分钟`
+        )
         socket.emit('error', { event: 'ping', message: '心跳频率异常' })
         socket.disconnect(true)
         return
@@ -426,10 +437,7 @@ export function initWebSocketServer(httpServer: HTTPServer) {
         void (async () => {
           try {
             const { getCachedUser } = await import('@/lib/api/handler')
-            const user = await getCachedUser(
-              client.userId!,
-              client.tokenVersion ?? undefined
-            )
+            const user = await getCachedUser(client.userId!, client.tokenVersion ?? undefined)
             if (!user) {
               logger.warn(`会话已失效，断开 WebSocket: user=${client.userId}, socket=${socket.id}`)
               socket.emit('error', { event: 'auth', message: '会话已失效，请重新登录' })
@@ -459,21 +467,23 @@ export function initWebSocketServer(httpServer: HTTPServer) {
   })
 
   // 仅清理长时间无心跳的僵尸连接（Engine.IO ping 已覆盖正常超时；此处兜底）
-  setStaleConnTimer(setInterval(() => {
-    const now = Date.now()
-    const idleThreshold = 5 * 60 * 1000
+  setStaleConnTimer(
+    setInterval(() => {
+      const now = Date.now()
+      const idleThreshold = 5 * 60 * 1000
 
-    for (const [socketId, clientInfo] of connectedClients.entries()) {
-      if (now - clientInfo.lastSeenAt > idleThreshold) {
-        logger.warn(`⚠️  清理空闲连接: ${socketId}`)
-        const targetSocket = getIo()?.sockets.sockets.get(socketId)
-        if (targetSocket) {
-          targetSocket.disconnect(true)
+      for (const [socketId, clientInfo] of connectedClients.entries()) {
+        if (now - clientInfo.lastSeenAt > idleThreshold) {
+          logger.warn(`⚠️  清理空闲连接: ${socketId}`)
+          const targetSocket = getIo()?.sockets.sockets.get(socketId)
+          if (targetSocket) {
+            targetSocket.disconnect(true)
+          }
+          connectedClients.delete(socketId)
         }
-        connectedClients.delete(socketId)
       }
-    }
-  }, 60 * 1000))
+    }, 60 * 1000)
+  )
 
   setIo(ioInstance)
   logger.info('WebSocket 服务器已启动')
@@ -522,26 +532,29 @@ export function getIO(): SocketIOServer | null {
 /**
  * 发送提交状态更新到指定用户
  */
-export function emitSubmissionUpdate(userId: string, data: {
-  id: string
-  status: string
-  score: number
-  time?: number
-  memory?: number
-  passedTests?: number
-  totalTests?: number
-  problemId?: string
-  message?: string
-  testResults?: Array<{
-    testId: string
+export function emitSubmissionUpdate(
+  userId: string,
+  data: {
+    id: string
     status: string
-    time: number
-    memory: number
+    score: number
+    time?: number
+    memory?: number
+    passedTests?: number
+    totalTests?: number
+    problemId?: string
     message?: string
-  }>
-  timeElapsedMs?: number
-  assignmentSubmissionId?: string
-}) {
+    testResults?: Array<{
+      testId: string
+      status: string
+      time: number
+      memory: number
+      message?: string
+    }>
+    timeElapsedMs?: number
+    assignmentSubmissionId?: string
+  }
+) {
   const ioInstance = getIO()
   if (!ioInstance) {
     logger.warn('⚠️  WebSocket 服务器未初始化，跳过推送')
@@ -570,19 +583,21 @@ const PROGRESS_THROTTLE_MS = 150
 /**
  * 发送评测进度到指定用户
  */
-export function emitJudgeProgress(userId: string, data: {
-  submissionId: string
-  currentTest: number
-  totalTests: number
-  status: string
-}) {
+export function emitJudgeProgress(
+  userId: string,
+  data: {
+    submissionId: string
+    currentTest: number
+    totalTests: number
+    status: string
+  }
+) {
   const ioInstance = getIO()
   if (!ioInstance) return
 
   const now = Date.now()
   const isTerminalProgress =
-    data.currentTest <= 0 ||
-    (data.totalTests > 0 && data.currentTest >= data.totalTests)
+    data.currentTest <= 0 || (data.totalTests > 0 && data.currentTest >= data.totalTests)
   const lastAt = progressThrottle.get(data.submissionId) ?? 0
   if (!isTerminalProgress && now - lastAt < PROGRESS_THROTTLE_MS) {
     return
@@ -608,13 +623,16 @@ export function cleanupJudgeProgress(submissionId: string): void {
 /**
  * 发送系统通知到指定用户
  */
-export function emitNotification(userId: string, notification: {
-  type: 'info' | 'success' | 'warning' | 'error'
-  title: string
-  message: string
-  unreadCount?: number
-  id?: string
-}) {
+export function emitNotification(
+  userId: string,
+  notification: {
+    type: 'info' | 'success' | 'warning' | 'error'
+    title: string
+    message: string
+    unreadCount?: number
+    id?: string
+  }
+) {
   const ioInstance = getIO()
   if (!ioInstance) return
 

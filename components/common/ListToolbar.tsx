@@ -50,9 +50,7 @@ export function ListToolbar({ leading, search, trailing, className = '' }: ListT
   const showDivider = Boolean((leading || search) && trailing)
 
   return (
-    <div
-      className={`card-static rounded-lg border border-border p-2 relative z-10 ${className}`.trim()}
-    >
+    <div className={`card-static border border-border p-2 relative z-10 ${className}`.trim()}>
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         {leading && (
           <div className="flex items-center gap-1 shrink-0 overflow-x-auto">{leading}</div>
@@ -60,10 +58,7 @@ export function ListToolbar({ leading, search, trailing, className = '' }: ListT
 
         {search &&
           (search.onSubmit ? (
-            <form
-              onSubmit={handleSubmit}
-              className="flex gap-2 flex-1 min-w-0 items-center"
-            >
+            <form onSubmit={handleSubmit} className="flex gap-2 flex-1 min-w-0 items-center">
               {searchInput}
               <button type="submit" className="btn btn-ghost btn-sm shrink-0 px-3">
                 {search.submitLabel || '搜索'}
@@ -126,7 +121,7 @@ export function ListToolbarTabs({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(item.key)}
-            className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+            className={`btn btn-sm transition-all whitespace-nowrap ${
               active
                 ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground hover:bg-background/80'

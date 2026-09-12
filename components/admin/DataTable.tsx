@@ -14,8 +14,15 @@ function useIsMobile() {
   return isMobile
 }
 
+/**
+ * 列标识：既可以是行字段名（`a.b` 路径形式运行时已支持），
+ * 也可以是自定义列的稳定字符串（例如「操作」列用 `__actions`）。
+ * 之前限定为 keyof T，导致「操作」列只能借用某个真实字段名，容易重名。
+ */
+export type ColumnKey<T> = keyof T | (string & {})
+
 export interface Column<T> {
-  key: keyof T
+  key: ColumnKey<T>
   label: string
   sortable?: boolean
   className?: string
@@ -118,7 +125,7 @@ export default function DataTable<T>({
   idKey,
   onRowClick,
   mobileCardRenderer,
-  onSelectionChange
+  onSelectionChange,
 }: DataTableProps<T>) {
   const isMobile = useIsMobile()
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -148,7 +155,7 @@ export default function DataTable<T>({
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedRows(new Set(data.map(row => String(row[idKey as keyof T]))))
+      setSelectedRows(new Set(data.map((row) => String(row[idKey as keyof T]))))
     } else {
       setSelectedRows(new Set())
     }
@@ -187,7 +194,7 @@ export default function DataTable<T>({
     <thead>
       <tr className="border-b border-border">
         {batchActions && batchActions.length > 0 && (
-          <th className="px-4 py-3 w-12">
+          <th className="w-12">
             <label className="inline-flex items-center justify-center w-9 h-9 cursor-pointer">
               <input
                 type="checkbox"
@@ -208,15 +215,14 @@ export default function DataTable<T>({
               onClick={column.sortable ? () => handleSort(String(column.key)) : undefined}
             >
               {column.label}
-              {column.sortable && (
-                sortConfig.key === column.key ? (
+              {column.sortable &&
+                (sortConfig.key === column.key ? (
                   sortConfig.direction === 'asc' ? (
                     <ChevronUp className="w-4 h-4 text-primary-light" />
                   ) : (
                     <ChevronDown className="w-4 h-4 text-primary-light" />
                   )
-                ) : null
-              )}
+                ) : null)}
             </div>
           </th>
         ))}
@@ -233,7 +239,7 @@ export default function DataTable<T>({
           {Array.from({ length: skeletonRowCount }).map((_, rowIdx) => (
             <tr key={`skeleton-${rowIdx}`}>
               {batchActions && batchActions.length > 0 && (
-                <td className="px-4 py-3">
+                <td>
                   <div className="w-4 h-4 rounded bg-muted animate-pulse"></div>
                 </td>
               )}
@@ -256,7 +262,10 @@ export default function DataTable<T>({
       return (
         <tbody>
           <tr>
-            <td colSpan={columns.length + (batchActions ? 2 : 1)} className="px-4 py-12 text-center text-muted-foreground">
+            <td
+              colSpan={columns.length + (batchActions ? 2 : 1)}
+              className="py-8 text-center text-muted-foreground"
+            >
               {emptyMessage}
             </td>
           </tr>
@@ -275,7 +284,7 @@ export default function DataTable<T>({
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >
               {batchActions && batchActions.length > 0 && (
-                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                <td onClick={(e) => e.stopPropagation()}>
                   <label className="inline-flex items-center justify-center w-9 h-9 cursor-pointer">
                     <input
                       type="checkbox"
@@ -287,12 +296,21 @@ export default function DataTable<T>({
                 </td>
               )}
               {columns.map((column) => {
-                const value = typeof column.key === 'string' && column.key.includes('.')
-                  ? column.key.split('.').reduce<unknown>((acc, key) => (acc as Record<string, unknown> | undefined | null)?.[key], row)
-                  : row[column.key as keyof T]
+                const value =
+                  typeof column.key === 'string' && column.key.includes('.')
+                    ? column.key
+                        .split('.')
+                        .reduce<unknown>(
+                          (acc, key) => (acc as Record<string, unknown> | undefined | null)?.[key],
+                          row
+                        )
+                    : row[column.key as keyof T]
+
                 return (
-                  <td key={String(column.key)} className={`px-4 py-3 ${column.className || ''}`}>
-                    {column.render ? column.render(value, row) : (
+                  <td key={String(column.key)} className={column.className}>
+                    {column.render ? (
+                      column.render(value, row)
+                    ) : (
                       <span className="text-foreground">{String(value ?? '')}</span>
                     )}
                   </td>
@@ -329,15 +347,17 @@ export default function DataTable<T>({
             <button
               onClick={() => onPageChange(Math.max(1, page - 1))}
               disabled={page === 1}
-              className="btn btn-ghost px-3.5 py-2 text-sm disabled:opacity-50"
+              className="btn btn-sm btn-ghost disabled:opacity-50"
             >
               <ChevronDown className="w-4 h-4 rotate-90" />
             </button>
-            <span className="px-3 text-sm text-muted-foreground">{page} / {totalPages || 1}</span>
+            <span className="px-3 text-sm text-muted-foreground">
+              {page} / {totalPages || 1}
+            </span>
             <button
               onClick={() => onPageChange(Math.min(totalPages, page + 1))}
               disabled={page === totalPages || totalPages === 0}
-              className="btn btn-ghost px-3.5 py-2 text-sm disabled:opacity-50"
+              className="btn btn-sm btn-ghost disabled:opacity-50"
             >
               <ChevronUp className="w-4 h-4 rotate-90" />
             </button>
@@ -361,11 +381,7 @@ export default function DataTable<T>({
       )
     }
     if (data.length === 0) {
-      return (
-        <div className="px-4 py-12 text-center text-muted-foreground">
-          {emptyMessage}
-        </div>
-      )
+      return <div className="px-4 py-12 text-center text-muted-foreground">{emptyMessage}</div>
     }
     return (
       <div className="p-4 space-y-3">
@@ -379,7 +395,10 @@ export default function DataTable<T>({
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >
               {batchActions && batchActions.length > 0 && (
-                <div className="flex items-center justify-between mb-3 pb-3 border-b border-border" onClick={e => e.stopPropagation()}>
+                <div
+                  className="flex items-center justify-between mb-3 pb-3 border-b border-border"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <label className="inline-flex items-center justify-center w-9 h-9 cursor-pointer">
                     <input
                       type="checkbox"
@@ -398,16 +417,25 @@ export default function DataTable<T>({
               ) : (
                 <dl className="space-y-2">
                   {columns.map((column) => {
-                    const value = typeof column.key === 'string' && column.key.includes('.')
-                      ? column.key.split('.').reduce<unknown>((acc, key) => (acc as Record<string, unknown> | undefined | null)?.[key], row)
-                      : row[column.key as keyof T]
+                    const value =
+                      typeof column.key === 'string' && column.key.includes('.')
+                        ? column.key
+                            .split('.')
+                            .reduce<unknown>(
+                              (acc, key) =>
+                                (acc as Record<string, unknown> | undefined | null)?.[key],
+                              row
+                            )
+                        : row[column.key as keyof T]
                     return (
                       <div key={String(column.key)} className="flex items-start gap-3">
                         <dt className="text-xs text-muted-foreground uppercase tracking-wider flex-shrink-0 min-w-[80px]">
                           {column.label}
                         </dt>
                         <dd className="text-sm text-foreground flex-1 break-words">
-                          {column.render ? column.render(value, row) : (
+                          {column.render ? (
+                            column.render(value, row)
+                          ) : (
                             <span>{String(value ?? '')}</span>
                           )}
                         </dd>
@@ -427,7 +455,9 @@ export default function DataTable<T>({
     <div className="card overflow-hidden">
       {batchActions && batchActions.length > 0 && selectedRows.size > 0 && (
         <div className="px-4 md:px-6 py-3 border-b border-border flex flex-wrap items-center gap-3 bg-primary/5">
-          <span className="text-sm text-primary-light font-medium">已选择 {selectedRows.size} 项</span>
+          <span className="text-sm text-primary-light font-medium">
+            已选择 {selectedRows.size} 项
+          </span>
           <div className="flex flex-wrap gap-2">
             {batchActions.map((action, index) => (
               <button
@@ -450,7 +480,7 @@ export default function DataTable<T>({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               {renderHeader()}
               {renderBody()}
             </table>

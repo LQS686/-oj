@@ -96,7 +96,7 @@ export default function CreateClassModal({
       <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
+            <label className="block text-label text-foreground mb-1.5">
               班级名称 <span className="text-error">*</span>
             </label>
             <input
@@ -112,7 +112,7 @@ export default function CreateClassModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5 flex items-center gap-1.5">
+            <label className="block text-label text-foreground mb-1.5 flex items-center gap-1.5">
               <Megaphone className="w-4 h-4 text-muted-foreground" />
               班级公告
             </label>
@@ -127,7 +127,7 @@ export default function CreateClassModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">头像 URL</label>
+            <label className="block text-label text-foreground mb-1.5">头像 URL</label>
             <input
               type="url"
               value={formData.avatar}
@@ -138,11 +138,13 @@ export default function CreateClassModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">最大成员数</label>
+            <label className="block text-label text-foreground mb-1.5">最大成员数</label>
             <input
               type="number"
               value={formData.maxMembers}
-              onChange={(e) => setFormData({ ...formData, maxMembers: parseInt(e.target.value, 10) || 50 })}
+              onChange={(e) =>
+                setFormData({ ...formData, maxMembers: parseInt(e.target.value, 10) || 50 })
+              }
               min={1}
               max={10000}
               className="input w-full max-w-[8rem]"
@@ -150,13 +152,15 @@ export default function CreateClassModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">可见性</label>
+            <label className="block text-label text-foreground mb-2">可见性</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, isPublic: true })}
                 className={`p-3 rounded-lg border text-left text-sm transition-colors ${
-                  formData.isPublic ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                  formData.isPublic
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/40'
                 }`}
               >
                 <div className="flex items-center gap-2 font-medium">
@@ -170,7 +174,9 @@ export default function CreateClassModal({
                 type="button"
                 onClick={() => setFormData({ ...formData, isPublic: false })}
                 className={`p-3 rounded-lg border text-left text-sm transition-colors ${
-                  !formData.isPublic ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                  !formData.isPublic
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/40'
                 }`}
               >
                 <div className="flex items-center gap-2 font-medium">
@@ -184,7 +190,9 @@ export default function CreateClassModal({
           </div>
 
           {error && (
-            <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">{error}</div>
+            <div className="p-2.5 rounded-lg bg-error/10 border border-error/20 text-sm text-error">
+              {error}
+            </div>
           )}
         </div>
 

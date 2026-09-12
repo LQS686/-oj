@@ -4,28 +4,11 @@ import { resolveViewerFromCookies } from '@/lib/api/withApi'
 import { getContestDetailWithRegistration } from '@/lib/contest/service'
 import { canManageContent } from '@/lib/permissions'
 import Link from 'next/link'
-import {
-  Edit,
-  Users,
-  User as UserIcon,
-  Clock,
-  Lock,
-  Globe,
-  FileCode,
-  Calendar,
-} from 'lucide-react'
+import { Edit, Users, User as UserIcon, Clock, Lock, Globe, FileCode, Calendar } from 'lucide-react'
 import { formatDateTimeShort, formatDurationMinutes } from '@/lib/utils'
-import {
-  EntityDescriptionCard,
-  EntityInfoCard,
-  EntityOverviewLayout,
-} from '@/components/entity'
+import { EntityDescriptionCard, EntityInfoCard, EntityOverviewLayout } from '@/components/entity'
 
-export default async function ContestOverviewPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export default async function ContestOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const viewer = await resolveViewerFromCookies()
   const contest = await getContestDetailWithRegistration(

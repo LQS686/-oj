@@ -50,7 +50,7 @@ describe('gradeObjectiveAnswer - 多选题', () => {
 
   it('多选判错（["A","B","C"] vs ["A","C"]）', () => {
     expect(gradeObjectiveAnswer('multiple-choice', ['A', 'C'], ['A', 'B', 'C']).isCorrect).toBe(
-      false,
+      false
     )
   })
 })
@@ -71,9 +71,9 @@ describe('gradeObjectiveAnswer - 判断题', () => {
 
 describe('gradeObjectiveAnswer - 填空题', () => {
   it('完全正确', () => {
-    expect(gradeObjectiveAnswer('fill-blank', ['Hello', 'World'], ['Hello', 'World']).isCorrect).toBe(
-      true,
-    )
+    expect(
+      gradeObjectiveAnswer('fill-blank', ['Hello', 'World'], ['Hello', 'World']).isCorrect
+    ).toBe(true)
   })
 
   it('大小写不敏感（["Hello"] vs ["hello"]）→ 正确', () => {
@@ -98,7 +98,7 @@ describe('gradeObjectiveAnswer - 填空题', () => {
 
   it('中文答案：完全一致 → 正确', () => {
     expect(gradeObjectiveAnswer('fill-blank', ['北京', '上海'], ['北京', '上海']).isCorrect).toBe(
-      true,
+      true
     )
   })
 
@@ -107,9 +107,9 @@ describe('gradeObjectiveAnswer - 填空题', () => {
   })
 
   it('中文答案：trim 后一致 → 正确', () => {
-    expect(gradeObjectiveAnswer('fill-blank', ['中华人民共和国'], [' 中华人民共和国 ']).isCorrect).toBe(
-      true,
-    )
+    expect(
+      gradeObjectiveAnswer('fill-blank', ['中华人民共和国'], [' 中华人民共和国 ']).isCorrect
+    ).toBe(true)
   })
 })
 
@@ -362,7 +362,9 @@ describe('validateObjectiveAnswerShape - 多选题', () => {
   })
 
   it('非法：非字符串元素', () => {
-    expect(validateObjectiveAnswerShape('multiple-choice', ['A', false], CHOICE_OPTIONS)).toBe(false)
+    expect(validateObjectiveAnswerShape('multiple-choice', ['A', false], CHOICE_OPTIONS)).toBe(
+      false
+    )
   })
 })
 

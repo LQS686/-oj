@@ -93,7 +93,9 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
 
   const userGrowth = totalUsers > 0 ? Number(((newUsersThisWeek / totalUsers) * 100).toFixed(1)) : 0
   const submissionGrowth =
-    totalSubmissions > 0 ? Number(((newSubmissionsThisWeek / totalSubmissions) * 100).toFixed(1)) : 0
+    totalSubmissions > 0
+      ? Number(((newSubmissionsThisWeek / totalSubmissions) * 100).toFixed(1))
+      : 0
 
   return {
     totalUsers,

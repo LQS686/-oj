@@ -4,7 +4,11 @@
  */
 import { withApi, ok, throw400, throw403, throw404 } from '@/lib/api/withApi'
 import { isObjectId } from '@/lib/api/validation'
-import { getClassMemberActivity, isClassAdminRole, getCurrentClassMember } from '@/lib/class/service'
+import {
+  getClassMemberActivity,
+  isClassAdminRole,
+  getCurrentClassMember,
+} from '@/lib/class/service'
 
 export const GET = withApi.auth(async (_req, ctx, { user }) => {
   const { id, memberId } = ctx.params

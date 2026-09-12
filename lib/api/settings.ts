@@ -1,5 +1,5 @@
-import { apiClient } from './base';
-import type { SystemSettings } from '@/lib/settings-defaults';
+import { apiClient } from './base'
+import type { SystemSettings } from '@/lib/settings-defaults'
 
 export type PublicSettings = Pick<
   SystemSettings,

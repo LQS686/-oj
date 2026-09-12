@@ -97,12 +97,12 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section id={id} className="scroll-mt-24 card-static rounded-xl overflow-hidden">
+    <section id={id} className="scroll-mt-24 card-static overflow-hidden">
       <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border bg-muted/30">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
           <Icon className="w-4 h-4 text-primary-light" />
         </div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <h2 className="text-section-title text-foreground">{title}</h2>
       </div>
       <div className="px-5 py-5 space-y-3 text-sm text-foreground/90 leading-relaxed">
         {children}
@@ -120,18 +120,13 @@ export default function HelpPage() {
   })
 
   return (
-    <EducationalPageShell width="standard" title="使用帮助" icon={CircleHelp}>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground tracking-tight">使用帮助</h1>
-        <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
-          快速了解大山 OJ：如何做题、参赛、练题单与完成班级作业。按章节跳转，边看边上手。
-        </p>
-      </div>
-
-      <nav
-        aria-label="帮助目录"
-        className="mb-6 flex flex-wrap gap-2"
-      >
+    <EducationalPageShell
+      width="standard"
+      title="使用帮助"
+      icon={CircleHelp}
+      description="快速了解大山 OJ：如何做题、参赛、练题单与完成班级作业。按章节跳转，边看边上手。"
+    >
+      <nav aria-label="帮助目录" className="mb-6 flex flex-wrap gap-2">
         {SECTIONS.map((s) => (
           <a
             key={s.id}
@@ -143,30 +138,26 @@ export default function HelpPage() {
         ))}
       </nav>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         <section id="quickstart" className="scroll-mt-24">
-          <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-            <Rocket className="w-4 h-4 text-primary-light" />
-            快速上手
-          </h2>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Rocket className="w-4 h-4 text-primary-light" />
+            </div>
+            <h2 className="text-section-title text-foreground">快速上手</h2>
+          </div>
           <ol className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {QUICK_STEPS.map((item) => {
               const Icon = item.icon
-              const href =
-                item.registerGated && !allowRegistration ? '/login' : item.href
-              const linkLabel =
-                item.registerGated && !allowRegistration ? '去登录' : item.linkLabel
-              const title =
-                item.registerGated && !allowRegistration ? '登录账号' : item.title
+              const href = item.registerGated && !allowRegistration ? '/login' : item.href
+              const linkLabel = item.registerGated && !allowRegistration ? '去登录' : item.linkLabel
+              const title = item.registerGated && !allowRegistration ? '登录账号' : item.title
               const desc =
                 item.registerGated && !allowRegistration
                   ? '使用已有账号登录后即可提交代码、参加竞赛与加入班级。当前暂不开放自行注册。'
                   : item.desc
               return (
-                <li
-                  key={item.step}
-                  className="card-static rounded-xl p-4 flex gap-3 items-start"
-                >
+                <li key={item.step} className="card-static p-4 flex gap-3 items-start">
                   <span className="shrink-0 w-7 h-7 rounded-lg bg-primary/10 text-primary-light text-xs font-bold flex items-center justify-center">
                     {item.step}
                   </span>
@@ -175,9 +166,7 @@ export default function HelpPage() {
                       <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                       {title}
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                      {desc}
-                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{desc}</p>
                     <Link
                       href={href}
                       className="inline-flex mt-2 text-xs font-medium text-primary-light hover:underline"
@@ -255,20 +244,20 @@ export default function HelpPage() {
 
         <Section id="verdict" icon={ListChecks} title="评测结果怎么读">
           <div className="overflow-x-auto -mx-1">
-            <table className="w-full text-left text-sm min-w-[28rem]">
+            <table className="table w-full text-left text-sm min-w-[28rem]">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium w-14">代号</th>
-                  <th className="py-2 pr-3 font-medium">含义</th>
-                  <th className="py-2 font-medium">说明</th>
+                  <th className="pr-3 w-14">代号</th>
+                  <th className="pr-3">含义</th>
+                  <th>说明</th>
                 </tr>
               </thead>
               <tbody>
                 {VERDICTS.map((v) => (
                   <tr key={v.code} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pr-3 font-mono font-semibold text-foreground">{v.code}</td>
-                    <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">{v.name}</td>
-                    <td className="py-2 text-foreground/85">{v.meaning}</td>
+                    <td className="pr-3 font-mono font-semibold text-foreground">{v.code}</td>
+                    <td className="pr-3 text-muted-foreground whitespace-nowrap">{v.name}</td>
+                    <td className="text-foreground/85">{v.meaning}</td>
                   </tr>
                 ))}
               </tbody>
@@ -293,9 +282,7 @@ export default function HelpPage() {
               </Link>
               。
             </li>
-            <li>
-              代码风格建议：先想清楚输入输出与边界，再写；TLE 时优先分析复杂度。
-            </li>
+            <li>代码风格建议：先想清楚输入输出与边界，再写；TLE 时优先分析复杂度。</li>
           </ul>
           <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-2">
             <Link href="/problems" className="btn btn-primary btn-sm">

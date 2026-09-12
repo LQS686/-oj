@@ -14,25 +14,30 @@ export type SealCutoff = { contestId: string; sealRankTime: Date }
  * 题目关联的、当前处于封榜中的竞赛及其封榜时刻。
  */
 export async function listSealedCutoffsForProblem(problemId: string): Promise<SealCutoff[]> {
-  return cache.get('problem:sealedCutoffs', [problemId], async () => {
-    const links = await prisma.contestProblem.findMany({
-      where: { problemId },
-      select: {
-        contestId: true,
-        contest: {
-          select: { sealRankTime: true, sealUnlocked: true },
+  return cache.get(
+    'problem:sealedCutoffs',
+    [problemId],
+    async () => {
+      const links = await prisma.contestProblem.findMany({
+        where: { problemId },
+        select: {
+          contestId: true,
+          contest: {
+            select: { sealRankTime: true, sealUnlocked: true },
+          },
         },
-      },
-    })
-    const out: SealCutoff[] = []
-    for (const link of links) {
-      const c = link.contest
-      if (!c?.sealRankTime) continue
-      if (!isContestSealed(c)) continue
-      out.push({ contestId: link.contestId, sealRankTime: c.sealRankTime })
-    }
-    return out
-  }, { ttl: 10_000 })
+      })
+      const out: SealCutoff[] = []
+      for (const link of links) {
+        const c = link.contest
+        if (!c?.sealRankTime) continue
+        if (!isContestSealed(c)) continue
+        out.push({ contestId: link.contestId, sealRankTime: c.sealRankTime })
+      }
+      return out
+    },
+    { ttl: 10_000 }
+  )
 }
 
 /**
@@ -67,8 +72,7 @@ export async function getContestSealCutoffForViewer(
     },
   })
   if (!contest || !isContestSealed(contest)) return null
-  const bypass =
-    canAccessAdmin(viewer ?? null) || (!!viewer?.id && viewer.id === contest.authorId)
+  const bypass = canAccessAdmin(viewer ?? null) || (!!viewer?.id && viewer.id === contest.authorId)
   if (bypass) return null
   return contest.sealRankTime
 }

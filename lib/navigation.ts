@@ -42,9 +42,9 @@ export function resolveLoginRedirect(search?: string | URLSearchParams): string 
   const params =
     typeof search === 'string'
       ? new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
-      : search ??
+      : (search ??
         (typeof window !== 'undefined'
           ? new URLSearchParams(window.location.search)
-          : new URLSearchParams())
+          : new URLSearchParams()))
   return safeInternalPath(params.get('redirect') ?? params.get('returnUrl'), '/')
 }

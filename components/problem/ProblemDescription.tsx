@@ -19,11 +19,13 @@ export default function ProblemDescription({
 }: ProblemDescriptionProps) {
   const sectionTitle = (icon: ReactNode, title: string) =>
     compact ? (
-      <h3 className="text-sm font-semibold text-foreground mb-2">{title}</h3>
+      <h3 className="text-subsection-title text-foreground mb-2">{title}</h3>
     ) : (
       <div className="flex items-center gap-2.5 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">{icon}</div>
-        <h3 className="text-lg font-bold text-foreground">{title}</h3>
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          {icon}
+        </div>
+        <h3 className="text-section-title text-foreground">{title}</h3>
       </div>
     )
 
@@ -36,10 +38,10 @@ export default function ProblemDescription({
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                 <BookOpen className="w-4 h-4 text-primary-light" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">题目背景</h3>
+              <h3 className="text-section-title text-foreground">题目背景</h3>
             </div>
           )}
-          {compact && <h3 className="text-sm font-semibold text-foreground mb-2">题目背景</h3>}
+          {compact && <h3 className="text-subsection-title text-foreground mb-2">题目背景</h3>}
           <div className="prose prose-slate max-w-none">
             <MarkdownRenderer content={problem.background} />
           </div>
@@ -52,7 +54,7 @@ export default function ProblemDescription({
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <FileCode className="w-4 h-4 text-primary-light" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">题目描述</h3>
+            <h3 className="text-section-title text-foreground">题目描述</h3>
           </div>
         )}
         <div className="prose prose-slate max-w-none">
@@ -61,12 +63,14 @@ export default function ProblemDescription({
       </section>
 
       <section className="animate-fadeIn">
-        {compact ? sectionTitle(null, '输入格式') : (
+        {compact ? (
+          sectionTitle(null, '输入格式')
+        ) : (
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
               <FileInput className="w-4 h-4 text-secondary-light" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">输入格式</h3>
+            <h3 className="text-section-title text-foreground">输入格式</h3>
           </div>
         )}
         <div className="prose prose-slate max-w-none">
@@ -75,12 +79,14 @@ export default function ProblemDescription({
       </section>
 
       <section className="animate-fadeIn">
-        {compact ? sectionTitle(null, '输出格式') : (
+        {compact ? (
+          sectionTitle(null, '输出格式')
+        ) : (
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
               <FileOutput className="w-4 h-4 text-accent-light" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">输出格式</h3>
+            <h3 className="text-section-title text-foreground">输出格式</h3>
           </div>
         )}
         <div className="prose prose-slate max-w-none">
@@ -89,21 +95,23 @@ export default function ProblemDescription({
       </section>
 
       <section className="animate-fadeIn">
-        {compact ? sectionTitle(null, '样例') : (
+        {compact ? (
+          sectionTitle(null, '样例')
+        ) : (
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
               <FileCode className="w-4 h-4 text-cyan-400" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">样例</h3>
+            <h3 className="text-section-title text-foreground">样例</h3>
           </div>
         )}
         <div>
-          {(problem.samples && problem.samples.length > 0) ? (
+          {problem.samples && problem.samples.length > 0 ? (
             problem.samples.map((sample, index: number) => (
               <div key={index} className="mb-6 last:mb-0 animate-fadeIn">
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="group">
-                    <div className="text-sm font-semibold text-foreground mb-2.5 flex items-center gap-2">
+                    <div className="text-subsection-title text-foreground mb-2.5 flex items-center gap-2">
                       <span className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center text-xs text-primary-light font-bold">
                         {index + 1}
                       </span>
@@ -121,7 +129,7 @@ export default function ProblemDescription({
                     </div>
                   </div>
                   <div className="group">
-                    <div className="text-sm font-semibold text-foreground mb-2.5 flex items-center gap-2">
+                    <div className="text-subsection-title text-foreground mb-2.5 flex items-center gap-2">
                       <span className="w-5 h-5 rounded bg-secondary/10 flex items-center justify-center text-xs text-secondary-light font-bold">
                         {index + 1}
                       </span>
@@ -149,12 +157,14 @@ export default function ProblemDescription({
 
       {problem.hint && (
         <section className="animate-fadeIn">
-          {compact ? sectionTitle(null, '提示') : (
+          {compact ? (
+            sectionTitle(null, '提示')
+          ) : (
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
                 <Lightbulb className="w-4 h-4 text-accent-light" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">提示</h3>
+              <h3 className="text-section-title text-foreground">提示</h3>
             </div>
           )}
           <div className="bg-primary/5 border-l-4 border-primary p-5 rounded-xl animate-fadeIn">
@@ -171,7 +181,7 @@ export default function ProblemDescription({
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Tag className="w-4 h-4 text-primary" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">标签</h3>
+            <h3 className="text-section-title text-foreground">标签</h3>
           </div>
           <div className="flex flex-wrap gap-2">
             {problem.tags.map((tag: string) => (

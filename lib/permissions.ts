@@ -64,9 +64,7 @@ export const SYSTEM_ADMIN_ONLY_PATHS = ['/admin/settings', '/admin/announcements
 
 /** 当前路径是否属于 SYSTEM_ADMIN 专属后台页 */
 export function isSystemAdminOnlyPath(pathname: string): boolean {
-  return SYSTEM_ADMIN_ONLY_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  )
+  return SYSTEM_ADMIN_ONLY_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
 /** 是否可管理前台内容（SYSTEM_ADMIN / ADMIN / TEACHER） */

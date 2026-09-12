@@ -20,7 +20,10 @@ export function readProcCpuTimeMs(pid: number): number {
     const lastParen = content.lastIndexOf(')')
     if (lastParen < 0) return -1
     // 切去 "pid (comm)" 后，剩余字段从 field 3 开始
-    const rest = content.slice(lastParen + 2).trim().split(/\s+/)
+    const rest = content
+      .slice(lastParen + 2)
+      .trim()
+      .split(/\s+/)
     // rest[0] = state (field 3), rest[11] = utime (field 14), rest[12] = stime (field 15)
     const utime = parseInt(rest[11], 10)
     const stime = parseInt(rest[12], 10)
@@ -87,7 +90,10 @@ export function readTimeFilePair(timeFilePath: string): { cpuMs: number; wallMs:
     if (!timeFilePath) return null
     const raw = readFileSync(timeFilePath, 'utf-8').trim()
     if (!raw) return null
-    const parts = raw.split(/\s+/).map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n) && n >= 0)
+    const parts = raw
+      .split(/\s+/)
+      .map((s) => parseInt(s, 10))
+      .filter((n) => Number.isFinite(n) && n >= 0)
     if (parts.length === 0) return null
     return {
       cpuMs: parts[0],
