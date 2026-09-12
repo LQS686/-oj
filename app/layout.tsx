@@ -12,6 +12,7 @@ import MainLandmark from '@/components/layout/MainLandmark'
 import NavigationProgress from '@/components/common/NavigationProgress'
 import { DialogProvider } from '@/components/common/DialogProvider'
 import { getServerSessionUser } from '@/lib/auth/server-session'
+import { getPublicSettings } from '@/lib/settings'
 
 const siteBaseUrl =
   process.env.NEXT_PUBLIC_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:3000'
@@ -54,7 +55,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const initialUser = await getServerSessionUser()
+  // 两件事互不依赖，并行读取：会话用户 + 公开设置（品牌/注册开关）
+  const [initialUser, initialSettings] = await Promise.all([
+    getServerSessionUser(),
+    getPublicSettings(),
+  ])
 
   return (
     <html lang="zh-CN">
@@ -76,7 +81,7 @@ export default async function RootLayout({
           跳到主内容
         </a>
         <SwrProvider>
-          <SettingsProvider>
+          <SettingsProvider initialSettings={initialSettings}>
             <UserProvider initialUser={initialUser}>
               <DialogProvider>
                 <DocumentTitleProvider />

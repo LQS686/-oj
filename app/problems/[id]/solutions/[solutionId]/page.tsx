@@ -20,9 +20,15 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatRelativeTime } from '@/lib/utils'
 import { canManageContent } from '@/lib/permissions'
-import MarkdownRenderer from '@/components/common/MarkdownRenderer'
+import MarkdownRenderer from '@/components/common/LazyMarkdownRenderer'
 import { PageContainer } from '@/components/layout'
-import CreateSolutionModal from '@/components/solution/CreateSolutionModal'
+import dynamic from 'next/dynamic'
+
+/** 发题解弹窗内含 markdown 编辑器（依赖整条 markdown 管线，约 631KB），
+ *  只在点击「写题解」后才需要 —— 按需加载，不进首屏 JS。 */
+const CreateSolutionModal = dynamic(() => import('@/components/solution/CreateSolutionModal'), {
+  ssr: false,
+})
 import ReportModal from '@/components/report/ReportModal'
 import { ListEmptyState, RouteSuspenseFallback } from '@/components/common'
 import { useDialog } from '@/components/common/DialogProvider'

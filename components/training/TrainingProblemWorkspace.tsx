@@ -13,12 +13,21 @@ import { fetchWithCookie } from '@/lib/api/base'
 import { ListEmptyState } from '@/components/common'
 import { logger } from '@/lib/logger'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
-import ProblemDescription from '@/components/problem/ProblemDescription'
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import ProblemLetterRail, { type ProblemLetterStatus } from '@/components/problem/ProblemLetterRail'
 import SubmissionList from '@/components/problem/SubmissionList'
-import SolutionTabPanel from '@/components/problem/SolutionTabPanel'
+import dynamic from 'next/dynamic'
+
+/** 题面 / 题解面板都依赖 markdown 渲染管线（实测单个分包 631KB / gzip 190KB），
+ *  且都在首屏之后才用到；与 ProblemPageClient 的处理保持一致，改为按需加载。 */
+const ProblemDescription = dynamic(() => import('@/components/problem/ProblemDescription'), {
+  ssr: false,
+  loading: () => <div className="min-h-[12rem] animate-pulse rounded-lg bg-muted/50" />,
+})
+const SolutionTabPanel = dynamic(() => import('@/components/problem/SolutionTabPanel'), {
+  ssr: false,
+})
 import ProblemSubmitColumn, {
   ProblemSubmitColumnHeader,
   WORKSPACE_LANGUAGE_OPTIONS,

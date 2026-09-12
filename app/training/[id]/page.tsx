@@ -36,12 +36,18 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { formatDate } from '@/lib/utils'
 import { PageLoading, RouteSuspenseFallback } from '@/components/common'
 import { PageContainer } from '@/components/layout'
-import {
-  EntityDescriptionCard,
-  EntityDetailHeader,
-  EntityInfoCard,
-  EntityOverviewLayout,
-} from '@/components/entity'
+import dynamic from 'next/dynamic'
+import EntityDetailHeader from '@/components/entity/EntityDetailHeader'
+import EntityInfoCard from '@/components/entity/EntityInfoCard'
+import EntityOverviewLayout from '@/components/entity/EntityOverviewLayout'
+
+/** 说明卡片内含 markdown 渲染管线（实测单个分包 631KB / gzip 190KB，见
+ *  components/common/MarkdownRenderer）。改为按需加载，不进首屏 JS；
+ *  同时不再走 '@/components/entity' barrel —— 那会把其它实体组件一并拉进客户端包。 */
+const EntityDescriptionCard = dynamic(() => import('@/components/entity/EntityDescriptionCard'), {
+  ssr: false,
+  loading: () => <div className="min-h-[8rem] animate-pulse rounded-lg bg-muted/40" />,
+})
 
 type Tab = 'intro' | 'problems'
 

@@ -19,13 +19,24 @@ import {
   Calendar,
 } from 'lucide-react'
 import StudentCompletionTable from '@/components/StudentCompletionTable'
-import ProblemDescription from '@/components/problem/ProblemDescription'
+import dynamic from 'next/dynamic'
+
+/** 题面 / 说明卡片内含 markdown 渲染管线（实测单个分包 631KB / gzip 190KB），
+ *  且本页由客户端取数后渲染、不可能进入 SSR HTML —— 改为按需加载，不进首屏 JS。 */
+const ProblemDescription = dynamic(() => import('@/components/problem/ProblemDescription'), {
+  ssr: false,
+  loading: () => <div className="min-h-[12rem] animate-pulse rounded-lg bg-muted/50" />,
+})
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import AssignmentProblemProgressList from '@/components/class/AssignmentProblemProgressList'
-import ObjectiveQuestionWorkspace, {
-  type ObjectiveSubmittedResult,
-} from '@/components/objective-question/ObjectiveQuestionWorkspace'
+import type { ObjectiveSubmittedResult } from '@/components/objective-question/ObjectiveQuestionWorkspace'
+
+/** 客观题工作台同样依赖 markdown 管线，且只有客观题作业才需要 —— 按需加载。 */
+const ObjectiveQuestionWorkspace = dynamic(
+  () => import('@/components/objective-question/ObjectiveQuestionWorkspace'),
+  { ssr: false }
+)
 import SubmissionList from '@/components/problem/SubmissionList'
 import ProblemSubmitColumn, {
   ProblemSubmitColumnHeader,
@@ -65,12 +76,16 @@ import {
   type ObjectiveQuestionType,
   type ObjectiveSubmissionDTO,
 } from '@/lib/objective-question/types'
-import {
-  EntityDescriptionCard,
-  EntityDetailHeader,
-  EntityInfoCard,
-  EntityOverviewLayout,
-} from '@/components/entity'
+import EntityDetailHeader from '@/components/entity/EntityDetailHeader'
+import EntityInfoCard from '@/components/entity/EntityInfoCard'
+import EntityOverviewLayout from '@/components/entity/EntityOverviewLayout'
+
+/** 说明卡片依赖 markdown 管线（约 631KB），按需加载；同时不再走 '@/components/entity'
+ *  barrel —— 那会把其它实体组件一并拉进客户端包。 */
+const EntityDescriptionCard = dynamic(() => import('@/components/entity/EntityDescriptionCard'), {
+  ssr: false,
+  loading: () => <div className="min-h-[8rem] animate-pulse rounded-lg bg-muted/40" />,
+})
 import type { Problem as ProblemModel } from '@/types/models'
 
 const PRESET = WORKSPACE_PRESETS.assignment

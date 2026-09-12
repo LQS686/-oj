@@ -4,7 +4,11 @@ import { usePathname } from 'next/navigation'
 import { FileText, List, ChartBar, Info } from 'lucide-react'
 import { formatDateTimeShort } from '@/lib/utils'
 import { useContestCountdown } from '@/hooks/useContestCountdown'
-import { EntityDetailHeader } from '@/components/entity'
+// 直接从具体模块引入，不要走 '@/components/entity' barrel：
+// 该 barrel 还导出 EntityDescriptionCard → MarkdownRenderer，
+// 会让 react-markdown / katex / 代码高亮整条管线（首屏 JS 约 631KB）
+// 被拖进 /contests/[id]/* 所有路由，包括完全不渲染 markdown 的排名/提交页。
+import EntityDetailHeader from '@/components/entity/EntityDetailHeader'
 
 interface Contest {
   id: string

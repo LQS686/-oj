@@ -36,7 +36,8 @@ import { getStatusText, getDifficultyClass } from '@/lib/status'
 import { fetchWithCookie } from '@/lib/api/base'
 import { AdminPageShell } from '@/components/admin'
 import { PageLoading, useDialog } from '@/components/common'
-import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
+import dynamic from 'next/dynamic'
+import type { CodeLanguage } from '@/components/code-editor/CodeEditor'
 import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import {
@@ -46,6 +47,18 @@ import {
   isNonFinalSubmissionStatus,
   SubmissionStatus,
 } from '@/lib/constants/submission-status'
+
+/** CodeMirror 让首屏 JS 增加约 560KB，而本页只是「只读查看源码」。
+ *  改为懒加载，并用等高骨架占位，避免加载完成时的布局偏移。 */
+const CodeEditor = dynamic(() => import('@/components/code-editor/CodeEditor'), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="w-full animate-pulse rounded-xl border border-border bg-muted"
+      style={{ height: '480px' }}
+    />
+  ),
+})
 
 interface TestResult {
   testId: string

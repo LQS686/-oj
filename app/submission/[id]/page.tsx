@@ -31,7 +31,8 @@ import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { fetchWithCookie } from '@/lib/api/base'
 import { PageContainer } from '@/components/layout'
-import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
+import type { CodeLanguage } from '@/components/code-editor/CodeEditor'
+import dynamic from 'next/dynamic'
 import {
   isAcceptedStatus,
   isCompileErrorStatus,
@@ -40,6 +41,18 @@ import {
   SubmissionStatus,
 } from '@/lib/constants/submission-status'
 import { downloadFirstWaTestCase, findFirstWaIndex } from '@/lib/submission/wa-download'
+
+/** CodeMirror 让首屏 JS 增加约 560KB，而本页只是「只读查看源码」。
+ *  改为懒加载，并用等高骨架占位，避免加载完成时的布局偏移。 */
+const CodeEditor = dynamic(() => import('@/components/code-editor/CodeEditor'), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="w-full animate-pulse rounded-xl border border-border bg-muted"
+      style={{ height: 'min(28rem, 60vh)' }}
+    />
+  ),
+})
 
 interface TestResult {
   testId: string

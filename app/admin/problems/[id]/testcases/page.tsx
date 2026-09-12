@@ -24,8 +24,14 @@ import { AdminPageShell } from '@/components/admin'
 import { PageLoading, useDialog } from '@/components/common'
 import { ZipUploadPanel } from './_components/ZipUploadPanel'
 import { TestCaseCard, type EditableTestCase } from './_components/TestCaseCard'
-import { VerifyModal } from './_components/VerifyModal'
+import dynamic from 'next/dynamic'
 import { LogsModal } from './_components/LogsModal'
+
+/** 验证弹窗内嵌 CodeMirror（首屏 JS 约 560KB），而它只在点「验证」时才用到。
+ *  改为懒加载，弹窗本身仍按 open 控制，不改变关闭动画。 */
+const VerifyModal = dynamic(() => import('./_components/VerifyModal').then((m) => m.VerifyModal), {
+  ssr: false,
+})
 
 type TestCase = EditableTestCase
 

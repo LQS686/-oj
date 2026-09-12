@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import {
@@ -13,15 +14,6 @@ import {
   Settings,
   ExternalLink,
 } from 'lucide-react'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 import type {
   User as UserType,
   ActivityData,
@@ -36,6 +28,13 @@ import { EducationalPageShell, ListEmptyState, PageLoading } from '@/components/
 import { useUser } from '@/contexts/UserContext'
 import { getRoleLabel, getRoleColor } from '@/lib/permissions'
 import { isAcceptedStatus } from '@/lib/constants/submission-status'
+
+/** 懒加载 recharts 图表（约 348KB）：侧栏图表不阻塞首屏，
+ *  占位块与容器同为 h-[140px]，避免加载完成时的布局偏移。 */
+const ActivityChart = dynamic(() => import('./_components/ActivityChart'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse rounded-lg bg-muted/60" />,
+})
 
 function difficultyBarClass(diff: string): string {
   if (diff.includes('入门')) return 'bg-success'
@@ -307,51 +306,7 @@ export default function UserProfilePage() {
                 <TrendingUp className="w-4 h-4 text-primary-light" />近 7 天通过
               </h2>
               <div className="h-[140px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={activityData}
-                    margin={{ top: 4, right: 4, left: -18, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="profileAcFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                    <XAxis
-                      dataKey="date"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
-                      width={28}
-                      tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 10,
-                        border: '1px solid var(--border)',
-                        background: 'var(--card)',
-                        color: 'var(--foreground)',
-                        fontSize: 12,
-                      }}
-                      labelStyle={{ color: 'var(--muted-foreground)' }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="count"
-                      name="通过"
-                      stroke="var(--primary)"
-                      strokeWidth={2}
-                      fill="url(#profileAcFill)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <ActivityChart data={activityData} />
               </div>
               {weekTotal === 0 && (
                 <p className="text-xs text-muted-foreground text-center mt-1">近一周暂无通过</p>

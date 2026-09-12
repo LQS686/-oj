@@ -25,14 +25,39 @@ export async function findProblemByIdOrNumber(idOrNumber: string) {
       const where: Prisma.ProblemWhereInput = isObjectIdLike(idOrNumber)
         ? { id: idOrNumber }
         : { problemNumber: idOrNumber }
+      // 显式 select：题面消费方（lib/problem/detail.ts）只用下面这些字段。
+      // 尤其要剔除 spjCode（上限 512KB）与 stdCode 两个大字段——它们只在
+      // 评测 / 导出时按需单读，跟着每次题面请求传输会显著放大响应体积。
       return prisma.problem.findFirst({
         where,
-        include: {
+        select: {
+          id: true,
+          problemNumber: true,
+          title: true,
+          description: true,
+          background: true,
+          input: true,
+          output: true,
+          samples: true,
+          hint: true,
+          source: true,
+          difficulty: true,
+          tags: true,
+          timeLimit: true,
+          memoryLimit: true,
+          isPublic: true,
+          visibility: true,
+          totalSubmit: true,
+          totalAccepted: true,
+          authorId: true,
           author: { select: { id: true, username: true, nickname: true } },
           testCases: {
             where: { isSample: true },
             orderBy: { orderIndex: 'asc' },
+            select: { id: true, input: true, output: true, isSample: true },
           },
+          createdAt: true,
+          updatedAt: true,
         },
       })
     },

@@ -103,6 +103,61 @@ export function getSystemSettingsSync(): SystemSettings {
   return { ...defaultSettings, judge: { ...defaultSettings.judge } }
 }
 
+/** 对前端公开的设置子集（品牌信息 / 注册开关 / 是否待引导） */
+export interface PublicSettings {
+  siteName: string
+  siteDescription: string
+  allowRegistration: boolean
+  /** 空库（尚无任何用户）时为 true，前端据此展示「创建管理员」入口 */
+  needsBootstrap: boolean
+  defaultLanguage: string
+}
+
+/**
+ * 读取公开设置。
+ *
+ * Root Layout（SSR 注入，避免每页加载后再发一次 /api/settings/public）与
+ * /api/settings/public 共用本实现，保证两处口径一致。
+ *
+ * 异常时 fail-closed：关闭「常规开放注册」，避免配置读取失败时误开注册；
+ * needsBootstrap 保持 true，避免空库被误判为已初始化而看不到引导入口。
+ */
+export async function getPublicSettings(): Promise<PublicSettings> {
+  try {
+    const settings = await getSystemSettings()
+    // 默认按「待引导」处理：只有明确查到用户才关闭引导
+    let needsBootstrap = true
+    try {
+      // 只判断「是否存在用户」：findFirst + projection 与用户总量无关，
+      // 比 count() 更适合放在每个页面都要走的热路径上。
+      needsBootstrap = (await prisma.user.findFirst({ select: { id: true } })) === null
+    } catch (probeError) {
+      logger.warn(
+        '[settings/public] 用户存在性检查失败，needsBootstrap=true（避免空库被误判为已初始化）',
+        probeError
+      )
+      needsBootstrap = true
+    }
+    return {
+      siteName: settings.siteName,
+      siteDescription: settings.siteDescription,
+      allowRegistration: settings.allowRegistration,
+      needsBootstrap,
+      defaultLanguage: settings.defaultLanguage,
+    }
+  } catch (error) {
+    logger.error('[settings/public] 读取失败，fail-closed（保留 needsBootstrap 引导）', error)
+    return {
+      siteName: '大山 OJ',
+      siteDescription: '代码如山·算法为径·陪你从入门到顶峰',
+      allowRegistration: false,
+      // 读库失败时不能断言「已有用户」，否则首次部署永远看不到注册入口
+      needsBootstrap: true,
+      defaultLanguage: 'cpp',
+    }
+  }
+}
+
 /**
  * 保存系统设置。
  *

@@ -223,11 +223,23 @@ export async function computeAssignmentStatistics(classId: string, assignmentId:
         user: { select: { username: true, nickname: true, avatar: true } },
       },
     }),
+    // 统计口径只用到下面这些字段：显式 select 避免把每条提交的 code 源码
+    // （上限 50KB/条）拉回内存——一次作业的全部提交叠加起来非常可观。
     prisma.classAssignmentSubmission.findMany({
       where: { assignmentId, ...ACTIVE_SUBMISSION_WHERE },
+      select: {
+        userId: true,
+        problemId: true,
+        status: true,
+        score: true,
+        isLate: true,
+        submittedAt: true,
+      },
     }),
+    // 题目信息只用于展示标题/难度/题号，不要拉回 description/stdCode/spjCode 等大字段
     prisma.problem.findMany({
       where: { id: { in: assignment.problemIds } },
+      select: { id: true, title: true, difficulty: true, problemNumber: true },
     }),
   ])
 

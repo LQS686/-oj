@@ -8,7 +8,14 @@ import { useUser } from '@/contexts/UserContext'
 import { fetchWithCookie } from '@/lib/api/base'
 import { logger } from '@/lib/logger'
 import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
-import ProblemDescription from '@/components/problem/ProblemDescription'
+import dynamic from 'next/dynamic'
+
+/** 题面内含 markdown 渲染管线（实测单个分包 631KB / gzip 190KB），且本页由客户端取数后
+ *  渲染，无法进入 SSR HTML —— 改为按需加载：不占首屏 JS，题面数据到达后再下载。 */
+const ProblemDescription = dynamic(() => import('@/components/problem/ProblemDescription'), {
+  ssr: false,
+  loading: () => <div className="min-h-[12rem] animate-pulse rounded-lg bg-muted/50" />,
+})
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import ProblemLetterRail from '@/components/problem/ProblemLetterRail'

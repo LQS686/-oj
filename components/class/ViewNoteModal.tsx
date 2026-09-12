@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Calendar, Edit, FileText, Tag, Trash2, User, AlertCircle } from 'lucide-react'
 import { CreateModalShell, useDialog } from '@/components/common'
-import MarkdownRenderer from '@/components/common/MarkdownRenderer'
+import MarkdownRenderer from '@/components/common/LazyMarkdownRenderer'
 import { fetchWithCookie } from '@/lib/api/base'
 import { formatDateTime } from '@/lib/utils'
 
