@@ -147,6 +147,8 @@ docker compose logs -f app
 | redis | 内部 | Redis 缓存（默认不映射宿主端口）          |
 
 > 反向代理（80/443）由**宿主机 Nginx / 宝塔**承担，compose 内不含 nginx 服务。
+>
+> ⚠️ 若要使用「大备份包恢复」，宿主机反向代理的 `client_max_body_size` 需 ≥ `BACKUP_MAX_SIZE_MB`（默认 4096MB）；**部署脚本不会自动修改正在运行的 Nginx**，存量站点升级后请按 [docs/BT_DEPLOY.md](docs/BT_DEPLOY.md) 的《升级后需要手工改的配置》手工调整并 `nginx -s reload`。
 
 ## 技术架构
 

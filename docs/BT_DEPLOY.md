@@ -80,6 +80,7 @@ sudo bash scripts/bt-deploy.sh --yes               # 跳过交互确认（宝塔
 1. 网站 → 添加站点 → 域名填脚本提示的域名（或 IP）
 2. HTTPS 站：SSL → Let's Encrypt → 申请证书
 3. 设置 → 配置文件 → 粘贴 `nginx/baota-proxy.conf` 内容并保存
+   （该片段已含 `client_max_body_size 50g;`，供大备份包恢复使用；**存量站点升级**时不会被自动应用，见《升级后需要手工改的配置》）
 
 ### 5. 验证
 
@@ -119,6 +120,51 @@ sudo bash scripts/bt-deploy.sh --no-build
 ```bash
 sudo bash scripts/bt-deploy.sh --prune
 ```
+
+### 升级后需要手工改的配置（检查清单）
+
+升级只更新代码与镜像，**宿主机的反向代理配置不会被脚本自动修改**。逐项对照：
+
+| 项目                                                  | 是否必改                     | 说明                                                                                         |
+| ----------------------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
+| 宿主 Nginx `client_max_body_size`                     | **仅当要用「大备份包恢复」** | 脚本只生成模板，正在运行的 Nginx 不受影响（见下）                                            |
+| `.env` `BACKUP_MAX_SIZE_MB`                           | 可选                         | 不写即默认 `4096`（硬上限 `51200`）；仅当你在 `.env` 里**显式写过**旧值（如 `1000`）才需调整 |
+| 其余（头像上传开关、SPJ 部分分、matcher、判题口径等） | 不用                         | 均为代码 / 编译期生效，无对应环境变量                                                        |
+
+> 本版本**没有新增必填环境变量**，不会出现「缺变量导致容器起不来」。
+
+#### 1) 反向代理上传上限（唯一必改项，且只在用大备份包恢复时）
+
+只影响备份包恢复的两条上传路由（`/api/admin/restore/upload`、`/api/setup/restore`）。
+
+```bash
+# ① 先查当前值，再决定是否需要改
+grep -rn "client_max_body_size" /www/server/panel/vhost/nginx/ 2>/dev/null
+
+# ② 改：宝塔面板 → 网站 → 你的站点 → 设置 → 配置文件
+#    在对应 server {} 块内加/改这一行（HTTPS 站点改 443 那个块，并用 https 域名访问上传页）：
+#      client_max_body_size 50g;
+
+# ③ 生效 + 验证
+nginx -t && nginx -s reload                            # 面板「保存」一般会自动 reload
+nginx -T 2>/dev/null | grep -n client_max_body_size    # 确认已生效
+```
+
+- 该值必须 **≥** `BACKUP_MAX_SIZE_MB`，否则超限的大包会先在 Nginx 层被 **413** 拒掉，进不到应用层。
+- 也可以把脚本新生成的 `nginx/baota-proxy.conf` **整体粘贴**覆盖，但该文件含证书路径等，**推荐只改上面那一行**，避免覆盖你自己的自定义配置。
+- 慢网络上传数 GB 备份包中途断开时，可一并调大 `client_body_timeout` / `proxy_read_timeout`（非必须）。
+
+#### 2) 可选：调整备份包体积上限
+
+```bash
+sed -i 's/^BACKUP_MAX_SIZE_MB=.*/BACKUP_MAX_SIZE_MB=10240/' .env   # 例：放宽到 10GB
+sudo bash scripts/bt-deploy.sh --no-build                          # 仅重启使 .env 生效
+```
+
+#### 3) 升级后建议执行（非配置项）
+
+- **判题口径变更** — `_pc(points)` 部分分映射、多字节字符跨读取缓冲区、`ignore-spaces` 行结构（PE）、`default` 模式多输出（OLE）等已调整；若希望历史提交与新口径一致，请对相关题目执行**重测（rejudge）**。
+- **头像上传** — 本版本默认**关闭自定义头像上传**，改用内置头像库。要恢复需把 `lib/user/avatar-config.ts` 的 `AVATAR_UPLOAD_ENABLED` 改为 `true` 并重建镜像，**无需环境变量**。
 
 ---
 
@@ -278,7 +324,7 @@ docker compose restart app
 9. **健康检查用 `/healthcheck-static`** — 不要改回依赖动态路由的 `/api/health` 作容器探活。
 10. **`.env` 值不要包反引号**。
 11. **prisma CLI 独立装在 `/opt/prisma-cli` 并须显式 COPY 到 runner** — runner 的 `npm ci --omit=dev` 不含 devDependencies（prisma CLI 在其中）；部署脚本依赖容器内 `prisma db push` 做幂等集合/索引同步，勿删该目录。
-12. **大备份包恢复依赖反向代理上传上限** — 备份/恢复支持数 GB 级备份包（`BACKUP_MAX_SIZE_MB`，默认 4096MB、硬上限 50GB），Nginx 的 `client_max_body_size` 需 ≥ 该值（部署脚本已设为 `50g`），否则超过限制的上传会先被 413 拒掉，进不到应用层。注意：**改的是部署脚本的模板，不影响已在运行的 Nginx**——对存量部署需手动把配置里的 `client_max_body_size` 调大（或重跑部署脚本）并 `nginx -s reload`。
+12. **大备份包恢复依赖反向代理上传上限** — 备份/恢复支持数 GB 级备份包（`BACKUP_MAX_SIZE_MB`，默认 4096MB、硬上限 50GB），Nginx 的 `client_max_body_size` 需 ≥ 该值（脚本生成的模板已设为 `50g`），否则超限上传会先被 413 拒掉，进不到应用层。注意：**改的是部署脚本的模板，不影响已在运行的 Nginx**——存量部署请按上文《升级 / 切域名 → 升级后需要手工改的配置》一节手工调整并 `nginx -s reload`。
 13. **备份/恢复是管理员与空库引导专用** — 上传恢复接口仅系统管理员（`/api/admin/restore/upload`）或空库部署引导（`/api/setup/restore`）可用，大体积请求受 JWT + CSRF + 限流防护，普通接口不受影响。
 14. **两个大包上传路由已从 Next 中间件 matcher 排除** — Next 在 `/middleware`（proxy）会克隆请求体，默认只在内存保留前 `10MB`，会把大备份包截断。故 `api/admin/restore/upload` 与 `api/setup/restore` 被排除在 matcher 之外，保持请求体真流式（`lib/backup/restore-upload.ts` 边收边写临时文件，内存恒定）。这两条路由的 CSRF（同源 + 双提交 Cookie）与限流不再由全局中间件处理，改为在路由内显式调用 `guardLargeUploadRequest`（`lib/security/csrf.ts`）和 `restoreRateLimiter`（`lib/rate-limit.ts`，按 IP 每小时 10 次）执行，行为与全局中间件等价。其余接口仍走全局中间件，不受影响。
 
