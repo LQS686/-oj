@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Flag,
   ListChecks,
+  HardDrive,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
@@ -74,6 +75,7 @@ const menuGroups: { label: string; items: AdminMenuItem[] }[] = [
     items: [
       { icon: FileCode, label: '提交记录', href: '/admin/submissions' },
       { icon: Settings, label: '系统设置', href: '/admin/settings', systemAdminOnly: true },
+      { icon: HardDrive, label: '备份与恢复', href: '/admin/backup', systemAdminOnly: true },
     ],
   },
 ]

@@ -60,7 +60,11 @@ export function canManageSystemAnnouncements(user: RoleUser | null): boolean {
  * 仅 SYSTEM_ADMIN 可访问的后台页面路径（与菜单 systemAdminOnly / withApi.systemAdmin 对齐）
  * middleware 与 AdminLayout 共用，避免路径漂移。
  */
-export const SYSTEM_ADMIN_ONLY_PATHS = ['/admin/settings', '/admin/announcements'] as const
+export const SYSTEM_ADMIN_ONLY_PATHS = [
+  '/admin/settings',
+  '/admin/announcements',
+  '/admin/backup',
+] as const
 
 /** 当前路径是否属于 SYSTEM_ADMIN 专属后台页 */
 export function isSystemAdminOnlyPath(pathname: string): boolean {

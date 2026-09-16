@@ -20,6 +20,7 @@
 
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
+import { getBackupEnvWarnings } from '@/lib/backup/config'
 
 let validated = false
 
@@ -173,6 +174,9 @@ export function validateEnvironment(): EnvironmentCheckResult {
 
   // JUDGE_* / MongoDB 副本集校验（仅生产环境 warn，dev 环境使用默认值）
   warnings.push(...checkJudgeAndMongoReplica())
+
+  // 备份/恢复配置（可选变量，非关键）
+  warnings.push(...getBackupEnvWarnings())
 
   if (warnings.length > 0) {
     for (const w of warnings) {

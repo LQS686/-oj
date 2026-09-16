@@ -166,5 +166,15 @@ export async function registerNewUser(input: {
     throw err
   }
 
+  // 首个用户创建后，部署引导缓存应立即失效
+  if (user.role === 'SYSTEM_ADMIN') {
+    try {
+      const { invalidateBootstrapCache } = await import('@/lib/bootstrap-guard')
+      invalidateBootstrapCache()
+    } catch {
+      /* 非关键失败忽略 */
+    }
+  }
+
   return { ...user, isFirstUser: user.role === 'SYSTEM_ADMIN' }
 }

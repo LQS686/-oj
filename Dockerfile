@@ -165,7 +165,7 @@ COPY --from=builder /opt/prisma-cli /opt/prisma-cli
 # 若不在镜像内预创建并赋权，卷首次挂载时目录属主为 root，评测进程（nextjs，uid 1001）
 # 无法写入，materializeTestCaseToDisk 缓存写失败 → 每次评测回源 Mongo 拉百万行字符串，
 # 大测点性能异常（本地可写、容器不可写的直接原因）。
-RUN mkdir -p /app/temp /app/logs /app/public/uploads/avatars /app/data/testdata && \
+RUN mkdir -p /app/temp /app/logs /app/public/uploads/avatars /app/data/testdata /app/data/backups && \
     chown -R nextjs:nodejs /app/temp /app/logs /app/public/uploads /app/data
 
 # 预编译评测监视器：同步密采样进程树 RssAnon（自适应间隔），避免 /usr/bin/time 总 RSS 虚高与后台轮询竞态

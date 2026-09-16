@@ -57,6 +57,7 @@ services:
       - app_logs:/app/logs
       - app_uploads:/app/public/uploads
       - app_testdata:/app/data/testdata
+      - app_backups:/app/data/backups
     logging:
       driver: 'json-file'
       options:
@@ -155,6 +156,7 @@ volumes:
   app_logs:
   app_uploads:
   app_testdata:
+  app_backups:
 
 networks:
   oj-network:

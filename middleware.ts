@@ -91,6 +91,35 @@ export async function middleware(request: NextRequest) {
     incomingRequestId && incomingRequestId.length <= 128 ? incomingRequestId : crypto.randomUUID()
   logger.setContext({ requestId })
 
+  // 部署引导：空库（尚无任何用户）时，除 /setup、/register、/login 与 API 外，
+  // 一律重定向到 /setup（新站部署引导：从备份恢复或全新注册）。
+  if (!pathname.startsWith('/api/')) {
+    const isSetup = pathname === '/setup' || pathname.startsWith('/setup/')
+    const isAllowedBootstrap =
+      isSetup ||
+      pathname === '/register' ||
+      pathname.startsWith('/register/') ||
+      pathname === '/login' ||
+      pathname.startsWith('/login/')
+
+    if (!isAllowedBootstrap) {
+      const { needsBootstrapNow } = await import('@/lib/bootstrap-guard')
+      if (await needsBootstrapNow()) {
+        const redirect = NextResponse.redirect(new URL('/setup', request.url))
+        redirect.headers.set('x-request-id', requestId)
+        return redirect
+      }
+    } else if (isSetup) {
+      // 已初始化的站点不再展示引导页
+      const { needsBootstrapNow } = await import('@/lib/bootstrap-guard')
+      if (!(await needsBootstrapNow())) {
+        const redirect = NextResponse.redirect(new URL('/', request.url))
+        redirect.headers.set('x-request-id', requestId)
+        return redirect
+      }
+    }
+  }
+
   // 拦截 /admin/* 页面路由（不含 /api/admin/*）：
   // 校验 JWT + tokenVersion/ban（getCachedUser），再用 DB 中的 role 判定；
   // 系统设置 / 系统公告等路径另需 SYSTEM_ADMIN。
@@ -197,5 +226,6 @@ export async function middleware(request: NextRequest) {
 export const runtime = 'nodejs'
 
 export const config = {
-  matcher: ['/api/:path*', '/admin/:path*'],
+  // 覆盖所有页面路由（含 /admin、/api 与 / 首页），但排除 Next 内部资源与带扩展名的静态文件
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 }
