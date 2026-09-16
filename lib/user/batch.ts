@@ -216,7 +216,9 @@ export async function batchRegisterUsers(
       }
 
       const trimmedUsername = String(user.username).trim()
-      const trimmedPassword = String(user.password)
+      // 与登录/注册的 trimAll 语义对齐：密码必须 trim，否则 CSV 中带首尾空格的密码
+      // 会以含空格的形式哈希，而登录侧会 trim 掉 → 该账号永远无法登录
+      const trimmedPassword = String(user.password).trim()
       const rawEmail = user.email != null ? String(user.email).trim() : ''
       const hasEmail = rawEmail.length > 0
       // 邮箱列可选：未填时写入唯一占位邮箱（User.email 为必填唯一字段）

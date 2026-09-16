@@ -116,8 +116,9 @@ async function readFilePreview(filePath: string, maxBytes: number): Promise<stri
     try {
       const len = Math.min(size, maxBytes)
       const buf = Buffer.alloc(len)
-      await fd.read(buf, 0, len, 0)
-      const text = buf.toString('utf-8')
+      const { bytesRead } = await fd.read(buf, 0, len, 0)
+      // 短读时 Buffer.alloc 的尾部零填充会混入预览，需按实际读取长度截断
+      const text = buf.subarray(0, bytesRead).toString('utf-8')
       return size > maxBytes ? text + '\n[已截断]' : text
     } finally {
       await fd.close()
@@ -186,14 +187,24 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
     language,
     input,
     inputPath: providedInputPath,
-    timeLimit,
-    memoryLimit,
+    timeLimit: rawTimeLimit,
+    memoryLimit: rawMemoryLimit,
     compiledPath,
     extraTimeRatio = 0,
     expectedOutputBytes,
     outputLimitBytes: outputLimitOverride,
     signal,
   } = options
+
+  // 防御性钳制：题目 timeLimit/memoryLimit 可能经导入链路写入（仅做下界校验、无上界）。
+  // - timeLimit 过大（> 2^31-1 ms）会让 setTimeout 溢出被 Node 降为 1ms → 所有测点瞬间 TLE
+  // - memoryLimit=0/NaN 会让 maxMemoryBytes=0 → 任意内存采样即误判 MLE
+  const timeLimit = Number.isFinite(rawTimeLimit)
+    ? Math.min(Math.max(1, Math.floor(rawTimeLimit)), 30000)
+    : 1000
+  const memoryLimit = Number.isFinite(rawMemoryLimit)
+    ? Math.min(Math.max(1, Math.floor(rawMemoryLimit)), 4096)
+    : 256
 
   if (!compiledPath) {
     throw new Error('缺少编译路径')

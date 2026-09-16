@@ -47,13 +47,18 @@ export const PATCH = withApi.admin(async (req, ctx, { user }) => {
     }
   }
 
+  // 仅写入显式传入的字段：service 以 `'isBanned' in body` 判定，
+  // 若无条件写入 `isBanned: undefined` 会把「只改角色」的请求误判为解封。
   const safeBody: {
     role?: 'ADMIN' | 'TEACHER' | 'STUDENT'
     isBanned?: boolean
     password?: string
-  } = {
-    isBanned: body.isBanned,
-    password: body.password,
+  } = {}
+  if (body.isBanned !== undefined) {
+    safeBody.isBanned = body.isBanned
+  }
+  if (body.password !== undefined) {
+    safeBody.password = body.password
   }
   if (body.role !== undefined) {
     safeBody.role = body.role as 'ADMIN' | 'TEACHER' | 'STUDENT'

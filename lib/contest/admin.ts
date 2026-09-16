@@ -218,8 +218,20 @@ export async function adminGetContestWithProblems(contestId: string) {
 }
 
 export async function adminDeleteContest(contestId: string) {
+  // MongoDB + Prisma 对 Contest 子表未声明 onDelete: Cascade（schema 中
+  // ContestProblem / ContestParticipant / Submission 均无级联），必须显式按依赖顺序清理，
+  // 否则会留下孤儿 ContestProblem / ContestParticipant，或在 Prisma 引用校验下删除失败。
+  // 与 deleteClass 一致：先置空 Submission.contestId 这个可选引用（保留提交记录本身），
+  // 再删除竞赛子表，最后删除竞赛。
+  await prisma.$transaction(async (tx) => {
+    await tx.submission.updateMany({ where: { contestId }, data: { contestId: null } })
+    await tx.contestProblem.deleteMany({ where: { contestId } })
+    await tx.contestParticipant.deleteMany({ where: { contestId } })
+    await tx.contest.delete({ where: { id: contestId } })
+  })
+
   cache.delete(CacheKeys.contest.byId(contestId))
-  return prisma.contest.delete({ where: { id: contestId } })
+  cache.deleteByPrefix(CacheKeys.contest.rankPrefix(contestId))
 }
 
 /* ============================================================================

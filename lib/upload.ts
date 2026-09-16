@@ -1,5 +1,6 @@
 import sharp from 'sharp'
 import { join, basename, extname } from 'path'
+import { once } from 'events'
 import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'fs/promises'
 import { existsSync, createWriteStream } from 'fs'
 import { logger } from '@/lib/logger'
@@ -159,6 +160,14 @@ export async function mergeChunks(
   const mergedFilePath = join(TEMP_DIR, `${safeId}_merged`)
   const writeStream = createWriteStream(mergedFilePath)
 
+  // 必须立即挂 'error' 监听：创建/写入期间（磁盘满、权限不足）emit 的 'error'
+  // 若无人监听会触发未捕获异常并可能导致进程退出；同时保证已有 rejection 被消费。
+  const writeFinished = new Promise<void>((resolve, reject) => {
+    writeStream.once('finish', () => resolve())
+    writeStream.once('error', reject)
+  })
+  writeFinished.catch(() => {})
+
   const maxBytes =
     typeof expectedFileSize === 'number' && expectedFileSize > 0
       ? Math.min(expectedFileSize, AVATAR_MAX_BYTES)
@@ -176,14 +185,14 @@ export async function mergeChunks(
       if (totalBytes > maxBytes) {
         throw new ApiError('FILE_TOO_LARGE', '合并后文件超过申报大小或上限', 400)
       }
-      writeStream.write(chunkData)
+      // 背压：write 返回 false 时等待 drain（期间若 emit 'error'，once 会 reject）
+      if (!writeStream.write(chunkData)) {
+        await once(writeStream, 'drain')
+      }
     }
     writeStream.end()
 
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on('finish', () => resolve())
-      writeStream.on('error', reject)
-    })
+    await writeFinished
 
     // 累加字节须与申报 fileSize 一致（允许分片编码误差 ≤ 0）
     if (
@@ -213,6 +222,8 @@ export async function mergeChunks(
 
     return result
   } catch (error) {
+    // 关闭写句柄：否则 Windows 上删除打开中的临时文件会失败并残留，且句柄泄漏
+    writeStream.destroy()
     if (existsSync(mergedFilePath)) await unlink(mergedFilePath).catch(() => {})
     for (let i = 0; i < totalChunks; i++) {
       const chunkPath = join(TEMP_DIR, `${safeId}_${i}`)

@@ -9,8 +9,11 @@ import { MAX_PAGE_SIZE } from '@/lib/types/common'
 
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
   const q = readQuery(req)
-  const page = toInt(q.page, 'page', 1)
-  const pageSize = Math.min(toInt(q.pageSize || q.limit, 'pageSize', 20), MAX_PAGE_SIZE)
+  const page = toInt(q.page, 'page', 1, 1)
+  const pageSize = Math.min(
+    Math.max(1, toInt(q.pageSize || q.limit, 'pageSize', 20, 1)),
+    MAX_PAGE_SIZE
+  )
   const unreadOnly = toBool(q.unreadOnly)
 
   const data = await listNotifications({ userId: user.id, unreadOnly }, { page, pageSize })

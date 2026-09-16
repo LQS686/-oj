@@ -44,14 +44,20 @@ export interface JWTPayload {
 /** 显式声明算法白名单（防御算法混淆攻击 / algorithm confusion CVE） */
 const JWT_ALGORITHM: jwt.Algorithm = 'HS256' as jwt.Algorithm
 
-export function signToken(payload: JWTPayload): string {
+/** 默认登录态有效期（与 lib/auth/cookie.ts 的 AUTH_MAX_AGE = 7 天对齐） */
+const DEFAULT_TOKEN_TTL: jwt.SignOptions['expiresIn'] = '7d'
+
+export function signToken(
+  payload: JWTPayload,
+  expiresIn: jwt.SignOptions['expiresIn'] = DEFAULT_TOKEN_TTL
+): string {
   validateJwtSecret()
   if (!JWT_SECRET) {
     throw new Error('JWT_SECRET 未初始化')
   }
   return jwt.sign(payload, JWT_SECRET, {
     algorithm: JWT_ALGORITHM,
-    expiresIn: '7d',
+    expiresIn,
   })
 }
 

@@ -5,7 +5,11 @@
  * 迁移到 withApi 中间件模式
  */
 import { withApi, ok, readQuery } from '@/lib/api/withApi'
+import { isObjectId } from '@/lib/api/validation'
 import { prismaRo } from '@/lib/prisma'
+
+/** 单次查询的题目数量上限：防止 ?problemIds= 传入超大数组（内存/DB 压力） */
+const MAX_PROBLEM_IDS = 500
 
 export const GET = withApi.auth(async (req, _ctx, { user }) => {
   const q = readQuery<{ problemIds?: string }>(req)
@@ -15,7 +19,15 @@ export const GET = withApi.auth(async (req, _ctx, { user }) => {
     return ok({})
   }
 
-  const problemIds = problemIdsParam.split(',').filter((id) => id.trim())
+  // 仅接受合法 ObjectId 并去重/限长：非法 id 会让 Prisma 的 ObjectId 查询报错（500）
+  const problemIds = Array.from(
+    new Set(
+      problemIdsParam
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => isObjectId(id))
+    )
+  ).slice(0, MAX_PROBLEM_IDS)
   if (problemIds.length === 0) {
     return ok({})
   }

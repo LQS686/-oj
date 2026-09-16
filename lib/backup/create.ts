@@ -124,15 +124,18 @@ export async function runBackup(
     const output = createWriteStream(finalFile)
     archive.pipe(output)
     archive.file(join(tmpDir, 'metadata.json'), { name: 'metadata.json' })
+    // 密钥条目紧随 metadata 写入（先于任何集合数据）：恢复时可在执行
+    // deleteMany/insertMany 等破坏性写入之前校验「恢复口令」，避免口令错误
+    // 在数据库已被覆盖之后才报错（不可逆）。旧备份包密钥仍在末尾，恢复侧保留兜底。
+    if (secretsCipher) {
+      archive.file(join(tmpDir, 'secrets.enc'), { name: 'secrets.enc' })
+      archive.file(join(tmpDir, 'secrets.salt'), { name: 'secrets.salt' })
+    }
     for (const name of collections) {
       archive.file(join(dbDir, `${name}.ndjson`), { name: `db/${name}.ndjson` })
     }
     for (const e of uploadEntries) {
       archive.file(e.abs, { name: `uploads/${e.rel}` })
-    }
-    if (secretsCipher) {
-      archive.file(join(tmpDir, 'secrets.enc'), { name: 'secrets.enc' })
-      archive.file(join(tmpDir, 'secrets.salt'), { name: 'secrets.salt' })
     }
     await new Promise<void>((resolve, reject) => {
       archive.on('error', reject)

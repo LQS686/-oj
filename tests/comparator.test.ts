@@ -52,6 +52,36 @@ describe('compareOutput - default 模式', () => {
     expect(r.status).toBe('WA')
     expect(r.message).toContain('第 2 行')
   })
+
+  // 与 strict / ignore-spaces / real-number 一致：多输出内容判 OLE，而非 WA
+  it('选手多输出非空内容 → OLE', async () => {
+    const r = await cmp('a\nb', 'a', 'default')
+    expect(r.status).toBe('OLE')
+    expect(r.score).toBe(0)
+  })
+
+  // default 的空格口径：仅「行尾」多余空格可忽略，「中间间隔空格数」必须一致
+  it('行内多余空格（中间间隔空格数不符）→ WA，不得判 AC', async () => {
+    const r = await cmp('1  2  3', '1 2 3', 'default')
+    expect(r.status).toBe('WA')
+    expect(r.score).toBe(0)
+  })
+
+  it('行尾多余空格 → AC（仅尾部可忽略）', async () => {
+    const r = await cmp('1 2 3   ', '1 2 3', 'default')
+    expect(r.status).toBe('AC')
+    expect(r.score).toBe(FULL)
+  })
+
+  it('每行行尾多余空格 → AC', async () => {
+    const r = await cmp('1 2  \n3 4\t', '1 2\n3 4', 'default')
+    expect(r.status).toBe('AC')
+  })
+
+  it('多输出的仍是空白行 → 容忍 AC（不误判 OLE）', async () => {
+    const r = await cmp('a\n   \n\n', 'a', 'default')
+    expect(r.status).toBe('AC')
+  })
 })
 
 describe('compareOutput - strict 模式', () => {
@@ -63,6 +93,11 @@ describe('compareOutput - strict 模式', () => {
 
   it('行尾空格不容忍 → WA', async () => {
     const r = await cmp('hello \n', 'hello\n', 'strict')
+    expect(r.status).toBe('WA')
+  })
+
+  it('行内多余空格 → WA', async () => {
+    const r = await cmp('1  2', '1 2', 'strict')
     expect(r.status).toBe('WA')
   })
 
@@ -110,10 +145,35 @@ describe('compareOutput - ignore-spaces 模式', () => {
     expect(r.status).toBe('OLE')
   })
 
-  it('token 匹配但换行不一致 → PE', async () => {
-    // 选手把 "a b c" 写成 "a\nb c"（b 前误换行）：token 全等，但行号不一致 → Presentation Error
+  it('标准答案 2 行、选手 4 行（token 全等但行结构不同）→ PE', async () => {
+    // 答案契约是「两行、行内空格分隔」；选手写成 4 行属于格式错误，不得判 AC
+    const r = await cmp('1\n2\n3\n4', '1 2\n3 4', 'ignore-spaces')
+    expect(r.status).toBe('PE')
+    expect(r.score).toBe(0)
+    expect(r.message).toContain('行格式错误')
+  })
+
+  it('多行与单行的 token 序列相同 → PE（行结构不符）', async () => {
+    const r = await cmp('1\n2\n3\n', '1 2 3', 'ignore-spaces')
+    expect(r.status).toBe('PE')
+    expect(r.score).toBe(0)
+  })
+
+  it('token 之间换行位置不同 → PE', async () => {
     const r = await cmp('a\nb c', 'a b c', 'ignore-spaces')
     expect(r.status).toBe('PE')
+    expect(r.score).toBe(0)
+  })
+
+  it('行内多余空格/制表符仍容忍 → AC（该模式的主要用途）', async () => {
+    const r = await cmp('1  2\t3', '1 2 3', 'ignore-spaces')
+    expect(r.status).toBe('AC')
+    expect(r.score).toBe(FULL)
+  })
+
+  it('换行把「中文」切成两个 token → WA（token 内容被改变，不是格式差异）', async () => {
+    const r = await cmp('中\n文 测 试', '中文 测试', 'ignore-spaces')
+    expect(r.status).toBe('WA')
   })
 })
 
@@ -377,5 +437,44 @@ describe('compareOutput - 超长 token（>256 字节）', () => {
     const r = await cmp(base + '1', base + '2', 'real-number')
     expect(r.status).toBe('WA')
     expect(r.score).toBe(0)
+  })
+})
+
+// 多字节字符横跨读取缓冲区边界时不得被拆成 U+FFFD（同步比对走 256KiB 直读缓冲）
+describe('compareOutput - 多字节字符跨读取缓冲区边界', () => {
+  it('两份内容仅空白对齐不同（其一恰好把「中」拆在 256KiB 边界）→ AC', async () => {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const os = await import('os')
+
+    // 同步读取缓冲为 256 KiB = 262144 字节。
+    // 单元 'a  ' 恰好 3 字节：87381 * 3 = 262143，使其后第一个 token 从 262143 开始，
+    // 于是「中」(3 字节) 的字节落在 262143/262144/262145 —— 正好被缓冲区边界切开。
+    const PAD_UNITS = 87381
+    const pad = 'a  '.repeat(PAD_UNITS)
+    const cnTokens = Array.from({ length: 20000 }, () => '中文测试').join(' ')
+
+    // std：中文 token 从 262143 开始（跨边界）；user：多一个空格（空白差异应被忽略），
+    // 中文 token 从 262144 开始（与边界对齐）。两者 token 序列完全相同。
+    const stdBody = pad + cnTokens
+    const userBody = pad + ' ' + cnTokens
+
+    const user = path.join(os.tmpdir(), `dsoj-utf8-u-${Date.now()}.txt`)
+    const exp = path.join(os.tmpdir(), `dsoj-utf8-e-${Date.now()}.txt`)
+    await fs.writeFile(user, userBody, 'utf-8')
+    await fs.writeFile(exp, stdBody, 'utf-8')
+    try {
+      const r = await compareOutput({
+        userOutputPath: user,
+        expectedOutputPath: exp,
+        fullScore: FULL,
+        comparisonMode: 'ignore-spaces',
+      })
+      expect(r.status).toBe('AC')
+      expect(r.score).toBe(FULL)
+    } finally {
+      await fs.unlink(user).catch(() => {})
+      await fs.unlink(exp).catch(() => {})
+    }
   })
 })

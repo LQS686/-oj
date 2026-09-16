@@ -199,7 +199,7 @@ export function ImportProblemsModal({ onClose, onSuccess }: ImportProblemsModalP
             </p>
             <div className="flex items-center gap-3 text-sm mt-2">
               <a
-                href="/templates/dsoj-pack/dsoj-pack-template.zip"
+                href="/templates/dsoj-pack.zip"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:text-primary-dark transition-colors flex items-center gap-1"

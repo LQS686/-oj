@@ -44,8 +44,7 @@ next-env.d.ts
 # temporary files
 temp/
 
-# legacy Windows judge artifact (removed; ignore if leftover)
-lib/judge/win-runner.exe
+# 评测监视器编译产物（由 Docker 构建 / ensure-watch 生成，勿提交）
 lib/judge/dsoj-watch
 lib/judge/dsoj-watch.lock
 lib/judge/dsoj-watch.new*

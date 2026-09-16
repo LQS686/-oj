@@ -369,6 +369,19 @@ export const apiRateLimiter = rateLimit({
   message: '请求频率过高，请稍后再试',
 })
 
+/**
+ * 备份恢复上传限流：两条大包恢复路由（/api/admin/restore/upload、/api/setup/restore）
+ * 被移出全局 proxy matcher 以保持请求体真流式，因此绕开了 middleware 里的全局限流；
+ * 此处在其路由内显式恢复（尤其 /api/setup/restore 为公开路由，防止空库阶段被反复
+ * 上传大包打满磁盘）。恢复是低频破坏性操作，按 IP 每小时 10 次足够且防滥用。
+ */
+export const restoreRateLimiter = rateLimit({
+  maxRequests: 10,
+  windowMs: 3600000,
+  keyGenerator: (req) => `restore:${getClientIP(req)}`,
+  message: '备份恢复过于频繁，请稍后再试',
+})
+
 export { checkRateLimit, getClientIP }
 export type { RateLimitConfig, RateLimitResult }
 

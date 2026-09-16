@@ -29,7 +29,7 @@ export function getBackupConfig(): BackupConfig {
     dir,
     keepDays: toPositiveInt(process.env.BACKUP_KEEP_DAYS, 7, 365),
     keepCount: toPositiveInt(process.env.BACKUP_KEEP_COUNT, 7, 100),
-    maxSizeMb: toPositiveInt(process.env.BACKUP_MAX_SIZE_MB, 1000, 10240),
+    maxSizeMb: toPositiveInt(process.env.BACKUP_MAX_SIZE_MB, 4096, 51200),
   }
 }
 

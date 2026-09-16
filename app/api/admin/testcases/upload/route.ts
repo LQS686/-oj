@@ -33,18 +33,19 @@ export const POST = withApi.admin(async (req, _ctx, { user: _user }) => {
   // 获取上传的文件
   logger.info('📦 开始解析 FormData...')
   const formData = await req.formData()
-  const file = formData.get('file') as File
-
-  logger.info('📄 文件信息:', {
-    name: file?.name,
-    type: file?.type,
-    size: file?.size,
-  })
-
-  if (!file) {
+  const rawFile = formData.get('file')
+  // 必须是文件部件：若客户端把该字段发成普通字符串，直接读取其 .type/.size 会抛 TypeError → 500
+  if (!rawFile || typeof (rawFile as File).arrayBuffer !== 'function') {
     logger.error('❌ 未选择文件')
     throw400('NO_FILE', '未选择文件')
   }
+  const file = rawFile as File
+
+  logger.info('📄 文件信息:', {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  })
 
   // A-P1-1 修复：读取文件内容前按 file.size 校验（对齐 parseTestCaseZip 的 50MB 上限）
   if (file.size > MAX_UPLOAD_BYTES) {

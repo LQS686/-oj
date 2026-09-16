@@ -77,7 +77,12 @@ export class LoginError extends Error {
 export interface LoginInput {
   username: string
   password: string
+  rememberMe?: boolean
 }
+
+/** JWT 有效期：普通 7 天；「记住我」30 天（与 lib/auth/cookie.ts 的 Cookie maxAge 对齐） */
+const TOKEN_TTL_DEFAULT = '7d'
+const TOKEN_TTL_REMEMBER = '30d'
 
 export interface UserResponse {
   id: string
@@ -195,6 +200,8 @@ function mapUserToResponse(user: {
 
 export async function loginUser(input: LoginInput): Promise<LoginResult> {
   try {
+    // rememberMe 决定 JWT 有效期；从原始入参读取，避免被 trimAll 归一化影响
+    const rememberMe = input?.rememberMe === true
     const trimmedInput = trimAll(input as unknown as Record<string, unknown>)
     const { username, password } = trimmedInput as unknown as LoginInput
 
@@ -256,13 +263,16 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
 
     await clearLoginAttempts(lockKey)
 
-    const token = signToken({
-      userId: user.id,
-      email: user.email,
-      username: user.username,
-      role: user.role,
-      tokenVersion: user.tokenVersion,
-    })
+    const token = signToken(
+      {
+        userId: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        tokenVersion: user.tokenVersion,
+      },
+      rememberMe ? TOKEN_TTL_REMEMBER : TOKEN_TTL_DEFAULT
+    )
 
     return { user: mapUserToResponse(user), token }
   } catch (error) {

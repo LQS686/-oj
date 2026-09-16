@@ -513,7 +513,8 @@ server {
     ssl_certificate /www/server/panel/vhost/cert/${domain}/fullchain.pem;
     ssl_certificate_key /www/server/panel/vhost/cert/${domain}/privkey.pem;
 
-    client_max_body_size 50M;
+    # 大文件备份包恢复上传（管理员/空库引导）：上限对齐 BACKUP_MAX_SIZE_MB（默认 4096MB、硬上限 50GB）
+    client_max_body_size 50g;
 
     location /socket.io/ {
 ${proxy_common}
@@ -534,7 +535,8 @@ server {
     listen 80;
     server_name ${domain};
 
-    client_max_body_size 50M;
+    # 大文件备份包恢复上传（管理员/空库引导）：上限对齐 BACKUP_MAX_SIZE_MB（默认 4096MB、硬上限 50GB）
+    client_max_body_size 50g;
 
     location /socket.io/ {
 ${proxy_common}

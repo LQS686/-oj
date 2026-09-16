@@ -44,21 +44,25 @@ export async function ensureCsrfToken(): Promise<string> {
   if (csrfInflight) return csrfInflight
 
   const gen = csrfGeneration
-  csrfInflight = (async () => {
-    const res = await fetch('/api/auth/csrf', { credentials: 'include', cache: 'no-store' })
-    const json = await res.json()
-    const token = json?.data?.csrfToken as string | undefined
-    if (!token) throw { message: '无法获取 CSRF token', code: 'CSRF_INIT' } as ClientApiError
-    // 签发过程中若已 clear（跨标签登出），丢弃本次结果并重新同步
-    if (gen !== csrfGeneration) {
-      return ensureCsrfToken()
+  const task = (async () => {
+    // 签发过程中若已 clear（跨标签登出），丢弃本次结果并重新同步。
+    // 注意：必须在本地循环重试，不能在 IIFE 内递归调用 ensureCsrfToken——
+    // 此时 csrfInflight 仍指向当前 Promise，递归会返回自身形成死锁。
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch('/api/auth/csrf', { credentials: 'include', cache: 'no-store' })
+      const json = await res.json()
+      const token = json?.data?.csrfToken as string | undefined
+      if (!token) throw { message: '无法获取 CSRF token', code: 'CSRF_INIT' } as ClientApiError
+      if (gen === csrfGeneration) return token
     }
-    return token
-  })().finally(() => {
-    csrfInflight = null
-  })
+    throw { message: '无法获取 CSRF token', code: 'CSRF_INIT' } as ClientApiError
+  })()
 
-  return csrfInflight
+  const tracked = task.finally(() => {
+    if (csrfInflight === tracked) csrfInflight = null
+  })
+  csrfInflight = tracked
+  return tracked
 }
 
 export function clearCsrfTokenCache(): void {

@@ -26,7 +26,7 @@ export const CacheKeys = {
     // 生成的 key 带 contestId/viewerId 变体，因此失效时必须用
     // cache.deleteByPrefix(CacheKeys.problem.statusCounts(id)) 按题目前缀删除
     //（cache.delete 精确删除永远无法命中多参数变体 key）
-    /** 与 cache.get('problem:stats', [id]) 生成的键一致 */
+    /** 与 cache.get('problem:stats', [id, contestId, viewerId]) 生成的键同前缀 */
     stats: (id: string) => `problem:stats:${id}`,
   },
   contest: {

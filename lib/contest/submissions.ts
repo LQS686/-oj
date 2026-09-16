@@ -37,8 +37,9 @@ export async function listContestSubmissionsPaged(
   contestId: string,
   filter: ListContestSubmissionsFilter = {}
 ) {
-  const page = filter.page ?? 1
-  const limit = filter.limit ?? 20
+  // 分页参数钳制：负数/0 会让 Prisma take/skip 抛错，超大 limit 会被滥用拉全量
+  const page = Math.max(1, Math.floor(filter.page ?? 1))
+  const limit = Math.min(100, Math.max(1, Math.floor(filter.limit ?? 20)))
 
   const contest = await prisma.contest.findUnique({
     where: { id: contestId },
@@ -64,11 +65,16 @@ export async function listContestSubmissionsPaged(
   }
   if (filter.problemId) where.problemId = filter.problemId
 
-  // 封榜期间普通用户：只能看自己的提交（含封榜后本人提交）；不可窥他人
+  // 封榜期间普通用户：只能看自己的提交（含封榜后本人提交）；不可窥他人。
+  // 未登录访客没有「自己的提交」，一律不可见——否则 where.userId 不设置会放行全部提交。
   if (sealed && !bypassSeal) {
-    if (filter.viewerUserId) {
-      where.userId = filter.viewerUserId
+    if (!filter.viewerUserId) {
+      return {
+        submissions: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      }
     }
+    where.userId = filter.viewerUserId
   } else if (filter.userId) {
     where.userId = filter.userId
   }

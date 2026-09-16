@@ -278,6 +278,9 @@ docker compose restart app
 9. **健康检查用 `/healthcheck-static`** — 不要改回依赖动态路由的 `/api/health` 作容器探活。
 10. **`.env` 值不要包反引号**。
 11. **prisma CLI 独立装在 `/opt/prisma-cli` 并须显式 COPY 到 runner** — runner 的 `npm ci --omit=dev` 不含 devDependencies（prisma CLI 在其中）；部署脚本依赖容器内 `prisma db push` 做幂等集合/索引同步，勿删该目录。
+12. **大备份包恢复依赖反向代理上传上限** — 备份/恢复支持数 GB 级备份包（`BACKUP_MAX_SIZE_MB`，默认 4096MB、硬上限 50GB），Nginx 的 `client_max_body_size` 需 ≥ 该值（部署脚本已设为 `50g`），否则超过限制的上传会先被 413 拒掉，进不到应用层。注意：**改的是部署脚本的模板，不影响已在运行的 Nginx**——对存量部署需手动把配置里的 `client_max_body_size` 调大（或重跑部署脚本）并 `nginx -s reload`。
+13. **备份/恢复是管理员与空库引导专用** — 上传恢复接口仅系统管理员（`/api/admin/restore/upload`）或空库部署引导（`/api/setup/restore`）可用，大体积请求受 JWT + CSRF + 限流防护，普通接口不受影响。
+14. **两个大包上传路由已从 Next 中间件 matcher 排除** — Next 在 `/middleware`（proxy）会克隆请求体，默认只在内存保留前 `10MB`，会把大备份包截断。故 `api/admin/restore/upload` 与 `api/setup/restore` 被排除在 matcher 之外，保持请求体真流式（`lib/backup/restore-upload.ts` 边收边写临时文件，内存恒定）。这两条路由的 CSRF（同源 + 双提交 Cookie）与限流不再由全局中间件处理，改为在路由内显式调用 `guardLargeUploadRequest`（`lib/security/csrf.ts`）和 `restoreRateLimiter`（`lib/rate-limit.ts`，按 IP 每小时 10 次）执行，行为与全局中间件等价。其余接口仍走全局中间件，不受影响。
 
 更细的编译 / 评测相关说明见仓库历史注释与 `Dockerfile`。
 

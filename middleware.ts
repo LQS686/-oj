@@ -226,6 +226,15 @@ export async function middleware(request: NextRequest) {
 export const runtime = 'nodejs'
 
 export const config = {
-  // 覆盖所有页面路由（含 /admin、/api 与 / 首页），但排除 Next 内部资源与带扩展名的静态文件
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
+  // 覆盖所有页面路由（含 /admin、/api 与 / 首页），但排除 Next 内部资源与静态文件。
+  // 静态资源判定用「(?!api/) 且含点」：仅排除非 api 的带扩展名路径，
+  // 避免旧规则 `.*\..*` 把 /api/xxx.y 一并跳过（那样会绕过限流与同源校验，
+  // 例如 /api/problems/1.x 可不受 100/min 限制地打库）。
+  // 例外：大体积备份包恢复上传（/api/admin/restore/upload、/api/setup/restore）排除在 proxy 之外，
+  // 因为 Next 执行 proxy 时会克隆请求体并默认按 10MB 截断（proxyClientMaxBodySize），
+  // 会让数 GB 备份包只传到前 10MB。排除后请求体保持真流式；CSRF（同源 + 双提交 Cookie）
+  // 由 withApi（admin 路由）与 guardLargeUploadRequest（setup 路由）在这些路由内显式执行。
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/admin/restore/upload|api/setup/restore|(?!api/).*\\..*).*)',
+  ],
 }

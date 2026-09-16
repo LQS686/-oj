@@ -20,7 +20,7 @@ export const POST = withApi.public(async (req) => {
   const { username, password, rememberMe } = body
 
   try {
-    const result = await loginUser({ username, password })
+    const result = await loginUser({ username, password, rememberMe })
 
     const response = NextResponse.json({
       success: true,

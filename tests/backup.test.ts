@@ -7,7 +7,11 @@
 import { describe, it, expect } from 'vitest'
 import { encryptSecrets, decryptSecrets } from '@/lib/backup/secrets'
 import { sanitizeArchiveRelPath } from '@/lib/backup/archive'
+import { uploadBackupToTemp } from '@/lib/backup/restore-upload'
 import { BSON, ObjectId } from 'mongodb'
+import { existsSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { getBackupConfig } from '@/lib/backup/config'
 
 describe('backup secrets（恢复口令加解密）', () => {
   const secrets = { jwtSecret: 'secret-1234567890', encryptionKey: 'enc-0987654321' }
@@ -65,5 +69,66 @@ describe('backup EJSON 序列化保真', () => {
     expect(restored.createdAt).toBeInstanceOf(Date)
     expect(restored.createdAt.toISOString()).toBe('2026-01-01T00:00:00.000Z')
     expect(restored.n).toBe(1.5)
+  })
+})
+
+describe('restore-upload 流式上传落盘（restoreUpload 切分）', () => {
+  const BND = 'BNDaaB_TEST99'
+
+  function buildRequest(bodyStr: string): Request {
+    const bytes = new TextEncoder().encode(bodyStr)
+    return new Request('http://localhost/upload', {
+      method: 'POST',
+      headers: { 'content-type': `multipart/form-data; boundary=${BND}` },
+      body: new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(bytes)
+          c.close()
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' })
+  }
+
+  it('把 file 部件流式写入临时文件并解析 options', async () => {
+    const data = 'PK\x03\x04MOCKDATA_UNIT12345'
+    const body = [
+      `--${BND}\r\n`,
+      'Content-Disposition: form-data; name="options"\r\n',
+      '\r\n',
+      '{"allowOverwrite":true}\r\n',
+      `--${BND}\r\n`,
+      'Content-Disposition: form-data; name="file"; filename="backup.dsoj.gz"\r\n',
+      'Content-Type: application/gzip\r\n',
+      '\r\n',
+      `${data}\r\n`,
+      `--${BND}--\r\n`,
+    ].join('')
+
+    const result = await uploadBackupToTemp(buildRequest(body), 1024 * 1024)
+
+    expect(existsSync(result.filePath)).toBe(true)
+    expect(result.fileSize).toBe(data.length)
+    expect(JSON.parse(result.optionsRaw ?? '{}')).toEqual({ allowOverwrite: true })
+
+    await result.cleanup()
+    expect(existsSync(result.filePath)).toBe(false)
+  })
+
+  it('超过 maxBytes 立即抛错并清理临时目录', async () => {
+    const data = 'A'.repeat(100)
+    const body = [
+      `--${BND}\r\n`,
+      'Content-Disposition: form-data; name="file"; filename="big.gz"\r\n',
+      '\r\n',
+      `${data}\r\n`,
+      `--${BND}--\r\n`,
+    ].join('')
+
+    await expect(uploadBackupToTemp(buildRequest(body), 10)).rejects.toThrow('PAYLOAD_TOO_LARGE')
+
+    const tmpDir = join(getBackupConfig().dir, '.restore-tmp')
+    const leftovers = existsSync(tmpDir) && readdirSync(tmpDir).length ? readdirSync(tmpDir) : []
+    expect(leftovers).toEqual([])
   })
 })

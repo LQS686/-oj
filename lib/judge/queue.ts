@@ -155,6 +155,20 @@ class JudgeQueue extends EventEmitter {
   }
 
   /**
+   * 统一把完成/失败任务登记进 completed，并裁剪只保留最近 100 条。
+   * 必须在所有终态路径调用：否则失败路径会让 completed 无限增长
+   *（每个 entry 常驻 job.data.code，最长 64KB）。
+   */
+  private recordCompleted(job: QueuedJob) {
+    this.completed.set(job.id, job)
+    while (this.completed.size > 100) {
+      const oldestKey = this.completed.keys().next().value as string | undefined
+      if (!oldestKey) break
+      this.completed.delete(oldestKey)
+    }
+  }
+
+  /**
    * 强制失败并 abort 在跑进程。
    * 旧实现只改状态不杀进程，会导致孤儿评测占满 CPU、后续任务排队更久。
    */
@@ -177,7 +191,7 @@ class JudgeQueue extends EventEmitter {
       job.error = errorMsg
       job.completedAt = new Date()
       this.processing.delete(job.id)
-      this.completed.set(job.id, job)
+      this.recordCompleted(job)
       this.emit('failed', job, new Error(errorMsg))
     } catch (e) {
       logger.error(`清理死任务时出错`, e, { jobId: job.id })
@@ -360,18 +374,11 @@ class JudgeQueue extends EventEmitter {
       job.completedAt = new Date()
 
       this.processing.delete(job.id)
-      this.completed.set(job.id, job)
+      // 入表并裁剪（保留最近 100 条）
+      this.recordCompleted(job)
 
       this.emit('completed', job, result)
       logger.info(`评测完成`, { jobId: job.id, status: result.status })
-
-      // 清理旧的已完成任务（保留最近100个）
-      if (this.completed.size > 100) {
-        const oldestKey = this.completed.keys().next().value as string | undefined
-        if (oldestKey) {
-          this.completed.delete(oldestKey)
-        }
-      }
     } catch (error) {
       this.clearJobGuards(job.id)
       // 竞态保护：若 job 已被 checkDeadJobs 标记为 failed/completed，
@@ -388,7 +395,7 @@ class JudgeQueue extends EventEmitter {
       job.completedAt = new Date()
 
       this.processing.delete(job.id)
-      this.completed.set(job.id, job)
+      this.recordCompleted(job)
 
       this.emit('failed', job, error)
       logger.error(`评测失败`, error, { jobId: job.id })
@@ -427,7 +434,14 @@ class JudgeQueue extends EventEmitter {
     // 从等待队列中移除
     const index = this.queue.findIndex((j) => j.id === jobId)
     if (index !== -1) {
-      this.queue.splice(index, 1)
+      const [job] = this.queue.splice(index, 1)
+      // 排队任务被取消也必须给出终态：否则监听 completed/failed 的上层收不到通知，
+      // 对应提交会永久停留在 PENDING（前端一直显示“排队中”）。
+      job.status = 'failed'
+      job.error = '评测已取消'
+      job.completedAt = new Date()
+      this.recordCompleted(job)
+      this.emit('failed', job, new Error('评测已取消'))
       logger.info(`任务已取消`, { jobId })
       return true
     }

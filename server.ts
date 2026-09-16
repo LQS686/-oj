@@ -17,6 +17,7 @@ import dotenv from 'dotenv'
 import { logger } from './lib/logger'
 import { saveChunk, isValidUploadId } from './lib/upload'
 import { assertAvatarUploadOwner } from './lib/avatar-upload-registry'
+import { AVATAR_UPLOAD_ENABLED } from './lib/user/avatar-config'
 import { ApiError, errorLike } from '@/lib/api/errors'
 import { checkRateLimit, getClientIPFromHeaders } from './lib/rate-limit'
 import jwt from 'jsonwebtoken'
@@ -122,6 +123,16 @@ async function handleAvatarChunkDirect(
   req: IncomingMessage,
   res: ServerResponse
 ): Promise<boolean> {
+  // 头像上传总开关（与 3 个 upload 路由一致）：关闭时此直通路径同步拒绝
+  if (!AVATAR_UPLOAD_ENABLED) {
+    writeJson(res, 403, {
+      success: false,
+      code: 'FORBIDDEN',
+      error: '头像上传功能已关闭，请从内置头像库中选择',
+    })
+    return true
+  }
+
   if (!assertWriteSecurityRaw(req, res)) return true
 
   // 独立限流：绕过 Next middleware，需在此单独限制分片上传频率

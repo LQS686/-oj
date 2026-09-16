@@ -8,7 +8,8 @@
  *  - 上传文件解包严格做路径穿越校验。
  */
 import 'server-only'
-import { createWriteStream } from 'fs'
+import { createWriteStream, createReadStream } from 'fs'
+import { stat, rm } from 'fs/promises'
 import { join, dirname } from 'path'
 import { Readable } from 'stream'
 import { createInterface } from 'readline'
@@ -38,8 +39,10 @@ export interface RestoreResult {
 }
 
 interface RestoreOptions {
-  /** 备份包字节内容 */
-  buffer: Buffer
+  /** 备份包字节内容（与 filePath 二选一，主要用于内存路径/测试） */
+  buffer?: Buffer
+  /** 备份包临时文件路径（与 buffer 二选一，流式路径，兼容大包） */
+  filePath?: string
   /** 备份内含密钥时所需的恢复口令 */
   passphrase?: string
   onProgress?: (p: RestoreProgress) => void
@@ -48,13 +51,15 @@ interface RestoreOptions {
 const CHUNK = 2000
 
 export async function restoreFromArchive(opts: RestoreOptions): Promise<RestoreResult> {
-  const { buffer, passphrase } = opts
+  const { buffer, filePath, passphrase } = opts
   const progress = opts.onProgress ?? (() => undefined)
   const warnings: string[] = []
   const collectionsRestored: string[] = []
   const collectionsCount: Record<string, number> = {}
   const uploadsRestored: string[] = []
   const collectedSecrets: Record<string, string> = {}
+  /** 若在读取到数据前已成功校验口令，缓存结果，避免末尾重复解密 */
+  let prevalidatedSecrets: BackupSecrets | null = null
   const result: RestoreResult = {
     ok: false,
     collectionsRestored,
@@ -129,7 +134,19 @@ export async function restoreFromArchive(opts: RestoreOptions): Promise<RestoreR
       stream.resume()
       return
     }
-    await ensureDir(dirname(target))
+    // 兼容大备份包与重复恢复：先把目标路径上已有的内容移除，避免 EEXIST（父路径被
+    // 残留成文件）/ EISDIR（目标为目录）等冲突，再干净地落盘覆盖写入。
+    const parentDir = dirname(target)
+    // 若套级父路径被上一次未完成的恢复残留成了「文件」，会挡住 ensureDir 的 mkdir，
+    // 这里先把它清掉（仅当它是文件/该类不再需要时）；目录本身则保留，交由 ensureDir 幂等补齐。
+    const pdStat = await stat(parentDir).catch(() => null)
+    if (pdStat && !pdStat.isDirectory()) await rm(parentDir, { recursive: true, force: true })
+    await ensureDir(parentDir)
+    const tStat = await stat(target).catch(() => null)
+    if (tStat) {
+      if (tStat.isDirectory()) await rm(target, { recursive: true, force: true })
+      else await rm(target, { force: true })
+    }
     await new Promise<void>((resolve, reject) => {
       const w = createWriteStream(target)
       stream.on('error', reject)
@@ -150,6 +167,14 @@ export async function restoreFromArchive(opts: RestoreOptions): Promise<RestoreR
     extract.on('entry', (header, stream, next) => {
       const rel = sanitizeArchiveRelPath(header.name)
       if (!rel) {
+        stream.resume()
+        return next()
+      }
+
+      // 跳过目录条目：tar 中目录以 name 尾缀 '/' 且 type=directory（tar-stream 小写）。
+      // 若不跳过，会把目录当成零字节文件写出，导致后续同目录下真实文件
+      // 的父目录 mkdir 时报 EEXIST。
+      if (header.type === 'directory' || rel.endsWith('/')) {
         stream.resume()
         return next()
       }
@@ -218,6 +243,18 @@ export async function restoreFromArchive(opts: RestoreOptions): Promise<RestoreR
         stream.on('data', (c) => (text += c.toString()))
         stream.on('end', () => {
           collectedSecrets[rel === 'secrets.enc' ? 'cipher' : 'salt'] = text
+          // 一读到密钥密文即校验恢复口令：新备份包把密钥写在集合数据之前，
+          // 可在任何 deleteMany/insertMany 之前失败退出，避免「库已被覆盖才发现口令错误」。
+          // 旧备份包密钥位于末尾，此处校验即等价于末尾校验，由下方兜底逻辑处理。
+          if (rel === 'secrets.enc') {
+            try {
+              prevalidatedSecrets = decryptSecrets(text, passphrase ?? '')
+            } catch (err) {
+              stream.destroy()
+              reject(err instanceof Error ? err : new Error(String(err)))
+              return
+            }
+          }
           next()
         })
         return
@@ -230,7 +267,8 @@ export async function restoreFromArchive(opts: RestoreOptions): Promise<RestoreR
       done = true
       resolve()
     })
-    Readable.from(buffer).pipe(zlib.createGunzip()).pipe(extract)
+    const source = filePath ? createReadStream(filePath) : Readable.from(buffer!)
+    source.pipe(zlib.createGunzip()).pipe(extract)
   })
 
   if (!done) {
@@ -240,7 +278,8 @@ export async function restoreFromArchive(opts: RestoreOptions): Promise<RestoreR
   // 密钥解密（若有）
   if (collectedSecrets.cipher) {
     progress({ stage: 'done', pct: 94, message: '正在校验恢复口令...' })
-    result.secrets = decryptSecrets(collectedSecrets.cipher, passphrase ?? '')
+    result.secrets =
+      prevalidatedSecrets ?? decryptSecrets(collectedSecrets.cipher, passphrase ?? '')
   }
 
   result.ok = true
@@ -264,6 +303,8 @@ export async function isDatabaseEmpty(): Promise<boolean> {
   try {
     return (await prisma.user.findFirst({ select: { id: true } })) === null
   } catch {
-    return true // fail-closed：无法判定按空库处理（仅用于放行空库恢复，不扩大风险）
+    // fail-closed：无法判定时视为「非空库」，拒绝走 /setup 的破坏性恢复路径。
+    // （返回 true 会让「数据库不可用」被当成空库，从而放行覆盖式恢复。）
+    return false
   }
 }

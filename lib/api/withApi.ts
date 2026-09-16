@@ -361,6 +361,12 @@ export async function readJson<T = unknown>(
     }
     return r.data as T
   }
+  // 无 schema 时也要求请求体是普通对象：JSON 字面量 null / [] / 123 会让调用方
+  // 在解构或读属性时抛 TypeError，被 safeCall 记为 500（且污染 error-monitor 的
+  // system 熔断统计），掩盖真实的 400 语义。
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    throw new ApiError('INVALID_BODY', '请求体必须是 JSON 对象', 400)
+  }
   return body as T
 }
 

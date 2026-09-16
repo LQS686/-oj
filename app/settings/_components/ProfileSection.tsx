@@ -4,6 +4,8 @@ import { motion } from 'motion/react'
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
 import AvatarUploader from '@/components/AvatarUploader'
+import BuiltinAvatarPicker from '@/components/BuiltinAvatarPicker'
+import { AVATAR_UPLOAD_ENABLED } from '@/lib/user/avatar-config'
 import { getRoleLabel, getRoleColor } from '@/lib/permissions'
 import type { SettingsFormData, SettingsUser } from '../_types'
 
@@ -59,11 +61,20 @@ export function ProfileSection({
         )}
       </div>
 
-      <AvatarUploader
-        currentAvatar={user?.avatar}
-        onAvatarUpdate={onAvatarUpdate}
-        variant="compact"
-      />
+      {/* 头像上传关闭时，改用内置头像库选择 */}
+      {AVATAR_UPLOAD_ENABLED ? (
+        <AvatarUploader
+          currentAvatar={user?.avatar}
+          onAvatarUpdate={onAvatarUpdate}
+          variant="compact"
+        />
+      ) : (
+        <BuiltinAvatarPicker
+          currentAvatar={user?.avatar}
+          onAvatarUpdate={onAvatarUpdate}
+          variant="compact"
+        />
+      )}
 
       <div className="space-y-4 pt-2 border-t border-border">
         <div>

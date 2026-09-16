@@ -3,8 +3,10 @@
  * 约定对齐洛谷 / Codeforces：
  *   - 仅 C++，编译参数 g++ -fno-asm -std=c++14 -O2
  *   - 运行：./checker <input> <user_output> <answer>
- *   - 退出码：0=AC, 1=WA, 2=PE, 3=Fail(SE), 7=部分分(PC)
- *   - quitp(ratio, ...) 的 ratio∈[0,1] 表示该测点得分比例
+ *   - 退出码（testlib 标准）：0=AC, 1=WA, 2=PE, 3=Fail(SE), 7=部分分(quitp)
+ *   - 部分分两种写法：
+ *       quitp(ratio, ...)   ratio∈[0,1]，退出码 7
+ *       _pc(points)         points∈[0,100]，退出码 base + points（见 SPJ_PC_BASE_EXIT_CODE）
  */
 import { writeFile, mkdir, unlink, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
@@ -22,6 +24,18 @@ export const SPJ_CODE_MAX_BYTES = 512 * 1024
 const SPJ_WALL_LIMIT_MS = 15_000
 /** checker 内存上限（MB） */
 const SPJ_MEMORY_MB = 512
+
+/**
+ * 编译 SPJ 时通过 `-DPC_BASE_EXIT_CODE` 指定 `_pc(points)` 的退出码基址。
+ *
+ * testlib 默认基址为 0，此时 `_pc(0)`（0 分部分分）的退出码恰为 0 → 被判成 AC（满分），
+ * `_pc(3)` 又会与 `_fail`(3) 撞码。这里偏移到 16，使 `_pc(points)`(points∈[0,100])
+ * 落在退出码 [16,116]，避开 testlib 标准码 0..8 与信号类退出码
+ * （≥128，如 137=SIGKILL / 152=SIGXCPU / 153=SIGXFSZ）。
+ */
+const SPJ_PC_BASE_EXIT_CODE = 16
+/** `_pc()` 部分分的满分刻度（testlib 约定为 0..100 的整数分） */
+const SPJ_PC_MAX_POINTS = 100
 
 const TESTLIB_PATH = join(process.cwd(), 'lib', 'judge', 'testlib.h')
 
@@ -79,6 +93,8 @@ export async function compileSpj(spjCode: string): Promise<CompileResult> {
       '-O2',
       '-w',
       '-fmax-errors=5',
+      // 修正 `_pc(points)` 的部分分退出码基址（默认 0 会与 AC 撞码，详见常量注释）
+      `-DPC_BASE_EXIT_CODE=${SPJ_PC_BASE_EXIT_CODE}`,
       `-I${tempDir}`,
       sourcePath,
       '-o',
@@ -259,6 +275,20 @@ export function parseSpjExit(
 ): CompareResult {
   const message = truncateMessage(pickSpjMessage(stdout, stderr))
 
+  // `_pc(points)`：testlib 以 TResult(_partially + points) 退出，实际退出码 = base + points。
+  // 必须显式映射为部分分，否则 `_pc(0)` 的退出码会被当成 AC（满分）。
+  if (exitCode >= SPJ_PC_BASE_EXIT_CODE && exitCode <= SPJ_PC_BASE_EXIT_CODE + SPJ_PC_MAX_POINTS) {
+    const points = exitCode - SPJ_PC_BASE_EXIT_CODE
+    const ratio = points / SPJ_PC_MAX_POINTS
+    const score = Math.max(0, Math.min(fullScore, Math.round(fullScore * ratio)))
+    const status: ResultState = fullScore > 0 && score >= fullScore ? 'AC' : score > 0 ? 'PC' : 'WA'
+    return {
+      score,
+      status,
+      message: message || `Partially correct (${points}/${SPJ_PC_MAX_POINTS})`,
+    }
+  }
+
   // Testlib 标准退出码
   switch (exitCode) {
     case 0:
@@ -317,12 +347,21 @@ export function parseSpjExit(
   }
 }
 
-/** quitp 写入的比例：优先解析消息开头的浮点数，其次扫描 points/partial */
+/** quitp 写入的比例：优先解析消息开头的浮点数，其次扫描 points/partial/points_info */
 function extractPointsRatio(stdout: string, stderr: string, message: string): number | null {
   const blobs = [message, stdout, stderr]
   for (const text of blobs) {
     const trimmed = text.trim()
     if (!trimmed) continue
+    // quitpi("points_info")：points_info=<数字>
+    const info = trimmed.match(/points_info\s*=\s*([0-9]+(?:\.[0-9]+)?)/i)
+    if (info) {
+      const v = Number(info[1])
+      if (Number.isFinite(v)) {
+        if (v >= 0 && v <= 1) return v
+        if (v > 1 && v <= 100) return v / 100
+      }
+    }
     // "0.5 message..." 或 "points 0.5"
     const head = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)\b/)
     if (head) {

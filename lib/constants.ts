@@ -41,18 +41,6 @@ export const DIFFICULTY_COLORS: Record<Difficulty, string> = {
   NOI: 'difficulty-expert', // 黑
 }
 
-/** 难度档位对应的洛谷颜色名（用于 UI 展示） */
-export const DIFFICULTY_LABELS: Record<Difficulty, { color: string; cn: string }> = {
-  入门: { color: '红', cn: '入门' },
-  '普及-': { color: '橙', cn: '普及-' },
-  普及: { color: '黄', cn: '普及' },
-  '普及+': { color: '绿', cn: '普及+' },
-  提高: { color: '青', cn: '提高' },
-  '提高+': { color: '蓝', cn: '提高+' },
-  省选: { color: '紫', cn: '省选' },
-  NOI: { color: '黑', cn: 'NOI' },
-}
-
 /**
  * 校验难度值是否合法（8 档之一）
  * @param value 待校验的字符串

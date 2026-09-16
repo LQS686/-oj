@@ -1,14 +1,19 @@
 /**
  * /api/users/avatar/upload/complete - 完成头像分片上传
  */
-import { withApi, ok, readJson, throw400 } from '@/lib/api/withApi'
+import { withApi, ok, readJson, throw400, throw403 } from '@/lib/api/withApi'
 import { mergeChunks, isValidUploadId, deleteAvatarFilesByUrl } from '@/lib/upload'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { assertAvatarUploadOwner, consumeAvatarUpload } from '@/lib/avatar-upload-registry'
 import { clearUserCache } from '@/lib/user/profile'
+import { AVATAR_UPLOAD_ENABLED } from '@/lib/user/avatar-config'
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  // 头像上传总开关：AVATAR_UPLOAD_ENABLED=false 时拒绝（防止绕过前端直接调用）
+  if (!AVATAR_UPLOAD_ENABLED) {
+    throw403('头像上传功能已关闭，请从内置头像库中选择')
+  }
   const body = await readJson<{
     uploadId?: string
     filename?: string

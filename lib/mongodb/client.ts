@@ -27,6 +27,10 @@ const MONGODB_URI = getDatabaseUrl()
 // 缓存客户端实例
 let cachedClient: MongoClient | null = null
 let cachedRoClient: MongoClient | null = null
+// 连接中的 Promise：并发首次调用复用同一连接，避免各自 new MongoClient 后
+// 仅缓存最后一个，其余客户端永不 close（连接池泄漏）
+let clientPromise: Promise<MongoClient> | null = null
+let roClientPromise: Promise<MongoClient> | null = null
 
 // 连接配置选项
 const clientOptions = {
@@ -46,16 +50,30 @@ export async function getMongoClient(): Promise<MongoClient> {
   if (cachedClient) {
     return cachedClient
   }
+  // 首次连接并发复用同一 Promise，避免重复建连（连接池泄漏）
+  if (clientPromise) return clientPromise
 
-  const client = new MongoClient(MONGODB_URI, {
-    ...clientOptions,
-    writeConcern: { w: 'majority', wtimeout: 5000 },
-    readPreference: ReadPreference.PRIMARY,
+  const task = (async () => {
+    const client = new MongoClient(MONGODB_URI, {
+      ...clientOptions,
+      writeConcern: { w: 'majority', wtimeout: 5000 },
+      readPreference: ReadPreference.PRIMARY,
+    })
+    try {
+      await client.connect()
+    } catch (err) {
+      await client.close().catch(() => {})
+      throw err
+    }
+    cachedClient = client
+    return client
+  })()
+
+  const tracked = task.finally(() => {
+    if (clientPromise === tracked) clientPromise = null
   })
-
-  await client.connect()
-  cachedClient = client
-  return client
+  clientPromise = tracked
+  return tracked
 }
 
 /**
@@ -66,17 +84,30 @@ export async function getMongoRoClient(): Promise<MongoClient> {
   if (cachedRoClient) {
     return cachedRoClient
   }
+  if (roClientPromise) return roClientPromise
 
   // 构造只读连接字符串或选项
   // 注意：在 MongoClient 选项中设置 readPreference 优于在 URL 中设置
-  const client = new MongoClient(MONGODB_URI, {
-    ...clientOptions,
-    readPreference: ReadPreference.SECONDARY_PREFERRED,
-  })
+  const task = (async () => {
+    const client = new MongoClient(MONGODB_URI, {
+      ...clientOptions,
+      readPreference: ReadPreference.SECONDARY_PREFERRED,
+    })
+    try {
+      await client.connect()
+    } catch (err) {
+      await client.close().catch(() => {})
+      throw err
+    }
+    cachedRoClient = client
+    return client
+  })()
 
-  await client.connect()
-  cachedRoClient = client
-  return client
+  const tracked = task.finally(() => {
+    if (roClientPromise === tracked) roClientPromise = null
+  })
+  roClientPromise = tracked
+  return tracked
 }
 
 /**
@@ -87,6 +118,8 @@ export async function closeMongoClient(): Promise<void> {
   const clients = [cachedClient, cachedRoClient].filter((c): c is MongoClient => c !== null)
   cachedClient = null
   cachedRoClient = null
+  clientPromise = null
+  roClientPromise = null
   if (clients.length === 0) return
   await Promise.allSettled(clients.map((c) => c.close()))
   logger.info('MongoDB 客户端连接已关闭')
@@ -123,7 +156,16 @@ export async function withRetry<T>(
       })
       await new Promise((resolve) => setTimeout(resolve, 1000))
       if (err.code === 10107) {
+        // 主节点切换：丢弃全部旧客户端（含只读），否则会继续命中失效连接。
+        // 旧实现只置空 cachedClient，既漏掉只读客户端也造成连接泄漏。
+        const stale = [cachedClient, cachedRoClient].filter((c): c is MongoClient => c !== null)
         cachedClient = null
+        cachedRoClient = null
+        clientPromise = null
+        roClientPromise = null
+        for (const staleClient of stale) {
+          void staleClient.close().catch(() => {})
+        }
       }
       return withRetry(operation, retries - 1, options)
     }

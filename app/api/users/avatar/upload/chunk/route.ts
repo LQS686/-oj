@@ -1,9 +1,10 @@
 /**
  * /api/users/avatar/upload/chunk - 接收头像分片
  */
-import { withApi, ok, throw400, ApiError } from '@/lib/api/withApi'
+import { withApi, ok, throw400, throw403, ApiError } from '@/lib/api/withApi'
 import { saveChunk, isValidUploadId } from '@/lib/upload'
 import { assertAvatarUploadOwner } from '@/lib/avatar-upload-registry'
+import { AVATAR_UPLOAD_ENABLED } from '@/lib/user/avatar-config'
 import { logger } from '@/lib/logger'
 
 /** 单个分片大小上限：2MB（init 路由推荐 1MB，允许一定余量） */
@@ -14,6 +15,10 @@ const MAX_CHUNK_INDEX = 1000
 const MAX_REQUEST_BODY = 3 * 1024 * 1024
 
 export const POST = withApi.auth(async (req, _ctx, { user }) => {
+  // 头像上传总开关：AVATAR_UPLOAD_ENABLED=false 时拒绝（防止绕过前端直接调用）
+  if (!AVATAR_UPLOAD_ENABLED) {
+    throw403('头像上传功能已关闭，请从内置头像库中选择')
+  }
   // 关键修复：自定义 server 模式下（tsx server.ts + Next 16），req.formData() 在 multipart/form-data
   // 编码 + chunk 较大（>1MB）时会触发 Response body object should not be disturbed or locked。
   // 改用 req.arrayBuffer() 自己解析 multipart，绕开 Next.js 的 Web Request formData 转换层。

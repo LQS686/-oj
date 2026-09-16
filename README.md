@@ -54,6 +54,8 @@
 - **帮助中心** — `app/help/` 提供平台使用说明
 - **响应式设计** — 移动端 Drawer 抽屉菜单适配
 - **Docker 部署** — 一键部署，MongoDB 副本集 + Redis 缓存 + Nginx 反代
+- **手动备份 / 一键恢复** — 后台备份并下载 `.dsoj.gz` 备份包；本地上传流式恢复（落盘临时文件，兼容数 GB 大包，`BACKUP_MAX_SIZE_MB` 默认 4096MB / 上限 50GB）；新站空库时自动进入 `/setup` 部署引导（恢复现存备份或注册系统管理员）
+- **备份保护** — 管理系统密钥可加密进备份包（AES-256-GCM + 恢复口令），恢复前自动生成当前状态快照；反向代理上传上限需对齐备份体积（见 [docs/BT_DEPLOY.md](docs/BT_DEPLOY.md) 部署注意第 12 条）
 
 > **说明**：班级积分账户、积分商城、积分流水及邀请码机制已移除；历史 MongoDB 集合需自行清理（见更新日志）。
 
@@ -268,8 +270,17 @@ Route → withApi.public|auth|admin|systemAdmin|classRole
 - `npm run dev` / `start` 使用 `tsx --conditions=react-server`，使 `import 'server-only'` 在自定义 Node server 下可用
 - Vitest 将 `server-only` 别名到 `tests/mocks/server-only.ts`；纯解析器应从 `lib/api/errors` 导入 `ApiError`，勿拉整包 `withApi`
 - 前端写操作统一走 `apiClient` / `fetchWithCookie`（自动 CSRF）；跨标签登出会 `clearCsrfTokenCache` + `forceResetAppSocket`
+- **提交规范** — 本环境固定按「WSL 写对象 → Windows 推送」执行，且 WSL 侧 `git add` / `commit` **必须**带 `-c core.autocrlf=true -c core.filemode=false`（否则换行被误判，整个仓库都会被算成改动）；完整命令、原因与自检见 [docs/WSL_DEV.md](docs/WSL_DEV.md)
 
 ## 更新日志
+
+### 2026/09（手动备份 / 一键恢复 + 部署引导）
+
+- **手动备份 / 下载 / 删除** — `/admin/backup` 后台手动备份（异步任务 + 进度轮询）、备份列表、下载到本地、按保留策略自动清理；可选恢复口令加密打包系统密钥
+- **本地上传恢复（流式）** — `lib/backup/restore-upload.ts` 边收边写临时文件（内存恒定），从临时文件流式恢复，**兼容数 GB 大备份包**；恢复前自动生成当前状态快照；`BACKUP_MAX_SIZE_MB` 默认 `1000 → 4096`、硬上限 `51200`（50GB）
+- **部署引导页 `/setup`** — 空库访问自动重定向；支持上传备份恢复或全新注册系统管理员；恢复完成/注册后引导缓存自动失效
+- **安全** — 备份含密钥用 AES-256-GCM（JWT_SECRET / ENCRYPTION_KEY）；恢复路径穿越防护；管理员 / 空库门控 + CSRF + 限流
+- **部署** — Nginx `client_max_body_size` 与宝塔部署脚本上调至 `50g`，对齐备份包上限；两条大包上传路由已移出 Next 中间件 matcher 以避开其 10MB 请求体克隆截断，并在路由内以 `guardLargeUploadRequest`（同源 + 双提交 Cookie）与 `restoreRateLimiter` 显式补齐 CSRF 与限流（见 [docs/BT_DEPLOY.md](docs/BT_DEPLOY.md) 注意事项第 12、14 条）
 
 ### 2026/07（安全硬化回归修复）
 
@@ -289,7 +300,7 @@ Route → withApi.public|auth|admin|systemAdmin|classRole
 - **题目测试点管理** — `app/admin/problems/[id]/testcases/_components`（TestCaseCard / LogsModal / VerifyModal / ZipUploadPanel）
 - **题库工作区上下文** — `contexts/ContestProblemWorkspaceContext.tsx`、`TrainingProblemWorkspaceContext.tsx`
 - **独立题单路由** — `app/training/[id]/problems/page.tsx`
-- **竞赛倒计时面板** — `components/contest/ContestCountdownPanel.tsx`、`hooks/useContestCountdown.ts`
+- **竞赛倒计时** — `hooks/useContestCountdown.ts`（配合 `ContestCard` / `ContestHeader` 展示）
 - **实体卡片组件** — `components/entity/`（EntityDetailHeader / InfoCard / DescriptionCard / OverviewLayout）
 - **通用 hook** — useWallClock / useUnreadNotifications / useSubmissionResultFlow / useContestCountdown；`hooks/socket-client.ts`
 - **批量注册 CSV** — `public/templates/users-template.csv`、`tests/batch-register-csv.test.ts`

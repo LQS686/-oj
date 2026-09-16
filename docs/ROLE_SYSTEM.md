@@ -16,7 +16,7 @@
 
 - **类型定义**：`RoleCode`（[lib/permissions.ts](../lib/permissions.ts)）
 - **Schema 字段**：`User.role`（[prisma/schema.prisma](../prisma/schema.prisma)），`@default("STUDENT")`
-- **前端常量**：`ROLE_DISPLAY`（[app/admin/users/page.tsx](../app/admin/users/page.tsx)）
+- **前端常量**：`ROLE_DISPLAY`（[app/admin/users/_utils.ts](../app/admin/users/_utils.ts)）
 
 > ⚠️ 严禁引入其他角色值。`User` 表只有 `role` 一个字段表达角色，
 > 不存在 `isAdmin` / `isSuperAdmin` 等冗余字段。

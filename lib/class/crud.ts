@@ -18,7 +18,7 @@ function sanitizeClassAvatar(avatar: string | null | undefined): string | null |
   if (!v) return ''
   const local = sanitizeAvatarUrl(v)
   if (local) return local
-  if (v.startsWith('/uploads/') || v.startsWith('/api/placeholder/')) return v.slice(0, 500)
+  if (v.startsWith('/uploads/')) return v.slice(0, 500)
   if (/^https?:\/\//i.test(v) && !/[\s<>"']/.test(v)) return v.slice(0, 500)
   throw new ApiError('VALIDATION', '班级头像 URL 不合法', 400)
 }

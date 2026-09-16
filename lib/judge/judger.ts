@@ -861,7 +861,12 @@ export async function executeJudge(
 
         // 确定最终状态（跳过 fail-fast 未跑测点，避免整单变成 SE）
         const totalFullScore = job.testCases.reduce((s, tc) => s + (tc.score || 0), 0)
-        if (result.passedTests === result.totalTests) {
+        if (result.totalTests === 0) {
+          // 无测点题目：0 === 0 不得判 AC，否则任何可编译代码都能刷 AC 污染统计/排行榜
+          result.status = 'SE'
+          result.message = '题目未配置测试点'
+          logger.warn('题目无测试点，判定为 SE', { problemId: job.problemId })
+        } else if (result.passedTests === result.totalTests) {
           result.status = 'AC'
           logger.info(`全部通过`)
         } else if (

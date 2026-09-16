@@ -44,9 +44,8 @@ export const DELETE = withApi.admin(async (_req, ctx) => {
   const { id } = ctx.params
   if (!isObjectId(id)) throw400('INVALID_ID', '无效的 ID')
 
-  // 删除竞赛（级联删除会处理关联数据，如 ContestProblem）
-  // 但注意 Prisma MongoDB 不支持完全的数据库级联，需要 schema 里定义 onDelete: Cascade 或者手动删除
-  // schema 中 ContestProblem 有 onDelete: Cascade 指向 Contest，所以 Prisma Client 会处理
+  // schema 中 Contest 子表（ContestProblem / ContestParticipant / Submission.contestId）
+  // 均未声明 onDelete: Cascade，级联清理由 adminDeleteContest 在事务内显式完成。
   await adminDeleteContest(id)
   return ok({ message: '删除成功' })
 })

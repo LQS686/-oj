@@ -28,6 +28,8 @@ class BufferedStreamReader {
   private pos: number
   private lineNumber: number
   private streamEnded: boolean
+  /** 流读取错误（ENOENT/EACCES 等）；置位后按流已结束处理，避免挂起或未捕获异常 */
+  private streamError: Error | null = null
   /** B-P1-4：最近一次 nextUntilSpace 读取的 token 是否因超长被截断（尾部被丢弃） */
   lastTokenTruncated = false
 
@@ -38,6 +40,12 @@ class BufferedStreamReader {
     this.pos = 0
     this.lineNumber = 1
     this.streamEnded = false
+    // createReadStream 打开失败会异步 emit 'error'。若不挂监听，Node 会抛
+    // ERR_UNHANDLED_ERROR 令整个进程崩溃；同时置 streamEnded 让阻塞中的 ensureData 解除等待。
+    stream.on('error', (err: Error) => {
+      this.streamError = err
+      this.streamEnded = true
+    })
   }
 
   private compact(): void {
@@ -80,24 +88,36 @@ class BufferedStreamReader {
     let chunk = pull()
     if (chunk === null || chunk.length === 0) {
       await new Promise<void>((resolve) => {
-        const onReadable = (): void => {
+        const cleanup = (): void => {
+          this.stream.off('readable', onReadable)
           this.stream.off('end', onEnd)
+          this.stream.off('error', onError)
+        }
+        const onReadable = (): void => {
+          cleanup()
           resolve()
         }
         const onEnd = (): void => {
-          this.stream.off('readable', onReadable)
+          cleanup()
+          resolve()
+        }
+        const onError = (): void => {
+          cleanup()
           resolve()
         }
         this.stream.once('readable', onReadable)
         this.stream.once('end', onEnd)
-        if (this.stream.readableLength > 0 || this.stream.readableEnded) {
-          this.stream.off('readable', onReadable)
-          this.stream.off('end', onEnd)
+        this.stream.once('error', onError)
+        if (this.stream.readableLength > 0 || this.stream.readableEnded || this.streamError) {
+          cleanup()
           resolve()
         }
       })
       chunk = pull()
-      if ((chunk === null || chunk.length === 0) && this.stream.readableEnded) {
+      if (
+        (chunk === null || chunk.length === 0) &&
+        (this.stream.readableEnded || this.streamError)
+      ) {
         this.streamEnded = true
         return
       }
@@ -308,6 +328,11 @@ async function compareDefault(
     const stdEof = await stdReader.eof()
 
     if (!buffersEqual(userLine, stdLine)) {
+      // 标准答案已结束、选手仍有多余的「非空」内容 → OLE（内容过多）。
+      // 与 strict / ignore-spaces / real-number 保持一致；仅多出空白行仍被容忍。
+      if (stdEof && userLine.length > 0 && stdLine.length === 0) {
+        return { score: 0, status: 'OLE', message: `第 ${lineNum} 行，选手输出内容过多` }
+      }
       return {
         score: 0,
         status: 'WA',
@@ -378,6 +403,9 @@ async function compareIgnoreSpaces(
       if (userEof && stdEof) {
         return { score: fullScore, status: 'AC', message: '' }
       }
+      // 对齐参考实现（LemonLime compareIgnoreSpaces）：token 全等但行号不一致 → Presentation Error。
+      // 含义：单词/数字内容正确，但「行结构」与标准答案不符（如答案应为 2 行却输出 4 行）。
+      // 这是格式错误而非正确答案：判 0 分并给出提示，绝不静默判 AC（否则会掩盖行结构错误）。
       if (userReader.line() !== stdReader.line()) {
         return { score: 0, status: 'PE', message: `第 ${userReader.line()} 行格式错误` }
       }

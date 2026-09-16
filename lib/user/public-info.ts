@@ -9,6 +9,7 @@ import { AppError } from '@/lib/errors'
 import { validatePassword } from '@/lib/api/validation'
 import { clearUserCache } from './profile'
 import { getSolvedProblemCount } from './solved-count'
+import { isBuiltinAvatar } from './avatar-config'
 import { isNonFinalSubmissionStatus } from '@/lib/constants/submission-status'
 
 /* ============================================================================
@@ -58,8 +59,13 @@ export async function getUserPublicInfo(userId: string) {
 
 /**
  * 获取用户统计（提交/题目/语言/热力图/社区/竞赛/难度分布）
+ *
+ * viewerId：当前访问者（可空）。公开访问他人主页时，recentSubmissions 仅返回
+ * 公开题目的提交并隐藏进行中竞赛（封榜）的提交，避免泄露私有题标题与实时判题结果；
+ * 访问自己主页（viewerId === userId）时不做过滤。
  */
-export async function getUserFullStats(userId: string) {
+export async function getUserFullStats(userId: string, viewerId?: string | null) {
+  const isSelf = !!viewerId && viewerId === userId
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -113,13 +119,14 @@ export async function getUserFullStats(userId: string) {
       distinct: ['problemId'],
     }),
     prisma.submission.findMany({
-      where: { userId },
+      where: isSelf ? { userId } : { userId, problem: { is: { isPublic: true } } },
       select: {
         id: true,
         status: true,
         language: true,
         problemId: true,
         submittedAt: true,
+        contestId: true,
         problem: {
           select: { title: true, difficulty: true, problemNumber: true },
         },
@@ -211,8 +218,27 @@ export async function getUserFullStats(userId: string) {
   const heatmapData = buildHeatmap(lastWeekEntries)
   const yearHeatmap = buildHeatmap(yearEntries)
 
-  // Recent submissions
-  const formattedRecent = recentSubmissions.map((sub) => ({
+  // Recent submissions：公开访问他人主页时隐藏进行中竞赛（封榜）的提交，
+  // 避免通过轮询他人主页获得实时判题结果（竞赛神谕）/ 泄露封榜期数据。
+  let visibleRecentSubmissions = recentSubmissions
+  if (!isSelf) {
+    const contestIds = Array.from(
+      new Set(recentSubmissions.map((s) => s.contestId).filter((v): v is string => !!v))
+    )
+    if (contestIds.length > 0) {
+      const { isContestSealed } = await import('@/lib/contest/rankings')
+      const contests = await prisma.contest.findMany({
+        where: { id: { in: contestIds } },
+        select: { id: true, sealRankTime: true, sealUnlocked: true },
+      })
+      const sealedIds = new Set(contests.filter((c) => isContestSealed(c)).map((c) => c.id))
+      visibleRecentSubmissions = recentSubmissions.filter(
+        (s) => !s.contestId || !sealedIds.has(s.contestId)
+      )
+    }
+  }
+
+  const formattedRecent = visibleRecentSubmissions.map((sub) => ({
     id: sub.id,
     problemId: sub.problem?.problemNumber || sub.problemId,
     realProblemId: sub.problemId,
@@ -304,11 +330,11 @@ export async function updateCurrentUserBasic(
     throw AppError.badRequest('INVALID_BIO', '个人简介不能超过500个字符')
   }
   if (data.avatar !== undefined) {
-    // 仅允许本站头像路径，禁止任意外链钓鱼
+    // 仅允许本站头像路径（已上传头像 / 内置头像），禁止任意外链钓鱼
     const ok =
       data.avatar === '' ||
       data.avatar.startsWith('/uploads/avatars/') ||
-      data.avatar.startsWith('/api/placeholder/')
+      isBuiltinAvatar(data.avatar)
     if (!ok) {
       throw AppError.badRequest('INVALID_AVATAR', '头像地址不合法')
     }

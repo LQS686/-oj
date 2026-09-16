@@ -79,21 +79,6 @@ export async function getUserCanManageContent(userId: string) {
   return canManageContent(u)
 }
 
-/** 检查当前用户是否在指定题上获得满分（用于提交记录越权校验） */
-export async function hasFullScoreOnProblem(
-  userId: string,
-  assignmentId: string,
-  problemId: string
-) {
-  const submissions = await prisma.classAssignmentSubmission.findMany({
-    where: { assignmentId, userId, problemId },
-    select: { score: true },
-  })
-  if (submissions.length === 0) return false
-  const maxScore = Math.max(...submissions.map((s) => s.score || 0))
-  return maxScore === 100
-}
-
 /** 校验当前操作者是班级 owner/admin，否则 throw403 */
 export async function requireClassAdminRole(classId: string, userId: string) {
   const member = await prisma.classMember.findUnique({
@@ -123,9 +108,15 @@ export async function requireManageableTarget(
   return target
 }
 
-/** 读取当前用户的基础 profile（用于加入申请通知） */
+/**
+ * 读取当前用户的基础 profile（用于加入申请 / 直邀通知）
+ * 仅返回通知文案需要的字段，禁止整行返回（避免 password 等敏感字段泄露）
+ */
 export async function getUserProfile(userId: string) {
-  return prisma.user.findUnique({ where: { id: userId } })
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, username: true, nickname: true, avatar: true },
+  })
 }
 
 /** 读直接邀请详情（含班级/邀请人/被邀请人） */

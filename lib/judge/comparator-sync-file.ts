@@ -192,7 +192,7 @@ class SyncFileReader {
       break
     }
 
-    let out = ''
+    const parts: Buffer[] = []
     let taken = 0
     while (taken < TOKEN_CAP) {
       if (this.eof()) break
@@ -205,7 +205,8 @@ class SyncFileReader {
         if (ch === SPACE || ch === TAB || ch === CR || ch === LF) break
         p++
       }
-      out += this.buf.toString('utf-8', start, p)
+      // 必须复制切片：后续 fill() 会用 copyWithin 复用 this.buf，视图会失效
+      parts.push(Buffer.from(this.buf.subarray(start, p)))
       taken += p - start
       this.pos = p
       if (this.pos < this.len) break
@@ -218,7 +219,13 @@ class SyncFileReader {
         this.lastTokenTruncated = true
       }
     }
-    return out
+
+    if (parts.length === 0) return ''
+    // 跨缓冲区拼接成完整字节序列后一次性解码：
+    // 逐段 toString 会把恰好横跨读取缓冲区边界的多字节字符拆成 U+FFFD，
+    // 导致「内容相同但空白对齐不同」的两份输出解码结果不一致而误判 WA。
+    if (parts.length === 1) return parts[0].toString('utf-8')
+    return Buffer.concat(parts).toString('utf-8')
   }
 }
 
@@ -312,6 +319,11 @@ function compareDefault(
     const stdEof = std.eof()
 
     if (!bufEqual(user.lineBuf, uTrim, std.lineBuf, sTrim)) {
+      // 标准答案已结束、选手仍有多余的「非空」内容 → OLE（内容过多）。
+      // 与 strict / ignore-spaces / real-number 保持一致；仅多出空白行仍被容忍。
+      if (stdEof && uTrim > 0 && sTrim === 0) {
+        return { score: 0, status: 'OLE', message: `第 ${lineNum} 行，选手输出内容过多` }
+      }
       return {
         score: 0,
         status: 'WA',
@@ -371,6 +383,10 @@ function compareIgnoreSpaces(
 
     if (userToken === stdToken) {
       if (user.eof() && std.eof()) return { score: fullScore, status: 'AC', message: '' }
+      // 对齐参考实现（LemonLime compareIgnoreSpaces）：token 全等但行号不一致 → Presentation Error。
+      // 含义：单词/数字内容正确，但「行结构」与标准答案不符（如答案应为 2 行却输出 4 行）。
+      // 这是格式错误而非正确答案：判 0 分并给出提示，绝不静默判 AC（否则会掩盖行结构错误）。
+      // 换行落在 token 之间属于行结构差异 → PE；仅行内多余空格/制表符 → 行号不变 → AC。
       if (user.line() !== std.line()) {
         return { score: 0, status: 'PE', message: `第 ${user.line()} 行格式错误` }
       }

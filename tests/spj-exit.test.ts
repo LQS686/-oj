@@ -53,4 +53,36 @@ describe('SPJ exit code mapping (Testlib)', () => {
     const r = parseSpjExit(1, '', 'wrong answer', 10)
     expect(r.status).toBe('WA')
   })
+
+  // `_pc(points)`：SPJ 以 -DPC_BASE_EXIT_CODE=16 编译，退出码 = 16 + points（points∈[0,100]）
+  it('maps _pc(0) (exit 16) to 0 分，而不是误判 AC', () => {
+    // testlib 默认基址为 0 时 _pc(0) 的退出码恰为 0 → 会被当成 AC（满分）
+    const r = parseSpjExit(16, '', '0/100', 10)
+    expect(r.status).not.toBe('AC')
+    expect(r.status).toBe('WA')
+    expect(r.score).toBe(0)
+  })
+
+  it('maps _pc(50) (exit 66) to PC with half score', () => {
+    const r = parseSpjExit(66, '', '50/100', 10)
+    expect(r.status).toBe('PC')
+    expect(r.score).toBe(5)
+  })
+
+  it('maps _pc(100) (exit 116) to AC 满分', () => {
+    const r = parseSpjExit(116, '', 'full', 10)
+    expect(r.status).toBe('AC')
+    expect(r.score).toBe(10)
+  })
+
+  it('exit 117（超出 _pc 映射范围）不按部分分处理', () => {
+    const r = parseSpjExit(117, '', '', 10)
+    expect(r.status).toBe('SE')
+  })
+
+  it('maps 7 quitpi(points_info=0.25) to PC', () => {
+    const r = parseSpjExit(7, '', 'points_info=0.25 all good', 10)
+    expect(r.status).toBe('PC')
+    expect(r.score).toBe(3)
+  })
 })

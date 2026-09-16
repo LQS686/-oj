@@ -3,7 +3,16 @@
  * - GET /api/classes  公开列表（含 / 排除我的班级）
  * - POST /api/classes  创建班级
  */
-import { withApi, ok, readJson, readQuery, throw400, throw403, throw409 } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readJson,
+  readQuery,
+  throw400,
+  throw401,
+  throw403,
+  throw409,
+} from '@/lib/api/withApi'
 import { createClass, findClassByName, listClasses } from '@/lib/class/service'
 import { canCreateClass } from '@/lib/permissions'
 
@@ -21,7 +30,8 @@ export const GET = withApi.public(async (req) => {
     const { resolveViewerFromRequest } = await import('@/lib/api/withApi')
     const viewer = await resolveViewerFromRequest(req)
     if (!viewer) {
-      throw400('UNAUTHORIZED', '请先登录')
+      // 未登录查询「我的班级」应返回 401（而非 400），前端据此跳转登录
+      throw401('请先登录')
     } else {
       userId = viewer.user.id
     }
