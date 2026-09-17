@@ -9,6 +9,11 @@ services:
         # JWT_SECRET 禁止作为 build arg：真实密钥不得进入镜像层，仅运行时 environment 注入
         NEXT_PUBLIC_API_URL: ${FRONTEND_URL:-https://dsoj.run}
         NEXT_PUBLIC_BASE_URL: ${FRONTEND_URL:-https://dsoj.run}
+        # 构建期内存保护（见 Dockerfile 注释）：
+        # bt-deploy.sh 会按宿主内存自动 export 这两个变量；手动 docker compose build 时用默认值。
+        # 注意：docker build 不受下方 mem_limit 约束，低配机器必须限制堆并考虑跳过类型检查。
+        NODE_MAX_OLD_SPACE_MB: ${NODE_MAX_OLD_SPACE_MB:-4096}
+        SKIP_TYPE_CHECK: ${SKIP_TYPE_CHECK:-false}
     image: oj-platform:app
     # 默认仅绑定本机回环，避免 0.0.0.0 直接暴露应用端口；生产应经反向代理。
     # 需要外部访问时设 APP_HOST_BIND=0.0.0.0

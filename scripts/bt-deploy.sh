@@ -10,6 +10,9 @@
 #   仅重启不重建：      sudo bash scripts/bt-deploy.sh --no-build
 #   深度清理构建缓存：  sudo bash scripts/bt-deploy.sh --prune
 #   跳过镜像加速配置：  sudo bash scripts/bt-deploy.sh --skip-mirror
+#   跳过 swap 配置：    sudo bash scripts/bt-deploy.sh --skip-swap
+#   不装内存看门狗：    sudo bash scripts/bt-deploy.sh --skip-watchdog
+#   强制类型检查：      sudo bash scripts/bt-deploy.sh --type-check
 #   跳过交互确认：      sudo bash scripts/bt-deploy.sh --yes （宝塔终端推荐）
 # ============================================================
 set -euo pipefail
@@ -27,6 +30,9 @@ FRONTEND_URL_ARG=""
 NO_BUILD=0
 DO_PRUNE=0
 SKIP_MIRROR=0
+SKIP_SWAP=0
+SKIP_WATCHDOG=0
+FORCE_TYPE_CHECK=0
 ASSUME_YES=0
 
 usage() {
@@ -37,6 +43,9 @@ usage() {
   --no-build        跳过镜像构建，仅 up -d + 健康检查（配置热更适用）
   --prune           构建后清理 7 天前的 BuildKit 缓存（默认仅清悬空镜像）
   --skip-mirror     不写入 /etc/docker/daemon.json 镜像加速
+  --skip-swap       不自动配置 swap（低配机器不建议跳过）
+  --skip-watchdog   不安装内存/磁盘看门狗 cron
+  --type-check      强制在构建期执行 TypeScript 类型检查（低配机器有 OOM 风险）
   -y, --yes         跳过所有交互确认（宝塔终端推荐使用，避免 read 阻塞卡死终端）
   -h, --help        显示帮助
 USAGE
@@ -47,6 +56,9 @@ while [[ $# -gt 0 ]]; do
     --no-build) NO_BUILD=1; shift ;;
     --prune) DO_PRUNE=1; shift ;;
     --skip-mirror) SKIP_MIRROR=1; shift ;;
+    --skip-swap) SKIP_SWAP=1; shift ;;
+    --skip-watchdog) SKIP_WATCHDOG=1; shift ;;
+    --type-check) FORCE_TYPE_CHECK=1; shift ;;
     -y|--yes) ASSUME_YES=1; shift ;;
     -h|--help) usage; exit 0 ;;
     http://*|https://*) FRONTEND_URL_ARG="$1"; shift ;;
@@ -444,6 +456,39 @@ check_disk() {
   info "磁盘可用约 $((avail_kb / 1024 / 1024))GB"
 }
 
+# ------------------------------------------------------------
+# 宿主内存加固：swap + 关键服务 OOM 免疫
+#
+# 背景：docker build 不受 compose 的 mem_limit 约束，会直接吃宿主机内存。
+#   next build 的类型检查阶段实测需要数 GB 内存；4G 宿主 + 无 swap 时会触发整机 OOM，
+#   把 nginx / 宝塔面板 / sshd 一起杀掉 → 网站与面板全打不开、SSH 也连不上，
+#   只能去云控制台强制重启（控制台仍显示「运行中」，因为虚拟机电源没断）。
+#
+# 原则：任何加固步骤失败都只告警，绝不中断部署（部署可用性优先）。
+# ------------------------------------------------------------
+ensure_host_hardening() {
+  local swap_script="${PROJECT_DIR}/scripts/setup-swap.sh"
+  local oom_script="${PROJECT_DIR}/scripts/setup-oom-protection.sh"
+
+  if [[ "$SKIP_SWAP" -eq 1 ]]; then
+    info "已跳过 swap 配置（--skip-swap）"
+  elif [[ -f "$swap_script" ]]; then
+    if ! bash "$swap_script"; then
+      warn "swap 配置未完成，可稍后手动执行: sudo bash scripts/setup-swap.sh"
+    fi
+  else
+    warn "未找到 scripts/setup-swap.sh，跳过 swap 配置"
+  fi
+
+  if [[ -f "$oom_script" ]]; then
+    if ! bash "$oom_script"; then
+      warn "OOM 保护未完成，可稍后手动执行: sudo bash scripts/setup-oom-protection.sh"
+    fi
+  else
+    warn "未找到 scripts/setup-oom-protection.sh，跳过 OOM 保护"
+  fi
+}
+
 dump_failure() {
   warn "部署未完全就绪，最近日志如下："
   echo ""
@@ -571,6 +616,12 @@ info "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 detect_compose
 
 check_disk
+
+# ========================================================
+# 宿主内存加固（防构建期内存耗尽导致整机假死）
+# ========================================================
+step "宿主内存加固（swap + OOM 保护）"
+ensure_host_hardening
 
 # ========================================================
 # 配置 Docker 镜像加速（国内服务器必需）
@@ -750,6 +801,29 @@ fi
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
+# ------------------------------------------------------------
+# 构建期内存参数（按宿主内存自动收紧）
+# 通过 export 传给 docker-compose.yml 的 build.args（见 docker-compose.yml / Dockerfile）。
+# 4G 宿主是「整机假死」高发区：此时自动跳过构建期类型检查（该检查已由
+# npm run typecheck / CI 完整覆盖，不降低质量门禁），并把 Node 堆上限压到安全区间。
+# ------------------------------------------------------------
+RAM_MB="$(awk '/^MemTotal:/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 4096)"
+if [[ "$FORCE_TYPE_CHECK" -eq 1 ]]; then
+  export SKIP_TYPE_CHECK=false
+  BUILD_NOTE="类型检查: 强制开启（--type-check）"
+elif (( RAM_MB <= 4608 )); then
+  export SKIP_TYPE_CHECK=true
+  BUILD_NOTE="类型检查: 已跳过（宿主 $((RAM_MB / 1024))G 防 OOM；本地/CI 仍会完整检查）"
+else
+  export SKIP_TYPE_CHECK=false
+  BUILD_NOTE="类型检查: 启用"
+fi
+# 堆上限 = 宿主内存 - 1.5G（留给内核与其他容器），夹在 [1G, 8G]
+NODE_HEAP_MB=$((RAM_MB - 1536))
+(( NODE_HEAP_MB < 1024 )) && NODE_HEAP_MB=1024
+(( NODE_HEAP_MB > 8192 )) && NODE_HEAP_MB=8192
+export NODE_MAX_OLD_SPACE_MB="$NODE_HEAP_MB"
+
 step "拉取基础镜像"
 if ! compose pull mongo redis; then
   warn "基础镜像拉取失败，将尝试使用本地已有镜像继续"
@@ -759,10 +833,14 @@ if [[ "$NO_BUILD" -eq 1 ]]; then
   step "跳过构建（--no-build）"
 else
   step "构建应用镜像（首次约 5-10 分钟；BuildKit 缓存可大幅加速后续构建）"
+  echo "  宿主内存 $((RAM_MB / 1024))GB | Node 堆上限 ${NODE_HEAP_MB}MB | ${BUILD_NOTE}"
   if ! compose build app; then
     err "应用镜像构建失败"
-    echo "  常见原因: 磁盘不足 / 镜像源超时 / 网络中断"
-    echo "  清理: docker image prune -f && df -h"
+    echo "  常见原因: 磁盘不足 / 镜像源超时 / 网络中断 / 内存不足被 OOM killer 杀掉"
+    echo "  排查 OOM: dmesg -T | grep -i -E 'oom|killed process' | tail"
+    echo "  清理磁盘: docker image prune -f && df -h"
+    echo "  低配机器建议后台构建（避免终端断连/无法中断）:"
+    echo "    nohup sudo bash scripts/bt-deploy.sh --yes > /tmp/deploy.log 2>&1 & tail -f /tmp/deploy.log"
     exit 1
   fi
 fi
@@ -936,7 +1014,24 @@ else
 fi
 
 # ============================================================
-# 7. 输出宝塔 Nginx 配置
+# 7. 安装内存/磁盘看门狗（防止再次发展成「整机假死」）
+# ============================================================
+if [[ "$SKIP_WATCHDOG" -eq 1 ]]; then
+  step "已跳过看门狗安装（--skip-watchdog）"
+else
+  step "安装内存/磁盘看门狗"
+  watchdog_script="${PROJECT_DIR}/scripts/oj-watchdog.sh"
+  if [[ -f "$watchdog_script" ]]; then
+    if ! bash "$watchdog_script" --install; then
+      warn "看门狗安装失败（不影响服务运行）: sudo bash scripts/oj-watchdog.sh --install"
+    fi
+  else
+    warn "未找到 scripts/oj-watchdog.sh，跳过看门狗安装"
+  fi
+fi
+
+# ============================================================
+# 8. 输出宝塔 Nginx 配置
 # ============================================================
 SNIPPET="$(write_nginx_snippet "$FRONTEND_URL")"
 DOMAIN="$(domain_from_url "$FRONTEND_URL")"
@@ -953,6 +1048,20 @@ echo -e "  监听绑定:   ${APP_BIND}:${APP_PORT} → 容器 3000"
 echo ""
 echo -e "  容器状态:"
 compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || compose ps
+echo ""
+echo -e "  ${BOLD}宿主加固：${NC}"
+SWAP_LINE="$(swapon --show --noheadings 2>/dev/null | awk 'NR==1{print $1" "$3}')"
+if [[ -n "$SWAP_LINE" ]]; then
+  echo -e "    swap:     ${GREEN}已启用${NC} (${SWAP_LINE})"
+else
+  echo -e "    swap:     ${YELLOW}未启用${NC} —— sudo bash scripts/setup-swap.sh"
+fi
+if command -v crontab >/dev/null 2>&1 && crontab -l 2>/dev/null | grep -qF "dsoj-watchdog"; then
+  echo -e "    看门狗:   ${GREEN}已安装${NC} (每 3 分钟自愈)"
+else
+  echo -e "    看门狗:   ${YELLOW}未安装${NC} —— sudo bash scripts/oj-watchdog.sh --install"
+fi
+echo -e "    构建内存: Node 堆上限 ${NODE_HEAP_MB}MB | ${BUILD_NOTE}"
 echo ""
 echo -e "  ${BOLD}首次使用：浏览器打开站点 → 注册首个账号（自动成为系统管理员）${NC}"
 echo -e "  ${YELLOW}说明: 空库时即使后台关闭了「开放注册」，登录页仍会显示「创建管理员账号」入口${NC}"
@@ -985,6 +1094,8 @@ echo -e "    sudo bash scripts/bt-deploy.sh --yes           # 跳过交互确认
 echo -e "    sudo bash scripts/bt-deploy.sh --no-build      # 仅重启"
 echo -e "    sudo bash scripts/bt-deploy.sh --prune         # 升级并深度清理构建缓存"
 echo -e "    sudo bash scripts/bt-deploy.sh https://域名    # 切域名并重建"
+echo -e "    sudo bash scripts/setup-swap.sh                # 配置 swap（防整机假死）"
+echo -e "    sudo bash scripts/oj-watchdog.sh --status      # 查看内存/磁盘看门狗状态"
 echo ""
 if [[ "$COMPOSE_KIND" == "standalone" ]]; then
   echo -e "  ${YELLOW}提示: 本机使用 docker-compose 独立程序；脚本已自动兼容。${NC}"

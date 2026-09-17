@@ -106,7 +106,10 @@ const nextConfig: NextConfig = {
   },
 
   typescript: {
-    ignoreBuildErrors: false,
+    // 构建期类型检查：Docker 构建可由 SKIP_TYPE_CHECK=true 跳过（低配服务器防 OOM，
+    // 见 Dockerfile / bt-deploy.sh）。类型检查已由 npm run typecheck 与 CI 完整覆盖，
+    // 跳过它不会降低质量门禁；本地与 CI 构建默认仍执行检查。
+    ignoreBuildErrors: process.env.SKIP_TYPE_CHECK === 'true',
   },
 }
 

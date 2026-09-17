@@ -26,6 +26,21 @@ ENV DATABASE_URL=${DATABASE_URL}
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
 
+# ---- 构建期内存保护（低配服务器防「整机假死」的关键）----
+# docker build 不受 docker-compose 的 mem_limit 约束，会直接吃宿主机内存。
+# 实测 next build 的「Running TypeScript」阶段需要数 GB 内存；4G 宿主 + 无 swap 时
+# 会触发整机 OOM —— 症状是网站/宝塔面板/SSH 全部无响应，只能去云控制台重启。
+#   NODE_MAX_OLD_SPACE_MB  限制 Node 堆上限，让构建「受控变慢」而不是拖垮整机
+#   SKIP_TYPE_CHECK=true   跳过构建期类型检查（已由 npm run typecheck / CI 完整覆盖），
+#                          显著降低内存峰值；本地/CI 构建保持 false 不受影响
+#   NEXT_TELEMETRY_DISABLED 构建期也关闭遥测，避免受限网络下的额外等待
+# 默认值面向内存充裕的机器（行为与之前一致）；bt-deploy.sh 会按宿主内存自动收紧。
+ARG NODE_MAX_OLD_SPACE_MB=4096
+ARG SKIP_TYPE_CHECK=false
+ENV NODE_OPTIONS=--max-old-space-size=${NODE_MAX_OLD_SPACE_MB}
+ENV SKIP_TYPE_CHECK=${SKIP_TYPE_CHECK}
+ENV NEXT_TELEMETRY_DISABLED=1
+
 # 使用阿里云 debian 镜像源（比默认 deb.debian.org 快）
 # BuildKit 缓存 /var/cache/apt，下次 build 时直接复用已下载的 .deb 包
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \

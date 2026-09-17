@@ -49,14 +49,16 @@ sudo bash scripts/bt-deploy.sh http://你的服务器IP
 脚本会自动：
 
 1. 检查 Docker / Compose / 磁盘（至少约 4GB 可用）
-2. 配置国内镜像加速（**幂等合并**已有 `daemon.json`：保留原配置，追加缺失的镜像源；仅实际变更时重启 Docker）
-3. 生成 `.env`（含 JWT / ENCRYPTION_KEY / Redis·Mongo 密码）
-4. 按 URL 协议设置 `FORCE_SECURE_COOKIE`（HTTP→false，HTTPS→true）
-5. 生成 `mongo-keyfile`
-6. 拉取基础镜像并构建应用（首次约 5–10 分钟）
-7. 先拉起 mongo/redis，再启动 app，并做健康检查
-8. **同步数据库结构**：在 app 容器内执行 `prisma db push`（幂等创建新增集合/索引，如客观题 `ObjectiveQuestion` 等，已有数据不受影响）
-9. 写出 Nginx 片段：`nginx/baota-proxy.conf`（端口与 `APP_HOST_PORT` 一致）
+2. **宿主内存加固**：幂等配置 swap（按内存自动定量）并为 sshd / nginx / 宝塔面板设置 OOM 免疫
+3. 配置国内镜像加速（**幂等合并**已有 `daemon.json`：保留原配置，追加缺失的镜像源；仅实际变更时重启 Docker）
+4. 生成 `.env`（含 JWT / ENCRYPTION_KEY / Redis·Mongo 密码）
+5. 按 URL 协议设置 `FORCE_SECURE_COOKIE`（HTTP→false，HTTPS→true）
+6. 生成 `mongo-keyfile`
+7. 拉取基础镜像并构建应用（首次约 5–10 分钟；**按宿主内存自动限制 Node 堆上限，4G 宿主自动跳过构建期类型检查**，见下文《构建期内存保护》）
+8. 先拉起 mongo/redis，再启动 app，并做健康检查
+9. **同步数据库结构**：在 app 容器内执行 `prisma db push`（幂等创建新增集合/索引，如客观题 `ObjectiveQuestion` 等，已有数据不受影响）
+10. 安装内存/磁盘看门狗 cron（每 3 分钟自愈；`--skip-watchdog` 可跳过）
+11. 写出 Nginx 片段：`nginx/baota-proxy.conf`（端口与 `APP_HOST_PORT` 一致）
 
 > **说明**：HTTP 临时站可在 `NODE_ENV=production` 下运行（脚本已兼容）。  
 > 切勿在 HTTPS 站点关闭 Secure Cookie。
@@ -67,8 +69,26 @@ sudo bash scripts/bt-deploy.sh http://你的服务器IP
 sudo bash scripts/bt-deploy.sh --no-build          # 仅重启，不重建镜像
 sudo bash scripts/bt-deploy.sh --prune             # 升级时顺带清理 7 天前 BuildKit 缓存
 sudo bash scripts/bt-deploy.sh --skip-mirror       # 不改 /etc/docker/daemon.json
+sudo bash scripts/bt-deploy.sh --skip-swap         # 不自动配置 swap（低配机器不建议跳过）
+sudo bash scripts/bt-deploy.sh --skip-watchdog     # 不安装看门狗 cron
+sudo bash scripts/bt-deploy.sh --type-check        # 强制构建期类型检查（低配机器有 OOM 风险）
 sudo bash scripts/bt-deploy.sh --yes               # 跳过交互确认（宝塔终端推荐）
 ```
+
+单独的加固脚本（可随时手动执行，均幂等）：
+
+```bash
+sudo bash scripts/setup-swap.sh                 # 配置 swap（--dry-run 可预览）
+sudo bash scripts/setup-oom-protection.sh       # 关键服务 OOM 免疫（--status 查看）
+sudo bash scripts/oj-watchdog.sh --status       # 查看看门狗与内存/磁盘指标
+sudo bash scripts/oj-watchdog.sh --install      # 手动安装看门狗 cron
+```
+
+> **低配服务器（≤4G）强烈建议后台构建**，避免宝塔终端断连/无法中断：
+>
+> ```bash
+> nohup sudo bash scripts/bt-deploy.sh --yes > /tmp/deploy.log 2>&1 & tail -f /tmp/deploy.log
+> ```
 
 > **宝塔终端用户注意**：宝塔 Web 终端是 TTY，脚本中的 `read` 交互提示会阻塞终端。
 > 当升级时恰好有进行中的评测，脚本会弹出 `确认继续重启？(y/N)` 等待输入，
@@ -132,6 +152,8 @@ sudo bash scripts/bt-deploy.sh --prune
 | 其余（头像上传开关、SPJ 部分分、matcher、判题口径等） | 不用                         | 均为代码 / 编译期生效，无对应环境变量                                                        |
 
 > 本版本**没有新增必填环境变量**，不会出现「缺变量导致容器起不来」。
+>
+> 宿主内存加固（swap / OOM 免疫 / 看门狗 cron）在升级时**由脚本自动完成**，无需手动操作；若此前用 `--skip-*` 跳过了，可手动补齐：`scripts/setup-swap.sh`、`scripts/setup-oom-protection.sh`、`scripts/oj-watchdog.sh --install`（均可重复执行）。
 
 #### 1) 反向代理上传上限（唯一必改项，且只在用大备份包恢复时）
 
@@ -219,7 +241,40 @@ docker builder prune -af --filter "until=168h"
 | 3000 端口被占用                               | 脚本会提示；可改 `.env` 的 `APP_HOST_PORT` 后重跑，并重新粘贴 `nginx/baota-proxy.conf`（端口已写入片段）                                                                                                                                                                                            |
 | 粘贴 Nginx 后 WebSocket 断线                  | 确认存在 `location /socket.io/`，且 `X-Forwarded-Proto` 与站点协议一致                                                                                                                                                                                                                              |
 
-### 配置镜像加速（镜像拉取慢 / 失败时）
+### 服务器整机假死（网站 + 宝塔面板 + SSH 全部打不开）
+
+**现象**：网站打不开、宝塔面板打不开、SSH 连不上，但腾讯云控制台显示「运行中」；重启服务器后恢复正常，过一段时间又复现。
+
+**原因**：这是**内存耗尽**，不是「死机」。控制台的「运行中」只代表虚拟机电源开着。内存耗尽时内核 OOM killer 会把 nginx / 宝塔面板 / sshd 一起杀掉，或整机在 swap 抖动中 I/O 打满，于是所有入口都无响应。常见触发点就是**构建**：`docker build` 不受 `docker-compose.yml` 的 `mem_limit` 约束，会直接吃宿主机内存，而 `next build` 的类型检查阶段实测需要数 GB 内存。
+
+**先确认（重启后仍可查）**：
+
+```bash
+journalctl -k -b -1 | grep -i -E 'oom|killed process' | tail -20   # 上一个开机周期的内核日志
+grep -i -E 'oom|killed process' /var/log/messages /var/log/syslog 2>/dev/null | tail
+free -h; swapon --show        # swapon 为空 = 无 swap，最危险
+nproc; df -h; docker system df
+```
+
+若看到 `Out of memory: Killed process ... (node|nginx|BT-Panel)` 即实锤。SSH/面板都进不去时，用云控制台的 **VNC 登录**进去查看（比强制重启安全）。
+
+**预防（本项目已内置，部署脚本自动执行）**：
+
+```bash
+sudo bash scripts/setup-swap.sh                 # ① swap 兜底内存峰值（4G 机器 → 4G swap）
+sudo bash scripts/setup-oom-protection.sh       # ② 让内核优先杀构建进程，保住 sshd/nginx/面板
+sudo bash scripts/oj-watchdog.sh --install      # ③ 看门狗：内存/磁盘超阈值自动清理，防患于未然
+```
+
+**构建期内存保护**（`Dockerfile` / `bt-deploy.sh` 自动生效）：
+
+| 机制                    | 说明                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| `NODE_MAX_OLD_SPACE_MB` | 限制 Node 堆上限（默认宿主内存 − 1.5G），让构建「受控变慢」而不是拖垮整机                                 |
+| `SKIP_TYPE_CHECK`       | 宿主 ≤4G 时自动跳过构建期类型检查（已由 `npm run typecheck` / CI 完整覆盖），显著降低内存峰值             |
+| 后台构建                | 低配机器建议 `nohup sudo bash scripts/bt-deploy.sh --yes > /tmp/deploy.log 2>&1 &`，避免终端断连/无法中断 |
+
+> 说明：`docker-compose.yml` 已为 app(2g)/mongo(1g)/redis(256m) 规划了 4G 宿主的运行时预算，另有两层日志轮转（daemon.json + 服务级 `logging`，10m×5）。**假死与运行时无关，只发生在构建期**——因为构建不吃 compose 的限制。
 
 脚本首次部署会自动写入多源 `registry-mirrors`（见 `bt-deploy.sh` 的 `ensure_docker_mirrors`）。若你的服务器已配置过 `daemon.json` 或镜像仍慢，可手动配置：
 
@@ -327,6 +382,8 @@ docker compose restart app
 12. **大备份包恢复依赖反向代理上传上限** — 备份/恢复支持数 GB 级备份包（`BACKUP_MAX_SIZE_MB`，默认 4096MB、硬上限 50GB），Nginx 的 `client_max_body_size` 需 ≥ 该值（脚本生成的模板已设为 `50g`），否则超限上传会先被 413 拒掉，进不到应用层。注意：**改的是部署脚本的模板，不影响已在运行的 Nginx**——存量部署请按上文《升级 / 切域名 → 升级后需要手工改的配置》一节手工调整并 `nginx -s reload`。
 13. **备份/恢复是管理员与空库引导专用** — 上传恢复接口仅系统管理员（`/api/admin/restore/upload`）或空库部署引导（`/api/setup/restore`）可用，大体积请求受 JWT + CSRF + 限流防护，普通接口不受影响。
 14. **两个大包上传路由已从 Next 中间件 matcher 排除** — Next 在 `/middleware`（proxy）会克隆请求体，默认只在内存保留前 `10MB`，会把大备份包截断。故 `api/admin/restore/upload` 与 `api/setup/restore` 被排除在 matcher 之外，保持请求体真流式（`lib/backup/restore-upload.ts` 边收边写临时文件，内存恒定）。这两条路由的 CSRF（同源 + 双提交 Cookie）与限流不再由全局中间件处理，改为在路由内显式调用 `guardLargeUploadRequest`（`lib/security/csrf.ts`）和 `restoreRateLimiter`（`lib/rate-limit.ts`，按 IP 每小时 10 次）执行，行为与全局中间件等价。其余接口仍走全局中间件，不受影响。
+
+15. **构建期内存与「整机假死」** — `docker build` 不受 `docker-compose.yml` 的 `mem_limit` 约束，会直接吃宿主机内存；`next build` 的类型检查阶段实测需数 GB 内存，4G 宿主 + 无 swap 时会触发整机 OOM（网站/宝塔面板/SSH 全部打不开，云控制台仍显示「运行中」）。部署脚本已自动处理：幂等配置 swap、为 sshd/nginx/面板设置 OOM 免疫、按宿主内存限制 Node 堆上限并在 ≤4G 时跳过构建期类型检查、安装看门狗 cron。详见上文《常见问题 → 服务器整机假死》。
 
 更细的编译 / 评测相关说明见仓库历史注释与 `Dockerfile`。
 
