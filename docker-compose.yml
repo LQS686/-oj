@@ -101,7 +101,11 @@ services:
       - MONGO_APP_USER=${MONGO_APP_USER:-ojuser}
       - MONGO_APP_PASSWORD=${MONGO_APP_PASSWORD:?err}
     entrypoint: ['/bin/bash', '/scripts/mongo-init.sh']
-    command: --replSet rs0 --bind_ip_all --auth --keyFile /etc/mongo/keyfile
+    # --wiredTigerCacheSizeGB：显式限制 WiredTiger 缓存。
+    # mongod 默认按「宿主内存」推算缓存（4G 宿主约 1.5GB）：既会顶到下面 1g 的
+    # mem_limit，又会在部署构建期与 next build 抢内存 → 4G 机器整机假死。
+    # 0.5GB 对 OJ 规模足够；数据量大可用 .env 的 MONGO_WIREDTIGER_CACHE_GB 调高。
+    command: --replSet rs0 --bind_ip_all --auth --keyFile /etc/mongo/keyfile --wiredTigerCacheSizeGB ${MONGO_WIREDTIGER_CACHE_GB:-0.5}
     restart: always
     mem_limit: 1g
     networks:

@@ -268,13 +268,41 @@ sudo bash scripts/oj-watchdog.sh --install      # ③ 看门狗：内存/磁盘�
 
 **构建期内存保护**（`Dockerfile` / `bt-deploy.sh` 自动生效）：
 
-| 机制                    | 说明                                                                                                      |
-| ----------------------- | --------------------------------------------------------------------------------------------------------- |
-| `NODE_MAX_OLD_SPACE_MB` | 限制 Node 堆上限（默认宿主内存 − 1.5G），让构建「受控变慢」而不是拖垮整机                                 |
-| `SKIP_TYPE_CHECK`       | 宿主 ≤4G 时自动跳过构建期类型检查（已由 `npm run typecheck` / CI 完整覆盖），显著降低内存峰值             |
-| 后台构建                | 低配机器建议 `nohup sudo bash scripts/bt-deploy.sh --yes > /tmp/deploy.log 2>&1 &`，避免终端断连/无法中断 |
+| 机制                      | 说明                                                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `NODE_MAX_OLD_SPACE_MB`   | 限制 Node 堆上限（默认宿主内存 − 1.5G），让构建「受控变慢」而不是拖垮整机                                             |
+| `SKIP_TYPE_CHECK`         | 宿主 ≤4G 时自动跳过构建期类型检查（已由 `npm run typecheck` / CI 完整覆盖），显著降低内存峰值                         |
+| `NEXT_TELEMETRY_DISABLED` | 构建阶段也关闭 Next 遥测，避免受限网络下的额外等待                                                                    |
+| MongoDB 缓存上限          | `--wiredTigerCacheSizeGB 0.5`（`MONGO_WIREDTIGER_CACHE_GB` 可调），避免 mongod 按宿主内存算出 ~1.5GB 缓存与构建抢内存 |
+| 后台构建                  | 低配机器建议 `nohup sudo bash scripts/bt-deploy.sh --yes > /tmp/deploy.log 2>&1 &`，避免终端断连/无法中断             |
 
-> 说明：`docker-compose.yml` 已为 app(2g)/mongo(1g)/redis(256m) 规划了 4G 宿主的运行时预算，另有两层日志轮转（daemon.json + 服务级 `logging`，10m×5）。**假死与运行时无关，只发生在构建期**——因为构建不吃 compose 的限制。
+**4G 宿主的实际内存预算**（构建期是峰值时刻）：
+
+| 阶段       | 占用情况                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| 运行时常驻 | app ≈ 0.3–0.8G + mongo ≤ 0.5G（已限制缓存）+ redis ≈ 30M ≈ **1–1.4G**                     |
+| 构建期峰值 | 上述常驻 + `next build`（跳过类型检查后约 1–1.5G），Node 堆上限 2.5G                      |
+| 兜底       | swap 4G（`setup-swap.sh`）+ OOM 免疫（内存极限时优先杀构建进程，sshd / nginx / 面板保留） |
+
+**可调参数**（按数据量与内存微调）：
+
+| 参数                        | 位置                          | 默认            | 何时调整                                           |
+| --------------------------- | ----------------------------- | --------------- | -------------------------------------------------- |
+| `MONGO_WIREDTIGER_CACHE_GB` | `.env`                        | `0.5`           | 题库/提交量到百万级可调到 1                        |
+| `NODE_MAX_OLD_SPACE_MB`     | `.env`（透传给 `build.args`） | 宿主内存 − 1.5G | 构建报 heap OOM 时调大；想更省内存可调小           |
+| `SKIP_TYPE_CHECK`           | `.env` 或 `--type-check`      | ≤4G 自动 `true` | 想强制类型检查用 `--type-check`（低配有 OOM 风险） |
+| `JUDGE_MAX_CONCURRENT`      | `.env`                        | `1`             | 4 核保持 1；内存吃紧时不要再上调                   |
+
+**构建仍然吃紧时的兜底**（临时腾出约 1G，代价是构建期间站点不可用）：
+
+```bash
+cd /项目目录
+docker compose stop app                          # 只停 app，mongo/redis 继续跑
+sudo bash scripts/bt-deploy.sh --yes             # 末尾的 up -d 会自动把 app 拉起来
+# 若构建失败导致 app 未启动: docker compose up -d app
+```
+
+> 说明：`docker-compose.yml` 里的 `mem_limit` 是**上限而非预留**，运行时实际占用取决于业务量；另有两层日志轮转（daemon.json + 服务级 `logging`，10m×5）。**假死只发生在构建期**——因为 `docker build` 不吃 compose 的限制。
 
 脚本首次部署会自动写入多源 `registry-mirrors`（见 `bt-deploy.sh` 的 `ensure_docker_mirrors`）。若你的服务器已配置过 `daemon.json` 或镜像仍慢，可手动配置：
 
