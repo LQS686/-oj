@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   BookOpen,
@@ -19,7 +18,6 @@ import {
 } from 'lucide-react'
 import { useSettings } from '@/contexts/SettingsContext'
 import { isSelfRegistrationOpen } from '@/lib/auth/registration-open'
-import { fetchWithCookie } from '@/lib/api/base'
 import type { PublicAnnouncementItem } from '@/lib/announcement/service'
 import { AnnouncementsGrid } from '@/app/_components/AnnouncementsGrid'
 import { SectionHeader } from '@/app/_components/SectionHeader'
@@ -80,7 +78,12 @@ const climbPath = [
   },
 ]
 
-export function GuestView() {
+export function GuestView({
+  initialAnnouncements = [],
+}: {
+  /** 服务端预取的公告，避免访客首页再发一次请求 */
+  initialAnnouncements?: PublicAnnouncementItem[]
+}) {
   const { settings, needsBootstrap } = useSettings()
   const siteName = settings.siteName || '大山 OJ'
   const tagline = '代码如山·算法为径'
@@ -88,22 +91,7 @@ export function GuestView() {
     allowRegistration: settings.allowRegistration,
     needsBootstrap,
   })
-  const [announcements, setAnnouncements] = useState<PublicAnnouncementItem[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-    fetchWithCookie('/api/announcements?limit=6')
-      .then((r) => r.json())
-      .then((json) => {
-        if (!cancelled && json.success && json.data?.items) {
-          setAnnouncements(json.data.items)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const announcements = initialAnnouncements
 
   return (
     <div className="space-y-12 md:space-y-16">

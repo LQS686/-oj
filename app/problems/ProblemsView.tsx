@@ -1,0 +1,613 @@
+'use client'
+
+import { useState, useMemo, useRef, useCallback } from 'react'
+import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useRouter } from 'next/navigation'
+import ProblemOpenLink from '@/components/problem/ProblemOpenLink'
+import TagOverflowList from '@/components/common/TagOverflowList'
+import { Search, Check, X, BookOpen, ChevronDown, Tag, Shuffle, Loader2 } from 'lucide-react'
+import { getDifficultyClass } from '@/lib/status'
+import { useUser } from '@/contexts/UserContext'
+import { DIFFICULTIES } from '@/lib/constants'
+import { fetchWithCookie } from '@/lib/api/base'
+import { useClickOutside } from '@/hooks/useClickOutside'
+import {
+  EducationalPageShell,
+  DenseListShell,
+  denseListRowClass,
+  ListEmptyState,
+  useDialog,
+  Modal,
+  ListToolbar,
+  Pagination,
+} from '@/components/common'
+
+export interface Problem {
+  id: string
+  problemNumber: string | null
+  title: string
+  difficulty: string
+  totalSubmit: number
+  totalAccepted: number
+  tags: string[]
+  source?: string | null
+}
+
+export interface ProblemsInitialData {
+  problems: Problem[]
+  total: number
+  totalPages: number
+  tags: string[]
+  statuses: Record<string, { score: number; submitted: boolean }>
+}
+
+export default function ProblemsView({
+  initialData,
+}: {
+  /** 服务端首屏数据；缺失时（SSR 取数失败）回退为客户端拉取 */
+  initialData?: ProblemsInitialData | null
+}) {
+  const dialog = useDialog()
+  const { user } = useUser()
+  const router = useRouter()
+  const [problems, setProblems] = useState<Problem[]>(initialData?.problems ?? [])
+  const [loading, setLoading] = useState(!initialData)
+  // 已有内容时的刷新态：保留旧列表并淡化，避免翻页/筛选整块闪回骨架屏
+  const [refreshing, setRefreshing] = useState(false)
+  const loadedOnceRef = useRef(Boolean(initialData))
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(initialData?.totalPages ?? 1)
+  const [, setTotalProblems] = useState(initialData?.total ?? 0)
+  const [availableTags, setAvailableTags] = useState<string[]>(initialData?.tags ?? [])
+
+  const [problemStatus, setProblemStatus] = useState<{
+    [problemId: string]: { score: number; submitted: boolean }
+  }>(initialData?.statuses ?? {})
+  const [difficultyOpen, setDifficultyOpen] = useState(false)
+  const [tagModalOpen, setTagModalOpen] = useState(false)
+  const [tagSearch, setTagSearch] = useState('')
+  const [randomLoading, setRandomLoading] = useState(false)
+
+  const difficultyRef = useRef<HTMLDivElement>(null)
+  useClickOutside(difficultyRef, () => setDifficultyOpen(false))
+
+  // 请求序号：快速翻页/筛选时丢弃过期响应，避免旧数据覆盖新数据
+  const reqSeqRef = useRef(0)
+  // 最新页码引用：筛选防抖回调读取最新 page，避免闭包捕获陈旧值
+  const pageRef = useRef(1)
+
+  const fetchTags = useCallback(async () => {
+    try {
+      const response = await fetchWithCookie('/api/problems/tags')
+      const data = await response.json()
+      if (data.success) {
+        setAvailableTags(data.data)
+      }
+    } catch (error) {
+      console.error('获取标签失败:', error)
+    }
+  }, [])
+
+  const fetchProblems = useCallback(async () => {
+    const seq = ++reqSeqRef.current
+    // 首次加载才用骨架屏；之后的翻页/筛选保留旧内容，减少闪烁
+    if (loadedOnceRef.current) setRefreshing(true)
+    else setLoading(true)
+    try {
+      // 搜索/难度/标签全部提交服务端，避免只过滤当前页 30 条导致
+      // 「目标题目不在第 1 页时搜不到、分页总数与筛选结果矛盾」
+      const params = new URLSearchParams({ page: String(page), pageSize: '30' })
+      if (searchQuery.trim()) params.set('search', searchQuery.trim())
+      if (selectedDifficulties.length > 0) {
+        params.set('difficulty', selectedDifficulties.join(','))
+      }
+      if (selectedTags.length > 0) {
+        params.set('tag', selectedTags.join(','))
+      }
+      const response = await fetchWithCookie(`/api/problems?${params.toString()}`)
+      const data = await response.json()
+
+      // 过期响应（期间又发起了新请求）直接丢弃
+      if (seq !== reqSeqRef.current) return
+
+      if (data.success) {
+        setProblems(data.data.problems || [])
+        setTotalPages(data.data.pagination?.totalPages || 1)
+        setTotalProblems(data.data.pagination?.total || 0)
+        // 登录用户的进度随列表一起返回（游客时字段缺省）
+        setProblemStatus(data.data.statuses || {})
+      }
+    } catch (error) {
+      console.error('获取题目列表失败:', error)
+    } finally {
+      if (seq === reqSeqRef.current) {
+        loadedOnceRef.current = true
+        setLoading(false)
+        setRefreshing(false)
+      }
+    }
+  }, [page, searchQuery, selectedDifficulties, selectedTags])
+
+  // 登录态变化（登录/退出/跨标签页同步）后刷新列表：进度列是列表响应的一部分
+  const prevUserRef = useRef<string | null | undefined>(undefined)
+  useDeferredEffect(() => {
+    const userId = user?.id ?? null
+    if (prevUserRef.current === undefined) {
+      prevUserRef.current = userId
+      return
+    }
+    if (prevUserRef.current === userId) return
+    prevUserRef.current = userId
+    setProblemStatus({})
+    void fetchProblems()
+  }, [user?.id])
+
+  // 挂载时仅拉一次标签集合（不随页码/筛选重复请求）；服务端已带标签时跳过
+  useDeferredEffect(() => {
+    if (initialData) return
+    void fetchTags()
+  }, [fetchTags])
+
+  // 翻页：立即请求（排除挂载首次，挂载由下方筛选 effect 触发，避免双请求）
+  const prevPageRef = useRef(1)
+  useDeferredEffect(() => {
+    pageRef.current = page
+    if (prevPageRef.current === page) return
+    prevPageRef.current = page
+    void fetchProblems()
+  }, [page])
+
+  // 筛选变化：防抖 300ms 后回到第 1 页重新请求。
+  // 首屏若已有服务端数据则不再请求；否则立即拉取，不让用户白等防抖周期。
+  const filtersInitializedRef = useRef(false)
+  useDeferredEffect(() => {
+    if (!filtersInitializedRef.current) {
+      filtersInitializedRef.current = true
+      if (initialData) return
+      void fetchProblems()
+      return
+    }
+    const timer = window.setTimeout(() => {
+      // 用 ref 读取最新页码，避免闭包捕获防抖期间已变化的陈旧 page
+      if (pageRef.current !== 1) {
+        setPage(1)
+      } else {
+        void fetchProblems()
+      }
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchQuery, selectedDifficulties, selectedTags])
+
+  const hasFilters = !!searchQuery || selectedDifficulties.length > 0 || selectedTags.length > 0
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setSelectedDifficulties([])
+    setSelectedTags([])
+  }
+
+  // 随机一题（参考 HOJ 题库 "随机一题" 按钮）
+  // 尊重当前筛选条件（search/difficulty/tag），从结果集中随机抽一题跳转
+  const handleRandomProblem = async () => {
+    try {
+      setRandomLoading(true)
+      const params = new URLSearchParams()
+      if (searchQuery) params.set('search', searchQuery)
+      // 多选难度/标签只取第一个作为随机筛选条件（API 单值）
+      if (selectedDifficulties.length > 0) params.set('difficulty', selectedDifficulties[0])
+      if (selectedTags.length > 0) params.set('tag', selectedTags[0])
+      const queryString = params.toString()
+      const url = `/api/problems/random${queryString ? `?${queryString}` : ''}`
+      const res = await fetchWithCookie(url)
+      const data = await res.json()
+      if (data.success && data.data) {
+        const target = data.data.problemNumber || data.data.id
+        router.push(`/problem/${target}`)
+      } else {
+        await dialog.alert({ tone: 'error', message: data.error || '没有符合条件的题目' })
+      }
+    } catch {
+      await dialog.alert({ tone: 'error', message: '网络错误，请稍后重试' })
+    } finally {
+      setRandomLoading(false)
+    }
+  }
+
+  const toggleDifficulty = (d: string) => {
+    setSelectedDifficulties((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+    )
+  }
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]))
+  }
+
+  const filteredTagOptions = useMemo(() => {
+    const q = tagSearch.trim().toLowerCase()
+    if (!q) return availableTags
+    return availableTags.filter((t) => t.toLowerCase().includes(q))
+  }, [availableTags, tagSearch])
+
+  const difficultyLabel =
+    selectedDifficulties.length === 0
+      ? '全部难度'
+      : selectedDifficulties.length === 1
+        ? selectedDifficulties[0]
+        : `难度 · ${selectedDifficulties.length}`
+
+  const tagLabel =
+    selectedTags.length === 0
+      ? '标签'
+      : selectedTags.length === 1
+        ? selectedTags[0]
+        : `标签 · ${selectedTags.length}`
+
+  const problemListColumns = [
+    { span: 'col-span-1 text-center', label: '状态' },
+    { span: 'col-span-1 text-center', label: '题号' },
+    { span: 'col-span-4', label: '标题' },
+    { span: 'col-span-7', label: '标签' },
+    { span: 'col-span-1 text-center', label: '难度' },
+    { span: 'col-span-2 text-center', label: 'AC 率' },
+  ]
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3 rounded-lg animate-pulse">
+              <div className="w-5 h-5 rounded bg-muted" />
+              <div className="w-16 h-4 rounded bg-muted" />
+              <div className="flex-1 h-4 rounded bg-muted" />
+              <div className="flex gap-1.5">
+                <div className="w-12 h-5 rounded bg-muted" />
+                <div className="w-8 h-5 rounded bg-muted" />
+              </div>
+              <div className="w-10 h-4 rounded bg-muted" />
+              <div className="w-8 h-4 rounded bg-muted" />
+              <div className="w-5 h-5 rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    if (problems.length === 0) {
+      return (
+        <ListEmptyState
+          icon={Search}
+          title="没有找到符合条件的题目"
+          description="尝试调整筛选条件或搜索关键词"
+          action={
+            hasFilters ? (
+              <button onClick={clearFilters} className="btn btn-primary btn-sm">
+                清除筛选
+              </button>
+            ) : undefined
+          }
+        />
+      )
+    }
+
+    return (
+      <div className="animate-fadeIn">
+        <div className="h-5 flex items-center justify-end" aria-live="polite">
+          {refreshing && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              更新中…
+            </span>
+          )}
+        </div>
+        <div
+          className={`transition-opacity duration-200 ${
+            refreshing ? 'opacity-50 pointer-events-none' : ''
+          }`}
+          aria-busy={refreshing}
+        >
+          <DenseListShell columns={problemListColumns}>
+            {problems.map((problem) => {
+              const status = problemStatus[problem.id]
+              const score = status?.score || 0
+              const submitted = status?.submitted || false
+              const isSolved = score === 100
+
+              return (
+                <ProblemOpenLink
+                  key={problem.id}
+                  href={`/problem/${problem.problemNumber || problem.id}`}
+                  problemTitle={problem.title}
+                  titleContext={{
+                    kind: 'library',
+                    problemNumber: problem.problemNumber || problem.id,
+                  }}
+                  className={`${denseListRowClass} group`}
+                >
+                  <div className="col-span-1 flex items-center justify-center">
+                    {user ? (
+                      isSolved ? (
+                        <Check className="w-5 h-5 text-secondary" aria-label="已通过" />
+                      ) : submitted ? (
+                        <X className="w-5 h-5 text-error" aria-label="已尝试未通过" />
+                      ) : (
+                        <div className="w-4 h-4"></div>
+                      )
+                    ) : (
+                      <div className="w-4 h-4"></div>
+                    )}
+                  </div>
+
+                  <div className="col-span-1 flex items-center justify-center">
+                    <span className="font-mono text-sm text-foreground font-semibold">
+                      {problem.problemNumber || problem.id}
+                    </span>
+                  </div>
+
+                  <div className="col-span-4 flex items-center">
+                    <span className="text-foreground font-medium group-hover:text-primary-light transition-colors truncate">
+                      {problem.title}
+                    </span>
+                  </div>
+
+                  <div className="col-span-7 flex min-w-0 items-center">
+                    <TagOverflowList
+                      tags={problem.tags ?? []}
+                      tagClassName="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary-light transition-colors"
+                      ellipsisClassName="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground"
+                    />
+                  </div>
+
+                  <div className="col-span-1 flex items-center justify-center">
+                    <span className={`difficulty-tag ${getDifficultyClass(problem.difficulty)}`}>
+                      {problem.difficulty}
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 flex items-center justify-center">
+                    {(() => {
+                      // AC 率进度条（参考 HOJ ProblemList.vue el-progress 分段色）
+                      // 0% 灰、1-39% 红、40-59% 橙、60-79% 蓝、80-100% 绿
+                      const total = problem.totalSubmit || 0
+                      const accepted = problem.totalAccepted || 0
+                      if (total === 0) {
+                        return <span className="text-xs text-muted-foreground/50">-</span>
+                      }
+                      const rate = Math.round((accepted / total) * 100)
+                      const colorClass =
+                        rate >= 80
+                          ? 'bg-secondary'
+                          : rate >= 60
+                            ? 'bg-primary'
+                            : rate >= 40
+                              ? 'bg-accent'
+                              : rate >= 1
+                                ? 'bg-error'
+                                : 'bg-muted'
+                      return (
+                        <div className="w-full max-w-[100px]">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-0.5">
+                            <span className="font-mono tabular-nums">{rate}%</span>
+                            <span className="font-mono tabular-nums">
+                              {accepted}/{total}
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={`h-full ${colorClass} rounded-full transition-all`}
+                              style={{ width: `${rate}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </ProblemOpenLink>
+              )
+            })}
+          </DenseListShell>
+
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-8">
+              <Pagination page={page} totalPages={totalPages} onChange={setPage} compact />
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <EducationalPageShell
+        title="题库"
+        icon={BookOpen}
+        toolbar={
+          <ListToolbar
+            search={{
+              value: searchQuery,
+              onChange: setSearchQuery,
+              placeholder: '输入题号、标题或来源',
+            }}
+            trailing={
+              <>
+                <div className="relative" ref={difficultyRef}>
+                  <button
+                    type="button"
+                    onClick={() => setDifficultyOpen((o) => !o)}
+                    className={`flex items-center gap-1.5 btn btn-sm border border-border bg-background hover:bg-muted transition-colors max-w-[9rem] truncate ${
+                      selectedDifficulties.length > 0
+                        ? 'border-primary/40 text-primary'
+                        : 'text-foreground'
+                    }`}
+                  >
+                    <span className="truncate">{difficultyLabel}</span>
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 transition-transform ${difficultyOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  {difficultyOpen && (
+                    <div className="absolute right-0 sm:left-0 z-50 mt-1 w-52 max-h-72 overflow-y-auto rounded-lg border border-border bg-background shadow-lg py-1">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDifficulties([])}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-muted text-muted-foreground"
+                      >
+                        全部难度
+                      </button>
+                      {DIFFICULTIES.map((d) => {
+                        const checked = selectedDifficulties.includes(d)
+                        return (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => toggleDifficulty(d)}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
+                          >
+                            <span
+                              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                checked
+                                  ? 'bg-primary border-primary text-primary-foreground'
+                                  : 'border-border'
+                              }`}
+                            >
+                              {checked && <Check className="w-3 h-3" />}
+                            </span>
+                            <span className={`difficulty-tag ${getDifficultyClass(d)}`}>{d}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTagSearch('')
+                    setTagModalOpen(true)
+                  }}
+                  className={`flex items-center gap-1.5 btn btn-sm border border-border bg-background hover:bg-muted transition-colors max-w-[9rem] truncate ${
+                    selectedTags.length > 0 ? 'border-primary/40 text-primary' : 'text-foreground'
+                  }`}
+                >
+                  <Tag className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{tagLabel}</span>
+                </button>
+
+                {hasFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="p-2 rounded-md text-muted-foreground hover:bg-error/10 hover:text-error transition-colors"
+                    title="清除筛选"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleRandomProblem}
+                  disabled={randomLoading}
+                  className="flex items-center gap-1.5 btn btn-sm border border-primary/30 bg-primary/10 text-primary-light hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="随机跳转一道题目（尊重当前筛选条件）"
+                >
+                  <Shuffle className={`w-4 h-4 ${randomLoading ? 'animate-pulse' : ''}`} />
+                  <span className="hidden sm:inline">随机一题</span>
+                </button>
+              </>
+            }
+          />
+        }
+      >
+        {renderContent()}
+      </EducationalPageShell>
+
+      {tagModalOpen && (
+        <Modal
+          open
+          onClose={() => setTagModalOpen(false)}
+          title="选择标签"
+          size="lg"
+          footer={
+            <div className="flex items-center justify-between gap-2 w-full">
+              <button
+                type="button"
+                onClick={() => setSelectedTags([])}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                清空已选
+              </button>
+              <button
+                type="button"
+                onClick={() => setTagModalOpen(false)}
+                className="btn btn-primary"
+              >
+                确定
+              </button>
+            </div>
+          }
+        >
+          <div className="pb-4 border-b border-border -mt-1 mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="搜索标签…"
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {selectedTags.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => toggleTag(t)}
+                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/10 text-primary"
+                  >
+                    {t}
+                    <X className="w-3 h-3" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            {filteredTagOptions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">暂无匹配标签</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {filteredTagOptions.map((tag) => {
+                  const checked = selectedTags.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className={`inline-flex items-center gap-1.5 btn btn-sm border transition-colors ${
+                        checked
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-muted/50 text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {checked && <Check className="w-3.5 h-3.5" />}
+                      {tag}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}

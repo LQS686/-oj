@@ -340,6 +340,10 @@ export async function getSolutionDetailWithPermission(
       author: {
         select: { id: true, username: true, nickname: true, avatar: true },
       },
+      // 题解页需要展示所属题目标题/题号，随详情一并返回，避免前端再发一次题目请求
+      problem: {
+        select: { id: true, title: true, problemNumber: true },
+      },
     },
   })
   if (!solution) return { found: false as const }

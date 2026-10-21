@@ -3,6 +3,8 @@
  * 管理员仪表盘数据
  */
 import { prisma } from '@/lib/prisma'
+import { cache } from '@/lib/cache'
+import { CacheKeys } from '@/lib/constants/cache-keys'
 
 export interface DashboardRecentSubmission {
   id: string
@@ -22,14 +24,55 @@ export interface DashboardData {
   recentSubmissions: DashboardRecentSubmission[]
 }
 
+interface DashboardAggregates {
+  totalUsers: number
+  totalProblems: number
+  totalSubmissions: number
+  todaySubmissions: number
+  userGrowth: number
+  submissionGrowth: number
+}
+
+/** 聚合统计与最近提交无关，单独缓存：数据量增长后 count/groupBy 不必每次页面加载都扫全表 */
+async function loadDashboardAggregates(today: Date, lastWeek: Date): Promise<DashboardAggregates> {
+  const [totalUsers, totalProblems, totalSubmissions, todaySubmissions, newUsers, newSubmissions] =
+    await Promise.all([
+      prisma.user.count(),
+      prisma.problem.count(),
+      prisma.submission.count(),
+      prisma.submission.count({ where: { submittedAt: { gte: today } } }),
+      prisma.user.count({ where: { createdAt: { gte: lastWeek } } }),
+      prisma.submission.count({ where: { submittedAt: { gte: lastWeek } } }),
+    ])
+
+  return {
+    totalUsers,
+    totalProblems,
+    totalSubmissions,
+    todaySubmissions,
+    userGrowth: totalUsers > 0 ? Number(((newUsers / totalUsers) * 100).toFixed(1)) : 0,
+    submissionGrowth:
+      totalSubmissions > 0 ? Number(((newSubmissions / totalSubmissions) * 100).toFixed(1)) : 0,
+  }
+}
+
 /**
  * 仪表盘聚合数据：用户/题目/提交统计 + 增长率 + 最近 10 条提交
  */
 export async function computeAdminDashboard(now: Date = new Date()): Promise<DashboardData> {
-  const [totalUsers, totalProblems, totalSubmissions, recentSubmissionsRaw] = await Promise.all([
-    prisma.user.count(),
-    prisma.problem.count(),
-    prisma.submission.count(),
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+  const lastWeek = new Date(now)
+  lastWeek.setDate(lastWeek.getDate() - 7)
+  const dayKey = today.toISOString().slice(0, 10)
+
+  const [aggregates, recentSubmissionsRaw] = await Promise.all([
+    cache.get(
+      CacheKeys.admin.dashboardStats(),
+      [dayKey],
+      () => loadDashboardAggregates(today, lastWeek),
+      { ttl: 15_000 }
+    ),
     prisma.submission.findMany({
       take: 10,
       orderBy: { submittedAt: 'desc' },
@@ -80,30 +123,8 @@ export async function computeAdminDashboard(now: Date = new Date()): Promise<Das
     }
   })
 
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
-  const lastWeek = new Date(now)
-  lastWeek.setDate(lastWeek.getDate() - 7)
-
-  const [todaySubmissions, newUsersThisWeek, newSubmissionsThisWeek] = await Promise.all([
-    prisma.submission.count({ where: { submittedAt: { gte: today } } }),
-    prisma.user.count({ where: { createdAt: { gte: lastWeek } } }),
-    prisma.submission.count({ where: { submittedAt: { gte: lastWeek } } }),
-  ])
-
-  const userGrowth = totalUsers > 0 ? Number(((newUsersThisWeek / totalUsers) * 100).toFixed(1)) : 0
-  const submissionGrowth =
-    totalSubmissions > 0
-      ? Number(((newSubmissionsThisWeek / totalSubmissions) * 100).toFixed(1))
-      : 0
-
   return {
-    totalUsers,
-    totalProblems,
-    totalSubmissions,
-    todaySubmissions,
-    userGrowth,
-    submissionGrowth,
+    ...aggregates,
     recentSubmissions,
   }
 }

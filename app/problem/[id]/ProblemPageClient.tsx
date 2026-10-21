@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { motion, AnimatePresence } from 'motion/react'
 import { ListEmptyState } from '@/components/common'
-import { AlertCircle, Wifi, CheckCircle2, FileCode, Edit3 } from 'lucide-react'
+import { AlertCircle, Wifi, Edit3 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
@@ -451,11 +451,6 @@ export default function ProblemPageClient({
     )
   }
 
-  const acceptRate =
-    problem.totalSubmit > 0
-      ? ((problem.totalAccepted / problem.totalSubmit) * 100).toFixed(1)
-      : '0.0'
-
   return (
     <div className="min-h-screen pb-20 lg:pb-8">
       <PageContainer variant="workspace" className="pt-4 pb-6">
@@ -474,22 +469,12 @@ export default function ProblemPageClient({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <CheckCircle2 className="w-4 h-4 text-secondary transition-transform duration-300" />
-            <span>通过率 {acceptRate}%</span>
+        {user && isConnected && (
+          <div className="flex items-center gap-1.5 mb-6 text-xs text-secondary hover:text-secondary-light transition-colors duration-300 group">
+            <Wifi className="w-3.5 h-3.5 transition-transform duration-300" />
+            <span>实时连接</span>
           </div>
-          <div className="flex items-center gap-1.5 hover:text-primary-light transition-colors duration-300 group">
-            <FileCode className="w-4 h-4 transition-transform duration-300" />
-            <span>{problem.totalSubmit?.toLocaleString() || '0'} 提交</span>
-          </div>
-          {user && isConnected && (
-            <div className="flex items-center gap-1.5 text-xs text-secondary hover:text-secondary-light transition-colors duration-300 group">
-              <Wifi className="w-3.5 h-3.5 transition-transform duration-300" />
-              <span>实时连接</span>
-            </div>
-          )}
-        </div>
+        )}
 
         <ProblemWorkspaceShell
           codeMode={activeTab === 'code'}

@@ -65,6 +65,14 @@ export async function ensureCsrfToken(): Promise<string> {
   return tracked
 }
 
+/**
+ * 同步读取 CSRF token。
+ * 仅供 pagehide/visibilitychange 等无法等待异步签发的 keepalive 请求使用。
+ */
+export function getCsrfTokenFromCookie(): string | null {
+  return readCsrfFromDocumentCookie()
+}
+
 export function clearCsrfTokenCache(): void {
   csrfGeneration++
   csrfInflight = null

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, Suspense } from 'react'
+import { useState, useMemo, useCallback, useEffect, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Trophy, Plus, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -30,6 +30,7 @@ function ContestsPageContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'all' | 'ongoing' | 'upcoming' | 'ended'>('all')
+  const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -97,6 +98,15 @@ function ContestsPageContent() {
   useDeferredEffect(() => {
     void fetchContests()
   }, [fetchContests])
+
+  // 搜索防抖：避免每个按键都触发一次列表请求
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setKeyword(keywordInput.trim())
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [keywordInput])
 
   useDeferredEffect(() => {
     if (searchParams.get('create') === '1' && user && canCreate) {
@@ -251,11 +261,8 @@ function ContestsPageContent() {
       toolbar={
         <ListToolbar
           search={{
-            value: keyword,
-            onChange: (value) => {
-              setKeyword(value)
-              setPage(1)
-            },
+            value: keywordInput,
+            onChange: setKeywordInput,
             placeholder: '搜索竞赛标题或简介...',
           }}
           trailing={

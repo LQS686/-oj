@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { DataTable, AdminPageShell } from '@/components/admin'
 import { useUser } from '@/contexts/UserContext'
 import { isSystemAdmin } from '@/lib/permissions'
@@ -22,20 +22,30 @@ export default function AdminUsersPage() {
   // 当前操作者是否为系统管理员（系统管理员可赋予 ADMIN/TEACHER/STUDENT；管理员只能赋予 TEACHER/STUDENT）
   const operatorIsSystemAdmin = isSystemAdmin(currentUser)
 
-  const { users, loading, error, pagination, fetchUsers, goToPage, changePageSize, applyFilters } =
-    useUserList()
+  const {
+    users,
+    initialLoading,
+    refreshing,
+    error,
+    pagination,
+    fetchUsers,
+    goToPage,
+    changePageSize,
+    applyFilters,
+  } = useUserList()
 
-  // 列表筛选（服务端过滤：条件变化自动回到第 1 页重新拉取）
-  const [searchQuery, setSearchQuery] = useState('')
+  // 筛选：搜索防抖 300ms，避免每个按键都打一次接口；角色切换同样走统一入口
+  const [searchInput, setSearchInput] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
-  const handleSearchChange = (v: string) => {
-    setSearchQuery(v)
-    applyFilters(v, roleFilter)
-  }
-  const handleRoleFilterChange = (v: string) => {
-    setRoleFilter(v)
-    applyFilters(searchQuery, v)
-  }
+  const filterEffectMounted = useRef(false)
+  useEffect(() => {
+    if (!filterEffectMounted.current) {
+      filterEffectMounted.current = true
+      return
+    }
+    const timer = setTimeout(() => applyFilters(searchInput, roleFilter), 300)
+    return () => clearTimeout(timer)
+  }, [searchInput, roleFilter, applyFilters])
 
   // 单条操作目标
   const [editTarget, setEditTarget] = useState<User | null>(null)
@@ -79,7 +89,7 @@ export default function AdminUsersPage() {
     [operatorIsSystemAdmin]
   )
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -104,53 +114,62 @@ export default function AdminUsersPage() {
   return (
     <>
       <AdminPageShell width="list" className="space-y-6">
-        <StatsCards users={users} total={pagination.total} />
+        <div className="h-5 flex items-center justify-end" aria-live="polite">
+          {refreshing && <span className="text-xs text-muted-foreground">更新中…</span>}
+        </div>
 
-        <FilterToolbar
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          roleFilter={roleFilter}
-          onRoleFilterChange={handleRoleFilterChange}
-          onBatchRegisterClick={() => setShowBatchRegisterModal(true)}
-        />
+        <div
+          className={`space-y-6 transition-opacity duration-200 ${refreshing ? 'opacity-50 pointer-events-none' : ''}`}
+          aria-busy={refreshing}
+        >
+          <StatsCards users={users} total={pagination.total} />
 
-        <DataTable
-          data={filteredUsers}
-          columns={columns}
-          idKey="id"
-          key={tableKey}
-          emptyMessage={searchQuery || roleFilter !== 'all' ? '没有找到匹配的用户' : '暂无用户'}
-          onRowClick={(row) => {
-            // 与编辑按钮一致的锁定判断：系统管理员 / （非系统管理员操作时的）管理员不可编辑
-            if (isUserLocked(row, operatorIsSystemAdmin)) return
-            setEditTarget(row)
-          }}
-          pagination={{
-            page: pagination.page,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            onPageChange: goToPage,
-            onPageSizeChange: changePageSize,
-          }}
-          batchActions={[
-            {
-              label: '批量修改角色',
-              action: (ids) => {
-                setSelectedUserIds(new Set(ids))
-                setShowBatchEditModal(true)
+          <FilterToolbar
+            searchQuery={searchInput}
+            onSearchChange={setSearchInput}
+            roleFilter={roleFilter}
+            onRoleFilterChange={setRoleFilter}
+            onBatchRegisterClick={() => setShowBatchRegisterModal(true)}
+          />
+
+          <DataTable
+            data={filteredUsers}
+            columns={columns}
+            idKey="id"
+            key={tableKey}
+            emptyMessage={searchInput || roleFilter !== 'all' ? '没有找到匹配的用户' : '暂无用户'}
+            onRowClick={(row) => {
+              // 与编辑按钮一致的锁定判断：系统管理员 / （非系统管理员操作时的）管理员不可编辑
+              if (isUserLocked(row, operatorIsSystemAdmin)) return
+              setEditTarget(row)
+            }}
+            pagination={{
+              page: pagination.page,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
+              onPageChange: goToPage,
+              onPageSizeChange: changePageSize,
+            }}
+            batchActions={[
+              {
+                label: '批量修改角色',
+                action: (ids) => {
+                  setSelectedUserIds(new Set(ids))
+                  setShowBatchEditModal(true)
+                },
               },
-            },
-            {
-              label: '批量删除',
-              action: (ids) => {
-                setSelectedUserIds(new Set(ids))
-                setShowBatchDeleteModal(true)
+              {
+                label: '批量删除',
+                action: (ids) => {
+                  setSelectedUserIds(new Set(ids))
+                  setShowBatchDeleteModal(true)
+                },
+                danger: true,
               },
-              danger: true,
-            },
-          ]}
-          mobileCardRenderer={mobileCardRenderer}
-        />
+            ]}
+            mobileCardRenderer={mobileCardRenderer}
+          />
+        </div>
       </AdminPageShell>
 
       {editTarget && (

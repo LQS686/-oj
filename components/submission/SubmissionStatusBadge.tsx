@@ -55,4 +55,22 @@ export function SubmissionStatusBadge({
   )
 }
 
+export function SubmissionStatusIcon({
+  status,
+  className = 'w-4 h-4',
+}: {
+  status: string
+  className?: string
+}) {
+  const { icon, color } = getStatusConfig(status)
+  const Icon = ICONS[icon] ?? AlertCircle
+  const spinning = icon === 'loader-2'
+  return (
+    <Icon
+      className={`${className} ${color} ${spinning ? 'animate-icon-spin' : ''}`.trim()}
+      aria-hidden="true"
+    />
+  )
+}
+
 export default SubmissionStatusBadge

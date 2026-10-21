@@ -48,6 +48,7 @@ const Navbar = () => {
             <SearchBar />
             <Link
               href="/help"
+              prefetch={false}
               className={`btn-ghost btn p-3 group ${
                 pathname === '/help' || pathname?.startsWith('/help/') ? 'text-primary-light' : ''
               }`}

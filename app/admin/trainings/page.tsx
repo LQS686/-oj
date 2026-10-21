@@ -4,7 +4,7 @@
  * app/admin/trainings/page.tsx
  * 管理后台 - 题单管理列表
  */
-import { useState, useCallback, Suspense } from 'react'
+import { useState, useCallback, useEffect, Suspense } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -43,6 +43,7 @@ function AdminTrainingsPageContent() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
@@ -83,6 +84,15 @@ function AdminTrainingsPageContent() {
   useDeferredEffect(() => {
     fetchItems()
   }, [fetchItems])
+
+  // 搜索防抖：避免每个按键都触发一次服务端查询
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setKeyword(keywordInput.trim())
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [keywordInput])
 
   const handleDelete = async (id: string, title: string) => {
     if (
@@ -134,6 +144,7 @@ function AdminTrainingsPageContent() {
           <Link
             href={`/training/${item.id}`}
             target="_blank"
+            prefetch={false}
             className="font-medium text-foreground hover:text-primary-light line-clamp-1"
           >
             {item.title}
@@ -188,6 +199,7 @@ function AdminTrainingsPageContent() {
           <Link
             href={`/training/${item.id}`}
             target="_blank"
+            prefetch={false}
             className="btn-icon-sm hover:bg-muted text-muted-foreground hover:text-foreground"
             title="预览"
           >
@@ -195,6 +207,7 @@ function AdminTrainingsPageContent() {
           </Link>
           <Link
             href={`/admin/trainings/${item.id}`}
+            prefetch={false}
             className="btn-icon-sm hover:bg-muted text-muted-foreground hover:text-foreground"
             title="编辑"
           >
@@ -220,11 +233,8 @@ function AdminTrainingsPageContent() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            value={keyword}
-            onChange={(e) => {
-              setKeyword(e.target.value)
-              setPage(1)
-            }}
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
             placeholder="搜索题单标题..."
             className="input w-full pl-9"
           />

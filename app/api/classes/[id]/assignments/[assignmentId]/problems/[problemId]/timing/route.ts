@@ -2,9 +2,10 @@
  * 班级作业题目计时
  *
  * POST /api/classes/[id]/assignments/[assignmentId]/problems/[problemId]/timing
- *   body: { action: 'start' | 'pause' | 'resume' }
+ *   body: { action: 'start' | 'pause' | 'resume' | 'heartbeat' }
  *   - start / resume：启动或恢复计时（已统一由 startOrResumeTiming 处理）
  *   - pause：暂停计时
+ *   - heartbeat：刷新最后活跃时间，用于识别失联会话
  *
  * GET /api/classes/[id]/assignments/[assignmentId]/problems/[problemId]/timing
  *   返回当前 progress（含实时累计用时，未创建则返回 null）
@@ -25,9 +26,14 @@ import {
   getCurrentClassMember,
   getAssignmentStatus,
 } from '@/lib/class/service'
-import { startOrResumeTiming, pauseTiming, getProgress } from '@/lib/gamification/timing'
+import {
+  startOrResumeTiming,
+  pauseTiming,
+  heartbeatTiming,
+  getProgress,
+} from '@/lib/gamification/timing'
 
-type TimingAction = 'start' | 'pause' | 'resume'
+type TimingAction = 'start' | 'pause' | 'resume' | 'heartbeat'
 
 /**
  * 公共校验：班级成员 + 作业存在 + 题目属于作业 + 作业时间窗口状态
@@ -65,12 +71,29 @@ async function validateTimingContext(
 export const POST = withApi.auth(async (req, ctx, { user }) => {
   const { id, assignmentId, problemId } = ctx.params
 
-  const { status } = await validateTimingContext(id, assignmentId, problemId, user.id)
+  const { assignment, status } = await validateTimingContext(id, assignmentId, problemId, user.id)
 
   const body = await readJson<{ action?: TimingAction }>(req)
   const action = body.action
-  if (action !== 'start' && action !== 'pause' && action !== 'resume') {
-    throw400('INVALID_ACTION', "action 必须为 'start' | 'pause' | 'resume'")
+  if (action !== 'start' && action !== 'pause' && action !== 'resume' && action !== 'heartbeat') {
+    throw400('INVALID_ACTION', "action 必须为 'start' | 'pause' | 'resume' | 'heartbeat'")
+  }
+
+  const now = Date.now()
+  const endMs = assignment?.endTime ? new Date(assignment.endTime).getTime() : now
+  const pauseUntil = status === 'ended' ? Math.min(now, endMs) : now
+
+  // 心跳只刷新活跃时间；作业已结束时改为结算并暂停，不能借心跳把计时重新拉起
+  if (action === 'heartbeat') {
+    if (status === 'ended') {
+      const progress = await pauseTiming(assignmentId, problemId, user.id, pauseUntil)
+      return ok({ action, progress })
+    }
+    if (status !== 'active') {
+      return ok({ action, progress: await getProgress(assignmentId, problemId, user.id) })
+    }
+    const progress = await heartbeatTiming(assignmentId, problemId, user.id)
+    return ok({ action, progress })
   }
 
   // start 与 resume 统一由 startOrResumeTiming 处理（内部幂等）
@@ -96,7 +119,7 @@ export const POST = withApi.auth(async (req, ctx, { user }) => {
   }
 
   // action === 'pause'，始终允许（即便作业已结束，也允许暂停未完成的计时）
-  const progress = await pauseTiming(assignmentId, problemId, user.id)
+  const progress = await pauseTiming(assignmentId, problemId, user.id, pauseUntil)
   return ok({
     action: 'pause',
     progress,

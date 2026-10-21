@@ -7,6 +7,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
@@ -65,8 +66,17 @@ export function SettingsProvider({
   )
   const [needsBootstrap, setNeedsBootstrap] = useState(initialSettings?.needsBootstrap === true)
   const [loading, setLoading] = useState(!initialSettings)
+  // 标签页可见性事件可能连续触发；短时间内的重复刷新直接忽略
+  const lastFetchAtRef = useRef(0)
 
-  const fetchSettings = useCallback(async () => {
+  useEffect(() => {
+    // 已有 SSR 注入时以挂载时间为起点，避免首屏加载又补发一次请求
+    if (initialSettings) lastFetchAtRef.current = Date.now()
+  }, [initialSettings])
+
+  const fetchSettings = useCallback(async (force = false) => {
+    if (!force && Date.now() - lastFetchAtRef.current < 1000) return
+    lastFetchAtRef.current = Date.now()
     try {
       const settingsData = await settingsApi.getPublicSettings()
       setSettings((prev) => mergePublicSettings(prev, settingsData).settings)
@@ -100,7 +110,7 @@ export function SettingsProvider({
       settings,
       needsBootstrap,
       loading,
-      refreshSettings: fetchSettings,
+      refreshSettings: () => fetchSettings(true),
     }),
     [settings, needsBootstrap, loading, fetchSettings]
   )

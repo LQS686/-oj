@@ -3,12 +3,21 @@
  * - GET  /api/problems  列表
  * - POST /api/problems  创建题目（仅管理员；与后台题库统一入口）
  */
-import { withApi, ok, readJson, readQuery, throw400, errorLike } from '@/lib/api/withApi'
+import {
+  withApi,
+  ok,
+  readJson,
+  readQuery,
+  throw400,
+  errorLike,
+  resolveViewerFromRequest,
+} from '@/lib/api/withApi'
 import {
   createProblemWithTestcases,
   findProblemByTitle,
   listPublicProblems,
 } from '@/lib/problem/service'
+import { getProblemStatusesForUser } from '@/lib/problem/user-status'
 
 import { ensureTotalScoreIs100 } from '@/lib/problem/testcase'
 import { logger } from '@/lib/logger'
@@ -32,16 +41,28 @@ export const GET = withApi.public(async (req) => {
         .filter(Boolean)
     : undefined
 
-  const result = await listPublicProblems({
-    page,
-    pageSize,
-    search: q.search,
-    // 多值筛选：difficulty/tag 支持逗号分隔（与列表页多选交互对应）
-    difficulty: q.difficulty,
-    tag: q.tag,
-    numbers,
-  })
-  return ok(result)
+  // 软登录：列表与查看者身份并行解析，登录用户直接带回做题进度，
+  // 前端无需再串行请求 /api/problems/status。
+  const [result, viewer] = await Promise.all([
+    listPublicProblems({
+      page,
+      pageSize,
+      search: q.search,
+      // 多值筛选：difficulty/tag 支持逗号分隔（与列表页多选交互对应）
+      difficulty: q.difficulty,
+      tag: q.tag,
+      numbers,
+    }),
+    resolveViewerFromRequest(req),
+  ])
+
+  if (!viewer || result.problems.length === 0) return ok(result)
+
+  const statuses = await getProblemStatusesForUser(
+    viewer.user.id,
+    result.problems.map((p) => p.id)
+  )
+  return ok({ ...result, statuses })
 })
 
 export const POST = withApi.admin(async (req, _ctx, { user }) => {

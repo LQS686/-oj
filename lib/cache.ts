@@ -56,6 +56,8 @@ class Cache {
   private inflight: Map<string, Promise<unknown>> = new Map()
   private redis: Redis | null = null
   private redisInit: Promise<boolean> | null = null
+  /** 连接不可用时的退避截止时间：避免每个请求都重新探测 Redis */
+  private redisRetryAt = 0
 
   constructor() {
     // 每5分钟清理一次过期缓存
@@ -87,16 +89,22 @@ class Cache {
   private async ensureRedis(): Promise<boolean> {
     if (!isRedisConfigured()) return false
     if (this.redis) return true
+    if (Date.now() < this.redisRetryAt) return false
     if (this.redisInit) return this.redisInit
 
     this.redisInit = (async () => {
       try {
         const { getRedisClient } = await import('./redis')
         const client = getRedisClient()
-        await client.ping()
+        // 未就绪时直接降级，不等待连接（离线队列已关闭，ping 也会立即失败）
+        if (client.status !== 'ready') {
+          this.redisRetryAt = Date.now() + 3000
+          return false
+        }
         this.redis = client
         return true
       } catch (error) {
+        this.redisRetryAt = Date.now() + 3000
         logger.warn('[cache] Redis 不可用，降级为内存缓存', {
           error: error instanceof Error ? error.message : String(error),
         })

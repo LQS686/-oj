@@ -5,6 +5,7 @@
  */
 import 'server-only'
 
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
 import { getCachedUser } from '@/lib/api/handler'
@@ -12,8 +13,11 @@ import { readAuthTokenFromCookieStore } from '@/lib/auth/cookie'
 import { sanitizeAvatarUrl } from '@/lib/user/avatar-url'
 import type { UserData } from '@/lib/api/auth'
 
-/** 从 httpOnly token cookie 解析当前用户（校验 tokenVersion） */
-export async function getServerSessionUser(): Promise<UserData | null> {
+/**
+ * 从 httpOnly token cookie 解析当前用户（校验 tokenVersion）。
+ * 用 React cache 按请求去重：Layout 与 Page 常在同一次渲染中各自读取会话。
+ */
+export const getServerSessionUser = cache(async (): Promise<UserData | null> => {
   try {
     const cookieStore = await cookies()
     const token = readAuthTokenFromCookieStore(cookieStore)
@@ -39,4 +43,4 @@ export async function getServerSessionUser(): Promise<UserData | null> {
   } catch {
     return null
   }
-}
+})

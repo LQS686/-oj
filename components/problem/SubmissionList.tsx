@@ -33,7 +33,7 @@ import { formatDateTime, formatTime, formatMemory } from '@/lib/utils'
 import { fetchWithCookie } from '@/lib/api/base'
 import type { UserData } from '@/lib/api/auth'
 import { loginPath } from '@/lib/navigation'
-import CodeEditor, { type CodeLanguage } from '@/components/code-editor/CodeEditor'
+import ReadOnlySubmissionCode from '@/components/submission/ReadOnlySubmissionCode'
 import type { SubmissionListRow } from '@/hooks/useSubmissionResultFlow'
 import { downloadFirstWaTestCase, findFirstWaIndex } from '@/lib/submission/wa-download'
 
@@ -47,11 +47,6 @@ interface SubmissionListProps {
   /** 当前展开的提交 ID；受控 */
   expandedId?: string | null
   onExpandedChange?: (id: string | null) => void
-}
-
-function toCodeLanguage(lang?: string): CodeLanguage {
-  if (lang === 'c' || lang === 'python') return lang
-  return 'cpp'
 }
 
 function StatusIcon({ name, className }: { name: string; className?: string }) {
@@ -387,14 +382,7 @@ function ExpandedDetail({
           )}
         </div>
         {data.code ? (
-          <CodeEditor
-            value={data.code}
-            onChange={() => {}}
-            language={toCodeLanguage(data.language)}
-            readOnly
-            height={codeHeight}
-            className="hover:border-border focus-within:border-border focus-within:ring-0"
-          />
+          <ReadOnlySubmissionCode code={data.code} language={data.language} height={codeHeight} />
         ) : (
           <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
             {detailLoading ? (

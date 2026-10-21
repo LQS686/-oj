@@ -65,7 +65,7 @@
 
 ### 环境要求
 
-- Node.js 20+
+- Node.js 20+（Docker 镜像与 CI 固定 Node 24，推荐本地使用 Node 24）
 - MongoDB 7+ (Replica Set 模式)
 - Redis 7+（**生产强制**；本地开发强烈建议配置，用于缓存 / 限流 / 头像分片 / 登录锁 / 多实例鉴权吊销）
 - g++/gcc（C/C++ 编译器，Linux / WSL / 容器内）
@@ -97,7 +97,7 @@ npm run dev
 
 ```env
 # 必需
-DATABASE_URL=mongodb://localhost:27017/dashan-oj
+DATABASE_URL=mongodb://localhost:27017/oj_platform
 JWT_SECRET=your-secret-key-at-least-32-chars
 NODE_ENV=development
 PORT=3000
@@ -119,16 +119,16 @@ ENCRYPTION_KEY=
 > 可在后台管理题目、竞赛、班级等。
 > 详见 `app/api/auth/register/route.ts` 的 `isFirstUser` 判定逻辑。
 
-> ⚠️ **生产环境强制校验**（`lib/env.ts` 启动时检查）：`JWT_SECRET`（≥32）、`REDIS_URL`、`ENCRYPTION_KEY`；禁止 `FORCE_SECURE_COOKIE=false`。生产评测统一走 `docker compose`（应用容器内 runner.sh + dsoj-watch 沙箱隔离）。**请勿在 Windows 宿主上直接跑评测。**
+> ⚠️ **生产环境强制校验**（`lib/env.ts` 启动时检查）：`JWT_SECRET`（≥32）、`REDIS_URL`、`ENCRYPTION_KEY`；HTTPS 生产站禁止 `FORCE_SECURE_COOKIE=false`（HTTP 临时测试站允许关闭）。生产评测统一走 `docker compose`（应用容器内 runner.sh + dsoj-watch 沙箱隔离）。**请勿在 Windows 宿主上直接跑评测。**
 
 ## Docker 部署
 
 **推荐（按环境选择脚本）：**
 
-| 场景        | 脚本                                                                                             |
-| ----------- | ------------------------------------------------------------------------------------------------ |
-| WSL / Linux | `sudo bash scripts/deploy.sh` 或 `docker compose up -d --build`                                  |
-| 宝塔面板    | `sudo bash scripts/bt-deploy.sh https://你的域名`（详见 [docs/BT_DEPLOY.md](docs/BT_DEPLOY.md)） |
+| 场景        | 命令                                                                                                                                   |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| WSL / Linux | `docker compose up -d --build`（已有数据库）；首次部署请按下方手动流程先同步数据库                                                     |
+| 宝塔面板    | `sudo bash scripts/bt-deploy.sh https://你的域名`（自动构建、启动前同步数据库、健康检查，详见 [docs/BT_DEPLOY.md](docs/BT_DEPLOY.md)） |
 
 手动部署：
 
@@ -136,9 +136,16 @@ ENCRYPTION_KEY=
 cp .env.example .env
 # 编辑 .env：填写 JWT_SECRET / ENCRYPTION_KEY / MONGO_*_PASSWORD / REDIS_PASSWORD / FRONTEND_URL
 # 首次还需：openssl rand -base64 512 | tr -d '\n' > mongo-keyfile && chmod 600 mongo-keyfile
-docker compose up -d --build
+
+docker compose build app
+docker compose up -d mongo redis
+# 启动应用前先同步集合/索引（等待 mongo healthy 后执行）
+docker compose run --rm --no-deps app /opt/prisma-cli/node_modules/.bin/prisma db push --skip-generate
+docker compose up -d
 docker compose logs -f app
 ```
+
+> 4G 等低配宿主请优先使用 `scripts/bt-deploy.sh`：它会自动配置 swap、限制 Node 堆并在宿主 ≤4.5G 时跳过构建期类型检查，手动 `docker compose build` 不包含这些内存保护。
 
 | 服务  | 端口 | 说明                                      |
 | ----- | ---- | ----------------------------------------- |
@@ -275,6 +282,15 @@ Route → withApi.public|auth|admin|systemAdmin|classRole
 - **提交规范** — 本环境固定按「WSL 写对象 → Windows 推送」执行，且 WSL 侧 `git add` / `commit` **必须**带 `-c core.autocrlf=true -c core.filemode=false`（否则换行被误判，整个仓库都会被算成改动）；完整命令、原因与自检见 [docs/WSL_DEV.md](docs/WSL_DEV.md)
 
 ## 更新日志
+
+### 2026/10（部署流程复核）
+
+- **统一部署入口** — 废弃旧版 `scripts/deploy.sh`（停止执行并提示迁移），WSL/Linux 使用 `docker compose`，宝塔使用 `scripts/bt-deploy.sh`
+- **数据库同步前移** — `prisma db push` 改到 app 启动前执行，避免新版本先接流量、后补集合/索引；失败时明确提示重复数据/破坏性变更
+- **运行时配置补齐** — Dockerfile 显式复制 `tsconfig.json`（tsx 解析 `@/*` 别名所需）；`.env.example` 补充构建期内存参数
+- **备份脚本加固** — `backup-oj.sh` 支持 `APP_DIR` / `BACKUP_DIR` 覆盖，数据库连接串不再出现在宿主机进程参数中
+- **计时可靠性** — 作业计时改用可携带 CSRF 的 keepalive pause，后台标签页不启动；增加心跳与失联截断，重复记录一并暂停
+- **文档校准** — 更新 Node 24、数据库名、部署端口、镜像/ASan 历史说明与宝塔手工检查项
 
 ### 2026/09（手动备份 / 一键恢复 + 部署引导）
 

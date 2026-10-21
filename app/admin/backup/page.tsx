@@ -60,24 +60,30 @@ export default function AdminBackupPage() {
 
   useEffect(() => {
     let cancelled = false
-    async function init() {
-      // 初始加载配置与备份列表（setState 均在 await 之后，避免同步触发级联渲染）
+    // 配置与备份列表互不依赖，并行请求，避免串行等待两次文件系统扫描
+    void (async () => {
+      const [configResult, listResult] = await Promise.allSettled([
+        fetchWithCookie('/api/admin/backup?action=config'),
+        fetchWithCookie('/api/admin/backup?action=list'),
+      ])
+      if (cancelled) return
       try {
-        const res = await fetchWithCookie('/api/admin/backup?action=config')
-        const data = await res.json()
-        if (!cancelled && data.success) setConfig(data.data || null)
+        if (configResult.status === 'fulfilled') {
+          const data = await configResult.value.json()
+          if (!cancelled && data.success) setConfig(data.data || null)
+        }
       } catch {
         /* ignore */
       }
       try {
-        const res = await fetchWithCookie('/api/admin/backup?action=list')
-        const data = await res.json()
-        if (!cancelled && data.success) setItems(data.data?.items || [])
+        if (listResult.status === 'fulfilled') {
+          const data = await listResult.value.json()
+          if (!cancelled && data.success) setItems(data.data?.items || [])
+        }
       } catch {
         /* ignore */
       }
-    }
-    init()
+    })()
     return () => {
       cancelled = true
     }

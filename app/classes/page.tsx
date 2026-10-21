@@ -63,6 +63,7 @@ function ClassesPageContent() {
   const [createClassOpen, setCreateClassOpen] = useState(false)
   const [selectedClass, setSelectedClass] = useState<Class | null>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const didInitialFetchRef = useRef(false)
   const [canCreate, setCanCreate] = useState(false)
 
   useDeferredEffect(() => {
@@ -121,6 +122,12 @@ function ClassesPageContent() {
   )
 
   useEffect(() => {
+    // 首屏立即拉取；仅搜索/翻页等后续变化走 300ms 防抖
+    if (!didInitialFetchRef.current) {
+      didInitialFetchRef.current = true
+      void fetchClasses(true)
+      return
+    }
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current)
     }

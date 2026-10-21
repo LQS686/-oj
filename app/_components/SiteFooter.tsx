@@ -2,14 +2,13 @@
 
 import Link from 'next/link'
 import { PageContainer } from '@/components/layout'
+import { useSettings } from '@/contexts/SettingsContext'
 
-export function SiteFooter({
-  siteName,
-  siteDescription,
-}: {
-  siteName: string
-  siteDescription: string
-}) {
+export function SiteFooter() {
+  const { settings } = useSettings()
+  const siteName = settings.siteName || '大山 OJ'
+  const siteDescription = settings.siteDescription || '代码如山·算法为径·陪你从入门到顶峰'
+
   return (
     <footer className="mt-auto border-t border-border bg-muted/20">
       <PageContainer variant="full">

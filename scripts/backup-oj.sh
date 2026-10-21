@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 每日 Mongo 备份（mongodump + docker cp 到宿主机），保留 7 天
 set -uo pipefail
-APP_DIR="/www/wwwroot/dashan-oj"
-BACKUP_DIR="/www/backup/oj"
+APP_DIR="${APP_DIR:-/www/wwwroot/dashan-oj}"
+BACKUP_DIR="${BACKUP_DIR:-/www/backup/oj}"
 
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR" 2>/dev/null || true
@@ -45,7 +45,8 @@ if [[ -z "$DB_URL" ]]; then
 fi
 
 STAMP="$(date +%Y%m%d%H%M)"
-if ! docker exec "$MONGO_NAME" mongodump --uri="$DB_URL" --out="/dump/$STAMP" --quiet 2>>"$BACKUP_DIR/backup.log"; then
+# 通过 stdin 把连接串送入容器，避免密码出现在宿主机 docker exec 的命令行参数中
+if ! printf '%s' "$DB_URL" | docker exec -i "$MONGO_NAME" sh -c 'IFS= read -r DB_URL; mongodump --uri="$DB_URL" --out="/dump/$1" --quiet' sh "$STAMP" 2>>"$BACKUP_DIR/backup.log"; then
   log "[$STAMP] mongodump FAILED (container=$MONGO_NAME)"
   exit 1
 fi

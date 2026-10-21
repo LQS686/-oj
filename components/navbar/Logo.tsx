@@ -6,7 +6,7 @@ export default function Logo() {
   const { settings } = useSettings()
 
   return (
-    <Link href="/" className="flex items-center gap-2.5 group">
+    <Link href="/" prefetch={false} className="flex items-center gap-2.5 group">
       <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white/80 backdrop-blur-sm">
         <Image
           src="/logos/dsojlogo.png"

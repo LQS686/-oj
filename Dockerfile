@@ -140,6 +140,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/server.ts ./
 COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# tsx 在运行时按 tsconfig.json 解析 @/* 路径别名；tsconfig.server.json 继承它
+COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.server.json ./
 
 # 复制tailwind和postcss配置

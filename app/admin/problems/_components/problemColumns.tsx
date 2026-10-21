@@ -55,7 +55,7 @@ export function buildProblemColumns({
         const tags = (value as string[]) || []
         return (
           <div className="flex flex-wrap items-center gap-1">
-            {tags.slice(0, 3).map((tag, idx) => (
+            {tags.map((tag, idx) => (
               <span
                 key={idx}
                 className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded"
@@ -63,9 +63,6 @@ export function buildProblemColumns({
                 {tag}
               </span>
             ))}
-            {tags.length > 3 && (
-              <span className="text-xs text-muted-foreground">+{tags.length - 3}</span>
-            )}
           </div>
         )
       },

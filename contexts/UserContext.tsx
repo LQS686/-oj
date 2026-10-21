@@ -65,11 +65,9 @@ export function UserProvider({
   /** 服务端从 cookie 解析的会话用户；有值时可在首屏直接渲染已登录导航 */
   initialUser?: User | null
 }) {
+  // Layout 已通过 getServerSessionUser 完成 DB 级校验（tokenVersion + 封禁），
+  // 客户端不再重复请求 /api/auth/me，避免每次加载多一次往返。
   const [user, setUser] = useState<User | null>(initialUser)
-  // Layout 已通过 getServerSessionUser 注入结果（用户或 null），首屏即可判定；
-  // 客户端校验只补全资料，不以网络失败清掉 SSR 会话。
-  const [isInitialized, setIsInitialized] = useState(true)
-  const initialUserRef = useRef(initialUser)
   const tabIdRef = useRef<string>('')
 
   // 初始化标签页 ID
@@ -97,33 +95,6 @@ export function UserProvider({
         })
       }
     }
-  }, [])
-
-  // 客户端校验：补全资料 / 纠正过期 token；不因网络抖动清掉 SSR 会话
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const verifyUser = async () => {
-      try {
-        const userData = await authApi.getCurrentUser()
-        setUser(userData)
-      } catch (error) {
-        const code =
-          error && typeof error === 'object' && 'code' in error
-            ? String((error as { code?: string }).code)
-            : undefined
-        if (code === 'UNAUTHORIZED') {
-          setUser(null)
-        } else if (!initialUserRef.current) {
-          setUser(null)
-        }
-        // 有 SSR 用户且非 401：保留 initialUser，避免短暂 Guest 闪烁
-      } finally {
-        setIsInitialized(true)
-      }
-    }
-
-    verifyUser()
   }, [])
 
   // 跨标签页同步：监听 BroadcastChannel + storage event 双通道
@@ -246,13 +217,14 @@ export function UserProvider({
   const value = useMemo(
     () => ({
       user,
-      isLoading: !isInitialized,
+      // 会话在 SSR 阶段已确定，客户端不存在「加载中」状态
+      isLoading: false,
       setUser,
       login,
       logout,
       refreshUser,
     }),
-    [user, isInitialized, login, logout, refreshUser]
+    [user, login, logout, refreshUser]
   )
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>

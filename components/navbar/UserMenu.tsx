@@ -90,7 +90,11 @@ export default function UserMenu() {
 
   return (
     <>
-      <Link href="/notifications" className="btn-ghost btn btn-icon-lg relative group">
+      <Link
+        href="/notifications"
+        prefetch={false}
+        className="btn-ghost btn btn-icon-lg relative group"
+      >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 badge-primary badge min-w-[18px] h-[18px] text-[10px]">

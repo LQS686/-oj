@@ -19,11 +19,23 @@ const ProblemDescription = dynamic(() => import('@/components/problem/ProblemDes
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import ProblemLetterRail from '@/components/problem/ProblemLetterRail'
-import SubmissionList from '@/components/problem/SubmissionList'
-import ProblemSubmitColumn, {
+import {
   ProblemSubmitColumnHeader,
   WORKSPACE_LANGUAGE_OPTIONS,
-} from '@/components/problem/ProblemSubmitColumn'
+} from '@/components/problem/ProblemSubmitColumnMeta'
+import SubmissionResultModal from '@/components/submission/SubmissionResultModal'
+
+// CodeMirror 编辑器与提交列表只在做题区使用，按需下载，避免进入首屏 JS
+const ProblemSubmitColumn = dynamic(() => import('@/components/problem/ProblemSubmitColumn'), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-3">
+      <div className="h-9 rounded-lg bg-muted animate-pulse" />
+      <div className="h-[420px] rounded-lg bg-muted/70 animate-pulse" />
+    </div>
+  ),
+})
+const SubmissionList = dynamic(() => import('@/components/problem/SubmissionList'), { ssr: false })
 import {
   ProblemWorkspaceDesktopTabs,
   ProblemWorkspaceMobileTabs,
@@ -31,7 +43,6 @@ import {
   WORKSPACE_PRESETS,
   type WorkspaceTab,
 } from '@/components/problem/ProblemWorkspaceTabs'
-import SubmissionResultModal from '@/components/submission/SubmissionResultModal'
 import { loginPath } from '@/lib/navigation'
 import {
   createPendingListRow,

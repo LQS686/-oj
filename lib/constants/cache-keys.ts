@@ -54,6 +54,12 @@ export const CacheKeys = {
   home: {
     dashboardPrefix: () => 'home:dashboard',
   },
+  admin: {
+    /** 仪表盘聚合统计（用户/题目/提交总数与增长），短 TTL 缓存 */
+    dashboardStats: () => 'admin:dashboardStats',
+    /** 提交列表顶部的全局状态统计，避免每次翻页全量 groupBy */
+    submissionStatusCounts: () => 'admin:submissionStatusCounts',
+  },
   // 班级作业题目作答进度（计时核心）
   timing: {
     progressPrefix: () => 'timing:progress',

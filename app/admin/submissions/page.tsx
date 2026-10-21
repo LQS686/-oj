@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { useForbiddenRedirect } from '@/hooks/useForbiddenRedirect'
 import { useRouter } from 'next/navigation'
@@ -47,7 +47,11 @@ export default function AdminSubmissionsPage() {
   const router = useRouter()
   const scheduleForbiddenRedirect = useForbiddenRedirect()
   const [submissions, setSubmissions] = useState<Submission[]>([])
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  // 首次加载才用骨架；翻页/筛选保留旧数据，减少表格跳动
+  const loadedOnceRef = useRef(false)
+  const fetchSeq = useRef(0)
   const [error, setError] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -70,8 +74,10 @@ export default function AdminSubmissionsPage() {
   }, [searchInput])
 
   const fetchSubmissions = useCallback(async () => {
+    const seq = ++fetchSeq.current
     try {
-      setLoading(true)
+      if (loadedOnceRef.current) setRefreshing(true)
+      else setInitialLoading(true)
       setError('')
       const group = STATUS_GROUPS.find((g) => g.key === statusFilter)
       const apiStatus = group?.status ?? 'all'
@@ -84,6 +90,7 @@ export default function AdminSubmissionsPage() {
       if (searchQuery) params.set('keyword', searchQuery)
 
       const response = await fetchWithCookie(`/api/admin/submissions?${params}`)
+      if (seq !== fetchSeq.current) return
 
       if (response.status === 403) {
         setError('需要管理员权限')
@@ -92,6 +99,7 @@ export default function AdminSubmissionsPage() {
       }
 
       const data = await response.json()
+      if (seq !== fetchSeq.current) return
       if (data.success) {
         const submissionsData = data.data?.submissions || data.data || []
         setSubmissions(Array.isArray(submissionsData) ? submissionsData : [])
@@ -103,9 +111,13 @@ export default function AdminSubmissionsPage() {
         setError(data.error || '获取提交记录失败')
       }
     } catch {
-      setError('网络错误')
+      if (seq === fetchSeq.current) setError('网络错误')
     } finally {
-      setLoading(false)
+      if (seq === fetchSeq.current) {
+        loadedOnceRef.current = true
+        setInitialLoading(false)
+        setRefreshing(false)
+      }
     }
   }, [page, pageSize, statusFilter, language, searchQuery, scheduleForbiddenRedirect])
 
@@ -241,6 +253,7 @@ export default function AdminSubmissionsPage() {
         <div className="flex items-center gap-1">
           <Link
             href={`/admin/submissions/${submission.id}`}
+            prefetch={false}
             className="btn-icon-sm text-muted-foreground hover:text-primary-light hover:bg-muted transition-colors inline-flex"
             title="查看详情"
             aria-label="查看详情"
@@ -337,54 +350,67 @@ export default function AdminSubmissionsPage() {
         </select>
       </FilterBar>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <div className="text-muted-foreground text-sm">总提交数</div>
-          <div className="text-2xl font-bold text-foreground mt-1 tabular-nums">{globalTotal}</div>
-        </div>
-        <div className="card p-4">
-          <div className="text-muted-foreground text-sm">通过 (AC)</div>
-          <div className="text-2xl font-bold text-secondary mt-1 tabular-nums">
-            {sumByNormalizedStatus(totalByStatus, isAcceptedStatus)}
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="text-muted-foreground text-sm">错误</div>
-          <div className="text-2xl font-bold text-error mt-1 tabular-nums">
-            {(['WA', 'RE', 'CE', 'TLE', 'MLE'] as const).reduce(
-              (sum, s) => sum + (totalByStatus[s] || 0),
-              0
-            )}
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="text-muted-foreground text-sm">等待评测</div>
-          <div className="text-2xl font-bold text-info mt-1 tabular-nums">
-            {sumByNormalizedStatus(totalByStatus, isNonFinalSubmissionStatus)}
-          </div>
-        </div>
+      <div className="h-5 flex items-center justify-end" aria-live="polite">
+        {refreshing && <span className="text-xs text-muted-foreground">更新中…</span>}
       </div>
 
-      <DataTable
-        data={submissions}
-        columns={columns}
-        idKey="id"
-        loading={loading}
-        emptyMessage={
-          searchQuery || statusFilter !== 'all' || language ? '没有找到匹配的记录' : '暂无提交记录'
-        }
-        onRowClick={(row) => router.push(`/admin/submissions/${row.id}`)}
-        pagination={{
-          page,
-          pageSize,
-          total,
-          onPageChange: setPage,
-          onPageSizeChange: (size) => {
-            setPageSize(size)
-            setPage(1)
-          },
-        }}
-      />
+      <div
+        className={`space-y-6 transition-opacity duration-200 ${refreshing ? 'opacity-50 pointer-events-none' : ''}`}
+        aria-busy={refreshing}
+      >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="card p-4">
+            <div className="text-muted-foreground text-sm">总提交数</div>
+            <div className="text-2xl font-bold text-foreground mt-1 tabular-nums">
+              {globalTotal}
+            </div>
+          </div>
+          <div className="card p-4">
+            <div className="text-muted-foreground text-sm">通过 (AC)</div>
+            <div className="text-2xl font-bold text-secondary mt-1 tabular-nums">
+              {sumByNormalizedStatus(totalByStatus, isAcceptedStatus)}
+            </div>
+          </div>
+          <div className="card p-4">
+            <div className="text-muted-foreground text-sm">错误</div>
+            <div className="text-2xl font-bold text-error mt-1 tabular-nums">
+              {(['WA', 'RE', 'CE', 'TLE', 'MLE'] as const).reduce(
+                (sum, s) => sum + (totalByStatus[s] || 0),
+                0
+              )}
+            </div>
+          </div>
+          <div className="card p-4">
+            <div className="text-muted-foreground text-sm">等待评测</div>
+            <div className="text-2xl font-bold text-info mt-1 tabular-nums">
+              {sumByNormalizedStatus(totalByStatus, isNonFinalSubmissionStatus)}
+            </div>
+          </div>
+        </div>
+
+        <DataTable
+          data={submissions}
+          columns={columns}
+          idKey="id"
+          loading={initialLoading}
+          emptyMessage={
+            searchQuery || statusFilter !== 'all' || language
+              ? '没有找到匹配的记录'
+              : '暂无提交记录'
+          }
+          onRowClick={(row) => router.push(`/admin/submissions/${row.id}`)}
+          pagination={{
+            page,
+            pageSize,
+            total,
+            onPageChange: setPage,
+            onPageSizeChange: (size) => {
+              setPageSize(size)
+              setPage(1)
+            },
+          }}
+        />
+      </div>
     </AdminPageShell>
   )
 }

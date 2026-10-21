@@ -16,7 +16,6 @@ import { useProblemDocumentTitle } from '@/hooks/useProblemDocumentTitle'
 import ProblemWorkspaceShell from '@/components/problem/ProblemWorkspaceShell'
 import ProblemMetaHeader from '@/components/problem/ProblemMetaHeader'
 import ProblemLetterRail, { type ProblemLetterStatus } from '@/components/problem/ProblemLetterRail'
-import SubmissionList from '@/components/problem/SubmissionList'
 import dynamic from 'next/dynamic'
 
 /** 题面 / 题解面板都依赖 markdown 渲染管线（实测单个分包 631KB / gzip 190KB），
@@ -28,10 +27,21 @@ const ProblemDescription = dynamic(() => import('@/components/problem/ProblemDes
 const SolutionTabPanel = dynamic(() => import('@/components/problem/SolutionTabPanel'), {
   ssr: false,
 })
-import ProblemSubmitColumn, {
+import {
   ProblemSubmitColumnHeader,
   WORKSPACE_LANGUAGE_OPTIONS,
-} from '@/components/problem/ProblemSubmitColumn'
+} from '@/components/problem/ProblemSubmitColumnMeta'
+// CodeMirror 编辑器与提交列表只在做题区使用，避免拖慢题单页首屏
+const ProblemSubmitColumn = dynamic(() => import('@/components/problem/ProblemSubmitColumn'), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-3">
+      <div className="h-9 rounded-lg bg-muted animate-pulse" />
+      <div className="h-[420px] rounded-lg bg-muted/70 animate-pulse" />
+    </div>
+  ),
+})
+const SubmissionList = dynamic(() => import('@/components/problem/SubmissionList'), { ssr: false })
 import {
   ProblemWorkspaceDesktopTabs,
   ProblemWorkspaceMobileTabs,

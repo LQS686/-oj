@@ -740,7 +740,6 @@ export interface ListAdminSubmissionsResult {
         userId: true
         problemId: true
         language: true
-        code: true
         status: true
         score: true
         time: true
@@ -760,6 +759,34 @@ export interface ListAdminSubmissionsResult {
   pageSize: number
   totalPages: number
   totalByStatus: Record<string, number>
+}
+
+/**
+ * 全库提交状态计数（后台列表顶部统计卡）。
+ * 每次翻页都 groupBy 全表会随数据量线性变慢，短 TTL 缓存即可满足展示需求。
+ */
+async function getSubmissionStatusCounts(): Promise<{
+  totalByStatus: Record<string, number>
+  total: number
+}> {
+  return cache.get(
+    CacheKeys.admin.submissionStatusCounts(),
+    [],
+    async () => {
+      const groups = await prisma.submission.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      })
+      const totalByStatus: Record<string, number> = {}
+      let total = 0
+      for (const g of groups) {
+        totalByStatus[g.status] = g._count._all
+        total += g._count._all
+      }
+      return { totalByStatus, total }
+    },
+    { ttl: 10_000 }
+  )
 }
 
 /**
@@ -788,6 +815,8 @@ export async function listAdminSubmissions(filter: {
       where.status = { in: statuses }
     }
   }
+  // 与关键字查询并行；状态统计不依赖筛选条件，命中缓存时几乎无开销
+  const statusCountsPromise = getSubmissionStatusCounts()
   const keyword = filter.keyword?.trim()
   if (keyword) {
     const [matchedUsers, matchedProblems] = await Promise.all([
@@ -815,19 +844,14 @@ export async function listAdminSubmissions(filter: {
     const userIds = matchedUsers.map((u) => u.id)
     const problemIds = matchedProblems.map((p) => p.id)
     if (userIds.length === 0 && problemIds.length === 0) {
-      const statusGroupsEmpty = await prisma.submission.groupBy({
-        by: ['status'],
-        _count: { _all: true },
-      })
-      const totalByStatusEmpty: Record<string, number> = {}
-      for (const g of statusGroupsEmpty) totalByStatusEmpty[g.status] = g._count._all
+      const { totalByStatus } = await statusCountsPromise
       return {
         submissions: [],
         total: 0,
         page,
         pageSize,
         totalPages: 0,
-        totalByStatus: totalByStatusEmpty,
+        totalByStatus,
       }
     }
     const or: Prisma.SubmissionWhereInput[] = []
@@ -838,40 +862,32 @@ export async function listAdminSubmissions(filter: {
       { OR: or },
     ]
   }
-  // 全局状态统计（不受 status 筛选影响），用于前端统计卡显示全局数字
-  const statusGroups = await prisma.submission.groupBy({
-    by: ['status'],
-    _count: { _all: true },
-  })
-  const totalByStatus: Record<string, number> = {}
-  let globalTotal = 0
-  for (const g of statusGroups) {
-    totalByStatus[g.status] = g._count._all
-    globalTotal += g._count._all
-  }
-  const [total, submissionsRaw] = await Promise.all([
-    prisma.submission.count({ where }),
-    prisma.submission.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { submittedAt: 'desc' },
-      select: {
-        id: true,
-        userId: true,
-        problemId: true,
-        language: true,
-        code: true,
-        status: true,
-        score: true,
-        time: true,
-        memory: true,
-        passedTests: true,
-        totalTests: true,
-        message: true,
-        submittedAt: true,
-      },
-    }),
+  const [{ totalByStatus, total: globalTotal }, [total, submissionsRaw]] = await Promise.all([
+    statusCountsPromise,
+    Promise.all([
+      prisma.submission.count({ where }),
+      prisma.submission.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { submittedAt: 'desc' },
+        // 列表不展示源码，只取详情页需要的元信息，避免每行多传数 KB code
+        select: {
+          id: true,
+          userId: true,
+          problemId: true,
+          language: true,
+          status: true,
+          score: true,
+          time: true,
+          memory: true,
+          passedTests: true,
+          totalTests: true,
+          message: true,
+          submittedAt: true,
+        },
+      }),
+    ]),
   ])
   // 无筛选时用全局总数；有 status/language/keyword 时用 where 计数
   const hasNarrowFilter =

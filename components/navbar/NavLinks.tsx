@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useRef, useEffect, useState } from 'react'
 import { BookOpen, Trophy, Dumbbell, GraduationCap, BarChart3 } from 'lucide-react'
 
@@ -21,6 +21,7 @@ const navLinks: NavLink[] = [
 
 export default function NavLinks() {
   const pathname = usePathname()
+  const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
 
@@ -61,6 +62,10 @@ export default function NavLinks() {
           <Link
             key={link.href}
             href={link.href}
+            // 不在视口内预取（每个访客会触发 5 次 RSC 服务端渲染）；悬停/聚焦时再预取，兼顾点击速度
+            prefetch={false}
+            onMouseEnter={() => router.prefetch(link.href)}
+            onFocus={() => router.prefetch(link.href)}
             className={`nav-link group relative ${isActive ? 'active' : ''}`}
           >
             <span className="relative z-10 flex items-center gap-1.5">

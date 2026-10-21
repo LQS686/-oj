@@ -63,14 +63,6 @@ export default async function RootLayout({
 
   return (
     <html lang="zh-CN">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body className="antialiased">
         {/* 跳到主内容：键盘用户的第一个可聚焦元素，避免每页都要 Tab 穿过整条导航。
             目标 #main-content 由 PageShell（前台）与 AdminLayout（后台）的 <main> 提供。 */}

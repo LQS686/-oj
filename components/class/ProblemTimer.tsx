@@ -24,7 +24,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDeferredEffect } from '@/hooks/useDeferredEffect'
 import { Clock, CheckCircle2, PauseCircle } from 'lucide-react'
-import { fetchWithCookie } from '@/lib/api/base'
+import { fetchWithCookie, getCsrfTokenFromCookie } from '@/lib/api/base'
+import { CSRF_CONSTANTS } from '@/lib/security/csrf-constants'
 import { logger } from '@/lib/logger'
 
 export interface ProblemTimerProgress {
@@ -75,6 +76,10 @@ export function formatDurationMs(ms: number): string {
 const HEARTBEAT_INTERVAL_MS = 30_000
 const TICK_INTERVAL_MS = 1000
 
+function isPageVisible(): boolean {
+  return typeof document === 'undefined' || document.visibilityState === 'visible'
+}
+
 export default function ProblemTimer({
   classId,
   assignmentId,
@@ -99,6 +104,8 @@ export default function ProblemTimer({
   const activeRef = useRef(true)
   // 标记 active 切换 effect 是否为首次挂载（首次由 init effect 处理）
   const firstRunRef = useRef(true)
+  // 是否真正发起过 start/resume：从未启动的被动展示计时器无需 pause
+  const startedRef = useRef(false)
 
   useEffect(() => {
     activeRef.current = active
@@ -117,7 +124,7 @@ export default function ProblemTimer({
     }
   }, [classId, assignmentId, problemId, assignmentEndTime])
 
-  const callTiming = async (action: 'start' | 'pause' | 'resume') => {
+  const callTiming = async (action: 'start' | 'pause' | 'resume' | 'heartbeat') => {
     try {
       const res = await fetchWithCookie(baseUrlRef.current, {
         method: 'POST',
@@ -132,6 +139,39 @@ export default function ProblemTimer({
       // 计时失败不应阻断作答，仅记录
       logger.warn('ProblemTimer callTiming failed', { action, err: String(err) })
     }
+  }
+
+  /**
+   * 页面隐藏/卸载时的暂停：普通 fetch 可能在页面销毁时被取消，
+   * 而 sendBeacon 无法携带接口必需的 X-CSRF-Token，因此用 keepalive fetch。
+   */
+  const pauseKeepalive = () => {
+    const url = baseUrlRef.current
+    if (!url) return
+    const body = JSON.stringify({ action: 'pause' })
+    const token = getCsrfTokenFromCookie()
+    if (token) {
+      try {
+        void fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            [CSRF_CONSTANTS.HEADER]: token,
+          },
+          body,
+          credentials: 'include',
+          keepalive: true,
+        }).catch((err) => {
+          logger.warn('ProblemTimer keepalive pause failed', { err: String(err) })
+        })
+        return
+      } catch {
+        // fetch 同步异常时退回下方异步路径
+      }
+    }
+    void fetchWithCookie(url, { method: 'POST', body, keepalive: true }).catch((err) => {
+      logger.warn('ProblemTimer pause fallback failed', { err: String(err) })
+    })
   }
 
   const fetchProgress = async () => {
@@ -192,8 +232,14 @@ export default function ProblemTimer({
       if (cancelled) return
       await fetchProgress()
       if (cancelled) return
-      // 仅当 active 时才 start；非选中题（被动展示）只 fetchProgress 一次
-      if (activeRef.current && !isCompletedRef.current && !assignmentEndedRef.current) {
+      // 仅当 active 且页面可见时才 start；后台标签页不应开始计时
+      if (
+        activeRef.current &&
+        !isCompletedRef.current &&
+        !assignmentEndedRef.current &&
+        isPageVisible()
+      ) {
+        startedRef.current = true
         await callTiming('start')
       }
     }
@@ -205,55 +251,45 @@ export default function ProblemTimer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId, assignmentId, problemId])
 
-  // 卸载：暂停计时（仅当未完成时）
+  // 卸载：暂停计时（仅当真正启动过且未完成）
   useEffect(() => {
     return () => {
-      // 非选中题（被动展示）从未启动计时，无需 pause
-      if (!activeRef.current) return
-      if (!isCompletedRef.current) {
-        // 使用 sendBeacon 提高页面卸载时的送达率
-        try {
-          const url = baseUrlRef.current
-          const blob = new Blob([JSON.stringify({ action: 'pause' })], {
-            type: 'application/json',
-          })
-          if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-            navigator.sendBeacon(url, blob)
-            return
-          }
-        } catch {
-          // sendBeacon 失败时不影响主流程
-        }
-        // 降级：直接 fetch（async，不等待）
-        void callTiming('pause')
-      }
+      if (!startedRef.current || isCompletedRef.current) return
+      pauseKeepalive()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId, assignmentId, problemId])
 
-  // visibilitychange：隐藏 pause，可见 resume
+  // visibilitychange / pagehide：隐藏或离开页面时确保暂停送达
   useEffect(() => {
-    const handleVisibility = () => {
-      if (typeof document === 'undefined') return
-      // 非选中题不参与 visibility 联动（被动展示模式）
-      if (!activeRef.current) return
-      if (document.hidden) {
-        if (!isCompletedRef.current) {
-          void callTiming('pause')
-        }
-      } else {
-        // 作业已结束时不 resume（后端会拒绝，避免无意义请求）
-        if (!isCompletedRef.current && !assignmentEndedRef.current) {
-          void callTiming('start')
-        }
+    const pauseIfRunning = () => {
+      if (startedRef.current && !isCompletedRef.current) {
+        pauseKeepalive()
       }
     }
+
+    const handleVisibility = () => {
+      if (typeof document === 'undefined') return
+      if (document.hidden) {
+        pauseIfRunning()
+      } else if (activeRef.current && !isCompletedRef.current && !assignmentEndedRef.current) {
+        // 作业已结束时不 resume（后端会拒绝，避免无意义请求）
+        startedRef.current = true
+        void callTiming('start')
+      }
+    }
+
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibility)
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', pauseIfRunning)
     }
     return () => {
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleVisibility)
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pagehide', pauseIfRunning)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,7 +298,7 @@ export default function ProblemTimer({
   // 30 秒心跳：GET 同步累计用时（也用于感知后端 finalizeTiming 完成）
   // 页面隐藏时暂停、恢复前台继续（参考 useWallClock 的 visibility-aware 模式，避免后台空转）
   useEffect(() => {
-    if (isCompleted || !active) return
+    if (isCompleted || !active || progress?.isPaused) return
 
     let intervalId: ReturnType<typeof setInterval> | null = null
 
@@ -278,7 +314,7 @@ export default function ProblemTimer({
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
       intervalId = setInterval(() => {
         if (!isCompletedRef.current) {
-          void fetchProgress()
+          void callTiming('heartbeat')
         }
       }, HEARTBEAT_INTERVAL_MS)
     }
@@ -299,7 +335,7 @@ export default function ProblemTimer({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCompleted, active])
+  }, [isCompleted, active, progress?.isPaused])
 
   // 1 秒 tick：本地累加显示（仅当计时中且未完成时）
   // 页面隐藏时暂停、恢复前台继续，避免后台空转
@@ -353,10 +389,11 @@ export default function ProblemTimer({
       return
     }
     if (active) {
-      // false → true：刷新进度并恢复计时
+      // false → true：刷新进度并恢复计时（后台标签页保持暂停）
       void (async () => {
         await fetchProgress()
-        if (!isCompletedRef.current && !assignmentEndedRef.current) {
+        if (!isCompletedRef.current && !assignmentEndedRef.current && isPageVisible()) {
+          startedRef.current = true
           await callTiming('start')
         }
       })()

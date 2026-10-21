@@ -150,7 +150,7 @@ npx vitest run
 ## 评测相关注意
 
 - **仅 Linux**：Windows 宿主调用评测会直接报错并提示改用 WSL/Docker。
-- **Node**：推荐 20/22 LTS。Node 24 + `tsx server.ts` 需 `lib/node-als-polyfill.ts`（已默认导入），否则会报 `AsyncLocalStorage accessed in runtime where it is not available`。
+- **Node**：推荐 24 LTS（与 Dockerfile / CI 一致）。Node 24 + `tsx server.ts` 需 `lib/node-als-polyfill.ts`（已默认导入），否则会报 `AsyncLocalStorage accessed in runtime where it is not available`。
 - **自定义 server**：`npm run dev` / `start` 使用 `tsx --conditions=react-server`，使 `server-only` 在 Node 侧解析为空模块（与 Next 服务端一致）；勿把 `ioredis` / `prisma` 经 barrel 引进 Client Component。
 - **单元测试**：Vitest 将 `server-only` 别名到 `tests/mocks/server-only.ts`；跑 `npm test` 无需额外条件。纯逻辑模块请从 `lib/api/errors` 导入 `ApiError`。
 - **Redis**：本地 `npm run dev` 强烈建议配置 `REDIS_URL`（缓存 / 限流 / 头像分片 / 登录锁 / 跨实例吊销）；生产未配置会启动失败。
@@ -184,4 +184,4 @@ diff -q /mnt/e/桌面/dsoj/lib/judge/runner.sh ~/dsoj/lib/judge/runner.sh
 ## 已移除（勿再使用）
 
 - Windows 本地 `win-runner` / `ALLOW_LOCAL_JUDGE_ON_WINDOWS`
-- `scripts/local-dev.ps1`、`scripts/deploy.ps1`（请用 WSL/Linux 的 `deploy.sh` 或 `docker compose`）
+- `scripts/local-dev.ps1`、`scripts/deploy.ps1`、旧版 `scripts/deploy.sh`（现仅为废弃提示，请用 `docker compose up -d --build` 或宝塔 `scripts/bt-deploy.sh`）

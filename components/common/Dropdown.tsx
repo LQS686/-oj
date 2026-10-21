@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect, useId, type ReactNode } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { getFocusableElements } from '@/hooks/useFocusTrap'
 
@@ -51,22 +50,6 @@ export type DropdownTriggerProps = {
   'aria-haspopup': 'menu' | 'dialog'
   'aria-expanded': boolean
   'aria-controls': string | undefined
-}
-
-const dropdownVariants = {
-  hidden: { opacity: 0, scale: 0.95, y: -4 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { duration: 0.15, ease: [0.16, 1, 0.3, 1] as const },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.95,
-    y: -4,
-    transition: { duration: 0.1, ease: 'easeIn' as const },
-  },
 }
 
 export default function Dropdown({
@@ -254,23 +237,17 @@ export default function Dropdown({
     >
       {trigger(triggerProps)}
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            id={menuId}
-            ref={menuRef}
-            className={`dropdown-menu ${className} ${align === 'right' ? 'right-0' : 'left-0'}`}
-            variants={dropdownVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            role={role}
-            aria-label={label}
-          >
-            {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isOpen && (
+        <div
+          id={menuId}
+          ref={menuRef}
+          className={`dropdown-menu ${className} ${align === 'right' ? 'right-0' : 'left-0'}`}
+          role={role}
+          aria-label={label}
+        >
+          {children}
+        </div>
+      )}
     </div>
   )
 }

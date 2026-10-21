@@ -59,19 +59,19 @@
   --card: #ffffff;
   --card-foreground: #1a1d23;
 
-  /* 字体栈：Inter 渲染英文/数字（拉丁字符），其后明确列出中文字体
-     供浏览器在渲染中文时直接命中（避免 Inter 无中文字形时仍用其 metrics
-     测量中文字宽，导致字间距异常紧密）。
-     - PingFang SC：macOS 默认中文字体（字间距天然舒适）
-     - Microsoft YaHei：Windows 默认中文字体
-     - Hiragino Sans GB：macOS 旧版备选
-     - Source Han Sans CN / Noto Sans CJK SC：Linux 常见中文字体
-     最后才回退到 system-ui / sans-serif 兜底 */
+  /* 字体栈全部使用系统字体：不请求 fonts.googleapis.com。
+     国内网络下该域名常被阻断，而 <link rel="stylesheet"> 会阻塞首屏渲染。
+     拉丁字符优先系统 UI 字体，中文按平台命中本地中文字体（浏览器按字形回退）：
+     - Segoe UI / SF：Windows / macOS 拉丁字符
+     - PingFang SC / Microsoft YaHei / 思源黑体：中文字形
+     - JetBrains Mono / Cascadia / Consolas：等宽场景 */
   --font-sans:
-    'Inter', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans CN',
-    'Noto Sans CJK SC', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
-  --font-display: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+    'Hiragino Sans GB', 'Source Han Sans CN', 'Noto Sans CJK SC', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
+  --font-display:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui,
+    sans-serif;
 
   /* 圆角刻度不在 :root 声明：统一由下方 @theme 定义（唯一来源，见「圆角刻度」注释） */
 

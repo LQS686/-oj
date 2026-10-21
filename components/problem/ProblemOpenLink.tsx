@@ -33,6 +33,9 @@ export default function ProblemOpenLink({
     <Link
       href={href}
       title={docTitle}
+      // 新标签页打开时预取 RSC 毫无收益（新标签需要完整文档），
+      // 却会让列表页每行都触发一次服务端渲染，反而拖慢当前页
+      prefetch={openInNewTab ? false : undefined}
       {...(openInNewTab ? { target: '_blank' as const, rel: 'noopener noreferrer' } : {})}
       {...rest}
     >

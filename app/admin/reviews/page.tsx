@@ -205,9 +205,10 @@ export default function AdminReviewsPage() {
                     </div>
                     <h3 className="font-semibold text-foreground break-words">
                       <Link
-                        href={`/problems/${row.problem.id}/solutions/${row.id}`}
+                        href={`/problem/${row.problem.id}/solutions/${row.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        prefetch={false}
                         className="inline-flex items-center gap-1.5 hover:text-primary transition-colors"
                       >
                         {row.title}
@@ -216,7 +217,8 @@ export default function AdminReviewsPage() {
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 truncate">
                       <Link
-                        href={`/problems/${row.problem.id}`}
+                        href={`/problem/${row.problem.id}`}
+                        prefetch={false}
                         className="hover:text-primary transition-colors"
                       >
                         {row.problem.problemNumber ? `${row.problem.problemNumber} · ` : ''}

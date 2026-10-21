@@ -1,9 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useDeferredEffect } from '@/hooks/useDeferredEffect'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { ListEmptyState } from '@/components/common'
 import {
   Users,
   Clock,
@@ -11,7 +9,6 @@ import {
   Calendar,
   TrendingUp,
   ChevronRight,
-  Loader2,
   Mountain,
   LayoutDashboard,
   BookOpen,
@@ -25,57 +22,27 @@ import { useUser } from '@/contexts/UserContext'
 import { canManageContent, getRoleLabel } from '@/lib/permissions'
 import toast from 'react-hot-toast'
 
-export function DashboardView() {
-  const { user } = useUser()
-  const [data, setData] = useState<HomeDashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+export function DashboardView({
+  initialData,
+  initialAllowAnnouncementToast = true,
+}: {
+  initialData: HomeDashboardData
   /** 与设置页「系统公告」开关对齐：关闭后不弹新公告 toast */
-  const [allowAnnouncementToast, setAllowAnnouncementToast] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetchWithCookie('/api/users/preferences')
-        const json = await res.json()
-        if (
-          !cancelled &&
-          json.success &&
-          json.data?.notifications &&
-          typeof json.data.notifications.systemAnnouncement === 'boolean'
-        ) {
-          setAllowAnnouncementToast(json.data.notifications.systemAnnouncement)
-        }
-      } catch {
-        // 偏好拉取失败时保持默认开启
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  initialAllowAnnouncementToast?: boolean
+}) {
+  const { user } = useUser()
+  const [data, setData] = useState<HomeDashboardData>(initialData)
 
   const fetchDashboard = useCallback(async () => {
     try {
-      setError('')
       const res = await fetchWithCookie('/api/home/dashboard')
       const json = await res.json()
-      if (!json.success && !json.ok) {
-        throw new Error(json.error || '加载失败')
-      }
+      if (!json.success && !json.ok) return
       setData(json.data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
-    } finally {
-      setLoading(false)
+    } catch {
+      // 实时刷新失败时保留已渲染的数据，不把整页退回错误态
     }
   }, [])
-
-  // 挂载时加载首页数据（复用 fetchDashboard，避免与 socket 刷新逻辑重复）
-  useDeferredEffect(() => {
-    void fetchDashboard()
-  }, [fetchDashboard])
 
   // 监听公告实时推送：新发布时弹 toast 提示并刷新首页公告区
   useAnnouncementSocket({
@@ -85,38 +52,11 @@ export function DashboardView() {
       void fetchDashboard()
     },
     onPublished: (event) => {
-      if (!allowAnnouncementToast) return
+      if (!initialAllowAnnouncementToast) return
       const title = event.title || '点击公告页查看'
       toast.success(`新公告：${title}`, { duration: 5000 })
     },
   })
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
-        <Loader2 className="w-7 h-7 animate-spin text-primary" />
-        <span className="text-sm">加载学习数据…</span>
-      </div>
-    )
-  }
-
-  if (error || !data) {
-    return (
-      <ListEmptyState
-        tone="error"
-        title={error || '暂无数据'}
-        action={
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={() => window.location.reload()}
-          >
-            重试
-          </button>
-        }
-      />
-    )
-  }
 
   const { stats, announcements, recentAssignments, upcomingContests } = data
   const displayName = user?.nickname || user?.username || '同学'

@@ -525,7 +525,7 @@ export default function SolutionTabPanel({
                   <div className="space-y-3">
                     <div className="flex items-center justify-end gap-4">
                       <Link
-                        href={`/problems/${problemId}/solutions/${solution.id}`}
+                        href={`/problem/${problemId}/solutions/${solution.id}`}
                         onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
                       >

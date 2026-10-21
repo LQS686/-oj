@@ -55,10 +55,12 @@ sudo bash scripts/bt-deploy.sh http://你的服务器IP
 5. 按 URL 协议设置 `FORCE_SECURE_COOKIE`（HTTP→false，HTTPS→true）
 6. 生成 `mongo-keyfile`
 7. 拉取基础镜像并构建应用（首次约 5–10 分钟；**按宿主内存自动限制 Node 堆上限，4G 宿主自动跳过构建期类型检查**，见下文《构建期内存保护》）
-8. 先拉起 mongo/redis，再启动 app，并做健康检查
-9. **同步数据库结构**：在 app 容器内执行 `prisma db push`（幂等创建新增集合/索引，如客观题 `ObjectiveQuestion` 等，已有数据不受影响）
+8. 先拉起 mongo/redis，并在启动 app 前执行 `prisma db push` 同步集合/索引
+9. 再启动 app 并做健康检查
 10. 安装内存/磁盘看门狗 cron（每 3 分钟自愈；`--skip-watchdog` 可跳过）
 11. 写出 Nginx 片段：`nginx/baota-proxy.conf`（端口与 `APP_HOST_PORT` 一致）
+
+> **数据库同步注意**：`prisma db push` 在 app 启动前执行，新增字段/集合会在新版本接流量前就绪。若历史数据违反唯一索引（例如重复的计时记录）或存在破坏性 schema 变更，脚本会告警但继续启动，**不会自动执行 `--accept-data-loss`**；请先备份数据、清理重复记录后手动重试。
 
 > **说明**：HTTP 临时站可在 `NODE_ENV=production` 下运行（脚本已兼容）。  
 > 切勿在 HTTPS 站点关闭 Secure Cookie。
@@ -74,6 +76,8 @@ sudo bash scripts/bt-deploy.sh --skip-watchdog     # 不安装看门狗 cron
 sudo bash scripts/bt-deploy.sh --type-check        # 强制构建期类型检查（低配机器有 OOM 风险）
 sudo bash scripts/bt-deploy.sh --yes               # 跳过交互确认（宝塔终端推荐）
 ```
+
+> 如果只是升级且当前镜像加速可用，建议加 `--skip-mirror`：脚本不会修改 `daemon.json`，也就不会在升级时重启 Docker、打断正在运行的容器和评测。
 
 单独的加固脚本（可随时手动执行，均幂等）：
 
@@ -106,7 +110,7 @@ sudo bash scripts/oj-watchdog.sh --install      # 手动安装看门狗 cron
 
 浏览器打开站点 → **注册首个账号**（自动成为系统管理员）。
 
-本机探针：
+本机探针（默认端口 3000；如改过 `.env` 的 `APP_HOST_PORT`，请替换为实际端口）：
 
 ```bash
 curl -sf http://127.0.0.1:3000/healthcheck-static && echo OK
@@ -116,6 +120,8 @@ curl -sf http://127.0.0.1:3000/api/health/db && echo DB_OK
 ---
 
 ## 升级 / 切域名
+
+> 升级前建议先在后台「备份与恢复」创建一次备份（或运行 `scripts/backup-oj.sh`），再执行 `git pull`。部署脚本会先同步数据库结构，但不会自动执行 `--accept-data-loss`。
 
 ```bash
 cd /www/wwwroot/dashan-oj
@@ -151,7 +157,7 @@ sudo bash scripts/bt-deploy.sh --prune
 | `.env` `BACKUP_MAX_SIZE_MB`                           | 可选                         | 不写即默认 `4096`（硬上限 `51200`）；仅当你在 `.env` 里**显式写过**旧值（如 `1000`）才需调整 |
 | 其余（头像上传开关、SPJ 部分分、matcher、判题口径等） | 不用                         | 均为代码 / 编译期生效，无对应环境变量                                                        |
 
-> 本版本**没有新增必填环境变量**，不会出现「缺变量导致容器起不来」。
+> 本版本**没有新增必填环境变量**，不会出现「缺变量导致容器起不来」；新增的 `MONGO_WIREDTIGER_CACHE_GB` 为可选项，脚本会按默认 `0.5` 自动补齐。
 >
 > 宿主内存加固（swap / OOM 免疫 / 看门狗 cron）在升级时**由脚本自动完成**，无需手动操作；若此前用 `--skip-*` 跳过了，可手动补齐：`scripts/setup-swap.sh`、`scripts/setup-oom-protection.sh`、`scripts/oj-watchdog.sh --install`（均可重复执行）。
 
@@ -221,25 +227,25 @@ docker builder prune -af --filter "until=168h"
 
 ## 常见问题
 
-| 问题                                          | 处理                                                                                                                                                                                                                                                                                                |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 宝塔终端卡死 / 无响应                         | 脚本在检测到进行中评测时会 `read` 等待确认，宝塔 Web 终端是 TTY 会阻塞。已加 60s 超时自动取消；**推荐加 `--yes` 跳过交互**：`sudo bash scripts/bt-deploy.sh --yes`。若已卡死，Ctrl+C 中断后加 `--yes` 重跑。                                                                                        |
-| 构建报 `libasan` / `libubsan` no such package | Alpine/musl 无这两个包。请 `git pull` 后重跑（Dockerfile 已移除）。评测默认不开 ASan/UBSan。                                                                                                                                                                                                        |
-| 未检测到 docker compose 插件                  | OpenCloudOS/宝塔常只有独立 `docker-compose`。新脚本会自动检测并尝试安装。也可先手动：`curl -fsSL https://get.daocloud.io/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose && docker-compose version` |
-| 首次部署 app 起不来 / Cookie 登不上           | HTTP 必须用 `http://IP` 部署；脚本会设 `FORCE_SECURE_COOKIE=false`。HTTPS 必须为 `true`。                                                                                                                                                                                                           |
-| `FORCE_SECURE_COOKIE=false` 启动失败          | 旧版会在生产直接拒绝。请 `git pull` 后重跑脚本；HTTPS 站不要关 Secure。                                                                                                                                                                                                                             |
-| mongo 一直 unhealthy，app 起不来              | 已改为要求 **PRIMARY** 的 healthcheck；看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。若日志有 `NotYetInitialized`，执行下方「修复副本集」。                                                                                                                                         |
-| API 全站 503 `SERVICE_UNAVAILABLE`            | 多为 Mongo 副本集未 PRIMARY，Prisma 连续失败触发熔断。先修副本集（见下），再 `docker compose restart app`；或等约 60s 熔断窗口结束。探针：`curl -sf http://127.0.0.1:3000/api/health/db`（需管理员）/ 看 `compose logs app`。                                                                       |
-| 登录页无注册入口                              | 查 `curl -s https://你的域名/api/settings/public`：`needsBootstrap=true` 应显示「创建管理员」；二者皆 false 表示库中已有用户且关闭了开放注册。管理员登录后在后台打开「开放注册」，或见下方 mongosh 开启。                                                                                           |
-| `mongo-keyfile: no such file`                 | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile`                                                                                                                                                                   |
-| 构建 ENOSPC / 磁盘满                          | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                                                                                                                                                                                     |
-| 镜像拉取失败 / 下载慢                         | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认多源 fallback（`docker.1panel.live` / `docker.1ms.run` / `docker.xuanyuan.me` / `docker.m.daocloud.io`），不覆盖已有自定义 daemon。手动配置示例见下方「配置镜像加速」。                                   |
-| 改域名后前端仍请求旧地址                      | 必须重建：`sudo bash scripts/bt-deploy.sh https://新域名`（不要用 `--no-build`）                                                                                                                                                                                                                    |
-| 升级后新功能报集合不存在 / 唯一约束不生效     | 部署脚本已内置数据库同步（app 就绪后自动 `prisma db push`）。若用了旧镜像（`--no-build`）或同步告警，手动执行：`docker compose exec app /opt/prisma-cli/node_modules/.bin/prisma db push --skip-generate`；涉及破坏性变更时会要求人工确认，确认前请先备份数据。                                     |
-| API 502                                       | `docker compose ps`；等健康检查通过；看 `docker compose logs -f app`                                                                                                                                                                                                                                |
-| 80/443 冲突                                   | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                                                                                                                                                                                  |
-| 3000 端口被占用                               | 脚本会提示；可改 `.env` 的 `APP_HOST_PORT` 后重跑，并重新粘贴 `nginx/baota-proxy.conf`（端口已写入片段）                                                                                                                                                                                            |
-| 粘贴 Nginx 后 WebSocket 断线                  | 确认存在 `location /socket.io/`，且 `X-Forwarded-Proto` 与站点协议一致                                                                                                                                                                                                                              |
+| 问题                                          | 处理                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 宝塔终端卡死 / 无响应                         | 脚本在检测到进行中评测时会 `read` 等待确认，宝塔 Web 终端是 TTY 会阻塞。已加 60s 超时自动取消；**推荐加 `--yes` 跳过交互**：`sudo bash scripts/bt-deploy.sh --yes`。若已卡死，Ctrl+C 中断后加 `--yes` 重跑。                                                                                             |
+| 构建报 `libasan` / `libubsan` no such package | 旧版 Alpine/musl 构建会出现；当前 Dockerfile 已改为 debian trixie-slim，并安装 `libasan8` / `libubsan1`。请确认已 `git pull` 到最新代码；评测默认仍关闭 ASan/UBSan。                                                                                                                                     |
+| 未检测到 docker compose 插件                  | OpenCloudOS/宝塔常只有独立 `docker-compose`。新脚本会自动检测并尝试安装。也可先手动：`curl -fsSL https://get.daocloud.io/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose && docker-compose version`      |
+| 首次部署 app 起不来 / Cookie 登不上           | HTTP 必须用 `http://IP` 部署；脚本会设 `FORCE_SECURE_COOKIE=false`。HTTPS 必须为 `true`。                                                                                                                                                                                                                |
+| `FORCE_SECURE_COOKIE=false` 启动失败          | 旧版会在生产直接拒绝。请 `git pull` 后重跑脚本；HTTPS 站不要关 Secure。                                                                                                                                                                                                                                  |
+| mongo 一直 unhealthy，app 起不来              | 已改为要求 **PRIMARY** 的 healthcheck；看 `docker compose logs mongo`，确认存在非空 `mongo-keyfile`。若日志有 `NotYetInitialized`，执行下方「修复副本集」。                                                                                                                                              |
+| API 全站 503 `SERVICE_UNAVAILABLE`            | 多为 Mongo 副本集未 PRIMARY，Prisma 连续失败触发熔断。先修副本集（见下），再 `docker compose restart app`；或等约 60s 熔断窗口结束。探针：`curl -sf http://127.0.0.1:3000/api/health/db`（需管理员）/ 看 `docker compose logs app`。                                                                     |
+| 登录页无注册入口                              | 查 `curl -s https://你的域名/api/settings/public`：`needsBootstrap=true` 应显示「创建管理员」；二者皆 false 表示库中已有用户且关闭了开放注册。管理员登录后在后台打开「开放注册」，或见下方 mongosh 开启。                                                                                                |
+| `mongo-keyfile: no such file`                 | `sudo bash scripts/bt-deploy.sh` 会生成；或：`openssl rand -base64 512 \| tr -d '\\n' > mongo-keyfile && chmod 600 mongo-keyfile`                                                                                                                                                                        |
+| 构建 ENOSPC / 磁盘满                          | 先 `docker image prune -f`；脚本预检可用空间 < 4GB 会直接退出。                                                                                                                                                                                                                                          |
+| 镜像拉取失败 / 下载慢                         | 检查 `/etc/docker/daemon.json` 的 `registry-mirrors`，`systemctl restart docker`。脚本默认多源 fallback（`docker.1panel.live` / `docker.1ms.run` / `docker.xuanyuan.me` / `docker.m.daocloud.io`），不覆盖已有自定义 daemon。手动配置示例见下方「配置镜像加速」。                                        |
+| 改域名后前端仍请求旧地址                      | 必须重建：`sudo bash scripts/bt-deploy.sh https://新域名`（不要用 `--no-build`）                                                                                                                                                                                                                         |
+| 升级后新功能报集合不存在 / 唯一约束不生效     | 部署脚本会在启动 app 前自动执行 `prisma db push`。若失败（常见于历史重复数据阻塞唯一索引，或破坏性变更），脚本只告警并继续启动；手动排查/重试：`docker compose run --rm --no-deps app /opt/prisma-cli/node_modules/.bin/prisma db push`（确认无数据风险后再考虑 `--accept-data-loss`，执行前务必备份）。 |
+| API 502                                       | `docker compose ps`；等健康检查通过；看 `docker compose logs -f app`                                                                                                                                                                                                                                     |
+| 80/443 冲突                                   | `lsof -i :80` / 宝塔里关掉占用站点                                                                                                                                                                                                                                                                       |
+| 3000 端口被占用                               | 脚本会提示；可改 `.env` 的 `APP_HOST_PORT` 后重跑，并重新粘贴 `nginx/baota-proxy.conf`（端口已写入片段）                                                                                                                                                                                                 |
+| 粘贴 Nginx 后 WebSocket 断线                  | 确认存在 `location /socket.io/`，且 `X-Forwarded-Proto` 与站点协议一致                                                                                                                                                                                                                                   |
 
 ### 服务器整机假死（网站 + 宝塔面板 + SSH 全部打不开）
 
@@ -281,17 +287,17 @@ sudo bash scripts/oj-watchdog.sh --install      # ③ 看门狗：内存/磁盘�
 | 阶段       | 占用情况                                                                                  |
 | ---------- | ----------------------------------------------------------------------------------------- |
 | 运行时常驻 | app ≈ 0.3–0.8G + mongo ≤ 0.5G（已限制缓存）+ redis ≈ 30M ≈ **1–1.4G**                     |
-| 构建期峰值 | 上述常驻 + `next build`（跳过类型检查后约 1–1.5G），Node 堆上限 2.5G                      |
+| 构建期峰值 | 上述常驻 + `next build`（跳过类型检查后约 1–1.5G），Node 堆上限约 2.2–2.5G                |
 | 兜底       | swap 4G（`setup-swap.sh`）+ OOM 免疫（内存极限时优先杀构建进程，sshd / nginx / 面板保留） |
 
 **可调参数**（按数据量与内存微调）：
 
-| 参数                        | 位置                          | 默认            | 何时调整                                           |
-| --------------------------- | ----------------------------- | --------------- | -------------------------------------------------- |
-| `MONGO_WIREDTIGER_CACHE_GB` | `.env`                        | `0.5`           | 题库/提交量到百万级可调到 1                        |
-| `NODE_MAX_OLD_SPACE_MB`     | `.env`（透传给 `build.args`） | 宿主内存 − 1.5G | 构建报 heap OOM 时调大；想更省内存可调小           |
-| `SKIP_TYPE_CHECK`           | `.env` 或 `--type-check`      | ≤4G 自动 `true` | 想强制类型检查用 `--type-check`（低配有 OOM 风险） |
-| `JUDGE_MAX_CONCURRENT`      | `.env`                        | `1`             | 4 核保持 1；内存吃紧时不要再上调                   |
+| 参数                        | 位置                                | 默认            | 何时调整                                           |
+| --------------------------- | ----------------------------------- | --------------- | -------------------------------------------------- |
+| `MONGO_WIREDTIGER_CACHE_GB` | `.env`                              | `0.5`           | 题库/提交量到百万级可调到 1                        |
+| `NODE_MAX_OLD_SPACE_MB`     | `.env`（可选）或 bt-deploy 自动计算 | 宿主内存 − 1.5G | 构建报 heap OOM 时调大；想更省内存可调小           |
+| `SKIP_TYPE_CHECK`           | `.env` 或 `--type-check`            | ≤4G 自动 `true` | 想强制类型检查用 `--type-check`（低配有 OOM 风险） |
+| `JUDGE_MAX_CONCURRENT`      | `.env`                              | `1`             | 4 核保持 1；内存吃紧时不要再上调                   |
 
 **构建仍然吃紧时的兜底**（临时腾出约 1G，代价是构建期间站点不可用）：
 
@@ -373,7 +379,7 @@ docker compose exec -T mongo mongosh --quiet \
 ### 开启开放注册（库中已有用户）
 
 ```bash
-# 确认当前公开设置
+# 确认当前公开设置（默认端口 3000，改过 APP_HOST_PORT 请替换）
 curl -s http://127.0.0.1:3000/api/settings/public
 
 # 在 Mongo 中打开 allowRegistration（集合名以 Prisma @@map 为准，一般为 SystemConfig）
@@ -403,7 +409,7 @@ docker compose restart app
 5. **runner 阶段必须 `npm ci --omit=dev`** — standalone 追不全自定义 `server.ts` 依赖；勿删。
 6. **`.prisma` 必须在 `npm ci` 之后回拷** — `npm ci` 会清空 `node_modules`；若先 COPY 再 ci，生成客户端丢失，app 会以 `Prisma` named export 报错崩溃重启。
 7. **`tsx` 必须带 `--conditions=react-server`** — 与本地 `npm start` 一致；否则 `server-only` 在自定义 server 里直接抛错。
-8. **须显式 COPY `server.ts` / `lib` / `prisma`** — 不要用 tracing 冒充。
+8. **须显式 COPY `server.ts` / `lib` / `prisma` / `tsconfig.json` / `tsconfig.server.json`** — 不要用 tracing 冒充；`tsx` 在运行时依赖 `tsconfig.json` 的 `@/*` 路径别名。
 9. **健康检查用 `/healthcheck-static`** — 不要改回依赖动态路由的 `/api/health` 作容器探活。
 10. **`.env` 值不要包反引号**。
 11. **prisma CLI 独立装在 `/opt/prisma-cli` 并须显式 COPY 到 runner** — runner 的 `npm ci --omit=dev` 不含 devDependencies（prisma CLI 在其中）；部署脚本依赖容器内 `prisma db push` 做幂等集合/索引同步，勿删该目录。
@@ -480,13 +486,13 @@ docker compose logs app | grep "评测运行时配置"
 
 ### 已实施优化
 
-| 优化项           | 效果                                     | 实施方式                                     |
-| ---------------- | ---------------------------------------- | -------------------------------------------- |
-| glibc 替代 musl  | 消除 7x printf/scanf/math 慢             | Dockerfile 基础镜像 alpine → debian-slim     |
-| tmpfs 替代磁盘卷 | 消除百万行 I/O 磁盘延迟                  | docker-compose.yml `app_temp` volume → tmpfs |
-| `-march=native`  | 利用 CPU AVX2/AVX-512 自动向量化，10-20% | compiler.ts 编译参数                         |
-| 统一评测路径     | 无分支探测失败、无回退开销               | 删除 Docker 沙箱 / bwrap 分支                |
-| 测点磁盘缓存     | 避免每次回源 Mongo 拉百万行字符串        | init.ts 启动自检 data/testdata 可写          |
+| 优化项           | 效果                                     | 实施方式                                                                   |
+| ---------------- | ---------------------------------------- | -------------------------------------------------------------------------- |
+| glibc 替代 musl  | 消除 7x printf/scanf/math 慢             | Dockerfile 基础镜像由旧版 alpine/musl 改为当前 debian trixie-slim（glibc） |
+| tmpfs 替代磁盘卷 | 消除百万行 I/O 磁盘延迟                  | docker-compose.yml `app_temp` volume → tmpfs                               |
+| `-march=native`  | 利用 CPU AVX2/AVX-512 自动向量化，10-20% | compiler.ts 编译参数                                                       |
+| 统一评测路径     | 无分支探测失败、无回退开销               | 删除 Docker 沙箱 / bwrap 分支                                              |
+| 测点磁盘缓存     | 避免每次回源 Mongo 拉百万行字符串        | init.ts 启动自检 data/testdata 可写                                        |
 
 ### 服务器 CPU 调优
 

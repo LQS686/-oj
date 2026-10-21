@@ -271,7 +271,7 @@ export default function UserProfilePage() {
                         >
                           <td>
                             <Link
-                              href={`/problems/${submission.realProblemId || submission.problemId}`}
+                              href={`/problem/${submission.realProblemId || submission.problemId}`}
                               className="group inline-flex items-baseline gap-1.5 min-w-0 max-w-full"
                             >
                               <span className="font-mono text-xs text-primary-light shrink-0">

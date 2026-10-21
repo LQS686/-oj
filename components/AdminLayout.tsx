@@ -148,11 +148,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [])
 
-  useDeferredEffect(() => {
-    if (!user || !canAccess) return
-    void fetchNotificationList()
-  }, [user, canAccess, fetchNotificationList])
-
+  // 通知列表在打开下拉时按需加载（未读数由 useUnreadNotifications 独立维护），
+  // 不再每次进入后台都预取 10 条通知
   const handleLogout = async () => {
     try {
       await fetchWithCookie('/api/auth/logout', {
@@ -257,6 +254,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       <Link
                         key={item.href}
                         href={item.href}
+                        // 后台页面均为动态数据页，预取 RSC 会为全部菜单项触发服务端渲染；
+                        // 需要时点击即可，避免每次进入后台产生十余次无收益请求
+                        prefetch={false}
                         onClick={closeSidebarOnMobile}
                         title={sidebarOpen ? undefined : item.label}
                         className={`flex items-center py-3 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group ${
@@ -287,6 +287,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className="flex-shrink-0 p-4 border-t border-border">
           <Link
             href="/"
+            prefetch={false}
             onClick={closeSidebarOnMobile}
             title={sidebarOpen ? undefined : '返回主站'}
             className={`flex items-center py-3 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group ${

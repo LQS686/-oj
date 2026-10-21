@@ -54,7 +54,6 @@ export async function swrFetcher<T = unknown>(url: string): Promise<T> {
  * 仅保留实际被 hooks 消费的方法
  */
 export const swrKey = {
-  me: () => '/api/auth/me',
   class: (id: string) => `/api/classes/${id}`,
   classMembers: (id: string) => `/api/classes/${id}/members`,
   contest: (id: string) => `/api/contests/${id}`,

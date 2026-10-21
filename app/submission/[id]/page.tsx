@@ -11,8 +11,6 @@ import {
   User,
   Calendar,
   Code,
-  CheckCircle,
-  CheckCircle2,
   XCircle,
   AlertTriangle,
   Copy,
@@ -26,67 +24,27 @@ import {
 } from 'lucide-react'
 import { formatTime, formatMemory, formatDateTime } from '@/lib/utils'
 import { getStatusText, getDifficultyClass } from '@/lib/status'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useUser } from '@/contexts/UserContext'
 import { useSubmissionSocket } from '@/hooks/useSubmissionSocket'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { fetchWithCookie } from '@/lib/api/base'
 import { PageContainer } from '@/components/layout'
-import type { CodeLanguage } from '@/components/code-editor/CodeEditor'
-import dynamic from 'next/dynamic'
 import {
   isAcceptedStatus,
   isCompileErrorStatus,
-  isFinalSubmissionStatus,
   isNonFinalSubmissionStatus,
-  SubmissionStatus,
 } from '@/lib/constants/submission-status'
 import { downloadFirstWaTestCase, findFirstWaIndex } from '@/lib/submission/wa-download'
-
-/** CodeMirror 让首屏 JS 增加约 560KB，而本页只是「只读查看源码」。
- *  改为懒加载，并用等高骨架占位，避免加载完成时的布局偏移。 */
-const CodeEditor = dynamic(() => import('@/components/code-editor/CodeEditor'), {
-  ssr: false,
-  loading: () => (
-    <div
-      className="w-full animate-pulse rounded-xl border border-border bg-muted"
-      style={{ height: 'min(28rem, 60vh)' }}
-    />
-  ),
-})
-
-interface TestResult {
-  testId: string
-  status: string
-  time: number
-  memory: number
-  message?: string
-}
-
-interface Submission {
-  id: string
-  problem: {
-    id: string
-    problemNumber?: string
-    title: string
-    difficulty: string
-  }
-  user: {
-    id: string
-    username: string
-    nickname?: string
-  }
-  language: string
-  code: string
-  status: string
-  score: number
-  time: number
-  memory: number
-  passedTests: number
-  totalTests: number
-  message?: string
-  testResults?: TestResult[]
-  submittedAt: string
-}
+import {
+  SubmissionStatusBadge,
+  SubmissionStatusIcon,
+} from '@/components/submission/SubmissionStatusBadge'
+import ReadOnlySubmissionCode from '@/components/submission/ReadOnlySubmissionCode'
+import {
+  isFinalStatus,
+  type SubmissionDetailData,
+  type SubmissionTestResult,
+} from '@/components/submission/types'
 
 interface SubmissionHistoryItem {
   id: string
@@ -98,71 +56,6 @@ interface SubmissionHistoryItem {
   language: string
 }
 
-function isFinalStatus(status: string | undefined | null): boolean {
-  if (!status) return false
-  return isFinalSubmissionStatus(status)
-}
-
-function toCodeLanguage(lang: string): CodeLanguage {
-  if (lang === 'c' || lang === 'python') return lang
-  return 'cpp'
-}
-
-function getTestStatusIcon(status: string, className = 'w-4 h-4') {
-  switch (status) {
-    case SubmissionStatus.ACCEPTED:
-      return <CheckCircle className={`${className} text-secondary`} />
-    case SubmissionStatus.WRONG_ANSWER:
-      return <XCircle className={`${className} text-error`} />
-    case SubmissionStatus.TIME_LIMIT_EXCEEDED:
-      return <Clock className={`${className} text-accent`} />
-    case SubmissionStatus.MEMORY_LIMIT_EXCEEDED:
-      return <Database className={`${className} text-info`} />
-    case SubmissionStatus.RUNTIME_ERROR:
-      return <AlertTriangle className={`${className} text-warning`} />
-    case SubmissionStatus.COMPILE_ERROR:
-      return <Code className={`${className} text-muted-foreground`} />
-    case SubmissionStatus.PARTLY_CORRECT:
-      return <CheckCircle2 className={`${className} text-[var(--difficulty-medium)]`} />
-    default:
-      return <AlertTriangle className={`${className} text-muted-foreground`} />
-  }
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const text = getStatusText(status)
-  if (isNonFinalSubmissionStatus(status)) {
-    return (
-      <span className="tag tag-info">
-        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        {text}
-      </span>
-    )
-  }
-  if (isAcceptedStatus(status)) {
-    return (
-      <span className="tag tag-success">
-        <CheckCircle className="w-3.5 h-3.5" />
-        {text}
-      </span>
-    )
-  }
-  if (status === SubmissionStatus.WRONG_ANSWER) {
-    return (
-      <span className="tag tag-error">
-        <XCircle className="w-3.5 h-3.5" />
-        {text}
-      </span>
-    )
-  }
-  return (
-    <span className="tag tag-warning">
-      <AlertTriangle className="w-3.5 h-3.5" />
-      {text}
-    </span>
-  )
-}
-
 function TestPointRow({
   result,
   index,
@@ -170,7 +63,7 @@ function TestPointRow({
   downloading,
   onDownloadWa,
 }: {
-  result: TestResult
+  result: SubmissionTestResult
   index: number
   canDownloadWa?: boolean
   downloading?: boolean
@@ -202,7 +95,7 @@ function TestPointRow({
             {judging ? (
               <Loader2 className="w-4 h-4 text-muted-foreground animate-spin shrink-0" />
             ) : (
-              getTestStatusIcon(result.status)
+              <SubmissionStatusIcon status={result.status} />
             )}
             <span className="text-subsection-title text-foreground">#{index + 1}</span>
             <span className="text-xs text-muted-foreground truncate">
@@ -249,8 +142,8 @@ function TestPointRow({
 export default function SubmissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const { user } = useCurrentUser()
-  const [submission, setSubmission] = useState<Submission | null>(null)
+  const { user } = useUser()
+  const [submission, setSubmission] = useState<SubmissionDetailData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [submissionHistory, setSubmissionHistory] = useState<SubmissionHistoryItem[]>([])
@@ -482,7 +375,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                 {submission.problem.title}
               </Link>
             </h1>
-            <StatusBadge status={submission.status} />
+            <SubmissionStatusBadge status={submission.status} />
           </div>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
@@ -573,13 +466,10 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
               </button>
             </div>
             {submission.code ? (
-              <CodeEditor
-                value={submission.code}
-                onChange={() => {}}
-                language={toCodeLanguage(submission.language)}
-                readOnly
+              <ReadOnlySubmissionCode
+                code={submission.code}
+                language={submission.language}
                 height="min(28rem, 60vh)"
-                className="hover:border-border focus-within:border-border focus-within:ring-0"
               />
             ) : (
               <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
@@ -650,7 +540,7 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                           }`}
                         >
                           <span className="flex items-center gap-1.5 min-w-0">
-                            {getTestStatusIcon(item.status, 'w-3.5 h-3.5')}
+                            <SubmissionStatusIcon status={item.status} className="w-3.5 h-3.5" />
                             <span className="truncate font-medium text-foreground">
                               {getStatusText(item.status)}
                             </span>

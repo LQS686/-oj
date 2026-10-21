@@ -35,10 +35,12 @@ function createRedisClient(): Redis {
   const redisUrl = getRedisUrl()
 
   const client = new Redis(redisUrl, {
-    maxRetriesPerRequest: 3,
+    maxRetriesPerRequest: 1,
     retryStrategy: (times) => Math.min(times * 50, 2000),
-    connectTimeout: 10000,
+    connectTimeout: 5000,
     keepAlive: 30000,
+    // Redis 故障时命令立即失败交给上层降级；默认队列会让请求排队等重连（最多 ~15s）
+    enableOfflineQueue: false,
   })
 
   client.on('error', (error) => {
@@ -73,16 +75,21 @@ export interface RedisCacheOptions {
 }
 
 class RedisCache {
-  private client: Redis
+  private client: Redis | null = null
 
-  constructor() {
-    this.client = getRedisClient()
+  /** 未配置 REDIS_URL 时不建连接；已配置但未就绪时立即降级，避免命令排队阻塞请求 */
+  private getClient(): Redis | null {
+    if (!isRedisConfigured()) return null
+    if (!this.client) this.client = getRedisClient()
+    return this.client.status === 'ready' ? this.client : null
   }
 
   async get<T>(key: string, options: RedisCacheOptions = {}): Promise<T | null> {
+    const client = this.getClient()
+    if (!client) return null
     const fullKey = options.prefix ? `${options.prefix}:${key}` : key
     try {
-      const value = await this.client.get(fullKey)
+      const value = await client.get(fullKey)
       if (value) {
         return JSON.parse(value)
       }
@@ -94,10 +101,12 @@ class RedisCache {
   }
 
   async set<T>(key: string, value: T, options: RedisCacheOptions = {}): Promise<boolean> {
+    const client = this.getClient()
+    if (!client) return false
     const fullKey = options.prefix ? `${options.prefix}:${key}` : key
     const ttl = options.ttl || 300 // 默认5分钟
     try {
-      await this.client.set(fullKey, JSON.stringify(value), 'EX', ttl)
+      await client.set(fullKey, JSON.stringify(value), 'EX', ttl)
       return true
     } catch (error) {
       logger.error('Redis set error:', error)
@@ -106,9 +115,11 @@ class RedisCache {
   }
 
   async delete(key: string, options: RedisCacheOptions = {}): Promise<boolean> {
+    const client = this.getClient()
+    if (!client) return false
     const fullKey = options.prefix ? `${options.prefix}:${key}` : key
     try {
-      await this.client.del(fullKey)
+      await client.del(fullKey)
       return true
     } catch (error) {
       logger.error('Redis delete error:', error)
@@ -117,9 +128,11 @@ class RedisCache {
   }
 
   async exists(key: string, options: RedisCacheOptions = {}): Promise<boolean> {
+    const client = this.getClient()
+    if (!client) return false
     const fullKey = options.prefix ? `${options.prefix}:${key}` : key
     try {
-      const result = await this.client.exists(fullKey)
+      const result = await client.exists(fullKey)
       return result > 0
     } catch (error) {
       logger.error('Redis exists error:', error)
@@ -128,9 +141,11 @@ class RedisCache {
   }
 
   async increment(key: string, options: RedisCacheOptions = {}): Promise<number | null> {
+    const client = this.getClient()
+    if (!client) return null
     const fullKey = options.prefix ? `${options.prefix}:${key}` : key
     try {
-      return await this.client.incr(fullKey)
+      return await client.incr(fullKey)
     } catch (error) {
       logger.error('Redis increment error:', error)
       return null
@@ -138,9 +153,11 @@ class RedisCache {
   }
 
   async decrement(key: string, options: RedisCacheOptions = {}): Promise<number | null> {
+    const client = this.getClient()
+    if (!client) return null
     const fullKey = options.prefix ? `${options.prefix}:${key}` : key
     try {
-      return await this.client.decr(fullKey)
+      return await client.decr(fullKey)
     } catch (error) {
       logger.error('Redis decrement error:', error)
       return null
@@ -148,13 +165,15 @@ class RedisCache {
   }
 
   async keys(pattern: string, options: RedisCacheOptions = {}): Promise<string[]> {
+    const client = this.getClient()
+    if (!client) return []
     const fullPattern = options.prefix ? `${options.prefix}:${pattern}` : pattern
     try {
       // SCAN 替代 KEYS，避免生产环境阻塞
       const keys: string[] = []
       let cursor = '0'
       do {
-        const [next, batch] = await this.client.scan(cursor, 'MATCH', fullPattern, 'COUNT', 100)
+        const [next, batch] = await client.scan(cursor, 'MATCH', fullPattern, 'COUNT', 100)
         cursor = next
         keys.push(...batch)
       } while (cursor !== '0')
@@ -166,11 +185,13 @@ class RedisCache {
   }
 
   async clear(pattern: string, options: RedisCacheOptions = {}): Promise<boolean> {
+    const client = this.getClient()
+    if (!client) return false
     const fullPattern = options.prefix ? `${options.prefix}:${pattern}` : pattern
     try {
       const keys = await this.keys(fullPattern)
       if (keys.length > 0) {
-        await this.client.del(...keys)
+        await client.del(...keys)
       }
       return true
     } catch (error) {
